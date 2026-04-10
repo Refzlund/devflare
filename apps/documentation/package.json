@@ -1,0 +1,33 @@
+{
+	"name": "documentation",
+	"private": true,
+	"version": "0.0.1",
+	"type": "module",
+	"scripts": {
+		"dev": "bunx --bun devflare dev",
+		"build": "bunx --bun devflare build",
+		"deploy": "bunx devflare deploy",
+		"deploy:preview": "bunx devflare deploy --preview",
+		"paraglide:compile": "bunx paraglide-js compile --project ./project.inlang --outdir ./src/lib/paraglide --emit-ts-declarations",
+		"prepare": "bun run paraglide:compile && svelte-kit sync || echo ''",
+		"check": "bun run paraglide:compile && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"check:watch": "bun run paraglide:compile && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+		"types": "bunx --bun devflare types"
+	},
+	"devDependencies": {
+		"@inlang/paraglide-js": "^2.15.2",
+		"@cloudflare/vite-plugin": "^1.0.0",
+		"@sveltejs/adapter-cloudflare": "^7.2.8",
+		"@sveltejs/kit": "^2.57.0",
+		"@sveltejs/vite-plugin-svelte": "^7.0.0",
+		"@tailwindcss/typography": "^0.5.19",
+		"@tailwindcss/vite": "^4.2.2",
+		"devflare": "file:../../packages/devflare",
+		"svelte": "^5.55.2",
+		"svelte-check": "^4.4.6",
+		"tailwindcss": "^4.2.2",
+		"typescript": "^6.0.2",
+		"vite": "^8.0.7",
+		"wrangler": "^4.81.0"
+	}
+}

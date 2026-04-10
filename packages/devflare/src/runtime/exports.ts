@@ -1,0 +1,217 @@
+// =============================================================================
+// Runtime Exports — Type-safe request-scoped context access
+// =============================================================================
+// These proxies provide ergonomic access to Cloudflare Worker context
+// with helpful error messages when accessed outside AsyncLocalStorage-backed
+// handler trails
+// =============================================================================
+
+import { getContextOrNull, type EventContext, type RuntimeContextValue } from './context'
+import { createContextProxy, ContextAccessError } from './validation'
+
+declare global {
+	interface DevflareEnv { }
+}
+
+// =============================================================================
+// Readonly Proxy Helper
+// =============================================================================
+
+/**
+ * Creates a readonly proxy that throws on mutation attempts
+ */
+function createReadonlyProxy<T extends object>(
+	getter: () => T | null | undefined,
+	name: string
+): Readonly<T> {
+	return new Proxy({} as T, {
+		get(_target, prop) {
+			const ctx = getter()
+			if (ctx === undefined || ctx === null) {
+				throw new ContextAccessError(name, String(prop))
+			}
+			return ctx[prop as keyof T]
+		},
+
+		set(_target, prop) {
+			throw new TypeError(
+				`Cannot assign to '${String(prop)}' on '${name}' because it is read-only.\n` +
+				`Use 'locals' for mutable request-scoped data.`
+			)
+		},
+
+		deleteProperty(_target, prop) {
+			throw new TypeError(
+				`Cannot delete property '${String(prop)}' from '${name}' because it is read-only.`
+			)
+		},
+
+		has(_target, prop) {
+			const ctx = getter()
+			if (ctx === undefined || ctx === null) {
+				return false
+			}
+			return prop in ctx
+		},
+
+		ownKeys(_target) {
+			const ctx = getter()
+			if (ctx === undefined || ctx === null) {
+				return []
+			}
+			return Reflect.ownKeys(ctx)
+		},
+
+		getOwnPropertyDescriptor(_target, prop) {
+			const ctx = getter()
+			if (ctx === undefined || ctx === null) {
+				return undefined
+			}
+			const descriptor = Reflect.getOwnPropertyDescriptor(ctx, prop)
+			if (descriptor) {
+				// Mark as non-writable for readonly semantics
+				return { ...descriptor, writable: false }
+			}
+			return undefined
+		}
+	}) as Readonly<T>
+}
+
+// =============================================================================
+// Environment Bindings (env)
+// =============================================================================
+
+/**
+ * Access environment bindings (KV, D1, R2, etc.) and variables
+ *
+ * @remarks
+ * This is readonly - bindings cannot be reassigned at runtime.
+ * Available only within an active Devflare-managed handler or middleware call trail.
+ *
+ * @example
+ * ```ts
+	 * import { env, type FetchEvent } from 'devflare/runtime'
+ *
+	 * export async function fetch(event: FetchEvent) {
+ *   const value = await env.MY_KV.get('key')
+ *   const dbResult = await env.DB.prepare('SELECT * FROM users').all()
+	 *   return new Response(JSON.stringify({
+	 *     path: new URL(event.request.url).pathname,
+	 *     value,
+	 *     dbResult
+	 *   }))
+ * }
+ * ```
+ *
+ * @throws {ContextAccessError} When accessed outside an active Devflare-managed handler trail
+ */
+export const env: Readonly<DevflareEnv> = createReadonlyProxy(
+	() => getContextOrNull()?.env as Record<string, unknown> | undefined,
+	'env'
+)
+
+// =============================================================================
+// Execution Context (ctx)
+// =============================================================================
+
+/**
+ * Access the ExecutionContext for background tasks
+ *
+ * @remarks
+ * Provides `waitUntil()` for background processing and
+ * `passThroughOnException()` for error handling on worker surfaces.
+ * When running inside a Durable Object, this proxy exposes the current
+ * `DurableObjectState` instead.
+ * This is readonly.
+ *
+ * @example
+ * ```ts
+	 * import { ctx, type FetchEvent } from 'devflare/runtime'
+ *
+	 * export async function fetch(event: FetchEvent) {
+ *   const response = new Response('OK')
+	 *   ctx.waitUntil(analytics.track(new URL(event.request.url).pathname))
+ *   return response
+ * }
+ * ```
+ *
+ * @throws {ContextAccessError} When accessed outside an active Devflare-managed handler trail
+ */
+export const ctx: Readonly<RuntimeContextValue> = createReadonlyProxy(
+	() => getContextOrNull()?.ctx as RuntimeContextValue | undefined,
+	'ctx'
+)
+
+// =============================================================================
+// Event Context (event)
+// =============================================================================
+
+/**
+ * Access the current event object.
+ *
+ * @remarks
+ * This is the generic event proxy for the active AsyncLocalStorage context.
+ *
+ * For strong per-surface typing, prefer `getFetchEvent()`, `getQueueEvent()`,
+ * `getScheduledEvent()`, `getEmailEvent()`, and the Durable Object getters
+ * from `devflare/runtime`.
+ *
+ * @example
+ * ```ts
+	 * import { event as runtimeEvent, type FetchEvent, type ScheduledEvent } from 'devflare/runtime'
+ *
+	 * export async function fetch(event: FetchEvent) {
+	 *   console.log(runtimeEvent.type)
+	 *   console.log(event.request.url)
+ * }
+ *
+	 * export async function scheduled(event: ScheduledEvent) {
+	 *   console.log(runtimeEvent.type)
+	 *   console.log(event.cron)
+ * }
+ * ```
+ *
+ * @throws {ContextAccessError} When accessed outside an active Devflare-managed handler trail
+ */
+export const event: Readonly<EventContext> = createReadonlyProxy(
+	() => getContextOrNull()?.event,
+	'event'
+)
+
+// =============================================================================
+// Request-Scoped Locals (locals)
+// =============================================================================
+
+/**
+ * Mutable request-scoped storage for sharing data between middleware
+ *
+ * @remarks
+ * Unlike `env` and `ctx`, locals can be mutated. Each request gets
+ * a fresh locals object. Use this for:
+ * - Authentication state
+ * - Parsed request data
+ * - Computed values shared across middleware
+ *
+ * @example
+ * ```ts
+	 * import { locals, type FetchEvent } from 'devflare/runtime'
+ *
+ * // In auth middleware
+	 * const authMiddleware = async (event: FetchEvent, next: () => Promise<Response>) => {
+ *   locals.user = await validateToken(event.request?.headers.get('Authorization'))
+ *   return next()
+ * }
+ *
+ * // In handler
+	 * export async function fetch(event: FetchEvent) {
+	 *   void event
+ *   console.log(locals.user)
+ * }
+ * ```
+ *
+ * @throws {ContextAccessError} When accessed outside an active Devflare-managed handler trail
+ */
+export const locals: Record<string, unknown> = createContextProxy(
+	() => getContextOrNull()?.locals,
+	'locals'
+)

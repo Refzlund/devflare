@@ -1,0 +1,26 @@
+{
+	"compilerOptions": {
+		"target": "ESNext",
+		"module": "ESNext",
+		"moduleResolution": "bundler",
+		"lib": ["ESNext"],
+		"types": ["@cloudflare/workers-types", "@types/bun"],
+		"strict": true,
+		"skipLibCheck": true,
+		"noEmit": true,
+		"esModuleInterop": true,
+		"allowSyntheticDefaultImports": true,
+		"resolveJsonModule": true,
+		"isolatedModules": true,
+		"verbatimModuleSyntax": true,
+		"declaration": true,
+		"declarationMap": true,
+		"sourceMap": true,
+		"paths": {
+			"devflare": ["./packages/devflare/src/index.ts"],
+			"devflare/*": ["./packages/devflare/src/*.ts"]
+		}
+	},
+	"include": ["packages/*/src/**/*.ts", "packages/*/tests/**/*.ts"],
+	"exclude": ["node_modules", "dist"]
+}

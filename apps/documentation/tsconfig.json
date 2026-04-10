@@ -1,0 +1,28 @@
+{
+	"extends": "./.svelte-kit/tsconfig.json",
+	"compilerOptions": {
+		"rootDir": "../..",
+		"rewriteRelativeImportExtensions": true,
+		"allowJs": true,
+		"checkJs": true,
+		"esModuleInterop": true,
+		"forceConsistentCasingInFileNames": true,
+		"resolveJsonModule": true,
+		"skipLibCheck": true,
+		"sourceMap": true,
+		"strict": true,
+		"moduleResolution": "bundler",
+		"types": [
+			"@cloudflare/workers-types",
+			"@sveltejs/kit"
+		]
+	},
+	"include": [
+		"env.d.ts",
+		"src/**/*.ts",
+		"src/**/*.svelte",
+		"devflare.config.ts",
+		"vite.config.ts",
+		".svelte-kit/types/**/*.d.ts"
+	]
+}

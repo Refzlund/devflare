@@ -1,0 +1,16 @@
+{
+	"name": "@devflare/case15-ai-vectorize",
+	"version": "0.0.1",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"test": "bun test",
+		"types": "devflare types"
+	},
+	"devDependencies": {
+		"@cloudflare/workers-types": "^4.20260317.1",
+		"@types/bun": "^1.3.11",
+		"devflare": "workspace:*",
+		"typescript": "^5.7.2"
+	}
+}

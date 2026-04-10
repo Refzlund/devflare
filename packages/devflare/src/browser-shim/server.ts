@@ -1,0 +1,642 @@
+// =============================================================================
+// Browser Shim Server — HTTP/WebSocket server for local Browser Rendering
+// =============================================================================
+// Provides endpoints that @cloudflare/puppeteer expects:
+// - POST /v1/acquire → Launch browser, return sessionId
+// - GET /v1/connectDevtools?browser_session=X → WebSocket to Chrome DevTools
+// - GET /v1/sessions → List active sessions
+// - GET /v1/limits → Return limits info
+// - GET /v1/history → Return session history
+//
+// Auto-installs Chrome Headless Shell using @puppeteer/browsers
+// Works with both Node.js and Bun runtimes
+// =============================================================================
+
+import type { ConsolaInstance } from 'consola'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
+import { existsSync } from 'node:fs'
+import { createServer, type IncomingMessage, type ServerResponse, type Server as HttpServer } from 'node:http'
+import puppeteerCore, { type Browser } from 'puppeteer-core'
+import {
+	install,
+	resolveBuildId,
+	detectBrowserPlatform,
+	Browser as BrowserType
+} from '@puppeteer/browsers'
+
+// -----------------------------------------------------------------------------
+// Types
+// -----------------------------------------------------------------------------
+
+export interface BrowserShimOptions {
+	/** Port to run the shim server on (default: 8788) */
+	port?: number
+	/** Host to bind to (default: 127.0.0.1) */
+	host?: string
+	/** Logger instance */
+	logger?: ConsolaInstance
+	/** Enable verbose logging */
+	verbose?: boolean
+	/** Keep alive timeout in ms (default: 60000 = 1 minute) */
+	keepAlive?: number
+	/** Custom cache directory for Chrome (default: ~/.devflare/chrome) */
+	cacheDir?: string
+}
+
+export interface BrowserShim {
+	/** Start the browser shim server */
+	start(): Promise<void>
+	/** Stop the server and close all browsers */
+	stop(): Promise<void>
+	/** Get the server URL (for creating Fetcher) */
+	getUrl(): string
+}
+
+interface BrowserSession {
+	sessionId: string
+	browser: Browser
+	wsEndpoint: string
+	connectionId?: string
+	connectionStartTime?: number
+	startTime: number
+	idleTimeout?: ReturnType<typeof setTimeout>
+}
+
+interface ClosedSession {
+	sessionId: string
+	startTime: number
+	endTime: number
+	closeReason: number
+	closeReasonText: string
+}
+
+// Track active and closed sessions
+const sessions = new Map<string, BrowserSession>()
+const history: ClosedSession[] = []
+
+// Cached browser executable path
+let cachedExecutablePath: string | null = null
+
+// -----------------------------------------------------------------------------
+// Browser Installation
+// -----------------------------------------------------------------------------
+
+/**
+ * Get or install Chrome Headless Shell
+ * Uses a shared cache directory so Chrome is only installed once globally
+ */
+async function ensureChrome(
+	cacheDir: string,
+	logger?: ConsolaInstance
+): Promise<string> {
+	// Return cached path if already resolved
+	if (cachedExecutablePath && existsSync(cachedExecutablePath)) {
+		return cachedExecutablePath
+	}
+
+	const platform = detectBrowserPlatform()
+	if (!platform) {
+		throw new Error('Could not detect browser platform')
+	}
+
+	// Resolve latest stable build ID for Chrome Headless Shell
+	const buildId = await resolveBuildId(
+		BrowserType.CHROMEHEADLESSSHELL,
+		platform,
+		'stable'
+	)
+
+	logger?.debug(`[BrowserShim] Resolved Chrome Headless Shell build: ${buildId}`)
+
+	// Install Chrome Headless Shell if not present
+	const installedBrowser = await install({
+		browser: BrowserType.CHROMEHEADLESSSHELL,
+		buildId,
+		cacheDir,
+		downloadProgressCallback: (downloadedBytes, totalBytes) => {
+			if (totalBytes > 0) {
+				const percent = Math.round((downloadedBytes / totalBytes) * 100)
+				if (percent % 20 === 0) {
+					logger?.info(`[BrowserShim] Downloading Chrome... ${percent}%`)
+				}
+			}
+		}
+	})
+
+	cachedExecutablePath = installedBrowser.executablePath
+	logger?.success(`[BrowserShim] Chrome ready: ${installedBrowser.executablePath}`)
+
+	return installedBrowser.executablePath
+}
+
+// -----------------------------------------------------------------------------
+// Browser Shim Server Implementation (Node.js compatible)
+// -----------------------------------------------------------------------------
+
+export function createBrowserShim(options: BrowserShimOptions = {}): BrowserShim {
+	const {
+		port = 8788,
+		host = '127.0.0.1',
+		logger,
+		verbose = false,
+		keepAlive = 60000,
+		cacheDir = join(homedir(), '.devflare', 'chrome')
+	} = options
+
+	let server: HttpServer | null = null
+	let executablePath: string | null = null
+
+	// Dynamic import of ws package (may not be installed)
+	let WebSocketServerClass: any = null
+	let WebSocketClass: any = null
+
+	/**
+	 * Launch a new browser and create a session
+	 */
+	async function acquireSession(acquireOptions?: {
+		keep_alive?: number
+	}): Promise<{ sessionId: string }> {
+		if (!executablePath) {
+			throw new Error('Chrome not initialized')
+		}
+
+		// Launch browser with remote debugging enabled
+		// Additional flags for stability with complex pages
+		const browser = await puppeteerCore.launch({
+			executablePath,
+			headless: true,
+			// Increase protocol timeout for complex pages
+			protocolTimeout: 120000,
+			args: [
+				'--no-sandbox',
+				'--disable-setuid-sandbox',
+				'--disable-dev-shm-usage',
+				'--disable-gpu',
+				'--disable-software-rasterizer',
+				// Additional stability flags
+				'--disable-extensions',
+				'--disable-background-networking',
+				'--disable-background-timer-throttling',
+				'--disable-backgrounding-occluded-windows',
+				'--disable-renderer-backgrounding',
+				'--disable-features=TranslateUI',
+				'--disable-ipc-flooding-protection',
+				// Reduce resource usage
+				'--disable-default-apps',
+				'--mute-audio',
+				// Memory limits to prevent crashes
+				'--js-flags=--max-old-space-size=4096'
+			]
+		})
+
+		const wsEndpoint = browser.wsEndpoint()
+		const sessionId = crypto.randomUUID()
+
+		const session: BrowserSession = {
+			sessionId,
+			browser,
+			wsEndpoint,
+			startTime: Date.now()
+		}
+
+		sessions.set(sessionId, session)
+
+		// Set up idle timeout
+		const timeout = acquireOptions?.keep_alive ?? keepAlive
+		if (timeout > 0) {
+			session.idleTimeout = setTimeout(async () => {
+				const s = sessions.get(sessionId)
+				if (s && !s.connectionId) {
+					// No active connection, close browser
+					await closeSession(sessionId, 2, 'BrowserIdle')
+				}
+			}, timeout)
+		}
+
+		if (verbose) {
+			logger?.debug(`[BrowserShim] Acquired session ${sessionId}`)
+		}
+
+		return { sessionId }
+	}
+
+	/**
+	 * Close a browser session
+	 */
+	async function closeSession(
+		sessionId: string,
+		closeReason: number = 1,
+		closeReasonText: string = 'NormalClosure'
+	): Promise<void> {
+		const session = sessions.get(sessionId)
+		if (!session) return
+
+		// Clear idle timeout
+		if (session.idleTimeout) {
+			clearTimeout(session.idleTimeout)
+		}
+
+		try {
+			await session.browser.close()
+		} catch {
+			// Ignore errors closing browser
+		}
+
+		sessions.delete(sessionId)
+
+		// Add to history
+		history.unshift({
+			sessionId,
+			startTime: session.startTime,
+			endTime: Date.now(),
+			closeReason,
+			closeReasonText
+		})
+
+		// Keep only last 100 entries
+		if (history.length > 100) {
+			history.pop()
+		}
+
+		if (verbose) {
+			logger?.debug(`[BrowserShim] Closed session ${sessionId}: ${closeReasonText}`)
+		}
+	}
+
+	/**
+	 * Handle HTTP requests
+	 */
+	async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
+		const url = new URL(req.url || '/', `http://${host}:${port}`)
+		const method = req.method || 'GET'
+
+		// Always log incoming requests for debugging
+		logger?.debug(`[BrowserShim] ${method} ${url.pathname}${url.search ? url.search : ''}`)
+
+		// Set CORS headers
+		res.setHeader('Access-Control-Allow-Origin', '*')
+		res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+		res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+
+		if (method === 'OPTIONS') {
+			res.writeHead(204)
+			res.end()
+			return
+		}
+
+		// POST /v1/acquire - Launch a new browser
+		// Note: @cloudflare/puppeteer actually uses GET (with query params) for acquire
+		if (url.pathname === '/v1/acquire' && (method === 'POST' || method === 'GET')) {
+			try {
+				let acquireOptions: { keep_alive?: number } = {}
+				// Parse query params for GET requests (used by @cloudflare/puppeteer)
+				if (method === 'GET') {
+					const keepAlive = url.searchParams.get('keep_alive')
+					if (keepAlive) {
+						acquireOptions.keep_alive = parseInt(keepAlive, 10)
+					}
+				} else {
+					// Parse body for POST requests
+					try {
+						const body = await readBody(req)
+						acquireOptions = JSON.parse(body) as { keep_alive?: number }
+					} catch {
+						// Ignore JSON parse errors
+					}
+				}
+				const result = await acquireSession(acquireOptions)
+				sendJson(res, 200, result)
+			} catch (error) {
+				const msg = error instanceof Error ? error.message : 'Failed to acquire browser'
+				logger?.error(`[BrowserShim] Acquire failed: ${msg}`)
+				sendJson(res, 500, { error: msg })
+			}
+			return
+		}
+
+		// GET /v1/sessions - List active sessions
+		if (url.pathname === '/v1/sessions' && method === 'GET') {
+			const activeSessions = Array.from(sessions.values()).map((s) => ({
+				sessionId: s.sessionId,
+				startTime: s.startTime,
+				connectionId: s.connectionId,
+				connectionStartTime: s.connectionStartTime
+			}))
+			sendJson(res, 200, activeSessions)
+			return
+		}
+
+		// GET /v1/history - List recent sessions
+		if (url.pathname === '/v1/history' && method === 'GET') {
+			sendJson(res, 200, history.slice(0, 50))
+			return
+		}
+
+		// GET /v1/limits - Return limits info
+		if (url.pathname === '/v1/limits' && method === 'GET') {
+			sendJson(res, 200, {
+				activeSessions: Array.from(sessions.keys()).map((id) => ({ id })),
+				allowedBrowserAcquisitions: 10,
+				maxConcurrentSessions: 10,
+				timeUntilNextAllowedBrowserAcquisition: 0
+			})
+			return
+		}
+
+		// GET /v1/session/:sessionId - Get session info including wsEndpoint
+		// This is used by the browser rendering worker to connect to Chrome directly
+		if (url.pathname.startsWith('/v1/session/') && method === 'GET') {
+			const sessionId = url.pathname.slice('/v1/session/'.length)
+			const session = sessions.get(sessionId)
+			if (!session) {
+				sendJson(res, 404, { error: 'Session not found' })
+				return
+			}
+			sendJson(res, 200, {
+				sessionId: session.sessionId,
+				wsEndpoint: session.wsEndpoint,
+				startTime: session.startTime,
+				connectionId: session.connectionId,
+				connectionStartTime: session.connectionStartTime
+			})
+			return
+		}
+
+		// Health check
+		if (url.pathname === '/_devflare/browser/health') {
+			sendJson(res, 200, {
+				ok: true,
+				activeSessions: sessions.size,
+				historySize: history.length,
+				executablePath
+			})
+			return
+		}
+
+		// For WebSocket upgrade requests, the upgrade handler handles it
+		if (url.pathname === '/v1/connectDevtools') {
+			// Will be handled by WebSocket server upgrade
+			res.writeHead(426, { 'Content-Type': 'text/plain' })
+			res.end('WebSocket upgrade required')
+			return
+		}
+
+		res.writeHead(404, { 'Content-Type': 'text/plain' })
+		res.end('Not found')
+	}
+
+	/**
+	 * Read request body as string
+	 */
+	function readBody(req: IncomingMessage): Promise<string> {
+		return new Promise((resolve, reject) => {
+			const chunks: Buffer[] = []
+			req.on('data', (chunk: Buffer) => chunks.push(chunk))
+			req.on('end', () => resolve(Buffer.concat(chunks).toString()))
+			req.on('error', reject)
+		})
+	}
+
+	/**
+	 * Send JSON response
+	 */
+	function sendJson(res: ServerResponse, status: number, data: unknown): void {
+		const body = JSON.stringify(data)
+		res.writeHead(status, {
+			'Content-Type': 'application/json',
+			'Content-Length': Buffer.byteLength(body)
+		})
+		res.end(body)
+	}
+
+	/**
+	 * Start the browser shim server
+	 */
+	async function start(): Promise<void> {
+		// Ensure Chrome is installed
+		logger?.info('[BrowserShim] Ensuring Chrome Headless Shell is available...')
+		executablePath = await ensureChrome(cacheDir, logger)
+
+		// Try to dynamically import ws package
+		try {
+			const wsModule = await import('ws') as unknown as {
+				WebSocketServer?: typeof import('ws').WebSocketServer
+				WebSocket?: typeof import('ws').WebSocket
+				default?: {
+					WebSocketServer?: typeof import('ws').WebSocketServer
+					WebSocket?: typeof import('ws').WebSocket
+				}
+			}
+			WebSocketServerClass = wsModule.WebSocketServer || wsModule.default?.WebSocketServer
+			WebSocketClass = (wsModule.WebSocket || wsModule.default?.WebSocket || wsModule.default) as typeof import('ws').WebSocket | undefined
+		} catch {
+			logger?.warn('[BrowserShim] ws package not found, WebSocket proxy disabled')
+			logger?.warn('[BrowserShim] Install with: npm install ws')
+		}
+
+		// Create HTTP server
+		server = createServer((req, res) => {
+			handleRequest(req, res).catch((error) => {
+				logger?.error('[BrowserShim] Request error:', error)
+				res.writeHead(500)
+				res.end('Internal server error')
+			})
+		})
+
+		// Set up WebSocket server for DevTools proxy
+		if (WebSocketServerClass) {
+			const wss = new WebSocketServerClass({ noServer: true })
+
+			server.on('upgrade', (request: IncomingMessage, socket: any, head: Buffer) => {
+				const url = new URL(request.url || '/', `http://${host}:${port}`)
+
+				if (url.pathname !== '/v1/connectDevtools') {
+					socket.destroy()
+					return
+				}
+
+				const sessionId = url.searchParams.get('browser_session')
+				if (!sessionId) {
+					socket.write('HTTP/1.1 400 Bad Request\r\n\r\n')
+					socket.destroy()
+					return
+				}
+
+				const session = sessions.get(sessionId)
+				if (!session) {
+					socket.write('HTTP/1.1 404 Not Found\r\n\r\n')
+					socket.destroy()
+					return
+				}
+
+				// Mark session as connected
+				const connectionId = crypto.randomUUID()
+				session.connectionId = connectionId
+				session.connectionStartTime = Date.now()
+
+				// Clear idle timeout since we have an active connection
+				if (session.idleTimeout) {
+					clearTimeout(session.idleTimeout)
+					session.idleTimeout = undefined
+				}
+
+				wss.handleUpgrade(request, socket, head, (ws: any) => {
+					if (verbose) {
+						logger?.debug(`[BrowserShim] WebSocket connected for session ${sessionId}`)
+					}
+
+					// Connect to Chrome's DevTools WebSocket
+					const chromeWs = new WebSocketClass(session.wsEndpoint)
+					let chromeConnected = false
+					
+					// Set a connection timeout
+					const connectTimeout = setTimeout(() => {
+						if (!chromeConnected) {
+							logger?.error('[BrowserShim] Chrome connection timeout')
+							try {
+								ws.close(1011, 'Chrome connection timeout')
+								chromeWs.close()
+							} catch {
+								// Ignore errors
+							}
+							closeSession(sessionId, 5, 'ChromeConnectionTimeout').catch(() => {})
+						}
+					}, 10000) // 10 second timeout
+
+					chromeWs.on('open', () => {
+						chromeConnected = true
+						clearTimeout(connectTimeout)
+						if (verbose) {
+							logger?.debug('[BrowserShim] Connected to Chrome DevTools')
+						}
+					})
+
+					chromeWs.on('message', (data: Buffer | string) => {
+						if (ws.readyState === 1) { // OPEN
+							ws.send(data)
+						}
+					})
+
+					chromeWs.on('close', (code: number, reason: Buffer) => {
+						if (verbose) {
+							logger?.debug(`[BrowserShim] Chrome WS closed: ${code}`)
+						}
+						// Ensure valid close code (1000-4999)
+						const validCode = (typeof code === 'number' && code >= 1000 && code <= 4999) ? code : 1000
+						try {
+							ws.close(validCode, reason?.toString?.() || '')
+						} catch {
+							// Ignore errors when closing already closed socket
+						}
+						
+						// Chrome connection closed - clean up the session entirely
+						// This handles crashes, timeouts, and normal closures
+						closeSession(sessionId, 2, 'ChromeDisconnected').catch((err) => {
+							logger?.error('[BrowserShim] Error closing session after Chrome disconnect:', err)
+						})
+					})
+
+					chromeWs.on('error', (error: Error) => {
+						logger?.error('[BrowserShim] Chrome WS error:', error.message)
+						try {
+							ws.close(1011, 'Chrome WebSocket error')
+						} catch {
+							// Ignore errors when closing already closed socket
+						}
+						
+						// Chrome error - clean up the session
+						closeSession(sessionId, 4, 'ChromeError').catch((err) => {
+							logger?.error('[BrowserShim] Error closing session after Chrome error:', err)
+						})
+					})
+
+					ws.on('message', (data: Buffer | string) => {
+						if (chromeWs.readyState === 1) { // OPEN
+							chromeWs.send(data)
+						}
+					})
+
+					ws.on('close', (code: number, reason: Buffer) => {
+						if (verbose) {
+							logger?.debug(`[BrowserShim] Client WS closed for session ${sessionId}`)
+						}
+						// Ensure valid close code (1000-4999)
+						const validCode = (typeof code === 'number' && code >= 1000 && code <= 4999) ? code : 1000
+						try {
+							chromeWs.close(validCode, reason?.toString?.() || '')
+						} catch {
+							// Ignore errors when closing already closed socket
+						}
+
+						// Clear connection from session and close browser immediately
+						// This prevents zombie browsers from accumulating
+						const s = sessions.get(sessionId)
+						if (s && s.connectionId === connectionId) {
+							s.connectionId = undefined
+							s.connectionStartTime = undefined
+							
+							// Close the browser session immediately when client disconnects
+							// Don't wait for idle timeout - clean up now
+							closeSession(sessionId, 1, 'ClientDisconnected').catch((err) => {
+								logger?.error('[BrowserShim] Error closing session after disconnect:', err)
+							})
+						}
+					})
+
+					ws.on('error', (error: Error) => {
+						logger?.error('[BrowserShim] Client WS error:', error.message)
+						try {
+							chromeWs.close()
+						} catch {
+							// Ignore errors when closing already closed socket
+						}
+					})
+				})
+			})
+		}
+
+		// Start listening
+		await new Promise<void>((resolve, reject) => {
+			server!.on('error', reject)
+			server!.listen(port, host, () => {
+				resolve()
+			})
+		})
+
+		logger?.success(`Browser shim server ready on http://${host}:${port}`)
+	}
+
+	/**
+	 * Stop the server and close all browsers
+	 */
+	async function stop(): Promise<void> {
+		// Close all browser sessions
+		for (const sessionId of sessions.keys()) {
+			await closeSession(sessionId, 3, 'ServerShutdown')
+		}
+
+		// Stop server
+		if (server) {
+			await new Promise<void>((resolve) => {
+				server!.close(() => resolve())
+			})
+			server = null
+		}
+
+		logger?.info('Browser shim server stopped')
+	}
+
+	/**
+	 * Get the server URL
+	 */
+	function getUrl(): string {
+		return `http://${host}:${port}`
+	}
+
+	return {
+		start,
+		stop,
+		getUrl
+	}
+}
