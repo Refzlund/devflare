@@ -2328,27 +2328,34 @@ The GitHub feedback action is where repository-visible deployment reporting belo
 
 - `mode: comment` for PR-only preview reporting
 - `mode: deployment` for branch-only or production reporting through the Deployments API
-- `mode: both` plus `resolve-pr-from-ref: 'true'` for combined branch + PR feedback from a single branch-scoped workflow
+- `mode: both` plus `resolve-pr-from-ref: "true"` for combined branch + PR feedback from a single branch-scoped workflow
 
 That split is deliberate because GitHub has stable native comments for PRs, but not for branches.
 
-Current action inputs include:
+Current deploy-action inputs include:
 
 - `working-directory`
+- `install-working-directory`
 - `environment`
 - `preview`
 - `preview-alias`
 - `branch-name`
+- `deploy-command`
+- `deploy-message`
+- `deploy-tag`
 - `verify-deployment`
+- `require-fresh-production-deployment`
 - `cloudflare-api-token`
 - `cloudflare-account-id`
 
-Current action outputs include:
+Current deploy-action outputs include:
 
 - `preview-alias`
 - `preview-url`
 - `version-id`
+- `verification-note`
 - `status`
+- `failure-stage`
 - `exit-code`
 - `log-excerpt`
 
@@ -2374,9 +2381,13 @@ That keeps preview naming deterministic across pull-request, push, and manual-di
 
 Current repository examples of that reporting layer:
 
-- `.github/workflows/documentation-preview.yml` deploys PR previews, upserts a stable PR comment, and retires the tracked preview metadata when the PR closes
-- `.github/workflows/documentation-production.yml` deploys production and publishes a GitHub deployment status with the production URL
-- `.github/workflows/testing-preview.yml` deploys the Durable Object-heavy testing app, publishes a branch deployment on every run, and updates a stable PR comment when that branch belongs to an open PR
+- `.github/workflows/documentation-preview-branch.yml` publishes branch-scoped documentation preview aliases on push for non-default branches and reports them through the Deployments API
+- `.github/workflows/documentation-preview-branch-cleanup.yml` retires tracked documentation branch-preview metadata and marks matching GitHub deployment feedback inactive when a branch is deleted
+- `.github/workflows/documentation-preview-pr.yml` deploys documentation PR previews, upserts a stable PR comment, and retires the tracked preview metadata when the PR closes
+- `.github/workflows/documentation-production.yml` deploys documentation production from the repository default branch and publishes a GitHub deployment status with the production URL
+- `.github/workflows/testing-preview-branch.yml` deploys the Durable Object-heavy testing app as a branch-scoped preview environment, publishes a branch deployment on every run, and also refreshes the stable PR comment when that branch belongs to an open PR
+- `.github/workflows/testing-preview-branch-cleanup.yml` retires tracked testing branch preview metadata, deletes the branch-scoped Workers, and marks matching GitHub deployment feedback plus the stable PR preview comment inactive when applicable
+- `.github/workflows/testing-preview-pr.yml` deploys PR-scoped testing previews and retires the stable PR preview comment when the PR closes
 - `.github/workflow-examples/branch-preview-cleanup.example.yml` is the copyable branch-delete cleanup template for same-Worker preview flows that retire tracked preview metadata and mark GitHub deployment feedback inactive
 
 ### Repository examples and acceptance verification
@@ -2390,8 +2401,8 @@ The repository intentionally splits example coverage across two app directories:
 
 Workflow-verification split that matters:
 
-- the documentation preview and production workflows rely on deploy-action control-plane verification for deploy success
-- the testing preview workflow intentionally keeps a later `/status` assertion because it is validating runtime wiring and binding availability, even though it now also demonstrates combined branch deployment + PR comment feedback via `mode: both`
+- the documentation branch-preview, PR-preview, and production workflows rely on deploy-action control-plane verification for deploy success, with default-branch targeting decided dynamically from the repository default branch rather than a hardcoded branch name
+- the testing branch-preview and PR-preview workflows intentionally keep a later `/status` assertion because they are validating runtime wiring and binding availability, and the branch workflow additionally demonstrates combined branch deployment + PR comment feedback via `mode: both`
 
 Additional repo-specific notes that matter to the example story:
 
@@ -2558,7 +2569,7 @@ This section exists so `TODO.md` can be cross-checked against `LLM.md` explicitl
 - Generated artifact locations and source-of-truth rules: covered in `Source of truth vs generated output` and `Generated artifacts and doctor`
 - `devflare tokens <bootstrap-token>` behavior: covered in `Command-by-command contract` under `tokens`
 - Composite GitHub Action contract: covered in `Related automation surface`
-- Branch/PR preview workflow and production-on-main workflow examples: covered in `Related automation surface`
+- Branch/PR preview workflow and production-on-default-branch workflow examples: covered in `Related automation surface`
 - Documentation app as the canonical SvelteKit same-Worker preview/deploy example: covered in `Preview deploys, version ids, and same-Worker branch previews` and `Repository examples and acceptance verification`
 - `apps/testing` as the exhaustive binding-matrix example, including preview and production overrides plus the Durable Object preview exception path: covered in `Preview deploys, version ids, and same-Worker branch previews` and `Repository examples and acceptance verification`
 - D1 stable-name authoring and resolved-id compilation: covered in `D1 by name, resolution modes, and resolved config reuse`

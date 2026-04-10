@@ -1,0 +1,102 @@
+name: "Devflare GitHub Feedback"
+description: "Publish Devflare deployment feedback as a PR comment, a GitHub deployment, or both"
+inputs:
+  github-token:
+    description: "GitHub token used to create PR comments and deployment statuses"
+    required: true
+  mode:
+    description: "Feedback surface to update: comment, deployment, or both"
+    required: false
+    default: "comment"
+  operation:
+    description: "Whether to publish a new report or clean up existing feedback"
+    required: false
+    default: "report"
+  status:
+    description: "Deployment status to publish: success, failure, in_progress, or inactive"
+    required: true
+  title:
+    description: "Human-readable title shown in the PR comment or deployment description"
+    required: true
+  comment-key:
+    description: "Stable marker key used to find and update an existing PR comment"
+    required: false
+    default: ""
+  pr-number:
+    description: "Explicit pull request number to update when comment mode is enabled"
+    required: false
+    default: ""
+  resolve-pr-from-ref:
+    description: "When true, look up an open PR for ref-name and update it when one exists"
+    required: false
+    default: "false"
+  deployment-kind:
+    description: "Logical deployment kind: preview or production"
+    required: false
+    default: "preview"
+  ref-name:
+    description: "Branch or ref name associated with the feedback"
+    required: false
+    default: ""
+  sha:
+    description: "Commit SHA to attach to a GitHub deployment"
+    required: false
+    default: ""
+  environment:
+    description: "GitHub deployment environment name"
+    required: false
+    default: ""
+  environment-url:
+    description: "Primary environment URL for deployment statuses"
+    required: false
+    default: ""
+  preview-url:
+    description: "Preview URL to include in PR comments"
+    required: false
+    default: ""
+  production-url:
+    description: "Production URL to include in PR comments"
+    required: false
+    default: ""
+  preview-alias:
+    description: "Preview alias to include in PR comments"
+    required: false
+    default: ""
+  version-id:
+    description: "Cloudflare Worker version ID to include in feedback"
+    required: false
+    default: ""
+  log-url:
+    description: "Workflow run or log URL to include in feedback"
+    required: false
+    default: ""
+  log-excerpt:
+    description: "Optional log excerpt rendered in a collapsible PR comment section"
+    required: false
+    default: ""
+  summary:
+    description: "Optional summary paragraph shown below the heading"
+    required: false
+    default: ""
+  details-markdown:
+    description: "Optional extra markdown appended inside the collapsible details section"
+    required: false
+    default: ""
+  transient-environment:
+    description: "Override the transient_environment flag for GitHub deployments"
+    required: false
+    default: ""
+  production-environment:
+    description: "Override the production_environment flag for GitHub deployments"
+    required: false
+    default: ""
+outputs:
+  comment-id:
+    description: "Updated PR comment id when comment mode runs successfully"
+  deployment-id:
+    description: "Created or updated deployment id when deployment mode runs successfully"
+  pr-number:
+    description: "Resolved pull request number used for comment mode"
+runs:
+  using: "node24"
+  main: "index.js"

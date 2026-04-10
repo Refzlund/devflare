@@ -63,6 +63,12 @@ That workflow now also publishes a GitHub deployment on every run and updates a
 stable PR comment whenever the branch belongs to an open pull request, while
 still keeping the later `/status` assertion as the binding-verification step.
 
+The branch preview lifecycle now also includes
+`.github/workflows/testing-preview-branch-cleanup.yml`, which retires the
+tracked preview metadata, deletes the branch-scoped Workers, and marks the
+matching GitHub deployment inactive plus the stable PR preview comment inactive
+when the branch is deleted while an open PR still points at it.
+
 If you want a copyable branch-delete cleanup template for same-Worker preview
 flows elsewhere in the repo, see
 `.github/workflow-examples/branch-preview-cleanup.example.yml`.

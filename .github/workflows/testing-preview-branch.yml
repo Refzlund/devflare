@@ -1,0 +1,286 @@
+name: Testing Branch Preview
+
+env:
+  TESTING_EXPECTED_APP_NAME: testing-binding-matrix-preview
+  TESTING_EXPECTED_DEPLOYMENT_CHANNEL: preview
+
+on:
+  push:
+    paths:
+      - "apps/testing/**"
+      - "packages/devflare/**"
+      - ".github/actions/devflare-deploy/**"
+      - ".github/actions/devflare-github-feedback/**"
+      - ".github/workflows/testing-preview-*.yml"
+
+permissions:
+  contents: read
+  deployments: write
+
+concurrency:
+  group: testing-preview-branch-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  deploy-preview:
+    if: ${{ startsWith(github.ref, 'refs/heads/') && github.ref_name != github.event.repository.default_branch }}
+    runs-on: ubuntu-latest
+    env:
+      DEVFLARE_PREVIEW_BRANCH: "${{ github.ref_name }}"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Deploy testing auth service
+        id: auth
+        continue-on-error: true
+        uses: ./.github/actions/devflare-deploy
+        with:
+          working-directory: apps/testing/workers/auth-service
+          install-working-directory: .
+          cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          cloudflare-account-id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Deploy testing search service
+        id: search
+        continue-on-error: true
+        uses: ./.github/actions/devflare-deploy
+        with:
+          working-directory: apps/testing/workers/search-service
+          install-working-directory: .
+          environment: staging
+          cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          cloudflare-account-id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Deploy testing branch preview
+        id: deploy
+        continue-on-error: true
+        uses: ./.github/actions/devflare-deploy
+        with:
+          working-directory: apps/testing
+          install-working-directory: .
+          environment: preview
+          cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          cloudflare-account-id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Verify testing branch preview runtime bindings
+        id: verify
+        if: ${{ always() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ -z "${{ steps.deploy.outputs.preview-url }}" ]; then
+            echo 'Expected the deploy action to return a preview-url output.' >&2
+            exit 1
+          fi
+
+          status_file="$(mktemp)"
+          curl --fail --silent --show-error --location \
+            --retry 10 \
+            --retry-all-errors \
+            --retry-delay 3 \
+            "${{ steps.deploy.outputs.preview-url }}/status" > "$status_file"
+
+          python3 - "$status_file" <<'PY'
+          import json
+          import os
+          import sys
+
+          with open(sys.argv[1], 'r', encoding='utf-8') as handle:
+            payload = json.load(handle)
+
+          assert payload['appName'] == os.environ['TESTING_EXPECTED_APP_NAME'], payload
+          assert payload['deploymentChannel'] == os.environ['TESTING_EXPECTED_DEPLOYMENT_CHANNEL'], payload
+
+          for key in (
+            'hasDurableObjectBindings',
+            'hasServiceBindings',
+            'hasVectorizeBindings',
+            'hasAnalyticsBindings',
+            'hasSendEmailBindings',
+            'hasHyperdriveBinding'
+          ):
+            assert payload[key] is True, (key, payload)
+          PY
+
+          rm -f "$status_file"
+
+      - name: Publish testing branch preview feedback
+        if: ${{ always() }}
+        uses: ./.github/actions/devflare-github-feedback
+        with:
+          github-token: ${{ github.token }}
+          mode: both
+          operation: report
+          status: ${{ steps.auth.outputs.status == 'success' && steps.search.outputs.status == 'success' && steps.deploy.outputs.status == 'success' && steps.verify.outcome == 'success' && 'success' || 'failure' }}
+          title: Testing branch preview
+          comment-key: testing-preview
+          resolve-pr-from-ref: "true"
+          deployment-kind: preview
+          ref-name: ${{ github.ref_name }}
+          sha: ${{ github.sha }}
+          environment: testing branch preview / ${{ github.ref_name }}
+          environment-url: ${{ steps.deploy.outputs.preview-url }}
+          preview-url: ${{ steps.deploy.outputs.preview-url }}
+          preview-alias: ${{ steps.deploy.outputs.preview-alias }}
+          version-id: ${{ steps.deploy.outputs.version-id }}
+          log-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          log-excerpt: ${{ steps.deploy.outputs.log-excerpt }}
+          summary: This workflow publishes a branch-scoped testing preview on every qualifying push, even when no pull request exists. When the branch belongs to an open pull request, the same run also refreshes the stable PR preview comment.
+          details-markdown: |
+            - Auth service version: `${{ steps.auth.outputs.version-id || 'not available' }}`
+            - Search service version: `${{ steps.search.outputs.version-id || 'not available' }}`
+            - Runtime binding verification: `${{ steps.verify.outcome == 'success' && 'passed' || 'failed' }}`
+            - Preview strategy: branch-scoped Worker names plus the `preview` environment, because the main worker uses Durable Objects.
+            - Auth deploy status: `${{ steps.auth.outputs.status || (steps.auth.outcome == 'success' && 'success' || 'failure') }}`
+            - Auth failure stage: `${{ steps.auth.outputs.failure-stage || 'n/a' }}`
+            - Search deploy status: `${{ steps.search.outputs.status || (steps.search.outcome == 'success' && 'success' || 'failure') }}`
+            - Search failure stage: `${{ steps.search.outputs.failure-stage || 'n/a' }}`
+            - Main preview deploy status: `${{ steps.deploy.outputs.status || (steps.deploy.outcome == 'success' && 'success' || 'failure') }}`
+            - Main preview failure stage: `${{ steps.deploy.outputs.failure-stage || 'n/a' }}`
+
+      - name: Summarize testing branch preview
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          {
+            echo '### Testing branch preview workflow'
+            echo ''
+            echo '- Preview strategy: branch-scoped Worker names plus the `preview` environment because the main worker uses Durable Objects'
+            echo '- GitHub feedback: transient GitHub deployment updated on every qualifying push, plus the stable PR comment when this branch belongs to an open pull request'
+            echo "- Final status: \`${{ steps.auth.outputs.status == 'success' && steps.search.outputs.status == 'success' && steps.deploy.outputs.status == 'success' && steps.verify.outcome == 'success' && 'success' || 'failure' }}\`"
+            echo "- Auth deploy status: \`${{ steps.auth.outputs.status || (steps.auth.outcome == 'success' && 'success' || 'failure') }}\`"
+            if [ -n "${{ steps.auth.outputs.failure-stage }}" ]; then
+              echo "- Auth failure stage: \`${{ steps.auth.outputs.failure-stage }}\`"
+            fi
+            echo "- Search deploy status: \`${{ steps.search.outputs.status || (steps.search.outcome == 'success' && 'success' || 'failure') }}\`"
+            if [ -n "${{ steps.search.outputs.failure-stage }}" ]; then
+              echo "- Search failure stage: \`${{ steps.search.outputs.failure-stage }}\`"
+            fi
+            echo "- Main preview deploy status: \`${{ steps.deploy.outputs.status || (steps.deploy.outcome == 'success' && 'success' || 'failure') }}\`"
+            if [ -n "${{ steps.deploy.outputs.failure-stage }}" ]; then
+              echo "- Main preview failure stage: \`${{ steps.deploy.outputs.failure-stage }}\`"
+            fi
+            if [ -n "${{ steps.auth.outputs.version-id }}" ]; then
+              echo "- Auth service version: \`${{ steps.auth.outputs.version-id }}\`"
+            fi
+            if [ -n "${{ steps.search.outputs.version-id }}" ]; then
+              echo "- Search service version: \`${{ steps.search.outputs.version-id }}\`"
+            fi
+            echo "- Branch scope: \`$DEVFLARE_PREVIEW_BRANCH\`"
+            if [ -n "${{ steps.deploy.outputs.preview-alias }}" ]; then
+              echo "- Preview alias: \`${{ steps.deploy.outputs.preview-alias }}\`"
+            fi
+            if [ -n "${{ steps.deploy.outputs.preview-url }}" ]; then
+              echo "- Reachable URL: ${{ steps.deploy.outputs.preview-url }}"
+              echo "- Verified response appName: \`$TESTING_EXPECTED_APP_NAME\`"
+              echo "- Verified response deploymentChannel: \`$TESTING_EXPECTED_DEPLOYMENT_CHANNEL\`"
+            fi
+            if [ -n "${{ steps.deploy.outputs.version-id }}" ]; then
+              echo "- Preview version ID: \`${{ steps.deploy.outputs.version-id }}\`"
+            fi
+            if [ -n "${{ steps.deploy.outputs.exit-code }}" ]; then
+              echo "- Main preview exit code: \`${{ steps.deploy.outputs.exit-code }}\`"
+            fi
+            echo "- Runtime binding verification: \`${{ steps.verify.outcome == 'success' && 'passed' || 'failed' }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail when any testing branch preview deploy or verification step did not succeed
+        if: ${{ always() && (steps.auth.outputs.status != 'success' || steps.search.outputs.status != 'success' || steps.deploy.outputs.status != 'success' || steps.verify.outcome == 'failure' || steps.auth.outcome == 'failure' || steps.search.outcome == 'failure' || steps.deploy.outcome == 'failure') }}
+        shell: bash
+        env:
+          AUTH_STATUS: ${{ steps.auth.outputs.status || (steps.auth.outcome == 'success' && 'success' || 'failure') }}
+          AUTH_FAILURE_STAGE: ${{ steps.auth.outputs.failure-stage }}
+          AUTH_EXIT_CODE: ${{ steps.auth.outputs.exit-code }}
+          AUTH_VERSION_ID: ${{ steps.auth.outputs.version-id }}
+          AUTH_LOG_EXCERPT: ${{ steps.auth.outputs.log-excerpt }}
+          SEARCH_STATUS: ${{ steps.search.outputs.status || (steps.search.outcome == 'success' && 'success' || 'failure') }}
+          SEARCH_FAILURE_STAGE: ${{ steps.search.outputs.failure-stage }}
+          SEARCH_EXIT_CODE: ${{ steps.search.outputs.exit-code }}
+          SEARCH_VERSION_ID: ${{ steps.search.outputs.version-id }}
+          SEARCH_LOG_EXCERPT: ${{ steps.search.outputs.log-excerpt }}
+          DEPLOY_STATUS: ${{ steps.deploy.outputs.status || (steps.deploy.outcome == 'success' && 'success' || 'failure') }}
+          DEPLOY_FAILURE_STAGE: ${{ steps.deploy.outputs.failure-stage }}
+          DEPLOY_EXIT_CODE: ${{ steps.deploy.outputs.exit-code }}
+          DEPLOY_VERSION_ID: ${{ steps.deploy.outputs.version-id }}
+          DEPLOY_PREVIEW_ALIAS: ${{ steps.deploy.outputs.preview-alias }}
+          DEPLOY_PREVIEW_URL: ${{ steps.deploy.outputs.preview-url }}
+          DEPLOY_LOG_EXCERPT: ${{ steps.deploy.outputs.log-excerpt }}
+          VERIFY_OUTCOME: ${{ steps.verify.outcome }}
+        run: |
+          echo 'Testing branch preview deployment or runtime verification failed.' >&2
+
+          if [ "$AUTH_STATUS" != 'success' ]; then
+            echo '' >&2
+            echo 'Testing auth service deploy failed.' >&2
+            if [ -n "$AUTH_FAILURE_STAGE" ]; then
+              echo "Failure stage: $AUTH_FAILURE_STAGE" >&2
+            fi
+            if [ -n "$AUTH_EXIT_CODE" ]; then
+              echo "Devflare exit code: $AUTH_EXIT_CODE" >&2
+            fi
+            if [ -n "$AUTH_VERSION_ID" ]; then
+              echo "Last version ID: $AUTH_VERSION_ID" >&2
+            fi
+            if [ -n "$AUTH_LOG_EXCERPT" ]; then
+              echo 'Last auth deploy log excerpt:' >&2
+              printf '%s\n' "$AUTH_LOG_EXCERPT" >&2
+            else
+              echo 'No auth-service log excerpt was captured by the deploy action.' >&2
+            fi
+          fi
+
+          if [ "$SEARCH_STATUS" != 'success' ]; then
+            echo '' >&2
+            echo 'Testing search service deploy failed.' >&2
+            if [ -n "$SEARCH_FAILURE_STAGE" ]; then
+              echo "Failure stage: $SEARCH_FAILURE_STAGE" >&2
+            fi
+            if [ -n "$SEARCH_EXIT_CODE" ]; then
+              echo "Devflare exit code: $SEARCH_EXIT_CODE" >&2
+            fi
+            if [ -n "$SEARCH_VERSION_ID" ]; then
+              echo "Last version ID: $SEARCH_VERSION_ID" >&2
+            fi
+            if [ -n "$SEARCH_LOG_EXCERPT" ]; then
+              echo 'Last search-service deploy log excerpt:' >&2
+              printf '%s\n' "$SEARCH_LOG_EXCERPT" >&2
+            else
+              echo 'No search-service log excerpt was captured by the deploy action.' >&2
+            fi
+          fi
+
+          if [ "$DEPLOY_STATUS" != 'success' ]; then
+            echo '' >&2
+            echo 'Testing branch preview deploy failed.' >&2
+            if [ -n "$DEPLOY_FAILURE_STAGE" ]; then
+              echo "Failure stage: $DEPLOY_FAILURE_STAGE" >&2
+            fi
+            if [ -n "$DEPLOY_EXIT_CODE" ]; then
+              echo "Devflare exit code: $DEPLOY_EXIT_CODE" >&2
+            fi
+            if [ -n "$DEPLOY_VERSION_ID" ]; then
+              echo "Last version ID: $DEPLOY_VERSION_ID" >&2
+            fi
+            if [ -n "$DEPLOY_PREVIEW_ALIAS" ]; then
+              echo "Resolved preview alias: $DEPLOY_PREVIEW_ALIAS" >&2
+            fi
+            if [ -n "$DEPLOY_PREVIEW_URL" ]; then
+              echo "Last preview URL: $DEPLOY_PREVIEW_URL" >&2
+            fi
+            if [ -n "$DEPLOY_LOG_EXCERPT" ]; then
+              echo 'Last main preview deploy log excerpt:' >&2
+              printf '%s\n' "$DEPLOY_LOG_EXCERPT" >&2
+            else
+              echo 'No main preview log excerpt was captured by the deploy action.' >&2
+            fi
+          fi
+
+          if [ "$VERIFY_OUTCOME" = 'failure' ]; then
+            echo '' >&2
+            echo 'Runtime binding verification failed. Inspect the "Verify testing branch preview runtime bindings" step for the curl or Python assertion details.' >&2
+          fi
+
+          exit 1

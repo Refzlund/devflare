@@ -696,9 +696,13 @@ Minimal preview step:
 
 This repository also includes thin caller workflows and copyable workflow examples:
 
-- [`.github/workflows/documentation-preview.yml`](../../.github/workflows/documentation-preview.yml) for PR previews, stable PR comments, and PR-close cleanup
-- [`.github/workflows/documentation-production.yml`](../../.github/workflows/documentation-production.yml) for production deploys from `next` plus GitHub deployment statuses
-- [`.github/workflows/testing-preview.yml`](../../.github/workflows/testing-preview.yml) for branch-scoped Durable Object previews, combined branch deployment + PR comment reporting, and later runtime binding verification
+- [`.github/workflows/documentation-preview-branch.yml`](../../.github/workflows/documentation-preview-branch.yml) for branch-scoped preview aliases published on push
+- [`.github/workflows/documentation-preview-branch-cleanup.yml`](../../.github/workflows/documentation-preview-branch-cleanup.yml) for delete-triggered retirement of tracked documentation branch previews plus GitHub deployment cleanup
+- [`.github/workflows/documentation-preview-pr.yml`](../../.github/workflows/documentation-preview-pr.yml) for PR previews, stable PR comments, and PR-close cleanup
+- [`.github/workflows/documentation-production.yml`](../../.github/workflows/documentation-production.yml) for production deploys from the repository default branch plus GitHub deployment statuses
+- [`.github/workflows/testing-preview-branch.yml`](../../.github/workflows/testing-preview-branch.yml) for branch-scoped Durable Object previews, combined branch deployment + PR comment reporting, and later runtime binding verification
+- [`.github/workflows/testing-preview-branch-cleanup.yml`](../../.github/workflows/testing-preview-branch-cleanup.yml) for delete-triggered retirement of tracked testing branch previews, deletion of branch-scoped Workers, and GitHub deployment plus PR feedback cleanup
+- [`.github/workflows/testing-preview-pr.yml`](../../.github/workflows/testing-preview-pr.yml) for PR-scoped testing previews and PR-close GitHub feedback cleanup
 - [`.github/workflow-examples/branch-preview-cleanup.example.yml`](../../.github/workflow-examples/branch-preview-cleanup.example.yml) as a delete-triggered same-Worker preview cleanup template that retires tracked preview metadata and marks GitHub deployment feedback inactive
 
 The live workflows now rely on the deploy action's control-plane verification for deploy success.
@@ -707,9 +711,15 @@ If you want other feedback modes in your own repo, the supported patterns are:
 
 - PR-only preview feedback: `mode: comment`
 - branch-only preview feedback: `mode: deployment`
-- combined branch deployment + PR comment feedback: `mode: both` with `resolve-pr-from-ref: 'true'` (the repo's `testing-preview.yml` now demonstrates this pattern)
+- combined branch deployment + PR comment feedback: `mode: both` with `resolve-pr-from-ref: 'true'` (the repo's `testing-preview-branch.yml` now demonstrates this pattern)
 
-Repository-specific runtime checks still exist where they are testing app behavior rather than deploy success. For example, [`testing-preview.yml`](../../.github/workflows/testing-preview.yml) now publishes both a GitHub deployment and a stable PR comment while still keeping its `/status` assertion, because it is validating runtime bindings and deployment-channel wiring rather than merely asking whether Cloudflare accepted the upload.
+Repository-specific runtime checks still exist where they are testing app
+behavior rather than deploy success. For example,
+[`testing-preview-branch.yml`](../../.github/workflows/testing-preview-branch.yml)
+now publishes both a GitHub deployment and, when the branch belongs to an open
+pull request, the stable PR comment while still keeping its `/status`
+assertion, because it is validating runtime bindings and deployment-channel
+wiring rather than merely asking whether Cloudflare accepted the upload.
 
 ---
 
