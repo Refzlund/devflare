@@ -411,9 +411,93 @@ describe('token command', () => {
 		const renderedMessages = logger.messages.map((message) => stripAnsi(message.args.join(' ')))
 
 		expect(result.exitCode).toBe(0)
-		expect(result.output).toBe('devflare-preview')
+		expect(result.output).toBe('preview')
 		expect(renderedMessages.some((message) => message.includes('Devflare-managed tokens'))).toBe(true)
+		expect(renderedMessages.some((message) => message.includes('preview'))).toBe(true)
+		expect(renderedMessages.some((message) => message.includes('devflare-preview'))).toBe(false)
 		expect(renderedMessages.some((message) => message.includes('manual-token'))).toBe(false)
+	})
+
+	test('rolls a normalized Devflare-managed token name without deleting and recreating it', async () => {
+		const requests: Array<{
+			url: string
+			method: string
+			body?: string
+		}> = []
+		globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
+			const url = String(input)
+			requests.push({
+				url,
+				method: init?.method ?? 'GET',
+				body: typeof init?.body === 'string' ? init.body : undefined
+			})
+
+			if (url.includes('/accounts?page=1&per_page=50')) {
+				return jsonResponse([
+					{
+						id: 'acc_123',
+						name: 'Devflare Account',
+						type: 'standard'
+					}
+				], {
+					page: 1,
+					per_page: 50,
+					total_pages: 1,
+					count: 1,
+					total_count: 1
+				})
+			}
+
+			if (url.includes('/accounts/acc_123/tokens?page=1&per_page=50')) {
+				return jsonResponse([
+					{
+						id: 'token_123',
+						name: 'devflare-preview',
+						status: 'active'
+					},
+					{
+						id: 'token_124',
+						name: 'manual-token',
+						status: 'active'
+					}
+				], {
+					page: 1,
+					per_page: 50,
+					total_pages: 1,
+					count: 2,
+					total_count: 2
+				})
+			}
+
+			if (init?.method === 'PUT' && url.endsWith('/accounts/acc_123/tokens/token_123/value')) {
+				return jsonResponse('cfat_rolled_secret')
+			}
+
+			throw new Error(`Unexpected fetch URL: ${url}`)
+		}) as unknown as typeof fetch
+
+		const logger = createLogger()
+		const result = await runTokenCommand(
+			{
+				command: 'tokens',
+				args: ['bootstrap-token'],
+				options: {
+					roll: 'preview'
+				}
+			},
+			logger as any,
+			{}
+		)
+		const renderedMessages = logger.messages.map((message) => stripAnsi(message.args.join(' ')))
+		const rollRequest = requests.find((request) => request.method === 'PUT')
+
+		expect(result.exitCode).toBe(0)
+		expect(result.output).toBe('cfat_rolled_secret')
+		expect(rollRequest?.url).toBe('https://api.cloudflare.com/client/v4/accounts/acc_123/tokens/token_123/value')
+		expect(rollRequest?.body).toBe('{}')
+		expect(renderedMessages.some((message) => message.includes('Rolled 1 Devflare-managed token(s) named devflare-preview'))).toBe(true)
+		expect(renderedMessages.some((message) => message.includes('Cloudflare only returns the new token secret once. Store it safely now.'))).toBe(true)
+		expect(renderedMessages.some((message) => message.includes('cfat_rolled_secret'))).toBe(true)
 	})
 
 	test('deletes a normalized Devflare-managed token name', async () => {
@@ -580,6 +664,29 @@ describe('token command', () => {
 		)
 
 		expect(result.exitCode).toBe(1)
-		expect(logger.messages.some((message) => message.args.join(' ').includes('Usage: devflare tokens'))).toBe(true)
+		expect(logger.messages.some((message) => message.level === 'error')).toBe(false)
+		expect(logger.messages.some((message) => stripAnsi(message.args.join(' ')).includes('devflare tokens <bootstrap-token>'))).toBe(true)
+		expect(stripAnsi(logger.messages.at(-1)?.args.join(' ') ?? 'missing')).toBe('')
+	})
+
+	test('shows a usage summary without logging an error when no token operation is selected', async () => {
+		const logger = createLogger()
+		const result = await runTokenCommand(
+			{
+				command: 'tokens',
+				args: ['bootstrap-token'],
+				options: {}
+			},
+			logger as any,
+			{}
+		)
+		const renderedMessages = logger.messages.map((message) => stripAnsi(message.args.join(' ')))
+
+		expect(result.exitCode).toBe(1)
+		expect(logger.messages.some((message) => message.level === 'error')).toBe(false)
+		expect(renderedMessages.some((message) => message.includes('Choose one token operation: --list, --new, --roll, --delete, or --delete-all.'))).toBe(false)
+		expect(renderedMessages.some((message) => message.includes('Usage: devflare tokens <bootstrap-token>'))).toBe(true)
+		expect(renderedMessages.some((message) => message.includes('--roll [name]'))).toBe(true)
+		expect(renderedMessages.at(-1)).toBe('')
 	})
 })

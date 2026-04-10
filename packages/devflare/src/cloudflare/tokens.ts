@@ -1,4 +1,4 @@
-import { apiDelete, apiGetAll, apiPost, type APIClientOptions } from './api'
+import { apiDelete, apiGetAll, apiPost, apiPut, type APIClientOptions } from './api'
 import type {
 	AccountOwnedAPIToken,
 	AccountOwnedAPITokenDeleteResult,
@@ -153,6 +153,16 @@ export function normalizeDevflareTokenName(name: string): string {
 	return `${DEVFLARE_MANAGED_TOKEN_PREFIX}${suffix}`
 }
 
+export function stripDevflareTokenNamePrefix(name: string): string {
+	const trimmedName = name.trim()
+	if (!trimmedName) {
+		return trimmedName
+	}
+
+	const strippedName = trimmedName.replace(DEVFLARE_MANAGED_TOKEN_NAME_PATTERN, '')
+	return strippedName || trimmedName
+}
+
 export function filterDevflareManagedTokens(
 	tokens: AccountOwnedAPIToken[]
 ): AccountOwnedAPIToken[] {
@@ -229,6 +239,14 @@ export async function deleteAccountOwnedAPIToken(
 	options?: APIClientOptions
 ): Promise<AccountOwnedAPITokenDeleteResult> {
 	return apiDelete<AccountOwnedAPITokenDeleteResult>(`/accounts/${accountId}/tokens/${tokenId}`, options)
+}
+
+export async function rollAccountOwnedAPITokenValue(
+	accountId: string,
+	tokenId: string,
+	options?: APIClientOptions
+): Promise<string> {
+	return apiPut<string>(`/accounts/${accountId}/tokens/${tokenId}/value`, {}, options)
 }
 
 export async function createAccountOwnedAPIToken(

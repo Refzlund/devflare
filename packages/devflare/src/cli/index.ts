@@ -159,6 +159,8 @@ Build / Deploy:
 	                          Rename an existing Worker and sync the matching devflare config
 	tokens <bootstrap-token> --new [name]
 	                          Create a Devflare-managed account-owned token
+	tokens <bootstrap-token> --roll [name]
+	                          Roll a matching Devflare-managed token secret (prompts when name is omitted)
 	tokens <bootstrap-token> --list
 	                          List Devflare-managed account-owned tokens for the selected account
 	tokens <bootstrap-token> --delete [name]
@@ -238,6 +240,7 @@ function getStyledHelpText(options: Record<string, string | boolean>): string {
 		formatCommand('devflare worker rename documentation --to devflare-documentation', 'Rename a Worker and sync the matching devflare config', theme),
 		formatCommand('devflare previews reconcile', 'Reconcile the registry against live Cloudflare versions', theme),
 		formatCommand('devflare tokens <bootstrap-token> --new preview', 'Create a prefixed Devflare-managed account token', theme),
+		formatCommand('devflare tokens <bootstrap-token> --roll preview', 'Roll the secret for a Devflare-managed account token', theme),
 		formatCommand('devflare account workers', 'List Workers for the selected account', theme),
 		formatCommand('devflare remote enable 30', 'Enable remote test mode for 30 minutes', theme),
 		''

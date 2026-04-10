@@ -3,7 +3,8 @@ import {
 	filterDevflareManagedTokens,
 	normalizeDevflareTokenName,
 	selectAllReusablePermissionGroups,
-	selectDevflarePermissionGroups
+	selectDevflarePermissionGroups,
+	stripDevflareTokenNamePrefix
 } from '../../../src/cloudflare/tokens'
 
 describe('selectDevflarePermissionGroups', () => {
@@ -158,6 +159,11 @@ describe('selectDevflarePermissionGroups', () => {
 	test('normalizes Devflare-managed token names to the devflare- prefix', () => {
 		expect(normalizeDevflareTokenName('preview')).toBe('devflare-preview')
 		expect(normalizeDevflareTokenName('devflare-preview')).toBe('devflare-preview')
+	})
+
+	test('strips the devflare- prefix for display without changing unprefixed names', () => {
+		expect(stripDevflareTokenNamePrefix('devflare-preview')).toBe('preview')
+		expect(stripDevflareTokenNamePrefix('preview')).toBe('preview')
 	})
 
 	test('filters account-owned tokens down to Devflare-managed names', () => {

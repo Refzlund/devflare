@@ -91,6 +91,13 @@ describe('parseArgs', () => {
 		expect(result.options.new).toBe('preview')
 	})
 
+	test('parses token roll command', () => {
+		const result = parseArgs(['tokens', 'bootstrap-token', '--roll', 'preview'])
+		expect(result.command).toBe('tokens')
+		expect(result.args).toEqual(['bootstrap-token'])
+		expect(result.options.roll).toBe('preview')
+	})
+
 	test('keeps the legacy token alias working', () => {
 		const result = parseArgs(['token', 'bootstrap-token'])
 		expect(result.command).toBe('token')
@@ -158,6 +165,7 @@ describe('runCli', () => {
 		expect(result.output).toContain('worker rename <old-name> --to <new-name>')
 		expect(result.output).toContain('tokens              Manage Devflare-managed Cloudflare API tokens')
 		expect(result.output).toContain('tokens <bootstrap-token> --new [name]')
+		expect(result.output).toContain('tokens <bootstrap-token> --roll [name]')
 		expect(result.output).toContain('tokens <bootstrap-token> --delete-all')
 	})
 

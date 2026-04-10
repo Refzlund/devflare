@@ -12,16 +12,27 @@ import {
 	listAccountOwnedAPITokens,
 	listAccountTokenPermissionGroups,
 	normalizeDevflareTokenName,
+	rollAccountOwnedAPITokenValue,
 	selectAllReusablePermissionGroups,
-	selectDevflarePermissionGroups
+	selectDevflarePermissionGroups,
+	stripDevflareTokenNamePrefix
 } from '../../cloudflare/tokens'
 
 const CLI_API_OPTIONS: APIClientOptions = { timeout: 10000 }
-const TOKENS_USAGE = 'Usage: devflare tokens <bootstrap-token> (--list | --new [token-name] | --delete [token-name] | --delete-all) [--account <id>] [--all-flags]'
+const TOKENS_USAGE = 'devflare tokens <bootstrap-token> (--list | --new [token-name] | --roll [token-name] | --delete [token-name] | --delete-all) [--account <id>] [--all-flags]'
+const TOKEN_OPERATION_SUMMARY_LINES = [
+	'--list             List Devflare-managed account-owned tokens',
+	'--new [name]       Create a Devflare-managed account-owned token',
+	'--roll [name]      Roll a Devflare-managed account-owned token secret',
+	'--delete [name]    Delete a Devflare-managed account-owned token',
+	'--delete-all       Delete every Devflare-managed account-owned token',
+	'--all-flags        With --new, include every reusable account-scoped permission group'
+] as const
 
 type TokenOperation =
 	| { kind: 'list' }
 	| { kind: 'new'; requestedName?: string }
+	| { kind: 'roll'; requestedName?: string }
 	| { kind: 'delete'; requestedName?: string }
 	| { kind: 'delete-all' }
 
@@ -57,20 +68,33 @@ function sortTokens(tokens: AccountOwnedAPIToken[]): AccountOwnedAPIToken[] {
 	})
 }
 
-function logUsage(logger: ConsolaInstance, theme: ReturnType<typeof createCliTheme>): void {
-	logger.error(TOKENS_USAGE)
+
+function logUsage(
+	logger: ConsolaInstance,
+	theme: ReturnType<typeof createCliTheme>
+): void {
+	logLine(logger)
+	logLine(logger, `${dim('Usage:', theme)} ${TOKENS_USAGE}`)
+	logLine(logger, dim('Operations:', theme))
+	for (const line of TOKEN_OPERATION_SUMMARY_LINES) {
+		logLine(logger, `  ${line}`)
+	}
+	logLine(logger, dim('Token names are normalized to the devflare- prefix automatically.', theme))
 	logLine(logger, dim('The bootstrap token must include Cloudflare API token management permissions.', theme))
+	logLine(logger)
 }
 
 function resolveTokenOperation(parsed: ParsedArgs): TokenOperation | string {
 	const newOption = parsed.options.new ?? parsed.options.name
+	const rollOption = parsed.options.roll
 	const deleteOption = parsed.options.delete
 	const requestedOperations = [
 		newOption !== undefined ? 'new' : null,
+		rollOption !== undefined ? 'roll' : null,
 		deleteOption !== undefined ? 'delete' : null,
 		parsed.options.list === true ? 'list' : null,
 		parsed.options['delete-all'] === true ? 'delete-all' : null
-	].filter(Boolean) as Array<'new' | 'delete' | 'list' | 'delete-all'>
+	].filter(Boolean) as Array<'new' | 'roll' | 'delete' | 'list' | 'delete-all'>
 	const useLegacyCreateAlias = parsed.command === 'token' && requestedOperations.length === 0
 
 	if (parsed.options['all-flags'] && !requestedOperations.includes('new') && !useLegacyCreateAlias) {
@@ -85,7 +109,7 @@ function resolveTokenOperation(parsed: ParsedArgs): TokenOperation | string {
 			}
 		}
 
-		return 'Choose one token operation: --list, --new, --delete, or --delete-all.'
+		return 'Choose one token operation: --list, --new, --roll, --delete, or --delete-all.'
 	}
 
 	if (requestedOperations.length > 1) {
@@ -97,6 +121,12 @@ function resolveTokenOperation(parsed: ParsedArgs): TokenOperation | string {
 			return {
 				kind: 'new',
 				requestedName: typeof newOption === 'string' ? newOption.trim() || undefined : undefined
+			}
+
+		case 'roll':
+			return {
+				kind: 'roll',
+				requestedName: typeof rollOption === 'string' ? rollOption.trim() || undefined : undefined
 			}
 
 		case 'delete':
@@ -113,6 +143,10 @@ function resolveTokenOperation(parsed: ParsedArgs): TokenOperation | string {
 	}
 }
 
+
+function formatManagedTokenDisplayName(name: string): string {
+	return stripDevflareTokenNamePrefix(name)
+}
 async function promptForTokenName(
 	logger: ConsolaInstance,
 	theme: ReturnType<typeof createCliTheme>,
@@ -296,7 +330,7 @@ async function listManagedTokens(
 		columns: [
 			{
 				label: 'Name',
-				value: (token) => token.name,
+				value: (token) => formatManagedTokenDisplayName(token.name),
 				width: 46
 			},
 			{
@@ -327,7 +361,73 @@ async function listManagedTokens(
 
 	return {
 		exitCode: 0,
-		output: managedTokens.map((token) => token.name).join('\n')
+		output: managedTokens.map((token) => formatManagedTokenDisplayName(token.name)).join('\n')
+	}
+}
+
+async function rollManagedTokensByName(
+	accountId: string,
+	accountSource: string,
+	bootstrapToken: string,
+	requestedName: string | undefined,
+	logger: ConsolaInstance,
+	theme: ReturnType<typeof createCliTheme>
+): Promise<CliResult> {
+	const tokenName = await resolveTokenName(
+		requestedName,
+		logger,
+		theme,
+		'Enter the Devflare token name to roll:'
+	)
+	if (!tokenName) {
+		return { exitCode: 0 }
+	}
+
+	logLine(logger)
+	logLine(logger, `${yellow('tokens', theme)} ${dim('Rolling a Devflare-managed account-owned token…', theme)}`)
+	logLine(logger, `${dim('Account:', theme)} ${green(accountId, theme)} ${whiteDim(`(${accountSource})`, theme)}`)
+	logLine(logger, `${dim('Name:', theme)} ${green(tokenName, theme)}`)
+
+	const accountTokens = await listAccountOwnedAPITokens(accountId, {
+		...CLI_API_OPTIONS,
+		token: bootstrapToken
+	})
+	const matchingTokens = filterDevflareManagedTokens(accountTokens).filter((token) => token.name === tokenName)
+
+	if (matchingTokens.length === 0) {
+		logger.error(`No Devflare-managed token named ${tokenName} was found.`)
+		return { exitCode: 1 }
+	}
+
+	if (matchingTokens.length > 1) {
+		logLine(
+			logger,
+			dim(`Found ${matchingTokens.length} tokens with that name. Rolling all exact matches.`, theme)
+		)
+	}
+
+	const rolledValues: string[] = []
+	for (const token of matchingTokens) {
+		const rolledValue = await rollAccountOwnedAPITokenValue(accountId, token.id, {
+			...CLI_API_OPTIONS,
+			token: bootstrapToken
+		})
+		rolledValues.push(rolledValue)
+	}
+
+	logger.success(`Rolled ${matchingTokens.length} Devflare-managed token(s) named ${tokenName}`)
+	logger.warn('Cloudflare only returns the new token secret once. Store it safely now.')
+	if (rolledValues.length === 1) {
+		logger.log(rolledValues[0])
+	} else {
+		for (const [index, value] of rolledValues.entries()) {
+			logLine(logger, `${dim(`${matchingTokens[index].id.slice(0, 12)}:`, theme)} ${value}`)
+		}
+	}
+
+	return {
+		exitCode: 0,
+		output: rolledValues.join('\n')
 	}
 }
 
@@ -446,7 +546,6 @@ export async function runTokenCommand(
 
 	const tokenOperation = resolveTokenOperation(parsed)
 	if (typeof tokenOperation === 'string') {
-		logger.error(tokenOperation)
 		logUsage(logger, theme)
 		return { exitCode: 1 }
 	}
@@ -464,6 +563,16 @@ export async function runTokenCommand(
 					bootstrapToken,
 					tokenOperation.requestedName,
 					parsed.options['all-flags'] === true,
+					logger,
+					theme
+				)
+
+			case 'roll':
+				return rollManagedTokensByName(
+					accountId,
+					source,
+					bootstrapToken,
+					tokenOperation.requestedName,
 					logger,
 					theme
 				)

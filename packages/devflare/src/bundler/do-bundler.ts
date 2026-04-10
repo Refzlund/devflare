@@ -606,7 +606,6 @@ export function createDOBundler(options: DOBundlerOptions): DOBundler {
 
 		// Create compiled matcher for the glob pattern
 		const isMatch = picomatch(pattern, {
-			cwd,
 			dot: true,
 			// Match from the start of the path
 			matchBase: false
