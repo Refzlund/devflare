@@ -12,6 +12,8 @@ on:
 permissions:
   contents: read
   deployments: write
+  issues: write
+  pull-requests: read
 
 jobs:
   cleanup-preview:
