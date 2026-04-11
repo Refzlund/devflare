@@ -81,8 +81,10 @@ account capabilities that cannot be created purely from source code:
 - `r2`
 	- the target account must have R2 enabled in the Cloudflare dashboard
 - `hyperdrive`
-	- `POSTGRES.id` must point at a real Hyperdrive config backed by a real
+	- `POSTGRES` must point at a real Hyperdrive config backed by a real
 		database
+	- prefer the stable configured name (`devflare-testing`) over a raw id so
+		Devflare can resolve it for build/deploy flows
 - `sendEmail`
 	- use real sender/destination addresses that match your Email Sending setup
 

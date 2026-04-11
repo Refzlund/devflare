@@ -5,7 +5,7 @@
 import { type ConsolaInstance } from 'consola'
 import { resolve, relative, dirname, basename } from 'pathe'
 import type { ParsedArgs, CliOptions, CliResult } from '../index'
-import { loadConfig, normalizeDOBinding, resolveConfigPath, type D1Binding, type DurableObjectBinding, type KVBinding } from '../../config'
+import { loadConfig, normalizeDOBinding, resolveConfigPath, type D1Binding, type DurableObjectBinding, type HyperdriveBinding, type KVBinding } from '../../config'
 import { getDependencies } from '../dependencies'
 import { findFiles, DEFAULT_DO_PATTERN, DEFAULT_ENTRYPOINT_PATTERN } from '../../utils/glob'
 import { findDurableObjectClasses } from '../../transform/durable-object'
@@ -379,7 +379,7 @@ function generateBindingMembers(
 			services?: Record<string, { service?: string }>
 			ai?: { binding?: string }
 			vectorize?: Record<string, { indexName?: string }>
-			hyperdrive?: Record<string, { id?: string }>
+			hyperdrive?: Record<string, HyperdriveBinding>
 			browser?: Record<string, string>
 			analyticsEngine?: Record<string, { dataset?: string }>
 			sendEmail?: Record<string, {
@@ -541,7 +541,7 @@ function generateBindingTypes(
 			services?: Record<string, { service?: string }>
 			ai?: { binding?: string }
 			vectorize?: Record<string, { indexName?: string }>
-			hyperdrive?: Record<string, { id?: string }>
+			hyperdrive?: Record<string, HyperdriveBinding>
 			browser?: Record<string, string>
 			analyticsEngine?: Record<string, { dataset?: string }>
 			sendEmail?: Record<string, {

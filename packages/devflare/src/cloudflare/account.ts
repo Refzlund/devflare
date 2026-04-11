@@ -22,6 +22,8 @@ import type {
 	KVNamespaceInfo,
 	D1Database,
 	D1DatabaseInfo,
+	HyperdriveConfig,
+	HyperdriveConfigInfo,
 	R2Bucket,
 	R2BucketInfo,
 	VectorizeIndex,
@@ -207,7 +209,7 @@ export async function listWorkerVersions(
 	const versions: WorkerVersionInfo[] = []
 	const encodedScriptName = encodeURIComponent(scriptName)
 
-	for (let page = 1; page <= 100; page++) {
+	for (let page = 1;page <= 100;page++) {
 		const result = await apiGet<WorkerVersionsListResult>(
 			`/accounts/${accountId}/workers/scripts/${encodedScriptName}/versions?page=${page}&per_page=100`,
 			options
@@ -334,6 +336,30 @@ export async function listD1Databases(
 		version: db.version,
 		tableCount: db.num_tables,
 		sizeBytes: db.file_size
+	}))
+}
+
+// -----------------------------------------------------------------------------
+// Hyperdrive Configurations
+// -----------------------------------------------------------------------------
+
+/**
+ * List all Hyperdrive configurations in an account
+ */
+export async function listHyperdrives(
+	accountId: string,
+	options?: APIClientOptions
+): Promise<HyperdriveConfigInfo[]> {
+	const hyperdrives = await apiGetAll<HyperdriveConfig>(
+		`/accounts/${accountId}/hyperdrive/configs`,
+		options
+	)
+
+	return hyperdrives.map((hyperdrive) => ({
+		id: hyperdrive.id,
+		name: hyperdrive.name,
+		createdOn: hyperdrive.created_on ? new Date(hyperdrive.created_on) : undefined,
+		modifiedOn: hyperdrive.modified_on ? new Date(hyperdrive.modified_on) : undefined
 	}))
 }
 
@@ -546,6 +572,20 @@ export async function getServiceStatus(
 				}
 			}
 
+			case 'hyperdrive': {
+				const hyperdrives = await Promise.race([
+					listHyperdrives(accountId),
+					new Promise<never>((_, reject) =>
+						setTimeout(() => reject(new Error('timeout')), timeout)
+					)
+				])
+				return {
+					service,
+					available: true,
+					count: hyperdrives.length
+				}
+			}
+
 			case 'r2': {
 				const buckets = await Promise.race([
 					listR2Buckets(accountId),
@@ -612,6 +652,7 @@ export async function getAllServiceStatus(accountId: string): Promise<ServiceSta
 		'workers',
 		'kv',
 		'd1',
+		'hyperdrive',
 		'r2',
 		'vectorize',
 		'ai'

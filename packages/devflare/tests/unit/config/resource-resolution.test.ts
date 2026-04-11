@@ -22,7 +22,7 @@ describe('config resource resolution', () => {
 		compatibilityFlags: []
 	}
 
-	test('normalizes KV and D1 name bindings for local runtime without Cloudflare lookup', () => {
+	test('normalizes KV, D1, and Hyperdrive name bindings for local runtime without Cloudflare lookup', () => {
 		const result = resolveConfigForLocalRuntime({
 			...baseConfig,
 			bindings: {
@@ -35,6 +35,11 @@ describe('config resource resolution', () => {
 					DB: { name: 'main-db' },
 					AUDIT: { id: 'audit-db-id' },
 					LEGACY: 'legacy-db'
+				},
+				hyperdrive: {
+					POSTGRES: { name: 'devflare-testing' },
+					REPLICA: { id: 'replica-hyperdrive-id' },
+					LEGACY_POSTGRES: 'legacy-postgres'
 				}
 			}
 		})
@@ -49,9 +54,14 @@ describe('config resource resolution', () => {
 			AUDIT: { id: 'audit-db-id' },
 			LEGACY: { id: 'legacy-db' }
 		})
+		expect(result.bindings?.hyperdrive).toEqual({
+			POSTGRES: { id: 'devflare-testing' },
+			REPLICA: { id: 'replica-hyperdrive-id' },
+			LEGACY_POSTGRES: { id: 'legacy-postgres' }
+		})
 	})
 
-	test('resolves KV and D1 name bindings using Cloudflare resource lookup', async () => {
+	test('resolves KV, D1, and Hyperdrive name bindings using Cloudflare resource lookup', async () => {
 		const getPrimaryAccount = mock(async () => ({
 			id: 'primary-account',
 			name: 'Primary',
@@ -71,6 +81,11 @@ describe('config resource resolution', () => {
 			{ id: 'analytics-db-id', name: 'analytics-db' },
 			{ id: 'legacy-db-id', name: 'legacy-db' }
 		]))
+		const listHyperdrives = mock(async () => ([
+			{ id: 'resolved-postgres-id', name: 'devflare-testing' },
+			{ id: 'legacy-postgres-id', name: 'legacy-postgres' },
+			{ id: 'replica-hyperdrive-id', name: 'replica-postgres' }
+		]))
 
 		const result = await resolveConfigResources({
 			...baseConfig,
@@ -85,6 +100,11 @@ describe('config resource resolution', () => {
 					ANALYTICS: { id: 'analytics-db-id' },
 					LEGACY: 'legacy-db'
 				},
+				hyperdrive: {
+					POSTGRES: { name: 'devflare-testing' },
+					LEGACY_POSTGRES: 'legacy-postgres',
+					REPLICA: { id: 'replica-hyperdrive-id' }
+				},
 				r2: {
 					ASSETS: 'assets-bucket'
 				}
@@ -94,7 +114,8 @@ describe('config resource resolution', () => {
 				getPrimaryAccount,
 				getEffectiveAccountId,
 				listKVNamespaces,
-				listD1Databases
+				listD1Databases,
+				listHyperdrives
 			}
 		})
 
@@ -108,6 +129,11 @@ describe('config resource resolution', () => {
 			ANALYTICS: { id: 'analytics-db-id' },
 			LEGACY: { id: 'legacy-db-id' }
 		})
+		expect(result.bindings?.hyperdrive).toEqual({
+			POSTGRES: { id: 'resolved-postgres-id' },
+			LEGACY_POSTGRES: { id: 'legacy-postgres-id' },
+			REPLICA: { id: 'replica-hyperdrive-id' }
+		})
 		expect(result.bindings?.r2).toEqual({
 			ASSETS: 'assets-bucket'
 		})
@@ -115,9 +141,10 @@ describe('config resource resolution', () => {
 		expect(getEffectiveAccountId).toHaveBeenCalledWith('primary-account')
 		expect(listKVNamespaces).toHaveBeenCalledWith('effective-account')
 		expect(listD1Databases).toHaveBeenCalledWith('effective-account')
+		expect(listHyperdrives).toHaveBeenCalledWith('effective-account')
 	})
 
-	test('prefers explicit accountId when resolving KV and D1 names', async () => {
+	test('prefers explicit accountId when resolving KV, D1, and Hyperdrive names', async () => {
 		const getPrimaryAccount = mock(async () => {
 			throw new Error('should not need primary account lookup')
 		})
@@ -129,6 +156,10 @@ describe('config resource resolution', () => {
 			expect(accountId).toBe('config-account')
 			return [{ id: 'resolved-db-id', name: 'main-db' }]
 		})
+		const listHyperdrives = mock(async (accountId: string) => {
+			expect(accountId).toBe('config-account')
+			return [{ id: 'resolved-postgres-id', name: 'devflare-testing' }]
+		})
 
 		const result = await resolveConfigResources({
 			...baseConfig,
@@ -139,18 +170,23 @@ describe('config resource resolution', () => {
 				},
 				d1: {
 					DB: { name: 'main-db' }
+				},
+				hyperdrive: {
+					POSTGRES: { name: 'devflare-testing' }
 				}
 			}
 		}, {
 			cloudflare: {
 				getPrimaryAccount,
 				listKVNamespaces,
-				listD1Databases
+				listD1Databases,
+				listHyperdrives
 			}
 		})
 
 		expect(result.bindings?.kv).toEqual({ CACHE: { id: 'resolved-cache-kv-id' } })
 		expect(result.bindings?.d1).toEqual({ DB: { id: 'resolved-db-id' } })
+		expect(result.bindings?.hyperdrive).toEqual({ POSTGRES: { id: 'resolved-postgres-id' } })
 		expect(getPrimaryAccount).not.toHaveBeenCalled()
 	})
 
@@ -189,7 +225,26 @@ describe('config resource resolution', () => {
 		})).rejects.toThrow('Could not find D1 database(s) for DB → missing-db')
 	})
 
-	test('loads config from disk and resolves KV and D1 name bindings', async () => {
+	test('throws a helpful error when a named Hyperdrive configuration cannot be found', async () => {
+		await expect(resolveConfigResources({
+			...baseConfig,
+			bindings: {
+				hyperdrive: {
+					POSTGRES: { name: 'missing-hyperdrive' }
+				}
+			}
+		}, {
+			cloudflare: {
+				getPrimaryAccount: async () => ({ id: 'primary-account', name: 'Primary', type: 'standard' }),
+				getEffectiveAccountId: async () => ({ accountId: 'effective-account', source: 'workspace' as const }),
+				listKVNamespaces: async () => [],
+				listD1Databases: async () => [],
+				listHyperdrives: async () => [{ id: 'resolved-postgres-id', name: 'devflare-testing' }]
+			}
+		})).rejects.toThrow('Could not find Hyperdrive configuration(s) for POSTGRES → missing-hyperdrive')
+	})
+
+	test('loads config from disk and resolves KV, D1, and Hyperdrive name bindings', async () => {
 		const projectDir = await mkdtemp(join(tmpdir(), 'devflare-resolved-config-'))
 		tempDirs.push(projectDir)
 
@@ -203,6 +258,9 @@ export default {
 		},
 		d1: {
 			DB: { name: 'main-db' }
+				},
+				hyperdrive: {
+					POSTGRES: 'devflare-testing'
 		},
 		r2: {
 			ASSETS: 'assets-bucket'
@@ -217,13 +275,15 @@ export default {
 				getPrimaryAccount: async () => ({ id: 'primary-account', name: 'Primary', type: 'standard' }),
 				getEffectiveAccountId: async () => ({ accountId: 'effective-account', source: 'workspace' as const }),
 				listKVNamespaces: async () => [{ id: 'resolved-cache-kv-id', name: 'cache-kv' }],
-				listD1Databases: async () => [{ id: 'resolved-db-id', name: 'main-db' }]
+				listD1Databases: async () => [{ id: 'resolved-db-id', name: 'main-db' }],
+				listHyperdrives: async () => [{ id: 'resolved-postgres-id', name: 'devflare-testing' }]
 			}
 		})
 
 		expect(result.name).toBe('resolved-worker')
 		expect(result.bindings?.kv).toEqual({ CACHE: { id: 'resolved-cache-kv-id' } })
 		expect(result.bindings?.d1).toEqual({ DB: { id: 'resolved-db-id' } })
+		expect(result.bindings?.hyperdrive).toEqual({ POSTGRES: { id: 'resolved-postgres-id' } })
 		expect(result.bindings?.r2).toEqual({ ASSETS: 'assets-bucket' })
 	})
 })

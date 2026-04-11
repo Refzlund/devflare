@@ -335,10 +335,21 @@ const vectorizeBindingSchema = z.object({
  * Provides accelerated PostgreSQL connections via connection pooling.
  * @see https://developers.cloudflare.com/hyperdrive/
  */
-const hyperdriveBindingSchema = z.object({
-	/** Hyperdrive configuration ID */
+const hyperdriveBindingByIdSchema = z.object({
+	/** Explicit Hyperdrive configuration ID */
 	id: z.string()
-})
+}).strict()
+
+const hyperdriveBindingByNameSchema = z.object({
+	/** Stable Hyperdrive configuration name to resolve to an ID at config/build/deploy time */
+	name: z.string()
+}).strict()
+
+const hyperdriveBindingSchema = z.union([
+	z.string(),
+	hyperdriveBindingByIdSchema,
+	hyperdriveBindingByNameSchema
+])
 
 const SINGLE_BROWSER_BINDING_ERROR_MESSAGE = 'Devflare currently supports exactly one browser binding because Wrangler only supports a single browser binding.'
 
@@ -493,6 +504,8 @@ const bindingsSchema = z.object({
 
 	/**
 	 * Hyperdrive bindings for accelerated PostgreSQL.
+	 * @example { DB: 'app-hyperdrive' }
+	 * @example { DB: { name: 'app-hyperdrive' } }
 	 * @example { DB: { id: 'hyperdrive-config-id' } }
 	 */
 	hyperdrive: z.record(z.string(), hyperdriveBindingSchema).optional(),
@@ -1125,6 +1138,7 @@ export type DevflareConfigInput = z.input<typeof configSchema>
 export type DevflareEnvConfig = z.output<typeof envConfigSchemaInner>
 export type BrowserBindings = z.infer<typeof browserBindingSchema>
 export type D1Binding = z.infer<typeof d1BindingSchema>
+export type HyperdriveBinding = z.infer<typeof hyperdriveBindingSchema>
 export type KVBinding = z.infer<typeof kvBindingSchema>
 export type DurableObjectBinding = z.infer<typeof durableObjectBindingSchema>
 export type QueueConsumer = z.infer<typeof queueConsumerSchema>
@@ -1167,6 +1181,13 @@ export interface NormalizedKVBinding {
 	/** Resolved KV namespace ID when one is already known */
 	namespaceId?: string
 	/** Stable KV namespace name when the binding is configured by name */
+	name?: string
+}
+
+export interface NormalizedHyperdriveBinding {
+	/** Resolved Hyperdrive configuration ID when one is already known */
+	configurationId?: string
+	/** Stable Hyperdrive configuration name when the binding is configured by name */
 	name?: string
 }
 
@@ -1235,6 +1256,22 @@ export function normalizeKVBinding(config: KVBinding): NormalizedKVBinding {
 }
 
 /**
+ * Normalize a Hyperdrive binding to a consistent object form.
+ * String bindings are treated as stable Hyperdrive configuration names.
+ */
+export function normalizeHyperdriveBinding(config: HyperdriveBinding): NormalizedHyperdriveBinding {
+	if (typeof config === 'string') {
+		return { name: config }
+	}
+
+	if ('id' in config) {
+		return { configurationId: config.id }
+	}
+
+	return { name: config.name }
+}
+
+/**
  * Get the identifier Devflare should use for local/runtime KV wiring.
  * Local Miniflare/workerd flows can use either a real namespace ID or the stable namespace name.
  */
@@ -1250,4 +1287,13 @@ export function getLocalKVNamespaceIdentifier(config: KVBinding): string {
 export function getLocalD1DatabaseIdentifier(config: D1Binding): string {
 	const normalized = normalizeD1Binding(config)
 	return normalized.databaseId ?? normalized.name ?? ''
+}
+
+/**
+ * Get the identifier Devflare should use for local/runtime Hyperdrive wiring.
+ * Local Miniflare/workerd flows can use either a real configuration ID or the stable Hyperdrive name.
+ */
+export function getLocalHyperdriveConfigIdentifier(config: HyperdriveBinding): string {
+	const normalized = normalizeHyperdriveBinding(config)
+	return normalized.configurationId ?? normalized.name ?? ''
 }

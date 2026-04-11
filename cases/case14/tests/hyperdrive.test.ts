@@ -49,6 +49,16 @@ describe('Fetch Handler', () => {
 		expect(body.binding).toBe('hyperdrive')
 	})
 
+	test('should report Hyperdrive connection info', async () => {
+		const request = new Request('http://localhost/connection-info')
+		const response = await fetch(request)
+
+		expect(response.status).toBe(200)
+		const body = await response.json() as { hasBinding: boolean, hasConnectionString: boolean }
+		expect(body.hasBinding).toBe(true)
+		expect(body.hasConnectionString).toBe(true)
+	})
+
 	test('should return 404 for unknown routes', async () => {
 		const request = new Request('http://localhost/unknown')
 		const response = await fetch(request)

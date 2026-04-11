@@ -1,11 +1,13 @@
-import { getPrimaryAccount, listD1Databases, listKVNamespaces } from '../cloudflare/account'
+import { getPrimaryAccount, listD1Databases, listHyperdrives, listKVNamespaces } from '../cloudflare/account'
 import { getEffectiveAccountId } from '../cloudflare/preferences'
 import { loadConfig, type LoadConfigOptions } from './loader'
 import { resolveConfigForEnvironment } from './resolve'
 import {
 	getLocalD1DatabaseIdentifier,
+	getLocalHyperdriveConfigIdentifier,
 	getLocalKVNamespaceIdentifier,
 	normalizeD1Binding,
+	normalizeHyperdriveBinding,
 	normalizeKVBinding,
 	type DevflareConfig
 } from './schema'
@@ -15,13 +17,15 @@ interface CloudflareConfigResolutionApi {
 	getEffectiveAccountId: typeof getEffectiveAccountId
 	listKVNamespaces: typeof listKVNamespaces
 	listD1Databases: typeof listD1Databases
+	listHyperdrives: typeof listHyperdrives
 }
 
 const defaultCloudflareApi: CloudflareConfigResolutionApi = {
 	getPrimaryAccount,
 	getEffectiveAccountId,
 	listKVNamespaces,
-	listD1Databases
+	listD1Databases,
+	listHyperdrives
 }
 
 export interface ResolveConfigResourcesOptions {
@@ -76,6 +80,16 @@ function materializeLocalD1Bindings(
 	)
 }
 
+function materializeLocalHyperdriveBindings(
+	bindings: NonNullable<NonNullable<DevflareConfig['bindings']>['hyperdrive']>
+): Record<string, { id: string }> {
+	return Object.fromEntries(
+		Object.entries(bindings).map(([bindingName, bindingConfig]) => {
+			return [bindingName, { id: getLocalHyperdriveConfigIdentifier(bindingConfig) }]
+		})
+	)
+}
+
 async function resolveLookupAccountId(
 	config: DevflareConfig,
 	options: ResolveConfigResourcesOptions,
@@ -125,8 +139,14 @@ function formatMissingD1Bindings(missing: Array<{ bindingName: string; databaseN
 		.join(', ')
 }
 
+function formatMissingHyperdriveBindings(missing: Array<{ bindingName: string; configurationName: string }>): string {
+	return missing
+		.map(({ bindingName, configurationName }) => `${bindingName} → ${configurationName}`)
+		.join(', ')
+}
+
 /**
- * Resolve environment overrides and normalize KV/D1 bindings for purely local runtimes.
+	* Resolve environment overrides and normalize KV/D1/Hyperdrive bindings for purely local runtimes.
  *
  * Local Miniflare/workerd flows can use either an explicit resource ID or the
  * stable resource name as the backing identifier, so this path avoids requiring
@@ -139,8 +159,9 @@ export function resolveConfigForLocalRuntime(
 	const resolvedConfig = resolveConfigForEnvironment(config, environment)
 	const kvBindings = resolvedConfig.bindings?.kv
 	const d1Bindings = resolvedConfig.bindings?.d1
+	const hyperdriveBindings = resolvedConfig.bindings?.hyperdrive
 
-	if (!kvBindings && !d1Bindings) {
+	if (!kvBindings && !d1Bindings && !hyperdriveBindings) {
 		return resolvedConfig
 	}
 
@@ -149,13 +170,14 @@ export function resolveConfigForLocalRuntime(
 		bindings: {
 			...resolvedConfig.bindings,
 			...(kvBindings ? { kv: materializeLocalKVBindings(kvBindings) } : {}),
-			...(d1Bindings ? { d1: materializeLocalD1Bindings(d1Bindings) } : {})
+			...(d1Bindings ? { d1: materializeLocalD1Bindings(d1Bindings) } : {}),
+			...(hyperdriveBindings ? { hyperdrive: materializeLocalHyperdriveBindings(hyperdriveBindings) } : {})
 		}
 	}
 }
 
 /**
- * Resolve Cloudflare-backed resource references such as KV/D1 name bindings into
+	* Resolve Cloudflare-backed resource references such as KV/D1/Hyperdrive name bindings into
  * concrete IDs for build, deploy, and automation workflows.
  */
 export async function resolveConfigResources(
@@ -165,8 +187,9 @@ export async function resolveConfigResources(
 	const resolvedConfig = resolveConfigForEnvironment(config, options.environment)
 	const kvBindings = resolvedConfig.bindings?.kv
 	const d1Bindings = resolvedConfig.bindings?.d1
+	const hyperdriveBindings = resolvedConfig.bindings?.hyperdrive
 
-	if (!kvBindings && !d1Bindings) {
+	if (!kvBindings && !d1Bindings && !hyperdriveBindings) {
 		return resolvedConfig
 	}
 
@@ -198,13 +221,32 @@ export async function resolveConfigResources(
 			.filter((binding): binding is { bindingName: string; databaseName: string } => binding !== null)
 		: []
 
-	if (pendingKVNameBindings.length === 0 && pendingD1NameBindings.length === 0) {
+	const pendingHyperdriveNameBindings = hyperdriveBindings
+		? Object.entries(hyperdriveBindings)
+			.map(([bindingName, bindingConfig]) => {
+				const normalized = normalizeHyperdriveBinding(bindingConfig)
+				return normalized.configurationId
+					? null
+					: {
+						bindingName,
+						configurationName: normalized.name ?? ''
+					}
+			})
+			.filter((binding): binding is { bindingName: string; configurationName: string } => binding !== null)
+		: []
+
+	if (
+		pendingKVNameBindings.length === 0 &&
+		pendingD1NameBindings.length === 0 &&
+		pendingHyperdriveNameBindings.length === 0
+	) {
 		return {
 			...resolvedConfig,
 			bindings: {
 				...resolvedConfig.bindings,
 				...(kvBindings ? { kv: materializeLocalKVBindings(kvBindings) } : {}),
-				...(d1Bindings ? { d1: materializeLocalD1Bindings(d1Bindings) } : {})
+				...(d1Bindings ? { d1: materializeLocalD1Bindings(d1Bindings) } : {}),
+				...(hyperdriveBindings ? { hyperdrive: materializeLocalHyperdriveBindings(hyperdriveBindings) } : {})
 			}
 		}
 	}
@@ -266,6 +308,33 @@ export async function resolveConfigResources(
 		}
 	}
 
+	let hyperdriveIdsByName = new Map<string, string>()
+	if (pendingHyperdriveNameBindings.length > 0) {
+		let hyperdrives
+		try {
+			hyperdrives = await cloudflareApi.listHyperdrives(accountId)
+		} catch (error) {
+			throw new ConfigResourceResolutionError(
+				`Could not list Hyperdrive configurations for Cloudflare account ${accountId} while resolving name-based Hyperdrive bindings.`,
+				error
+			)
+		}
+
+		hyperdriveIdsByName = new Map(
+			hyperdrives.map((hyperdrive) => [hyperdrive.name, hyperdrive.id])
+		)
+
+		const missingHyperdriveBindings = pendingHyperdriveNameBindings.filter(({ configurationName }) => {
+			return !hyperdriveIdsByName.has(configurationName)
+		})
+
+		if (missingHyperdriveBindings.length > 0) {
+			throw new ConfigResourceResolutionError(
+				`Could not find Hyperdrive configuration(s) for ${formatMissingHyperdriveBindings(missingHyperdriveBindings)} in Cloudflare account ${accountId}.`
+			)
+		}
+	}
+
 	return {
 		...resolvedConfig,
 		bindings: {
@@ -287,6 +356,17 @@ export async function resolveConfigResources(
 						Object.entries(d1Bindings).map(([bindingName, bindingConfig]) => {
 							const normalized = normalizeD1Binding(bindingConfig)
 							const resolvedId = normalized.databaseId ?? databaseIdsByName.get(normalized.name ?? '') ?? ''
+							return [bindingName, { id: resolvedId }]
+						})
+					)
+				}
+				: {}),
+			...(hyperdriveBindings
+				? {
+					hyperdrive: Object.fromEntries(
+						Object.entries(hyperdriveBindings).map(([bindingName, bindingConfig]) => {
+							const normalized = normalizeHyperdriveBinding(bindingConfig)
+							const resolvedId = normalized.configurationId ?? hyperdriveIdsByName.get(normalized.name ?? '') ?? ''
 							return [bindingName, { id: resolvedId }]
 						})
 					)

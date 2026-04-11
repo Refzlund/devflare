@@ -261,7 +261,18 @@ describe('compileConfig', () => {
 			])
 		})
 
-		test('compiles Hyperdrive bindings', () => {
+		test('throws for unresolved Hyperdrive name bindings configured with string shorthand', () => {
+			expect(() => compileConfig({
+				...baseConfig,
+				bindings: {
+					hyperdrive: {
+						POSTGRES: 'devflare-testing'
+					}
+				}
+			})).toThrow('configured by name (devflare-testing)')
+		})
+
+		test('compiles Hyperdrive bindings configured with explicit id objects', () => {
 			const result = compileConfig({
 				...baseConfig,
 				bindings: {
@@ -274,6 +285,17 @@ describe('compileConfig', () => {
 			expect(result.hyperdrive).toEqual([
 				{ binding: 'POSTGRES', id: 'hyperdrive-id' }
 			])
+		})
+
+		test('throws for unresolved Hyperdrive name bindings configured with { name }', () => {
+			expect(() => compileConfig({
+				...baseConfig,
+				bindings: {
+					hyperdrive: {
+						POSTGRES: { name: 'devflare-testing' }
+					}
+				}
+			})).toThrow('loadResolvedConfig() or resolveConfigResources()')
 		})
 
 		test('compiles Browser binding map syntax', () => {

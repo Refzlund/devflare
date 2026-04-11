@@ -713,7 +713,7 @@ Current `files` rules worth keeping explicit:
 | `services` | `Record<string, { service: string; environment?: string; entrypoint?: string }>` | Worker service bindings. `ref().worker` and `ref().worker('Entrypoint')` normalize here. |
 | `ai` | `{ binding: string }` | Workers AI binding |
 | `vectorize` | `Record<string, { indexName: string }>` | Vectorize index bindings |
-| `hyperdrive` | `Record<string, { id: string }>` | Hyperdrive bindings |
+| `hyperdrive` | `Record<string, string \| { id: string } \| { name: string }>` | Hyperdrive binding name → stable Hyperdrive config name or explicit config id |
 | `browser` | `Record<string, string>` | Browser Rendering named-map binding. Devflare currently allows exactly one entry because Wrangler only supports a single browser binding. |
 | `analyticsEngine` | `Record<string, { dataset: string }>` | Analytics Engine dataset bindings |
 | `sendEmail` | `Record<string, { destinationAddress?: string; allowedDestinationAddresses?: string[]; allowedSenderAddresses?: string[] }>` | Outbound email bindings |
@@ -735,6 +735,7 @@ Two `bindings` details that matter in practice:
 - `bindings.sendEmail` must use either `destinationAddress` or `allowedDestinationAddresses`, not both
 - `bindings.durableObjects.*.scriptName` is how you point a binding at another worker when the class does not live in the main worker bundle
 - `bindings.d1.*.{ name }` is the stable-name form; local runtime uses the name directly, while Wrangler-facing flows must resolve it to a real Cloudflare id first
+- `bindings.hyperdrive.*` supports the same stable-name pattern as D1; local runtime uses the name directly, while Wrangler-facing flows must resolve it to a real Hyperdrive configuration id first
 - `bindings.browser` uses a named-map DX such as `browser: { BROWSER: 'browser' }`, but current compile/deploy flows only accept exactly one browser binding and compile it down to Wrangler's single `browser: { binding: 'BROWSER' }` shape
 
 #### `triggers`, `routes`, and `wsRoutes`

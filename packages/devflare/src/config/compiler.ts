@@ -5,11 +5,13 @@
 import { isAbsolute, relative, resolve } from 'pathe'
 import {
 	getSingleBrowserBindingName,
+	normalizeHyperdriveBinding,
 	normalizeKVBinding,
 	normalizeD1Binding,
 	normalizeDOBinding,
 	type DevflareConfig,
 	type D1Binding,
+	type HyperdriveBinding,
 	type KVBinding
 } from './schema'
 import { resolveConfigForEnvironment } from './resolve'
@@ -132,6 +134,17 @@ function getWranglerKVNamespaceId(bindingName: string, bindingConfig: KVBinding)
 
 	throw new Error(
 		`KV binding "${bindingName}" is configured by name (${normalized.name}) and must be resolved before compiling Wrangler config. Use loadResolvedConfig() or resolveConfigResources() for build/deploy/automation flows.`
+	)
+}
+
+function getWranglerHyperdriveId(bindingName: string, bindingConfig: HyperdriveBinding): string {
+	const normalized = normalizeHyperdriveBinding(bindingConfig)
+	if (normalized.configurationId) {
+		return normalized.configurationId
+	}
+
+	throw new Error(
+		`Hyperdrive binding "${bindingName}" is configured by name (${normalized.name}) and must be resolved before compiling Wrangler config. Use loadResolvedConfig() or resolveConfigResources() for build/deploy/automation flows.`
 	)
 }
 
@@ -364,7 +377,7 @@ function compileBindings(
 	if (bindings.hyperdrive) {
 		result.hyperdrive = Object.entries(bindings.hyperdrive).map(([binding, config]) => ({
 			binding,
-			id: config.id
+			id: getWranglerHyperdriveId(binding, config)
 		}))
 	}
 

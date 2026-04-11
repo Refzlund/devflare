@@ -480,7 +480,7 @@ Devflare natively models:
 
 For R2 delivery strategy guidance, see [`R2.md`](./R2.md).
 
-For D1, prefer stable config names when you can:
+For D1 and Hyperdrive, prefer stable config names when you can:
 
 ```ts
 export default {
@@ -489,6 +489,10 @@ export default {
 			DB: { name: 'app-db' },
 			AUDIT: { id: 'existing-d1-id' }
 		},
+		hyperdrive: {
+			DB: 'app-postgres',
+			LEGACY_DB: { id: 'existing-hyperdrive-id' }
+		},
 		r2: {
 			ASSETS: 'app-assets'
 		}
@@ -496,7 +500,7 @@ export default {
 }
 ```
 
-Use `.env*` and `secrets` for values that are actually secret or genuinely process-specific. Do **not** move stable bucket/database names into env vars just to make other tooling happy.
+Use `.env*` and `secrets` for values that are actually secret or genuinely process-specific. Do **not** move stable bucket/database/Hyperdrive names into env vars just to make other tooling happy.
 
 ---
 

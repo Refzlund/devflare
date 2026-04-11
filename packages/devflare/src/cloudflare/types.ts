@@ -134,6 +134,24 @@ export interface D1DatabaseInfo {
 	sizeBytes?: number
 }
 
+// -----------------------------------------------------------------------------
+// Hyperdrive Types
+// -----------------------------------------------------------------------------
+
+export interface HyperdriveConfig {
+	id: string
+	name: string
+	created_on?: string
+	modified_on?: string
+}
+
+export interface HyperdriveConfigInfo {
+	id: string
+	name: string
+	createdOn?: Date
+	modifiedOn?: Date
+}
+
 export type D1QueryParameter = string | number | boolean | null
 
 export interface D1QueryMeta {

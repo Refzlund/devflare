@@ -393,54 +393,55 @@ export async function tail(events: TailEvent): Promise<void> {
 ---
 
 ### Case 14: Hyperdrive
-**Description**: PostgreSQL-like patterns using Bun's built-in SQLite  
-**Local Dev**: ✅ Full local simulation (Bun SQLite in-memory)  
-**Bindings**: None (pure SQLite for local testing)  
+**Description**: Minimal Hyperdrive binding example using `env.DB.connectionString`  
+**Local Dev**: ✅ Local binding-shape coverage; use remote/deployed runs for real Hyperdrive behavior  
+**Bindings**: Hyperdrive (`DB`)  
 **Docs**: [Hyperdrive](https://developers.cloudflare.com/hyperdrive/)
 
 **File Structure**:
 ```
 case14/
 ├── src/
-│   └── fetch.ts         # HTTP handler with SQL patterns
+│   └── fetch.ts         # Health + connection-info routes using env.DB
 ├── tests/
-│   └── hyperdrive.test.ts  # DB lifecycle in beforeAll/afterAll (15 passing)
-├── devflare.config.ts
+│   └── hyperdrive.test.ts  # Binding presence and basic route checks
+├── devflare.config.ts      # Named Hyperdrive binding (`devflare-testing`)
 └── env.d.ts
 ```
 
 **Local Dev Strategy**:
-Uses Bun's built-in `bun:sqlite` for local development:
-```ts
-import { Database } from 'bun:sqlite'
+Use the local test/runtime binding shape to verify that the worker can see the
+Hyperdrive binding and its connection string:
 
-// In tests — lifecycle managed
-let db: Database
-
-beforeAll(() => {
-  db = new Database(':memory:')
-  db.run(`CREATE TABLE users (id INTEGER PRIMARY KEY, ...)`)
-})
-
-afterAll(() => {
-  db.close()
-})
-```
-
-**Tested Patterns**:
-- CRUD operations (insert, select, update, delete)
-- Relational data (joins)
-- Transactions (commit, rollback)
-- Query patterns (parameterized, LIKE, ORDER BY, LIMIT, aggregates)
-- Connection pooling semantics
-
-**Production Note**: In production, use real Hyperdrive binding with PostgreSQL:
 ```ts
 import postgres from 'postgres'
-const sql = postgres(env.HYPERDRIVE.connectionString)
+import { env } from 'devflare'
+
+const sql = postgres(env.DB.connectionString)
 ```
 
-**Status**: ✅ Complete (15 tests passing)
+For end-to-end verification against a real PostgreSQL origin, create a real
+Hyperdrive config in Cloudflare (for example `devflare-testing`) and run the
+case remotely or deployed.
+
+**Tested Patterns**:
+- Hyperdrive binding presence in `env`
+- Hyperdrive `connectionString` availability
+- Health route behavior
+- Connection-info route behavior
+
+**Production Note**: Prefer a stable Hyperdrive config name in `devflare.config.ts`:
+```ts
+export default defineConfig({
+  bindings: {
+    hyperdrive: {
+      DB: 'devflare-testing'
+    }
+  }
+})
+```
+
+**Status**: ✅ Minimal Hyperdrive example
 
 ---
 

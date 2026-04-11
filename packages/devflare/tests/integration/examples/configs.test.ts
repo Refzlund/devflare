@@ -443,6 +443,7 @@ describe('repo example app configs', () => {
 		expect(config.bindings?.ai).toEqual({ binding: 'AI' })
 		expect(Object.keys(config.bindings?.vectorize ?? {}).sort()).toEqual(['DOCUMENT_INDEX', 'SEARCH_INDEX'])
 		expect(Object.keys(config.bindings?.hyperdrive ?? {})).toEqual(['POSTGRES'])
+		expect(config.bindings?.hyperdrive?.POSTGRES).toBe('devflare-testing')
 		expect(config.bindings?.browser).toEqual({ BROWSER: 'devflare-testing-browser' })
 		expect(config.compatibilityFlags).toEqual(expect.arrayContaining(['nodejs_compat']))
 		expect(Object.keys(config.bindings?.analyticsEngine ?? {}).sort()).toEqual([
@@ -474,6 +475,9 @@ describe('repo example app configs', () => {
 				environment: 'staging'
 			}
 		]))
+		expect(compiled.hyperdrive).toEqual([
+			{ binding: 'POSTGRES', id: 'devflare-testing' }
+		])
 
 		expect(production.vars?.APP_NAME).toBe('testing-binding-matrix-production')
 		expect(production.vars?.DEPLOYMENT_CHANNEL).toBe('production')

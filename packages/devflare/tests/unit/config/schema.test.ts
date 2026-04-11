@@ -362,7 +362,41 @@ describe('configSchema', () => {
 			expect(result.success).toBe(true)
 		})
 
-		test('accepts Hyperdrive bindings', () => {
+		test('accepts Hyperdrive bindings configured by string shorthand names', () => {
+			const result = configSchema.safeParse({
+				name: 'my-worker',
+				compatibilityDate: '2025-01-07',
+				bindings: {
+					hyperdrive: {
+						POSTGRES: 'devflare-testing'
+					}
+				}
+			})
+
+			expect(result.success).toBe(true)
+			if (result.success) {
+				expect(result.data.bindings?.hyperdrive?.POSTGRES).toBe('devflare-testing')
+			}
+		})
+
+		test('accepts Hyperdrive bindings configured by name', () => {
+			const result = configSchema.safeParse({
+				name: 'my-worker',
+				compatibilityDate: '2025-01-07',
+				bindings: {
+					hyperdrive: {
+						POSTGRES: { name: 'devflare-testing' }
+					}
+				}
+			})
+
+			expect(result.success).toBe(true)
+			if (result.success) {
+				expect(result.data.bindings?.hyperdrive?.POSTGRES).toEqual({ name: 'devflare-testing' })
+			}
+		})
+
+		test('accepts Hyperdrive bindings configured by explicit id object', () => {
 			const result = configSchema.safeParse({
 				name: 'my-worker',
 				compatibilityDate: '2025-01-07',

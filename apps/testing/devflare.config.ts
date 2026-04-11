@@ -94,10 +94,9 @@ export default defineConfig({
 		},
 
 		hyperdrive: {
-			POSTGRES: {
-				// Requires a real Hyperdrive config backed by a real database.
-				id: 'devflare-testing-hyperdrive-id'
-			}
+			// Requires a real Hyperdrive config backed by a real database.
+			// Prefer the stable configured name over a raw id so Devflare can resolve it when needed.
+			POSTGRES: 'devflare-testing'
 		},
 
 		browser: {
