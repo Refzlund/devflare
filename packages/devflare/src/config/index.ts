@@ -4,6 +4,17 @@
 
 export { defineConfig } from './define'
 export {
+	preview,
+	isPreviewScopedName,
+	materializePreviewScopedConfig,
+	materializePreviewScopedString,
+	type PreviewScopeFn,
+	type PreviewScopeOptions,
+	type PreviewScopedName,
+	type PreviewScopedNameOptions,
+	type PreviewResolutionOptions
+} from './preview'
+export {
 	configSchema,
 	getLocalHyperdriveConfigIdentifier,
 	getLocalKVNamespaceIdentifier,
@@ -19,6 +30,7 @@ export {
 	type DevflareConfig,
 	type DevflareConfigInput,
 	type DevflareEnvConfig,
+	type PreviewConfig,
 	type DurableObjectBinding,
 	type KVBinding,
 	type NormalizedHyperdriveBinding,
@@ -49,8 +61,10 @@ export {
 export { resolveConfigForEnvironment } from './resolve'
 export {
 	resolveConfigForLocalRuntime,
+	resolveMaterializedConfigResources,
 	resolveConfigResources,
 	type LoadResolvedConfigOptions,
+	type ResolveMaterializedConfigResourcesOptions,
 	type ResolveConfigResourcesOptions
 } from './resource-resolution'
 

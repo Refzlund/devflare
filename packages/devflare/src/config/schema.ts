@@ -554,6 +554,22 @@ const triggersSchema = z.object({
 	crons: z.array(z.string()).optional()
 }).optional()
 
+/**
+ * Preview-specific Devflare behavior.
+ * Controls how Devflare treats branch-scoped preview deploys beyond the raw
+ * Wrangler config surface.
+ */
+const previewsConfigSchema = z.object({
+	/**
+	 * Whether branch-scoped preview deploys should keep cron triggers in the
+	 * emitted Wrangler config.
+	 *
+	 * Defaults to `false` so previews do not accidentally schedule shared jobs
+	 * unless the config opts in explicitly.
+	 */
+	includeCrons: z.boolean().optional().default(false)
+}).optional()
+
 // -----------------------------------------------------------------------------
 // Secrets Schema
 // -----------------------------------------------------------------------------
@@ -883,6 +899,8 @@ const envConfigSchema = z.object({
 	compatibilityDate: compatibilityDateSchema.optional(),
 	/** Override compatibility flags */
 	compatibilityFlags: z.array(z.string()).optional(),
+	/** Override preview behavior */
+	previews: previewsConfigSchema,
 	/** Override file handlers */
 	files: filesSchema,
 	/** Override bindings */
@@ -1008,6 +1026,11 @@ const canonicalConfigSchema = z.object({
 		const merged = new Set([...FORCED_COMPATIBILITY_FLAGS, ...flags])
 		return [...merged]
 	}),
+
+	/**
+	 * Preview-specific Devflare behavior.
+	 */
+	previews: previewsConfigSchema,
 
 	/**
 	 * File handlers configuration.
@@ -1136,6 +1159,7 @@ export type DevflareConfig = z.output<typeof configSchema>
 export type DevflareConfigInput = z.input<typeof configSchema>
 
 export type DevflareEnvConfig = z.output<typeof envConfigSchemaInner>
+export type PreviewConfig = z.output<typeof previewsConfigSchema>
 export type BrowserBindings = z.infer<typeof browserBindingSchema>
 export type D1Binding = z.infer<typeof d1BindingSchema>
 export type HyperdriveBinding = z.infer<typeof hyperdriveBindingSchema>

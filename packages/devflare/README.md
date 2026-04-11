@@ -301,6 +301,7 @@ The most important top-level keys are:
 - `accountId`
 - `compatibilityDate`
 - `compatibilityFlags`
+- `previews`
 - `files`
 - `bindings`
 - `triggers`
@@ -599,6 +600,7 @@ Useful commands:
 bunx --bun devflare previews
 bunx --bun devflare previews provision
 bunx --bun devflare previews reconcile --worker documentation
+bunx --bun devflare previews cleanup-resources --env preview --apply
 bunx --bun devflare previews retire --worker documentation --branch feature-search --apply
 bunx --bun devflare previews cleanup --worker documentation --days 7 --apply
 ```
@@ -609,6 +611,7 @@ Current behavior:
 - `devflare previews provision` ensures the registry D1 database exists
 - `devflare previews reconcile` syncs the registry against live Cloudflare Worker versions and deployments for the selected Worker
 - `devflare previews retire` immediately marks one tracked preview, alias, and preview deployment as deleted by branch name, preview alias, version id, or commit sha
+- `devflare previews cleanup-resources` deletes preview-scoped Cloudflare resources such as KV, D1, R2, Queues, Vectorize, and any existing preview Hyperdrive configs for the current preview identifier; Workers Analytics Engine datasets and Browser bindings are skipped because Cloudflare does not manage them as explicit account-owned resources through this binding surface
 - `devflare previews cleanup` performs a dry run by default and `--apply` soft-deletes stale non-active records after reconciliation
 - `devflare deploy` now performs a best-effort registry reconciliation after successful deploys so preview metadata stays warm without extra CI glue
 
@@ -725,12 +728,66 @@ pull request, the stable PR comment while still keeping its `/status`
 assertion, because it is validating runtime bindings and deployment-channel
 wiring rather than merely asking whether Cloudflare accepted the upload.
 
+For branch-scoped real preview deploys such as `apps/testing`, Devflare now
+automatically omits shared queue consumers from the deployed Wrangler config,
+and it omits cron triggers by default, when it detects the branch-preview
+strategy (`--env preview` plus branch scope, without `--preview`). That keeps
+previews from colliding on singleton Cloudflare resources while leaving the
+authoring config itself fully exhaustive for local dev, tests, and production
+deploys.
+
+If a branch-scoped preview really should keep its cron schedule, opt in with:
+
+```ts
+export default defineConfig({
+	previews: {
+		includeCrons: true
+	}
+})
+```
+
+If those previews also need preview-owned Cloudflare resources, use
+`preview.scope()` in the config authoring layer:
+
+```ts
+import { defineConfig, preview } from 'devflare/config'
+
+const pv = preview.scope()
+
+export default defineConfig({
+	bindings: {
+		kv: {
+			CACHE: pv('my-cache-kv')
+		},
+		r2: {
+			ASSETS: pv('my-assets-bucket')
+		}
+	}
+})
+```
+
+Devflare resolves those opaque markers to base names outside preview
+environments, and to preview-scoped names such as `my-cache-kv-preview` (or a
+branch-derived suffix when `DEVFLARE_PREVIEW_BRANCH`, `DEVFLARE_PREVIEW_PR`, or
+`DEVFLARE_PREVIEW_IDENTIFIER` is present) for preview resolution and deploys.
+During `devflare deploy --env preview`, Devflare also provisions missing
+preview-scoped KV, D1, R2, Queue, and Vectorize resources automatically before
+the Wrangler deploy runs. Preview-scoped Hyperdrive names are reused when the
+matching preview config already exists, and otherwise Devflare falls back to the
+base Hyperdrive config because Cloudflare does not expose stored Hyperdrive
+credentials for cloning preview configs automatically. Use
+`devflare previews cleanup-resources --env preview --apply` during PR-close or
+branch-delete cleanup to delete the preview-owned resources again.
+Service bindings created through `ref()` still follow the referenced worker
+names, so branch-scoped worker naming remains the way to isolate preview
+service bindings.
+
 ---
 
 ## Repo examples
 
 - [`apps/documentation/`](../../apps/documentation/) is the executable SvelteKit example for dev, build, preview deploys, production deploys, workflow automation, and browser validation
-- [`apps/testing/`](../../apps/testing/) is the exhaustive binding-matrix example for the config contract itself, including preview and production environment overrides where bindings differ by deployment channel, and its `src/fetch.ts` smoke Worker is exercised by repository integration tests through `devflare/test`
+- [`apps/testing/`](../../apps/testing/) is the exhaustive binding-matrix example for the config contract itself, including `preview.scope()`-driven preview resource names, production overrides where bindings differ by deployment channel, and a tiny `src/fetch.ts` smoke Worker exercised by repository integration tests through `devflare/test`
 
 ---
 

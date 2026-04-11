@@ -1,4 +1,4 @@
-import { defineConfig, ref } from '../../packages/devflare/src/config-entry'
+import { defineConfig, preview, ref } from '../../packages/devflare/src/config-entry'
 import { resolveTestingWorkerNames } from './worker-names'
 
 const accountId = (
@@ -9,12 +9,16 @@ const accountId = (
 const workerNames = resolveTestingWorkerNames()
 const authService = ref(workerNames.authServiceName, () => import('./workers/auth-service/devflare.config'))
 const searchService = ref(workerNames.searchServiceName, () => import('./workers/search-service/devflare.config'))
+const pv = preview.scope()
 
 export default defineConfig({
 	name: workerNames.mainWorkerName,
 	compatibilityDate: '2026-04-08',
 	accountId,
 	compatibilityFlags: ['nodejs_compat'],
+	previews: {
+		includeCrons: false
+	},
 
 	// This config is the repo's deploy-oriented, real-world testing app.
 	// It keeps the exhaustive binding matrix, but pairs it with actual source
@@ -23,20 +27,20 @@ export default defineConfig({
 	bindings: {
 		kv: {
 			// devflare-testing-cache-kv
-			CACHE: 'devflare-testing-cache-kv',
+			CACHE: pv('devflare-testing-cache-kv'),
 			// devflare-testing-sessions-kv
-			SESSIONS: 'devflare-testing-sessions-kv'
+			SESSIONS: pv('devflare-testing-sessions-kv')
 		},
 
 		d1: {
-			PRIMARY_DB: 'devflare-testing-primary-db',
-			AUDIT_DB: { name: 'devflare-testing-audit-db' },
-			LEGACY_DB: { name: 'devflare-testing-legacy-db' }
+			PRIMARY_DB: pv('devflare-testing-primary-db'),
+			AUDIT_DB: pv('devflare-testing-audit-db'),
+			LEGACY_DB: pv('devflare-testing-legacy-db')
 		},
 
 		r2: {
-			ASSETS: 'devflare-testing-assets-bucket',
-			ARCHIVE: 'devflare-testing-archive-bucket'
+			ASSETS: pv('devflare-testing-assets-bucket'),
+			ARCHIVE: pv('devflare-testing-archive-bucket')
 		},
 
 		durableObjects: {
@@ -47,25 +51,25 @@ export default defineConfig({
 
 		queues: {
 			producers: {
-				JOBS: 'devflare-testing-jobs-queue',
-				EMAILS: 'devflare-testing-emails-queue'
+				JOBS: pv('devflare-testing-jobs-queue'),
+				EMAILS: pv('devflare-testing-emails-queue')
 			},
 			consumers: [
 				{
-					queue: 'devflare-testing-jobs-queue',
+					queue: pv('devflare-testing-jobs-queue'),
 					maxBatchSize: 10,
 					maxBatchTimeout: 5,
 					maxRetries: 3,
 					maxConcurrency: 2,
 					retryDelay: 30,
-					deadLetterQueue: 'devflare-testing-jobs-dlq'
+					deadLetterQueue: pv('devflare-testing-jobs-dlq')
 				},
 				{
-					queue: 'devflare-testing-emails-queue',
+					queue: pv('devflare-testing-emails-queue'),
 					maxBatchSize: 25,
 					maxBatchTimeout: 3,
 					maxRetries: 5,
-					deadLetterQueue: 'devflare-testing-emails-dlq'
+					deadLetterQueue: pv('devflare-testing-emails-dlq')
 				}
 			]
 		},
@@ -82,29 +86,29 @@ export default defineConfig({
 
 		vectorize: {
 			DOCUMENT_INDEX: {
-				indexName: 'devflare-testing-document-index'
+				indexName: pv('devflare-testing-document-index')
 			},
 			SEARCH_INDEX: {
-				indexName: 'devflare-testing-search-index'
+				indexName: pv('devflare-testing-search-index')
 			}
 		},
 
 		hyperdrive: {
 			// Requires a real Hyperdrive config backed by a real database.
 			// Prefer the stable configured name over a raw id so Devflare can resolve it when needed.
-			POSTGRES: 'devflare-testing'
+			POSTGRES: pv('devflare-testing')
 		},
 
 		browser: {
-			BROWSER: 'devflare-testing-browser'
+			BROWSER: pv('devflare-testing-browser')
 		},
 
 		analyticsEngine: {
 			APP_ANALYTICS: {
-				dataset: 'devflare-testing-app-analytics'
+				dataset: pv('devflare-testing-app-analytics')
 			},
 			SEARCH_ANALYTICS: {
-				dataset: 'devflare-testing-search-analytics'
+				dataset: pv('devflare-testing-search-analytics')
 			}
 		},
 
@@ -134,15 +138,6 @@ export default defineConfig({
 			vars: {
 				APP_NAME: 'testing-binding-matrix-preview',
 				DEPLOYMENT_CHANNEL: 'preview'
-			},
-			bindings: {
-				kv: {
-					// devflare-testing-cache-kv-preview
-					CACHE: 'devflare-testing-cache-kv-preview'
-				},
-				r2: {
-					ASSETS: 'devflare-testing-assets-bucket-preview'
-				}
 			}
 		},
 		production: {

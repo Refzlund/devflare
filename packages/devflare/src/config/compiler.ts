@@ -14,6 +14,7 @@ import {
 	type HyperdriveBinding,
 	type KVBinding
 } from './schema'
+import { materializePreviewScopedConfig } from './preview'
 import { resolveConfigForEnvironment } from './resolve'
 
 /**
@@ -503,14 +504,16 @@ export function compileDOWorkerConfig(
 	doWorkerEntry: string,
 	options?: { absoluteMain?: boolean; cwd?: string }
 ): WranglerConfig | null {
+	const resolvedConfig = materializePreviewScopedConfig(config)
+
 	// Check if there are any DOs configured
-	if (!config.bindings?.durableObjects || Object.keys(config.bindings.durableObjects).length === 0) {
+	if (!resolvedConfig.bindings?.durableObjects || Object.keys(resolvedConfig.bindings.durableObjects).length === 0) {
 		return null
 	}
 
 	// Get the script name from the first DO binding (they should all have the same scriptName)
-	const firstDO = normalizeDOBinding(Object.values(config.bindings.durableObjects)[0])
-	const workerName = firstDO.scriptName || `${config.name}-do`
+	const firstDO = normalizeDOBinding(Object.values(resolvedConfig.bindings.durableObjects)[0])
+	const workerName = firstDO.scriptName || `${resolvedConfig.name}-do`
 
 	// Resolve main path (absolute if needed for wrangler pages dev)
 	let mainPath = doWorkerEntry
@@ -523,17 +526,17 @@ export function compileDOWorkerConfig(
 	const result: WranglerConfig = {
 		name: workerName,
 		main: mainPath,
-		compatibility_date: config.compatibilityDate
+		compatibility_date: resolvedConfig.compatibilityDate
 	}
 
 	// Add compatibility flags
-	if (config.compatibilityFlags && config.compatibilityFlags.length > 0) {
-		result.compatibility_flags = config.compatibilityFlags
+	if (resolvedConfig.compatibilityFlags && resolvedConfig.compatibilityFlags.length > 0) {
+		result.compatibility_flags = resolvedConfig.compatibilityFlags
 	}
 
 	// Add DO bindings WITHOUT script_name (since they're defined in this worker)
 	result.durable_objects = {
-		bindings: Object.entries(config.bindings.durableObjects).map(([name, doConfig]) => {
+		bindings: Object.entries(resolvedConfig.bindings.durableObjects).map(([name, doConfig]) => {
 			const normalized = normalizeDOBinding(doConfig)
 			return {
 				name,
@@ -544,8 +547,8 @@ export function compileDOWorkerConfig(
 	}
 
 	// Add migrations if present
-	if (config.migrations && config.migrations.length > 0) {
-		result.migrations = config.migrations.map((migration) => ({
+	if (resolvedConfig.migrations && resolvedConfig.migrations.length > 0) {
+		result.migrations = resolvedConfig.migrations.map((migration) => ({
 			tag: migration.tag,
 			...(migration.new_classes && { new_classes: migration.new_classes }),
 			...(migration.renamed_classes && {
@@ -560,28 +563,28 @@ export function compileDOWorkerConfig(
 	}
 
 	// Include bindings that DOs might need (storage, browser, etc.)
-	if (config.bindings.kv) {
-		result.kv_namespaces = Object.entries(config.bindings.kv).map(([binding, namespace]) => ({
+	if (resolvedConfig.bindings.kv) {
+		result.kv_namespaces = Object.entries(resolvedConfig.bindings.kv).map(([binding, namespace]) => ({
 			binding,
 			id: getWranglerKVNamespaceId(binding, namespace)
 		}))
 	}
 
-	if (config.bindings.d1) {
-		result.d1_databases = Object.entries(config.bindings.d1).map(([binding, database_id]) => ({
+	if (resolvedConfig.bindings.d1) {
+		result.d1_databases = Object.entries(resolvedConfig.bindings.d1).map(([binding, database_id]) => ({
 			binding,
 			database_id: getWranglerD1DatabaseId(binding, database_id)
 		}))
 	}
 
-	if (config.bindings.r2) {
-		result.r2_buckets = Object.entries(config.bindings.r2).map(([binding, bucket_name]) => ({
+	if (resolvedConfig.bindings.r2) {
+		result.r2_buckets = Object.entries(resolvedConfig.bindings.r2).map(([binding, bucket_name]) => ({
 			binding,
 			bucket_name: bucket_name as string
 		}))
 	}
 
-	const browserBinding = getWranglerBrowserBinding(config.bindings.browser)
+	const browserBinding = getWranglerBrowserBinding(resolvedConfig.bindings.browser)
 	if (browserBinding) {
 		result.browser = browserBinding
 	}

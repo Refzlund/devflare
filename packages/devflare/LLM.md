@@ -616,6 +616,7 @@ Current defaults worth knowing:
 
 - `compatibilityDate` defaults to the current date when omitted
 - current default compatibility flags include `nodejs_compat` and `nodejs_als`
+- branch-scoped preview deploys omit cron triggers unless `previews.includeCrons` is `true`
 
 Common keys:
 
@@ -624,6 +625,7 @@ Common keys:
 | `name` | Worker name |
 | `compatibilityDate` | Workers compatibility date |
 | `compatibilityFlags` | Workers compatibility flags |
+| `previews` | preview-specific Devflare behavior such as whether branch-scoped preview deploys keep cron triggers |
 | `files` | explicit handler paths and discovery globs |
 | `bindings` | Cloudflare bindings |
 | `triggers` | scheduled trigger config |
@@ -658,6 +660,7 @@ Treat this as the exhaustive property checklist for `defineConfig({...})`. The l
 | `accountId` | `string` | no | Compiled to Wrangler `account_id`. Most relevant for deploy flows and remote-oriented bindings such as AI and Vectorize. Not currently supported inside `config.env`. |
 | `compatibilityDate` | `string` (`YYYY-MM-DD`) | no | Compiled to Wrangler `compatibility_date`. Defaults to the current date when omitted. |
 | `compatibilityFlags` | `string[]` | no | Additional Workers compatibility flags. Devflare also forces `nodejs_compat` and `nodejs_als`. |
+| `previews` | `{ includeCrons?: boolean }` | no | Devflare preview-behavior controls. Branch-scoped preview deploys omit cron triggers unless `includeCrons` is set to `true`. |
 | `files` | object | no | Explicit surface file paths and discovery globs. Use this when a surface matters to generated output. |
 | `bindings` | object | no | Cloudflare binding declarations. These compile to Wrangler binding sections and also drive generated typing. |
 | `triggers` | object | no | Scheduled trigger configuration such as cron expressions. |
@@ -828,6 +831,7 @@ That distinction is intentional:
 - `name`
 - `compatibilityDate`
 - `compatibilityFlags`
+- `previews`
 - `files`
 - `bindings`
 - `triggers`
@@ -2399,6 +2403,46 @@ The repository intentionally splits example coverage across two app directories:
 - `apps/testing/devflare.config.ts` is the exhaustive binding-matrix example for the config contract itself, including preview and production environment overrides where resource names differ by deployment channel
 
 `apps/testing/` is intentionally config-first rather than a second polished app shell, but it now also includes `src/fetch.ts` as a tiny smoke Worker that repository integration tests execute through `devflare/test` under both preview and production config resolution. It is also the repository's concrete example of the Durable Object preview exception path: CI deploys it as a branch-scoped preview environment instead of relying on same-Worker preview URLs for the main worker. Use it to regression-test the authoring contract and a minimal real Worker surface; use `apps/documentation/` to validate the same-Worker preview pipeline end to end.
+
+For that branch-scoped real-preview strategy, Devflare now automatically omits shared queue consumers from the deployed Wrangler config, and it omits cron triggers by default, whenever it detects `--env preview` plus branch scope without `--preview`. Keep the config authoring exhaustive; the deploy layer handles the singleton-resource safety valve.
+
+If that preview should keep its cron schedule, opt in with:
+
+```ts
+export default defineConfig({
+	previews: {
+		includeCrons: true
+	}
+})
+```
+
+If the preview should also use preview-owned Cloudflare resources, author those
+binding names with `preview.scope()`:
+
+```ts
+import { defineConfig, preview } from 'devflare/config'
+
+const pv = preview.scope()
+
+export default defineConfig({
+	bindings: {
+		kv: {
+			CACHE: pv('my-cache-kv')
+		},
+		vectorize: {
+			SEARCH_INDEX: {
+				indexName: pv('my-search-index')
+			}
+		}
+	}
+})
+```
+
+Devflare resolves those opaque markers back to base names outside preview
+environments, and to preview-scoped names such as `my-cache-kv-preview` or a
+branch-derived suffix during preview resolution and deploys. Service bindings
+created with `ref()` still isolate through worker naming rather than
+`preview.scope()`.
 
 Workflow-verification split that matters:
 

@@ -59,6 +59,22 @@ search, and main workers branch-scoped names during CI preview deploys. The
 main worker then deploys with `--env preview`, so each PR gets a real,
 reachable `workers.dev` URL while the normal local/default names stay unchanged.
 
+During those branch/PR-scoped preview deploys, Devflare now automatically
+omits the shared queue consumers and, by default, the cron trigger from the
+deployed Wrangler config. That keeps previews from contending for the globally
+shared Cloudflare queue consumer slot or running extra scheduled jobs against
+the shared testing resources, without forcing the app config itself to carry
+deploy-strategy conditionals. If a preview really should keep its cron
+schedule, set `previews.includeCrons: true` in `devflare.config.ts`.
+
+The config also uses `preview.scope()` for the preview-owned resource names in
+KV, D1, R2, queues, Vectorize, Hyperdrive, Browser Rendering, and Analytics
+Engine. That keeps the base config exhaustive while letting preview resolution
+materialize names like `devflare-testing-cache-kv-preview` automatically.
+Service bindings still follow the branch-scoped worker names produced by
+`resolveTestingWorkerNames()`, because those are references to other Workers
+rather than standalone Cloudflare resource names.
+
 That workflow now also publishes a GitHub deployment on every run and updates a
 stable PR comment whenever the branch belongs to an open pull request, while
 still keeping the later `/status` assertion as the binding-verification step.

@@ -7,6 +7,7 @@
 // Config utilities
 export {
 	defineConfig,
+	preview,
 	loadConfig,
 	loadResolvedConfig,
 	compileConfig,
@@ -19,6 +20,10 @@ export {
 	resolveConfigResources,
 	type DevflareConfig,
 	type DevflareConfigInput,
+	type PreviewScopeFn,
+	type PreviewScopeOptions,
+	type PreviewScopedName,
+	type PreviewScopedNameOptions,
 	type LoadResolvedConfigOptions,
 	type ResolveConfigResourcesOptions
 } from './config'

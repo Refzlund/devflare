@@ -22,6 +22,7 @@ import {
 	formatPreviewAliasUrl,
 	resolvePreviewAlias
 } from '../preview'
+import { applyDeploymentStrategy, describeDeploymentStrategy } from '../deploy-strategy'
 import { reconcilePreviewRegistry } from '../../cloudflare/preview-registry'
 import { createCliTheme, dim, green, logLine, whiteDim, yellow, yellowBold } from '../ui'
 
@@ -355,11 +356,21 @@ export async function runDeployCommand(
 	logLine(logger, `${yellowBold('deploy', theme)} ${dim('Shipping to Cloudflare', theme)}`)
 
 	try {
-		const config = await loadResolvedConfig({ cwd, configFile: configPath, environment })
-		const wranglerConfig = compileConfig(config)
-
 		if (dryRun) {
+			const config = await loadResolvedConfig({ cwd, configFile: configPath, environment })
+			const deploymentStrategy = applyDeploymentStrategy(config, {
+				environment,
+				preview,
+				branchName,
+				previewBranch: process.env.DEVFLARE_PREVIEW_BRANCH
+			})
+			const wranglerConfig = compileConfig(deploymentStrategy.config)
+
 			logLine(logger, `${yellow('dry run', theme)} ${dim('Skipping actual deployment', theme)}`)
+			const deploymentStrategyMessage = describeDeploymentStrategy(deploymentStrategy)
+			if (deploymentStrategyMessage) {
+				logLine(logger, dim(deploymentStrategyMessage, theme))
+			}
 			logLine(logger, dim('Would deploy with wrangler config:', theme))
 			logLine(logger, stringifyConfig(wranglerConfig))
 			return { exitCode: 0 }
@@ -448,7 +459,7 @@ export async function runDeployCommand(
 		const parsedOutput = structuredOutput
 			? parseWranglerStructuredOutput(structuredOutput)
 			: { urls: [], versionId: undefined, previewUrl: undefined, previewAliasUrl: undefined }
-		const configuredAccountId = normalizeCloudflareAccountId(config.accountId)
+		const configuredAccountId = normalizeCloudflareAccountId(prepared.config.accountId)
 			?? normalizeCloudflareAccountId(process.env.CLOUDFLARE_ACCOUNT_ID)
 		let resolvedAccountId = configuredAccountId
 		let didAttemptAccountResolution = false

@@ -17,6 +17,7 @@ import {
 	type DevflarePreviewRecord,
 	type PreviewRegistryContext
 } from '../../cloudflare'
+import { cleanupPreviewScopedResources } from '../../config/preview-resources'
 import { loadConfig, ConfigNotFoundError, resolveConfigPath } from '../../config/loader'
 
 // CLI commands use a 10-second timeout to avoid long hangs
@@ -25,7 +26,7 @@ const CLI_API_OPTIONS: APIClientOptions = { timeout: 10000 }
 const DEVFLARE_CACHE_DIR = '.devflare'
 const PREVIEW_CONFIG_CACHE_FILE = 'preview-command-config.json'
 
-const PREVIEW_SUBCOMMANDS = ['list', 'provision', 'reconcile', 'cleanup', 'retire'] as const
+const PREVIEW_SUBCOMMANDS = ['list', 'provision', 'reconcile', 'cleanup', 'retire', 'cleanup-resources'] as const
 const ANSI_REGEX = /\x1b\[[0-9;]*m/g
 
 type PreviewSubcommand = typeof PREVIEW_SUBCOMMANDS[number]
@@ -700,7 +701,8 @@ async function resolveContext(
 ): Promise<PreviewCommandContext> {
 	const cwd = options.cwd ?? process.cwd()
 	const configFile = asOptionalString(parsed.options.config)
-	const needsConfig = !asOptionalString(parsed.options.account)
+	const needsConfig = subcommand === 'cleanup-resources'
+		|| !asOptionalString(parsed.options.account)
 		|| (!asOptionalString(parsed.options.worker) && !fallbackArg)
 	const config = await loadLocalConfig(cwd, configFile, needsConfig)
 	const accountId = await resolveAccountId(parsed, config)
@@ -807,6 +809,7 @@ export async function runPreviewsCommand(
 	try {
 		const context = await resolveContext(parsed, options, subcommand, fallbackWorkerArg)
 		const databaseName = asOptionalString(parsed.options.database)
+		const environment = asOptionalString(parsed.options.env)
 
 		switch (subcommand) {
 			case 'provision': {
@@ -916,6 +919,51 @@ export async function runPreviewsCommand(
 				logger.info(
 					`Candidates: ${result.candidates.previews.length} preview(s) · ${result.candidates.aliases.length} alias record(s) · ${result.candidates.deployments.length} deployment record(s)`
 				)
+				return { exitCode: 0 }
+			}
+
+			case 'cleanup-resources': {
+				const cwd = options.cwd ?? process.cwd()
+				const configFile = asOptionalString(parsed.options.config)
+				const config = await loadConfig({ cwd, configFile })
+				const result = await cleanupPreviewScopedResources(config, {
+					environment: environment ?? 'preview',
+					accountId: context.accountId,
+					apply: parsed.options.apply === true
+				})
+
+				const totalCandidates = result.candidates.kv.length
+					+ result.candidates.d1.length
+					+ result.candidates.r2.length
+					+ result.candidates.queues.length
+					+ result.candidates.vectorize.length
+					+ result.candidates.hyperdrive.length
+
+				logger.success(
+					parsed.options.apply === true
+						? `Deleted ${totalCandidates} preview-scoped Cloudflare resource${totalCandidates === 1 ? '' : 's'}`
+						: `Preview-scoped resource cleanup dry run complete with ${totalCandidates} candidate${totalCandidates === 1 ? '' : 's'}`
+				)
+
+				const resourceSummary = [
+					result.candidates.kv.length > 0 ? `KV ${result.candidates.kv.length}` : null,
+					result.candidates.d1.length > 0 ? `D1 ${result.candidates.d1.length}` : null,
+					result.candidates.r2.length > 0 ? `R2 ${result.candidates.r2.length}` : null,
+					result.candidates.queues.length > 0 ? `Queues ${result.candidates.queues.length}` : null,
+					result.candidates.vectorize.length > 0 ? `Vectorize ${result.candidates.vectorize.length}` : null,
+					result.candidates.hyperdrive.length > 0 ? `Hyperdrive ${result.candidates.hyperdrive.length}` : null
+				].filter((segment): segment is string => segment !== null)
+
+				if (resourceSummary.length > 0) {
+					logger.info(`Candidates: ${resourceSummary.join(' · ')}`)
+				} else {
+					logger.info('Candidates: none')
+				}
+
+				for (const warning of result.warnings) {
+					logger.warn(warning)
+				}
+
 				return { exitCode: 0 }
 			}
 

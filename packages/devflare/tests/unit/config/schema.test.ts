@@ -85,6 +85,36 @@ describe('configSchema', () => {
 		})
 	})
 
+	describe('preview behavior', () => {
+		test('accepts preview cron settings', () => {
+			const result = configSchema.safeParse({
+				name: 'my-worker',
+				compatibilityDate: '2025-01-07',
+				previews: {
+					includeCrons: true
+				}
+			})
+
+			expect(result.success).toBe(true)
+			if (result.success) {
+				expect(result.data.previews?.includeCrons).toBe(true)
+			}
+		})
+
+		test('defaults preview cron inclusion to false when previews is present without overrides', () => {
+			const result = configSchema.safeParse({
+				name: 'my-worker',
+				compatibilityDate: '2025-01-07',
+				previews: {}
+			})
+
+			expect(result.success).toBe(true)
+			if (result.success) {
+				expect(result.data.previews?.includeCrons).toBe(false)
+			}
+		})
+	})
+
 	describe('file handlers', () => {
 		test('accepts file handler paths', () => {
 			const result = configSchema.safeParse({
@@ -548,7 +578,10 @@ describe('configSchema', () => {
 				compatibilityDate: '2025-01-07',
 				env: {
 					production: {
-						vars: { DEBUG: 'false' }
+						vars: { DEBUG: 'false' },
+						previews: {
+							includeCrons: true
+						}
 					},
 					staging: {
 						vars: { DEBUG: 'true' }
@@ -559,6 +592,7 @@ describe('configSchema', () => {
 			expect(result.success).toBe(true)
 			if (result.success) {
 				expect(result.data.env?.production?.vars?.DEBUG).toBe('false')
+				expect(result.data.env?.production?.previews?.includeCrons).toBe(true)
 			}
 		})
 

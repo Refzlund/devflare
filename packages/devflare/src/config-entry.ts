@@ -13,6 +13,14 @@ export {
 } from './config/define'
 
 export {
+	preview,
+	type PreviewScopeFn,
+	type PreviewScopeOptions,
+	type PreviewScopedName,
+	type PreviewScopedNameOptions
+} from './config/preview'
+
+export {
 	ref,
 	resolveRef,
 	serviceBinding,

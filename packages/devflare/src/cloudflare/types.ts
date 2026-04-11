@@ -135,6 +135,32 @@ export interface D1DatabaseInfo {
 }
 
 // -----------------------------------------------------------------------------
+// Queue Types
+// -----------------------------------------------------------------------------
+
+export interface Queue {
+	queue_id?: string
+	queue_name?: string
+	created_on?: string
+	modified_on?: string
+	settings?: {
+		delivery_delay?: number
+		delivery_paused?: boolean
+		message_retention_period?: number
+	}
+}
+
+export interface QueueInfo {
+	id: string
+	name: string
+	createdOn?: Date
+	modifiedOn?: Date
+	deliveryDelay?: number
+	deliveryPaused?: boolean
+	messageRetentionPeriod?: number
+}
+
+// -----------------------------------------------------------------------------
 // Hyperdrive Types
 // -----------------------------------------------------------------------------
 

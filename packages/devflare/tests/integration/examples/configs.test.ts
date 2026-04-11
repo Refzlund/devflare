@@ -4,6 +4,7 @@ import { resolve } from 'pathe'
 import { createMockEnv } from '../../../src/test'
 import {
 	compileConfig,
+	isPreviewScopedName,
 	loadConfig,
 	resolveConfigForEnvironment,
 	resolveConfigForLocalRuntime,
@@ -166,12 +167,16 @@ function createTestingExampleEnv(config: DevflareConfig): TestingExampleHarness 
 		}
 	}
 
+	const authServiceName = config.bindings?.services?.AUTH_SERVICE.service ?? 'devflare-testing-auth-service'
+	const adminServiceName = config.bindings?.services?.ADMIN_RPC.service ?? authServiceName
+	const searchServiceName = config.bindings?.services?.SEARCH_SERVICE.service ?? 'devflare-testing-search-service'
+
 	const serviceBindings = {
 		AUTH_SERVICE: {
 			getServiceInfo: () => {
 				serviceCalls.push('AUTH_SERVICE:getServiceInfo')
 				return {
-					service: 'devflare-testing-auth-service',
+					service: authServiceName,
 					version: '1.0.0'
 				}
 			},
@@ -188,7 +193,8 @@ function createTestingExampleEnv(config: DevflareConfig): TestingExampleHarness 
 			async getHealth() {
 				serviceCalls.push('ADMIN_RPC:getHealth')
 				return {
-					status: 'healthy'
+					status: 'healthy',
+					service: adminServiceName
 				}
 			},
 			async runDiagnostics() {
@@ -202,7 +208,7 @@ function createTestingExampleEnv(config: DevflareConfig): TestingExampleHarness 
 			getServiceInfo: () => {
 				serviceCalls.push('SEARCH_SERVICE:getServiceInfo')
 				return {
-					service: 'devflare-testing-search-service',
+					service: searchServiceName,
 					channel: 'staging'
 				}
 			},
@@ -216,11 +222,14 @@ function createTestingExampleEnv(config: DevflareConfig): TestingExampleHarness 
 		}
 	}
 
+	const documentIndexName = config.bindings?.vectorize?.DOCUMENT_INDEX.indexName ?? 'devflare-testing-document-index'
+	const searchIndexName = config.bindings?.vectorize?.SEARCH_INDEX.indexName ?? 'devflare-testing-search-index'
+
 	const vectorizeBindings = {
 		DOCUMENT_INDEX: {
 			async describe() {
 				return {
-					name: 'devflare-testing-document-index'
+					name: documentIndexName
 				}
 			},
 			async upsert(vectors: Array<{ id: string; values: number[]; metadata?: Record<string, unknown> }>) {
@@ -240,7 +249,7 @@ function createTestingExampleEnv(config: DevflareConfig): TestingExampleHarness 
 		SEARCH_INDEX: {
 			async describe() {
 				return {
-					name: 'devflare-testing-search-index'
+					name: searchIndexName
 				}
 			},
 			async upsert(vectors: Array<{ id: string; values: number[]; metadata?: Record<string, unknown> }>) {
@@ -420,7 +429,7 @@ async function runTestingScheduled(config: DevflareConfig): Promise<TestingExamp
 }
 
 describe('repo example app configs', () => {
-	test('apps/testing covers the full binding matrix, uses sidecar refs, and keeps preview/production overrides', async () => {
+	test('apps/testing covers the full binding matrix, uses preview-scoped resource names, and keeps production overrides', async () => {
 		const config = await loadConfig({ cwd: testingAppDir })
 		const preview = resolveConfigForEnvironment(config, 'preview')
 		const production = resolveConfigForEnvironment(config, 'production')
@@ -435,17 +444,26 @@ describe('repo example app configs', () => {
 			'SESSION_ROOM'
 		])
 		expect(Object.keys(config.bindings?.queues?.producers ?? {}).sort()).toEqual(['EMAILS', 'JOBS'])
+		expect(config.bindings?.queues?.consumers).toHaveLength(2)
 		expect(Object.keys(config.bindings?.services ?? {}).sort()).toEqual([
 			'ADMIN_RPC',
 			'AUTH_SERVICE',
 			'SEARCH_SERVICE'
 		])
+		expect(isPreviewScopedName(config.bindings?.kv?.CACHE)).toBe(true)
+		expect(isPreviewScopedName(config.bindings?.kv?.SESSIONS)).toBe(true)
+		expect(isPreviewScopedName(config.bindings?.d1?.PRIMARY_DB)).toBe(true)
+		expect(isPreviewScopedName(config.bindings?.r2?.ASSETS)).toBe(true)
+		expect(isPreviewScopedName(config.bindings?.queues?.producers?.JOBS)).toBe(true)
+		expect(isPreviewScopedName(config.bindings?.vectorize?.DOCUMENT_INDEX.indexName)).toBe(true)
+		expect(isPreviewScopedName(config.bindings?.hyperdrive?.POSTGRES)).toBe(true)
+		expect(isPreviewScopedName(config.bindings?.browser?.BROWSER)).toBe(true)
+		expect(isPreviewScopedName(config.bindings?.analyticsEngine?.APP_ANALYTICS.dataset)).toBe(true)
 		expect(config.bindings?.ai).toEqual({ binding: 'AI' })
 		expect(Object.keys(config.bindings?.vectorize ?? {}).sort()).toEqual(['DOCUMENT_INDEX', 'SEARCH_INDEX'])
 		expect(Object.keys(config.bindings?.hyperdrive ?? {})).toEqual(['POSTGRES'])
-		expect(config.bindings?.hyperdrive?.POSTGRES).toBe('devflare-testing')
-		expect(config.bindings?.browser).toEqual({ BROWSER: 'devflare-testing-browser' })
 		expect(config.compatibilityFlags).toEqual(expect.arrayContaining(['nodejs_compat']))
+		expect(config.previews?.includeCrons).toBe(false)
 		expect(Object.keys(config.bindings?.analyticsEngine ?? {}).sort()).toEqual([
 			'APP_ANALYTICS',
 			'SEARCH_ANALYTICS'
@@ -458,7 +476,23 @@ describe('repo example app configs', () => {
 		expect(preview.vars?.APP_NAME).toBe('testing-binding-matrix-preview')
 		expect(preview.vars?.DEPLOYMENT_CHANNEL).toBe('preview')
 		expect(preview.bindings?.kv?.CACHE).toBe('devflare-testing-cache-kv-preview')
+		expect(preview.bindings?.kv?.SESSIONS).toBe('devflare-testing-sessions-kv-preview')
+		expect(preview.bindings?.d1?.PRIMARY_DB).toBe('devflare-testing-primary-db-preview')
+		expect(preview.bindings?.d1?.AUDIT_DB).toBe('devflare-testing-audit-db-preview')
 		expect(preview.bindings?.r2?.ASSETS).toBe('devflare-testing-assets-bucket-preview')
+		expect(preview.bindings?.r2?.ARCHIVE).toBe('devflare-testing-archive-bucket-preview')
+		expect(preview.bindings?.queues?.producers?.JOBS).toBe('devflare-testing-jobs-queue-preview')
+		expect(preview.bindings?.queues?.producers?.EMAILS).toBe('devflare-testing-emails-queue-preview')
+		expect(preview.bindings?.queues?.consumers?.[0]?.queue).toBe('devflare-testing-jobs-queue-preview')
+		expect(preview.bindings?.queues?.consumers?.[0]?.deadLetterQueue).toBe('devflare-testing-jobs-dlq-preview')
+		expect(preview.bindings?.vectorize?.DOCUMENT_INDEX.indexName).toBe('devflare-testing-document-index-preview')
+		expect(preview.bindings?.vectorize?.SEARCH_INDEX.indexName).toBe('devflare-testing-search-index-preview')
+		expect(preview.bindings?.hyperdrive?.POSTGRES).toBe('devflare-testing-preview')
+		expect(preview.bindings?.browser?.BROWSER).toBe('devflare-testing-browser-preview')
+		expect(preview.bindings?.analyticsEngine?.APP_ANALYTICS.dataset).toBe('devflare-testing-app-analytics-preview')
+		expect(preview.triggers?.crons).toEqual(['0 */6 * * *'])
+		expect(compiled.queues?.consumers).toHaveLength(2)
+		expect(compiled.triggers?.crons).toEqual(['0 */6 * * *'])
 		expect(compiled.services).toEqual(expect.arrayContaining([
 			{
 				binding: 'AUTH_SERVICE',
@@ -477,11 +511,22 @@ describe('repo example app configs', () => {
 		expect(compiled.hyperdrive).toEqual([
 			{ binding: 'POSTGRES', id: 'devflare-testing' }
 		])
+		expect(compiled.r2_buckets).toEqual(expect.arrayContaining([
+			{ binding: 'ASSETS', bucket_name: 'devflare-testing-assets-bucket' },
+			{ binding: 'ARCHIVE', bucket_name: 'devflare-testing-archive-bucket' }
+		]))
+		expect(compiled.analytics_engine_datasets).toEqual(expect.arrayContaining([
+			{ binding: 'APP_ANALYTICS', dataset: 'devflare-testing-app-analytics' },
+			{ binding: 'SEARCH_ANALYTICS', dataset: 'devflare-testing-search-analytics' }
+		]))
 
 		expect(production.vars?.APP_NAME).toBe('testing-binding-matrix-production')
 		expect(production.vars?.DEPLOYMENT_CHANNEL).toBe('production')
 		expect(production.bindings?.kv?.CACHE).toBe('devflare-testing-cache-kv-production')
+		expect(production.bindings?.kv?.SESSIONS).toBe('devflare-testing-sessions-kv')
 		expect(production.bindings?.r2?.ASSETS).toBe('devflare-testing-assets-bucket-production')
+		expect(production.bindings?.r2?.ARCHIVE).toBe('devflare-testing-archive-bucket')
+		expect(production.bindings?.vectorize?.DOCUMENT_INDEX.indexName).toBe('devflare-testing-document-index')
 	})
 
 	test('apps/testing default routes stay cheap and smoke stays guarded until explicitly invoked', async () => {
@@ -564,7 +609,7 @@ describe('repo example app configs', () => {
 		const preview = resolveConfigForEnvironment(config, 'preview')
 
 		const queueHarness = await runTestingQueue(preview, {
-			queue: 'devflare-testing-jobs-queue',
+			queue: preview.bindings?.queues?.consumers?.[0]?.queue ?? 'devflare-testing-jobs-queue-preview',
 			messages: [{ body: { type: 'job-smoke' } }]
 		})
 		const queueState = await (queueHarness.env.SESSIONS as KVNamespace).get('testing:queue:jobs:last')
@@ -588,6 +633,7 @@ describe('repo example app configs', () => {
 		expect(compiled.preview_urls).toBe(true)
 		expect(compiled.workers_dev).toBe(true)
 		expect(config.files?.fetch).toBe('.adapter-cloudflare/_worker.js')
+		expect(config.previews?.includeCrons).toBe(false)
 		expect(config.assets).toEqual({
 			binding: 'ASSETS',
 			directory: '.adapter-cloudflare'

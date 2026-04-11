@@ -153,6 +153,8 @@ Build / Deploy:
 	previews --all              Include historical and deleted registry records
 	previews reconcile          Reconcile the registry against live Cloudflare versions
 	previews cleanup --apply    Soft-delete stale registry records after reconciliation
+	previews cleanup-resources --env preview --apply
+	                          Delete preview-scoped Cloudflare resources for the active preview scope
 	previews retire --worker <name> --branch <branch> --apply
 	                          Retire a tracked preview immediately by branch, alias, version, or commit
 	worker rename <old-name> --to <new-name>
@@ -239,6 +241,7 @@ function getStyledHelpText(options: Record<string, string | boolean>): string {
 		formatCommand('devflare deploy --message "Docs release" --tag docs-123', 'Attach explicit version metadata to a deploy', theme),
 		formatCommand('devflare worker rename documentation --to devflare-documentation', 'Rename a Worker and sync the matching devflare config', theme),
 		formatCommand('devflare previews reconcile', 'Reconcile the registry against live Cloudflare versions', theme),
+		formatCommand('devflare previews cleanup-resources --env preview --apply', 'Delete preview-scoped Cloudflare resources for the current preview scope', theme),
 		formatCommand('devflare tokens <bootstrap-token> --new preview', 'Create a prefixed Devflare-managed account token', theme),
 		formatCommand('devflare tokens <bootstrap-token> --roll preview', 'Roll the secret for a Devflare-managed account token', theme),
 		formatCommand('devflare account workers', 'List Workers for the selected account', theme),

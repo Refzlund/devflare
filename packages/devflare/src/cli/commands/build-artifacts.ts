@@ -2,15 +2,25 @@ import { type ConsolaInstance } from 'consola'
 import { dirname, relative, resolve } from 'pathe'
 import type { CliOptions, ParsedArgs } from '../index'
 import type { FileSystem } from '../dependencies'
-import { loadResolvedConfig, type DevflareConfig } from '../../config'
+import {
+	loadConfig,
+	resolveConfigResources,
+	resolveMaterializedConfigResources,
+	type DevflareConfig
+} from '../../config'
 import {
 	compileConfig,
 	rebaseWranglerConfigPaths,
 	writeWranglerConfig,
 	type WranglerConfig
 } from '../../config/compiler'
+import {
+	preparePreviewScopedResourcesForDeploy,
+	type PreviewScopedResourceNames
+} from '../../config/preview-resources'
 import { getDependencies } from '../dependencies'
 import { ensureGeneratedDirectory, getGeneratedArtifactPaths } from '../generated-artifacts'
+import { applyDeploymentStrategy, describeDeploymentStrategy } from '../deploy-strategy'
 import { bundleWorkerEntry } from '../../bundler'
 import { detectViteProject } from '../../dev-server/vite-utils'
 import {
@@ -33,6 +43,21 @@ export interface PreparedBuildArtifactsResult {
 
 interface RetryableCleanupError {
 	code?: string
+}
+
+function summarizePreviewScopedResourceNames(resources: PreviewScopedResourceNames): string | null {
+	const segments = [
+		resources.kv.length > 0 ? `KV ${resources.kv.length}` : null,
+		resources.d1.length > 0 ? `D1 ${resources.d1.length}` : null,
+		resources.r2.length > 0 ? `R2 ${resources.r2.length}` : null,
+		resources.queues.length > 0 ? `Queues ${resources.queues.length}` : null,
+		resources.vectorize.length > 0 ? `Vectorize ${resources.vectorize.length}` : null,
+		resources.hyperdrive.length > 0 ? `Hyperdrive ${resources.hyperdrive.length}` : null,
+		resources.analyticsEngine.length > 0 ? `Analytics ${resources.analyticsEngine.length}` : null,
+		resources.browser.length > 0 ? `Browser ${resources.browser.length}` : null
+	].filter((segment): segment is string => segment !== null)
+
+	return segments.length > 0 ? segments.join(' · ') : null
 }
 
 function getBuildArtifactPaths(cwd: string): BuildArtifactPaths {
@@ -230,7 +255,35 @@ export async function prepareBuildArtifacts(
 	const configPath = parsed.options.config as string | undefined
 	const environment = parsed.options.env as string | undefined
 
-	const config = await loadResolvedConfig({ cwd, configFile: configPath, environment })
+	const rawConfig = await loadConfig({ cwd, configFile: configPath })
+	const shouldPreparePreviewScopedResources = parsed.command === 'deploy' && environment === 'preview'
+	const previewScopedResources = shouldPreparePreviewScopedResources
+		? await preparePreviewScopedResourcesForDeploy(rawConfig, { environment })
+		: null
+	const config = previewScopedResources
+		? await resolveMaterializedConfigResources(previewScopedResources.config, {
+			accountId: previewScopedResources.accountId
+		})
+		: await resolveConfigResources(rawConfig, { environment })
+
+	const createdPreviewResourcesSummary = previewScopedResources
+		? summarizePreviewScopedResourceNames(previewScopedResources.created)
+		: null
+	if (createdPreviewResourcesSummary) {
+		logLine(logger, `Provisioned preview-scoped resources: ${createdPreviewResourcesSummary}`)
+	}
+
+	const existingPreviewResourcesSummary = previewScopedResources
+		? summarizePreviewScopedResourceNames(previewScopedResources.existing)
+		: null
+	if (existingPreviewResourcesSummary) {
+		logLine(logger, `Reused preview-scoped resources: ${existingPreviewResourcesSummary}`)
+	}
+
+	for (const warning of previewScopedResources?.warnings ?? []) {
+		logger.warn(warning)
+	}
+
 	logLine(logger, `Building: ${config.name}`)
 
 	const composedMainEntry = await prepareComposedWorkerEntrypoint(cwd, config, environment)
@@ -240,9 +293,20 @@ export async function prepareBuildArtifacts(
 		config,
 		environment
 	)
+	const deploymentStrategy = applyDeploymentStrategy(config, {
+		environment,
+		preview: parsed.options.preview === true,
+		branchName: parsed.options['branch-name'] as string | undefined,
+		previewBranch: process.env.DEVFLARE_PREVIEW_BRANCH
+	})
+	const deploymentStrategyMessage = describeDeploymentStrategy(deploymentStrategy)
+
+	if (deploymentStrategyMessage) {
+		logLine(logger, deploymentStrategyMessage)
+	}
 
 	const devWranglerConfig = compileConfig(config)
-	const deployWranglerConfig = structuredClone(devWranglerConfig)
+	const deployWranglerConfig = compileConfig(deploymentStrategy.config)
 
 	if (viteProject.shouldStartVite) {
 		if (composedMainEntry) {

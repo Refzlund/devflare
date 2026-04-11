@@ -105,6 +105,22 @@ jobs:
           delete_worker "$SEARCH_SERVICE_NAME"
           delete_worker "$AUTH_SERVICE_NAME"
 
+      - name: Delete preview-scoped testing Cloudflare resources
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DEVFLARE_PREVIEW_BRANCH: ${{ env.PREVIEW_BRANCH }}
+        run: |
+          set -euo pipefail
+
+          cd apps/testing
+
+          bunx --bun devflare previews cleanup-resources \
+            --account "$CLOUDFLARE_ACCOUNT_ID" \
+            --env preview \
+            --apply
+
       - name: Mark testing branch preview deployment inactive
         uses: ./.github/actions/devflare-github-feedback
         with:
@@ -119,7 +135,7 @@ jobs:
           ref-name: ${{ env.PREVIEW_BRANCH }}
           environment: testing branch preview / ${{ env.PREVIEW_BRANCH }}
           log-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          summary: This branch was deleted, so Devflare retired the tracked testing preview metadata, deleted the branch-scoped Workers, and marked the related GitHub deployment and stable PR preview comment inactive when applicable.
+          summary: This branch was deleted, so Devflare retired the tracked testing preview metadata, deleted the branch-scoped Workers plus preview-owned Cloudflare resources, and marked the related GitHub deployment and stable PR preview comment inactive when applicable.
 
       - name: Summarize testing branch preview cleanup
         if: ${{ always() }}
@@ -133,7 +149,7 @@ jobs:
             echo '### Testing branch preview cleanup'
             echo ''
             echo "- Branch scope: \`$PREVIEW_BRANCH\`"
-            echo '- Cleanup action: retired tracked preview metadata, deleted branch-scoped Workers, and marked matching GitHub deployment feedback inactive plus the stable PR preview comment when applicable'
+            echo '- Cleanup action: retired tracked preview metadata, deleted branch-scoped Workers and preview-owned Cloudflare resources, and marked matching GitHub deployment feedback inactive plus the stable PR preview comment when applicable'
             echo "- Main Worker: \`$MAIN_WORKER_NAME\`"
             echo "- Search service Worker: \`$SEARCH_SERVICE_NAME\`"
             echo "- Auth service Worker: \`$AUTH_SERVICE_NAME\`"

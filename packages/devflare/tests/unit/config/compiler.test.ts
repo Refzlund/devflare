@@ -3,6 +3,7 @@
 // =============================================================================
 
 import { describe, expect, test } from 'bun:test'
+import { preview } from '../../../src/config'
 import { compileConfig, rebaseWranglerConfigPaths } from '../../../src/config/compiler'
 import type { DevflareConfig } from '../../../src/config/schema'
 
@@ -59,6 +60,44 @@ describe('compileConfig', () => {
 	})
 
 	describe('bindings', () => {
+		test('materializes preview-scoped bindings before compilation', () => {
+			const pv = preview.scope()
+			const result = compileConfig({
+				...baseConfig,
+				bindings: {
+					r2: { BUCKET: pv('my-bucket') },
+					queues: {
+						producers: { JOBS: pv('jobs-queue') },
+						consumers: [{ queue: pv('jobs-queue') }]
+					},
+					vectorize: {
+						SEARCH_INDEX: { indexName: pv('search-index') }
+					},
+					browser: { BROWSER: pv('browser-renderer') },
+					analyticsEngine: {
+						ANALYTICS: { dataset: pv('analytics-dataset') }
+					}
+				}
+			})
+
+			expect(result.r2_buckets).toEqual([
+				{ binding: 'BUCKET', bucket_name: 'my-bucket' }
+			])
+			expect(result.queues?.producers).toEqual([
+				{ binding: 'JOBS', queue: 'jobs-queue' }
+			])
+			expect(result.queues?.consumers).toEqual([
+				{ queue: 'jobs-queue' }
+			])
+			expect(result.vectorize).toEqual([
+				{ binding: 'SEARCH_INDEX', index_name: 'search-index' }
+			])
+			expect(result.browser).toEqual({ binding: 'BROWSER' })
+			expect(result.analytics_engine_datasets).toEqual([
+				{ binding: 'ANALYTICS', dataset: 'analytics-dataset' }
+			])
+		})
+
 		test('compiles KV bindings configured with explicit id objects', () => {
 			const result = compileConfig({
 				...baseConfig,

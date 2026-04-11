@@ -34,6 +34,11 @@ export interface ResolveConfigResourcesOptions {
 	cloudflare?: Partial<CloudflareConfigResolutionApi>
 }
 
+export interface ResolveMaterializedConfigResourcesOptions {
+	accountId?: string
+	cloudflare?: Partial<CloudflareConfigResolutionApi>
+}
+
 export interface LoadResolvedConfigOptions extends LoadConfigOptions {
 	accountId?: string
 	cloudflare?: Partial<CloudflareConfigResolutionApi>
@@ -180,11 +185,10 @@ export function resolveConfigForLocalRuntime(
 	* Resolve Cloudflare-backed resource references such as KV/D1/Hyperdrive name bindings into
  * concrete IDs for build, deploy, and automation workflows.
  */
-export async function resolveConfigResources(
-	config: DevflareConfig,
-	options: ResolveConfigResourcesOptions = {}
+export async function resolveMaterializedConfigResources(
+	resolvedConfig: DevflareConfig,
+	options: ResolveMaterializedConfigResourcesOptions = {}
 ): Promise<DevflareConfig> {
-	const resolvedConfig = resolveConfigForEnvironment(config, options.environment)
 	const kvBindings = resolvedConfig.bindings?.kv
 	const d1Bindings = resolvedConfig.bindings?.d1
 	const hyperdriveBindings = resolvedConfig.bindings?.hyperdrive
@@ -236,9 +240,9 @@ export async function resolveConfigResources(
 		: []
 
 	if (
-		pendingKVNameBindings.length === 0 &&
-		pendingD1NameBindings.length === 0 &&
-		pendingHyperdriveNameBindings.length === 0
+		pendingKVNameBindings.length === 0
+		&& pendingD1NameBindings.length === 0
+		&& pendingHyperdriveNameBindings.length === 0
 	) {
 		return {
 			...resolvedConfig,
@@ -374,6 +378,22 @@ export async function resolveConfigResources(
 				: {})
 		}
 	}
+}
+
+/**
+	* Resolve Cloudflare-backed resource references such as KV/D1/Hyperdrive name bindings into
+ * concrete IDs for build, deploy, and automation workflows.
+ */
+export async function resolveConfigResources(
+	config: DevflareConfig,
+	options: ResolveConfigResourcesOptions = {}
+): Promise<DevflareConfig> {
+	const resolvedConfig = resolveConfigForEnvironment(config, options.environment)
+
+	return resolveMaterializedConfigResources(resolvedConfig, {
+		accountId: options.accountId,
+		cloudflare: options.cloudflare
+	})
 }
 
 /**
