@@ -471,8 +471,7 @@ describe('repo example app configs', () => {
 			},
 			{
 				binding: 'SEARCH_SERVICE',
-				service: 'devflare-testing-search-service',
-				environment: 'staging'
+				service: 'devflare-testing-search-service'
 			}
 		]))
 		expect(compiled.hyperdrive).toEqual([

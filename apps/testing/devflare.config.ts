@@ -73,11 +73,7 @@ export default defineConfig({
 		services: {
 			AUTH_SERVICE: authService.worker,
 			ADMIN_RPC: authService.worker('AdminEntrypoint'),
-			SEARCH_SERVICE: {
-				service: workerNames.searchServiceName,
-				environment: 'staging',
-				__ref: searchService
-			}
+			SEARCH_SERVICE: searchService.worker
 		},
 
 		ai: {

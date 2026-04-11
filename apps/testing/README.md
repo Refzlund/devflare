@@ -24,7 +24,7 @@ on every public request.
 - `workers/auth-service`
 	- sidecar RPC service for auth-style operations
 - `workers/search-service`
-	- sidecar RPC service that the main worker binds to via `environment: 'staging'`
+	- sidecar RPC service deployed from the `staging` config, which the main worker then binds to directly by its branch-scoped Worker name
 
 ## Safe-by-default behavior
 
@@ -43,7 +43,7 @@ requests into surprise browser sessions, vector writes, or outbound email.
 This app depends on sidecar Workers. Deploy them before deploying the main app:
 
 1. `workers/auth-service` (`devflare-testing-auth-service`)
-2. `workers/search-service` with its `staging` environment (`devflare-testing-search-service`)
+2. `workers/search-service` using its `staging` config (`devflare-testing-search-service`)
 3. the main worker in `apps/testing` (`devflare-testing-binding-matrix`)
 
 ## Branch-scoped CI previews
