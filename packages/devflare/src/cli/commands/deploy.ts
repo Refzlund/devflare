@@ -99,7 +99,7 @@ async function retryDeployVerification<T>(
 	const { attempts, delayMs } = getDeployVerificationSettings()
 	let lastError: unknown
 
-	for (let attempt = 1; attempt <= attempts; attempt++) {
+	for (let attempt = 1;attempt <= attempts;attempt++) {
 		try {
 			return await operation()
 		} catch (error) {

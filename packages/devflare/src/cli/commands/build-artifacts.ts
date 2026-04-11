@@ -110,7 +110,7 @@ async function removePathWithRetries(
 ): Promise<void> {
 	const fs = await import('node:fs/promises')
 
-	for (let attempt = 1; attempt <= attempts; attempt++) {
+	for (let attempt = 1;attempt <= attempts;attempt++) {
 		try {
 			await fs.rm(targetPath, {
 				recursive: true,
