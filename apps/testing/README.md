@@ -75,15 +75,16 @@ Service bindings still follow the branch-scoped worker names produced by
 `resolveTestingWorkerNames()`, because those are references to other Workers
 rather than standalone Cloudflare resource names.
 
-That workflow now also publishes a GitHub deployment on every run and updates a
-stable PR comment whenever the branch belongs to an open pull request, while
-still keeping the later `/status` assertion as the binding-verification step.
+That shared preview workflow now publishes a GitHub deployment for branch
+targets, updates the stable PR comment for PR targets, and on qualifying branch
+pushes can refresh both from the same prepared job while still keeping the
+later `/status` assertion as the binding-verification step.
 
-The branch preview lifecycle now also includes
-`.github/workflows/testing-preview-branch-cleanup.yml`, which retires the
-tracked preview metadata, deletes the branch-scoped Workers, and marks the
-matching GitHub deployment inactive plus the stable PR preview comment inactive
-when the branch is deleted while an open PR still points at it.
+The preview lifecycle now also lives in `.github/workflows/preview.yml`, which
+handles branch cleanup, PR-close cleanup, and manual branch cleanup dispatches.
+It retires the branch-scoped Workers, deletes preview-owned resources, and
+marks matching GitHub deployment feedback plus the shared PR preview comment
+sections inactive when those preview scopes are retired.
 
 If you want a copyable branch-delete cleanup template for same-Worker preview
 flows elsewhere in the repo, see

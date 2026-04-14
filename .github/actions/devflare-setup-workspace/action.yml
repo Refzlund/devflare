@@ -1,0 +1,38 @@
+name: "Devflare Setup Workspace"
+description: "Install Bun, warm the Bun cache, and install shared workspace dependencies once per workflow job"
+inputs:
+  bun-version:
+    description: "Bun version to install"
+    required: false
+    default: "1.3.12"
+  working-directory:
+    description: "Directory to run the install command from"
+    required: false
+    default: "."
+  install-command:
+    description: "Dependency installation command to run"
+    required: false
+    default: "bun install --frozen-lockfile"
+runs:
+  using: "composite"
+  steps:
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
+      with:
+        bun-version: ${{ inputs.bun-version }}
+
+    - name: Restore Bun install cache
+      uses: actions/cache@v4
+      with:
+        path: ~/.bun/install/cache
+        key: ${{ runner.os }}-bun-${{ inputs.bun-version }}-${{ hashFiles('bun.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-bun-${{ inputs.bun-version }}-
+
+    - name: Install shared workspace dependencies
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        set -euo pipefail
+
+        ${{ inputs.install-command }}

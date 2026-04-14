@@ -29,6 +29,14 @@ inputs:
     description: "Directory to run the dependency installation command from, allowing monorepo subdirectory deploys to reuse a shared root install"
     required: false
     default: ""
+  skip-setup:
+    description: "When true, assume Bun is already installed by an earlier workflow step and skip the local setup/cache steps"
+    required: false
+    default: "false"
+  skip-install:
+    description: "When true, assume dependencies are already installed by an earlier workflow step and skip the local install step"
+    required: false
+    default: "false"
   deploy-command:
     description: "Optional command prefix used to invoke deploy from the target package, for example 'bun run deploy --'. When omitted, the action falls back to 'bunx --bun devflare deploy'."
     required: false
@@ -83,6 +91,7 @@ runs:
   steps:
     - name: Setup Bun
       id: setup
+      if: ${{ inputs.skip-setup != 'true' }}
       continue-on-error: true
       uses: oven-sh/setup-bun@v2
       with:
@@ -90,7 +99,7 @@ runs:
 
     - name: Restore Bun install cache
       id: bun-cache
-      if: ${{ steps.setup.outcome == 'success' }}
+      if: ${{ inputs.skip-setup != 'true' && steps.setup.outcome == 'success' }}
       uses: actions/cache@v4
       with:
         path: ~/.bun/install/cache
@@ -100,7 +109,7 @@ runs:
 
     - name: Install dependencies
       id: install
-      if: ${{ steps.setup.outcome == 'success' }}
+      if: ${{ inputs.skip-install != 'true' && (inputs.skip-setup == 'true' || steps.setup.outcome == 'success') }}
       continue-on-error: true
       shell: bash
       working-directory: ${{ inputs.install-working-directory != '' && inputs.install-working-directory || inputs.working-directory }}
@@ -130,7 +139,7 @@ runs:
 
     - name: Deploy with Devflare
       id: deploy
-      if: ${{ steps.setup.outcome == 'success' && steps.install.outcome == 'success' }}
+      if: ${{ (inputs.skip-setup == 'true' || steps.setup.outcome == 'success') && (inputs.skip-install == 'true' || steps.install.outcome == 'success') }}
       continue-on-error: true
       shell: bash
       working-directory: ${{ inputs.working-directory }}
@@ -264,8 +273,8 @@ runs:
       if: ${{ always() }}
       shell: bash
       env:
-        SETUP_OUTCOME: ${{ steps.setup.outcome }}
-        INSTALL_OUTCOME: ${{ steps.install.outcome }}
+        SETUP_OUTCOME: ${{ inputs.skip-setup == 'true' && 'success' || steps.setup.outcome }}
+        INSTALL_OUTCOME: ${{ inputs.skip-install == 'true' && 'success' || steps.install.outcome }}
         INSTALL_EXIT_CODE: ${{ steps.install.outputs.exit_code }}
         INSTALL_LOG_EXCERPT: ${{ steps.install.outputs.log_excerpt }}
         DEPLOY_OUTCOME: ${{ steps.deploy.outcome }}

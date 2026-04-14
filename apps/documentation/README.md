@@ -8,9 +8,8 @@ It intentionally demonstrates that:
 - Wrangler config is generated under `.devflare/` and `.wrangler/deploy/`
 - SvelteKit can compose `devflare/sveltekit` with existing hooks
 - `devflare dev`, `devflare build`, `devflare deploy`, and `devflare deploy --preview` are the primary flows
-- `.github/workflows/documentation-preview-branch.yml` publishes branch-scoped preview aliases on push for non-default branches
-- `.github/workflows/documentation-preview-branch-cleanup.yml` retires tracked branch preview metadata and marks matching GitHub deployments inactive when a branch is deleted
-- `.github/workflows/documentation-preview-pr.yml` is the PR preview workflow that updates one stable PR comment and retires preview metadata on PR close
+- `.github/workflows/preview.yml` handles documentation and testing preview deploys, branch/PR feedback, and cleanup flows from one shared workflow
+- branch pushes can prepare the workspace once and then refresh both the branch preview target and the matching PR preview target when the branch already belongs to an open pull request
 - `.github/workflows/documentation-production.yml` is the production-on-default-branch workflow that publishes a GitHub deployment status with the production URL
 
 ## Scripts

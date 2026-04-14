@@ -626,6 +626,8 @@ The legacy singular `devflare token <bootstrap-token>` create flow is still acce
 
 The repo ships a reusable composite action at [`.github/actions/devflare-deploy`](../../.github/actions/devflare-deploy).
 
+The repo also ships a shared workspace setup action at [`.github/actions/devflare-setup-workspace`](../../.github/actions/devflare-setup-workspace) so one workflow job can install dependencies once and then deploy multiple preview targets from the same checkout.
+
 The repo also ships a GitHub-feedback action at [`.github/actions/devflare-github-feedback`](../../.github/actions/devflare-github-feedback) for publishing deployment results back into GitHub.
 
 The action stays intentionally thin:
@@ -639,7 +641,7 @@ The reporting split is also intentional:
 
 - GitHub PR feedback should use a stable PR comment because PRs are issue-backed conversations
 - GitHub branch feedback should use Deployments + deployment statuses because GitHub does not provide first-class branch comments
-- combined branch + PR reporting should use `mode: both` on the feedback action together with `resolve-pr-from-ref: 'true'`
+- one preview workflow can publish both branch deployment feedback and the shared PR comment in the same run when a pushed branch already belongs to an open pull request
 
 Current action inputs that matter most:
 
@@ -647,6 +649,8 @@ Current action inputs that matter most:
 - `environment`
 - `production`
 - `preview-scope`
+- `skip-setup`
+- `skip-install`
 - `verify-deployment` (defaults to `true`)
 - `cloudflare-api-token`
 - `cloudflare-account-id`
@@ -675,16 +679,11 @@ Minimal preview step:
 		cloudflare-account-id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 ```
 
-This repository also includes thin caller workflows and copyable workflow examples:
+This repository now keeps preview delivery in one shared workflow plus one production workflow:
 
-- [`.github/workflows/documentation-preview-branch.yml`](../../.github/workflows/documentation-preview-branch.yml) for branch-scoped dedicated preview Workers published on push
-- [`.github/workflows/documentation-preview-branch-cleanup.yml`](../../.github/workflows/documentation-preview-branch-cleanup.yml) for delete-triggered cleanup of documentation branch preview scopes plus GitHub deployment cleanup
-- [`.github/workflows/documentation-preview-pr.yml`](../../.github/workflows/documentation-preview-pr.yml) for PR previews, stable PR comments, and PR-close scope cleanup
-- [`.github/workflows/documentation-production.yml`](../../.github/workflows/documentation-production.yml) for production deploys from the repository default branch plus GitHub deployment statuses
-- [`.github/workflows/testing-preview-branch.yml`](../../.github/workflows/testing-preview-branch.yml) for branch-scoped Durable Object previews, combined branch deployment + PR comment reporting, and later runtime binding verification
-- [`.github/workflows/testing-preview-branch-cleanup.yml`](../../.github/workflows/testing-preview-branch-cleanup.yml) for delete-triggered cleanup of testing branch preview scopes plus GitHub deployment and PR feedback cleanup
-- [`.github/workflows/testing-preview-pr.yml`](../../.github/workflows/testing-preview-pr.yml) for PR-scoped testing previews and PR-close scope cleanup
-- [`.github/workflow-examples/branch-preview-cleanup.example.yml`](../../.github/workflow-examples/branch-preview-cleanup.example.yml) as a delete-triggered preview-scope cleanup template that cleans one branch scope and marks GitHub deployment feedback inactive
+- [`.github/workflows/preview.yml`](../../.github/workflows/preview.yml) handles documentation + testing previews, push + PR lifecycle triggers, branch + PR targets, and cleanup flows from one place
+- [`.github/workflows/documentation-production.yml`](../../.github/workflows/documentation-production.yml) handles production deploys from the repository default branch plus GitHub deployment statuses
+- [`.github/workflow-examples/branch-preview-cleanup.example.yml`](../../.github/workflow-examples/branch-preview-cleanup.example.yml) remains as a copyable delete-triggered preview-scope cleanup template for downstream repos that want a smaller starting point
 
 The live workflows now rely on the deploy action's control-plane verification for deploy success.
 
@@ -692,15 +691,16 @@ If you want other feedback modes in your own repo, the supported patterns are:
 
 - PR-only preview feedback: `mode: comment`
 - branch-only preview feedback: `mode: deployment`
-- combined branch deployment + PR comment feedback: `mode: both` with `resolve-pr-from-ref: 'true'` (the repo's `testing-preview-branch.yml` now demonstrates this pattern)
+- combined branch deployment + PR comment feedback: either `mode: both` with `resolve-pr-from-ref: 'true'`, or separate deployment/comment steps inside one shared preview workflow when you want finer control over grouped PR comments
 
 Repository-specific runtime checks still exist where they are testing app
 behavior rather than deploy success. For example,
-[`testing-preview-branch.yml`](../../.github/workflows/testing-preview-branch.yml)
-now publishes both a GitHub deployment and, when the branch belongs to an open
-pull request, the stable PR comment while still keeping its `/status`
-assertion, because it is validating runtime bindings and deployment-channel
-wiring rather than merely asking whether Cloudflare accepted the upload.
+[`preview.yml`](../../.github/workflows/preview.yml)
+deploys testing previews for both branch and PR scopes from one prepared job
+when a pushed branch already belongs to an open pull request, while still
+keeping its deployed-binding verification because it is validating runtime
+bindings and deployment-channel wiring rather than merely asking whether
+Cloudflare accepted the upload.
 
 For branch-scoped real preview deploys such as `apps/testing`, Devflare now
 automatically omits shared queue consumers from the deployed Wrangler config,

@@ -11,7 +11,7 @@ It is meant to read like a proper markdown handbook rather than a second source 
 - Links use the same `/docs/...` routes as the documentation site.
 
 ## Documentation map
-This export covers 81 pages across 5 top-level groups.
+This export covers 83 pages across 5 top-level groups.
 
 ### Quickstart
 See why Devflare exists, build the smallest safe first worker, and keep the documentation contract nearby before you branch into the deeper toolkit.
@@ -28,11 +28,13 @@ See why Devflare exists, build the smallest safe first worker, and keep the docu
 
 ### Devflare
 Keep the day-to-day Devflare surfaces easy to scan: runtime model, HTTP split, authored config rules, CLI workflow, helpers, testing, and framework lanes all live here instead of being scattered across deploy-only docs.
-- [Routing](/docs/http-routing) — Use `src/fetch.ts` for request-wide behavior, `src/routes/**` for leaf handlers, and `files.routes` when you need a custom root, prefix, or route-only app.
 - [CLI](/docs/devflare-cli) — Start at `devflare --help`: the root page already maps local dev, inspection, deploy intent, account inventory, preview lifecycle, production control, token management, AI pricing, and remote-mode operations in one place.
+- [Project Architecture](/docs/project-architecture) — This is the practical answer to “what does a real Devflare project look like on disk?” — from a small worker package, to a multi-surface app, to a hosted SvelteKit package, to a Bun monorepo with several deployable workers.
+- [Routing](/docs/http-routing) — Use `src/fetch.ts` for request-wide behavior, `src/routes/**` for leaf handlers, and `files.routes` when you need a custom root, prefix, or route-only app.
 
 - **Configuration** — Keep authored config readable, stable, and clearly separated from generated output.
   - [Config basics](/docs/config-basics) — Write `devflare.config.ts` for humans first, let Devflare merge environments and resolve names later, and treat generated Wrangler-facing files as outputs rather than authoring surfaces.
+  - [Full config](/docs/full-config) — See one canonical `devflare.config.ts` that touches the main current config lanes in a single file, with hover coverage on every property shown in the example.
   - [Project shape](/docs/project-shape) — Start with one fetch file, then add routes, background handlers, Durable Objects, assets, and transport rules only when the project genuinely needs them.
   - [Worker surfaces](/docs/worker-surfaces) — Devflare can compose or wrap several Worker surfaces into one generated entrypoint, but the authored source of truth should stay in explicit files such as `src/fetch.ts`, `src/queue.ts`, `src/scheduled.ts`, and `src/email.ts`.
   - [Generated types](/docs/generated-types) — `devflare types` turns config, discovered Durable Objects, named entrypoints, and cross-worker references into one generated TypeScript contract instead of a pile of hand-maintained env guesswork.
@@ -60,7 +62,7 @@ Keep the day-to-day Devflare surfaces easy to scan: runtime model, HTTP split, a
 Deploy explicitly, choose the right preview model, manage preview lifecycle cleanly, and keep CI/CD plus verification honest.
 
 - **CI/CD** — Use small GitHub workflows that keep triggers, permissions, impact checks, deploy intent, and feedback easy to review.
-  - [GitHub workflows](/docs/github-workflows) — This repository keeps GitHub workflows small on purpose: caller workflows own triggers, permissions, and package selection, while shared Devflare actions handle impact checks, deploy execution, and feedback publishing.
+  - [GitHub workflows](/docs/github-workflows) — This repository keeps GitHub workflows small on purpose: one shared preview workflow owns branch and PR preview lifecycles, while reusable Devflare actions handle impact checks, shared workspace setup, deploy execution, and feedback publishing.
 
 - **Deploy targets** — Move from local build output to production or preview deploys without guessing which destination you are about to hit.
   - [Production deploys](/docs/production-deploys) — Devflare keeps build and deploy flows inspectable, but deploys are intentionally explicit: production uses `--prod` or `--production`, while preview is either a same-worker upload with plain `--preview` or a named preview scope with `--preview <name>`.
@@ -293,11 +295,7 @@ The build and local-dev story stays honest too. Rolldown is the worker builder, 
 
 #### What Devflare already supports across a real application
 
-These labels describe how complete the Devflare story is for the surface itself: authored config, compilation, local runtime, tests, previews, and operational guidance.
-
-The honest answer is not that every Cloudflare surface feels identical. Some lanes are fully local-first, some are real but remote-oriented, and some are deliberately narrower because the platform contract itself is narrower.
-
-That is exactly why the labels matter. Devflare is strongest when the docs say clearly whether a feature is first-class, caveated, or intentionally limited instead of pretending every binding has the same ergonomics.
+Hover a label to see what it means for config, local runtime, tests, previews, and operational guidance.
 
 ##### Highlights
 
@@ -308,17 +306,7 @@ That is exactly why the labels matter. Devflare is strongest when the docs say c
 - **Hyperdrive** — Hyperdrive is modeled cleanly in config and generated output, but the local and preview ergonomics are more constrained than KV, D1, or R2 because the real database and credentials stay remote. ([link](/docs/hyperdrive-binding))
 - **Workers AI** — The AI binding is supported in config, types, and deployment flows, but meaningful tests are remote-oriented because real inference still lives on Cloudflare infrastructure. ([link](/docs/ai-binding))
 - **Vectorize** — Vectorize is fully modeled in config and preview-aware naming, but real inserts and similarity queries still need remote infrastructure and honest remote-mode tests. ([link](/docs/vectorize-binding))
-- **Browser Rendering** — Browser Rendering is real and useful through Devflare's smart bridge-backed dev-server story, but the contract is intentionally narrow today: exactly one browser binding and a stronger integration path than tiny helper-based unit tests. ([link](/docs/browser-binding))
-
-> **Note — How to read the labels**
->
-> `Full` means Devflare has a strong config, local runtime, documentation, and testing story for that surface.
->
-> `Partial` means the surface is supported, but important behavior still depends on remote Cloudflare infrastructure or other platform caveats.
->
-> `Limited` means there is a real supported lane, but the contract is intentionally narrower today.
->
-> `None` means Devflare does not model that surface yet, and you should reach for passthrough or raw Cloudflare tooling instead of expecting fake local magic.
+- **Browser Rendering** — Browser Rendering is fully supported through Devflare's bridge-backed local dev story, config model, generated typing, and runtime integration. The main platform caveat is still the Cloudflare one: exactly one browser binding. ([link](/docs/browser-binding))
 
 #### What Devflare adds on top of raw Cloudflare workflows
 
@@ -340,6 +328,14 @@ These are the parts that feel distinctly like Devflare rather than just a thinne
 > **Tip — This is the real distinction**
 >
 > Cloudflare gives you the platform primitives. Devflare adds the authored config model, runtime helpers, bridge-backed local dev, test harnesses, typed generation, and preview-aware workflows that make those primitives feel like one coherent application story.
+
+> **Important — Composable infrastructure is intentional**
+>
+> Devflare is designed around small, explicit files and runtime surfaces: `src/fetch.ts`, `src/queue.ts`, `src/do/**/*.ts`, route modules, and runtime APIs that let those pieces compose cleanly instead of collapsing into one monolithic worker file.
+>
+> That same shape works for a tiny project and for a larger enterprise repo. You can keep responsibilities split by surface, file, and package without losing the thread of one coherent Cloudflare application.
+>
+> Want to see the package and repo shape Devflare is optimized for? [Open the project architecture guide](/docs/project-architecture)
 
 #### What you get on day one
 
@@ -1045,6 +1041,589 @@ When this local preview loop is ready to leave your shell history and become rev
 
 ---
 
+### Treat `devflare` as one documented CLI, not a bag of one-off shell snippets
+
+> Start at `devflare --help`: the root page already maps local dev, inspection, deploy intent, account inventory, preview lifecycle, production control, token management, AI pricing, and remote-mode operations in one place.
+
+| Field | Value |
+| --- | --- |
+| Route | [`/docs/devflare-cli`](/docs/devflare-cli) |
+| Group | Devflare |
+| Navigation title | CLI |
+| Eyebrow | Command surface |
+
+Devflare’s CLI is the public control surface for the same authored config model the docs site describes. Most packages live in the boring `types → dev → build → deploy` loop, but the CLI also owns the surrounding control plane. Learn the root commands once, then drill into `devflare help <command>` or nested `--help` pages when one family goes deeper.
+
+#### At a glance
+
+| Fact | Value |
+| --- | --- |
+| Best for | Everyday dev, config inspection, explicit deploys, and the Cloudflare control-plane work around those deploys |
+| Fastest orientation | `bunx --bun devflare --help` |
+| Help depth | `devflare help <command> [subcommand]` |
+| Safest habit | Run commands from the package that owns the `devflare.config.*` you mean to resolve |
+
+#### Start with the root help page, then drill down
+
+The root help page is not just a banner and a couple of examples. It is the best quick map of the whole CLI: core dev commands, deploy intent, inspection tools, and the deeper control-plane families all show up there first.
+
+From there, the CLI keeps the same shape all the way down. `devflare help deploy` and `devflare deploy --help` resolve to the same detailed guide, and nested families such as `previews` or `productions` keep going with their own subcommand help instead of forcing you to remember a maze of ad-hoc commands.
+
+##### Key points
+
+- Use the root help first when you are not sure which command family owns the job.
+- Use command-specific help when the job is already obvious but the option vocabulary is not.
+- Use nested help for the control-plane families that have real subcommand trees instead of pretending one page can explain them all.
+
+> **Note — The docs page should mirror the help tree**
+>
+> If the built-in help already describes the command surface cleanly, the docs page should explain that structure instead of flattening everything back into four example commands.
+
+##### Example — Use the built-in help tree as the CLI map
+
+```bash
+bunx --bun devflare --help
+bunx --bun devflare help deploy
+bunx --bun devflare previews --help
+bunx --bun devflare previews cleanup-resources --help
+bunx --bun devflare productions rollback --help
+```
+
+#### Know what each root command family owns
+
+##### Reference table
+
+| Command | Primary job | What the deeper help covers |
+| --- | --- | --- |
+| `init` | Scaffold a new package. | Template choice and generated starter scripts. |
+| `dev` | Start local development. | Worker-only defaults, Vite auto-detection, logging, and persistence. |
+| `build` | Compile deploy-ready artifacts. | Environment resolution and Wrangler-facing output. |
+| `deploy` | Ship explicitly to production or preview. | Target selection, dry runs, preview naming, messages, and tags. |
+| `types` | Generate `env.d.ts` and typed bindings. | Custom output paths plus entrypoint and Durable Object discovery. |
+| `doctor` | Check local project health. | Config, package, TypeScript, Vite, and generated artifact diagnostics. |
+| `config` | Print resolved config. | `print`, raw Devflare JSON, or compiled Wrangler JSON. |
+| `account` | Inspect Cloudflare account inventories and limits. | Resource lists, usage limits, and interactive global/workspace selection. |
+| `login` | Authenticate with Cloudflare via Wrangler. | `--force` behavior and reuse of existing sessions. |
+| `previews` | Operate on preview lifecycle state. | `bindings`, `provision`, `reconcile`, `cleanup`, `retire`, and `cleanup-resources`. |
+| `productions` | Inspect and mutate live production state. | `versions`, `rollback`, and `delete`. |
+| `worker` | Run Worker control-plane operations. | Currently `rename`, plus config-sync expectations. |
+| `tokens` | Manage Devflare-managed account-owned API tokens. | List, create, roll, delete, and the legacy `token` alias. |
+| `ai` | Print the bundled Workers AI pricing snapshot. | Read-only pricing surface; verify current rates in Cloudflare docs when it matters. |
+| `remote` | Toggle remote test mode for paid features. | `status`, `enable`, and `disable`. |
+| `help` | Render root or command-specific help. | Nested help resolution for command families and subcommands. |
+| `version` | Print the installed version. | Same information as the global `--version` flag. |
+
+#### Learn the shared option vocabulary once
+
+The root help page also teaches the common option vocabulary. That matters because not every command supports every option, but the meaning stays consistent when the option exists.
+
+If you already know what `--config`, `--env`, `--debug`, and `--help` mean, the command-specific help pages get much easier to scan.
+
+##### Key points
+
+- `--env` is meaningful only on commands that actually resolve config environments.
+- `--help` is not a fallback after confusion; it is the intended first stop for a new command family.
+- When in doubt about which config file is being resolved, make `--config` explicit instead of trusting directory luck.
+
+##### Reference table
+
+| Option | What it means | Where it matters most |
+| --- | --- | --- |
+| `--config <path>` | Pick the exact `devflare.config.*` file to resolve. | `build`, `deploy`, `types`, `doctor`, `config`, `previews`, `productions`, and `worker rename`. |
+| `--env <name>` | Resolve `config.env[name]` before the command runs. | `build`, `config`, preview-aware inspection, and production discovery flows. |
+| `--debug` | Print stack traces and extra debug output. | Build, deploy, type generation, and other failure-heavy paths. |
+| `--no-color` | Disable ANSI color output. | CI logs, copied transcripts, or plain-text debugging. |
+| `-h, --help` | Show the detailed help page for the current command path. | Every root command and nested subcommand surface. |
+| `-v, --version` | Print the installed version and exit. | Root invocation when you need to verify the installed package quickly. |
+
+#### Use the root page as the map, then let deeper pages own the sharp edges
+
+The root CLI page should tell you which family exists and what it is broadly for. Once a command starts operating on preview lifecycle, live production, account context, tokens, or paid-test gates, the sharper behavior belongs on the dedicated operations pages instead of being re-explained here in parallel.
+
+Use the built-in help for exact flags, then use the docs pages below for the operational safety rules and workflow context around those command families.
+
+##### Highlights
+
+- **Control-plane operations** — Open this page for account selection, live production inspection, rollback or delete posture, worker rename, token bootstrap, and remote-mode gates. ([link](/docs/control-plane-operations))
+- **devflare/cloudflare** — Open this page when a script or tool should use the same account, registry, usage, and token helpers the CLI builds on. ([link](/docs/cloudflare-api))
+- **Preview operations** — Open this page when the question is preview registry inspection, reconciliation, retirement, or resource cleanup. ([link](/docs/preview-operations))
+- **Production deploys** — Open this page when the question is the deploy target and preflight inspection rather than later control-plane changes. ([link](/docs/production-deploys))
+
+##### Key points
+
+- Use `account`, `productions`, `worker`, `tokens`, and `remote` when you are operating real Cloudflare state instead of just building locally.
+- Use `previews` when the job is preview lifecycle rather than day-to-day package development.
+- Treat nested `--apply` flows as command families that deserve both built-in help and the dedicated docs page before you run them.
+
+> **Warning — The sharp edges live one level deeper**
+>
+> `previews cleanup-resources`, `previews retire`, `productions rollback`, and `productions delete` all carry behavior and safety notes that are too specific for the root CLI map. Read their help and the dedicated docs page before treating them as copy-paste habits.
+
+#### Most packages still live in one boring, reliable command loop
+
+The most useful Devflare loop is intentionally repetitive: refresh generated types when bindings move, run local dev, inspect build output when the shape changes, and deploy with an explicit preview or production target.
+
+That loop stays the same whether the package is worker-only or Vite-backed. The config decides the host; the command vocabulary stays familiar.
+
+When the job changes from building to operating, switch command families instead of inventing ad-hoc command snippets: `config` and `doctor` for inspection, `previews` for preview lifecycle, `productions` for live production state, and `account` for inventory questions.
+
+##### Key points
+
+- Run `types` after binding or entrypoint changes so `env.d.ts` stays honest.
+- Run `build` or `config print --format wrangler` when the compiled shape matters more than the dev server feeling healthy.
+- Keep preview and production intent explicit in the final deploy command instead of hiding it in a generic script name.
+- Use the nested help pages when a lifecycle command reaches `--apply`, account selection, rollback, or cleanup territory.
+
+##### Example — A good everyday command loop
+
+```bash
+bunx --bun devflare types
+bunx --bun devflare dev
+bunx --bun devflare build --env staging
+bunx --bun devflare deploy --preview next
+bunx --bun devflare deploy --prod
+```
+
+##### Example — When the setup feels suspicious, inspect before you improvise
+
+```bash
+bunx --bun devflare config print --format wrangler
+bunx --bun devflare doctor
+bunx --bun devflare previews bindings --scope next
+bunx --bun devflare productions versions
+```
+
+#### Use the inspection and lifecycle commands before you improvise command snippets
+
+##### Highlights
+
+- **`config print`** — Best when you need to see the resolved Devflare config or compiled Wrangler-facing shape before trusting a build or deploy.
+- **`doctor`** — Best when config resolution, generated artifacts, or local Vite detection feel hard to trace and need a sharper diagnostic pass.
+- **`previews` / `productions`** — Best when the question is no longer “can I deploy?” but “what exists right now, and what should I retire, roll back, or inspect?”
+
+> **Warning — Keep commands package-local**
+>
+> Run Devflare from the package that owns the config you actually mean to resolve. In monorepos, Turbo can decide what changed, but package-local `devflare` commands still decide what gets built, deployed, reconciled, or cleaned up.
+
+---
+
+### Structure Devflare projects around one authored config, explicit runtime files, and package-local deploy ownership
+
+> This is the practical answer to “what does a real Devflare project look like on disk?” — from a small worker package, to a multi-surface app, to a hosted SvelteKit package, to a Bun monorepo with several deployable workers.
+
+| Field | Value |
+| --- | --- |
+| Route | [`/docs/project-architecture`](/docs/project-architecture) |
+| Group | Devflare |
+| Navigation title | Project Architecture |
+| Eyebrow | Project setup |
+
+Devflare projects stay readable when the package boundary is obvious, the authored files stay separate from generated output, and each runtime surface owns its own file. This page maps the common file types, then shows a few real project shapes from this repository so you can set up your package on purpose instead of accumulating conventions by accident.
+
+#### At a glance
+
+| Fact | Value |
+| --- | --- |
+| Best for | Teams deciding how to lay out a new Devflare package or a multi-package workspace before file structure gets noisy |
+| Primary authored file | `devflare.config.ts` in each deployable package |
+| Generated files | `env.d.ts`, `.devflare/**`, and `.wrangler/deploy/**` |
+| Monorepo rule | Validate from the root, but deploy from the package that owns the config |
+
+#### Start with authored files, and treat generated files as output
+
+The first architecture decision is not “which framework?” It is usually “which files in this package are actually authored source of truth?” In Devflare, the stable answer is that `devflare.config.ts`, `package.json`, and your runtime files are authored; generated Wrangler-facing files and generated types are downstream outputs.
+
+That split is what keeps the project reviewable. If a file describes package intent or runtime behavior, author it directly. If a file is emitted by Devflare, a framework adapter, or Wrangler preparation, treat it as disposable output and regenerate it when the source changes.
+
+##### Reference table
+
+| Path or pattern | Own it when | What it means |
+| --- | --- | --- |
+| `devflare.config.ts` | Every deployable package | The authored Devflare source of truth for files, bindings, env overlays, previews, and deployment posture. |
+| `package.json` | Every package | Package-local scripts, dependencies, and the command loop that should run from that package. |
+| `src/fetch.ts` | The package owns request-wide HTTP behavior | The main worker entry for broad middleware or request handling. |
+| `src/routes/**` | The package uses file-based HTTP leaves | URL-specific route handlers that sit beside, or replace, one large fetch file. |
+| `src/queue.ts`, `src/scheduled.ts`, `src/email.ts` | The package consumes those platform events | Separate event surfaces instead of burying background logic inside fetch code. |
+| `src/do/**/*.ts` | The package owns Durable Object classes | Stateful classes discovered and bundled through config. |
+| `src/ep/**/*.ts` | The package exposes named worker entrypoints | Classes discovered for typed `ref().worker(...)` service boundaries. |
+| `src/workflows/**/*.ts` | The package owns workflow definitions | Additional discovered runtime modules that stay explicit in config review. |
+| `src/transport.ts` | Local RPC-style bridge calls must preserve custom values | Custom encode/decode rules for local bridge-backed calls, most often in tests or Durable Object method round-trips. |
+| `env.d.ts` | You run `devflare types` | Generated binding and entrypoint types. Do not hand-edit it. |
+| `vite.config.ts`, `svelte.config.js`, `src/routes/+page.svelte` | The package is a hosted Vite or SvelteKit app | Host-app files that sit around the Devflare worker story instead of replacing it. |
+| `.devflare/**`, `.wrangler/deploy/**` | Devflare has built, checked, or prepared deploy output | Generated build and deploy artifacts. Useful to inspect, not the authored architecture. |
+
+> **Tip — A good architecture rule**
+>
+> If the file describes package intent, author it. If the file exists because Devflare or a host tool generated it, inspect it when needed but keep the authored source elsewhere.
+
+#### A worker-first package can stay small for a long time
+
+A healthy Devflare package can start with one config file, one `src/fetch.ts`, one route tree, and one small test. That already gives you package-local scripts, generated types, generated deploy output, and room to grow without forcing a framework or a monorepo strategy on day one.
+
+The point of this shape is not minimalism for its own sake. It is that the package boundary stays obvious: the package owns its config, owns its worker files, and can be built or deployed without pretending the whole repo is one worker.
+
+##### Key points
+
+- Keep the package-local command loop in `package.json` so `types`, `dev`, `build`, and `deploy` always resolve the right config.
+- Keep `src/fetch.ts` request-wide and let `src/routes/**` own the URL-specific work once there is more than one leaf.
+- Expect `env.d.ts`, `.devflare/**`, and `.wrangler/deploy/**` to appear as generated outputs after the normal command loop runs.
+
+##### Example — Small worker package with one config, one fetch file, one route tree, and generated output kept in its lane
+
+###### File — package.json
+
+```json
+{
+	"name": "notes-api",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"types": "bunx --bun devflare types",
+		"dev": "bunx --bun devflare dev",
+		"build": "bunx --bun devflare build",
+		"deploy": "bunx --bun devflare deploy"
+	},
+	"devDependencies": {
+		"devflare": "workspace:*"
+	}
+}
+```
+
+###### File — devflare.config.ts
+
+```ts
+import { defineConfig } from 'devflare/config'
+
+export default defineConfig({
+	name: 'notes-api',
+	files: {
+		fetch: 'src/fetch.ts',
+		routes: {
+			dir: 'src/routes',
+			prefix: '/api'
+		}
+	}
+})
+```
+
+###### File — src/fetch.ts
+
+```ts
+import { sequence, type FetchEvent, type ResolveFetch } from 'devflare/runtime'
+
+async function requestId(event: FetchEvent, resolve: ResolveFetch): Promise<Response> {
+	event.locals.requestId = crypto.randomUUID()
+	return resolve(event)
+}
+
+export const handle = sequence(requestId)
+```
+
+###### File — src/routes/health.ts
+
+```ts
+export async function GET(): Promise<Response> {
+	return Response.json({ ok: true })
+}
+```
+
+#### One package can own many runtime files without becoming a monolith
+
+This is where Devflare architecture becomes more interesting than “one fetch file.” A single package can still own HTTP, route modules, queue work, scheduled jobs, email handlers, Durable Objects, named entrypoints, workflows, and transport rules — as long as each surface keeps its own file and the config names those surfaces honestly.
+
+That is also why the `files.*` lane matters so much. It is not busywork. It is the map of which runtime surfaces the package actually owns.
+
+##### Reference table
+
+| File lane | Why it exists |
+| --- | --- |
+| `src/fetch.ts` | Request-wide middleware and the outer HTTP trail. |
+| `src/routes/**` | Leaf handlers that mirror URLs instead of bloating the global fetch file. |
+| `src/queue.ts`, `src/scheduled.ts`, `src/email.ts` | Background and platform-triggered event surfaces with their own runtime contracts. |
+| `src/do/**/*.ts` | Stateful Durable Object classes discovered and bundled through config. |
+| `src/ep/**/*.ts` | Named worker entrypoints for typed cross-worker boundaries. |
+| `src/workflows/**/*.ts` | Workflow definitions discovered as part of the package runtime shape. |
+| `src/transport.ts` | Local bridge serialization only when custom values need to survive a bridge-backed call. |
+
+> **Warning — Not every package should own every file type**
+>
+> The point is explicit ownership, not maximal surface area. Add each runtime file only when the package really owns that event or discovery lane.
+
+##### Example — A single package with all the main worker-owned file types visible on disk
+
+###### File — devflare.config.ts
+
+```ts
+import { defineConfig } from 'devflare/config'
+
+export default defineConfig({
+	name: 'workspace-app',
+	files: {
+		fetch: 'src/fetch.ts',
+		routes: {
+			dir: 'src/routes',
+			prefix: '/api'
+		},
+		queue: 'src/queue.ts',
+		scheduled: 'src/scheduled.ts',
+		email: 'src/email.ts',
+		durableObjects: 'src/do/**/*.ts',
+		entrypoints: 'src/ep/**/*.ts',
+		workflows: 'src/workflows/**/*.ts',
+		transport: 'src/transport.ts'
+	},
+	bindings: {
+		durableObjects: {
+			SESSION_ROOM: 'SessionRoom'
+		},
+		queues: {
+			producers: {
+				EMAILS: 'workspace-emails'
+			},
+			consumers: [
+				{
+					queue: 'workspace-emails'
+				}
+			]
+		}
+	},
+	triggers: {
+		crons: ['0 */6 * * *']
+	}
+})
+```
+
+###### File — src/queue.ts
+
+```ts
+import type { QueueEvent } from 'devflare/runtime'
+
+export async function queue({ messages }: QueueEvent): Promise<void> {
+	for (const message of messages) {
+		console.log('processing job', message.id)
+	}
+}
+```
+
+###### File — src/do/session-room.ts
+
+```ts
+import { DurableObject } from 'cloudflare:workers'
+
+export class SessionRoom extends DurableObject<DevflareEnv> {
+	async fetch(request: Request): Promise<Response> {
+		return new Response('room:' + new URL(request.url).pathname)
+	}
+}
+```
+
+#### Hosted apps add Vite or SvelteKit around the worker, not instead of it
+
+The docs app in this repo is the simplest real example of a hosted package: it has `package.json`, `devflare.config.ts`, `vite.config.ts`, `svelte.config.js`, Svelte route files, and static assets. Devflare still owns the Cloudflare-facing config and generated Wrangler output, while Vite and SvelteKit own the host-app shell.
+
+The repo also includes a fuller SvelteKit case that points `files.fetch` at the generated Cloudflare worker output while still discovering Durable Objects and transport hooks from source. That is the important hosted-app lesson: the framework shell and the worker surfaces can coexist in one package when the file ownership stays explicit.
+
+##### Key points
+
+- Package-local host files like `vite.config.ts` and `svelte.config.js` belong beside the Devflare config, not in a separate orchestration package.
+- Hosted apps can point at generated framework worker output, or they can mix that output with extra Devflare-owned surfaces like Durable Objects and transport hooks.
+- The generated worker file still belongs on the generated side of the boundary; the authored source remains the config plus the source files that feed it.
+
+##### Example — Real hosted app package from `apps/documentation`
+
+###### File — apps/documentation/package.json
+
+```json
+{
+	"name": "documentation",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "bun run llm:generate && bunx --bun devflare dev",
+		"build": "bun run llm:generate && bunx --bun devflare build",
+		"deploy": "bun run llm:generate && bunx devflare deploy",
+		"types": "bunx --bun devflare types"
+	},
+	"devDependencies": {
+		"devflare": "workspace:*",
+		"vite": "^8",
+		"@sveltejs/kit": "^2"
+	}
+}
+```
+
+###### File — apps/documentation/devflare.config.ts
+
+```ts
+import { defineConfig } from '../../packages/devflare/src/config-entry'
+
+const accountId = process.env.CLOUDFLARE_ACCOUNT_ID?.trim()
+
+export default defineConfig({
+	name: 'devflare-docs',
+	compatibilityDate: '2026-04-08',
+	files: {
+		fetch: false
+	},
+	previews: {
+		includeCrons: false
+	},
+	accountId,
+	assets: {
+		binding: 'ASSETS',
+		directory: '.adapter-cloudflare'
+	},
+	wrangler: {
+		passthrough: {
+			main: '.adapter-cloudflare/_worker.js'
+		}
+	}
+})
+```
+
+###### File — apps/documentation/vite.config.ts
+
+```ts
+import { sveltekit } from '@sveltejs/kit/vite'
+import { devflarePlugin } from '../../packages/devflare/src/vite/index'
+import { defineConfig } from 'vite'
+
+export default defineConfig({
+	plugins: [
+		devflarePlugin(),
+		sveltekit()
+	]
+})
+```
+
+##### Example — Hosted SvelteKit package that still owns extra worker surfaces
+
+```ts
+import { defineConfig } from 'devflare/config'
+
+export default defineConfig({
+	name: 'case18-sveltekit-full',
+	files: {
+		fetch: '.svelte-kit/cloudflare/_worker.js',
+		durableObjects: 'src/do.*.ts',
+		transport: 'src/transport.ts'
+	},
+	bindings: {
+		r2: {
+			IMAGES: 'images-bucket'
+		},
+		d1: {
+			DB: 'main-db'
+		},
+		durableObjects: {
+			CHAT_ROOM: {
+				className: 'ChatRoom'
+			}
+		}
+	}
+})
+```
+
+#### In a monorepo, Turbo orchestrates the workspace but packages still deploy themselves
+
+This repository is the monorepo example. The root owns workspace scripts, workspaces, and Turbo task orchestration. But deployable packages still keep their own `devflare.config.ts` files and package-local commands. That is true for `apps/documentation`, `apps/testing`, sidecar workers under `apps/testing/workers/*`, and the smaller cases under `cases/*`.
+
+That split is what keeps the monorepo honest. Root scripts decide what to validate or cache. Package-local Devflare commands decide what actually resolves, builds, deploys, or cleans up.
+
+##### Steps
+
+1. Use the repo root for Turbo build, test, check, and impacted-package orchestration.
+2. Run `devflare` from the package that owns the config you actually mean to resolve.
+3. Keep sidecar workers or service-bound packages as separate workspace packages with their own configs and scripts.
+4. Reuse one preview scope across a worker family only after you have made the package boundaries explicit.
+
+> **Warning — Turbo is not the deploy target**
+>
+> Turbo decides which packages need work. The package working directory still decides which `devflare.config.ts` gets built or deployed.
+
+##### Example — The repo root orchestrates, but the packages still own deployment
+
+###### File — package.json
+
+```json
+{
+	"name": "devflare-monorepo",
+	"private": true,
+	"workspaces": [
+		"apps/*",
+		"apps/testing/workers/*",
+		"packages/*",
+		"cases/*"
+	],
+	"scripts": {
+		"devflare:build": "turbo run build --filter=devflare --filter=documentation",
+		"devflare:test": "turbo run test --filter=...devflare",
+		"devflare:check": "turbo run check --filter=documentation",
+		"devflare:ci": "bun run devflare:build && bun run devflare:test && bun run devflare:check"
+	}
+}
+```
+
+###### File — turbo.json
+
+```json
+{
+	"tasks": {
+		"build": {
+			"dependsOn": ["^build"],
+			"outputs": ["dist/**", ".devflare/**", ".wrangler/deploy/**", "env.d.ts"]
+		},
+		"test": {
+			"dependsOn": ["^build", "transit"]
+		},
+		"check": {
+			"dependsOn": ["^build", "transit"]
+		}
+	}
+}
+```
+
+###### File — apps/testing/workers/auth-service/devflare.config.ts
+
+```ts
+import { defineConfig } from '../../../../packages/devflare/src/config-entry'
+
+export default defineConfig({
+	name: 'devflare-testing-auth-service',
+	files: {
+		fetch: 'src/worker.ts'
+	}
+})
+```
+
+##### Example — Good monorepo command split
+
+```bash
+# repo-root orchestration
+bun run turbo build --filter=documentation
+bun run devflare:check
+
+# package-local deploy
+cd apps/documentation
+bun run deploy -- --preview next
+
+# sidecar worker family
+cd ../testing/workers/auth-service
+bunx --bun devflare deploy --preview pr-123
+```
+
+#### Open the deeper page for the part of the architecture you are deciding next
+
+##### Highlights
+
+- **Need the file-surface rules?** — Open project shape when the next question is how many surfaces the package should actually own and which conventions should stay explicit. ([link](/docs/project-shape))
+- **Need the event-surface map?** — Open worker surfaces when the real question is fetch versus queue versus scheduled versus email, or when the package has started owning more than one event family. ([link](/docs/worker-surfaces))
+- **Need route layout next?** — Open the routing page when the package boundary is clear and the next decision is how `src/fetch.ts` and `src/routes/**` should split responsibility. ([link](/docs/http-routing))
+- **Need generated types and entrypoints?** — Open generated types when the architecture includes bindings, named entrypoints, service refs, or Durable Objects that should land in `env.d.ts` honestly. ([link](/docs/generated-types))
+- **Need the fuller monorepo workflow?** — Open the monorepo page when the next question is Turbo filters, CI workflow boundaries, or package-local deploy discipline across the workspace. ([link](/docs/monorepo-turborepo))
+
+---
+
 ### Split request-wide middleware from route leaves so HTTP stays easy to read
 
 > Use `src/fetch.ts` for request-wide behavior, `src/routes/**` for leaf handlers, and `files.routes` when you need a custom root, prefix, or route-only app.
@@ -1213,172 +1792,6 @@ It is not the same thing as top-level Cloudflare deployment `routes`, which deci
 
 ---
 
-### Treat `devflare` as one documented CLI, not a bag of one-off shell snippets
-
-> Start at `devflare --help`: the root page already maps local dev, inspection, deploy intent, account inventory, preview lifecycle, production control, token management, AI pricing, and remote-mode operations in one place.
-
-| Field | Value |
-| --- | --- |
-| Route | [`/docs/devflare-cli`](/docs/devflare-cli) |
-| Group | Devflare |
-| Navigation title | CLI |
-| Eyebrow | Command surface |
-
-Devflare’s CLI is the public control surface for the same authored config model the docs site describes. Most packages live in the boring `types → dev → build → deploy` loop, but the CLI also owns the surrounding control plane. Learn the root commands once, then drill into `devflare help <command>` or nested `--help` pages when one family goes deeper.
-
-#### At a glance
-
-| Fact | Value |
-| --- | --- |
-| Best for | Everyday dev, config inspection, explicit deploys, and the Cloudflare control-plane work around those deploys |
-| Fastest orientation | `bunx --bun devflare --help` |
-| Help depth | `devflare help <command> [subcommand]` |
-| Safest habit | Run commands from the package that owns the `devflare.config.*` you mean to resolve |
-
-#### Start with the root help page, then drill down
-
-The root help page is not just a banner and a couple of examples. It is the best quick map of the whole CLI: core dev commands, deploy intent, inspection tools, and the deeper control-plane families all show up there first.
-
-From there, the CLI keeps the same shape all the way down. `devflare help deploy` and `devflare deploy --help` resolve to the same detailed guide, and nested families such as `previews` or `productions` keep going with their own subcommand help instead of forcing you to remember a maze of ad-hoc commands.
-
-##### Key points
-
-- Use the root help first when you are not sure which command family owns the job.
-- Use command-specific help when the job is already obvious but the option vocabulary is not.
-- Use nested help for the control-plane families that have real subcommand trees instead of pretending one page can explain them all.
-
-> **Note — The docs page should mirror the help tree**
->
-> If the built-in help already describes the command surface cleanly, the docs page should explain that structure instead of flattening everything back into four example commands.
-
-##### Example — Use the built-in help tree as the CLI map
-
-```bash
-bunx --bun devflare --help
-bunx --bun devflare help deploy
-bunx --bun devflare previews --help
-bunx --bun devflare previews cleanup-resources --help
-bunx --bun devflare productions rollback --help
-```
-
-#### Know what each root command family owns
-
-##### Reference table
-
-| Command | Primary job | What the deeper help covers |
-| --- | --- | --- |
-| `init` | Scaffold a new package. | Template choice and generated starter scripts. |
-| `dev` | Start local development. | Worker-only defaults, Vite auto-detection, logging, and persistence. |
-| `build` | Compile deploy-ready artifacts. | Environment resolution and Wrangler-facing output. |
-| `deploy` | Ship explicitly to production or preview. | Target selection, dry runs, preview naming, messages, and tags. |
-| `types` | Generate `env.d.ts` and typed bindings. | Custom output paths plus entrypoint and Durable Object discovery. |
-| `doctor` | Check local project health. | Config, package, TypeScript, Vite, and generated artifact diagnostics. |
-| `config` | Print resolved config. | `print`, raw Devflare JSON, or compiled Wrangler JSON. |
-| `account` | Inspect Cloudflare account inventories and limits. | Resource lists, usage limits, and interactive global/workspace selection. |
-| `login` | Authenticate with Cloudflare via Wrangler. | `--force` behavior and reuse of existing sessions. |
-| `previews` | Operate on preview lifecycle state. | `bindings`, `provision`, `reconcile`, `cleanup`, `retire`, and `cleanup-resources`. |
-| `productions` | Inspect and mutate live production state. | `versions`, `rollback`, and `delete`. |
-| `worker` | Run Worker control-plane operations. | Currently `rename`, plus config-sync expectations. |
-| `tokens` | Manage Devflare-managed account-owned API tokens. | List, create, roll, delete, and the legacy `token` alias. |
-| `ai` | Print the bundled Workers AI pricing snapshot. | Read-only pricing surface; verify current rates in Cloudflare docs when it matters. |
-| `remote` | Toggle remote test mode for paid features. | `status`, `enable`, and `disable`. |
-| `help` | Render root or command-specific help. | Nested help resolution for command families and subcommands. |
-| `version` | Print the installed version. | Same information as the global `--version` flag. |
-
-#### Learn the shared option vocabulary once
-
-The root help page also teaches the common option vocabulary. That matters because not every command supports every option, but the meaning stays consistent when the option exists.
-
-If you already know what `--config`, `--env`, `--debug`, and `--help` mean, the command-specific help pages get much easier to scan.
-
-##### Key points
-
-- `--env` is meaningful only on commands that actually resolve config environments.
-- `--help` is not a fallback after confusion; it is the intended first stop for a new command family.
-- When in doubt about which config file is being resolved, make `--config` explicit instead of trusting directory luck.
-
-##### Reference table
-
-| Option | What it means | Where it matters most |
-| --- | --- | --- |
-| `--config <path>` | Pick the exact `devflare.config.*` file to resolve. | `build`, `deploy`, `types`, `doctor`, `config`, `previews`, `productions`, and `worker rename`. |
-| `--env <name>` | Resolve `config.env[name]` before the command runs. | `build`, `config`, preview-aware inspection, and production discovery flows. |
-| `--debug` | Print stack traces and extra debug output. | Build, deploy, type generation, and other failure-heavy paths. |
-| `--no-color` | Disable ANSI color output. | CI logs, copied transcripts, or plain-text debugging. |
-| `-h, --help` | Show the detailed help page for the current command path. | Every root command and nested subcommand surface. |
-| `-v, --version` | Print the installed version and exit. | Root invocation when you need to verify the installed package quickly. |
-
-#### Use the root page as the map, then let deeper pages own the sharp edges
-
-The root CLI page should tell you which family exists and what it is broadly for. Once a command starts operating on preview lifecycle, live production, account context, tokens, or paid-test gates, the sharper behavior belongs on the dedicated operations pages instead of being re-explained here in parallel.
-
-Use the built-in help for exact flags, then use the docs pages below for the operational safety rules and workflow context around those command families.
-
-##### Highlights
-
-- **Control-plane operations** — Open this page for account selection, live production inspection, rollback or delete posture, worker rename, token bootstrap, and remote-mode gates. ([link](/docs/control-plane-operations))
-- **devflare/cloudflare** — Open this page when a script or tool should use the same account, registry, usage, and token helpers the CLI builds on. ([link](/docs/cloudflare-api))
-- **Preview operations** — Open this page when the question is preview registry inspection, reconciliation, retirement, or resource cleanup. ([link](/docs/preview-operations))
-- **Production deploys** — Open this page when the question is the deploy target and preflight inspection rather than later control-plane changes. ([link](/docs/production-deploys))
-
-##### Key points
-
-- Use `account`, `productions`, `worker`, `tokens`, and `remote` when you are operating real Cloudflare state instead of just building locally.
-- Use `previews` when the job is preview lifecycle rather than day-to-day package development.
-- Treat nested `--apply` flows as command families that deserve both built-in help and the dedicated docs page before you run them.
-
-> **Warning — The sharp edges live one level deeper**
->
-> `previews cleanup-resources`, `previews retire`, `productions rollback`, and `productions delete` all carry behavior and safety notes that are too specific for the root CLI map. Read their help and the dedicated docs page before treating them as copy-paste habits.
-
-#### Most packages still live in one boring, reliable command loop
-
-The most useful Devflare loop is intentionally repetitive: refresh generated types when bindings move, run local dev, inspect build output when the shape changes, and deploy with an explicit preview or production target.
-
-That loop stays the same whether the package is worker-only or Vite-backed. The config decides the host; the command vocabulary stays familiar.
-
-When the job changes from building to operating, switch command families instead of inventing ad-hoc command snippets: `config` and `doctor` for inspection, `previews` for preview lifecycle, `productions` for live production state, and `account` for inventory questions.
-
-##### Key points
-
-- Run `types` after binding or entrypoint changes so `env.d.ts` stays honest.
-- Run `build` or `config print --format wrangler` when the compiled shape matters more than the dev server feeling healthy.
-- Keep preview and production intent explicit in the final deploy command instead of hiding it in a generic script name.
-- Use the nested help pages when a lifecycle command reaches `--apply`, account selection, rollback, or cleanup territory.
-
-##### Example — A good everyday command loop
-
-```bash
-bunx --bun devflare types
-bunx --bun devflare dev
-bunx --bun devflare build --env staging
-bunx --bun devflare deploy --preview next
-bunx --bun devflare deploy --prod
-```
-
-##### Example — When the setup feels suspicious, inspect before you improvise
-
-```bash
-bunx --bun devflare config print --format wrangler
-bunx --bun devflare doctor
-bunx --bun devflare previews bindings --scope next
-bunx --bun devflare productions versions
-```
-
-#### Use the inspection and lifecycle commands before you improvise command snippets
-
-##### Highlights
-
-- **`config print`** — Best when you need to see the resolved Devflare config or compiled Wrangler-facing shape before trusting a build or deploy.
-- **`doctor`** — Best when config resolution, generated artifacts, or local Vite detection feel hard to trace and need a sharper diagnostic pass.
-- **`previews` / `productions`** — Best when the question is no longer “can I deploy?” but “what exists right now, and what should I retire, roll back, or inspect?”
-
-> **Warning — Keep commands package-local**
->
-> Run Devflare from the package that owns the config you actually mean to resolve. In monorepos, Turbo can decide what changed, but package-local `devflare` commands still decide what gets built, deployed, reconciled, or cleaned up.
-
----
-
 ### Author stable config, keep secrets and generated output in their own lanes
 
 > Write `devflare.config.ts` for humans first, let Devflare merge environments and resolve names later, and treat generated Wrangler-facing files as outputs rather than authoring surfaces.
@@ -1467,6 +1880,227 @@ export default defineConfig({
 	}
 })
 ```
+
+---
+
+### Scan one full `devflare.config.ts` example with the main current config lanes in one place
+
+> See one canonical `devflare.config.ts` that touches the main current config lanes in a single file, with hover coverage on every property shown in the example.
+
+| Field | Value |
+| --- | --- |
+| Route | [`/docs/full-config`](/docs/full-config) |
+| Group | Devflare |
+| Navigation title | Full config |
+| Eyebrow | Configuration |
+
+This page is the quick “show me the whole shape” version of Devflare config. It is intentionally full enough to scan the current top-level lanes in one file without turning into a maximal dump of every possible nested variant.
+
+#### At a glance
+
+| Fact | Value |
+| --- | --- |
+| Best for | Seeing the whole current config shape before you zoom into one subsection |
+| Reading pattern | Scan the example first, then hover properties, then open the specialist page you actually need |
+| Important boundary | This example is canonical, but not every binding family variant is shown inline |
+
+#### Use one canonical example when you want the whole shape in view
+
+When you already know Devflare is split into config, runtime, testing, and framework lanes, the next practical question is often just: what does a full current config actually look like?
+
+That is what this page is for. The example below touches the major current top-level config lanes in one place, while still staying readable enough for code review and copy-with-intent adaptation.
+
+> **Note — Full does not mean maximal**
+>
+> Every property shown above is real and current, but some binding families accept richer object variants than this page needs to show. Use this page as the canonical shape, then open the dedicated binding or configuration page when you need a deeper variant.
+
+##### Example — One full config example you can scan top to bottom
+
+Hover any property in the config to see what that lane means. The example is intentionally broad, but the dedicated pages still own the deeper caveats and richer nested variants.
+
+```ts
+import { defineConfig } from 'devflare/config'
+
+export default defineConfig({
+	name: 'docs-platform',
+	accountId: process.env.CLOUDFLARE_ACCOUNT_ID,
+	compatibilityDate: '2026-03-17',
+	compatibilityFlags: ['urlpattern_polyfill'],
+	previews: {
+		includeCrons: false
+	},
+	files: {
+		fetch: 'src/fetch.ts',
+		queue: 'src/queue.ts',
+		scheduled: 'src/scheduled.ts',
+		email: 'src/email.ts',
+		durableObjects: 'src/do/**/*.ts',
+		entrypoints: 'src/ep/**/*.ts',
+		routes: {
+			dir: 'src/routes',
+			prefix: '/api'
+		},
+		workflows: 'src/workflows/**/*.ts',
+		transport: 'src/transport.ts'
+	},
+	bindings: {
+		kv: {
+			CACHE: 'docs-cache'
+		},
+		d1: {
+			PRIMARY_DB: 'docs-db'
+		},
+		r2: {
+			UPLOADS: 'docs-uploads'
+		},
+		durableObjects: {
+			CHAT_ROOMS: 'ChatRoom'
+		},
+		queues: {
+			producers: {
+				EMAILS: 'docs-emails'
+			},
+			consumers: [
+				{
+					queue: 'docs-emails',
+					deadLetterQueue: 'docs-emails-dlq',
+					maxBatchSize: 50,
+					maxBatchTimeout: 10,
+					maxRetries: 5,
+					maxConcurrency: 2,
+					retryDelay: 30
+				}
+			]
+		},
+		services: {
+			AUTH: {
+				service: 'auth-worker'
+			}
+		},
+		ai: {
+			binding: 'AI'
+		},
+		vectorize: {
+			SEARCH_INDEX: {
+				indexName: 'docs-search'
+			}
+		},
+		hyperdrive: {
+			APP_DB: 'docs-primary-db'
+		},
+		browser: {
+			BROWSER: 'browser'
+		},
+		analyticsEngine: {
+			REQUESTS: {
+				dataset: 'docs_requests'
+			}
+		},
+		sendEmail: {
+			MAILER: {
+				destinationAddress: 'team@example.com'
+			}
+		}
+	},
+	triggers: {
+		crons: ['0 */6 * * *']
+	},
+	vars: {
+		APP_ENV: 'development'
+	},
+	secrets: {
+		API_TOKEN: {
+			required: true
+		}
+	},
+	routes: [
+		{
+			pattern: 'docs.example.com/*',
+			custom_domain: true
+		}
+	],
+	wsRoutes: [
+		{
+			pattern: '/ws/:id',
+			doNamespace: 'CHAT_ROOMS',
+			idParam: 'id',
+			forwardPath: '/websocket'
+		}
+	],
+	assets: {
+		directory: 'static',
+		binding: 'ASSETS'
+	},
+	limits: {
+		cpu_ms: 50
+	},
+	observability: {
+		enabled: true,
+		head_sampling_rate: 1
+	},
+	migrations: [
+		{
+			tag: 'v1',
+			new_sqlite_classes: ['ChatRoom']
+		}
+	],
+	rolldown: {
+		target: 'es2022',
+		minify: true,
+		sourcemap: true,
+		options: {}
+	},
+	vite: {
+		plugins: []
+	},
+	env: {
+		preview: {
+			vars: {
+				APP_ENV: 'preview'
+			},
+			previews: {
+				includeCrons: false
+			},
+			observability: {
+				enabled: true,
+				head_sampling_rate: 1
+			}
+		},
+		production: {
+			vars: {
+				APP_ENV: 'production'
+			}
+		}
+	},
+	wrangler: {
+		passthrough: {
+			logpush: true
+		}
+	}
+})
+```
+
+#### Know what each top-level lane is doing
+
+##### Reference table
+
+| Lane | What it owns | Open next when you need more |
+| --- | --- | --- |
+| `name`, `accountId`, `compatibility*` | Worker identity and runtime posture. | `config-basics` and `runtime-deploy-settings` |
+| `previews`, `files`, `bindings`, `triggers` | The authored Worker shape: surfaces, bindings, and scheduled intent. | `project-shape`, `worker-surfaces`, and `config-previews` |
+| `vars`, `secrets`, `env` | Runtime strings, secret declarations, and environment overlays. | `config-environments` |
+| `routes`, `wsRoutes`, `assets` | Deployment routing, dev WebSocket proxy rules, and static asset delivery. | `runtime-deploy-settings` |
+| `limits`, `observability`, `migrations` | Operational posture and release-time controls. | `runtime-deploy-settings` |
+| `rolldown`, `vite`, `wrangler` | Bundler coordination, host integration, and unsupported Wrangler passthrough. | `config-basics`, `vite-standalone`, and `svelte-with-rolldown` |
+
+#### Open the specialist page once the full picture is clear
+
+##### Highlights
+
+- **Need the authoring rules?** — Open config basics when the question is what should live in authored config versus generated output or deploy-time resolution. ([link](/docs/config-basics))
+- **Need the project shape story?** — Open project shape when the main question is how many Worker surfaces or discovery lanes the package should actually own. ([link](/docs/project-shape))
+- **Need preview or environment overlays?** — Use the environments and previews pages when the full config turns into a question about per-lane overrides or preview-scoped resources. ([link](/docs/config-environments))
+- **Need runtime and deploy posture?** — Open runtime and deploy settings when the question is routes, assets, WebSocket proxy rules, observability, limits, or migrations. ([link](/docs/runtime-deploy-settings))
 
 ---
 
@@ -1564,6 +2198,7 @@ export default defineConfig({
 
 ##### Highlights
 
+- **Need the broader package setup map?** — Open project architecture when the question is the full package layout — authored config, runtime files, generated output, hosted app files, or monorepo boundaries. ([link](/docs/project-architecture))
 - **Need route modules?** — Open the HTTP routing page when `files.routes` becomes part of the project shape. ([link](/docs/http-routing))
 - **Need transport?** — Read the transport page when a custom transport file becomes part of the contract between worker code and stateful surfaces. ([link](/docs/transport-file))
 - **Need generated env types?** — Open the generated types page when bindings, Durable Objects, or named entrypoints become part of the package contract. ([link](/docs/generated-types))
@@ -3594,7 +4229,7 @@ export const handle = sequence(devflareHandle)
 
 ### Use GitHub workflows as thin orchestration around explicit Devflare deploy and validation actions
 
-> This repository keeps GitHub workflows small on purpose: caller workflows own triggers, permissions, and package selection, while shared Devflare actions handle impact checks, deploy execution, and feedback publishing.
+> This repository keeps GitHub workflows small on purpose: one shared preview workflow owns branch and PR preview lifecycles, while reusable Devflare actions handle impact checks, shared workspace setup, deploy execution, and feedback publishing.
 
 | Field | Value |
 | --- | --- |
@@ -3603,7 +4238,7 @@ export const handle = sequence(devflareHandle)
 | Navigation title | GitHub workflows |
 | Eyebrow | CI/CD |
 
-The CI/CD pattern in this repo is intentionally boring in the best way. One workflow validates the workspace, preview workflows decide whether a package is affected before they deploy, production workflows verify what went live, and shared actions keep the mechanics consistent across packages.
+The CI/CD pattern in this repo is intentionally boring in the best way. One workflow validates the workspace, one shared preview workflow handles preview targets and cleanup, production stays explicit, and reusable actions keep the mechanics consistent across packages.
 
 #### At a glance
 
@@ -3672,77 +4307,98 @@ jobs:
 
 #### Preview and production workflows should resolve impact before they deploy
 
-The repository preview and production workflows call `devflare-deploy-impact` before they deploy. That action compares the target package against the relevant git range so the workflow can skip Cloudflare work when the package or its important dependencies did not change, and it also accepts `extra-paths` when shared files outside the package root should still invalidate the deploy.
+The repository preview and production workflows still call `devflare-deploy-impact` before they deploy. That action compares the target package against the relevant git range so the workflow can skip Cloudflare work when the package or its important dependencies did not change, and it also accepts `extra-paths` when shared files outside the package root should still invalidate the deploy.
 
-When a deploy is needed, the workflow hands the package path and explicit target to `devflare-deploy`. That action enforces the deploy target rules, installs dependencies from the right place, runs the deploy command, captures preview aliases or version ids, and publishes a structured summary for the workflow run.
+The main preview lane now lives in `preview.yml`. It resolves branch and PR context first, prepares the workspace once per job through `devflare-setup-workspace`, and then runs separate target-aware `devflare-deploy` calls for the branch scope, the PR scope, or both.
 
-The reusable action metadata in this repo still exposes a `preview-alias` input for same-worker preview uploads, and the live documentation PR workflow below still threads that deprecated input through the deploy action. Treat that as current repo drift rather than a recommended pattern: `devflare deploy` itself no longer accepts `--preview-alias`, so new workflows should prefer `branch-name` for same-worker uploads or `preview-scope` for named preview deploys until the shared action and caller workflows are cleaned up.
+When a later deploy step is reusing that prepared checkout, the caller sets `skip-setup` and `skip-install` so `devflare-deploy` can focus on the target-specific deploy work instead of repeating Bun setup and dependency installation.
 
-The documentation workflow family is the clearest repo-local example to study because PR previews, branch previews, production deploys, and branch cleanup all live as separate `.github/workflows/*.yml` files.
+The documentation preview job is the clearest repo-local example to study because the same shared workflow can refresh both the branch preview and the stable PR preview from one prepared job while production stays in its own explicit workflow.
 
 ##### Highlights
 
-- **documentation-preview-pr.yml** — PR-scoped docs preview with a stable PR comment that gets updated in place. ([link](https://github.com/Refzlund/devflare/blob/next/.github/workflows/documentation-preview-pr.yml))
-- **documentation-preview-branch.yml** — Branch push preview for the docs app when there is no PR requirement. ([link](https://github.com/Refzlund/devflare/blob/next/.github/workflows/documentation-preview-branch.yml))
+- **preview.yml** — Shared preview workflow for documentation and testing branch previews, PR previews, and cleanup flows. ([link](https://github.com/Refzlund/devflare/blob/next/.github/workflows/preview.yml))
 - **documentation-production.yml** — Explicit docs production deploy lane with live verification after deploy. ([link](https://github.com/Refzlund/devflare/blob/next/.github/workflows/documentation-production.yml))
 
 ##### Key points
 
 - Use `production: true`, `preview: true`, or `preview-scope: <name>` exactly once per deploy action call.
+- Use `devflare-setup-workspace` when one job needs to deploy multiple targets or packages from the same checkout.
+- Use `skip-setup` and `skip-install` on later deploy calls when a shared job has already prepared Bun and dependencies.
+- Keep branch and PR deploy calls separate even when one push updates both targets, because the deploy target is still part of the explicit workflow policy.
 - Use `extra-paths` on the impact action when shared workspace files outside the package root should still trigger a redeploy.
 - Use `install-working-directory` when a package-local deploy should reuse one shared root install in a monorepo.
 - Let the workflow pass branch names, preview scopes, and messages explicitly so deploy intent is visible in logs.
-- Use package-specific workflows when the preview model differs, like PR-scoped docs previews versus branch-scoped multi-worker preview families.
 
-> **Warning — Current repo example, not the future-safe pattern**
+> **Note — Build once, deploy twice still means two deploy calls**
 >
-> The live `documentation-preview-pr.yml` file still passes `preview-alias`, and its closed-PR cleanup job still retires metadata with `--preview-alias`. Treat that as repository drift under cleanup, not as the shape to copy into new workflows.
+> The optimization in this repo is the shared checkout and install work. Cloudflare target selection still lives in each explicit deploy step, so branch and PR targets stay reviewable instead of being hidden inside one shell command.
 
-##### Example — The documentation PR preview workflow resolves impact, then runs an explicit deploy
+##### Example — The shared preview workflow prepares once, then updates the documentation targets it needs
 
-This abridged excerpt intentionally shows the current repo workflow, including the stale `preview-alias` wiring. It omits repeated auth details and the separate closed-PR cleanup job, which still needs the same alias-flag cleanup.
+This abridged excerpt shows the shared documentation preview job inside `.github/workflows/preview.yml`. It omits repeated feedback details so the shared setup, impact check, and target-specific deploy steps stay visible.
 
-###### File — .github/workflows/documentation-preview-pr.yml
+###### File — .github/workflows/preview.yml
 
 ```yaml
-name: Documentation PR Preview
+name: Preview
 
 on:
+	push:
 	pull_request:
-		types: [opened, synchronize, reopened, ready_for_review, closed]
+		types: [opened, reopened, ready_for_review, closed]
+	delete:
+	workflow_dispatch:
 
 jobs:
-	deploy-preview:
+	documentation-preview:
 		steps:
-			- name: Resolve documentation PR preview impact
+			- uses: actions/checkout@v5
+
+			- uses: ./.github/actions/devflare-setup-workspace
+
+			- name: Resolve documentation preview impact
 			  id: impact
 			  uses: ./.github/actions/devflare-deploy-impact
 			  with:
 			    target-package: documentation
 
-			- name: Deploy documentation PR preview
-			  id: deploy
-			  if: \${{ steps.impact.outputs.should-deploy == 'true' }}
+			- name: Deploy documentation branch preview
+			  id: branch-deploy
+			  if: \${{ needs.resolve-context.outputs.branch-preview-enabled == 'true' && steps.impact.outputs.should-deploy == 'true' }}
 			  uses: ./.github/actions/devflare-deploy
 			  with:
 			    working-directory: apps/documentation
 			    install-working-directory: .
+			    skip-setup: 'true'
+			    skip-install: 'true'
 			    deploy-command: bun run deploy --
-			    preview: 'true'
-			    preview-alias: \${{ env.DOCUMENTATION_PR_PREVIEW_ALIAS_PREFIX }}-\${{ github.event.pull_request.number }}
+			    preview-scope: \${{ needs.resolve-context.outputs.branch-preview-scope }}
+
+			- name: Deploy documentation PR preview
+			  id: pr-deploy
+			  if: \${{ needs.resolve-context.outputs.pr-preview-enabled == 'true' && steps.impact.outputs.should-deploy == 'true' }}
+			  uses: ./.github/actions/devflare-deploy
+			  with:
+			    working-directory: apps/documentation
+			    install-working-directory: .
+			    skip-setup: 'true'
+			    skip-install: 'true'
+			    deploy-command: bun run deploy --
+			    preview-scope: \${{ needs.resolve-context.outputs.pr-preview-scope }}
 
 			- name: Publish documentation PR preview feedback
 			  uses: ./.github/actions/devflare-github-feedback
 			  with:
 			    mode: comment
-			    comment-key: documentation-preview
+			    comment-key: pr-deployment-status
 ```
 
 #### Publish feedback and verify the live result instead of treating the deploy log as the whole story
 
-After deploy, the workflows in this repo publish GitHub feedback on purpose. Preview workflows update a stable PR comment in place, while production workflows can publish a GitHub deployment record and verify that the expected build is actually visible on the live site.
+After deploy, the workflows in this repo publish GitHub feedback on purpose. The shared preview workflow updates branch deployment feedback and grouped PR comment sections from the same run, while production stays in its own deploy-and-verify lane.
 
-This is where thin workflows pay off: reporting stays separate from deploy mechanics, and a failed live verification can be surfaced cleanly without hiding inside one giant shell step.
+This is where thin workflows pay off: reporting stays separate from deploy mechanics, and a failed live verification or preview verification can be surfaced cleanly without hiding inside one giant shell step.
 
 Keep the reusable action outputs in mind too: `devflare-deploy-impact` returns `should-deploy`, `reason`, `comparison-base`, `comparison-head`, `changed-workspaces`, and `changed-files`; `devflare-deploy` returns `preview-alias`, `preview-url`, `version-id`, `verification-note`, `status`, `failure-stage`, `exit-code`, and `log-excerpt`; and `devflare-github-feedback` returns `comment-id`, `deployment-id`, and `pr-number` for later jobs that need to update, retire, or cross-link that feedback.
 
@@ -3757,12 +4413,9 @@ Keep the reusable action outputs in mind too: `devflare-deploy-impact` returns `
 
 | Workflow file | When it runs | GitHub feedback |
 | --- | --- | --- |
-| `documentation-preview-pr.yml` | Docs pull requests into the default branch | Stable PR comment updated in place. |
-| `documentation-preview-branch.yml` | Non-default branch pushes that affect the docs app | GitHub deployment updated with the current branch preview URL. |
+| `preview.yml` | Non-default branch pushes, selected PR lifecycle events, branch deletion, or manual cleanup dispatch | Branch deployment feedback, grouped PR comment sections, and inactive cleanup updates for retired previews. |
 | `documentation-production.yml` | Default branch pushes or manual dispatch for docs production | Production deployment record plus live URL verification. |
-| `testing-preview-pr.yml` | Testing pull requests into the default branch | Stable PR comment for the PR-scoped preview family. |
-| `testing-preview-branch.yml` | Non-default branch pushes that affect the testing app or workers | GitHub deployment, plus the PR comment when that branch belongs to an open PR. |
-| `*-cleanup.yml` and closed-PR cleanup jobs | Deleted branches or closed pull requests | Marks preview feedback inactive after retirement and cleanup. |
+| `workspace-ci.yml` | Workspace PRs, selected branch pushes, or manual dispatch | No deployment feedback; validation stays separate from deploy policy. |
 
 > **Tip — What the repo pattern optimizes for**
 >
@@ -3770,110 +4423,117 @@ Keep the reusable action outputs in mind too: `devflare-deploy-impact` returns `
 
 #### Cleanup workflows should be visible too, not hidden in one-off scripts
 
-This repo keeps cleanup as first-class automation. Deleted branches have dedicated cleanup workflows, while PR-scoped previews clean themselves up through a `cleanup-preview` job inside the matching PR workflow when the pull request closes.
+This repo keeps cleanup as first-class automation inside `preview.yml`. Deleted branches and manual branch cleanup dispatches reuse the same cleanup jobs, while PR-scoped previews clean themselves up through the same shared workflow when the pull request closes.
 
-The current documentation PR cleanup job still retires metadata with `--preview-alias`, which the CLI no longer accepts. Use `--alias` in new automation and treat that repo job as pending cleanup instead of current best practice.
+Each cleanup job checks out the default branch, reuses the shared workspace setup action, runs `devflare previews cleanup --scope <name> --apply` for the relevant package, and then marks the matching GitHub deployment or grouped PR comment section inactive.
 
-That keeps teardown reviewable: you can see which file retires preview metadata, which one deletes preview-owned Cloudflare resources or Workers, and which one marks GitHub feedback inactive instead of leaving old preview links pretending they still mean something.
+That keeps teardown reviewable: you can still see which workflow retires preview-owned resources and which feedback surfaces get marked inactive, but without splitting the lifecycle across six nearly-identical workflow files.
 
 ##### Highlights
 
-- **documentation-preview-branch-cleanup.yml** — Retires documentation branch preview metadata after branch deletion or manual dispatch. ([link](https://github.com/Refzlund/devflare/blob/next/.github/workflows/documentation-preview-branch-cleanup.yml))
-- **testing-preview-branch-cleanup.yml** — Retires testing branch preview metadata, deletes preview Workers and resources, and marks feedback inactive. ([link](https://github.com/Refzlund/devflare/blob/next/.github/workflows/testing-preview-branch-cleanup.yml))
-- **documentation-preview-pr.yml** — Also contains the closed-PR cleanup job for the stable documentation preview comment. ([link](https://github.com/Refzlund/devflare/blob/next/.github/workflows/documentation-preview-pr.yml))
-- **testing-preview-pr.yml** — Also contains the closed-PR cleanup job for the testing preview family. ([link](https://github.com/Refzlund/devflare/blob/next/.github/workflows/testing-preview-pr.yml))
+- **preview.yml** — Shared preview lifecycle workflow that also owns branch cleanup, PR-close cleanup, and manual branch cleanup dispatches. ([link](https://github.com/Refzlund/devflare/blob/next/.github/workflows/preview.yml))
 
 ##### Key points
 
-- Branch deletion cleanup lives in dedicated `*-branch-cleanup.yml` files so the trigger is obvious from the filename.
-- PR closure cleanup lives beside the PR preview deploy job so the open-and-close lifecycle stays in one file.
+- Branch deletion cleanup and manual branch cleanup dispatches now live in the same shared workflow file.
+- PR closure cleanup lives beside the preview deploy jobs so the open-update-close lifecycle stays reviewable in one place.
 - Cleanup retires preview records first, then removes preview-owned infrastructure, then marks GitHub feedback inactive.
 
-##### Example — The testing branch cleanup workflow retires metadata, removes preview resources, and closes the feedback loop
+##### Example — The shared preview workflow keeps cleanup visible beside deploy logic
 
-This abridged excerpt is the real branch cleanup lane under `.github/workflows/testing-preview-branch-cleanup.yml`. It omits repeated auth and feedback inputs so the lifecycle steps stay visible.
+This abridged excerpt shows the cleanup portion of `.github/workflows/preview.yml`. It omits repeated auth details so the branch and PR cleanup shape stays visible.
 
-###### File — .github/workflows/testing-preview-branch-cleanup.yml
+###### File — .github/workflows/preview.yml
 
 ```yaml
-name: Testing Branch Preview Cleanup
+name: Preview
 
 on:
 	delete:
 	workflow_dispatch:
-		inputs:
-			branch:
-				description: Branch name to clean up manually
-				required: true
-				type: string
 
 jobs:
-	cleanup-preview:
+	documentation-cleanup:
 		steps:
-			- name: Retire tracked testing branch preview metadata
+			- name: Clean up documentation branch preview scope
 			  shell: bash
-			  run: bunx --bun devflare previews retire --worker "$MAIN_WORKER_NAME" --branch "$PREVIEW_BRANCH" --apply
+			  run: |
+			    cd apps/documentation
+			    bunx --bun devflare previews cleanup --scope "$PREVIEW_SCOPE" --apply
 
-			- name: Delete preview-scoped testing Cloudflare resources
+			- name: Mark documentation branch preview deployment inactive
+			  uses: ./.github/actions/devflare-github-feedback
+
+	testing-cleanup:
+		steps:
+			- name: Clean up testing PR preview scope
 			  shell: bash
 			  run: |
 			    cd apps/testing
-			    bunx --bun devflare previews cleanup-resources --scope "$PREVIEW_BRANCH" --apply
+			    bunx --bun devflare previews cleanup --scope "$PREVIEW_SCOPE" --apply
 
-			- name: Mark testing branch preview deployment inactive
+			- name: Publish testing PR preview cleanup feedback
 			  uses: ./.github/actions/devflare-github-feedback
 ```
 
 #### Multi-worker preview families still deploy package by package
 
-The testing preview workflows show the multi-worker version of the same rule. They keep one shared preview scope like `DEVFLARE_PREVIEW_BRANCH`, but still deploy each worker package separately with its own `working-directory`.
+The testing preview job inside `preview.yml` shows the multi-worker version of the same rule. One shared job prepares the workspace once, then still deploys each worker package separately with its own `working-directory` and explicit preview scope.
 
 That is the important CI/CD habit for multi-worker systems: one workflow can coordinate the family, but each package still owns its own resolved Devflare config and deploy step.
 
-`testing-preview-branch.yml` is also the repo example of branch pushes updating both a GitHub deployment and, when the branch already belongs to an open pull request, the stable PR comment through the same workflow run.
+The shared job is also the repo example of branch pushes updating both a GitHub deployment and, when the branch already belongs to an open pull request, the grouped PR comment through the same workflow run.
 
 ##### Highlights
 
-- **testing-preview-pr.yml** — PR-scoped testing preview family with one explicit preview scope per pull request. ([link](https://github.com/Refzlund/devflare/blob/next/.github/workflows/testing-preview-pr.yml))
-- **testing-preview-branch.yml** — Branch-scoped testing preview family that can refresh both deployment feedback and the PR comment. ([link](https://github.com/Refzlund/devflare/blob/next/.github/workflows/testing-preview-branch.yml))
+- **preview.yml** — Shared testing preview job that coordinates auth-service, search-service, and the main app across branch and PR targets. ([link](https://github.com/Refzlund/devflare/blob/next/.github/workflows/preview.yml))
 
-##### Example — Branch-scoped multi-worker previews stay package-local
+##### Example — Shared multi-worker previews still keep each package deploy explicit
 
-This excerpt comes from `.github/workflows/testing-preview-branch.yml`, which fans one explicit preview scope across the testing worker family.
+This excerpt comes from `.github/workflows/preview.yml`, which fans one prepared job across the testing worker family while keeping each deploy package-local.
 
-###### File — .github/workflows/testing-preview-branch.yml
+###### File — .github/workflows/preview.yml
 
 ```yaml
-name: Testing Branch Preview
-
-env:
-	DEVFLARE_PREVIEW_BRANCH: '\${{ github.ref_name }}'
+name: Preview
 
 jobs:
-	deploy-preview:
+	testing-preview:
 		steps:
+			- uses: ./.github/actions/devflare-setup-workspace
+
 			- uses: ./.github/actions/devflare-deploy
 			  with:
 			    working-directory: apps/testing/workers/auth-service
 			    install-working-directory: .
-			    preview-scope: \${{ env.DEVFLARE_PREVIEW_BRANCH }}
+			    skip-setup: 'true'
+			    skip-install: 'true'
+			    preview-scope: \${{ needs.resolve-context.outputs.branch-preview-scope }}
 
 			- uses: ./.github/actions/devflare-deploy
 			  with:
 			    working-directory: apps/testing/workers/search-service
 			    install-working-directory: .
-			    preview-scope: \${{ env.DEVFLARE_PREVIEW_BRANCH }}
+			    skip-setup: 'true'
+			    skip-install: 'true'
+			    preview-scope: \${{ needs.resolve-context.outputs.branch-preview-scope }}
 
 			- uses: ./.github/actions/devflare-deploy
 			  with:
 			    working-directory: apps/testing
 			    install-working-directory: .
-			    preview-scope: \${{ env.DEVFLARE_PREVIEW_BRANCH }}
+			    skip-setup: 'true'
+			    skip-install: 'true'
+			    preview-scope: \${{ needs.resolve-context.outputs.branch-preview-scope }}
 
 			- uses: ./.github/actions/devflare-github-feedback
 			  with:
-			    mode: both
-			    resolve-pr-from-ref: 'true'
+			    mode: deployment
+
+			- uses: ./.github/actions/devflare-github-feedback
+			  with:
+			    mode: comment
+			    comment-key: pr-deployment-status
 ```
 
 ---
