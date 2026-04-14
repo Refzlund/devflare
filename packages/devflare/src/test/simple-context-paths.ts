@@ -1,6 +1,7 @@
 import { existsSync } from 'fs'
 import { createServer } from 'net'
 import { dirname, join } from 'path'
+import { fileURLToPath } from 'url'
 import { resolveConfigPath } from '../config'
 
 export const DEFAULT_TRANSPORT_ENTRY_FILES = [
@@ -9,6 +10,8 @@ export const DEFAULT_TRANSPORT_ENTRY_FILES = [
 	'src/transport.mts',
 	'src/transport.mjs'
 ] as const
+
+const CURRENT_PACKAGE_ROOT = findPackageRoot(dirname(fileURLToPath(import.meta.url)))
 
 /**
  * Access Bun global via globalThis to avoid shadowing richer @types/bun
@@ -38,37 +41,74 @@ export function getBunRuntime(): {
 
 /**
  * Get the directory of the test file.
- * Uses Bun.main for bun test, falls back to stack trace parsing.
+ * Prefers stack trace parsing so bun test hooks resolve the actual test file,
+ * then falls back to the current working directory.
+ *
+ * We intentionally do not use Bun.main here because workspace consumers often
+ * import the built devflare package from `packages/devflare/dist`, which would
+ * incorrectly anchor autodiscovery inside the devflare package instead of the
+ * calling project under test.
  */
 export function getCallerDirectory(): string {
-	const bun = getBunRuntime()
-	if (bun?.main) {
-		const mainPath = bun.main
-		if (!mainPath.includes('[') && existsSync(mainPath)) {
-			return dirname(mainPath)
-		}
-	}
-
-	const originalPrepare = Error.prepareStackTrace
-	Error.prepareStackTrace = (_, stack) => stack
-	const err = new Error()
-	const stack = err.stack as unknown as NodeJS.CallSite[]
-	Error.prepareStackTrace = originalPrepare
-
-	for (const site of stack) {
-		const filename = site.getFileName?.()
-		if (
-			filename
-			&& !filename.includes('simple-context')
-			&& !filename.includes('node_modules')
-			&& !filename.includes('[')
-			&& existsSync(filename)
-		) {
-			return dirname(filename)
-		}
+	const stackCallerDirectory = getStackCallerDirectory()
+	if (stackCallerDirectory) {
+		return stackCallerDirectory
 	}
 
 	return process.cwd()
+}
+
+function getStackCallerDirectory(): string | null {
+	const originalPrepare = Error.prepareStackTrace
+	Error.prepareStackTrace = (_, stack) => stack
+
+	try {
+		const err = new Error()
+		const stack = err.stack as unknown as NodeJS.CallSite[] | undefined
+
+		for (const site of stack ?? []) {
+			const filename = site.getFileName?.()
+			if (
+				filename
+				&& !isInsideCurrentPackage(filename)
+				&& !filename.includes('simple-context')
+				&& !filename.includes('node_modules')
+				&& !filename.includes('[')
+				&& existsSync(filename)
+			) {
+				return dirname(filename)
+			}
+		}
+	} finally {
+		Error.prepareStackTrace = originalPrepare
+	}
+
+	return null
+}
+
+function findPackageRoot(startDir: string): string {
+	let currentDir = startDir
+
+	while (true) {
+		if (existsSync(join(currentDir, 'package.json'))) {
+			return currentDir
+		}
+
+		const parentDir = dirname(currentDir)
+		if (parentDir === currentDir) {
+			return startDir
+		}
+
+		currentDir = parentDir
+	}
+}
+
+function isInsideCurrentPackage(filePath: string): boolean {
+	const normalizedFilePath = filePath.replace(/\\/g, '/')
+	const normalizedPackageRoot = CURRENT_PACKAGE_ROOT.replace(/\\/g, '/')
+
+	return normalizedFilePath === normalizedPackageRoot
+		|| normalizedFilePath.startsWith(`${normalizedPackageRoot}/`)
 }
 
 /**

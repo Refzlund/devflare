@@ -111,6 +111,50 @@ console.log('stub wrangler binary')
 		expect(deployExecution?.args.slice(1)).toEqual(['deploy'])
 	})
 
+	test('deploy prefers a local wrangler package installed in an ancestor workspace directory', async () => {
+		const workspaceDir = join(projectDir, 'workspace')
+		const workerDir = join(workspaceDir, 'workers', 'auth-service')
+		await mkdir(workerDir, { recursive: true })
+		await writeProjectFiles(workerDir, { withViteConfig: false, withViteDeps: false })
+		await mkdir(join(workspaceDir, 'node_modules', 'wrangler', 'bin'), { recursive: true })
+		await writeFile(join(workspaceDir, 'node_modules', 'wrangler', 'package.json'), JSON.stringify({
+			name: 'wrangler',
+			version: '4.81.1',
+			type: 'module',
+			bin: {
+				wrangler: './bin/wrangler.js'
+			}
+		}, null, '\t'))
+		await writeFile(join(workspaceDir, 'node_modules', 'wrangler', 'bin', 'wrangler.js'), `
+#!/usr/bin/env node
+console.log('stub wrangler binary')
+`.trim())
+
+		const executions: ExecInvocation[] = []
+		const logger = createLogger()
+		setDependencies(createCliDependencies(
+			createProcessRunner((command, args) => {
+				if (isViteBuildExecution(command, args)) {
+					throw new Error('vite build should not run for worker-only deploy')
+				}
+
+				return successResult()
+			}, executions)
+		))
+
+		const result = await runDeployCommand(
+			{ command: 'deploy', args: [], options: {} },
+			logger as any,
+			{ cwd: workerDir }
+		)
+
+		expect(result.exitCode).toBe(0)
+		const deployExecution = executions.find(({ args }) => args.at(-1) === 'deploy')
+		expect(deployExecution?.command).toBe('bun')
+		expect(deployExecution?.args[0]?.replace(/\\/g, '/')).toBe(`${workspaceDir.replace(/\\/g, '/')}/node_modules/wrangler/bin/wrangler.js`)
+		expect(deployExecution?.args.slice(1)).toEqual(['deploy'])
+	})
+
 	test('deploy forwards Wrangler version metadata flags when message and tag are provided', async () => {
 		await writeProjectFiles(projectDir, { withViteConfig: false, withViteDeps: false })
 
@@ -268,5 +312,51 @@ console.log('stub wrangler binary')
 		expect(result.exitCode).toBe(0)
 		expect(logger.messages.some((message) => message.args.join(' ').includes('Version ID: version-123'))).toBe(true)
 		expect(logger.messages.some((message) => message.args.join(' ').includes('Preview Alias URL: https://feature-branch-worker-build-test.example-subdomain.workers.dev'))).toBe(true)
+	})
+
+	test('deploy derives branch-scoped preview urls from the workers.dev subdomain when wrangler omits them', async () => {
+		await writeAccountProjectFiles(projectDir, {
+			accountId: TEST_ACCOUNT_ID,
+			workerName: 'worker-build-test-next'
+		})
+
+		const executions: ExecInvocation[] = []
+		const logger = createLogger()
+
+		globalThis.fetch = mock(async () => new Response(JSON.stringify({
+			success: true,
+			result: { subdomain: 'example-subdomain' },
+			errors: [],
+			messages: []
+		}), {
+			status: 200,
+			headers: { 'Content-Type': 'application/json' }
+		})) as unknown as typeof fetch
+		process.env.CLOUDFLARE_API_TOKEN = 'test-token'
+
+		setDependencies(createCliDependencies(
+			createProcessRunner((command, args) => {
+				if (command === 'bunx' && args[0] === 'wrangler' && args[1] === 'deploy') {
+					return successResult('Version ID: version-456')
+				}
+
+				return successResult()
+			}, executions)
+		))
+
+		const result = await runDeployCommand(
+			{
+				command: 'deploy',
+				args: [],
+				options: {
+					preview: 'next'
+				}
+			},
+			logger as any,
+			{ cwd: projectDir }
+		)
+
+		expect(result.exitCode).toBe(0)
+		expect(logger.messages.some((message) => message.args.join(' ').includes('Preview URL: https://worker-build-test-next.example-subdomain.workers.dev'))).toBe(true)
 	})
 })

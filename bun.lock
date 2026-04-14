@@ -53,6 +53,7 @@
         "testing-auth-service": "workspace:*",
         "testing-lock-service": "workspace:*",
         "testing-search-service": "workspace:*",
+        "wrangler": "4.81.1",
       },
     },
     "apps/testing/workers/auth-service": {
@@ -60,6 +61,7 @@
       "version": "0.0.1",
       "devDependencies": {
         "devflare": "workspace:*",
+        "wrangler": "4.81.1",
       },
     },
     "apps/testing/workers/lock-service": {
@@ -74,6 +76,7 @@
       "version": "0.0.1",
       "devDependencies": {
         "devflare": "workspace:*",
+        "wrangler": "4.81.1",
       },
     },
     "cases/case1": {

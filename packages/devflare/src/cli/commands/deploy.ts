@@ -18,6 +18,7 @@ import { compileConfig, stringifyConfig } from '../../config/compiler'
 import { getDependencies } from '../dependencies'
 import { prepareBuildArtifacts } from './build-artifacts'
 import {
+	formatWorkersDevUrl,
 	mergeParsedWranglerDeployOutputs,
 	parseWranglerDeployOutput,
 	parseWranglerStructuredOutput,
@@ -545,6 +546,7 @@ export async function runDeployCommand(
 				return resolvedAccountId
 			}
 			let resolvedVersionId = parsedOutput.versionId
+			let resolvedPreviewUrl = parsedOutput.previewUrl
 			let previewAliasUrl = parsedOutput.previewAliasUrl
 			let loggedVersionId = false
 
@@ -573,6 +575,10 @@ export async function runDeployCommand(
 			}
 
 			if (!preview && !resolvedVersionId) {
+				resolvedAccountId = await ensureResolvedAccountId()
+			}
+
+			if (isBranchScopedPreviewDeployment && !resolvedPreviewUrl) {
 				resolvedAccountId = await ensureResolvedAccountId()
 			}
 
@@ -653,12 +659,23 @@ export async function runDeployCommand(
 				logger.success(`Version ID: ${resolvedVersionId}`)
 			}
 
+			if (
+				isBranchScopedPreviewDeployment
+				&& !resolvedPreviewUrl
+				&& resolvedAccountId
+			) {
+				const workersSubdomain = await getWorkersSubdomain(resolvedAccountId)
+				if (workersSubdomain) {
+					resolvedPreviewUrl = formatWorkersDevUrl(prepared.config.name, workersSubdomain)
+				}
+			}
+
 			if (preview && previewAliasUrl) {
 				logger.success(`Preview Alias URL: ${previewAliasUrl}`)
 			}
 
-			if (preview && parsedOutput.previewUrl) {
-				logger.success(`Preview URL: ${parsedOutput.previewUrl}`)
+			if ((preview || isBranchScopedPreviewDeployment) && resolvedPreviewUrl) {
+				logger.success(`Preview URL: ${resolvedPreviewUrl}`)
 			}
 
 			if (shouldVerifyDeployControlPlane()) {
@@ -702,12 +719,12 @@ export async function runDeployCommand(
 					? resolvedPreviewAlias?.alias
 					: branchScopedPreviewAlias
 				const previewRegistryUrl = preview || isBranchScopedPreviewDeployment
-					? parsedOutput.previewUrl
+					? resolvedPreviewUrl
 					: undefined
 				const previewRegistryAliasUrl = preview
 					? previewAliasUrl
 					: isBranchScopedPreviewDeployment
-						? parsedOutput.previewUrl
+						? resolvedPreviewUrl
 						: undefined
 
 				try {

@@ -3,10 +3,13 @@ import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { dirname, join } from 'pathe'
+import { ensurePackageBuilt } from '../helpers/built-devflare.helpers'
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '../../../')
 const devflareTestImportPath = pathToFileURL(join(repoRoot, 'src', 'test', 'index.ts')).href
 const devflareImportPath = pathToFileURL(join(repoRoot, 'src', 'index.ts')).href
+const builtDevflareTestImportPath = pathToFileURL(join(repoRoot, 'dist', 'src', 'test', 'index.js')).href
+const builtDevflareImportPath = pathToFileURL(join(repoRoot, 'dist', 'src', 'index.js')).href
 const tempDirs: string[] = []
 
 interface TransportResult {
@@ -59,13 +62,41 @@ async function runProjectScript(projectDir: string, scriptRelativePath: string, 
 	return stdout
 }
 
+async function runProjectTests(projectDir: string, testRelativePath: string, testContents: string): Promise<string> {
+	await writeProjectFiles(projectDir, {
+		[testRelativePath]: testContents
+	})
+
+	const process = Bun.spawn(['bun', 'test', testRelativePath], {
+		cwd: projectDir,
+		stdout: 'pipe',
+		stderr: 'pipe'
+	})
+
+	const [stdout, stderr, exitCode] = await Promise.all([
+		new Response(process.stdout).text(),
+		new Response(process.stderr).text(),
+		process.exited
+	])
+
+	if (exitCode !== 0) {
+		throw new Error([
+			'Expected createTestContext() bun test project to succeed',
+			stdout.trim(),
+			stderr.trim()
+		].filter(Boolean).join('\n\n'))
+	}
+
+	return [stdout.trim(), stderr.trim()].filter(Boolean).join('\n')
+}
+
 function extractResult<T>(stdout: string): T {
 	const lines = stdout
 		.split(/\r?\n/)
 		.map((line) => line.trim())
 		.filter(Boolean)
 
-	for (let index = lines.length - 1; index >= 0; index -= 1) {
+	for (let index = lines.length - 1;index >= 0;index -= 1) {
 		const line = lines[index]
 		if (line.startsWith('RESULT:')) {
 			return JSON.parse(line.slice('RESULT:'.length)) as T
@@ -167,6 +198,108 @@ console.log('auto-discovered-mts-config')
 `)
 
 		expect(stdout.trim()).toContain('auto-discovered-mts-config')
+	})
+
+	test('auto-discovers devflare.config.ts from bun test hooks without an explicit config path', async () => {
+		const projectDir = await mkdtemp(join(tmpdir(), 'devflare-test-context-bun-test-'))
+		tempDirs.push(projectDir)
+
+		await writeProjectFiles(projectDir, {
+			'package.json': JSON.stringify({
+				name: 'test-context-bun-test-project',
+				private: true,
+				type: 'module'
+			}, null, 2),
+			'devflare.config.ts': `
+export default {
+	name: 'test-context-bun-test-project',
+	compatibilityDate: '2026-03-17',
+	vars: {
+		TEST_VALUE: 'auto-discovered'
+	},
+	files: {
+		fetch: 'src/fetch.ts'
+	}
+}
+`.trim(),
+			'src/fetch.ts': `
+export async function fetch(): Promise<Response> {
+	return new Response('ok')
+}
+`.trim()
+		})
+
+		const output = await runProjectTests(projectDir, 'tests/autodiscovery-bun.test.ts', `
+import { afterAll, beforeAll, expect, test } from 'bun:test'
+import { createTestContext } from '${devflareTestImportPath}'
+import { env } from '${devflareImportPath}'
+
+beforeAll(async () => {
+	await createTestContext()
+})
+
+afterAll(async () => {
+	await env.dispose()
+})
+
+test('auto-discovers config during bun test hooks', () => {
+	expect(env.TEST_VALUE).toBe('auto-discovered')
+})
+`)
+
+		expect(output).toContain('1 pass')
+	})
+
+	test('auto-discovers devflare.config.ts from bun test hooks when importing the built dist entry', async () => {
+		const projectDir = await mkdtemp(join(tmpdir(), 'devflare-test-context-built-dist-'))
+		tempDirs.push(projectDir)
+
+		await ensurePackageBuilt()
+
+		await writeProjectFiles(projectDir, {
+			'package.json': JSON.stringify({
+				name: 'test-context-built-dist-project',
+				private: true,
+				type: 'module'
+			}, null, 2),
+			'devflare.config.ts': `
+export default {
+	name: 'test-context-built-dist-project',
+	compatibilityDate: '2026-03-17',
+	vars: {
+		TEST_VALUE: 'built-dist-auto-discovered'
+	},
+	files: {
+		fetch: 'src/fetch.ts'
+	}
+}
+`.trim(),
+			'src/fetch.ts': `
+export async function fetch(): Promise<Response> {
+	return new Response('ok')
+}
+`.trim()
+		})
+
+		const output = await runProjectTests(projectDir, 'tests/autodiscovery-built-dist.test.ts', `
+import { afterAll, beforeAll, expect, test } from 'bun:test'
+import { createTestContext } from '${builtDevflareTestImportPath}'
+import { env } from '${builtDevflareImportPath}'
+
+beforeAll(async () => {
+	await createTestContext()
+})
+
+afterAll(async () => {
+	await env.dispose()
+})
+
+test('auto-discovers config during bun test hooks from built dist entry', () => {
+	expect(env.TEST_VALUE).toBe('built-dist-auto-discovered')
+})
+`)
+
+		expect(output).toContain('1 pass')
 	})
 
 	test('auto-discovers src/transport.ts when files.transport is omitted', async () => {

@@ -39,6 +39,13 @@ interface WranglerStructuredOutputRecord {
 
 const PREVIEW_ALIAS_MAX_LENGTH = 63
 
+function normalizeWorkersSubdomain(accountSubdomain: string): string {
+	return accountSubdomain
+		.trim()
+		.replace(/^https?:\/\//i, '')
+		.replace(/\.workers\.dev\/?$/i, '')
+}
+
 function normalizeAlias(rawAlias: string): string {
 	return rawAlias
 		.toLowerCase()
@@ -131,12 +138,18 @@ export function formatPreviewAliasUrl(
 	workerName: string,
 	accountSubdomain: string
 ): string {
-	const normalizedSubdomain = accountSubdomain
-		.trim()
-		.replace(/^https?:\/\//i, '')
-		.replace(/\.workers\.dev\/?$/i, '')
+	const normalizedSubdomain = normalizeWorkersSubdomain(accountSubdomain)
 
 	return `https://${alias}-${workerName}.${normalizedSubdomain}.workers.dev`
+}
+
+export function formatWorkersDevUrl(
+	workerName: string,
+	accountSubdomain: string
+): string {
+	const normalizedSubdomain = normalizeWorkersSubdomain(accountSubdomain)
+
+	return `https://${workerName}.${normalizedSubdomain}.workers.dev`
 }
 
 export function formatVersionPreviewUrl(
@@ -144,10 +157,7 @@ export function formatVersionPreviewUrl(
 	workerName: string,
 	accountSubdomain: string
 ): string {
-	const normalizedSubdomain = accountSubdomain
-		.trim()
-		.replace(/^https?:\/\//i, '')
-		.replace(/\.workers\.dev\/?$/i, '')
+	const normalizedSubdomain = normalizeWorkersSubdomain(accountSubdomain)
 
 	const versionPrefix = versionId.split('-')[0] || versionId
 

@@ -4,6 +4,7 @@
 	"version": "0.0.1",
 	"type": "module",
 	"devDependencies": {
-		"devflare": "workspace:*"
+		"devflare": "workspace:*",
+		"wrangler": "4.81.1"
 	}
 }
