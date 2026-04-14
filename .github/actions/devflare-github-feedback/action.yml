@@ -13,13 +13,25 @@ inputs:
     required: false
     default: "report"
   status:
-    description: "Deployment status to publish: success, failure, in_progress, or inactive"
+    description: "Deployment status to publish: success, failure, in_progress, inactive, or skipped"
     required: true
   title:
     description: "Human-readable title shown in the PR comment or deployment description"
     required: true
   comment-key:
     description: "Stable marker key used to find and update an existing PR comment"
+    required: false
+    default: ""
+  comment-section-key:
+    description: "Optional section key used to merge this feedback into a shared PR comment instead of replacing the entire comment body"
+    required: false
+    default: ""
+  comment-group-title:
+    description: "Optional shared heading rendered above grouped PR comment sections"
+    required: false
+    default: ""
+  comment-group-summary:
+    description: "Optional shared summary paragraph rendered above grouped PR comment sections"
     required: false
     default: ""
   pr-number:

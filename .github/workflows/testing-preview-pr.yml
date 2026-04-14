@@ -131,15 +131,18 @@ jobs:
           bun .github/scripts/verify-testing-preview-deployment.ts "$DEVFLARE_PREVIEW_BRANCH"
 
       - name: Publish testing PR preview feedback
-        if: ${{ always() && (steps.auth-impact.outputs.should-deploy == 'true' || steps.search-impact.outputs.should-deploy == 'true' || steps.main-impact.outputs.should-deploy == 'true') }}
+        if: ${{ always() }}
         uses: ./.github/actions/devflare-github-feedback
         with:
           github-token: ${{ github.token }}
           mode: comment
           operation: report
-          status: ${{ (steps.auth-impact.outputs.should-deploy != 'true' || steps.auth.outputs.status == 'success') && (steps.search-impact.outputs.should-deploy != 'true' || steps.search.outputs.status == 'success') && (steps.main-impact.outputs.should-deploy != 'true' || (steps.deploy.outputs.status == 'success' && steps.verify.outcome == 'success')) && 'success' || 'failure' }}
+          status: ${{ (steps.auth-impact.outputs.should-deploy != 'true' && steps.search-impact.outputs.should-deploy != 'true' && steps.main-impact.outputs.should-deploy != 'true') && 'skipped' || (((steps.auth-impact.outputs.should-deploy != 'true' || steps.auth.outputs.status == 'success') && (steps.search-impact.outputs.should-deploy != 'true' || steps.search.outputs.status == 'success') && (steps.main-impact.outputs.should-deploy != 'true' || (steps.deploy.outputs.status == 'success' && steps.verify.outcome == 'success'))) && 'success' || 'failure') }}
           title: Testing PR preview
-          comment-key: testing-preview
+          comment-key: pr-deployment-status
+          comment-section-key: testing-preview
+          comment-group-title: Pull request deployment status
+          comment-group-summary: This single comment tracks the latest documentation and testing preview results for this pull request and is updated in place on every relevant preview workflow.
           pr-number: ${{ github.event.pull_request.number }}
           deployment-kind: preview
           ref-name: ${{ github.event.pull_request.head.ref }}
@@ -148,7 +151,7 @@ jobs:
           version-id: ${{ steps.deploy.outputs.version-id }}
           log-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           log-excerpt: ${{ steps.deploy.outputs.log-excerpt }}
-          summary: This pull request gets a stable PR-scoped testing preview link that is updated in place on every preview run.
+          summary: ${{ (steps.auth-impact.outputs.should-deploy != 'true' && steps.search-impact.outputs.should-deploy != 'true' && steps.main-impact.outputs.should-deploy != 'true') && 'No testing preview redeploy was needed for this run, so the existing PR-scoped testing preview remains in place.' || 'This pull request gets a stable PR-scoped testing preview link that is updated in place on every preview run.' }}
           details-markdown: |
             - Auth impact: `${{ steps.auth-impact.outputs.should-deploy == 'true' && 'deploy' || 'skip' }}` (`${{ steps.auth-impact.outputs.reason }}`)
             - Auth service version: `${{ steps.auth.outputs.version-id || 'not available' }}`
@@ -174,7 +177,7 @@ jobs:
             echo '### Testing PR preview workflow'
             echo ''
             echo '- Preview strategy: named preview scope via `--preview <name>` so the testing worker family deploys to one explicit PR target'
-            echo '- GitHub feedback: stable PR comment updated in place when a new preview deployment is necessary'
+            echo '- GitHub feedback: shared PR deployment comment updated in place for every relevant run'
             if [ "${{ steps.auth-impact.outputs.should-deploy }}" != 'true' ] && [ "${{ steps.search-impact.outputs.should-deploy }}" != 'true' ] && [ "${{ steps.main-impact.outputs.should-deploy }}" != 'true' ]; then
               echo '- Final status: `skipped`'
               echo '- Summary: all testing deployment targets were unaffected, so the workflow kept the existing PR preview family as-is'
@@ -368,11 +371,14 @@ jobs:
           operation: cleanup
           status: inactive
           title: Testing PR preview
-          comment-key: testing-preview
+          comment-key: pr-deployment-status
+          comment-section-key: testing-preview
+          comment-group-title: Pull request deployment status
+          comment-group-summary: This single comment tracks the latest documentation and testing preview results for this pull request and is updated in place on every relevant preview workflow.
           pr-number: ${{ github.event.pull_request.number }}
           deployment-kind: preview
           ref-name: ${{ github.event.pull_request.head.ref }}
-          summary: This pull request was closed, so Devflare cleaned up the PR-scoped testing preview Workers plus preview-owned Cloudflare resources and marked the stable PR preview comment as inactive.
+          summary: This pull request was closed, so Devflare cleaned up the PR-scoped testing preview Workers plus preview-owned Cloudflare resources and marked the shared PR deployment comment section inactive.
 
       - name: Summarize testing PR preview cleanup
         if: ${{ always() }}
@@ -383,5 +389,5 @@ jobs:
             echo ''
             echo "- PR scope: \`#${{ github.event.pull_request.number }}\`"
             echo "- Preview scope worker suffix: \`$PREVIEW_BRANCH\`"
-            echo '- Cleanup action: deleted PR-scoped preview Workers plus preview-owned Cloudflare resources, and marked the stable PR preview comment inactive'
+            echo '- Cleanup action: deleted PR-scoped preview Workers plus preview-owned Cloudflare resources, and marked the shared PR deployment comment section inactive'
           } >> "$GITHUB_STEP_SUMMARY"

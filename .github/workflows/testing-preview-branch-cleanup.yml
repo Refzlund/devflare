@@ -63,17 +63,15 @@ jobs:
         uses: ./.github/actions/devflare-github-feedback
         with:
           github-token: ${{ github.token }}
-          mode: both
+          mode: deployment
           operation: cleanup
           status: inactive
           title: Testing branch preview
-          comment-key: testing-preview
-          resolve-pr-from-ref: "true"
           deployment-kind: preview
           ref-name: ${{ env.PREVIEW_BRANCH }}
           environment: testing branch preview / ${{ env.PREVIEW_BRANCH }}
           log-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          summary: This branch was deleted, so Devflare cleaned up the branch-scoped testing preview Workers plus preview-owned Cloudflare resources and marked the related GitHub deployment and stable PR preview comment inactive when applicable.
+          summary: This branch was deleted, so Devflare cleaned up the branch-scoped testing preview Workers plus preview-owned Cloudflare resources and marked the related GitHub deployment inactive.
 
       - name: Summarize testing branch preview cleanup
         if: ${{ always() }}
@@ -83,6 +81,6 @@ jobs:
             echo '### Testing branch preview cleanup'
             echo ''
             echo "- Branch scope: \`$PREVIEW_BRANCH\`"
-            echo '- Cleanup action: deleted branch-scoped preview Workers plus preview-owned Cloudflare resources, and marked matching GitHub deployment feedback inactive plus the stable PR preview comment when applicable'
+            echo '- Cleanup action: deleted branch-scoped preview Workers plus preview-owned Cloudflare resources, and marked matching GitHub deployment feedback inactive'
             echo "- Trigger: \`${{ github.event_name }}\`"
           } >> "$GITHUB_STEP_SUMMARY"

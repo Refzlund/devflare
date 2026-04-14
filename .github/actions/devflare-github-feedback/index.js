@@ -74,6 +74,10 @@ function truncate(value, maxLength) {
 	return `${value.slice(0, maxLength - 1)}…`;
 }
 
+function escapeRegExp(value) {
+	return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function shortSha(value) {
 	return value.length <= 12 ? value : value.slice(0, 12);
 }
@@ -172,6 +176,13 @@ function getStatusPresentation(config) {
 			};
 		}
 
+			case "skipped": {
+				return {
+					emoji: "⏭️",
+					suffix: "was unchanged",
+				};
+			}
+
 		case "failure": {
 			return {
 				emoji: "❌",
@@ -209,6 +220,12 @@ function buildSummary(config) {
 			: "The preview deployment failed before Devflare could confirm a healthy result.";
 	}
 
+	if (config.status === "skipped") {
+		return config.deploymentKind === "production"
+			? "No new production deployment was needed for this run, so the latest verified production state remains in place."
+			: "No new preview deployment was needed for this run, so the existing stable preview remains in place.";
+	}
+
 	if (config.status === "in_progress") {
 		return "GitHub has accepted the deployment request and the latest run is still in progress.";
 	}
@@ -218,11 +235,18 @@ function buildSummary(config) {
 		: "Devflare verified the latest preview deployment through Cloudflare control-plane checks.";
 }
 
-function buildCommentBody(config) {
+function buildCommentHeading(config, headingLevel = 2) {
 	const presentation = getStatusPresentation(config);
+	return `${"#".repeat(headingLevel)} ${presentation.emoji} ${config.title} ${presentation.suffix}`;
+}
+
+export function buildCommentBody(
+	config,
+	{ includeMarker = true, headingLevel = 2 } = {},
+) {
 	const lines = [
-		config.commentMarker,
-		`## ${presentation.emoji} ${config.title} ${presentation.suffix}`,
+		...(includeMarker ? [config.commentMarker] : []),
+		buildCommentHeading(config, headingLevel),
 		"",
 		buildSummary(config),
 		"",
@@ -302,6 +326,102 @@ function buildCommentBody(config) {
 	return `${lines.join("\n").trim()}\n`;
 }
 
+function usesGroupedComment(config) {
+	return Boolean(config.commentSectionKey);
+}
+
+function getCommentGroupTitle(config) {
+	return config.commentGroupTitle ?? "Deployment status";
+}
+
+function getCommentGroupSummary(config) {
+	return config.commentGroupSummary ?? "This single comment tracks the latest deployment feedback for this pull request and is updated in place by the related Devflare workflows.";
+}
+
+function getCommentSectionStartMarker(commentKey, sectionKey) {
+	return `<!-- devflare-feedback-section:${commentKey}:${sectionKey}:start -->`;
+}
+
+function getCommentSectionEndMarker(commentKey, sectionKey) {
+	return `<!-- devflare-feedback-section:${commentKey}:${sectionKey}:end -->`;
+}
+
+export function parseGroupedCommentSections(commentKey, body) {
+	const sections = new Map();
+	if (!body) {
+		return sections;
+	}
+
+	const escapedCommentKey = escapeRegExp(commentKey);
+	const pattern = new RegExp(
+		`<!-- devflare-feedback-section:${escapedCommentKey}:([^:]+):start -->\\s*([\\s\\S]*?)\\s*<!-- devflare-feedback-section:${escapedCommentKey}:\\1:end -->`,
+		"g",
+	);
+
+	for (const match of body.matchAll(pattern)) {
+		const sectionKey = match[1];
+		const sectionBody = match[2]?.trim();
+		if (sectionKey && sectionBody) {
+			sections.set(sectionKey, sectionBody);
+		}
+	}
+
+	return sections;
+}
+
+export function buildGroupedCommentBody(config, sections) {
+	const orderedSections = [...sections.entries()].sort(([leftKey], [rightKey]) =>
+		leftKey.localeCompare(rightKey),
+	);
+	const lines = [
+		config.commentMarker,
+		`## ${getCommentGroupTitle(config)}`,
+		"",
+		getCommentGroupSummary(config),
+	];
+
+	for (const [sectionKey, sectionBody] of orderedSections) {
+		lines.push(
+			"",
+			getCommentSectionStartMarker(config.commentKey, sectionKey),
+			sectionBody.trim(),
+			getCommentSectionEndMarker(config.commentKey, sectionKey),
+		);
+	}
+
+	return `${lines.join("\n").trim()}\n`;
+}
+
+function sortCommentsById(comments) {
+	return [...comments].sort((left, right) => {
+		const leftId = Number(left?.id ?? 0);
+		const rightId = Number(right?.id ?? 0);
+		return leftId - rightId;
+	});
+}
+
+function buildGroupedCommentSectionBody(config) {
+	return buildCommentBody(config, {
+		includeMarker: false,
+		headingLevel: 3,
+	}).trim();
+}
+
+function mergeGroupedCommentSections(config, comments) {
+	const sections = new Map();
+	for (const comment of sortCommentsById(comments)) {
+		for (const [sectionKey, sectionBody] of parseGroupedCommentSections(
+			config.commentKey,
+			comment.body,
+		)) {
+			sections.set(sectionKey, sectionBody);
+		}
+	}
+
+	sections.set(config.commentSectionKey, buildGroupedCommentSectionBody(config));
+	return sections;
+}
+
 function buildDeploymentDescription(config) {
 	if (config.operation === "cleanup" || config.status === "inactive") {
 		return truncate(`${config.title} retired`, 140);
@@ -311,6 +431,10 @@ function buildDeploymentDescription(config) {
 		case "success": {
 			return truncate(`${config.title} deployed successfully`, 140);
 		}
+
+			case "skipped": {
+				return truncate(`${config.title} was unchanged`, 140);
+			}
 
 		case "failure": {
 			return truncate(`${config.title} failed`, 140);
@@ -429,32 +553,36 @@ async function resolvePrNumber(config) {
 	return typeof number === "number" && number > 0 ? number : undefined;
 }
 
-async function upsertPrComment(config, prNumber) {
+async function listMatchingPrComments(config, prNumber) {
 	const comments = await githubRequest(
 		config.githubToken,
 		"GET",
 		`/repos/${config.owner}/${config.repo}/issues/${prNumber}/comments?per_page=100`,
 	);
-	const existingComment = Array.isArray(comments)
-		? comments.find(
-			(comment) =>
-				typeof comment.body === "string" &&
-				comment.body.includes(config.commentMarker),
+
+	return Array.isArray(comments)
+		? sortCommentsById(
+			comments.filter(
+				(comment) =>
+					typeof comment.body === "string" &&
+					comment.body.includes(config.commentMarker),
+			),
 		)
-		: undefined;
-	const body = buildCommentBody(config);
+		: [];
+}
 
-	if (existingComment?.id) {
-		const updated = await githubRequest(
-			config.githubToken,
-			"PATCH",
-			`/repos/${config.owner}/${config.repo}/issues/comments/${existingComment.id}`,
-			{ body },
-		);
-		log(`Updated PR comment #${existingComment.id} on pull request #${prNumber}`);
-		return updated?.id ?? existingComment.id;
-	}
+async function updatePrComment(config, commentId, body, prNumber) {
+	const updated = await githubRequest(
+		config.githubToken,
+		"PATCH",
+		`/repos/${config.owner}/${config.repo}/issues/comments/${commentId}`,
+		{ body },
+	);
+	log(`Updated PR comment #${commentId} on pull request #${prNumber}`);
+	return updated?.id ?? commentId;
+}
 
+async function createPrComment(config, prNumber, body) {
 	const created = await githubRequest(
 		config.githubToken,
 		"POST",
@@ -463,6 +591,75 @@ async function upsertPrComment(config, prNumber) {
 	);
 	log(`Created PR comment on pull request #${prNumber}`);
 	return created?.id;
+}
+
+async function deletePrComment(config, commentId) {
+	await githubRequest(
+		config.githubToken,
+		"DELETE",
+		`/repos/${config.owner}/${config.repo}/issues/comments/${commentId}`,
+	);
+	log(`Deleted duplicate PR comment #${commentId}`);
+}
+
+async function dedupePrComments(config, prNumber, body) {
+	const matchingComments = await listMatchingPrComments(config, prNumber);
+	if (matchingComments.length === 0) {
+		return undefined;
+	}
+
+	const [canonicalComment, ...duplicateComments] = matchingComments;
+	let commentId = canonicalComment.id;
+	if (canonicalComment.body !== body) {
+		commentId = await updatePrComment(config, canonicalComment.id, body, prNumber);
+	}
+
+	for (const duplicateComment of duplicateComments) {
+		if (duplicateComment.id === canonicalComment.id) {
+			continue;
+		}
+
+		await deletePrComment(config, duplicateComment.id);
+	}
+
+	return commentId;
+}
+
+async function upsertPrComment(config, prNumber) {
+	const matchingComments = await listMatchingPrComments(config, prNumber);
+
+	if (usesGroupedComment(config)) {
+		const body = buildGroupedCommentBody(
+			config,
+			mergeGroupedCommentSections(config, matchingComments),
+		);
+
+		if (matchingComments.length > 0) {
+			const [canonicalComment] = matchingComments;
+			await updatePrComment(config, canonicalComment.id, body, prNumber);
+			return await dedupePrComments(config, prNumber, body);
+		}
+
+		await createPrComment(config, prNumber, body);
+		const mergedBody = buildGroupedCommentBody(
+			config,
+			mergeGroupedCommentSections(
+				config,
+				await listMatchingPrComments(config, prNumber),
+			),
+		);
+		return await dedupePrComments(config, prNumber, mergedBody);
+	}
+
+	const body = buildCommentBody(config);
+	if (matchingComments.length > 0) {
+		const [canonicalComment] = matchingComments;
+		await updatePrComment(config, canonicalComment.id, body, prNumber);
+		return await dedupePrComments(config, prNumber, body);
+	}
+
+	await createPrComment(config, prNumber, body);
+	return await dedupePrComments(config, prNumber, body);
 }
 
 async function createDeployment(config) {
@@ -604,6 +801,7 @@ export function buildConfig() {
 
 	const deploymentKind = getOptionalInput("deployment-kind") ?? "preview";
 	const commentKey = getOptionalInput("comment-key") ?? slugify(title);
+	const commentSectionKeyInput = getOptionalInput("comment-section-key");
 	const previewUrl = getOptionalInput("preview-url");
 	const productionUrl = deploymentKind === "production"
 		? getOptionalInput("production-url")
@@ -627,6 +825,11 @@ export function buildConfig() {
 		title,
 		commentKey,
 		commentMarker: `<!-- devflare-feedback:${commentKey} -->`,
+		commentSectionKey: commentSectionKeyInput
+			? slugify(commentSectionKeyInput)
+			: undefined,
+		commentGroupTitle: getOptionalInput("comment-group-title"),
+		commentGroupSummary: getOptionalInput("comment-group-summary"),
 		mode,
 		operation,
 		status,
@@ -703,6 +906,12 @@ function handleCommentFeedbackFailure(config, error, failures) {
 }
 
 async function runDeploymentFeedback(config) {
+	if (config.status === "skipped") {
+		throw new Error(
+			'Deployment feedback does not support status "skipped". Use comment mode when no deployment update is needed.',
+		);
+	}
+
 	return config.operation === "cleanup" || config.status === "inactive"
 		? await deactivateDeployments(config)
 		: await createDeployment(config);

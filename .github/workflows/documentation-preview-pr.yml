@@ -82,15 +82,18 @@ jobs:
           fi
 
       - name: Publish documentation PR preview feedback
-        if: ${{ steps.impact.outputs.should-deploy == 'true' && always() }}
+        if: ${{ always() }}
         uses: ./.github/actions/devflare-github-feedback
         with:
           github-token: ${{ github.token }}
           mode: comment
           operation: report
-          status: ${{ steps.deploy.outputs.status == 'success' && steps.validate-preview.outcome != 'failure' && 'success' || 'failure' }}
+          status: ${{ steps.impact.outputs.should-deploy != 'true' && 'skipped' || (steps.deploy.outputs.status == 'success' && steps.validate-preview.outcome != 'failure' && 'success' || 'failure') }}
           title: Documentation PR preview
-          comment-key: documentation-preview
+          comment-key: pr-deployment-status
+          comment-section-key: documentation-preview
+          comment-group-title: Pull request deployment status
+          comment-group-summary: This single comment tracks the latest documentation and testing preview results for this pull request and is updated in place on every relevant preview workflow.
           pr-number: ${{ github.event.pull_request.number }}
           deployment-kind: preview
           ref-name: ${{ github.event.pull_request.head.ref }}
@@ -99,7 +102,13 @@ jobs:
           version-id: ${{ steps.deploy.outputs.version-id }}
           log-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           log-excerpt: ${{ steps.deploy.outputs.log-excerpt }}
-          summary: This pull request gets a stable PR-scoped preview link that is updated in place on every preview run.
+          summary: ${{ steps.impact.outputs.should-deploy != 'true' && 'No documentation preview redeploy was needed for this run, so the existing PR-scoped preview remains in place.' || 'This pull request gets a stable PR-scoped preview link that is updated in place on every preview run.' }}
+          details-markdown: |
+            - Impact decision: `${{ steps.impact.outputs.should-deploy == 'true' && 'deploy' || 'skip' }}`
+            - Impact reason: `${{ steps.impact.outputs.reason }}`
+            - Preview target verification: `${{ steps.impact.outputs.should-deploy != 'true' && 'skipped' || (steps.validate-preview.outcome == 'success' && 'passed' || 'failed') }}`
+            - Final status: `${{ steps.impact.outputs.should-deploy != 'true' && 'skipped' || (steps.deploy.outputs.status == 'success' && steps.validate-preview.outcome != 'failure' && 'success' || 'failure') }}`
+            - Preview strategy: named preview scope via `--preview <name>` so every pull request targets one stable dedicated preview Worker.
 
       - name: Summarize documentation PR preview
         if: ${{ always() }}
@@ -112,7 +121,7 @@ jobs:
             echo "- Impact decision: \`${{ steps.impact.outputs.should-deploy == 'true' && 'deploy' || 'skip' }}\`"
             echo "- Impact reason: ${{ steps.impact.outputs.reason }}"
             if [ "${{ steps.impact.outputs.should-deploy }}" = 'true' ]; then
-              echo '- GitHub feedback: stable PR comment updated in place'
+              echo '- GitHub feedback: shared PR deployment comment updated in place'
               echo "- Final status: \`${{ steps.deploy.outputs.status == 'success' && steps.validate-preview.outcome != 'failure' && 'success' || (steps.deploy.outputs.status || (steps.deploy.outcome == 'success' && 'success' || 'failure')) }}\`"
             else
               echo '- GitHub feedback: skipped because no preview deployment was needed'
@@ -224,8 +233,11 @@ jobs:
           operation: cleanup
           status: inactive
           title: Documentation PR preview
-          comment-key: documentation-preview
+          comment-key: pr-deployment-status
+          comment-section-key: documentation-preview
+          comment-group-title: Pull request deployment status
+          comment-group-summary: This single comment tracks the latest documentation and testing preview results for this pull request and is updated in place on every relevant preview workflow.
           pr-number: ${{ github.event.pull_request.number }}
           deployment-kind: preview
           ref-name: ${{ github.event.pull_request.head.ref }}
-          summary: This pull request was closed, so Devflare deleted the PR-scoped documentation preview Worker, cleaned up preview-owned resources, and marked the stable preview comment inactive.
+          summary: This pull request was closed, so Devflare deleted the PR-scoped documentation preview Worker, cleaned up preview-owned resources, and marked the shared PR deployment comment section inactive.

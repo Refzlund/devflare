@@ -140,12 +140,10 @@ jobs:
         uses: ./.github/actions/devflare-github-feedback
         with:
           github-token: ${{ github.token }}
-          mode: both
+          mode: deployment
           operation: report
           status: ${{ (steps.auth-impact.outputs.should-deploy != 'true' || steps.auth.outputs.status == 'success') && (steps.search-impact.outputs.should-deploy != 'true' || steps.search.outputs.status == 'success') && (steps.main-impact.outputs.should-deploy != 'true' || (steps.deploy.outputs.status == 'success' && steps.verify.outcome == 'success')) && 'success' || 'failure' }}
           title: Testing branch preview
-          comment-key: testing-preview
-          resolve-pr-from-ref: "true"
           deployment-kind: preview
           ref-name: ${{ github.ref_name }}
           sha: ${{ github.sha }}
@@ -155,7 +153,7 @@ jobs:
           version-id: ${{ steps.deploy.outputs.version-id }}
           log-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           log-excerpt: ${{ steps.deploy.outputs.log-excerpt }}
-          summary: This workflow publishes a branch-scoped testing preview on every qualifying push, even when no pull request exists. When the branch belongs to an open pull request, the same run also refreshes the stable PR preview comment.
+          summary: This workflow publishes a branch-scoped testing preview on every qualifying push, even when no pull request exists.
           details-markdown: |
             - Auth impact: `${{ steps.auth-impact.outputs.should-deploy == 'true' && 'deploy' || 'skip' }}` (`${{ steps.auth-impact.outputs.reason }}`)
             - Auth service version: `${{ steps.auth.outputs.version-id || 'not available' }}`
@@ -180,7 +178,7 @@ jobs:
             echo '### Testing branch preview workflow'
             echo ''
             echo '- Preview strategy: named preview scope via `--preview <branch>` so the testing worker family deploys to one explicit branch target'
-            echo '- GitHub feedback: transient GitHub deployment updated on qualifying pushes, plus the stable PR comment when this branch belongs to an open pull request'
+            echo '- GitHub feedback: transient GitHub deployment updated on qualifying pushes'
             if [ "${{ steps.auth-impact.outputs.should-deploy }}" != 'true' ] && [ "${{ steps.search-impact.outputs.should-deploy }}" != 'true' ] && [ "${{ steps.main-impact.outputs.should-deploy }}" != 'true' ]; then
               echo '- Final status: `skipped`'
               echo '- Summary: all testing deployment targets were unaffected, so the workflow kept the existing preview family as-is'
