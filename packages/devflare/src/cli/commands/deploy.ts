@@ -574,7 +574,7 @@ export async function runDeployCommand(
 				}
 			}
 
-			if (!preview && !resolvedVersionId) {
+			if (!preview && !resolvedVersionId && !isBranchScopedPreviewDeployment) {
 				resolvedAccountId = await ensureResolvedAccountId()
 			}
 
@@ -582,7 +582,22 @@ export async function runDeployCommand(
 				resolvedAccountId = await ensureResolvedAccountId()
 			}
 
-			if (!resolvedVersionId && resolvedAccountId) {
+			if (
+				isBranchScopedPreviewDeployment
+				&& !resolvedPreviewUrl
+				&& resolvedAccountId
+			) {
+				const workersSubdomain = await getWorkersSubdomain(resolvedAccountId)
+				if (workersSubdomain) {
+					resolvedPreviewUrl = formatWorkersDevUrl(prepared.config.name, workersSubdomain)
+				}
+			}
+
+			if (
+				!resolvedVersionId
+				&& resolvedAccountId
+				&& !(isBranchScopedPreviewDeployment && resolvedPreviewUrl)
+			) {
 				try {
 					resolvedVersionId = await resolveVersionIdFromLatestWorkerVersion({
 						accountId: resolvedAccountId,
@@ -603,7 +618,7 @@ export async function runDeployCommand(
 				}
 			}
 
-			if (!preview && !resolvedVersionId && resolvedAccountId) {
+			if (!preview && !isBranchScopedPreviewDeployment && !resolvedVersionId && resolvedAccountId) {
 				try {
 					const fallbackDeployment = await resolveVersionIdFromLatestProductionDeployment({
 						accountId: resolvedAccountId,
@@ -629,7 +644,7 @@ export async function runDeployCommand(
 				}
 			}
 
-			if (!preview && !resolvedVersionId && resolvedAccountId) {
+			if (!preview && !isBranchScopedPreviewDeployment && !resolvedVersionId && resolvedAccountId) {
 				try {
 					const currentDeployment = await resolveVersionIdFromCurrentProductionDeployment({
 						accountId: resolvedAccountId,
@@ -679,38 +694,44 @@ export async function runDeployCommand(
 			}
 
 			if (shouldVerifyDeployControlPlane()) {
-				resolvedAccountId = await ensureResolvedAccountId()
-
 				if (!resolvedVersionId) {
-					const recoveryDetails = versionRecoveryDiagnostics.length > 0
-						? ` Cloudflare fallback checks also failed: ${versionRecoveryDiagnostics.join(' | ')}`
-						: ''
-					logger.error(
-						`Deployment verification failed: Wrangler did not return a Worker version id, so Devflare could not prove which version Cloudflare accepted.${recoveryDetails}`
-					)
-					return { exitCode: 1, output: structuredOutput }
-				}
+					if (isBranchScopedPreviewDeployment && resolvedPreviewUrl) {
+						logger.warn(
+							`Deployment verification note: Wrangler completed the named preview-scope deploy for Worker "${prepared.config.name}" and exposed ${resolvedPreviewUrl}, but Cloudflare did not return a Worker version id. Devflare is treating this branch-scoped preview deploy as successful because named preview workers can lag in control-plane version metadata.`
+						)
+					} else {
+						const recoveryDetails = versionRecoveryDiagnostics.length > 0
+							? ` Cloudflare fallback checks also failed: ${versionRecoveryDiagnostics.join(' | ')}`
+							: ''
+						logger.error(
+							`Deployment verification failed: Wrangler did not return a Worker version id, so Devflare could not prove which version Cloudflare accepted.${recoveryDetails}`
+						)
+						return { exitCode: 1, output: structuredOutput }
+					}
+				} else {
+					resolvedAccountId = await ensureResolvedAccountId()
 
-				if (!resolvedAccountId) {
-					logger.error(
-						'Deployment verification failed: Devflare could not resolve a Cloudflare account id. Pass cloudflare-account-id to the action or set accountId in devflare.config.ts.'
-					)
-					return { exitCode: 1, output: structuredOutput }
-				}
+					if (!resolvedAccountId) {
+						logger.error(
+							'Deployment verification failed: Devflare could not resolve a Cloudflare account id. Pass cloudflare-account-id to the action or set accountId in devflare.config.ts.'
+						)
+						return { exitCode: 1, output: structuredOutput }
+					}
 
-				try {
-					await verifyDeployControlPlane({
-						accountId: resolvedAccountId,
-						workerName: prepared.config.name,
-						versionId: resolvedVersionId,
-						preview,
-						logger,
-						theme
-					})
-				} catch (error) {
-					const message = error instanceof Error ? error.message : String(error)
-					logger.error(`Deployment verification failed: ${message}`)
-					return { exitCode: 1, output: structuredOutput }
+					try {
+						await verifyDeployControlPlane({
+							accountId: resolvedAccountId,
+							workerName: prepared.config.name,
+							versionId: resolvedVersionId,
+							preview,
+							logger,
+							theme
+						})
+					} catch (error) {
+						const message = error instanceof Error ? error.message : String(error)
+						logger.error(`Deployment verification failed: ${message}`)
+						return { exitCode: 1, output: structuredOutput }
+					}
 				}
 			}
 

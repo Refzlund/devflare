@@ -46,6 +46,82 @@ let globalTransportDecode: Map<string, (v: unknown) => unknown> | null = null
 let globalRemoteBindings: Record<string, unknown> | null = null
 let globalMiniflareBindings: Record<string, unknown> | null = null
 
+const TEST_CONTEXT_STARTUP_RETRY_ATTEMPTS = 3
+const TEST_CONTEXT_STARTUP_RETRY_DELAY_MS = 75
+
+interface StartedBridgeBackedTestContext {
+	port: number
+	client: BridgeClient
+	miniflare: any
+	miniflareBindings: Record<string, unknown>
+}
+
+function isRetriableTestContextStartupError(error: unknown): boolean {
+	if (!(error instanceof Error)) {
+		return false
+	}
+
+	const message = error.message.toLowerCase()
+	return message.includes('websocket connection failed')
+		|| message.includes('connection timeout: ws://')
+		|| message.includes('econnrefused')
+		|| message.includes('eaddrinuse')
+		|| message.includes('address already in use')
+}
+
+async function waitForTestContextStartupRetry(): Promise<void> {
+	await new Promise((resolve) => setTimeout(resolve, TEST_CONTEXT_STARTUP_RETRY_DELAY_MS))
+}
+
+async function startBridgeBackedTestContext(mfConfig: any): Promise<StartedBridgeBackedTestContext> {
+	const { Miniflare } = await import('miniflare')
+
+	for (let attempt = 1;attempt <= TEST_CONTEXT_STARTUP_RETRY_ATTEMPTS;attempt++) {
+		const port = await getAvailablePort()
+		let miniflare: any = null
+		let client: BridgeClient | null = null
+
+		try {
+			miniflare = new Miniflare({
+				...mfConfig,
+				port
+			})
+			await miniflare.ready
+
+			const miniflareBindings = wrapEnvSendEmailBindings(await miniflare.getBindings())
+			client = new BridgeClient({
+				url: `ws://localhost:${port}`
+			})
+			await client.connect()
+
+			return {
+				port,
+				client,
+				miniflare,
+				miniflareBindings
+			}
+		} catch (error) {
+			client?.disconnect()
+
+			if (miniflare) {
+				try {
+					await miniflare.dispose()
+				} catch {
+					// Ignore cleanup failures while retrying test context startup.
+				}
+			}
+
+			if (attempt >= TEST_CONTEXT_STARTUP_RETRY_ATTEMPTS || !isRetriableTestContextStartupError(error)) {
+				throw error
+			}
+
+			await waitForTestContextStartupRetry()
+		}
+	}
+
+	throw new Error('Bridge-backed test context startup exhausted all retry attempts.')
+}
+
 // -----------------------------------------------------------------------------
 // Main API
 // -----------------------------------------------------------------------------
@@ -157,11 +233,9 @@ export async function createTestContext(configPath?: string): Promise<void> {
 		doBindingResolution = await resolveDOBindings(config, configDir)
 	}
 
-	const randomPort = await getAvailablePort()
 	const localWorkerBindings: Record<string, unknown> = config.vars ?? {}
 	const mfConfig: any = {
-		modules: true,
-		port: randomPort
+		modules: true
 	}
 
 	if (config.bindings?.kv) {
@@ -287,11 +361,24 @@ export async function createTestContext(configPath?: string): Promise<void> {
 		mfConfig.workers = workers
 	}
 
-	const { Miniflare } = await import('miniflare')
-	globalMiniflare = new Miniflare(mfConfig)
-	await globalMiniflare.ready
+	let activePort: number
 
-	globalMiniflareBindings = wrapEnvSendEmailBindings(await globalMiniflare.getBindings())
+	if (hasMultiWorkerServices || hasMultiWorkerDOs) {
+		const { Miniflare } = await import('miniflare')
+		activePort = await getAvailablePort()
+		globalMiniflare = new Miniflare({
+			...mfConfig,
+			port: activePort
+		})
+		await globalMiniflare.ready
+		globalMiniflareBindings = wrapEnvSendEmailBindings(await globalMiniflare.getBindings())
+	} else {
+		const startedBridgeBackedTestContext = await startBridgeBackedTestContext(mfConfig)
+		activePort = startedBridgeBackedTestContext.port
+		globalMiniflare = startedBridgeBackedTestContext.miniflare
+		globalMiniflareBindings = startedBridgeBackedTestContext.miniflareBindings
+		globalClient = startedBridgeBackedTestContext.client
+	}
 
 	const disposeContext = async () => {
 		if (globalClient) {
@@ -407,7 +494,7 @@ export async function createTestContext(configPath?: string): Promise<void> {
 		getEnv: getTestEnv
 	})
 	configureEmail({
-		port: randomPort,
+		port: activePort,
 		handlerPath: resolvedEmailPath,
 		configDir,
 		getEnv: getTestEnv
@@ -438,14 +525,14 @@ export async function createTestContext(configPath?: string): Promise<void> {
 		return
 	}
 
-	globalClient = new BridgeClient({
-		url: `ws://localhost:${randomPort}`
-	})
-	await globalClient.connect()
+	const bridgeClient = globalClient
+	if (!bridgeClient) {
+		throw new Error('Bridge-backed test context did not initialize a client.')
+	}
 
 	setBindingHints(hints)
 	globalEnvProxy = createEnvProxy({
-		client: globalClient,
+		client: bridgeClient,
 		transformResult: (result: unknown) => decodeTransport(result)
 	})
 
