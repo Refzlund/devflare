@@ -226,10 +226,6 @@ function buildCommentBody(config) {
 		lines.push(`- Production URL: ${toLink(productionUrl, productionUrl)}`);
 	}
 
-	if (config.previewAlias) {
-		lines.push(`- Preview alias: \`${config.previewAlias}\``);
-	}
-
 	if (config.versionId) {
 		lines.push(`- Version ID: \`${config.versionId}\``);
 	}
@@ -587,7 +583,6 @@ export function buildConfig() {
 		environmentUrl,
 		previewUrl,
 		productionUrl,
-		previewAlias: getOptionalInput("preview-alias"),
 		versionId: getOptionalInput("version-id"),
 		logUrl: getOptionalInput("log-url") ?? getDefaultRunUrl(),
 		logExcerpt: getOptionalInput("log-excerpt"),

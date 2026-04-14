@@ -44,15 +44,8 @@ These scripts intentionally keep the default shared lane focused on the parts of
 For a worker-only project, the smallest install is just Devflare:
 
 ```bash
-bun add -d devflare
-```
-
-If the current package also uses Vite, add Vite and the Cloudflare Vite plugin too:
-
-```bash
 bun add -d devflare vite @cloudflare/vite-plugin
 ```
-
 A local `vite.config.*` opts that package into Vite-backed flows. Without one, Devflare stays in worker-only mode.
 
 ---
@@ -84,21 +77,12 @@ import type { FetchEvent } from 'devflare/runtime'
 
 export async function fetch({ url }: FetchEvent): Promise<Response> {
 	return new Response(
-		url.pathname === '/'
-			? 'Hello from Devflare'
 			: `Hello from Devflare: ${url.pathname}`
 	)
 }
 ```
 
 ### 3. Generate types
-
-```bash
-bunx --bun devflare types
-```
-
-This generates `env.d.ts` so bindings, secrets, and discovered entrypoints stay typed.
-
 ### 4. Start development
 
 ```bash
@@ -566,39 +550,24 @@ For the full contract-level explanation and a concrete Rolldown + Svelte example
 
 `devflare deploy --preview` is different: it uploads a **new version of the same Worker** with `wrangler versions upload` instead of creating a separate Worker environment.
 
-That same-Worker version model is the intended phase-1 branch-preview story:
+Named preview deploys are now the primary preview model:
 
-- each preview upload gets a Cloudflare Worker version id
-- preview URLs can point at that uploaded version
-- preview aliases can give the branch a stable readable preview identity
-- feature branches do **not** need a separate Worker just to get previews
+- each preview scope deploys its own dedicated Worker (or Worker family)
+- preview-scoped bindings and resources can be assigned only to that scope
+- feature branches and PRs get stable preview URLs from the scope name itself
 
-Cloudflare caveats matter here:
-
-- preview URLs must be enabled for the Worker, or the returned links may not be usable
-- preview URLs are public unless you protect them with Cloudflare Access
-- preview uploads cannot be the first upload for a brand-new Worker
-- Cloudflare does **not** currently generate preview URLs for Workers that implement Durable Objects
-- `wrangler versions upload` does **not** currently support Durable Object migrations
-
-Preview alias generation follows Cloudflare's documented limits:
-
-- lowercase letters, numbers, and dashes only
-- must begin with a lowercase letter
-- alias plus worker name must fit within Cloudflare's DNS label limit
+Preview scope names should still be lowercase and dash-friendly so they map cleanly into Worker names and `workers.dev` URLs.
 
 Useful preview examples:
 
 ```bash
-bunx --bun devflare deploy --preview
-bunx --bun devflare deploy --preview --preview-alias feature-search
-bunx --bun devflare deploy --preview --branch-name my-feature-branch
+bunx --bun devflare deploy --preview next
+bunx --bun devflare deploy --preview pr-42
 ```
 
-When available, Devflare prints the Worker version id plus preview alias and preview URL outputs after the upload finishes.
-If Wrangler omits the preview alias URL line, Devflare derives the alias URL from the account's `workers.dev` subdomain so CI and GitHub Action outputs still get a stable branch preview link.
+When available, Devflare prints the Worker version id and preview URL outputs after the deploy finishes.
 
-### Login and preview registry helpers
+### Login and preview scope helpers
 
 `devflare login` is the thin authentication wrapper for Cloudflare.
 
@@ -606,33 +575,25 @@ If Wrangler omits the preview alias URL line, Devflare derives the alias URL fro
 - `devflare login --force` opens `wrangler login` again even when auth is already present
 - after login, Devflare prints the primary account when Cloudflare account discovery succeeds
 
-`devflare previews` is the account-owned preview-registry surface.
-
-The registry is D1-backed and tracks Devflare-managed preview, preview-alias, and deployment records so preview lifecycle management no longer depends only on Cloudflare's sparse discovery APIs.
+`devflare previews` is the config-aware preview-scope surface for dedicated preview Workers.
 
 Useful commands:
 
 ```bash
 bunx --bun devflare previews
-bunx --bun devflare previews provision
-bunx --bun devflare previews reconcile --worker documentation
-bunx --bun devflare previews cleanup-resources --env preview --apply
-bunx --bun devflare previews retire --worker documentation --branch feature-search --apply
-bunx --bun devflare previews cleanup --worker documentation --days 7 --apply
+bunx --bun devflare previews bindings --scope next
+bunx --bun devflare previews cleanup --scope next --apply
+bunx --bun devflare previews cleanup --all --apply
 ```
 
 Current behavior:
 
-- `devflare previews` lists tracked preview, alias, and deployment records from the Devflare registry
-- `devflare previews provision` ensures the registry D1 database exists
-- `devflare previews reconcile` syncs the registry against live Cloudflare Worker versions and deployments for the selected Worker
-- `devflare previews retire` immediately marks one tracked preview, alias, and preview deployment as deleted by branch name, preview alias, version id, or commit sha
-- `devflare previews cleanup-resources` deletes preview-scoped Cloudflare resources such as KV, D1, R2, Queues, Vectorize, and any existing preview Hyperdrive configs for the current preview identifier; Workers Analytics Engine datasets and Browser bindings are skipped because Cloudflare does not manage them as explicit account-owned resources through this binding surface
-- `devflare previews cleanup` performs a dry run by default and `--apply` soft-deletes stale non-active records after reconciliation
-- `devflare deploy` now performs a best-effort registry reconciliation after successful deploys so preview metadata stays warm without extra CI glue
-
-That targeted retirement step is what the example cleanup workflows use when a PR closes or when a branch-scoped preview should be torn down immediately.
-Cloudflare's same-Worker preview alias lifecycle is still platform-limited, so Devflare can retire its own registry state and GitHub-visible feedback immediately even when Cloudflare may keep the alias reachable until a later overwrite or retention eviction.
+- `devflare previews` lists stable workers plus discovered dedicated preview scopes for the current worker family using live Cloudflare Worker names
+- `devflare previews bindings` resolves preview-scoped resources for one scope and shows how many deployed workers reference them
+- `devflare previews cleanup` deletes dedicated preview Workers plus preview-scoped KV, D1, R2, Queue, Vectorize, and reusable Hyperdrive resources for one scope or every discovered scope; it is a dry run unless `--apply` is present
+- the legacy `devflare previews cleanup-resources` spelling is still accepted as a compatibility alias, but `cleanup` is the documented public command
+- the old registry-maintenance verbs (`provision`, `reconcile`, and `retire`) are no longer part of the public `previews` surface
+- `devflare deploy` still performs best-effort internal preview metadata synchronization after successful deploys so cleanup flows can retire deleted preview workers cleanly without extra CI glue
 
 ### Manage Devflare tokens
 
@@ -672,7 +633,7 @@ The action stays intentionally thin:
 - the caller workflow owns the runner, triggers, permissions, and environments
 - Cloudflare credentials must be passed in explicitly
 - by default, the action asks `devflare deploy` to verify Cloudflare control-plane state before the step is considered successful
-- the caller workflow should pass `branch-name: ${{ github.head_ref || github.ref_name }}` for deterministic preview identity across PR, push, and manual workflows
+- the caller workflow should pass a deterministic `preview-scope`, such as the branch name or `pr-<number>`, for stable dedicated preview Worker naming across PR, push, and manual workflows
 
 The reporting split is also intentional:
 
@@ -684,9 +645,8 @@ Current action inputs that matter most:
 
 - `working-directory`
 - `environment`
-- `preview`
-- `preview-alias`
-- `branch-name`
+- `production`
+- `preview-scope`
 - `verify-deployment` (defaults to `true`)
 - `cloudflare-api-token`
 - `cloudflare-account-id`
@@ -695,8 +655,7 @@ When `verify-deployment` is enabled, the action fails if Devflare cannot confirm
 
 Action outputs:
 
-- `preview-alias`
-- `preview-url` (prefers the preview alias URL, including the derived alias URL fallback when Wrangler omits it)
+- `preview-url`
 - `version-id`
 - `status`
 - `exit-code`
@@ -711,22 +670,21 @@ Minimal preview step:
 	uses: ./.github/actions/devflare-deploy
 	with:
 		working-directory: apps/documentation
-		preview: 'true'
-		branch-name: ${{ github.head_ref || github.ref_name }}
+		preview-scope: ${{ github.head_ref || github.ref_name }}
 		cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 		cloudflare-account-id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 ```
 
 This repository also includes thin caller workflows and copyable workflow examples:
 
-- [`.github/workflows/documentation-preview-branch.yml`](../../.github/workflows/documentation-preview-branch.yml) for branch-scoped preview aliases published on push
-- [`.github/workflows/documentation-preview-branch-cleanup.yml`](../../.github/workflows/documentation-preview-branch-cleanup.yml) for delete-triggered retirement of tracked documentation branch previews plus GitHub deployment cleanup
-- [`.github/workflows/documentation-preview-pr.yml`](../../.github/workflows/documentation-preview-pr.yml) for PR previews, stable PR comments, and PR-close cleanup
+- [`.github/workflows/documentation-preview-branch.yml`](../../.github/workflows/documentation-preview-branch.yml) for branch-scoped dedicated preview Workers published on push
+- [`.github/workflows/documentation-preview-branch-cleanup.yml`](../../.github/workflows/documentation-preview-branch-cleanup.yml) for delete-triggered cleanup of documentation branch preview scopes plus GitHub deployment cleanup
+- [`.github/workflows/documentation-preview-pr.yml`](../../.github/workflows/documentation-preview-pr.yml) for PR previews, stable PR comments, and PR-close scope cleanup
 - [`.github/workflows/documentation-production.yml`](../../.github/workflows/documentation-production.yml) for production deploys from the repository default branch plus GitHub deployment statuses
 - [`.github/workflows/testing-preview-branch.yml`](../../.github/workflows/testing-preview-branch.yml) for branch-scoped Durable Object previews, combined branch deployment + PR comment reporting, and later runtime binding verification
-- [`.github/workflows/testing-preview-branch-cleanup.yml`](../../.github/workflows/testing-preview-branch-cleanup.yml) for delete-triggered retirement of tracked testing branch previews, deletion of branch-scoped Workers, and GitHub deployment plus PR feedback cleanup
-- [`.github/workflows/testing-preview-pr.yml`](../../.github/workflows/testing-preview-pr.yml) for PR-scoped testing previews and PR-close GitHub feedback cleanup
-- [`.github/workflow-examples/branch-preview-cleanup.example.yml`](../../.github/workflow-examples/branch-preview-cleanup.example.yml) as a delete-triggered same-Worker preview cleanup template that retires tracked preview metadata and marks GitHub deployment feedback inactive
+- [`.github/workflows/testing-preview-branch-cleanup.yml`](../../.github/workflows/testing-preview-branch-cleanup.yml) for delete-triggered cleanup of testing branch preview scopes plus GitHub deployment and PR feedback cleanup
+- [`.github/workflows/testing-preview-pr.yml`](../../.github/workflows/testing-preview-pr.yml) for PR-scoped testing previews and PR-close scope cleanup
+- [`.github/workflow-examples/branch-preview-cleanup.example.yml`](../../.github/workflow-examples/branch-preview-cleanup.example.yml) as a delete-triggered preview-scope cleanup template that cleans one branch scope and marks GitHub deployment feedback inactive
 
 The live workflows now rely on the deploy action's control-plane verification for deploy success.
 
@@ -792,7 +750,7 @@ the Wrangler deploy runs. Preview-scoped Hyperdrive names are reused when the
 matching preview config already exists, and otherwise Devflare falls back to the
 base Hyperdrive config because Cloudflare does not expose stored Hyperdrive
 credentials for cloning preview configs automatically. Use
-`devflare previews cleanup-resources --env preview --apply` during PR-close or
+`devflare previews cleanup --env preview --apply` during PR-close or
 branch-delete cleanup to delete the preview-owned resources again.
 Service bindings created through `ref()` still follow the referenced worker
 names, so branch-scoped worker naming remains the way to isolate preview
@@ -860,7 +818,7 @@ Every top-level command supports `--help`, and nested command groups support bot
 | `devflare config` | print resolved Devflare config or resolved Wrangler JSON |
 | `devflare account` | inspect accounts, resources, usage, and limits |
 | `devflare login` | authenticate with Cloudflare via Wrangler, reusing existing auth unless `--force` is passed |
-| `devflare previews` | inspect, provision, reconcile, retire, and clean up the Devflare preview registry |
+| `devflare previews` | inspect and clean dedicated preview Workers plus preview-owned scope resources |
 | `devflare productions` | inspect live production Workers, list recent versions, roll back, or delete a live Worker script |
 | `devflare worker` | run Worker control-plane actions such as remote renaming and local config sync |
 | `devflare tokens` | create, list, and delete Devflare-managed account-owned tokens from a bootstrap token with API-token-management permission |
@@ -882,7 +840,7 @@ Legacy aliases:
 |---|---|
 | `account` | `info`, `workers`, `kv`, `d1`, `r2`, `vectorize`, `usage`, `limits`, `limits set`, `limits enable`, `limits disable`, `global`, `workspace` |
 | `config` | `print` |
-| `previews` | `list`, `bindings`, `provision`, `reconcile`, `cleanup`, `retire`, `cleanup-resources` |
+| `previews` | `list`, `bindings`, `cleanup` |
 | `productions` | `list`, `versions`, `rollback`, `delete` |
 | `remote` | `status`, `enable`, `disable` |
 | `worker` | `rename` |
@@ -893,13 +851,10 @@ Useful flags:
 - `build --env <name>`
 - `deploy --env <name>`
 - `deploy --dry-run`
-- `deploy --preview`
-- `deploy --preview --preview-alias <alias>`
-- `deploy --preview --branch-name <branch>`
+- `deploy --preview <name>`
 - `login --force`
 - `previews`
-- `previews reconcile --worker <name>`
-- `previews cleanup --worker <name> --apply`
+- `previews cleanup --scope <name> --apply`
 - `config print --json`
 - `config print --format wrangler`
 - `types --output <path>`
@@ -915,7 +870,7 @@ bunx --bun devflare dev
 bunx --bun devflare types
 bunx --bun devflare build
 bunx --bun devflare help account limits set
-bunx --bun devflare previews cleanup-resources --help
+bunx --bun devflare previews cleanup --help
 ```
 
 ---

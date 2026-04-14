@@ -58,10 +58,6 @@ inputs:
     description: "Production URL to include in PR comments"
     required: false
     default: ""
-  preview-alias:
-    description: "Preview alias to include in PR comments"
-    required: false
-    default: ""
   version-id:
     description: "Cloudflare Worker version ID to include in feedback"
     required: false

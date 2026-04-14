@@ -22,7 +22,7 @@ export const CORE_HELP_PAGES: HelpPage[] = [
 			entry('config', 'Print resolved Devflare/Wrangler config'),
 			entry('account', 'View Cloudflare account info and resource inventories'),
 			entry('login', 'Authenticate with Cloudflare via Wrangler'),
-			entry('previews', 'Inspect preview scopes and preview registry state'),
+			entry('previews', 'Inspect and clean dedicated preview Workers and scopes'),
 			entry('productions', 'Inspect and manage live production Workers and deployments'),
 			entry('worker', 'Rename and manage Worker control-plane operations'),
 			entry('tokens', 'Manage Devflare-managed Cloudflare API tokens'),
@@ -37,7 +37,7 @@ export const CORE_HELP_PAGES: HelpPage[] = [
 			entry('devflare dev', 'Start worker-only or unified local development'),
 			entry('devflare deploy --prod', 'Deploy explicitly to production'),
 			entry('devflare deploy --preview next', 'Deploy a named preview scope directly'),
-			entry('devflare previews bindings --env preview', 'Inspect preview-scoped resources and current worker associations'),
+			entry('devflare previews cleanup --scope next --apply', 'Delete one dedicated preview scope and its preview-owned resources'),
 			entry('devflare productions', 'Inspect live production Workers and active deployments'),
 			entry('devflare help deploy', 'Show the detailed deploy help page')
 		],
@@ -292,7 +292,7 @@ export const CORE_HELP_PAGES: HelpPage[] = [
 		examples: [
 			entry('devflare help', 'Show the root command overview'),
 			entry('devflare help previews', 'Show the detailed previews help page'),
-			entry('devflare help previews cleanup-resources', 'Show nested help for a preview subcommand when available')
+			entry('devflare help previews cleanup', 'Show nested help for a preview subcommand when available')
 		],
 		notes: [
 			'`devflare <command> --help` resolves to the same detailed help page as `devflare help <command>`.'

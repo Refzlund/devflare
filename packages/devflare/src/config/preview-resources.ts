@@ -65,6 +65,10 @@ export interface PreviewScopedResourceNames {
 export interface PreparePreviewScopedResourcesForDeployResult {
 	accountId?: string
 	config: DevflareConfig
+	resourceResolutionCloudflare?: Pick<
+		PreviewScopedResourceLifecycleApi,
+		'listKVNamespaces' | 'listD1Databases' | 'listHyperdrives'
+	>
 	plan: PreviewScopedResourcePlan
 	created: PreviewScopedResourceNames
 	existing: PreviewScopedResourceNames
@@ -311,6 +315,19 @@ async function loadPreviewScopedResourceLifecycleState(
 	}
 }
 
+function createPreviewScopedResourceResolutionCloudflareApi(
+	state: Pick<PreviewScopedResourceLifecycleState, 'namespaces' | 'databases' | 'hyperdrives'>
+): Pick<
+	PreviewScopedResourceLifecycleApi,
+	'listKVNamespaces' | 'listD1Databases' | 'listHyperdrives'
+> {
+	return {
+		listKVNamespaces: async () => state.namespaces,
+		listD1Databases: async () => state.databases,
+		listHyperdrives: async () => state.hyperdrives
+	}
+}
+
 function findVectorizeIndexByName(
 	indexes: VectorizeIndexInfo[],
 	name: string
@@ -485,9 +502,9 @@ export async function preparePreviewScopedResourcesForDeploy(
 			continue
 		}
 
-		await cloudflareApi.createKVNamespace(accountId, ref.previewName)
+		const namespace = await cloudflareApi.createKVNamespace(accountId, ref.previewName)
 		created.kv.push(ref.previewName)
-		namespaces.push({ id: '', name: ref.previewName })
+		namespaces.push(namespace)
 	}
 
 	for (const ref of plan.d1) {
@@ -569,12 +586,16 @@ export async function preparePreviewScopedResourcesForDeploy(
 		)
 	}
 
+	const preparedConfig = applyHyperdriveBindingFallbacks(mergedConfig, hyperdriveBindingFallbacks)
+
 	return {
 		accountId,
-		config: materializePreviewScopedConfig(
-			applyHyperdriveBindingFallbacks(mergedConfig, hyperdriveBindingFallbacks),
-			options
-		),
+		config: materializePreviewScopedConfig(preparedConfig, options),
+		resourceResolutionCloudflare: createPreviewScopedResourceResolutionCloudflareApi({
+			namespaces,
+			databases,
+			hyperdrives
+		}),
 		plan,
 		created,
 		existing,

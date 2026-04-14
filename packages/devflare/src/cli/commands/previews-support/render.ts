@@ -1,9 +1,11 @@
 import type { ConsolaInstance } from 'consola'
-import { listTrackedRegistryState, type PreviewRegistryContext } from '../../../cloudflare'
+import { listTrackedRegistryState, type PreviewRegistryContext, type WorkerInfo } from '../../../cloudflare'
 import { inspectBindingAssociations, type BindingAssociationRow } from '../../preview-bindings'
 import {
 	buildPreviewScopeRows,
+	buildPreviewScopeRowsFromLiveWorkers,
 	buildStableWorkerRows,
+	buildStableWorkerRowsFromLiveWorkers,
 	buildWorkerGroupMap,
 	buildWorkerGroups,
 	filterFamilyRecords,
@@ -79,6 +81,27 @@ function logSection<Row>(
 ): void {
 	for (const line of buildSectionLines(title, records, columns, theme)) {
 		logLine(logger, line)
+	}
+}
+
+function logLiveWorkerFamilyOverview(
+	logger: ConsolaInstance,
+	families: ConfiguredWorkerFamilyMember[],
+	workers: WorkerInfo[],
+	workersSubdomain: string | null | undefined,
+	theme: PreviewOutputTheme
+): void {
+	const stableRows = buildStableWorkerRowsFromLiveWorkers(families, workers, workersSubdomain)
+	const previewScopeRows = buildPreviewScopeRowsFromLiveWorkers(families, workers, workersSubdomain)
+
+	logWorkerFamilyHeader(logger, families, theme)
+	logSection(logger, 'Stable workers', stableRows, buildStableWorkerColumns(theme), theme)
+
+	logLine(logger)
+	if (previewScopeRows.length === 0) {
+		logLine(logger, dim('No dedicated preview scopes found for this worker family.', theme))
+	} else {
+		logSection(logger, 'Preview scopes', previewScopeRows, buildPreviewScopeColumns(theme), theme)
 	}
 }
 
@@ -393,22 +416,6 @@ export async function showTrackedState(
 	logLine(logger)
 }
 
-export function showMissingPreviewRegistryState(
-	logger: ConsolaInstance,
-	families: ConfiguredWorkerFamilyMember[] | undefined,
-	theme: PreviewOutputTheme
-): void {
-	logLine(logger)
-
-	if (families && families.length > 0) {
-		logWorkerFamilyHeader(logger, families, theme)
-	}
-
-	logger.warn('No Devflare preview registry database was found for the resolved account.')
-	logger.info('Run `devflare previews provision` to create it, then `devflare previews reconcile --worker <name>` after deploying previews you want to track.')
-	logLine(logger)
-}
-
 export async function showWorkerFamilyOverview(
 	registry: PreviewRegistryContext,
 	families: ConfiguredWorkerFamilyMember[],
@@ -439,13 +446,54 @@ export async function showWorkerFamilyOverview(
 
 	logLine(logger)
 	if (previewScopeRows.length === 0) {
-		logLine(logger, dim('No active preview scopes found for this worker family.', theme))
+		logLine(logger, dim('No dedicated preview scopes found for this worker family.', theme))
 	} else {
 		logSection(logger, 'Preview scopes', previewScopeRows, buildPreviewScopeColumns(theme), theme)
 	}
 
 	logLine(logger)
-	logLine(logger, dim('Use --worker <name> to inspect raw registry records for a specific worker.', theme))
+	logLine(logger, dim('Preview scopes are derived from live worker names and the current config family.', theme))
+	logLine(logger, dim('Use `devflare previews cleanup --scope <name>` to delete one scope or `--all` to clean every discovered scope.', theme))
+	logLine(logger)
+}
+
+export function showWorkerFamilyOverviewFromLiveWorkers(
+	families: ConfiguredWorkerFamilyMember[],
+	workers: WorkerInfo[],
+	workersSubdomain: string | null | undefined,
+	logger: ConsolaInstance,
+	theme: PreviewOutputTheme
+): void {
+	logLine(logger)
+	logLiveWorkerFamilyOverview(logger, families, workers, workersSubdomain, theme)
+	logLine(logger)
+	logLine(logger, dim('Preview scopes are derived from live worker names and the current config family.', theme))
+	logLine(logger, dim('Use `devflare previews cleanup --scope <name>` to delete one scope or `--all` to clean every discovered scope.', theme))
+	logLine(logger)
+}
+
+export function showWorkspaceWorkerFamilyOverviewFromLiveWorkers(
+	familyGroups: ConfiguredWorkerFamilyMember[][],
+	workers: WorkerInfo[],
+	workersSubdomain: string | null | undefined,
+	logger: ConsolaInstance,
+	theme: PreviewOutputTheme
+): void {
+	logLine(logger)
+	logLine(logger, `${dim('configured worker families', theme)} ${whiteDim(String(familyGroups.length), theme)}`)
+	logLine(logger)
+
+	for (const [index, families] of familyGroups.entries()) {
+		if (index > 0) {
+			logLine(logger)
+		}
+
+		logLiveWorkerFamilyOverview(logger, families, workers, workersSubdomain, theme)
+	}
+
+	logLine(logger)
+	logLine(logger, dim('Preview scopes are derived from live worker names and each discovered config family.', theme))
+	logLine(logger, dim('Run inside a configured package or pass `--config <path>` to narrow the summary or clean one family.', theme))
 	logLine(logger)
 }
 

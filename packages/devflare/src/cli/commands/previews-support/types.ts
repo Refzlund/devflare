@@ -7,7 +7,7 @@ import type {
 	PreviewRegistryContext
 } from '../../../cloudflare'
 
-export const PREVIEW_SUBCOMMANDS = ['list', 'bindings', 'provision', 'reconcile', 'cleanup', 'retire', 'cleanup-resources'] as const
+export const PREVIEW_SUBCOMMANDS = ['list', 'bindings', 'cleanup'] as const
 
 export type PreviewSubcommand = typeof PREVIEW_SUBCOMMANDS[number]
 export type WorkerNameSource = 'option' | 'arg' | 'config' | 'none'
@@ -28,6 +28,7 @@ export interface PreviewCommandContext {
 	workerName?: string
 	workerNameSource: WorkerNameSource
 	config?: PreviewConfigSummary
+	listDiscovery?: PreviewListDiscovery
 }
 
 export interface PreviewOutputTheme {
@@ -54,6 +55,17 @@ export interface ConfiguredWorkerFamilyMember {
 	role: 'primary' | 'service'
 }
 
+export interface PreviewConfiguredFamilyGroup {
+	accountId?: string
+	configPath?: string
+	families: ConfiguredWorkerFamilyMember[]
+}
+
+export interface PreviewListDiscovery {
+	accountIds: string[]
+	familyGroups: PreviewConfiguredFamilyGroup[]
+}
+
 export interface StableWorkerRow {
 	workerName: string
 	role: string
@@ -64,7 +76,7 @@ export interface StableWorkerRow {
 
 export interface PreviewScopeRow {
 	scope: string
-	strategy: 'dedicated workers' | 'preview alias'
+	strategy: 'dedicated workers'
 	workersLabel: string
 	status: 'ready' | 'partial' | 'active' | 'deleted' | 'superseded' | 'reassigned' | 'orphaned' | 'rolled_back'
 	updatedAt?: Date

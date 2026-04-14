@@ -2,7 +2,6 @@ name: Documentation PR Preview
 
 env:
   DOCUMENTATION_PRODUCTION_URL: https://devflare-docs.refz.workers.dev
-  DOCUMENTATION_PR_PREVIEW_ALIAS_PREFIX: documentation-pr
 
 on:
   pull_request:
@@ -48,8 +47,7 @@ jobs:
           working-directory: apps/documentation
           install-working-directory: .
           deploy-command: bun run deploy --
-          preview: "true"
-          preview-alias: ${{ env.DOCUMENTATION_PR_PREVIEW_ALIAS_PREFIX }}-${{ github.event.pull_request.number }}
+          preview-scope: pr-${{ github.event.pull_request.number }}
           deploy-message: Documentation PR preview ${{ github.event.pull_request.head.sha }} (run ${{ github.run_id }})
           deploy-tag: documentation-pr-preview-${{ github.run_id }}
           cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -71,7 +69,6 @@ jobs:
           sha: ${{ github.event.pull_request.head.sha }}
           preview-url: ${{ steps.deploy.outputs.preview-url }}
           production-url: ${{ env.DOCUMENTATION_PRODUCTION_URL }}
-          preview-alias: ${{ steps.deploy.outputs.preview-alias }}
           version-id: ${{ steps.deploy.outputs.version-id }}
           log-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           log-excerpt: ${{ steps.deploy.outputs.log-excerpt }}
@@ -84,7 +81,7 @@ jobs:
           {
             echo '### Documentation PR preview workflow'
             echo ''
-            echo '- Preview strategy: PR-scoped preview alias so every pull request targeting the repository default branch gets a stable link independent of the source branch name'
+            echo '- Preview strategy: named preview scope via `--preview <name>` so every pull request targets one stable dedicated preview Worker'
             echo "- Impact decision: \`${{ steps.impact.outputs.should-deploy == 'true' && 'deploy' || 'skip' }}\`"
             echo "- Impact reason: ${{ steps.impact.outputs.reason }}"
             if [ "${{ steps.impact.outputs.should-deploy }}" = 'true' ]; then
@@ -102,9 +99,6 @@ jobs:
             if [ -n "${{ steps.deploy.outputs.exit-code }}" ]; then
               echo "- Exit code: \`${{ steps.deploy.outputs.exit-code }}\`"
             fi
-            if [ -n "${{ steps.deploy.outputs.preview-alias }}" ]; then
-              echo "- Preview alias: \`${{ steps.deploy.outputs.preview-alias }}\`"
-            fi
             if [ -n "${{ steps.deploy.outputs.preview-url }}" ]; then
               echo "- Preview URL: ${{ steps.deploy.outputs.preview-url }}"
             fi
@@ -121,7 +115,6 @@ jobs:
           DEVFLARE_FAILURE_STAGE: ${{ steps.deploy.outputs.failure-stage }}
           DEVFLARE_DEPLOY_EXIT_CODE: ${{ steps.deploy.outputs.exit-code }}
           DEVFLARE_DEPLOY_VERSION_ID: ${{ steps.deploy.outputs.version-id }}
-          DEVFLARE_PREVIEW_ALIAS: ${{ steps.deploy.outputs.preview-alias }}
           DEVFLARE_PREVIEW_URL: ${{ steps.deploy.outputs.preview-url }}
           DEVFLARE_DEPLOY_LOG_EXCERPT: ${{ steps.deploy.outputs.log-excerpt }}
         run: |
@@ -134,9 +127,6 @@ jobs:
           fi
           if [ -n "$DEVFLARE_DEPLOY_VERSION_ID" ]; then
             echo "Last version ID: $DEVFLARE_DEPLOY_VERSION_ID" >&2
-          fi
-          if [ -n "$DEVFLARE_PREVIEW_ALIAS" ]; then
-            echo "Resolved preview alias: $DEVFLARE_PREVIEW_ALIAS" >&2
           fi
           if [ -n "$DEVFLARE_PREVIEW_URL" ]; then
             echo "Last preview URL: $DEVFLARE_PREVIEW_URL" >&2
@@ -153,6 +143,8 @@ jobs:
   cleanup-preview:
     if: ${{ github.event.pull_request.base.ref == github.event.repository.default_branch && github.event.action == 'closed' && github.event.pull_request.head.repo.fork == false }}
     runs-on: ubuntu-latest
+    env:
+      PREVIEW_SCOPE: pr-${{ github.event.pull_request.number }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -174,7 +166,7 @@ jobs:
         shell: bash
         run: bun install --frozen-lockfile
 
-      - name: Retire tracked documentation PR preview metadata
+      - name: Clean up documentation PR preview scope
         shell: bash
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -182,10 +174,11 @@ jobs:
         run: |
           set -euo pipefail
 
-          bunx --bun devflare previews retire \
+          cd apps/documentation
+
+          bunx --bun devflare previews cleanup \
             --account "$CLOUDFLARE_ACCOUNT_ID" \
-            --worker devflare-docs \
-            --preview-alias "${DOCUMENTATION_PR_PREVIEW_ALIAS_PREFIX}-${{ github.event.pull_request.number }}" \
+            --scope "$PREVIEW_SCOPE" \
             --apply
 
       - name: Publish documentation PR preview cleanup feedback
@@ -200,4 +193,4 @@ jobs:
           pr-number: ${{ github.event.pull_request.number }}
           deployment-kind: preview
           ref-name: ${{ github.event.pull_request.head.ref }}
-          summary: This pull request was closed, so Devflare retired the tracked PR preview alias metadata for its stable preview link.
+          summary: This pull request was closed, so Devflare deleted the PR-scoped documentation preview Worker, cleaned up preview-owned resources, and marked the stable preview comment inactive.

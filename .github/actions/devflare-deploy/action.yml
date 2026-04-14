@@ -1,5 +1,5 @@
 name: "Devflare Deploy"
-description: "Install dependencies and deploy a Devflare project to Cloudflare with an explicit production, preview upload, or named preview-scope target"
+description: "Install dependencies and deploy a Devflare project to Cloudflare with an explicit production or named preview-scope target"
 inputs:
   working-directory:
     description: "Directory containing the Devflare project"
@@ -13,20 +13,8 @@ inputs:
     description: "When true, deploy explicitly to production via --prod"
     required: false
     default: "false"
-  preview:
-    description: "When true, upload a same-worker preview version instead of deploying to production"
-    required: false
-    default: "false"
   preview-scope:
     description: "Explicit named preview scope to deploy via --preview <name>"
-    required: false
-    default: ""
-  preview-alias:
-    description: "Explicit preview alias to use for same-worker preview uploads"
-    required: false
-    default: ""
-  branch-name:
-    description: "Branch name to sanitize into a preview alias when preview-alias is not provided for same-worker preview uploads"
     required: false
     default: ""
   bun-version:
@@ -69,11 +57,8 @@ inputs:
     required: false
     default: ""
 outputs:
-  preview-alias:
-    description: "Resolved preview alias used for the deploy, if preview mode was enabled"
-    value: ${{ steps.finalize.outputs.preview_alias }}
   preview-url:
-    description: "Preview alias URL, preview URL, or deployed workers.dev URL returned by Devflare or Wrangler when available"
+    description: "Preview URL or deployed workers.dev URL returned by Devflare or Wrangler when available"
     value: ${{ steps.finalize.outputs.preview_url }}
   version-id:
     description: "Cloudflare Worker version ID returned by Devflare or Wrangler"
@@ -154,10 +139,7 @@ runs:
         CLOUDFLARE_ACCOUNT_ID: ${{ inputs.cloudflare-account-id }}
         INPUT_ENVIRONMENT: ${{ inputs.environment }}
         INPUT_PRODUCTION: ${{ inputs.production }}
-        INPUT_PREVIEW: ${{ inputs.preview }}
         INPUT_PREVIEW_SCOPE: ${{ inputs.preview-scope }}
-        INPUT_PREVIEW_ALIAS: ${{ inputs.preview-alias }}
-        INPUT_BRANCH_NAME: ${{ inputs.branch-name }}
         INPUT_DEPLOY_COMMAND: ${{ inputs.deploy-command }}
         INPUT_DEPLOY_MESSAGE: ${{ inputs.deploy-message }}
         INPUT_DEPLOY_TAG: ${{ inputs.deploy-tag }}
@@ -176,20 +158,17 @@ runs:
         if [ "$INPUT_PRODUCTION" = 'true' ]; then
           target_count=$((target_count + 1))
         fi
-        if [ "$INPUT_PREVIEW" = 'true' ]; then
-          target_count=$((target_count + 1))
-        fi
         if [ -n "$INPUT_PREVIEW_SCOPE" ]; then
           target_count=$((target_count + 1))
         fi
 
         if [ "$target_count" -eq 0 ]; then
-          echo 'Devflare deploy action requires one explicit target input. Set exactly one of production: "true", preview: "true", or preview-scope: <name>.' >&2
+          echo 'Devflare deploy action requires one explicit target input. Set exactly one of production: "true" or preview-scope: <name>.' >&2
           exit 1
         fi
 
         if [ "$target_count" -gt 1 ]; then
-          echo 'Choose only one explicit deploy target input: production, preview, or preview-scope.' >&2
+          echo 'Choose only one explicit deploy target input: production or preview-scope.' >&2
           exit 1
         fi
 
@@ -199,7 +178,7 @@ runs:
             exit 1
           fi
 
-          if { [ "$INPUT_PREVIEW" = 'true' ] || [ -n "$INPUT_PREVIEW_SCOPE" ]; } && [ "$INPUT_ENVIRONMENT" != 'preview' ]; then
+          if [ -n "$INPUT_PREVIEW_SCOPE" ] && [ "$INPUT_ENVIRONMENT" != 'preview' ]; then
             echo 'Preview deploys can only be paired with environment: preview.' >&2
             exit 1
           fi
@@ -211,15 +190,6 @@ runs:
         elif [ -n "$INPUT_PREVIEW_SCOPE" ]; then
           deploy_args+=(--preview "$INPUT_PREVIEW_SCOPE")
           resolved_target="preview scope ($INPUT_PREVIEW_SCOPE)"
-        elif [ "$INPUT_PREVIEW" = 'true' ]; then
-          deploy_args+=(--preview)
-          resolved_target='preview upload'
-
-          if [ -n "$INPUT_PREVIEW_ALIAS" ]; then
-            deploy_args+=(--preview-alias "$INPUT_PREVIEW_ALIAS")
-          elif [ -n "$INPUT_BRANCH_NAME" ]; then
-            deploy_args+=(--branch-name "$INPUT_BRANCH_NAME")
-          fi
         fi
 
         if [ -n "$INPUT_ENVIRONMENT" ]; then
@@ -252,10 +222,8 @@ runs:
         deploy_exit_code="${PIPESTATUS[0]}"
         set -e
 
-        preview_alias="$(sed -nE 's/^.*[Pp]review [Aa]lias:?[[:space:]]+([A-Za-z0-9_-]+).*$/\1/p' "$deploy_log" | tail -n 1)"
         version_id="$(sed -nE 's/^.*(Worker )?[Vv]ersion ID:?[[:space:]]+([A-Za-z0-9_-]+).*$/\2/p' "$deploy_log" | tail -n 1)"
         preview_url="$(sed -nE 's/^.*(Preview URL|Version Preview URL|URL):[[:space:]]+(https?:\/\/[^[:space:]]+).*$/\2/p' "$deploy_log" | tail -n 1)"
-        preview_alias_url="$(sed -nE 's/^.*(Preview Alias URL|Alias URL):[[:space:]]+(https?:\/\/[^[:space:]]+).*$/\2/p' "$deploy_log" | tail -n 1)"
         verification_note="$(sed -nE 's/^.*Deployment verification note:[[:space:]]+(.*)$/\1/p' "$deploy_log" | tail -n 1)"
         workers_dev_url="$(grep -oE 'https?:\/\/[^[:space:]]+' "$deploy_log" | grep 'workers.dev' | tail -n 1 || true)"
         deploy_status='success'
@@ -263,14 +231,7 @@ runs:
           deploy_status='failure'
         fi
 
-        if [ -z "$preview_alias" ] && [ -n "$INPUT_PREVIEW_ALIAS" ]; then
-          preview_alias="$INPUT_PREVIEW_ALIAS"
-        fi
-
-        preferred_preview_url="$preview_alias_url"
-        if [ -z "$preferred_preview_url" ]; then
-          preferred_preview_url="$preview_url"
-        fi
+        preferred_preview_url="$preview_url"
         if [ -z "$preferred_preview_url" ]; then
           preferred_preview_url="$workers_dev_url"
         fi
@@ -279,7 +240,6 @@ runs:
         log_delimiter="DEVFLARE_LOG_$(date +%s)_$$"
         note_delimiter="DEVFLARE_NOTE_$(date +%s)_$$"
 
-        echo "preview_alias=$preview_alias" >> "$GITHUB_OUTPUT"
         echo "version_id=$version_id" >> "$GITHUB_OUTPUT"
         echo "preview_url=$preferred_preview_url" >> "$GITHUB_OUTPUT"
         echo "status=$deploy_status" >> "$GITHUB_OUTPUT"
@@ -312,13 +272,11 @@ runs:
         DEPLOY_STATUS: ${{ steps.deploy.outputs.status }}
         DEPLOY_EXIT_CODE: ${{ steps.deploy.outputs.exit_code }}
         DEPLOY_VERSION_ID: ${{ steps.deploy.outputs.version_id }}
-        DEPLOY_PREVIEW_ALIAS: ${{ steps.deploy.outputs.preview_alias }}
         DEPLOY_PREVIEW_URL: ${{ steps.deploy.outputs.preview_url }}
         DEPLOY_VERIFICATION_NOTE: ${{ steps.deploy.outputs.verification_note }}
         DEPLOY_LOG_EXCERPT: ${{ steps.deploy.outputs.log_excerpt }}
         INPUT_ENVIRONMENT: ${{ inputs.environment }}
         INPUT_PRODUCTION: ${{ inputs.production }}
-        INPUT_PREVIEW: ${{ inputs.preview }}
         INPUT_PREVIEW_SCOPE: ${{ inputs.preview-scope }}
         INPUT_WORKING_DIRECTORY: ${{ inputs.working-directory }}
       run: |
@@ -329,7 +287,6 @@ runs:
         deploy_status='success'
         exit_code=''
         version_id=''
-        preview_alias=''
         preview_url=''
         verification_note=''
         log_excerpt=''
@@ -359,7 +316,6 @@ runs:
 
           exit_code="$DEPLOY_EXIT_CODE"
           version_id="$DEPLOY_VERSION_ID"
-          preview_alias="$DEPLOY_PREVIEW_ALIAS"
           preview_url="$DEPLOY_PREVIEW_URL"
           verification_note="$DEPLOY_VERIFICATION_NOTE"
           log_excerpt="$DEPLOY_LOG_EXCERPT"
@@ -377,8 +333,6 @@ runs:
           deploy_target='production'
         elif [ -n "$INPUT_PREVIEW_SCOPE" ]; then
           deploy_target="preview scope ($INPUT_PREVIEW_SCOPE)"
-        elif [ "$INPUT_PREVIEW" = 'true' ]; then
-          deploy_target='preview upload'
         else
           deploy_target='unknown'
         fi
@@ -386,7 +340,6 @@ runs:
         log_delimiter="DEVFLARE_LOG_$(date +%s)_$$"
         note_delimiter="DEVFLARE_NOTE_$(date +%s)_$$"
 
-        echo "preview_alias=$preview_alias" >> "$GITHUB_OUTPUT"
         echo "version_id=$version_id" >> "$GITHUB_OUTPUT"
         echo "preview_url=$preview_url" >> "$GITHUB_OUTPUT"
         echo "status=$deploy_status" >> "$GITHUB_OUTPUT"
@@ -421,9 +374,6 @@ runs:
           fi
           if [ -n "$INPUT_ENVIRONMENT" ]; then
             echo "- Environment: \`$INPUT_ENVIRONMENT\`"
-          fi
-          if [ -n "$preview_alias" ]; then
-            echo "- Preview alias: \`$preview_alias\`"
           fi
           if [ -n "$version_id" ]; then
             echo "- Version ID: \`$version_id\`"

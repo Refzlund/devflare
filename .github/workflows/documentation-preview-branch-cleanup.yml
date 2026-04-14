@@ -18,7 +18,7 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.ref_type == 'branch' }}
     runs-on: ubuntu-latest
     env:
-      PREVIEW_BRANCH: ${{ github.event_name == 'workflow_dispatch' && inputs.branch || github.event.ref }}
+      PREVIEW_SCOPE: ${{ github.event_name == 'workflow_dispatch' && inputs.branch || github.event.ref }}
     steps:
       - name: Checkout default branch
         uses: actions/checkout@v5
@@ -42,7 +42,7 @@ jobs:
         shell: bash
         run: bun install --frozen-lockfile
 
-      - name: Retire tracked documentation branch preview metadata
+      - name: Clean up documentation branch preview scope
         shell: bash
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -50,10 +50,11 @@ jobs:
         run: |
           set -euo pipefail
 
-          bunx --bun devflare previews retire \
+          cd apps/documentation
+
+          bunx --bun devflare previews cleanup \
             --account "$CLOUDFLARE_ACCOUNT_ID" \
-            --worker devflare-docs \
-            --branch "$PREVIEW_BRANCH" \
+            --scope "$PREVIEW_SCOPE" \
             --apply
 
       - name: Mark documentation branch preview deployment inactive
@@ -65,10 +66,10 @@ jobs:
           status: inactive
           title: Documentation branch preview
           deployment-kind: preview
-          ref-name: ${{ env.PREVIEW_BRANCH }}
-          environment: documentation branch preview / ${{ env.PREVIEW_BRANCH }}
+          ref-name: ${{ env.PREVIEW_SCOPE }}
+          environment: documentation branch preview / ${{ env.PREVIEW_SCOPE }}
           log-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          summary: This branch was deleted, so Devflare retired the tracked documentation preview metadata and marked the related GitHub deployment inactive.
+          summary: This branch was deleted, so Devflare deleted the branch-scoped documentation preview Worker, cleaned up preview-owned resources, and marked the related GitHub deployment inactive.
 
       - name: Summarize documentation branch preview cleanup
         if: ${{ always() }}
@@ -77,7 +78,7 @@ jobs:
           {
             echo '### Documentation branch preview cleanup'
             echo ''
-            echo "- Branch scope: \`$PREVIEW_BRANCH\`"
-            echo '- Cleanup action: retired tracked preview metadata and marked matching GitHub deployment feedback inactive'
+            echo "- Branch scope: \`$PREVIEW_SCOPE\`"
+            echo '- Cleanup action: deleted the branch-scoped preview Worker, cleaned up preview-owned resources, and marked matching GitHub deployment feedback inactive'
             echo "- Trigger: \`${{ github.event_name }}\`"
           } >> "$GITHUB_STEP_SUMMARY"

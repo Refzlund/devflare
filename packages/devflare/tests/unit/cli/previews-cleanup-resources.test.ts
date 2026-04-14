@@ -65,7 +65,7 @@ afterEach(() => {
 })
 
 describe('previews command', () => {
-	test('cleanup-resources warns when it falls back to the default preview scope and finds no matching resources', async () => {
+	test('cleanup warns when it falls back to the default preview scope and finds no matching resources', async () => {
 		process.env.CLOUDFLARE_API_TOKEN = 'cf_test_token'
 		const projectDir = temporaryCacheDirectories.create('devflare-previews-cleanup-default-')
 		writeKvCleanupProject(projectDir, 'demo-preview-cleanup')
@@ -110,7 +110,7 @@ describe('previews command', () => {
 		const result = await runPreviewsCommand(
 			{
 				command: 'previews',
-				args: ['cleanup-resources'],
+				args: ['cleanup'],
 				options: {
 					account: 'acc_123'
 				}
@@ -125,7 +125,7 @@ describe('previews command', () => {
 		expect(renderedMessages.some((message) => message.includes('No preview-only resources or dedicated preview Worker scripts matched the default "preview" scope'))).toBe(true)
 	})
 
-	test('cleanup-resources uses --scope to target named preview resources', async () => {
+	test('cleanup uses --scope to target named preview resources', async () => {
 		process.env.CLOUDFLARE_API_TOKEN = 'cf_test_token'
 		const projectDir = temporaryCacheDirectories.create('devflare-previews-cleanup-scope-')
 		writeKvCleanupProject(projectDir, 'demo-preview-cleanup-scope')
@@ -181,7 +181,7 @@ describe('previews command', () => {
 		const result = await runPreviewsCommand(
 			{
 				command: 'previews',
-				args: ['cleanup-resources'],
+				args: ['cleanup'],
 				options: {
 					account: 'acc_123',
 					scope: 'next'
@@ -200,7 +200,7 @@ describe('previews command', () => {
 		expect(renderedMessages.some((message) => message.includes('next') && message.includes('dedicated workers') && message.includes('Workers 1'))).toBe(true)
 	})
 
-	test('cleanup-resources uses --all to clean every discovered preview scope', async () => {
+	test('cleanup uses --all to clean every discovered preview scope', async () => {
 		process.env.CLOUDFLARE_API_TOKEN = 'cf_test_token'
 		const projectDir = temporaryCacheDirectories.create('devflare-previews-cleanup-all-')
 		writeKvCleanupProject(projectDir, 'demo-preview-cleanup-all')
@@ -261,7 +261,7 @@ describe('previews command', () => {
 		const result = await runPreviewsCommand(
 			{
 				command: 'previews',
-				args: ['cleanup-resources'],
+				args: ['cleanup'],
 				options: {
 					account: 'acc_123',
 					all: true
@@ -282,7 +282,7 @@ describe('previews command', () => {
 		expect(renderedMessages.some((message) => message.includes('preview') && message.includes('default preview scope'))).toBe(true)
 	})
 
-	test('cleanup-resources deletes preview worker consumers before preview service providers', async () => {
+	test('cleanup deletes preview worker consumers before preview service providers', async () => {
 		process.env.CLOUDFLARE_API_TOKEN = 'cf_test_token'
 		const projectDir = temporaryCacheDirectories.create('devflare-previews-cleanup-apply-order-')
 		writeServiceCleanupProject(projectDir)
@@ -360,7 +360,7 @@ describe('previews command', () => {
 		const result = await runPreviewsCommand(
 			{
 				command: 'previews',
-				args: ['cleanup-resources'],
+				args: ['cleanup'],
 				options: {
 					account: 'acc_123',
 					scope: 'next',

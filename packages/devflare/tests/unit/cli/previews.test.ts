@@ -1,25 +1,38 @@
 import { afterEach, describe, expect, mock, test } from 'bun:test'
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { runPreviewsCommand } from '../../../src/cli/commands/previews'
 import { createTrackedTempDirectories } from '../../helpers/tracked-temp-directories'
 import {
 	capturePreviewTestEnvironmentSnapshot,
-	createD1ResultsResponse,
-	createDeploymentRecordFixture,
-	createPreviewRegistryFetch,
 	createLogger,
-	createPreviewAliasRecordFixture,
-	createPreviewRecordFixture,
-	createRegistryDatabaseListResponse,
-	createRegistryDatabaseRecord,
-	createSerializedRegistryRecord,
 	jsonResponse,
 	renderMessages,
-	runTrackedPreviewsCommand,
 	restorePreviewTestEnvironmentSnapshot
 } from './previews.test-utils'
 
 const originalEnvironment = capturePreviewTestEnvironmentSnapshot()
 const temporaryCacheDirectories = createTrackedTempDirectories()
+
+function writePreviewProject(projectDir: string, projectName: string, accountId: string = 'acc_123'): void {
+	const previewScopedValue = `__DEVFLARE_PREVIEW_SCOPE__:${JSON.stringify({ baseName: 'cache-kv', separator: '-' })}`
+	writeFileSync(join(projectDir, 'package.json'), JSON.stringify({
+		name: projectName,
+		type: 'module'
+	}, null, '\t'), 'utf-8')
+	writeFileSync(join(projectDir, 'devflare.config.ts'), `
+		export default {
+			name: ${JSON.stringify(projectName)},
+			accountId: ${JSON.stringify(accountId)},
+			compatibilityDate: '2026-04-08',
+			bindings: {
+				kv: {
+					CACHE: ${JSON.stringify(previewScopedValue)}
+				}
+			}
+		}
+	`, 'utf-8')
+}
 
 afterEach(() => {
 	restorePreviewTestEnvironmentSnapshot(originalEnvironment)
@@ -27,108 +40,31 @@ afterEach(() => {
 })
 
 describe('previews command', () => {
-	test('provisions the preview registry database', async () => {
+	test('rejects removed registry maintenance subcommands with migration guidance', async () => {
 		process.env.CLOUDFLARE_API_TOKEN = 'cf_test_token'
-		process.env.DEVFLARE_CACHE_DIR = temporaryCacheDirectories.create('devflare-previews-cli-')
-		const requestBodies: Array<{ url: string; body?: unknown }> = []
-		globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
-			const url = String(input)
-			const body = typeof init?.body === 'string' ? JSON.parse(init.body) : undefined
-			requestBodies.push({ url, body })
+		const removedSubcommands = ['provision', 'reconcile', 'retire'] as const
 
-			if (url.includes('/accounts/acc_123/d1/database?page=1&per_page=50')) {
-				return createRegistryDatabaseListResponse([])
-			}
+		for (const subcommand of removedSubcommands) {
+			const logger = createLogger()
+			const result = await runPreviewsCommand(
+				{
+					command: 'previews',
+					args: [subcommand],
+					options: {}
+				},
+				logger as any,
+				{}
+			)
 
-			if (url.endsWith('/accounts/acc_123/d1/database')) {
-				return jsonResponse({
-					uuid: 'db_123',
-					name: 'devflare-registry',
-					version: 'alpha',
-					num_tables: 0,
-					file_size: 0
-				})
-			}
-
-			if (url.endsWith('/accounts/acc_123/d1/database/db_123/query')) {
-				return createD1ResultsResponse()
-			}
-
-			throw new Error(`Unexpected fetch URL: ${url}`)
-		}) as unknown as typeof fetch
-
-		const logger = createLogger()
-		const result = await runPreviewsCommand(
-			{
-				command: 'previews',
-				args: ['provision'],
-				options: {
-					account: 'acc_123'
-				}
-			},
-			logger as any,
-			{}
-		)
-
-		expect(result.exitCode).toBe(0)
-		expect(requestBodies.some((request) => request.url.endsWith('/accounts/acc_123/d1/database'))).toBe(true)
-		expect(logger.messages.some((message) => message.args.join(' ').includes('Provisioned preview registry database'))).toBe(true)
+			expect(result.exitCode).toBe(1)
+			expect(logger.messages.some((message) => message.args.join(' ').includes(`devflare previews ${subcommand}`))).toBe(true)
+			expect(logger.messages.some((message) => message.args.join(' ').includes('dedicated-preview-worker cleanup'))).toBe(true)
+			expect(logger.messages.some((message) => message.args.join(' ').includes('devflare previews cleanup --scope <name> --apply'))).toBe(true)
+		}
 	})
 
-	test('lists tracked preview records for a worker', async () => {
+	test('no longer treats a positional worker name as a raw registry shorthand', async () => {
 		process.env.CLOUDFLARE_API_TOKEN = 'cf_test_token'
-		process.env.DEVFLARE_CACHE_DIR = temporaryCacheDirectories.create('devflare-previews-cli-')
-		const recordedSql: string[] = []
-		const previewRecord = createPreviewRecordFixture({
-			workerName: 'demo-worker',
-			versionId: '5dba9570-33c4-4375-b784-e1b34ad01569',
-			previewUrl: 'https://5dba9570-demo-worker.example-subdomain.workers.dev',
-			alias: 'feature-branch',
-			aliasPreviewUrl: 'https://feature-branch-demo-worker.example-subdomain.workers.dev'
-		})
-		const deploymentRecord = createDeploymentRecordFixture({
-			id: 'deployment:demo-worker:deploy_123',
-			workerName: 'demo-worker',
-			deploymentId: 'deploy_123',
-			channel: 'preview',
-			versionId: '5dba9570-33c4-4375-b784-e1b34ad01569',
-			previewId: String(previewRecord.id),
-			url: 'https://feature-branch-demo-worker.example-subdomain.workers.dev',
-			createdAt: '2025-01-03T04:05:06.000Z',
-			updatedAt: '2025-01-03T05:06:07.000Z'
-		})
-		globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
-			const url = String(input)
-
-			if (url.includes('/accounts/acc_123/d1/database?page=1&per_page=50')) {
-				return createRegistryDatabaseListResponse([
-					createRegistryDatabaseRecord()
-				])
-			}
-
-			if (url.endsWith('/accounts/acc_123/d1/database/db_123/query')) {
-				const body = typeof init?.body === 'string' ? JSON.parse(init.body) : {}
-				const sql = String(body.sql ?? '')
-				recordedSql.push(sql)
-
-				if (sql.startsWith('SELECT payload_json FROM devflare_preview_records')) {
-					return createD1ResultsResponse([
-						createSerializedRegistryRecord(previewRecord)
-					])
-				}
-
-				if (sql.startsWith('SELECT payload_json FROM devflare_deployment_records')) {
-					return createD1ResultsResponse([
-						createSerializedRegistryRecord(deploymentRecord)
-					])
-				}
-
-				return createD1ResultsResponse()
-			}
-
-			throw new Error(`Unexpected fetch URL: ${url}`)
-		}) as unknown as typeof fetch
-
 		const logger = createLogger()
 		const result = await runPreviewsCommand(
 			{
@@ -141,174 +77,48 @@ describe('previews command', () => {
 			logger as any,
 			{}
 		)
-		const renderedMessages = renderMessages(logger)
 
-		expect(result.exitCode).toBe(0)
-		expect(renderedMessages.some((message) => message.includes('Preview registry'))).toBe(false)
-		expect(renderedMessages.some((message) => message.includes('Showing active state only.'))).toBe(false)
-		expect(renderedMessages.some((message) => message.includes('┌ worker demo-worker'))).toBe(true)
-		expect(renderedMessages.some((message) => message.includes('│  Previews (1)'))).toBe(true)
-		expect(renderedMessages.some((message) => message.includes('│  Deployments (1)'))).toBe(true)
-		expect(renderedMessages.some((message) => message.includes('Alias'))).toBe(true)
-		expect(renderedMessages.some((message) => message.includes('Deployed'))).toBe(true)
-		expect(renderedMessages.some((message) => message.includes('└  preview'))).toBe(true)
-		expect(renderedMessages.some((message) => message.includes('Aliases ('))).toBe(false)
-		expect(renderedMessages.some((message) => message.includes('Total:'))).toBe(false)
-		expect(renderedMessages.some((message) => message.includes('feature-branch-demo-worker.example-subdomain.workers.dev'))).toBe(true)
-		expect(renderedMessages.some((message) => message.includes('2025-01-03 04:05:06'))).toBe(true)
-		expect(recordedSql.filter((sql) => sql.startsWith('CREATE TABLE'))).toHaveLength(0)
-		expect(recordedSql.filter((sql) => sql.startsWith('CREATE INDEX'))).toHaveLength(0)
-		expect(recordedSql.filter((sql) => sql.startsWith('SELECT payload_json FROM'))).toHaveLength(3)
+		expect(result.exitCode).toBe(1)
+		expect(logger.messages.some((message) => message.args.join(' ').includes('Unknown previews subcommand: demo-worker'))).toBe(true)
+		expect(logger.messages.some((message) => message.args.join(' ').includes('Available previews subcommands: list, bindings, cleanup'))).toBe(true)
 	})
 
-	test('groups records by worker when listing the full registry', async () => {
+	test('cleanup-resources remains as a compatibility alias for cleanup', async () => {
 		process.env.CLOUDFLARE_API_TOKEN = 'cf_test_token'
-		process.env.DEVFLARE_CACHE_DIR = temporaryCacheDirectories.create('devflare-previews-cli-')
-		const previewRecords = [
-			createPreviewRecordFixture({
-				workerName: 'alpha-worker',
-				versionId: '11111111-1111-4111-8111-111111111111',
-				previewUrl: 'https://alpha-main.example.workers.dev',
-				alias: 'main',
-				aliasPreviewUrl: 'https://main-alpha.example.workers.dev',
-				createdAt: '2025-01-03T10:00:00.000Z',
-				updatedAt: '2025-01-03T10:30:00.000Z'
-			}),
-			createPreviewRecordFixture({
-				workerName: 'alpha-worker',
-				versionId: '22222222-2222-4222-8222-222222222222',
-				previewUrl: 'https://alpha-feature.example.workers.dev',
-				alias: 'feature-a',
-				aliasPreviewUrl: 'https://feature-a-alpha.example.workers.dev',
-				createdAt: '2025-01-03T09:00:00.000Z',
-				updatedAt: '2025-01-03T09:30:00.000Z'
-			}),
-			createPreviewRecordFixture({
-				workerName: 'beta-worker',
-				versionId: '33333333-3333-4333-8333-333333333333',
-				previewUrl: 'https://beta-main.example.workers.dev',
-				alias: 'main',
-				aliasPreviewUrl: 'https://main-beta.example.workers.dev',
-				createdAt: '2025-01-02T08:00:00.000Z',
-				updatedAt: '2025-01-02T08:30:00.000Z'
-			})
-		]
-		const deploymentRecords = [
-			createDeploymentRecordFixture({
-				id: 'deployment:alpha-worker:deploy_a_preview',
-				workerName: 'alpha-worker',
-				deploymentId: 'deploy_a_preview',
-				channel: 'preview',
-				versionId: '11111111-1111-4111-8111-111111111111',
-				previewId: 'preview:alpha-worker:11111111-1111-4111-8111-111111111111',
-				url: 'https://main-alpha.example.workers.dev',
-				createdAt: '2025-01-03T10:31:00.000Z',
-				updatedAt: '2025-01-03T10:35:00.000Z'
-			}),
-			createDeploymentRecordFixture({
-				id: 'deployment:alpha-worker:deploy_a_prod',
-				workerName: 'alpha-worker',
-				deploymentId: 'deploy_a_prod',
-				channel: 'production',
-				versionId: '44444444-4444-4444-8444-444444444444',
-				url: 'https://alpha.example.workers.dev',
-				createdAt: '2025-01-03T10:40:00.000Z',
-				updatedAt: '2025-01-03T10:45:00.000Z'
-			}),
-			createDeploymentRecordFixture({
-				id: 'deployment:beta-worker:deploy_b_preview',
-				workerName: 'beta-worker',
-				deploymentId: 'deploy_b_preview',
-				channel: 'preview',
-				versionId: '33333333-3333-4333-8333-333333333333',
-				previewId: 'preview:beta-worker:33333333-3333-4333-8333-333333333333',
-				url: 'https://main-beta.example.workers.dev',
-				createdAt: '2025-01-02T08:31:00.000Z',
-				updatedAt: '2025-01-02T08:35:00.000Z'
-			})
-		]
+		const projectDir = temporaryCacheDirectories.create('devflare-previews-cleanup-alias-')
+		writePreviewProject(projectDir, 'demo-preview-cleanup-alias')
 
-		globalThis.fetch = mock(createPreviewRegistryFetch({
-			previewRecords,
-			deploymentRecords
-		})) as unknown as typeof fetch
-
-		const { result, renderedMessages } = await runTrackedPreviewsCommand()
-
-		expect(result.exitCode).toBe(0)
-		expect(renderedMessages.some((message) => message.includes('Preview registry'))).toBe(false)
-		expect(renderedMessages.some((message) => message.includes('┌ worker alpha-worker'))).toBe(true)
-		expect(renderedMessages.some((message) => message.includes('┌ worker beta-worker'))).toBe(true)
-		expect(renderedMessages.some((message) => message.includes('│  Previews (2)'))).toBe(true)
-		expect(renderedMessages.some((message) => message.includes('│  Deployments (2)'))).toBe(true)
-		expect(renderedMessages.some((message) => message.includes('│  Previews (1)'))).toBe(true)
-		expect(renderedMessages.some((message) => message.includes('└  production'))).toBe(true)
-		expect(renderedMessages.some((message) => message.includes('└  preview'))).toBe(true)
-		expect(renderedMessages.some((message) => message.includes('2025-01-03 10:31:00'))).toBe(true)
-		expect(renderedMessages.some((message) => message.includes('2025-01-03 10:40:00'))).toBe(true)
-	})
-
-	test('retires tracked preview records for a branch', async () => {
-		process.env.CLOUDFLARE_API_TOKEN = 'cf_test_token'
-		process.env.DEVFLARE_CACHE_DIR = temporaryCacheDirectories.create('devflare-previews-cli-')
-		const recordedStatements: Array<{ sql: string; params: unknown[] }> = []
-		globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
+		globalThis.fetch = mock(async (input: RequestInfo | URL) => {
 			const url = String(input)
 
 			if (url.includes('/accounts/acc_123/d1/database?page=1&per_page=50')) {
-				return createRegistryDatabaseListResponse([
-					createRegistryDatabaseRecord()
-				])
+				return jsonResponse([], {
+					page: 1,
+					per_page: 50,
+					total_pages: 1,
+					count: 0,
+					total_count: 0
+				})
 			}
 
-			if (url.endsWith('/accounts/acc_123/d1/database/db_123/query')) {
-				const body = typeof init?.body === 'string' ? JSON.parse(init.body) : {}
-				const sql = String(body.sql ?? '')
-				recordedStatements.push({
-					sql,
-					params: Array.isArray(body.params) ? body.params : []
+			if (url.includes('/accounts/acc_123/workers/scripts?page=1&per_page=50')) {
+				return jsonResponse([], {
+					page: 1,
+					per_page: 50,
+					total_pages: 1,
+					count: 0,
+					total_count: 0
 				})
+			}
 
-				if (sql.startsWith('SELECT payload_json FROM devflare_preview_records')) {
-					return createD1ResultsResponse([
-						createSerializedRegistryRecord(createPreviewRecordFixture({
-							workerName: 'demo-worker',
-							versionId: '5dba9570-33c4-4375-b784-e1b34ad01569',
-							previewUrl: 'https://5dba9570-demo-worker.example-subdomain.workers.dev',
-							alias: 'feature-branch',
-							aliasPreviewUrl: 'https://feature-branch-demo-worker.example-subdomain.workers.dev',
-							branchName: 'feature/branch'
-						}))
-					])
-				}
-
-				if (sql.startsWith('SELECT payload_json FROM devflare_preview_alias_records')) {
-					return createD1ResultsResponse([
-						createSerializedRegistryRecord(createPreviewAliasRecordFixture({
-							workerName: 'demo-worker',
-							alias: 'feature-branch',
-							aliasPreviewUrl: 'https://feature-branch-demo-worker.example-subdomain.workers.dev',
-							versionId: '5dba9570-33c4-4375-b784-e1b34ad01569',
-							branchName: 'feature/branch'
-						}))
-					])
-				}
-
-				if (sql.startsWith('SELECT payload_json FROM devflare_deployment_records')) {
-					return createD1ResultsResponse([
-						createSerializedRegistryRecord(createDeploymentRecordFixture({
-							id: 'deployment:demo-worker:preview:demo-worker:5dba9570-33c4-4375-b784-e1b34ad01569',
-							workerName: 'demo-worker',
-							deploymentId: 'preview:demo-worker:5dba9570-33c4-4375-b784-e1b34ad01569',
-							channel: 'preview',
-							versionId: '5dba9570-33c4-4375-b784-e1b34ad01569',
-							previewId: 'preview:demo-worker:5dba9570-33c4-4375-b784-e1b34ad01569',
-							url: 'https://feature-branch-demo-worker.example-subdomain.workers.dev'
-						}))
-					])
-				}
-
-				return createD1ResultsResponse()
+			if (url.includes('/accounts/acc_123/storage/kv/namespaces?page=1&per_page=50')) {
+				return jsonResponse([], {
+					page: 1,
+					per_page: 50,
+					total_pages: 1,
+					count: 0,
+					total_count: 0
+				})
 			}
 
 			throw new Error(`Unexpected fetch URL: ${url}`)
@@ -318,45 +128,132 @@ describe('previews command', () => {
 		const result = await runPreviewsCommand(
 			{
 				command: 'previews',
-				args: ['retire'],
+				args: ['cleanup-resources'],
 				options: {
-					account: 'acc_123',
-					worker: 'demo-worker',
-					branch: 'feature/branch',
-					apply: true
+					account: 'acc_123'
 				}
 			},
 			logger as any,
-			{}
+			{ cwd: projectDir }
 		)
+		const renderedMessages = renderMessages(logger)
 
 		expect(result.exitCode).toBe(0)
-		expect(logger.messages.some((message) => message.args.join(' ').includes('Retired preview registry records for demo-worker'))).toBe(true)
-		expect(logger.messages.some((message) => message.args.join(' ').includes('Candidates: 1 preview(s) · 1 alias record(s) · 1 deployment record(s)'))).toBe(true)
-		expect(recordedStatements.some((statement) => statement.sql.startsWith('INSERT INTO devflare_preview_records'))).toBe(true)
-		expect(recordedStatements.some((statement) => statement.sql.startsWith('INSERT INTO devflare_preview_alias_records'))).toBe(true)
-		expect(recordedStatements.some((statement) => statement.sql.startsWith('INSERT INTO devflare_deployment_records'))).toBe(true)
+		expect(renderedMessages.some((message) => message.includes('cleanup-resources') && message.includes('deprecated'))).toBe(true)
+		expect(renderedMessages.some((message) => message.includes('Preview cleanup dry run complete'))).toBe(true)
 	})
 
-	test('rejects preview-alias for preview retirement and points callers to --alias', async () => {
-		const logger = createLogger()
+	test('lists every configured worker family when run from a monorepo root', async () => {
+		process.env.CLOUDFLARE_API_TOKEN = 'cf_test_token'
+		const workspaceDir = temporaryCacheDirectories.create('devflare-previews-workspace-')
+		writeFileSync(join(workspaceDir, 'package.json'), JSON.stringify({
+			name: 'preview-workspace',
+			private: true,
+			type: 'module',
+			workspaces: ['apps/*']
+		}, null, '\t'), 'utf-8')
 
+		const docsDir = join(workspaceDir, 'apps', 'docs')
+		const testingDir = join(workspaceDir, 'apps', 'testing')
+		mkdirSync(docsDir, { recursive: true })
+		mkdirSync(testingDir, { recursive: true })
+		writePreviewProject(docsDir, 'docs-worker')
+		writePreviewProject(testingDir, 'testing-worker')
+
+		globalThis.fetch = mock(async (input: RequestInfo | URL) => {
+			const url = String(input)
+
+			if (url.includes('/accounts/acc_123/workers/scripts?page=1&per_page=50')) {
+				return jsonResponse([
+					{
+						id: 'docs-worker',
+						created_on: '2026-04-12T10:00:00.000Z',
+						modified_on: '2026-04-12T10:05:00.000Z'
+					},
+					{
+						id: 'docs-worker-pr-42',
+						created_on: '2026-04-12T10:01:00.000Z',
+						modified_on: '2026-04-12T10:06:00.000Z'
+					},
+					{
+						id: 'testing-worker',
+						created_on: '2026-04-12T10:02:00.000Z',
+						modified_on: '2026-04-12T10:07:00.000Z'
+					},
+					{
+						id: 'testing-worker-next',
+						created_on: '2026-04-12T10:03:00.000Z',
+						modified_on: '2026-04-12T10:08:00.000Z'
+					}
+				], {
+					page: 1,
+					per_page: 50,
+					total_pages: 1,
+					count: 4,
+					total_count: 4
+				})
+			}
+
+			if (url.endsWith('/accounts/acc_123/workers/subdomain')) {
+				return jsonResponse({
+					subdomain: 'demo-subdomain'
+				})
+			}
+
+			throw new Error(`Unexpected fetch URL: ${url}`)
+		}) as unknown as typeof fetch
+
+		const logger = createLogger()
 		const result = await runPreviewsCommand(
 			{
 				command: 'previews',
-				args: ['retire'],
-				options: {
-					account: 'acc_123',
-					worker: 'demo-worker',
-					'preview-alias': 'feature-branch'
-				}
+				args: [],
+				options: {}
 			},
 			logger as any,
-			{}
+			{ cwd: workspaceDir }
+		)
+		const renderedMessages = renderMessages(logger)
+
+		expect(result.exitCode).toBe(0)
+		expect(renderedMessages.some((message) => message.includes('configured worker families 2'))).toBe(true)
+		expect(renderedMessages.some((message) => message.includes('worker family docs-worker'))).toBe(true)
+		expect(renderedMessages.some((message) => message.includes('worker family testing-worker'))).toBe(true)
+		expect(renderedMessages.some((message) => message.includes('docs-worker.demo-subdomain.workers.dev'))).toBe(true)
+		expect(renderedMessages.some((message) => message.includes('testing-worker-next.demo-subdomain.workers.dev'))).toBe(true)
+	})
+
+	test('requires --account when a monorepo root discovers multiple Cloudflare accounts', async () => {
+		process.env.CLOUDFLARE_API_TOKEN = 'cf_test_token'
+		const workspaceDir = temporaryCacheDirectories.create('devflare-previews-workspace-accounts-')
+		writeFileSync(join(workspaceDir, 'package.json'), JSON.stringify({
+			name: 'preview-workspace-accounts',
+			private: true,
+			type: 'module',
+			workspaces: ['apps/*']
+		}, null, '\t'), 'utf-8')
+
+		const docsDir = join(workspaceDir, 'apps', 'docs')
+		const testingDir = join(workspaceDir, 'apps', 'testing')
+		mkdirSync(docsDir, { recursive: true })
+		mkdirSync(testingDir, { recursive: true })
+		writePreviewProject(docsDir, 'docs-worker', 'acc_123')
+		writePreviewProject(testingDir, 'testing-worker', 'acc_456')
+
+		const logger = createLogger()
+		const result = await runPreviewsCommand(
+			{
+				command: 'previews',
+				args: [],
+				options: {}
+			},
+			logger as any,
+			{ cwd: workspaceDir }
 		)
 
 		expect(result.exitCode).toBe(1)
-		expect(logger.messages.some((message) => message.args.join(' ').includes('no longer accepts --preview-alias'))).toBe(true)
-		expect(logger.messages.some((message) => message.args.join(' ').includes('--alias <alias> instead'))).toBe(true)
+		expect(logger.messages.some((message) => {
+			return message.args.join(' ').includes('Multiple Cloudflare account ids were discovered across local Devflare configs')
+		})).toBe(true)
 	})
 })

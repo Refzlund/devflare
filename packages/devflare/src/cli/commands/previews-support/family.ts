@@ -215,6 +215,14 @@ function getStableWorkerUrl(group: WorkerDisplayGroup): string | undefined {
 		?? getGroupDisplayUrl(group)
 }
 
+function getWorkerUrl(workerName: string, workersSubdomain: string | null | undefined): string | undefined {
+	if (!workersSubdomain) {
+		return undefined
+	}
+
+	return `https://${workerName}.${workersSubdomain}.workers.dev`
+}
+
 export function getWorkerScopeSuffix(workerName: string, baseName: string): string | undefined {
 	if (!workerName.startsWith(`${baseName}-`)) {
 		return undefined
@@ -263,6 +271,37 @@ export function buildStableWorkerRows(
 			status,
 			updatedAt: group ? getStableWorkerUpdatedAt(group) : undefined,
 			url: group ? getStableWorkerUrl(group) : undefined
+		}
+	}).sort((left, right) => {
+		if (left.role === 'primary' && right.role !== 'primary') {
+			return -1
+		}
+
+		if (left.role !== 'primary' && right.role === 'primary') {
+			return 1
+		}
+
+		return left.workerName.localeCompare(right.workerName)
+	})
+}
+
+export function buildStableWorkerRowsFromLiveWorkers(
+	families: ConfiguredWorkerFamilyMember[],
+	workers: WorkerInfo[],
+	workersSubdomain: string | null | undefined
+): StableWorkerRow[] {
+	const workersByName = new Map(workers.map((worker) => [worker.name, worker]))
+
+	return families.map((family) => {
+		const worker = workersByName.get(family.baseName)
+		const status: StableWorkerRow['status'] = worker ? 'active' : 'missing'
+
+		return {
+			workerName: family.baseName,
+			role: family.roleLabel,
+			status,
+			updatedAt: worker?.modifiedOn,
+			url: worker ? getWorkerUrl(family.baseName, workersSubdomain) : undefined
 		}
 	}).sort((left, right) => {
 		if (left.role === 'primary' && right.role !== 'primary') {
@@ -343,77 +382,83 @@ function buildDedicatedWorkerPreviewScopeRows(
 	}).sort(comparePreviewScopeRows)
 }
 
-function buildSameWorkerPreviewScopeRows(
-	families: ConfiguredWorkerFamilyMember[],
-	groupsByWorker: Map<string, WorkerDisplayGroup>
-): PreviewScopeRow[] {
-	const previewScopes = new Map<string, {
-		updatedAt?: Date
-		status: PreviewScopeRow['status']
-		entryUrl?: string
-		participants: Set<string>
-	}>()
-
-	for (const family of families) {
-		const group = groupsByWorker.get(family.baseName)
-		if (!group) {
-			continue
-		}
-
-		for (const record of group.previews) {
-			const scope = record.alias?.trim() || record.branchName?.trim()
-			if (!scope) {
-				continue
-			}
-			const recordStatus: PreviewScopeRow['status'] = record.status
-
-			const existing = previewScopes.get(scope) ?? {
-				updatedAt: undefined,
-				status: recordStatus,
-				entryUrl: undefined,
-				participants: new Set<string>()
-			}
-			const currentDate = record.updatedAt ?? record.createdAt
-
-			if (!existing.updatedAt || currentDate.getTime() >= existing.updatedAt.getTime()) {
-				existing.updatedAt = currentDate
-				existing.status = recordStatus
-			}
-
-			if (!existing.entryUrl || family.role === 'primary') {
-				existing.entryUrl = record.aliasPreviewUrl ?? record.previewUrl
-			}
-
-			existing.participants.add(family.roleLabel)
-			previewScopes.set(scope, existing)
-		}
-	}
-
-	return Array.from(previewScopes.entries()).map(([scope, previewScope]) => {
-		const strategy: PreviewScopeRow['strategy'] = 'preview alias'
-
-		return {
-			scope,
-			strategy,
-			workersLabel: String(previewScope.participants.size),
-			status: previewScope.status,
-			updatedAt: previewScope.updatedAt,
-			notes: previewScope.participants.size > 1
-				? `present ${Array.from(previewScope.participants).sort((left, right) => left.localeCompare(right)).join(', ')}`
-				: undefined,
-			entryUrl: previewScope.entryUrl
-		}
-	}).sort(comparePreviewScopeRows)
-}
-
 export function buildPreviewScopeRows(
 	families: ConfiguredWorkerFamilyMember[],
 	groupsByWorker: Map<string, WorkerDisplayGroup>
 ): PreviewScopeRow[] {
-	return [
-		...buildDedicatedWorkerPreviewScopeRows(families, groupsByWorker),
-		...buildSameWorkerPreviewScopeRows(families, groupsByWorker)
-	].sort(comparePreviewScopeRows)
+	return buildDedicatedWorkerPreviewScopeRows(families, groupsByWorker)
+}
+
+function getDedicatedPreviewFamilyNamesFromWorkers(
+	families: ConfiguredWorkerFamilyMember[],
+	workers: WorkerInfo[]
+): Set<string> {
+	const familyNames = new Set<string>()
+	const workerNames = workers.map((worker) => worker.name)
+
+	for (const family of families) {
+		if (family.role === 'primary') {
+			familyNames.add(family.baseName)
+			continue
+		}
+
+		if (workerNames.some((workerName) => Boolean(getWorkerScopeSuffix(workerName, family.baseName)))) {
+			familyNames.add(family.baseName)
+		}
+	}
+
+	return familyNames
+}
+
+export function buildPreviewScopeRowsFromLiveWorkers(
+	families: ConfiguredWorkerFamilyMember[],
+	workers: WorkerInfo[],
+	workersSubdomain: string | null | undefined
+): PreviewScopeRow[] {
+	const workersByName = new Map(workers.map((worker) => [worker.name, worker]))
+	const previewFamilyNames = getDedicatedPreviewFamilyNamesFromWorkers(families, workers)
+	const expectedFamilies = families.filter((family) => previewFamilyNames.has(family.baseName))
+	const workerCandidatesByScope = buildPreviewWorkerCandidatesByScope(families, workers)
+
+	return Array.from(workerCandidatesByScope.keys()).map((scope) => {
+		const resolvedFamilies = expectedFamilies.map((family) => ({
+			family,
+			worker: workersByName.get(`${family.baseName}-${scope}`)
+		}))
+		const presentFamilies = resolvedFamilies.filter((entry) => entry.worker)
+		const updatedAt = presentFamilies.reduce<Date | undefined>((latest, entry) => {
+			const currentDate = entry.worker?.modifiedOn
+			if (!currentDate) {
+				return latest
+			}
+
+			if (!latest || currentDate.getTime() > latest.getTime()) {
+				return currentDate
+			}
+
+			return latest
+		}, undefined)
+		const primaryEntry = resolvedFamilies.find((entry) => entry.family.role === 'primary')
+		const entryWorker = primaryEntry?.worker ?? presentFamilies[0]?.worker
+		const missingLabels = resolvedFamilies
+			.filter((entry) => !entry.worker)
+			.map((entry) => entry.family.role === 'primary' ? 'primary' : entry.family.roleLabel)
+		const notes: string[] = []
+
+		if (missingLabels.length > 0) {
+			notes.push(`missing ${missingLabels.join(', ')}`)
+		}
+
+		return {
+			scope,
+			strategy: 'dedicated workers',
+			workersLabel: `${presentFamilies.length}/${resolvedFamilies.length}`,
+			status: presentFamilies.length === resolvedFamilies.length ? 'ready' : 'partial',
+			updatedAt,
+			notes: notes.length > 0 ? notes.join(' · ') : undefined,
+			entryUrl: entryWorker ? getWorkerUrl(entryWorker.name, workersSubdomain) : undefined
+		}
+	}).sort(comparePreviewScopeRows)
 }
 
 export function filterRecordsForScope<RecordType extends { workerName: string }>(

@@ -29,6 +29,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       DEVFLARE_PREVIEW_BRANCH: "${{ github.ref_name }}"
+      DEVFLARE_VERIFY_DEPLOYMENT_ATTEMPTS: "15"
+      DEVFLARE_VERIFY_DEPLOYMENT_DELAY_MS: "3000"
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -172,7 +174,6 @@ jobs:
           environment: testing branch preview / ${{ github.ref_name }}
           environment-url: ${{ steps.deploy.outputs.preview-url }}
           preview-url: ${{ steps.deploy.outputs.preview-url }}
-          preview-alias: ${{ steps.deploy.outputs.preview-alias }}
           version-id: ${{ steps.deploy.outputs.version-id }}
           log-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           log-excerpt: ${{ steps.deploy.outputs.log-excerpt }}
@@ -232,9 +233,6 @@ jobs:
               echo "- Search service version: \`${{ steps.search.outputs.version-id }}\`"
             fi
             echo "- Branch scope: \`$DEVFLARE_PREVIEW_BRANCH\`"
-            if [ -n "${{ steps.deploy.outputs.preview-alias }}" ]; then
-              echo "- Preview alias: \`${{ steps.deploy.outputs.preview-alias }}\`"
-            fi
             if [ -n "${{ steps.deploy.outputs.preview-url }}" ]; then
               echo "- Reachable URL: ${{ steps.deploy.outputs.preview-url }}"
               echo "- Verified response appName: \`$TESTING_EXPECTED_APP_NAME\`"
@@ -267,7 +265,6 @@ jobs:
           DEPLOY_FAILURE_STAGE: ${{ steps.deploy.outputs.failure-stage }}
           DEPLOY_EXIT_CODE: ${{ steps.deploy.outputs.exit-code }}
           DEPLOY_VERSION_ID: ${{ steps.deploy.outputs.version-id }}
-          DEPLOY_PREVIEW_ALIAS: ${{ steps.deploy.outputs.preview-alias }}
           DEPLOY_PREVIEW_URL: ${{ steps.deploy.outputs.preview-url }}
           DEPLOY_LOG_EXCERPT: ${{ steps.deploy.outputs.log-excerpt }}
           VERIFY_OUTCOME: ${{ steps.verify.outcome }}
@@ -325,9 +322,6 @@ jobs:
             fi
             if [ -n "$DEPLOY_VERSION_ID" ]; then
               echo "Last version ID: $DEPLOY_VERSION_ID" >&2
-            fi
-            if [ -n "$DEPLOY_PREVIEW_ALIAS" ]; then
-              echo "Resolved preview alias: $DEPLOY_PREVIEW_ALIAS" >&2
             fi
             if [ -n "$DEPLOY_PREVIEW_URL" ]; then
               echo "Last preview URL: $DEPLOY_PREVIEW_URL" >&2

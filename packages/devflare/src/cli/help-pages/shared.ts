@@ -22,20 +22,7 @@ export const ACCOUNT_OPTION: HelpEntry = {
 }
 
 export const PREVIEWS_COMMON_OPTIONS: HelpEntry[] = [
-	{ command: '--account <id>', description: 'Use a specific Cloudflare account for preview registry and resource operations' },
-	{ command: '--database <name>', description: 'Override the preview registry D1 database name' },
-	{ command: '--worker <name>', description: 'Target a specific worker when inspecting or mutating raw preview registry state' },
-	{ command: '--all', description: 'Include historical registry records in list/reconcile output, or clean every discovered preview scope with `cleanup-resources`' },
-	{ command: '--apply', description: 'Execute the mutation instead of doing a dry run for cleanup and retirement commands' }
-]
-
-export const PREVIEWS_SELECTOR_OPTIONS: HelpEntry[] = [
-	{ command: '--branch <branch>', description: 'Select preview records by branch name' },
-	{ command: '--alias <alias>', description: 'Select preview records by alias name' },
-	{ command: '--version <id>', description: 'Select preview records by Worker version id (shortcut for --version-id)' },
-	{ command: '--version-id <id>', description: 'Select preview records by Worker version id' },
-	{ command: '--sha <sha>', description: 'Select preview records by commit sha (shortcut for --commit-sha)' },
-	{ command: '--commit-sha <sha>', description: 'Select preview records by commit sha' }
+	{ command: '--account <id>', description: 'Use a specific Cloudflare account for preview Worker and preview-resource operations' }
 ]
 
 export function entry(command: string, description: string): HelpEntry {

@@ -22,6 +22,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       DEVFLARE_PREVIEW_BRANCH: "pr-${{ github.event.pull_request.number }}"
+      DEVFLARE_VERIFY_DEPLOYMENT_ATTEMPTS: "15"
+      DEVFLARE_VERIFY_DEPLOYMENT_DELAY_MS: "3000"
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -164,7 +166,6 @@ jobs:
           ref-name: ${{ github.event.pull_request.head.ref }}
           sha: ${{ github.event.pull_request.head.sha }}
           preview-url: ${{ steps.deploy.outputs.preview-url }}
-          preview-alias: ${{ steps.deploy.outputs.preview-alias }}
           version-id: ${{ steps.deploy.outputs.version-id }}
           log-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           log-excerpt: ${{ steps.deploy.outputs.log-excerpt }}
@@ -227,9 +228,6 @@ jobs:
               echo "- Search service version: \`${{ steps.search.outputs.version-id }}\`"
             fi
             echo "- PR scope worker suffix: \`$DEVFLARE_PREVIEW_BRANCH\`"
-            if [ -n "${{ steps.deploy.outputs.preview-alias }}" ]; then
-              echo "- Preview alias: \`${{ steps.deploy.outputs.preview-alias }}\`"
-            fi
             if [ -n "${{ steps.deploy.outputs.preview-url }}" ]; then
               echo "- Reachable URL: ${{ steps.deploy.outputs.preview-url }}"
               echo "- Verified response appName: \`$TESTING_EXPECTED_APP_NAME\`"
@@ -262,7 +260,6 @@ jobs:
           DEPLOY_FAILURE_STAGE: ${{ steps.deploy.outputs.failure-stage }}
           DEPLOY_EXIT_CODE: ${{ steps.deploy.outputs.exit-code }}
           DEPLOY_VERSION_ID: ${{ steps.deploy.outputs.version-id }}
-          DEPLOY_PREVIEW_ALIAS: ${{ steps.deploy.outputs.preview-alias }}
           DEPLOY_PREVIEW_URL: ${{ steps.deploy.outputs.preview-url }}
           DEPLOY_LOG_EXCERPT: ${{ steps.deploy.outputs.log-excerpt }}
           VERIFY_OUTCOME: ${{ steps.verify.outcome }}
@@ -321,9 +318,6 @@ jobs:
             if [ -n "$DEPLOY_VERSION_ID" ]; then
               echo "Last version ID: $DEPLOY_VERSION_ID" >&2
             fi
-            if [ -n "$DEPLOY_PREVIEW_ALIAS" ]; then
-              echo "Resolved preview alias: $DEPLOY_PREVIEW_ALIAS" >&2
-            fi
             if [ -n "$DEPLOY_PREVIEW_URL" ]; then
               echo "Last preview URL: $DEPLOY_PREVIEW_URL" >&2
             fi
@@ -370,76 +364,7 @@ jobs:
         shell: bash
         run: bun install --frozen-lockfile
 
-      - name: Resolve testing PR-scoped Worker names
-        id: worker-names
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          bun --bun -e "import { resolveTestingWorkerNames } from './apps/testing/worker-names.ts'; const names = resolveTestingWorkerNames(process.env.PREVIEW_BRANCH); console.log(\`auth_service_name=\${names.authServiceName}\`); console.log(\`search_service_name=\${names.searchServiceName}\`); console.log(\`main_worker_name=\${names.mainWorkerName}\`)" >> "$GITHUB_OUTPUT"
-
-      - name: Retire tracked testing PR preview metadata
-        shell: bash
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          MAIN_WORKER_NAME: ${{ steps.worker-names.outputs.main_worker_name }}
-        run: |
-          set -euo pipefail
-
-          bunx --bun devflare previews retire \
-            --account "$CLOUDFLARE_ACCOUNT_ID" \
-            --worker "$MAIN_WORKER_NAME" \
-            --branch "$PREVIEW_BRANCH" \
-            --apply
-
-      - name: Delete PR-scoped testing Workers from Cloudflare
-        shell: bash
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          AUTH_SERVICE_NAME: ${{ steps.worker-names.outputs.auth_service_name }}
-          SEARCH_SERVICE_NAME: ${{ steps.worker-names.outputs.search_service_name }}
-          MAIN_WORKER_NAME: ${{ steps.worker-names.outputs.main_worker_name }}
-        run: |
-          set -euo pipefail
-
-          delete_worker() {
-            local worker_name="$1"
-            local encoded_name
-            local response_file
-            local status_code
-
-            encoded_name="$(python3 -c "import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=''))" "$worker_name")"
-            response_file="$(mktemp)"
-            status_code="$(curl --silent --show-error --output "$response_file" --write-out '%{http_code}' \
-              --request DELETE \
-              --header "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-              "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/$encoded_name?force=true")"
-
-            if [ "$status_code" = '404' ]; then
-              echo "Worker $worker_name was already absent."
-              rm -f "$response_file"
-              return 0
-            fi
-
-            if [ "${status_code#2}" != "$status_code" ]; then
-              echo "Deleted Worker $worker_name"
-              rm -f "$response_file"
-              return 0
-            fi
-
-            echo "Deleting Worker $worker_name failed with HTTP $status_code." >&2
-            cat "$response_file" >&2
-            rm -f "$response_file"
-            return 1
-          }
-
-          delete_worker "$MAIN_WORKER_NAME"
-          delete_worker "$SEARCH_SERVICE_NAME"
-          delete_worker "$AUTH_SERVICE_NAME"
-
-      - name: Delete preview-scoped testing Cloudflare resources
+      - name: Clean up testing PR preview scope
         shell: bash
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -449,7 +374,7 @@ jobs:
 
           cd apps/testing
 
-          bunx --bun devflare previews cleanup-resources \
+          bunx --bun devflare previews cleanup \
             --account "$CLOUDFLARE_ACCOUNT_ID" \
             --scope "$PREVIEW_BRANCH" \
             --apply
@@ -466,23 +391,16 @@ jobs:
           pr-number: ${{ github.event.pull_request.number }}
           deployment-kind: preview
           ref-name: ${{ github.event.pull_request.head.ref }}
-          summary: This pull request was closed, so Devflare retired the tracked testing preview metadata, deleted the PR-scoped Workers plus preview-owned Cloudflare resources, and marked the stable PR preview comment as inactive.
+          summary: This pull request was closed, so Devflare cleaned up the PR-scoped testing preview Workers plus preview-owned Cloudflare resources and marked the stable PR preview comment as inactive.
 
       - name: Summarize testing PR preview cleanup
         if: ${{ always() }}
         shell: bash
-        env:
-          AUTH_SERVICE_NAME: ${{ steps.worker-names.outputs.auth_service_name }}
-          SEARCH_SERVICE_NAME: ${{ steps.worker-names.outputs.search_service_name }}
-          MAIN_WORKER_NAME: ${{ steps.worker-names.outputs.main_worker_name }}
         run: |
           {
             echo '### Testing PR preview cleanup'
             echo ''
             echo "- PR scope: \`#${{ github.event.pull_request.number }}\`"
             echo "- Preview scope worker suffix: \`$PREVIEW_BRANCH\`"
-            echo '- Cleanup action: retired tracked preview metadata, deleted PR-scoped Workers and preview-owned Cloudflare resources, and marked the stable PR preview comment inactive'
-            echo "- Main Worker: \`$MAIN_WORKER_NAME\`"
-            echo "- Search service Worker: \`$SEARCH_SERVICE_NAME\`"
-            echo "- Auth service Worker: \`$AUTH_SERVICE_NAME\`"
+            echo '- Cleanup action: deleted PR-scoped preview Workers plus preview-owned Cloudflare resources, and marked the stable PR preview comment inactive'
           } >> "$GITHUB_STEP_SUMMARY"

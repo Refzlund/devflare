@@ -51,8 +51,7 @@ jobs:
           working-directory: apps/documentation
           install-working-directory: .
           deploy-command: bun run deploy --
-          preview: "true"
-          branch-name: ${{ github.ref_name }}
+          preview-scope: ${{ github.ref_name }}
           deploy-message: Documentation branch preview ${{ github.sha }} (run ${{ github.run_id }})
           deploy-tag: documentation-branch-preview-${{ github.run_id }}
           cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -74,7 +73,6 @@ jobs:
           environment-url: ${{ steps.deploy.outputs.preview-url }}
           preview-url: ${{ steps.deploy.outputs.preview-url }}
           production-url: ${{ env.DOCUMENTATION_PRODUCTION_URL }}
-          preview-alias: ${{ steps.deploy.outputs.preview-alias }}
           version-id: ${{ steps.deploy.outputs.version-id }}
           log-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           log-excerpt: ${{ steps.deploy.outputs.log-excerpt }}
@@ -87,7 +85,7 @@ jobs:
           {
             echo '### Documentation branch preview workflow'
             echo ''
-            echo '- Preview strategy: branch-scoped preview alias published on push so every branch can have its own link without a PR'
+            echo '- Preview strategy: named preview scope via `--preview <name>` so every branch gets a dedicated preview Worker without a PR requirement'
             echo "- Impact decision: \`${{ steps.impact.outputs.should-deploy == 'true' && 'deploy' || 'skip' }}\`"
             echo "- Impact reason: ${{ steps.impact.outputs.reason }}"
             if [ "${{ steps.impact.outputs.should-deploy }}" = 'true' ]; then
@@ -103,9 +101,6 @@ jobs:
             fi
             if [ -n "${{ steps.deploy.outputs.exit-code }}" ]; then
               echo "- Exit code: \`${{ steps.deploy.outputs.exit-code }}\`"
-            fi
-            if [ -n "${{ steps.deploy.outputs.preview-alias }}" ]; then
-              echo "- Preview alias: \`${{ steps.deploy.outputs.preview-alias }}\`"
             fi
             if [ -n "${{ steps.deploy.outputs.preview-url }}" ]; then
               echo "- Preview URL: ${{ steps.deploy.outputs.preview-url }}"
@@ -123,7 +118,6 @@ jobs:
           DEVFLARE_FAILURE_STAGE: ${{ steps.deploy.outputs.failure-stage }}
           DEVFLARE_DEPLOY_EXIT_CODE: ${{ steps.deploy.outputs.exit-code }}
           DEVFLARE_DEPLOY_VERSION_ID: ${{ steps.deploy.outputs.version-id }}
-          DEVFLARE_PREVIEW_ALIAS: ${{ steps.deploy.outputs.preview-alias }}
           DEVFLARE_PREVIEW_URL: ${{ steps.deploy.outputs.preview-url }}
           DEVFLARE_DEPLOY_LOG_EXCERPT: ${{ steps.deploy.outputs.log-excerpt }}
         run: |
@@ -136,9 +130,6 @@ jobs:
           fi
           if [ -n "$DEVFLARE_DEPLOY_VERSION_ID" ]; then
             echo "Last version ID: $DEVFLARE_DEPLOY_VERSION_ID" >&2
-          fi
-          if [ -n "$DEVFLARE_PREVIEW_ALIAS" ]; then
-            echo "Resolved preview alias: $DEVFLARE_PREVIEW_ALIAS" >&2
           fi
           if [ -n "$DEVFLARE_PREVIEW_URL" ]; then
             echo "Last preview URL: $DEVFLARE_PREVIEW_URL" >&2

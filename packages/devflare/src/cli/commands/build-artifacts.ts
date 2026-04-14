@@ -262,7 +262,8 @@ export async function prepareBuildArtifacts(
 		: null
 	const config = previewScopedResources
 		? await resolveMaterializedConfigResources(previewScopedResources.config, {
-			accountId: previewScopedResources.accountId
+			accountId: previewScopedResources.accountId,
+			cloudflare: previewScopedResources.resourceResolutionCloudflare
 		})
 		: await resolveConfigResources(rawConfig, { environment })
 

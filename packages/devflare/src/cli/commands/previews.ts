@@ -1,10 +1,6 @@
 import type { ConsolaInstance } from 'consola'
 import {
 	account,
-	cleanupPreviewRegistry,
-	ensurePreviewRegistry,
-	reconcilePreviewRegistry,
-	retirePreviewRegistry,
 	type APIClientOptions
 } from '../../cloudflare'
 import { loadResolvedConfig, resolvePreviewIdentifier } from '../../config'
@@ -15,6 +11,7 @@ import {
 	resolveCloudflareAccountId,
 	resolveNamedSelection
 } from '../command-utils'
+import { findConfigPathsUnderDirectory } from '../config-path'
 import { getDependencies } from '../dependencies'
 import type { CliOptions, CliResult, ParsedArgs } from '../index'
 import { inspectBindingAssociations } from '../preview-bindings'
@@ -30,43 +27,181 @@ import {
 import {
 	buildPreviewWorkerCandidatesByScope,
 	collectConfiguredWorkerFamilies,
-	loadConfiguredWorkerFamilies,
 	loadTrackedPreviewScopeRows,
 	orderPreviewWorkerNamesForDeletion
 } from './previews-support/family'
 import {
 	showBindingAssociations,
-	showMissingPreviewRegistryState,
-	showTrackedState,
-	showWorkerFamilyOverview
+	showWorkspaceWorkerFamilyOverviewFromLiveWorkers,
+	showWorkerFamilyOverviewFromLiveWorkers
 } from './previews-support/render'
 import { dim, green, logLine, shouldUseColor } from './previews-support/theme'
 import {
+	type ConfiguredWorkerFamilyMember,
 	PREVIEW_SUBCOMMANDS,
 	type PreviewCommandContext,
+	type PreviewConfiguredFamilyGroup,
 	type PreviewCleanupExecution,
 	type PreviewConfigSummary,
+	type PreviewListDiscovery,
 	type PreviewOutputTheme,
 	type PreviewScopeSelection,
 	type PreviewSubcommand,
 	type WorkerNameSource
 } from './previews-support/types'
 
+const LEGACY_PREVIEW_SUBCOMMAND_ALIASES = {
+	'cleanup-resources': 'cleanup'
+} as const
+
+const REMOVED_PREVIEW_SUBCOMMANDS = new Set([
+	'provision',
+	'reconcile',
+	'retire'
+])
+
 const CLI_API_OPTIONS: APIClientOptions = {
 	timeout: 10000
 }
 
-function isPreviewSubcommand(value: string): value is PreviewSubcommand {
-	return PREVIEW_SUBCOMMANDS.includes(value as PreviewSubcommand)
-}
-
-function asPositiveNumber(value: string | boolean | undefined, fallback: number): number {
-	if (typeof value !== 'string') {
-		return fallback
+function compareConfiguredWorkerFamilies(
+	left: ConfiguredWorkerFamilyMember,
+	right: ConfiguredWorkerFamilyMember
+): number {
+	if (left.role === 'primary' && right.role !== 'primary') {
+		return -1
 	}
 
-	const parsed = Number.parseInt(value, 10)
-	return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+	if (left.role !== 'primary' && right.role === 'primary') {
+		return 1
+	}
+
+	return left.baseName.localeCompare(right.baseName)
+}
+
+function sortConfiguredWorkerFamilies(
+	families: ConfiguredWorkerFamilyMember[]
+): ConfiguredWorkerFamilyMember[] {
+	return [...families].sort(compareConfiguredWorkerFamilies)
+}
+
+function resolvePrimaryWorkerFamilyName(
+	families: ConfiguredWorkerFamilyMember[]
+): string | undefined {
+	return families.find((family) => family.role === 'primary')?.baseName ?? families[0]?.baseName
+}
+
+function shouldReplaceConfiguredWorkerFamily(
+	existing: ConfiguredWorkerFamilyMember | undefined,
+	candidate: ConfiguredWorkerFamilyMember
+): boolean {
+	return !existing || (candidate.role === 'primary' && existing.role !== 'primary')
+}
+
+function mergeConfiguredWorkerFamilies(
+	existing: ConfiguredWorkerFamilyMember[],
+	candidates: ConfiguredWorkerFamilyMember[]
+): ConfiguredWorkerFamilyMember[] {
+	const merged = new Map(existing.map((family) => [family.baseName, family]))
+
+	for (const candidate of candidates) {
+		if (shouldReplaceConfiguredWorkerFamily(merged.get(candidate.baseName), candidate)) {
+			merged.set(candidate.baseName, candidate)
+		}
+	}
+
+	return sortConfiguredWorkerFamilies(Array.from(merged.values()))
+}
+
+function comparePreviewConfiguredFamilyGroups(
+	left: PreviewConfiguredFamilyGroup,
+	right: PreviewConfiguredFamilyGroup
+): number {
+	const leftName = resolvePrimaryWorkerFamilyName(left.families) ?? left.configPath ?? ''
+	const rightName = resolvePrimaryWorkerFamilyName(right.families) ?? right.configPath ?? ''
+	return leftName.localeCompare(rightName)
+}
+
+function upsertPreviewConfiguredFamilyGroup(
+	groups: Map<string, PreviewConfiguredFamilyGroup>,
+	candidate: PreviewConfiguredFamilyGroup
+): void {
+	const primaryFamilyName = resolvePrimaryWorkerFamilyName(candidate.families)
+	const groupKey = primaryFamilyName ?? candidate.configPath ?? `group-${groups.size}`
+	const existing = groups.get(groupKey)
+
+	if (!existing) {
+		groups.set(groupKey, {
+			...candidate,
+			families: sortConfiguredWorkerFamilies(candidate.families)
+		})
+		return
+	}
+
+	groups.set(groupKey, {
+		accountId: existing.accountId ?? candidate.accountId,
+		configPath: existing.configPath ?? candidate.configPath,
+		families: mergeConfiguredWorkerFamilies(existing.families, candidate.families)
+	})
+}
+
+async function discoverPreviewListConfigs(
+	cwd: string,
+	configFile: string | undefined,
+	environment: string | undefined
+): Promise<PreviewListDiscovery> {
+	const groups = new Map<string, PreviewConfiguredFamilyGroup>()
+	const accountIds = new Set<string>()
+
+	const loadAndCollect = async (candidateConfigFile?: string): Promise<boolean> => {
+		try {
+			const config = await loadConfig({ cwd, configFile: candidateConfigFile })
+			const families = collectConfiguredWorkerFamilies(config, environment)
+			const accountId = config.accountId?.trim() || undefined
+
+			if (accountId) {
+				accountIds.add(accountId)
+			}
+
+			upsertPreviewConfiguredFamilyGroup(groups, {
+				accountId,
+				configPath: candidateConfigFile,
+				families
+			})
+
+			return true
+		} catch (error) {
+			if (error instanceof ConfigNotFoundError) {
+				return false
+			}
+
+			throw error
+		}
+	}
+
+	if (configFile) {
+		await loadAndCollect(configFile)
+	} else {
+		const directConfigPath = await resolveConfigPath(cwd)
+		const loadedDirectly = directConfigPath
+			? await loadAndCollect()
+			: false
+		if (!loadedDirectly) {
+			const configPaths = await findConfigPathsUnderDirectory(cwd)
+			for (const configPath of configPaths) {
+				await loadAndCollect(configPath)
+			}
+		}
+	}
+
+	return {
+		accountIds: Array.from(accountIds).sort((left, right) => left.localeCompare(right)),
+		familyGroups: Array.from(groups.values()).sort(comparePreviewConfiguredFamilyGroups)
+	}
+}
+
+function isPreviewSubcommand(value: string): value is PreviewSubcommand {
+	return PREVIEW_SUBCOMMANDS.includes(value as PreviewSubcommand)
 }
 
 function resolvePreviewScopeSelection(
@@ -192,12 +327,10 @@ async function resolveAccountId(
 
 function resolveWorkerName(
 	parsed: ParsedArgs,
-	config: PreviewConfigSummary | undefined,
-	fallbackArg: string | undefined
+	config: PreviewConfigSummary | undefined
 ): { workerName?: string; source: WorkerNameSource } {
 	const selection = resolveNamedSelection({
 		explicitValue: asOptionalString(parsed.options.worker),
-		fallbackValue: fallbackArg,
 		configuredValue: config?.name
 	})
 
@@ -210,29 +343,55 @@ function resolveWorkerName(
 async function resolveContext(
 	parsed: ParsedArgs,
 	options: CliOptions,
-	subcommand: PreviewSubcommand,
-	fallbackArg: string | undefined
+	subcommand: PreviewSubcommand
 ): Promise<PreviewCommandContext> {
 	const cwd = options.cwd ?? process.cwd()
 	const configFile = asOptionalString(parsed.options.config)
-	const needsConfig = subcommand === 'cleanup-resources'
+	const explicitAccountId = asOptionalString(parsed.options.account)
+	const environment = asOptionalString(parsed.options.env)
+
+	if (subcommand === 'list') {
+		const listDiscovery = await discoverPreviewListConfigs(cwd, configFile, environment)
+
+		if (!explicitAccountId && listDiscovery.accountIds.length > 1) {
+			throw new Error(
+				'Multiple Cloudflare account ids were discovered across local Devflare configs. Pass --account to select one account explicitly for `devflare previews`.'
+			)
+		}
+
+		const accountId = await resolveCloudflareAccountId({
+			explicitAccountId,
+			configuredAccountId: listDiscovery.accountIds[0],
+			apiOptions: CLI_API_OPTIONS
+		})
+
+		if (!accountId) {
+			throw new Error('No Cloudflare account could be resolved. Use --account or configure accountId in devflare.config.*.')
+		}
+
+		return {
+			accountId,
+			workerName: undefined,
+			workerNameSource: 'none',
+			config: undefined,
+			listDiscovery
+		}
+	}
+
+	const needsConfig = subcommand === 'cleanup'
 		|| subcommand === 'bindings'
-		|| !asOptionalString(parsed.options.account)
-		|| (!asOptionalString(parsed.options.worker) && !fallbackArg)
+		|| !explicitAccountId
 	const config = await loadLocalConfig(cwd, configFile, needsConfig)
+
+	if (needsConfig && !config) {
+		throw new Error('Preview commands now inspect and clean dedicated preview workers for the current package. Run inside a configured package or pass --config <path>.')
+	}
+
 	const accountId = await resolveAccountId(parsed, config)
-	const workerSelection = resolveWorkerName(parsed, config, fallbackArg)
+	const workerSelection = resolveWorkerName(parsed, config)
 
 	if (!accountId) {
 		throw new Error('No Cloudflare account could be resolved. Use --account or configure accountId in devflare.config.*.')
-	}
-
-	if (subcommand === 'reconcile' && !workerSelection.workerName) {
-		throw new Error('A worker name is required for preview reconciliation. Use --worker or run inside a configured package.')
-	}
-
-	if ((subcommand === 'reconcile' || subcommand === 'retire') && !workerSelection.workerName) {
-		throw new Error(`A worker name is required for preview ${subcommand}. Use --worker or run inside a configured package.`)
 	}
 
 	return {
@@ -241,52 +400,6 @@ async function resolveContext(
 		workerNameSource: workerSelection.source,
 		config
 	}
-}
-
-async function runProvisionSubcommand(
-	context: PreviewCommandContext,
-	databaseName: string | undefined,
-	logger: ConsolaInstance
-): Promise<CliResult> {
-	const registry = await ensurePreviewRegistry({
-		accountId: context.accountId,
-		databaseName,
-		apiOptions: CLI_API_OPTIONS,
-		logger
-	})
-	logger.success(
-		registry.created
-			? `Provisioned preview registry database ${registry.databaseName}`
-			: `Preview registry database ${registry.databaseName} is ready`
-	)
-	return { exitCode: 0 }
-}
-
-async function runReconcileSubcommand(
-	context: PreviewCommandContext,
-	databaseName: string | undefined,
-	logger: ConsolaInstance,
-	includeAll: boolean,
-	theme: PreviewOutputTheme
-): Promise<CliResult> {
-	if (!context.workerName) {
-		logger.error('A worker name is required for preview reconciliation')
-		return { exitCode: 1 }
-	}
-
-	const result = await reconcilePreviewRegistry({
-		accountId: context.accountId,
-		workerName: context.workerName,
-		databaseName,
-		apiOptions: CLI_API_OPTIONS,
-		logger
-	})
-	logger.success(`Reconciled preview registry for ${context.workerName}`)
-	logger.info(
-		`Synced ${result.previews.length} preview(s) · ${result.previewAliases.length} alias record(s) · ${result.deployments.length} deployment record(s)`
-	)
-	await showTrackedState(result.registry, { workerName: context.workerName }, logger, includeAll, theme, CLI_API_OPTIONS)
-	return { exitCode: 0 }
 }
 
 async function runBindingsSubcommand(
@@ -323,94 +436,6 @@ async function runBindingsSubcommand(
 }
 
 async function runCleanupSubcommand(
-	parsed: ParsedArgs,
-	context: PreviewCommandContext,
-	databaseName: string | undefined,
-	logger: ConsolaInstance
-): Promise<CliResult> {
-	if (context.workerName) {
-		await reconcilePreviewRegistry({
-			accountId: context.accountId,
-			workerName: context.workerName,
-			databaseName,
-			apiOptions: CLI_API_OPTIONS,
-			logger
-		})
-	}
-
-	const days = asPositiveNumber(parsed.options.days, 7)
-	const result = await cleanupPreviewRegistry({
-		accountId: context.accountId,
-		workerName: context.workerName,
-		databaseName,
-		apiOptions: CLI_API_OPTIONS,
-		days,
-		apply: parsed.options.apply === true,
-		logger
-	})
-	logger.success(
-		parsed.options.apply === true
-			? `Cleaned up preview registry records older than ${days} day(s)`
-			: `Preview cleanup dry run complete for records older than ${days} day(s)`
-	)
-	logger.info(
-		`Candidates: ${result.candidates.previews.length} preview(s) · ${result.candidates.aliases.length} alias record(s) · ${result.candidates.deployments.length} deployment record(s)`
-	)
-	return { exitCode: 0 }
-}
-
-async function runRetireSubcommand(
-	parsed: ParsedArgs,
-	context: PreviewCommandContext,
-	databaseName: string | undefined,
-	logger: ConsolaInstance
-): Promise<CliResult> {
-	if (!context.workerName) {
-		logger.error('A worker name is required for preview retirement')
-		return { exitCode: 1 }
-	}
-
-	if (parsed.options['preview-alias'] !== undefined) {
-		logger.error('Preview retirement no longer accepts --preview-alias. Use --alias <alias> instead.')
-		return { exitCode: 1 }
-	}
-
-	const branchName = asOptionalString(parsed.options.branch)
-	const previewAlias = asOptionalString(parsed.options.alias)
-	const versionId = asOptionalString(parsed.options.version)
-		|| asOptionalString(parsed.options['version-id'])
-	const commitSha = asOptionalString(parsed.options.sha)
-		|| asOptionalString(parsed.options['commit-sha'])
-
-	if (!branchName && !previewAlias && !versionId && !commitSha) {
-		logger.error('Preview retirement needs at least one selector: --branch, --alias, --version-id, or --commit-sha')
-		return { exitCode: 1 }
-	}
-
-	const result = await retirePreviewRegistry({
-		accountId: context.accountId,
-		workerName: context.workerName,
-		databaseName,
-		apiOptions: CLI_API_OPTIONS,
-		branchName,
-		previewAlias,
-		versionId,
-		commitSha,
-		apply: parsed.options.apply === true,
-		logger
-	})
-	logger.success(
-		parsed.options.apply === true
-			? `Retired preview registry records for ${context.workerName}`
-			: `Preview retirement dry run complete for ${context.workerName}`
-	)
-	logger.info(
-		`Candidates: ${result.candidates.previews.length} preview(s) · ${result.candidates.aliases.length} alias record(s) · ${result.candidates.deployments.length} deployment record(s)`
-	)
-	return { exitCode: 0 }
-}
-
-async function runCleanupResourcesSubcommand(
 	parsed: ParsedArgs,
 	context: PreviewCommandContext,
 	logger: ConsolaInstance,
@@ -550,39 +575,67 @@ async function runCleanupResourcesSubcommand(
 async function runListSubcommand(
 	context: PreviewCommandContext,
 	logger: ConsolaInstance,
-	options: CliOptions,
-	databaseName: string | undefined,
-	environment: string | undefined,
-	configFile: string | undefined,
-	includeAll: boolean,
 	theme: PreviewOutputTheme
 ): Promise<CliResult> {
-	const cwd = options.cwd ?? process.cwd()
-	const configuredFamilies = context.workerNameSource === 'config' && context.config?.name
-		? await loadConfiguredWorkerFamilies(cwd, configFile, environment)
-		: undefined
-	const registry = await account.getPreviewRegistryContext({
-		accountId: context.accountId,
-		databaseName,
-		apiOptions: CLI_API_OPTIONS,
-		skipContextCache: true
+	const discoveredFamilyGroups = context.listDiscovery?.familyGroups ?? []
+	if (discoveredFamilyGroups.length === 0) {
+		throw new Error('Preview listing needs a resolvable devflare config in the current package or workspace so Devflare can identify worker families.')
+	}
+
+	const matchingFamilyGroups = discoveredFamilyGroups.filter((group) => {
+		return !group.accountId || group.accountId === context.accountId
 	})
 
-	if (!registry) {
-		showMissingPreviewRegistryState(logger, configuredFamilies, theme)
+	if (matchingFamilyGroups.length === 0) {
+		throw new Error(
+			`No configured preview worker families matched Cloudflare account ${context.accountId}. Pass --account or --config <path> to narrow the selection.`
+		)
+	}
+
+	const liveWorkers = await account.workers(context.accountId, CLI_API_OPTIONS)
+	const workersSubdomain = await account.workersSubdomain(context.accountId, CLI_API_OPTIONS)
+
+	if (matchingFamilyGroups.length === 1) {
+		showWorkerFamilyOverviewFromLiveWorkers(
+			matchingFamilyGroups[0]!.families,
+			liveWorkers,
+			workersSubdomain,
+			logger,
+			theme
+		)
 		return { exitCode: 0 }
 	}
 
-	if (configuredFamilies && configuredFamilies.length > 0) {
-		await showWorkerFamilyOverview(registry, configuredFamilies, logger, includeAll, theme, CLI_API_OPTIONS)
-		return { exitCode: 0 }
-	}
-
-	const scope = context.workerNameSource === 'config' && context.config?.name
-		? { workerFamilyName: context.config.name }
-		: { workerName: context.workerName }
-	await showTrackedState(registry, scope, logger, includeAll, theme, CLI_API_OPTIONS)
+	showWorkspaceWorkerFamilyOverviewFromLiveWorkers(
+		matchingFamilyGroups.map((group) => group.families),
+		liveWorkers,
+		workersSubdomain,
+		logger,
+		theme
+	)
 	return { exitCode: 0 }
+}
+
+function resolveLegacyPreviewSubcommand(rawSubcommand: string | undefined): PreviewSubcommand | undefined {
+	if (!rawSubcommand) {
+		return undefined
+	}
+
+	if (rawSubcommand in LEGACY_PREVIEW_SUBCOMMAND_ALIASES) {
+		return LEGACY_PREVIEW_SUBCOMMAND_ALIASES[rawSubcommand as keyof typeof LEGACY_PREVIEW_SUBCOMMAND_ALIASES]
+	}
+
+	if (isPreviewSubcommand(rawSubcommand)) {
+		return rawSubcommand
+	}
+
+	return undefined
+}
+
+function showRemovedPreviewSubcommandError(logger: ConsolaInstance, subcommand: string): CliResult {
+	logger.error(`The \`devflare previews ${subcommand}\` subcommand was removed during the dedicated-preview-worker cleanup.`)
+	logger.info('Use `devflare previews` to inspect live preview scopes, `devflare previews bindings` to inspect preview bindings, or `devflare previews cleanup --scope <name> --apply` to remove a preview scope.')
+	return { exitCode: 1 }
 }
 
 export async function runPreviewsCommand(
@@ -598,47 +651,38 @@ export async function runPreviewsCommand(
 	}
 
 	const rawSubcommand = parsed.args[0]
-	const fallbackWorkerArg = rawSubcommand && !isPreviewSubcommand(rawSubcommand)
-		? rawSubcommand
-		: parsed.args[1]
-	const subcommand: PreviewSubcommand = rawSubcommand && isPreviewSubcommand(rawSubcommand)
-		? rawSubcommand
-		: 'list'
+	if (rawSubcommand && REMOVED_PREVIEW_SUBCOMMANDS.has(rawSubcommand)) {
+		return showRemovedPreviewSubcommandError(logger, rawSubcommand)
+	}
+
+	const subcommand = resolveLegacyPreviewSubcommand(rawSubcommand) ?? 'list'
 	const includeAll = parsed.options.all === true
 	const theme: PreviewOutputTheme = {
 		useColor: shouldUseColor(parsed.options as Record<string, string | boolean>)
 	}
 
-	if (rawSubcommand && !isPreviewSubcommand(rawSubcommand) && parsed.args.length > 2) {
+	if (rawSubcommand && !resolveLegacyPreviewSubcommand(rawSubcommand)) {
 		logger.error(`Unknown previews subcommand: ${rawSubcommand}`)
 		logger.info(`Available previews subcommands: ${PREVIEW_SUBCOMMANDS.join(', ')}`)
 		return { exitCode: 1 }
 	}
 
+	if (rawSubcommand === 'cleanup-resources') {
+		logger.warn('`devflare previews cleanup-resources` is deprecated; use `devflare previews cleanup` instead.')
+	}
+
 	try {
-		const context = await resolveContext(parsed, options, subcommand, fallbackWorkerArg)
+		const context = await resolveContext(parsed, options, subcommand)
 		const databaseName = asOptionalString(parsed.options.database)
 		const environment = asOptionalString(parsed.options.env)
 		const configFile = asOptionalString(parsed.options.config)
 
 		switch (subcommand) {
-			case 'provision':
-				return runProvisionSubcommand(context, databaseName, logger)
-
-			case 'reconcile':
-				return runReconcileSubcommand(context, databaseName, logger, includeAll, theme)
-
 			case 'bindings':
 				return runBindingsSubcommand(parsed, context, logger, options, environment, configFile, theme)
 
 			case 'cleanup':
-				return runCleanupSubcommand(parsed, context, databaseName, logger)
-
-			case 'retire':
-				return runRetireSubcommand(parsed, context, databaseName, logger)
-
-			case 'cleanup-resources':
-				return runCleanupResourcesSubcommand(
+				return runCleanupSubcommand(
 					parsed,
 					context,
 					logger,
@@ -652,7 +696,7 @@ export async function runPreviewsCommand(
 
 			case 'list':
 			default:
-				return runListSubcommand(context, logger, options, databaseName, environment, configFile, includeAll, theme)
+				return runListSubcommand(context, logger, theme)
 		}
 	} catch (error) {
 		if (error instanceof Error) {

@@ -19,7 +19,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PREVIEW_BRANCH: ${{ github.event_name == 'workflow_dispatch' && inputs.branch || github.event.ref }}
-      TARGET_WORKER: documentation
       FEEDBACK_TITLE: Documentation preview
       FEEDBACK_KEY: documentation-preview
     steps:
@@ -35,7 +34,7 @@ jobs:
         shell: bash
         run: bun install --frozen-lockfile
 
-      - name: Retire tracked preview metadata
+      - name: Clean up preview scope
         shell: bash
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -43,10 +42,9 @@ jobs:
         run: |
           set -euo pipefail
 
-          bunx --bun devflare previews retire \
+          bunx --bun devflare previews cleanup \
             --account "$CLOUDFLARE_ACCOUNT_ID" \
-            --worker "$TARGET_WORKER" \
-            --branch "$PREVIEW_BRANCH" \
+            --scope "$PREVIEW_BRANCH" \
             --apply
 
       - name: Mark GitHub deployment feedback inactive
@@ -62,4 +60,4 @@ jobs:
           ref-name: ${{ env.PREVIEW_BRANCH }}
           environment: documentation preview / ${{ env.PREVIEW_BRANCH }}
           log-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          summary: The branch was deleted, so Devflare retired the tracked preview metadata and marked the related GitHub deployment inactive.
+          summary: The branch was deleted, so Devflare cleaned up the preview scope and marked the related GitHub deployment inactive.
