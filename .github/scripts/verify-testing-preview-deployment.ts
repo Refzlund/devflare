@@ -7,7 +7,7 @@ import {
 	parseWranglerVersionBindings,
 	type ParsedWranglerBindingRow
 } from '../../packages/devflare/src/cli/preview-bindings'
-import { loadResolvedConfig } from '../../packages/devflare/src/config'
+import { loadConfig, resolveConfigForEnvironment, type DevflareConfig } from '../../packages/devflare/src/config'
 import { resolveTestingWorkerNames } from '../../apps/testing/worker-names'
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url))
@@ -75,6 +75,16 @@ async function withTemporaryPreviewEnvironment<T>(
 		restoreOptionalEnvironmentVariable('DEVFLARE_PREVIEW_BRANCH', originalPreviewBranch)
 		restoreOptionalEnvironmentVariable('DEVFLARE_PREVIEW_IDENTIFIER', originalPreviewIdentifier)
 	}
+}
+
+export async function loadTestingPreviewConfig(previewScope: string): Promise<DevflareConfig> {
+	return withTemporaryPreviewEnvironment(previewScope, async () => {
+		const config = await loadConfig({
+			cwd: TESTING_DIR
+		})
+
+		return resolveConfigForEnvironment(config, 'preview')
+	})
 }
 
 function uniqueSorted(values: string[]): string[] {
@@ -185,14 +195,7 @@ async function loadVerificationSnapshot(
 	availableTestingWorkers: string[]
 }> {
 	const workerNames = resolveTestingWorkerNames(previewScope)
-	const config = await withTemporaryPreviewEnvironment(previewScope, async () => {
-		return loadResolvedConfig({
-			cwd: TESTING_DIR,
-			environment: 'preview',
-			identifier: previewScope,
-			accountId
-		})
-	})
+	const config = await loadTestingPreviewConfig(previewScope)
 	const vars = (config.vars ?? {}) as Record<string, unknown>
 	const liveWorkers = await account.workers(accountId, CLOUDFLARE_API_OPTIONS)
 	const availableWorkers = uniqueSorted(liveWorkers.map((worker) => worker.name))

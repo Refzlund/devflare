@@ -3,10 +3,20 @@ import {
 	collectTestingPreviewVerificationErrors,
 	DEFAULT_EXPECTED_APP_NAME,
 	DEFAULT_EXPECTED_DEPLOYMENT_CHANNEL,
+	loadTestingPreviewConfig,
 	REQUIRED_MAIN_BINDINGS
 } from '../../../../../.github/scripts/verify-testing-preview-deployment'
 
 describe('testing preview deployment verifier', () => {
+	test('loads preview config without requiring Cloudflare resource resolution', async () => {
+		const config = await loadTestingPreviewConfig('pr-1')
+
+		expect(config.name).toBe('devflare-testing-binding-matrix-pr-1')
+		expect(config.vars?.APP_NAME).toBe(DEFAULT_EXPECTED_APP_NAME)
+		expect(config.vars?.DEPLOYMENT_CHANNEL).toBe(DEFAULT_EXPECTED_DEPLOYMENT_CHANNEL)
+		expect(config.bindings?.hyperdrive?.POSTGRES).toBe('devflare-testing-pr-1')
+	})
+
 	test('accepts a preview deployment snapshot with the expected workers and bindings', () => {
 		const workerName = 'devflare-testing-binding-matrix-next'
 
