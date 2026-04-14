@@ -28,6 +28,7 @@ describe('preview helpers', () => {
 	test('falls back to git metadata when no explicit or CI branch is available', async () => {
 		const result = await resolvePreviewAlias({
 			workerName: 'demo-worker',
+			env: {},
 			getGitBranch: async () => 'feature/git-branch'
 		})
 
