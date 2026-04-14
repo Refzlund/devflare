@@ -64,7 +64,9 @@
 		"prepack": "bun run llm:generate",
 		"test": "bun test",
 		"test:watch": "bun test --watch",
-		"typecheck": "tsgo --noEmit"
+		"typecheck": "tsgo --noEmit",
+		"types": "bun run typecheck",
+		"check": "bun run typecheck"
 	},
 	"dependencies": {
 		"@cloudflare/workers-types": "^4.20250109.0",

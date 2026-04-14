@@ -2,7 +2,7 @@
 // Config Compiler — Transforms DevflareConfig to wrangler.jsonc format
 // =============================================================================
 
-import { isAbsolute, relative, resolve } from 'pathe'
+import { basename, isAbsolute, relative, resolve } from 'pathe'
 import {
 	getSingleBrowserBindingName,
 	normalizeHyperdriveBinding,
@@ -442,6 +442,61 @@ function rebasePathForConfigDir(
 		: resolve(projectRoot, pathValue)
 
 	return relative(configDir, absolutePath).replace(/\\/g, '/')
+}
+
+function pathIsInsideDirectory(directoryPath: string, candidatePath: string): boolean {
+	const normalizedDirectoryPath = directoryPath.replace(/\\/g, '/')
+	const normalizedCandidatePath = candidatePath.replace(/\\/g, '/')
+
+	return (
+		normalizedCandidatePath === normalizedDirectoryPath ||
+		normalizedCandidatePath.startsWith(`${normalizedDirectoryPath}/`)
+	)
+}
+
+export function isolateViteBuildOutputPaths(
+	projectRoot: string,
+	config: WranglerConfig
+): WranglerConfig {
+	const assetsDirectory = config.assets?.directory
+	if (!assetsDirectory) {
+		return config
+	}
+
+	const isolatedAssetsDirectoryPath = resolve(
+		projectRoot,
+		'.devflare',
+		'vite-build-output',
+		basename(assetsDirectory)
+	)
+	const isolatedAssetsDirectory = relative(projectRoot, isolatedAssetsDirectoryPath).replace(/\\/g, '/')
+	const isolatedConfig: WranglerConfig = {
+		...config,
+		assets: config.assets
+			? {
+				...config.assets,
+				directory: isolatedAssetsDirectory
+			}
+			: config.assets
+	}
+
+	if (!config.main) {
+		return isolatedConfig
+	}
+
+	const originalAssetsDirectoryPath = resolve(projectRoot, assetsDirectory)
+	const originalMainEntryPath = resolve(projectRoot, config.main)
+	if (!pathIsInsideDirectory(originalAssetsDirectoryPath, originalMainEntryPath)) {
+		return isolatedConfig
+	}
+
+	const relativeMainEntryPath = relative(originalAssetsDirectoryPath, originalMainEntryPath)
+	const isolatedMainEntryPath = resolve(isolatedAssetsDirectoryPath, relativeMainEntryPath)
+
+	return {
+		...isolatedConfig,
+		main: relative(projectRoot, isolatedMainEntryPath).replace(/\\/g, '/')
+	}
 }
 
 export function rebaseWranglerConfigPaths(

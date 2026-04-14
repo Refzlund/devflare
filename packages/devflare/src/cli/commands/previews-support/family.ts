@@ -448,12 +448,14 @@ export function buildPreviewScopeRowsFromLiveWorkers(
 		if (missingLabels.length > 0) {
 			notes.push(`missing ${missingLabels.join(', ')}`)
 		}
+		const strategy: PreviewScopeRow['strategy'] = 'dedicated workers'
+		const status: PreviewScopeRow['status'] = presentFamilies.length === resolvedFamilies.length ? 'ready' : 'partial'
 
 		return {
 			scope,
-			strategy: 'dedicated workers',
+			strategy,
 			workersLabel: `${presentFamilies.length}/${resolvedFamilies.length}`,
-			status: presentFamilies.length === resolvedFamilies.length ? 'ready' : 'partial',
+			status,
 			updatedAt,
 			notes: notes.length > 0 ? notes.join(' · ') : undefined,
 			entryUrl: entryWorker ? getWorkerUrl(entryWorker.name, workersSubdomain) : undefined

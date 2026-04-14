@@ -10,6 +10,7 @@ import {
 } from '../../config'
 import {
 	compileConfig,
+	isolateViteBuildOutputPaths as isolateCompiledViteBuildOutputPaths,
 	rebaseWranglerConfigPaths,
 	writeWranglerConfig,
 	type WranglerConfig
@@ -45,6 +46,18 @@ interface RetryableCleanupError {
 	code?: string
 }
 
+interface CleanupFileSystem {
+	access(path: string): Promise<void>
+	rename(oldPath: string, newPath: string): Promise<void>
+	rm(
+		path: string,
+		options: {
+			recursive: boolean
+			force: boolean
+		}
+	): Promise<void>
+}
+
 function summarizePreviewScopedResourceNames(resources: PreviewScopedResourceNames): string | null {
 	const segments = [
 		resources.kv.length > 0 ? `KV ${resources.kv.length}` : null,
@@ -69,6 +82,13 @@ function isNestedPath(parentPath: string, candidatePath: string): boolean {
 	const normalizedCandidatePath = candidatePath.replace(/\\/g, '/')
 
 	return normalizedCandidatePath.startsWith(`${normalizedParentPath}/`)
+}
+
+export function isolateViteBuildOutputPaths(
+	cwd: string,
+	wranglerConfig: WranglerConfig
+): WranglerConfig {
+	return isolateCompiledViteBuildOutputPaths(cwd, wranglerConfig)
 }
 
 export function getViteBuildCleanupTargets(cwd: string, wranglerConfig: WranglerConfig): string[] {
@@ -103,12 +123,75 @@ function shouldRetryCleanup(error: unknown): error is RetryableCleanupError {
 	return errorCode === 'EBUSY' || errorCode === 'EPERM' || errorCode === 'ENOTEMPTY'
 }
 
-async function removePathWithRetries(
+async function getCleanupFileSystem(): Promise<CleanupFileSystem> {
+	return await import('node:fs/promises')
+}
+
+async function pathExists(cleanupFs: CleanupFileSystem, targetPath: string): Promise<boolean> {
+	try {
+		await cleanupFs.access(targetPath)
+		return true
+	} catch {
+		return false
+	}
+}
+
+export function createDeferredCleanupPath(targetPath: string, uniqueSuffix?: string): string {
+	const suffix =
+		uniqueSuffix ??
+		`${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+
+	return `${targetPath}.devflare-stale-${suffix}`
+}
+
+async function tryMoveLockedPathAside(
 	targetPath: string,
 	logger: ConsolaInstance,
-	attempts: number = 5
+	cleanupFs: CleanupFileSystem
+): Promise<boolean> {
+	if (!(await pathExists(cleanupFs, targetPath))) {
+		return true
+	}
+
+	const deferredCleanupPath = createDeferredCleanupPath(targetPath)
+
+	try {
+		await cleanupFs.rename(targetPath, deferredCleanupPath)
+	} catch {
+		return false
+	}
+
+	logger.warn(
+		`Moved locked build output aside to ${deferredCleanupPath} after repeated cleanup failures; continuing build`
+	)
+
+	try {
+		await cleanupFs.rm(deferredCleanupPath, {
+			recursive: true,
+			force: true
+		})
+	} catch (error) {
+		const cleanupErrorCode =
+			error instanceof Error && 'code' in error && typeof error.code === 'string'
+				? error.code
+				: 'an unknown error'
+
+		logger.warn(
+			`Deferred cleanup for ${deferredCleanupPath} is still blocked by ${cleanupErrorCode}; you can remove it manually later`
+		)
+	}
+
+	return true
+}
+
+export async function removePathWithRetries(
+	targetPath: string,
+	logger: ConsolaInstance,
+	attempts: number = 5,
+	cleanupFs?: CleanupFileSystem
 ): Promise<void> {
-	const fs = await import('node:fs/promises')
+	const fs = cleanupFs ?? await getCleanupFileSystem()
+	let lastError: unknown
 
 	for (let attempt = 1;attempt <= attempts;attempt++) {
 		try {
@@ -118,8 +201,10 @@ async function removePathWithRetries(
 			})
 			return
 		} catch (error) {
+			lastError = error
+
 			if (!shouldRetryCleanup(error) || attempt === attempts) {
-				throw error
+				break
 			}
 
 			logger.warn(
@@ -128,6 +213,27 @@ async function removePathWithRetries(
 			await new Promise((resolveRetry) => setTimeout(resolveRetry, attempt * 100))
 		}
 	}
+
+	if (
+		shouldRetryCleanup(lastError) &&
+		await tryMoveLockedPathAside(targetPath, logger, fs)
+	) {
+		return
+	}
+
+	if (shouldRetryCleanup(lastError)) {
+		const cleanupErrorCode =
+			lastError instanceof Error && 'code' in lastError && typeof lastError.code === 'string'
+				? lastError.code
+				: 'an unknown error'
+
+		logger.warn(
+			`Continuing build without pre-clean for ${targetPath} because cleanup is still blocked by ${cleanupErrorCode}`
+		)
+		return
+	}
+
+	throw lastError
 }
 
 export async function cleanupViteBuildOutputs(
@@ -306,8 +412,12 @@ export async function prepareBuildArtifacts(
 		logLine(logger, deploymentStrategyMessage)
 	}
 
-	const devWranglerConfig = compileConfig(config)
-	const deployWranglerConfig = compileConfig(deploymentStrategy.config)
+	const devWranglerConfig = viteProject.shouldStartVite
+		? isolateViteBuildOutputPaths(cwd, compileConfig(config))
+		: compileConfig(config)
+	const deployWranglerConfig = viteProject.shouldStartVite
+		? isolateViteBuildOutputPaths(cwd, compileConfig(deploymentStrategy.config))
+		: compileConfig(deploymentStrategy.config)
 
 	if (viteProject.shouldStartVite) {
 		if (composedMainEntry) {

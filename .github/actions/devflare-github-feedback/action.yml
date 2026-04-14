@@ -78,6 +78,10 @@ inputs:
     description: "Optional extra markdown appended inside the collapsible details section"
     required: false
     default: ""
+  ignore-comment-permission-errors:
+    description: "When true, skip PR comment updates that are forbidden for the current GitHub token instead of failing the action"
+    required: false
+    default: "true"
   transient-environment:
     description: "Override the transient_environment flag for GitHub deployments"
     required: false

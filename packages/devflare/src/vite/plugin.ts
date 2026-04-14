@@ -25,6 +25,7 @@ import {
 import {
 	compileConfig,
 	compileToProgrammaticConfig,
+	isolateViteBuildOutputPaths,
 	rebaseWranglerConfigPaths,
 	writeWranglerConfig,
 	type WranglerConfig
@@ -258,8 +259,15 @@ async function buildPluginContextState(
 	const effectiveConfig = mode === 'build'
 		? await resolveConfigResources(devflareConfig, { environment })
 		: resolveConfigForLocalRuntime(devflareConfig, environment)
-	const wranglerConfig = compileConfig(effectiveConfig)
-	const cloudflareConfig = compileToProgrammaticConfig(effectiveConfig)
+	const compiledWranglerConfig = compileConfig(effectiveConfig)
+	const wranglerConfig = mode === 'build'
+		? isolateViteBuildOutputPaths(projectRoot, compiledWranglerConfig)
+		: compiledWranglerConfig
+	const cloudflareConfig = {
+		...(mode === 'build'
+			? isolateViteBuildOutputPaths(projectRoot, compileToProgrammaticConfig(effectiveConfig) as WranglerConfig)
+			: compileToProgrammaticConfig(effectiveConfig))
+	}
 	const composedMainEntry = mode === 'build'
 		? null
 		: await prepareComposedWorkerEntrypoint(projectRoot, effectiveConfig, environment)

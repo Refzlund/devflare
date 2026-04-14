@@ -13,7 +13,7 @@ permissions:
   contents: read
   deployments: write
   issues: write
-  pull-requests: read
+  pull-requests: write
 
 jobs:
   cleanup-preview:

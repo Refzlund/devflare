@@ -17,7 +17,7 @@ permissions:
   contents: read
   deployments: write
   issues: write
-  pull-requests: read
+  pull-requests: write
 
 concurrency:
   group: testing-preview-branch-${{ github.ref_name }}
