@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test'
-import { access, mkdir, mkdtemp, rm } from 'node:fs/promises'
+import { access, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'pathe'
 import { clearDependencies, setDependencies } from '../../../src/cli/dependencies'
@@ -68,6 +68,47 @@ describe('build/deploy worker-only behavior', () => {
 		expect(executions.some(({ command, args }) => command === 'bunx' && args.join(' ') === 'wrangler deploy')).toBe(true)
 		expect(logger.messages.some((message) => message.args.join(' ').includes('Skipping Vite build'))).toBe(true)
 		await access(join(projectDir, '.wrangler', 'deploy', 'config.json'))
+	})
+
+	test('deploy prefers the local wrangler package over bunx when it is installed in the project', async () => {
+		await writeProjectFiles(projectDir, { withViteConfig: false, withViteDeps: false })
+		await mkdir(join(projectDir, 'node_modules', 'wrangler', 'bin'), { recursive: true })
+		await writeFile(join(projectDir, 'node_modules', 'wrangler', 'package.json'), JSON.stringify({
+			name: 'wrangler',
+			version: '3.114.17',
+			type: 'module',
+			bin: {
+				wrangler: './bin/wrangler.js'
+			}
+		}, null, '\t'))
+		await writeFile(join(projectDir, 'node_modules', 'wrangler', 'bin', 'wrangler.js'), `
+#!/usr/bin/env node
+console.log('stub wrangler binary')
+`.trim())
+
+		const executions: ExecInvocation[] = []
+		const logger = createLogger()
+		setDependencies(createCliDependencies(
+			createProcessRunner((command, args) => {
+				if (isViteBuildExecution(command, args)) {
+					throw new Error('vite build should not run for worker-only deploy')
+				}
+
+				return successResult()
+			}, executions)
+		))
+
+		const result = await runDeployCommand(
+			{ command: 'deploy', args: [], options: {} },
+			logger as any,
+			{ cwd: projectDir }
+		)
+
+		expect(result.exitCode).toBe(0)
+		const deployExecution = executions.find(({ args }) => args.at(-1) === 'deploy')
+		expect(deployExecution?.command).toBe('bun')
+		expect(deployExecution?.args[0]?.replace(/\\/g, '/')).toBe(`${projectDir.replace(/\\/g, '/')}/node_modules/wrangler/bin/wrangler.js`)
+		expect(deployExecution?.args.slice(1)).toEqual(['deploy'])
 	})
 
 	test('deploy forwards Wrangler version metadata flags when message and tag are provided', async () => {

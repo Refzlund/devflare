@@ -21,18 +21,27 @@ import {
 } from '../src/fetch'
 import fetchHandler from '../src/fetch'
 
-// -----------------------------------------------------------------------------
-// Test Setup — Standard devflare pattern
-// -----------------------------------------------------------------------------
-
-beforeAll(() => createTestContext())
-afterAll(() => env.dispose())
-
 // Skip conditions resolved in parallel at module load
 const [skipAI, skipVectorize] = await Promise.all([
 	shouldSkip.ai,
 	shouldSkip.vectorize
 ])
+
+const requiresRemoteContext = !skipAI || !skipVectorize
+
+// -----------------------------------------------------------------------------
+// Test Setup — Only create a runtime context when a remote suite will run
+// -----------------------------------------------------------------------------
+// AI and Vectorize are remote-only services. In default local/CI validation runs
+// those suites are skipped, and the module smoke tests below do not need a live
+// runtime context. Keeping the setup conditional avoids unnecessary bridge/
+// Miniflare startup for a file whose real integration coverage is explicitly
+// gated behind remote mode.
+
+if (requiresRemoteContext) {
+	beforeAll(() => createTestContext())
+	afterAll(() => env.dispose())
+}
 
 // -----------------------------------------------------------------------------
 // Models — Using cheapest options for testing

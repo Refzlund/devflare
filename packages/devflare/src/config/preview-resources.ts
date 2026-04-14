@@ -185,7 +185,9 @@ function createPreviewScopedResourceRef(
 		return null
 	}
 
-	const baseName = materializePreviewScopedString(value)
+	const baseName = materializePreviewScopedString(value, {
+		env: {}
+	})
 	const previewName = materializePreviewScopedString(value, options)
 
 	if (!baseName || !previewName || baseName === previewName) {

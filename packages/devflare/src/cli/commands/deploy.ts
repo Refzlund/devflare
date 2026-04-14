@@ -33,6 +33,7 @@ import {
 import { applyDeploymentStrategy, describeDeploymentStrategy } from '../deploy-strategy'
 import { reconcilePreviewRegistry } from '../../cloudflare/preview-registry'
 import { createCliTheme, dim, green, logLine, whiteDim, yellow, yellowBold } from '../ui'
+import { resolvePackageSpecifier } from '../../utils/resolve-package'
 
 async function getCurrentGitBranch(cwd: string): Promise<string | null> {
 	const deps = await getDependencies()
@@ -47,6 +48,20 @@ async function getCurrentGitBranch(cwd: string): Promise<string | null> {
 	}
 
 	return branchName
+}
+
+async function resolveLocalWranglerExecutable(
+	cwd: string,
+	fs: Awaited<ReturnType<typeof getDependencies>>['fs']
+): Promise<string | null> {
+	const wranglerExecutablePath = resolvePackageSpecifier('wrangler/bin/wrangler.js', cwd)
+
+	try {
+		await fs.access(wranglerExecutablePath)
+		return wranglerExecutablePath
+	} catch {
+		return null
+	}
 }
 
 function inferRecordSource(): 'cli' | 'github-action' {
@@ -407,6 +422,7 @@ export async function runDeployCommand(
 			const deps = await getDependencies()
 			const prepared = await prepareBuildArtifacts(resolvedParsed, logger, options)
 			logLine(logger, `${dim('worker', theme)} ${green(prepared.config.name, theme)}`)
+			const localWranglerExecutable = await resolveLocalWranglerExecutable(cwd, deps.fs)
 
 			let resolvedPreviewAlias: Awaited<ReturnType<typeof resolvePreviewAlias>> | undefined
 			if (preview) {
@@ -458,9 +474,14 @@ export async function runDeployCommand(
 			)
 			await deps.fs.mkdir(wranglerOutputDirectory, { recursive: true })
 
+			const wranglerCommand = localWranglerExecutable ? 'bun' : 'bunx'
 			const wranglerArgs = preview
-				? ['wrangler', 'versions', 'upload']
-				: ['wrangler', 'deploy']
+				? localWranglerExecutable
+					? [localWranglerExecutable, 'versions', 'upload']
+					: ['wrangler', 'versions', 'upload']
+				: localWranglerExecutable
+					? [localWranglerExecutable, 'deploy']
+					: ['wrangler', 'deploy']
 
 			if (deployMessage?.trim()) {
 				wranglerArgs.push('--message', deployMessage.trim())
@@ -474,7 +495,7 @@ export async function runDeployCommand(
 				wranglerArgs.push('--preview-alias', resolvedPreviewAlias.alias)
 			}
 
-			const deployProc = await deps.exec.exec('bunx', wranglerArgs, {
+			const deployProc = await deps.exec.exec(wranglerCommand, wranglerArgs, {
 				cwd,
 				stdio: 'inherit',
 				env: {

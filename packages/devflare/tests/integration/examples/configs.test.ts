@@ -11,6 +11,7 @@ import {
 	resolveConfigForLocalRuntime,
 	type DevflareConfig
 } from '../../../src/config'
+import { collectPreviewScopedResourcePlan } from '../../../src/config/preview-resources'
 
 const repoRoot = resolve(import.meta.dirname, '../../../../../')
 const casesDir = resolve(repoRoot, 'cases')
@@ -543,6 +544,67 @@ describe('repo example app configs', () => {
 		expect(production.bindings?.r2?.ASSETS).toBe('devflare-testing-assets-bucket-production')
 		expect(production.bindings?.r2?.ARCHIVE).toBe('devflare-testing-archive-bucket')
 		expect(production.bindings?.vectorize?.DOCUMENT_INDEX.indexName).toBe('devflare-testing-document-index')
+	})
+
+	test('apps/testing preview resource planning keeps stable base names while targeting a branch preview scope', async () => {
+		const originalPreviewBranch = process.env.DEVFLARE_PREVIEW_BRANCH
+		const originalPreviewIdentifier = process.env.DEVFLARE_PREVIEW_IDENTIFIER
+
+		try {
+			process.env.DEVFLARE_PREVIEW_BRANCH = 'next'
+			process.env.DEVFLARE_PREVIEW_IDENTIFIER = 'next'
+
+			const config = await loadConfig({ cwd: testingAppDir })
+			const plan = collectPreviewScopedResourcePlan(config, {
+				environment: 'preview'
+			})
+
+			expect(plan.kv.map((ref) => ({
+				baseName: ref.baseName,
+				previewName: ref.previewName
+			}))).toEqual([
+				{
+					baseName: 'devflare-testing-cache-kv',
+					previewName: 'devflare-testing-cache-kv-next'
+				},
+				{
+					baseName: 'devflare-testing-sessions-kv',
+					previewName: 'devflare-testing-sessions-kv-next'
+				}
+			])
+			expect(plan.d1.map((ref) => ref.previewName)).toEqual([
+				'devflare-testing-primary-db-next',
+				'devflare-testing-audit-db-next',
+				'devflare-testing-legacy-db-next'
+			])
+			expect(plan.queues.map((ref) => ref.previewName).sort()).toEqual([
+				'devflare-testing-emails-dlq-next',
+				'devflare-testing-emails-queue-next',
+				'devflare-testing-jobs-dlq-next',
+				'devflare-testing-jobs-queue-next'
+			])
+			expect(plan.hyperdrive.map((ref) => ({
+				baseName: ref.baseName,
+				previewName: ref.previewName
+			}))).toEqual([
+				{
+					baseName: 'devflare-testing',
+					previewName: 'devflare-testing-next'
+				}
+			])
+		} finally {
+			if (originalPreviewBranch === undefined) {
+				delete process.env.DEVFLARE_PREVIEW_BRANCH
+			} else {
+				process.env.DEVFLARE_PREVIEW_BRANCH = originalPreviewBranch
+			}
+
+			if (originalPreviewIdentifier === undefined) {
+				delete process.env.DEVFLARE_PREVIEW_IDENTIFIER
+			} else {
+				process.env.DEVFLARE_PREVIEW_IDENTIFIER = originalPreviewIdentifier
+			}
+		}
 	})
 
 	test('apps/testing default routes stay cheap and smoke stays guarded until explicitly invoked', async () => {

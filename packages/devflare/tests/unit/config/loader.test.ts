@@ -3,7 +3,7 @@
 // =============================================================================
 
 import { describe, expect, test, beforeEach, afterEach } from 'bun:test'
-import { join } from 'pathe'
+import { join, relative } from 'pathe'
 import { loadConfig, resolveConfigPath } from '../../../src/config/loader'
 import { mkdir, rm, writeFile } from 'node:fs/promises'
 
@@ -92,6 +92,23 @@ export default config
 		expect(config.name).toBe('test-worker')
 		// Should have forced flags even though none were specified
 		expect(config.compatibilityFlags).toContain('nodejs_compat')
+	})
+
+	test('accepts relative cwd paths by normalizing them before loading config', async () => {
+		const projectDir = join(TEST_DIR, 'relative-cwd')
+		await mkdir(projectDir, { recursive: true })
+		await writeFile(join(projectDir, 'devflare.config.ts'), `
+			export default {
+				name: 'relative-worker',
+				compatibilityDate: '2025-01-07'
+			}
+		`)
+
+		const config = await loadConfig({
+			cwd: relative(process.cwd(), projectDir)
+		})
+
+		expect(config.name).toBe('relative-worker')
 	})
 
 	test('infers SvelteKit Cloudflare worker and asset outputs when they are omitted', async () => {

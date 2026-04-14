@@ -93,6 +93,59 @@ describe('preview-scoped resource lifecycle', () => {
 		])
 	})
 
+	test('keeps base preview resource names stable when preview env vars are already set', () => {
+		const originalPreviewBranch = process.env.DEVFLARE_PREVIEW_BRANCH
+		const originalPreviewIdentifier = process.env.DEVFLARE_PREVIEW_IDENTIFIER
+
+		try {
+			process.env.DEVFLARE_PREVIEW_BRANCH = 'next'
+			process.env.DEVFLARE_PREVIEW_IDENTIFIER = 'next'
+
+			const plan = collectPreviewScopedResourcePlan(createPreviewScopedResourceConfig(), {
+				environment: 'preview'
+			})
+
+			expect(plan.kv.map((ref) => ({
+				baseName: ref.baseName,
+				previewName: ref.previewName
+			}))).toEqual([
+				{
+					baseName: 'cache-kv',
+					previewName: 'cache-kv-next'
+				},
+				{
+					baseName: 'sessions-kv',
+					previewName: 'sessions-kv-next'
+				}
+			])
+			expect(plan.queues.map((ref) => ref.previewName).sort()).toEqual([
+				'jobs-dlq-next',
+				'jobs-queue-next'
+			])
+			expect(plan.hyperdrive.map((ref) => ({
+				baseName: ref.baseName,
+				previewName: ref.previewName
+			}))).toEqual([
+				{
+					baseName: 'testing-hyperdrive',
+					previewName: 'testing-hyperdrive-next'
+				}
+			])
+		} finally {
+			if (originalPreviewBranch === undefined) {
+				delete process.env.DEVFLARE_PREVIEW_BRANCH
+			} else {
+				process.env.DEVFLARE_PREVIEW_BRANCH = originalPreviewBranch
+			}
+
+			if (originalPreviewIdentifier === undefined) {
+				delete process.env.DEVFLARE_PREVIEW_IDENTIFIER
+			} else {
+				process.env.DEVFLARE_PREVIEW_IDENTIFIER = originalPreviewIdentifier
+			}
+		}
+	})
+
 	test('provisions supported preview resources and falls back to the base Hyperdrive config', async () => {
 		const result = await preparePreviewScopedResourcesForDeploy(createPreviewScopedResourceConfig(), {
 			environment: 'preview',

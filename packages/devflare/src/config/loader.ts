@@ -4,7 +4,7 @@
 
 import { existsSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
-import { dirname, join } from 'pathe'
+import { dirname, join, resolve } from 'pathe'
 import { applyFrameworkConfigProviders } from './framework-providers'
 import { configSchema, type DevflareConfig } from './schema'
 
@@ -124,7 +124,7 @@ export async function resolveConfigPath(cwd: string): Promise<string | undefined
  * @throws When config file not found or validation fails
  */
 export async function loadConfig(options: LoadConfigOptions = {}): Promise<DevflareConfig> {
-	const cwd = options.cwd ?? process.cwd()
+	const cwd = resolve(options.cwd ?? process.cwd())
 	const configFile = options.configFile ?? 'devflare.config'
 	const { loadConfig: c12LoadConfig, setupDotenv } = resolveC12Module(cwd)
 
