@@ -15,18 +15,7 @@ describe('preview helpers', () => {
 		expect(sanitizePreviewAlias('123-start')).toBe('b-123-start')
 	})
 
-	test('uses explicit preview aliases before branch metadata', async () => {
-		const result = await resolvePreviewAlias({
-			explicitAlias: 'My Preview Alias',
-			branchName: 'feature/branch',
-			workerName: 'demo-worker'
-		})
-
-		expect(result.alias).toBe('my-preview-alias')
-		expect(result.source).toBe('preview-alias')
-	})
-
-	test('falls back to branch metadata when no explicit alias is provided', async () => {
+	test('uses branch metadata when it is provided', async () => {
 		const result = await resolvePreviewAlias({
 			branchName: 'feature/branch',
 			workerName: 'demo-worker'

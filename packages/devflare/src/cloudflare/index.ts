@@ -13,6 +13,7 @@ import {
 	getWorkersSubdomain,
 	listWorkers,
 	renameWorker,
+	deleteWorker,
 	listWorkerVersions,
 	getWorkerVersionDetail,
 	listWorkerDeployments,
@@ -156,6 +157,9 @@ export const account = {
 
 	/** Rename an existing Worker */
 	renameWorker,
+
+	/** Delete a Worker script */
+	deleteWorker,
 
 	/** List all Worker versions for a script */
 	workerVersions: listWorkerVersions,

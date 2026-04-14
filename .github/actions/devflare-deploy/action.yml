@@ -1,24 +1,32 @@
 name: "Devflare Deploy"
-description: "Install dependencies and deploy a Devflare project to Cloudflare, including optional preview uploads"
+description: "Install dependencies and deploy a Devflare project to Cloudflare with an explicit production, preview upload, or named preview-scope target"
 inputs:
   working-directory:
     description: "Directory containing the Devflare project"
     required: false
     default: "."
   environment:
-    description: "Optional Devflare environment name"
+    description: "Optional Devflare environment name. When set, it must match the explicit deploy target"
     required: false
     default: ""
-  preview:
-    description: "When true, upload a preview version instead of deploying to production"
+  production:
+    description: "When true, deploy explicitly to production via --prod"
     required: false
     default: "false"
+  preview:
+    description: "When true, upload a same-worker preview version instead of deploying to production"
+    required: false
+    default: "false"
+  preview-scope:
+    description: "Explicit named preview scope to deploy via --preview <name>"
+    required: false
+    default: ""
   preview-alias:
-    description: "Explicit preview alias to use for wrangler versions upload"
+    description: "Explicit preview alias to use for same-worker preview uploads"
     required: false
     default: ""
   branch-name:
-    description: "Branch name to sanitize into a preview alias when preview-alias is not provided"
+    description: "Branch name to sanitize into a preview alias when preview-alias is not provided for same-worker preview uploads"
     required: false
     default: ""
   bun-version:
@@ -34,7 +42,7 @@ inputs:
     required: false
     default: ""
   deploy-command:
-    description: "Optional command prefix used to invoke deploy from the target package, for example 'bun run deploy --'. When omitted, the action falls back to 'bunx devflare deploy'."
+    description: "Optional command prefix used to invoke deploy from the target package, for example 'bun run deploy --'. When omitted, the action falls back to 'bunx --bun devflare deploy'."
     required: false
     default: ""
   deploy-message:
@@ -95,6 +103,16 @@ runs:
       with:
         bun-version: ${{ inputs.bun-version }}
 
+    - name: Restore Bun install cache
+      id: bun-cache
+      if: ${{ steps.setup.outcome == 'success' }}
+      uses: actions/cache@v4
+      with:
+        path: ~/.bun/install/cache
+        key: ${{ runner.os }}-bun-${{ inputs.bun-version }}-${{ hashFiles('bun.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-bun-${{ inputs.bun-version }}-
+
     - name: Install dependencies
       id: install
       if: ${{ steps.setup.outcome == 'success' }}
@@ -135,7 +153,9 @@ runs:
         CLOUDFLARE_API_TOKEN: ${{ inputs.cloudflare-api-token }}
         CLOUDFLARE_ACCOUNT_ID: ${{ inputs.cloudflare-account-id }}
         INPUT_ENVIRONMENT: ${{ inputs.environment }}
+        INPUT_PRODUCTION: ${{ inputs.production }}
         INPUT_PREVIEW: ${{ inputs.preview }}
+        INPUT_PREVIEW_SCOPE: ${{ inputs.preview-scope }}
         INPUT_PREVIEW_ALIAS: ${{ inputs.preview-alias }}
         INPUT_BRANCH_NAME: ${{ inputs.branch-name }}
         INPUT_DEPLOY_COMMAND: ${{ inputs.deploy-command }}
@@ -150,19 +170,60 @@ runs:
         set -euo pipefail
 
         deploy_args=()
+        resolved_target=''
 
-        if [ -n "$INPUT_ENVIRONMENT" ]; then
-          deploy_args+=(--env "$INPUT_ENVIRONMENT")
+        target_count=0
+        if [ "$INPUT_PRODUCTION" = 'true' ]; then
+          target_count=$((target_count + 1))
+        fi
+        if [ "$INPUT_PREVIEW" = 'true' ]; then
+          target_count=$((target_count + 1))
+        fi
+        if [ -n "$INPUT_PREVIEW_SCOPE" ]; then
+          target_count=$((target_count + 1))
         fi
 
-        if [ "$INPUT_PREVIEW" = 'true' ]; then
+        if [ "$target_count" -eq 0 ]; then
+          echo 'Devflare deploy action requires one explicit target input. Set exactly one of production: "true", preview: "true", or preview-scope: <name>.' >&2
+          exit 1
+        fi
+
+        if [ "$target_count" -gt 1 ]; then
+          echo 'Choose only one explicit deploy target input: production, preview, or preview-scope.' >&2
+          exit 1
+        fi
+
+        if [ -n "$INPUT_ENVIRONMENT" ]; then
+          if [ "$INPUT_PRODUCTION" = 'true' ] && [ "$INPUT_ENVIRONMENT" != 'production' ]; then
+            echo 'Production deploys can only be paired with environment: production.' >&2
+            exit 1
+          fi
+
+          if { [ "$INPUT_PREVIEW" = 'true' ] || [ -n "$INPUT_PREVIEW_SCOPE" ]; } && [ "$INPUT_ENVIRONMENT" != 'preview' ]; then
+            echo 'Preview deploys can only be paired with environment: preview.' >&2
+            exit 1
+          fi
+        fi
+
+        if [ "$INPUT_PRODUCTION" = 'true' ]; then
+          deploy_args+=(--prod)
+          resolved_target='production'
+        elif [ -n "$INPUT_PREVIEW_SCOPE" ]; then
+          deploy_args+=(--preview "$INPUT_PREVIEW_SCOPE")
+          resolved_target="preview scope ($INPUT_PREVIEW_SCOPE)"
+        elif [ "$INPUT_PREVIEW" = 'true' ]; then
           deploy_args+=(--preview)
+          resolved_target='preview upload'
 
           if [ -n "$INPUT_PREVIEW_ALIAS" ]; then
             deploy_args+=(--preview-alias "$INPUT_PREVIEW_ALIAS")
           elif [ -n "$INPUT_BRANCH_NAME" ]; then
             deploy_args+=(--branch-name "$INPUT_BRANCH_NAME")
           fi
+        fi
+
+        if [ -n "$INPUT_ENVIRONMENT" ]; then
+          deploy_args+=(--env "$INPUT_ENVIRONMENT")
         fi
 
         if [ -n "$INPUT_DEPLOY_MESSAGE" ]; then
@@ -175,11 +236,12 @@ runs:
 
         deploy_command="$INPUT_DEPLOY_COMMAND"
         if [ -z "$deploy_command" ]; then
-          deploy_command='bunx devflare deploy'
+          deploy_command='bunx --bun devflare deploy'
         fi
 
         deploy_log="$(mktemp)"
         printf 'Using deploy command: %s\n' "$deploy_command" | tee "$deploy_log"
+        printf 'Deploy target: %s\n' "$resolved_target" | tee -a "$deploy_log"
         printf 'Bun version: %s\n' "$(bun --version)" | tee -a "$deploy_log"
         printf 'Node version: %s\n' "$(node --version)" | tee -a "$deploy_log"
         if [ -f node_modules/vite/package.json ]; then
@@ -255,11 +317,14 @@ runs:
         DEPLOY_VERIFICATION_NOTE: ${{ steps.deploy.outputs.verification_note }}
         DEPLOY_LOG_EXCERPT: ${{ steps.deploy.outputs.log_excerpt }}
         INPUT_ENVIRONMENT: ${{ inputs.environment }}
+        INPUT_PRODUCTION: ${{ inputs.production }}
         INPUT_PREVIEW: ${{ inputs.preview }}
+        INPUT_PREVIEW_SCOPE: ${{ inputs.preview-scope }}
         INPUT_WORKING_DIRECTORY: ${{ inputs.working-directory }}
       run: |
         set -euo pipefail
 
+        deploy_target=''
         failure_stage=''
         deploy_status='success'
         exit_code=''
@@ -308,6 +373,16 @@ runs:
           failure_stage=''
         fi
 
+        if [ "$INPUT_PRODUCTION" = 'true' ]; then
+          deploy_target='production'
+        elif [ -n "$INPUT_PREVIEW_SCOPE" ]; then
+          deploy_target="preview scope ($INPUT_PREVIEW_SCOPE)"
+        elif [ "$INPUT_PREVIEW" = 'true' ]; then
+          deploy_target='preview upload'
+        else
+          deploy_target='unknown'
+        fi
+
         log_delimiter="DEVFLARE_LOG_$(date +%s)_$$"
         note_delimiter="DEVFLARE_NOTE_$(date +%s)_$$"
 
@@ -336,7 +411,7 @@ runs:
           fi
           echo ''
           echo "- Working directory: \`$INPUT_WORKING_DIRECTORY\`"
-          echo "- Preview mode: \`$INPUT_PREVIEW\`"
+          echo "- Deploy target: \`$deploy_target\`"
           echo "- Status: \`$deploy_status\`"
           if [ -n "$failure_stage" ]; then
             echo "- Failure stage: \`$failure_stage\`"

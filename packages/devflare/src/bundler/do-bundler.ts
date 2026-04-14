@@ -8,21 +8,15 @@
 import { resolve, dirname, basename, relative } from 'pathe'
 import type { ConsolaInstance } from 'consola'
 import picomatch from 'picomatch'
-import type {
-	ExternalOption,
-	InputOptions,
-	OutputOptions,
-	RolldownOptions,
-	RolldownPluginOption
-} from 'rolldown'
 import type { DevflareRolldownOptions } from '../config/schema'
 import { findFiles, DEFAULT_DO_PATTERN } from '../utils/glob'
 import { findDurableObjectClasses } from '../transform/durable-object'
 import { transformDurableObject } from '../transform/durable-object'
 import {
-	assertWorkerBundleHasNoDynamicImports,
-	createWorkerDynamicImportPlugin
-} from './worker-compat'
+	ensureDebugShim,
+	resolveWorkerCompatibleRolldownConfig,
+	writeWorkerCompatibleBundle
+} from './rolldown-shared'
 
 // -----------------------------------------------------------------------------
 // Types
@@ -170,173 +164,6 @@ function stripDecoratorSyntax(code: string): string {
 	return result
 }
 
-type ExternalPattern = string | RegExp
-
-function toArray<T>(value: T | T[]): T[] {
-	return Array.isArray(value) ? value : [value]
-}
-
-function matchesExternalPattern(pattern: ExternalPattern, id: string): boolean {
-	if (pattern instanceof RegExp) {
-		pattern.lastIndex = 0
-		return pattern.test(id)
-	}
-
-	return pattern === id
-}
-
-function matchesExternalOption(
-	option: ExternalOption | undefined,
-	id: string,
-	parentId: string | undefined,
-	isResolved: boolean
-): boolean {
-	if (!option) {
-		return false
-	}
-
-	if (typeof option === 'function') {
-		return option(id, parentId, isResolved) ?? false
-	}
-
-	return toArray(option).some((pattern) => matchesExternalPattern(pattern, id))
-}
-
-function mergeExternalOptions(
-	base: ExternalOption | undefined,
-	user: ExternalOption | undefined
-): ExternalOption | undefined {
-	if (!base) {
-		return user
-	}
-
-	if (!user) {
-		return base
-	}
-
-	if (typeof base !== 'function' && typeof user !== 'function') {
-		return [...toArray(base), ...toArray(user)]
-	}
-
-	return (id, parentId, isResolved) => {
-		return matchesExternalOption(base, id, parentId, isResolved) ||
-			matchesExternalOption(user, id, parentId, isResolved) ||
-			false
-	}
-}
-
-function mergePluginOptions(
-	base: RolldownPluginOption | undefined,
-	user: RolldownPluginOption | undefined
-): RolldownPluginOption | undefined {
-	if (!base) {
-		return user
-	}
-
-	if (!user) {
-		return base
-	}
-
-	return [base, user]
-}
-
-function mergeResolveOptions(
-	base: InputOptions['resolve'] | undefined,
-	user: InputOptions['resolve'] | undefined
-): InputOptions['resolve'] | undefined {
-	if (!base) {
-		return user
-	}
-
-	if (!user) {
-		return base
-	}
-
-	return {
-		...user,
-		...base,
-		alias: {
-			...(user.alias ?? {}),
-			...(base.alias ?? {})
-		}
-	}
-}
-
-function resolveDOBundleRolldownConfig(options: {
-	cwd: string
-	inputFile: string
-	outFile: string
-	debugShimPath: string
-	rolldownOptions?: DevflareRolldownOptions
-	sourcemap?: boolean
-	minify?: boolean
-}): {
-	inputOptions: InputOptions
-	outputOptions: OutputOptions
-} {
-	type SanitizedRolldownOptions = DevflareRolldownOptions & Partial<
-		Pick<RolldownOptions, 'cwd' | 'input' | 'platform' | 'watch'>
-	>
-	type SanitizedRolldownOutputOptions = NonNullable<DevflareRolldownOptions['output']> &
-		Partial<Pick<OutputOptions, 'codeSplitting' | 'dir' | 'file' | 'format' | 'inlineDynamicImports'>>
-
-	const {
-		output: userOutputOptions,
-		input: _ignoredInput,
-		cwd: _ignoredCwd,
-		platform: _ignoredPlatform,
-		watch: _ignoredWatch,
-		external: userExternal,
-		plugins: userPlugins,
-		resolve: userResolve,
-		tsconfig: userTsconfig,
-		...userInputOptions
-	} = (options.rolldownOptions ?? {}) as SanitizedRolldownOptions
-
-	const {
-		codeSplitting: _ignoredCodeSplitting,
-		dir: _ignoredDir,
-		file: _ignoredFile,
-		format: _ignoredFormat,
-		inlineDynamicImports: _ignoredInlineDynamicImports,
-		...safeUserOutputOptions
-	} = (userOutputOptions ?? {}) as SanitizedRolldownOutputOptions
-
-	const defaultExternalModules: ExternalPattern[] = [
-		/^cloudflare:/,
-		/^node:/,
-		'buffer', 'crypto', 'events', 'http', 'https', 'net', 'os', 'path',
-		'stream', 'tls', 'url', 'util', 'zlib', 'fs', 'child_process',
-		'async_hooks', 'querystring', 'string_decoder', 'assert', 'dns'
-	]
-
-	return {
-		inputOptions: {
-			...userInputOptions,
-			input: options.inputFile,
-			cwd: options.cwd,
-			platform: 'neutral',
-			tsconfig: userTsconfig ?? resolve(options.cwd, 'tsconfig.json'),
-			external: mergeExternalOptions(defaultExternalModules, userExternal),
-			plugins: mergePluginOptions(createWorkerDynamicImportPlugin(), userPlugins),
-			resolve: mergeResolveOptions({
-				alias: {
-					debug: options.debugShimPath
-				}
-			}, userResolve)
-		},
-		outputOptions: {
-			...safeUserOutputOptions,
-			file: options.outFile,
-			format: 'esm',
-			sourcemap: safeUserOutputOptions.sourcemap ?? options.sourcemap ?? false,
-			minify: safeUserOutputOptions.minify ?? options.minify,
-			codeSplitting: false,
-			inlineDynamicImports: true
-		}
-	}
-}
-
 // NOTE: @cloudflare/puppeteer is now fully supported via our local browser shim!
 // The shim provides a Fetcher service binding that emulates Cloudflare's
 // Browser Rendering API using puppeteer-core + chrome-headless-shell.
@@ -357,7 +184,6 @@ async function bundleDOFile(
 	cwd: string,
 	bundleOptions?: Pick<DOBundlerOptions, 'rolldownOptions' | 'sourcemap' | 'minify'>
 ): Promise<string> {
-	const { rolldown } = await import('rolldown')
 	const fs = await import('node:fs/promises')
 
 	// Ensure output directory exists
@@ -396,45 +222,30 @@ export default {
 	}
 	await fs.mkdir(classOutDir, { recursive: true })
 
-	// Create a shim for the 'debug' module that @cloudflare/puppeteer uses
-	// This prevents "no matching module rules" error when running in Miniflare
-	const debugShimCode = `
-// Debug module shim for local development
-const createDebug = (namespace) => {
-	const logger = (...args) => {
-		if (createDebug.enabled) console.debug(\`[\${namespace}]\`, ...args)
-	}
-	logger.enabled = false
-	logger.namespace = namespace
-	logger.extend = (sub) => createDebug(\`\${namespace}:\${sub}\`)
-	return logger
-}
-createDebug.enabled = false
-createDebug.formatters = {}
-export default createDebug
-`
-	const debugShimPath = resolve(outDir, '_debug_shim.js')
-	await fs.writeFile(debugShimPath, debugShimCode, 'utf-8')
+	// Create a shim for the 'debug' module that @cloudflare/puppeteer uses.
+	const debugShimPath = await ensureDebugShim(outDir)
 
 	const outFile = resolve(classOutDir, 'index.js')
-	const { inputOptions, outputOptions } = resolveDOBundleRolldownConfig({
+	const { inputOptions, outputOptions } = resolveWorkerCompatibleRolldownConfig({
 		cwd,
 		inputFile: tempFilePath,
 		outFile,
-		debugShimPath,
+		platform: 'neutral',
+		alias: {
+			debug: debugShimPath
+		},
 		rolldownOptions: bundleOptions?.rolldownOptions,
 		sourcemap: bundleOptions?.sourcemap,
-		minify: bundleOptions?.minify
+		minify: bundleOptions?.minify,
+		inlineDynamicImports: true,
+		defaultTsconfigMode: 'always'
 	})
 
-	// Bundle with Rolldown
-	const bundle = await rolldown(inputOptions)
-
-	// Write the bundle to a single file (no code splitting for Miniflare compatibility)
-	await bundle.write(outputOptions)
-	await assertWorkerBundleHasNoDynamicImports(outFile)
-
-	await bundle.close()
+	await writeWorkerCompatibleBundle({
+		inputOptions,
+		outputOptions,
+		outFile
+	})
 
 	// Clean up temp file
 	try {

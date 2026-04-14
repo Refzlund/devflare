@@ -156,6 +156,23 @@ function getWranglerBrowserBinding(
 	return bindingName ? { binding: bindingName } : undefined
 }
 
+function compileWranglerMigrations(
+	migrations: NonNullable<DevflareConfig['migrations']>
+): NonNullable<WranglerConfig['migrations']> {
+	return migrations.map((migration) => ({
+		tag: migration.tag,
+		...(migration.new_classes && { new_classes: migration.new_classes }),
+		...(migration.renamed_classes && {
+			renamed_classes: migration.renamed_classes.map((renamedClass) => ({
+				from: renamedClass.from,
+				to: renamedClass.to
+			}))
+		}),
+		...(migration.deleted_classes && { deleted_classes: migration.deleted_classes }),
+		...(migration.new_sqlite_classes && { new_sqlite_classes: migration.new_sqlite_classes })
+	}))
+}
+
 /**
  * Compile DevflareConfig to WranglerConfig
  *
@@ -238,18 +255,7 @@ export function compileConfig(
 
 	// Migrations
 	if (mergedConfig.migrations && mergedConfig.migrations.length > 0) {
-		result.migrations = mergedConfig.migrations.map((migration) => ({
-			tag: migration.tag,
-			...(migration.new_classes && { new_classes: migration.new_classes }),
-			...(migration.renamed_classes && {
-				renamed_classes: migration.renamed_classes.map((rc) => ({
-					from: rc.from,
-					to: rc.to
-				}))
-			}),
-			...(migration.deleted_classes && { deleted_classes: migration.deleted_classes }),
-			...(migration.new_sqlite_classes && { new_sqlite_classes: migration.new_sqlite_classes })
-		}))
+		result.migrations = compileWranglerMigrations(mergedConfig.migrations)
 	}
 
 	// Merge passthrough config
@@ -548,18 +554,7 @@ export function compileDOWorkerConfig(
 
 	// Add migrations if present
 	if (resolvedConfig.migrations && resolvedConfig.migrations.length > 0) {
-		result.migrations = resolvedConfig.migrations.map((migration) => ({
-			tag: migration.tag,
-			...(migration.new_classes && { new_classes: migration.new_classes }),
-			...(migration.renamed_classes && {
-				renamed_classes: migration.renamed_classes.map((rc) => ({
-					from: rc.from,
-					to: rc.to
-				}))
-			}),
-			...(migration.deleted_classes && { deleted_classes: migration.deleted_classes }),
-			...(migration.new_sqlite_classes && { new_sqlite_classes: migration.new_sqlite_classes })
-		}))
+		result.migrations = compileWranglerMigrations(resolvedConfig.migrations)
 	}
 
 	// Include bindings that DOs might need (storage, browser, etc.)

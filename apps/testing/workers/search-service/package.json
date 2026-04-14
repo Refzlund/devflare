@@ -1,0 +1,9 @@
+{
+	"name": "testing-search-service",
+	"private": true,
+	"version": "0.0.1",
+	"type": "module",
+	"devDependencies": {
+		"devflare": "workspace:*"
+	}
+}

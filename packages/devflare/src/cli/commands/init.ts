@@ -38,8 +38,7 @@ export default defineConfig({
 `,
 		'src/fetch.ts': `import type { FetchEvent } from 'devflare/runtime'
 
-export async function fetch({ request }: FetchEvent): Promise<Response> {
-	const url = new URL(request.url)
+export async function fetch({ url }: FetchEvent): Promise<Response> {
 	return new Response(
 		url.pathname === '/'
 			? 'Hello from Devflare'
@@ -123,9 +122,7 @@ export async function corsHandle(event: FetchEvent, resolve: ResolveFetch): Prom
 `,
 		'src/app.ts': `import type { FetchEvent } from 'devflare/runtime'
 
-export async function appFetch({ request }: FetchEvent): Promise<Response> {
-	const url = new URL(request.url)
-
+export async function appFetch({ url }: FetchEvent): Promise<Response> {
 	if (url.pathname === '/api/health') {
 		return Response.json({ status: 'ok' })
 	}

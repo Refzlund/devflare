@@ -29,6 +29,13 @@ export interface PreviewResolutionOptions {
 	identifier?: string
 }
 
+export type PreviewIdentifierSource = 'identifier' | 'env-identifier' | 'env-pr' | 'env-branch' | 'environment' | 'none'
+
+export interface ResolvedPreviewIdentifier {
+	identifier?: string
+	source: PreviewIdentifierSource
+}
+
 function getPreviewScopedSeparator(options: PreviewScopedNameOptions | PreviewScopeOptions | undefined): string {
 	return options?.separator ?? '-'
 }
@@ -67,39 +74,60 @@ function normalizePreviewFragment(rawValue: string): string {
 	return normalized
 }
 
-function getPreviewIdentifierFromEnv(env: Record<string, string | undefined>): string | undefined {
+function getPreviewIdentifierFromEnv(env: Record<string, string | undefined>): ResolvedPreviewIdentifier {
 	const explicitIdentifier = env.DEVFLARE_PREVIEW_IDENTIFIER?.trim()
 	if (explicitIdentifier) {
-		return normalizePreviewFragment(explicitIdentifier)
+		return {
+			identifier: normalizePreviewFragment(explicitIdentifier),
+			source: 'env-identifier'
+		}
 	}
 
 	const previewPr = env.DEVFLARE_PREVIEW_PR?.trim()
 	if (previewPr) {
-		return normalizePreviewFragment(`pr-${previewPr}`)
+		return {
+			identifier: normalizePreviewFragment(`pr-${previewPr}`),
+			source: 'env-pr'
+		}
 	}
 
 	const previewBranch = env.DEVFLARE_PREVIEW_BRANCH?.trim()
 	if (previewBranch) {
-		return normalizePreviewFragment(previewBranch)
+		return {
+			identifier: normalizePreviewFragment(previewBranch),
+			source: 'env-branch'
+		}
 	}
 
-	return undefined
+	return {
+		identifier: undefined,
+		source: 'none'
+	}
 }
 
-function resolvePreviewIdentifier(options: PreviewResolutionOptions = {}): string | undefined {
+export function resolvePreviewIdentifier(options: PreviewResolutionOptions = {}): ResolvedPreviewIdentifier {
 	if (options.identifier?.trim()) {
-		return normalizePreviewFragment(options.identifier)
+		return {
+			identifier: normalizePreviewFragment(options.identifier),
+			source: 'identifier'
+		}
 	}
 
 	const env = options.env ?? process.env
 	const envIdentifier = getPreviewIdentifierFromEnv(env)
-	if (envIdentifier) {
+	if (envIdentifier.identifier) {
 		return envIdentifier
 	}
 
 	return options.environment === 'preview'
-		? 'preview'
-		: undefined
+		? {
+			identifier: 'preview',
+			source: 'environment'
+		}
+		: {
+			identifier: undefined,
+			source: 'none'
+		}
 }
 
 function mapRecordValues<TValue>(
@@ -138,7 +166,7 @@ export function materializePreviewScopedString(
 	}
 
 	const scoped = decodePreviewScopedName(value)
-	const previewIdentifier = resolvePreviewIdentifier(options)
+	const previewIdentifier = resolvePreviewIdentifier(options).identifier
 
 	return previewIdentifier
 		? `${scoped.baseName}${scoped.separator}${previewIdentifier}`

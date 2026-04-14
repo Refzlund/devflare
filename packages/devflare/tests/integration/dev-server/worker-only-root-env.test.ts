@@ -1,81 +1,13 @@
 import { afterAll, describe, expect, test } from 'bun:test'
-import { cp, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
-import { createServer } from 'node:net'
+import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { fileURLToPath } from 'node:url'
-import { dirname, join } from 'pathe'
+import { join } from 'pathe'
 import { createDevServer, type DevServer } from '../../../src/dev-server'
+import { cleanupTempDirs, getAvailablePort, installBuiltDevflare } from '../helpers/built-devflare.helpers'
 
-const packageRoot = join(dirname(fileURLToPath(import.meta.url)), '../../../')
 const tempDirs: string[] = []
-let buildPromise: Promise<void> | null = null
-
-async function getAvailablePort(): Promise<number> {
-	return await new Promise((resolvePromise, rejectPromise) => {
-		const server = createServer()
-
-		server.on('error', rejectPromise)
-		server.listen(0, '127.0.0.1', () => {
-			const address = server.address()
-			if (!address || typeof address === 'string') {
-				server.close(() => rejectPromise(new Error('Could not determine an available port')))
-				return
-			}
-
-			const { port } = address
-			server.close((error) => {
-				if (error) {
-					rejectPromise(error)
-					return
-				}
-
-				resolvePromise(port)
-			})
-		})
-	})
-}
-
-async function ensurePackageBuilt(): Promise<void> {
-	if (!buildPromise) {
-		buildPromise = (async () => {
-			const build = Bun.spawn(['bun', 'run', 'build'], {
-				cwd: packageRoot,
-				stdout: 'pipe',
-				stderr: 'pipe'
-			})
-
-			const [stdout, stderr, exitCode] = await Promise.all([
-				new Response(build.stdout).text(),
-				new Response(build.stderr).text(),
-				build.exited
-			])
-
-			if (exitCode !== 0) {
-				throw new Error([
-					'Package build failed',
-					stdout.trim(),
-					stderr.trim()
-				].filter(Boolean).join('\n\n'))
-			}
-		})()
-	}
-
-	await buildPromise
-}
-
-async function installBuiltDevflare(projectDir: string): Promise<void> {
-	await ensurePackageBuilt()
-
-	const packagedDevflareDir = join(projectDir, 'node_modules', 'devflare')
-	await mkdir(packagedDevflareDir, { recursive: true })
-	await cp(join(packageRoot, 'package.json'), join(packagedDevflareDir, 'package.json'))
-	await cp(join(packageRoot, 'dist'), join(packagedDevflareDir, 'dist'), { recursive: true })
-}
-
 afterAll(async () => {
-	for (const tempDir of tempDirs) {
-		await rm(tempDir, { recursive: true, force: true })
-	}
+	await cleanupTempDirs(tempDirs)
 })
 
 describe('worker-only dev server root env imports', () => {

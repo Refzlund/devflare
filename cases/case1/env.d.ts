@@ -10,11 +10,8 @@ declare global {
 	}
 }
 
-declare module 'devflare/test' {
-	interface DevflareEnv {
-		CACHE: KVNamespace
-		LOG_LEVEL: string
-	}
-}
-
-export {}
+/**
+ * Named entrypoints (none discovered - add ep.*.ts files to enable).
+ * Use with defineConfig<Entrypoints>() for type-safe cross-worker references.
+ */
+export type Entrypoints = string

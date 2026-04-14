@@ -1,15 +1,17 @@
 import type { Handle } from '@sveltejs/kit'
 import { sequence } from '@sveltejs/kit/hooks'
 import { handle as devflareHandle } from '../../../packages/devflare/src/sveltekit/index'
-import { getTextDirection } from '$lib/paraglide/runtime'
 import { paraglideMiddleware } from '$lib/paraglide/server'
+import { getTextDirection } from '$lib/paraglide/runtime'
 
-const handleParaglide: Handle = ({ event, resolve }) => paraglideMiddleware(event.request, ({ request, locale }) => {
-	event.request = request
+const handleDocumentLocale: Handle = ({ event, resolve }) =>
+	paraglideMiddleware(event.request, ({ request: localizedRequest, locale }) => {
+		event.request = localizedRequest
 
-	return resolve(event, {
-		transformPageChunk: ({ html }) => html.replace('%paraglide.lang%', locale).replace('%paraglide.dir%', getTextDirection(locale))
+		return resolve(event, {
+			transformPageChunk: ({ html }) =>
+				html.replace('%paraglide.lang%', locale).replace('%paraglide.dir%', getTextDirection(locale))
+		})
 	})
-})
 
-export const handle: Handle = sequence(devflareHandle as Handle, handleParaglide)
+export const handle: Handle = sequence(devflareHandle as Handle, handleDocumentLocale)

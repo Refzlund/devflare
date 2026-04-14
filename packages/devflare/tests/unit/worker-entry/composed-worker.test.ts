@@ -68,4 +68,25 @@ export class Counter extends DurableObject<DevflareEnv> {}
 		const source = await readFile(join(TEST_DIR, composedEntry), 'utf-8')
 		expect(source).toContain("export { Counter } from '../../src/do.counter.ts'")
 	})
+
+	test('throws when an explicit fetch handler path is missing instead of silently falling back to src/fetch.ts', async () => {
+		await mkdir(join(TEST_DIR, 'src'), { recursive: true })
+		await writeFile(join(TEST_DIR, 'src', 'fetch.ts'), `
+export async function fetch(): Promise<Response> {
+	return new Response('default')
+}
+		`.trim())
+
+		const config = configSchema.parse({
+			name: 'explicit-fetch-path-test',
+			compatibilityDate: '2026-04-12',
+			files: {
+				fetch: 'src/custom-fetch.ts'
+			}
+		})
+
+		await expect(prepareComposedWorkerEntrypoint(TEST_DIR, config)).rejects.toThrow(
+			'Configured fetch handler "src/custom-fetch.ts" was not found'
+		)
+	})
 })

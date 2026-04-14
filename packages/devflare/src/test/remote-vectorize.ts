@@ -5,9 +5,7 @@
 // This allows testing Vectorize functionality without a running dev server.
 // =============================================================================
 
-import { getApiToken } from '../cloudflare/auth'
-import { getPrimaryAccount } from '../cloudflare/account'
-import { getEffectiveAccountId } from '../cloudflare/preferences'
+import { createRemoteCloudflareClient } from './remote-cloudflare'
 
 // -----------------------------------------------------------------------------
 // Remote Vectorize Binding
@@ -18,103 +16,35 @@ import { getEffectiveAccountId } from '../cloudflare/preferences'
  * Matches the Workers Vectorize binding interface.
  */
 export function createRemoteVectorize(indexName: string, accountId?: string): VectorizeIndex {
-	let resolvedAccountId: string | null = null
-
-	async function getAccountId(): Promise<string> {
-		if (accountId) return accountId
-		if (resolvedAccountId) return resolvedAccountId
-
-		const primary = await getPrimaryAccount()
-		if (!primary) {
-			throw new Error('No Cloudflare account found. Run: bunx wrangler login')
-		}
-
-		const { accountId: effectiveId } = await getEffectiveAccountId(primary.id)
-		resolvedAccountId = effectiveId
-		return effectiveId
-	}
-
-	async function getToken(): Promise<string> {
-		const token = await getApiToken()
-		if (!token) {
-			throw new Error('Not authenticated. Run: bunx wrangler login')
-		}
-		return token
-	}
+	const cloudflare = createRemoteCloudflareClient(accountId)
 
 	async function apiRequest<T>(
 		method: string,
 		endpoint: string,
 		body?: unknown
 	): Promise<T> {
-		const [acctId, token] = await Promise.all([getAccountId(), getToken()])
-
-		const url = `https://api.cloudflare.com/client/v4/accounts/${acctId}/vectorize/v2/indexes/${indexName}${endpoint}`
-
-		const response = await fetch(url, {
+		return cloudflare.jsonRequest<T>({
 			method,
-			headers: {
-				'Authorization': `Bearer ${token}`,
-				'Content-Type': 'application/json'
-			},
+			path: `/vectorize/v2/indexes/${indexName}${endpoint}`,
+			serviceLabel: 'Vectorize',
 			body: body ? JSON.stringify(body) : undefined
 		})
-
-		if (!response.ok) {
-			const errorText = await response.text()
-			throw new Error(`Vectorize API error (${response.status}): ${errorText}`)
-		}
-
-		const result = await response.json() as {
-			success: boolean
-			result: T
-			errors?: Array<{ message: string }>
-		}
-
-		if (!result.success) {
-			const message = result.errors?.[0]?.message || 'Unknown Vectorize error'
-			throw new Error(`Vectorize API error: ${message}`)
-		}
-
-		return result.result
 	}
 
 	async function ndjsonRequest<T>(
 		endpoint: string,
 		vectors: VectorizeVector[]
 	): Promise<T> {
-		const [acctId, token] = await Promise.all([getAccountId(), getToken()])
-		const url = `https://api.cloudflare.com/client/v4/accounts/${acctId}/vectorize/v2/indexes/${indexName}${endpoint}`
-
 		// Vectorize uses NDJSON for insert/upsert
 		const ndjson = vectors.map((v) => JSON.stringify(v)).join('\n')
 
-		const response = await fetch(url, {
+		return cloudflare.jsonRequest<T>({
 			method: 'POST',
-			headers: {
-				'Authorization': `Bearer ${token}`,
-				'Content-Type': 'application/x-ndjson'
-			},
+			path: `/vectorize/v2/indexes/${indexName}${endpoint}`,
+			serviceLabel: 'Vectorize',
+			contentType: 'application/x-ndjson',
 			body: ndjson
 		})
-
-		if (!response.ok) {
-			const errorText = await response.text()
-			throw new Error(`Vectorize API error (${response.status}): ${errorText}`)
-		}
-
-		const result = await response.json() as {
-			success: boolean
-			result: T
-			errors?: Array<{ message: string }>
-		}
-
-		if (!result.success) {
-			const message = result.errors?.[0]?.message || 'Unknown Vectorize error'
-			throw new Error(`Vectorize API error: ${message}`)
-		}
-
-		return result.result
 	}
 
 	// Create an object that implements VectorizeIndex via REST API

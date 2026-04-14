@@ -9,8 +9,6 @@
 	},
 	"baseLocale": "en",
 	"locales": [
-		"en",
-		"de",
-		"dk"
+		"en"
 	]
 }

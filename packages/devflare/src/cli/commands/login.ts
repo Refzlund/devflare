@@ -1,34 +1,9 @@
 import type { ConsolaInstance } from 'consola'
 import type { ParsedArgs, CliOptions, CliResult } from '../index'
 import { account } from '../../cloudflare'
-import { getWorkspaceAccountId } from '../../cloudflare/preferences'
-import { loadConfig, resolveConfigPath } from '../../config/loader'
+import { getConfiguredAccountId } from '../command-utils'
 import { getDependencies } from '../dependencies'
 import { createCliTheme, dim, green, logLine, yellow, whiteDim } from '../ui'
-
-async function getConfiguredAccountId(cwd: string): Promise<string | undefined> {
-	const workspaceAccountId = getWorkspaceAccountId()
-	if (workspaceAccountId) {
-		return workspaceAccountId
-	}
-
-	const envAccountId = process.env.CLOUDFLARE_ACCOUNT_ID?.trim()
-	if (envAccountId) {
-		return envAccountId
-	}
-
-	const configPath = await resolveConfigPath(cwd)
-	if (!configPath) {
-		return undefined
-	}
-
-	try {
-		const config = await loadConfig({ cwd })
-		return config.accountId
-	} catch {
-		return undefined
-	}
-}
 
 async function logResolvedAccount(cwd: string, logger: ConsolaInstance, theme: ReturnType<typeof createCliTheme>): Promise<void> {
 	try {

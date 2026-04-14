@@ -41,6 +41,42 @@ describe('vite plugin config generation', () => {
 		clearDependencies()
 	})
 
+	async function withResolvedPluginOutput(options: {
+		configSource: string
+		files: Record<string, string>
+		assert(projectDir: string): Promise<void>
+	}): Promise<void> {
+		const projectDir = await mkdtemp(join(tmpdir(), 'devflare-vite-config-'))
+
+		try {
+			await mkdir(join(projectDir, 'src'), { recursive: true })
+			await writeFile(join(projectDir, 'package.json'), JSON.stringify({
+				name: 'vite-config-test',
+				private: true,
+				type: 'module'
+			}, null, 2))
+			await writeFile(join(projectDir, 'devflare.config.ts'), options.configSource.trim())
+
+			for (const [relativePath, content] of Object.entries(options.files)) {
+				await writeFile(join(projectDir, relativePath), content)
+			}
+
+			const plugin = devflarePlugin()
+			if (!plugin.configResolved) {
+				throw new Error('Expected devflare Vite plugin to expose configResolved()')
+			}
+
+			await plugin.configResolved({
+				root: projectDir,
+				command: 'build'
+			} as any)
+
+			await options.assert(projectDir)
+		} finally {
+			await rm(projectDir, { recursive: true, force: true })
+		}
+	}
+
 	describe('compileConfig', () => {
 		test('compiles minimal config', () => {
 			const config: DevflareConfigInput = {
@@ -283,109 +319,72 @@ describe('vite plugin config generation', () => {
 	})
 
 	describe('plugin configResolved output', () => {
-		test('writes a composed fetch entry for .devflare/wrangler.jsonc', async () => {
-			const projectDir = await mkdtemp(join(tmpdir(), 'devflare-vite-config-'))
-
-			try {
-				await mkdir(join(projectDir, 'src'), { recursive: true })
-				await writeFile(join(projectDir, 'package.json'), JSON.stringify({
-					name: 'vite-config-test',
-					private: true,
-					type: 'module'
-				}, null, 2))
-				await writeFile(join(projectDir, 'devflare.config.ts'), `
-export default {
-	name: 'vite-config-test',
-	compatibilityDate: '2026-03-17',
-	files: {
-		fetch: 'src/fetch.ts'
-	}
-}
-`.trim())
-				await writeFile(join(projectDir, 'src', 'fetch.ts'), `export async function fetch(): Promise<Response> { return new Response('ok') }`)
-
-				const plugin = devflarePlugin()
-				if (!plugin.configResolved) {
-					throw new Error('Expected devflare Vite plugin to expose configResolved()')
+		test('preserves a direct fetch entry for build-mode wrangler output', async () => {
+			await withResolvedPluginOutput({
+				configSource: [
+					'export default {',
+					"\tname: 'vite-config-test',",
+					"\tcompatibilityDate: '2026-03-17',",
+					'\tfiles: {',
+					"\t\tfetch: 'src/fetch.ts'",
+					'\t}',
+					'}'
+				].join('\n'),
+				files: {
+					'src/fetch.ts': `export async function fetch(): Promise<Response> { return new Response('ok') }`
+				},
+				assert: async (projectDir) => {
+					const wranglerConfig = await readFile(join(projectDir, '.devflare', 'wrangler.jsonc'), 'utf8')
+					expect(wranglerConfig).toContain('"main": "../src/fetch.ts"')
+					await expect(access(join(projectDir, '.devflare', 'worker-entrypoints', 'main.ts'))).rejects.toThrow()
 				}
-
-				await plugin.configResolved({
-					root: projectDir,
-					command: 'build'
-				} as any)
-
-				const wranglerConfig = await readFile(join(projectDir, '.devflare', 'wrangler.jsonc'), 'utf8')
-				expect(wranglerConfig).toContain('"main": "worker-entrypoints/main.ts"')
-				const composedEntry = await readFile(join(projectDir, '.devflare', 'worker-entrypoints', 'main.ts'), 'utf8')
-				expect(composedEntry).toContain('src/fetch.ts')
-				expect(composedEntry).toContain('invokeFetchModule')
-			} finally {
-				await rm(projectDir, { recursive: true, force: true })
-			}
+			})
 		})
 
-		test('writes a composed worker entry for split handler files', async () => {
-			const projectDir = await mkdtemp(join(tmpdir(), 'devflare-vite-config-'))
-
-			try {
-				await mkdir(join(projectDir, 'src'), { recursive: true })
-				await writeFile(join(projectDir, 'package.json'), JSON.stringify({
-					name: 'vite-config-test',
-					private: true,
-					type: 'module'
-				}, null, 2))
-				await writeFile(join(projectDir, 'devflare.config.ts'), `
-export default {
-	name: 'vite-config-test',
-	compatibilityDate: '2026-03-17',
-	files: {
-		fetch: 'src/fetch.ts',
-		queue: 'src/queue.ts',
-		scheduled: 'src/scheduled.ts',
-		email: 'src/email.ts'
-	},
-	bindings: {
-		queues: {
-			producers: {
-				TASK_QUEUE: 'task-queue'
-			},
-			consumers: [
-				{
-					queue: 'task-queue'
+		test('preserves a direct fetch entry while retaining auxiliary bindings in build mode', async () => {
+			await withResolvedPluginOutput({
+				configSource: [
+					'export default {',
+					"\tname: 'vite-config-test',",
+					"\tcompatibilityDate: '2026-03-17',",
+					'\tfiles: {',
+					"\t\tfetch: 'src/fetch.ts',",
+					"\t\tqueue: 'src/queue.ts',",
+					"\t\tscheduled: 'src/scheduled.ts',",
+					"\t\temail: 'src/email.ts'",
+					'\t},',
+					'\tbindings: {',
+					'\t\tqueues: {',
+					'\t\t\tproducers: {',
+					"\t\t\t\tTASK_QUEUE: 'task-queue'",
+					'\t\t\t},',
+					'\t\t\tconsumers: [',
+					'\t\t\t\t{',
+					"\t\t\t\t\tqueue: 'task-queue'",
+					'\t\t\t\t}',
+					'\t\t\t]',
+					'\t\t}',
+					'\t},',
+					'\ttriggers: {',
+					"\t\tcrons: ['0 * * * *']",
+					'\t}',
+					'}'
+				].join('\n'),
+				files: {
+					'src/fetch.ts': `export async function fetch(): Promise<Response> { return new Response('ok') }`,
+					'src/queue.ts': `export async function queue(): Promise<void> { return undefined }`,
+					'src/scheduled.ts': `export async function scheduled(): Promise<void> { return undefined }`,
+					'src/email.ts': `export async function email() { return undefined }`
+				},
+				assert: async (projectDir) => {
+					const wranglerConfig = await readFile(join(projectDir, '.devflare', 'wrangler.jsonc'), 'utf8')
+					expect(wranglerConfig).toContain('"main": "../src/fetch.ts"')
+					expect(wranglerConfig).toContain('"binding": "TASK_QUEUE"')
+					expect(wranglerConfig).toContain('"queue": "task-queue"')
+					expect(wranglerConfig).toContain('"crons": [')
+					await expect(access(join(projectDir, '.devflare', 'worker-entrypoints', 'main.ts'))).rejects.toThrow()
 				}
-			]
-		}
-	},
-	triggers: {
-		crons: ['0 * * * *']
-	}
-}
-`.trim())
-				await writeFile(join(projectDir, 'src', 'fetch.ts'), `export async function fetch(): Promise<Response> { return new Response('ok') }`)
-				await writeFile(join(projectDir, 'src', 'queue.ts'), `export async function queue(): Promise<void> { return undefined }`)
-				await writeFile(join(projectDir, 'src', 'scheduled.ts'), `export async function scheduled(): Promise<void> { return undefined }`)
-				await writeFile(join(projectDir, 'src', 'email.ts'), `export async function email() { return undefined }`)
-
-				const plugin = devflarePlugin()
-				if (!plugin.configResolved) {
-					throw new Error('Expected devflare Vite plugin to expose configResolved()')
-				}
-
-				await plugin.configResolved({
-					root: projectDir,
-					command: 'build'
-				} as any)
-
-				const wranglerConfig = await readFile(join(projectDir, '.devflare', 'wrangler.jsonc'), 'utf8')
-				expect(wranglerConfig).toContain('"main": "worker-entrypoints/main.ts"')
-				const composedEntry = await readFile(join(projectDir, '.devflare', 'worker-entrypoints', 'main.ts'), 'utf8')
-				expect(composedEntry).toContain('src/fetch.ts')
-				expect(composedEntry).toContain('src/queue.ts')
-				expect(composedEntry).toContain('src/scheduled.ts')
-				expect(composedEntry).toContain('src/email.ts')
-			} finally {
-				await rm(projectDir, { recursive: true, force: true })
-			}
+			})
 		})
 
 		test('preserves an explicit wrangler passthrough main instead of generating a composed entry', async () => {

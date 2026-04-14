@@ -1,0 +1,81 @@
+{
+	"$schema": "https://turbo.build/schema.json",
+	"globalDependencies": [
+		"bun.lock",
+		"package.json",
+		"tsconfig.json",
+		"cases/tsconfig.base.json",
+		"biome.json",
+		".env.example"
+	],
+	"tasks": {
+		"transit": {
+			"dependsOn": [
+				"^transit"
+			]
+		},
+		"build": {
+			"dependsOn": [
+				"^build"
+			],
+			"outputs": [
+				"dist/**",
+				".svelte-kit/**",
+				".devflare/**",
+				".wrangler/deploy/**",
+				"env.d.ts",
+				"src/lib/paraglide/**"
+			]
+		},
+		"test": {
+			"dependsOn": [
+				"^build",
+				"transit"
+			],
+			"outputs": []
+		},
+		"test:watch": {
+			"cache": false,
+			"persistent": true
+		},
+		"types": {
+			"dependsOn": [
+				"^build",
+				"transit"
+			],
+			"outputs": [
+				"env.d.ts"
+			]
+		},
+		"typecheck": {
+			"dependsOn": [
+				"transit"
+			],
+			"outputs": []
+		},
+		"check": {
+			"dependsOn": [
+				"^build",
+				"transit"
+			],
+			"outputs": [
+				".svelte-kit/**",
+				"src/lib/paraglide/**",
+				"env.d.ts"
+			]
+		},
+		"dev": {
+			"cache": false,
+			"persistent": true
+		},
+		"deploy": {
+			"cache": false
+		},
+		"//#lint:root": {
+			"outputs": []
+		},
+		"//#typecheck:root": {
+			"outputs": []
+		}
+	}
+}

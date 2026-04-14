@@ -96,7 +96,7 @@ function createReadonlyProxy<T extends object>(
  *   const value = await env.MY_KV.get('key')
  *   const dbResult = await env.DB.prepare('SELECT * FROM users').all()
 	 *   return new Response(JSON.stringify({
-	 *     path: new URL(event.request.url).pathname,
+	 *     path: event.url.pathname,
 	 *     value,
 	 *     dbResult
 	 *   }))
@@ -130,7 +130,7 @@ export const env: Readonly<DevflareEnv> = createReadonlyProxy(
  *
 	 * export async function fetch(event: FetchEvent) {
  *   const response = new Response('OK')
-	 *   ctx.waitUntil(analytics.track(new URL(event.request.url).pathname))
+	 *   ctx.waitUntil(analytics.track(event.url.pathname))
  *   return response
  * }
  * ```
@@ -162,7 +162,7 @@ export const ctx: Readonly<RuntimeContextValue> = createReadonlyProxy(
  *
 	 * export async function fetch(event: FetchEvent) {
 	 *   console.log(runtimeEvent.type)
-	 *   console.log(event.request.url)
+	 *   console.log(event.url.pathname)
  * }
  *
 	 * export async function scheduled(event: ScheduledEvent) {

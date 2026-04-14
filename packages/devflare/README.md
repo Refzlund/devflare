@@ -22,18 +22,35 @@ For the deeper public contract, caveats, and current feature boundaries, see [`L
 
 ---
 
+## Monorepo contributor workflow
+
+When you are working on `packages/devflare` inside this monorepo, use the repo-root Turbo scripts instead of assembling ad-hoc commands by hand:
+
+- `bun run devflare:dev`
+- `bun run devflare:test:watch`
+- `bun run devflare:build`
+- `bun run devflare:typecheck`
+- `bun run devflare:test`
+- `bun run devflare:types`
+- `bun run devflare:check`
+- `bun run devflare:ci`
+
+These scripts intentionally keep the default shared lane focused on the parts of the workspace that are currently stable in local development and CI. In particular, the shared test lane excludes `@devflare/case5-multi-worker`, and the shared check lane stays centered on `apps/documentation` because `cases/case18` still expects Cloudflare-backed resource resolution outside the default contributor workflow.
+
+---
+
 ## Install
 
-For a worker-only project, Devflare works fine with just the Worker toolchain:
+For a worker-only project, the smallest install is just Devflare:
 
 ```bash
-bun add -d devflare wrangler @cloudflare/workers-types
+bun add -d devflare
 ```
 
 If the current package also uses Vite, add Vite and the Cloudflare Vite plugin too:
 
 ```bash
-bun add -d devflare wrangler @cloudflare/workers-types vite @cloudflare/vite-plugin
+bun add -d devflare vite @cloudflare/vite-plugin
 ```
 
 A local `vite.config.*` opts that package into Vite-backed flows. Without one, Devflare stays in worker-only mode.
@@ -65,8 +82,7 @@ Use `devflare/config` for config files so Bun only loads the lightweight config 
 // src/fetch.ts
 import type { FetchEvent } from 'devflare/runtime'
 
-export async function fetch({ request }: FetchEvent): Promise<Response> {
-	const url = new URL(request.url)
+export async function fetch({ url }: FetchEvent): Promise<Response> {
 	return new Response(
 		url.pathname === '/'
 			? 'Hello from Devflare'
@@ -195,8 +211,8 @@ async function corsHandle(event: FetchEvent, resolve: ResolveFetch): Promise<Res
 	return next
 }
 
-async function appFetch({ request }: FetchEvent): Promise<Response> {
-	return Response.json({ path: new URL(request.url).pathname })
+async function appFetch({ url }: FetchEvent): Promise<Response> {
+	return Response.json({ path: url.pathname })
 }
 
 export const handle = sequence(corsHandle, appFetch)
@@ -479,7 +495,7 @@ Devflare natively models:
 - `sendEmail` is modeled through config compilation, generated env types, and local runtime/test flows
 - R2 bindings are real in local dev/test/runtime flows, but Devflare does **not** publish a stable browser-facing local bucket URL contract; browser-visible local asset flows should go through your Worker routes
 
-For R2 delivery strategy guidance, see [`R2.md`](./R2.md).
+For R2 delivery strategy guidance, use the `R2 uploads & delivery` page in the documentation site.
 
 For D1 and Hyperdrive, prefer stable config names when you can:
 
@@ -538,7 +554,7 @@ Short version:
 - in worker-only mode, Devflare now bundles the composed main worker to `.devflare/worker-entrypoints/main.js` via Rolldown before handing it to Miniflare or Wrangler
 - Rolldown still rebuilds Durable Object worker code in unified Vite dev flows where Vite hosts the outer app
 
-For the full contract-level explanation and a concrete Rolldown + Svelte example, see [`LLM.md`](./LLM.md).
+For the full contract-level explanation and a concrete Rolldown + Svelte example, see the generated [`LLM.md`](./LLM.md) handbook entries for workflow modes and Svelte in workers.
 
 ---
 
@@ -827,6 +843,12 @@ It also auto-detects conventional `src/fetch.ts`, `src/queue.ts`, `src/scheduled
 
 ## CLI
 
+Every top-level command supports `--help`, and nested command groups support both:
+
+- `bunx --bun devflare <command> --help`
+- `bunx --bun devflare <command> <subcommand> --help`
+- `bunx --bun devflare help <command> [subcommand]`
+
 | Command | What it does |
 |---|---|
 | `devflare init` | scaffold a project using `src/fetch.ts` and explicit `files.fetch` |
@@ -839,9 +861,32 @@ It also auto-detects conventional `src/fetch.ts`, `src/queue.ts`, `src/scheduled
 | `devflare account` | inspect accounts, resources, usage, and limits |
 | `devflare login` | authenticate with Cloudflare via Wrangler, reusing existing auth unless `--force` is passed |
 | `devflare previews` | inspect, provision, reconcile, retire, and clean up the Devflare preview registry |
+| `devflare productions` | inspect live production Workers, list recent versions, roll back, or delete a live Worker script |
+| `devflare worker` | run Worker control-plane actions such as remote renaming and local config sync |
 | `devflare tokens` | create, list, and delete Devflare-managed account-owned tokens from a bootstrap token with API-token-management permission |
+| `devflare help` | print the command overview or the detailed help page for a command path |
+| `devflare version` | print the installed Devflare version |
 | `devflare ai` | show Workers AI model pricing info |
 | `devflare remote` | manage remote test mode |
+
+Legacy aliases:
+
+- `devflare token` is the legacy alias for `devflare tokens`
+- `devflare config` defaults to `devflare config print`
+- `devflare previews` defaults to `devflare previews list`
+- `devflare productions` defaults to `devflare productions list`
+
+### Command groups
+
+| Group | Subcommands / operations |
+|---|---|
+| `account` | `info`, `workers`, `kv`, `d1`, `r2`, `vectorize`, `usage`, `limits`, `limits set`, `limits enable`, `limits disable`, `global`, `workspace` |
+| `config` | `print` |
+| `previews` | `list`, `bindings`, `provision`, `reconcile`, `cleanup`, `retire`, `cleanup-resources` |
+| `productions` | `list`, `versions`, `rollback`, `delete` |
+| `remote` | `status`, `enable`, `disable` |
+| `worker` | `rename` |
+| `tokens` | `--list`, `--new`, `--roll`, `--delete`, `--delete-all` (flag-driven operations rather than subcommands) |
 
 Useful flags:
 
@@ -869,6 +914,8 @@ Recommended invocation style:
 bunx --bun devflare dev
 bunx --bun devflare types
 bunx --bun devflare build
+bunx --bun devflare help account limits set
+bunx --bun devflare previews cleanup-resources --help
 ```
 
 ---

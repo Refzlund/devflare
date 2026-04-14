@@ -1,33 +1,9 @@
-import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'pathe'
 import { runConfigCommand } from '../../../src/cli/commands/config'
-
-interface TestLogger {
-	info: ReturnType<typeof mock>
-	warn: ReturnType<typeof mock>
-	error: ReturnType<typeof mock>
-	success: ReturnType<typeof mock>
-	debug: ReturnType<typeof mock>
-	messages: Array<{ level: string; args: unknown[] }>
-}
-
-function createLogger(): TestLogger {
-	const messages: Array<{ level: string; args: unknown[] }> = []
-	const createMethod = (level: string) => mock((...args: unknown[]) => {
-		messages.push({ level, args })
-	})
-
-	return {
-		info: createMethod('info'),
-		warn: createMethod('warn'),
-		error: createMethod('error'),
-		success: createMethod('success'),
-		debug: createMethod('debug'),
-		messages
-	}
-}
+import { createLogger } from '../../helpers/mock-logger'
 
 describe('runConfigCommand', () => {
 	let projectDir: string
@@ -56,7 +32,7 @@ export default {
 	})
 
 	test('prints resolved devflare config JSON', async () => {
-		const logger = createLogger()
+		const logger = createLogger({ includeLog: false })
 		const result = await runConfigCommand(
 			{ command: 'config', args: ['print'], options: { json: true } },
 			logger as any,
@@ -70,7 +46,7 @@ export default {
 	})
 
 	test('prints resolved wrangler config JSON', async () => {
-		const logger = createLogger()
+		const logger = createLogger({ includeLog: false })
 		const result = await runConfigCommand(
 			{ command: 'config', args: ['print'], options: { format: 'wrangler', json: true } },
 			logger as any,

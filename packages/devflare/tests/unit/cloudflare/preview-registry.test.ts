@@ -1,100 +1,134 @@
 import { afterEach, describe, expect, mock, test } from 'bun:test'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import {
 	getPreviewRegistryContext,
 	reconcilePreviewRegistry,
 	retirePreviewRegistry
 } from '../../../src/cloudflare/preview-registry'
+import { createTrackedTempDirectories } from '../../helpers/tracked-temp-directories'
+import {
+	capturePreviewTestEnvironmentSnapshot,
+	createD1ResultsResponse,
+	createDeploymentRecordFixture,
+	createPreviewAliasRecordFixture,
+	createPreviewRecordFixture,
+	createRegistryDatabaseListResponse,
+	createRegistryDatabaseRecord,
+	createSerializedRegistryRecord,
+	jsonResponse,
+	restorePreviewTestEnvironmentSnapshot
+} from '../cli/previews.test-utils'
 
-function jsonResponse(result: unknown, resultInfo?: Record<string, number>): Response {
-	return new Response(JSON.stringify({
-		success: true,
-		errors: [],
-		messages: [],
-		result,
-		...(resultInfo ? { result_info: resultInfo } : {})
-	}), {
-		headers: {
-			'Content-Type': 'application/json'
-		}
-	})
+const originalEnvironment = capturePreviewTestEnvironmentSnapshot()
+const temporaryCacheDirectories = createTrackedTempDirectories()
+const defaultReconcileRequest = {
+	accountId: 'acc_123',
+	workerName: 'demo-worker',
+	versionId: '5dba9570-33c4-4375-b784-e1b34ad01569',
+	previewAlias: 'feature-branch',
+	previewUrl: 'https://5dba9570-demo-worker.example-subdomain.workers.dev',
+	previewAliasUrl: 'https://feature-branch-demo-worker.example-subdomain.workers.dev',
+	branchName: 'feature/branch',
+	commitSha: 'abcdef1234567',
+	source: 'cli' as const
 }
 
-function createD1Result(results: unknown[] = []): Response {
-	return jsonResponse([
-		{
-			success: true,
-			meta: {
-				served_by: 'test',
-				duration: 0,
-				changes: 0,
-				last_row_id: 0,
-				changed_db: false,
-				size_after: 0,
-				rows_read: results.length,
-				rows_written: 0
-			},
-			results
+function createPreviewRegistryFetch(options: {
+	recordedSql?: string[]
+	versionsItems?: Array<Record<string, unknown>>
+	versionDetail?: Record<string, unknown>
+	deployments?: Array<Record<string, unknown>>
+	previewRecords?: Array<Record<string, unknown>>
+	previewAliasRecords?: Array<Record<string, unknown>>
+	deploymentRecords?: Array<Record<string, unknown>>
+	recordedStatements?: Array<{ sql: string; params: unknown[] }>
+} = {}): typeof fetch {
+	return mock(async (input: RequestInfo | URL, init?: RequestInit) => {
+		const url = String(input)
+
+		if (url.includes('/accounts/acc_123/d1/database?page=1&per_page=50')) {
+			return createRegistryDatabaseListResponse([
+				createRegistryDatabaseRecord({ fileSize: 4096 })
+			])
 		}
-	])
+
+		if (url.endsWith('/accounts/acc_123/workers/subdomain')) {
+			return jsonResponse({
+				subdomain: 'example-subdomain'
+			})
+		}
+
+		if (url.includes('/accounts/acc_123/workers/scripts/demo-worker/versions?page=1&per_page=100')) {
+			return jsonResponse({
+				items: options.versionsItems ?? []
+			})
+		}
+
+		if (url.endsWith('/accounts/acc_123/workers/scripts/demo-worker/versions/5dba9570-33c4-4375-b784-e1b34ad01569')) {
+			if (options.versionDetail) {
+				return jsonResponse(options.versionDetail)
+			}
+		}
+
+		if (url.endsWith('/accounts/acc_123/workers/scripts/demo-worker/deployments')) {
+			return jsonResponse({
+				deployments: options.deployments ?? []
+			})
+		}
+
+		if (url.endsWith('/accounts/acc_123/d1/database/db_123/query')) {
+			const body = typeof init?.body === 'string' ? JSON.parse(init.body) : {}
+			const sql = String(body.sql ?? '')
+			options.recordedSql?.push(sql)
+			if (options.recordedStatements) {
+				options.recordedStatements.push({
+					sql,
+					params: Array.isArray(body.params) ? body.params : []
+				})
+			}
+
+			if (sql.startsWith('SELECT payload_json FROM devflare_preview_records')) {
+				return createD1ResultsResponse((options.previewRecords ?? []).map(createSerializedRegistryRecord))
+			}
+
+			if (sql.startsWith('SELECT payload_json FROM devflare_preview_alias_records')) {
+				return createD1ResultsResponse((options.previewAliasRecords ?? []).map(createSerializedRegistryRecord))
+			}
+
+			if (sql.startsWith('SELECT payload_json FROM devflare_deployment_records')) {
+				return createD1ResultsResponse((options.deploymentRecords ?? []).map(createSerializedRegistryRecord))
+			}
+
+			return createD1ResultsResponse()
+		}
+
+		throw new Error(`Unexpected fetch URL: ${url}`)
+	}) as unknown as typeof fetch
 }
 
-const originalFetch = globalThis.fetch
-const originalToken = process.env.CLOUDFLARE_API_TOKEN
-const originalCacheDir = process.env.DEVFLARE_CACHE_DIR
-const temporaryCacheDirectories = new Set<string>()
-
-function createTemporaryCacheDir(): string {
-	const directory = mkdtempSync(join(tmpdir(), 'devflare-preview-registry-'))
-	temporaryCacheDirectories.add(directory)
-	return directory
+function expectRegistryInsertStatements(recordedSql: string[]): void {
+	expect(recordedSql.some((sql) => sql.startsWith('INSERT INTO devflare_preview_records'))).toBe(true)
+	expect(recordedSql.some((sql) => sql.startsWith('INSERT INTO devflare_preview_alias_records'))).toBe(true)
+	expect(recordedSql.some((sql) => sql.startsWith('INSERT INTO devflare_deployment_records'))).toBe(true)
 }
 
 afterEach(() => {
-	globalThis.fetch = originalFetch
-	if (originalToken === undefined) {
-		delete process.env.CLOUDFLARE_API_TOKEN
-	} else {
-		process.env.CLOUDFLARE_API_TOKEN = originalToken
-	}
-	if (originalCacheDir === undefined) {
-		delete process.env.DEVFLARE_CACHE_DIR
-	} else {
-		process.env.DEVFLARE_CACHE_DIR = originalCacheDir
-	}
-	for (const directory of temporaryCacheDirectories) {
-		rmSync(directory, { recursive: true, force: true })
-	}
-	temporaryCacheDirectories.clear()
+	restorePreviewTestEnvironmentSnapshot(originalEnvironment)
+	temporaryCacheDirectories.cleanup()
 })
 
 describe('preview registry', () => {
 	test('caches registry discovery locally to avoid repeated D1 listing', async () => {
 		process.env.CLOUDFLARE_API_TOKEN = 'cf_test_token'
-		process.env.DEVFLARE_CACHE_DIR = createTemporaryCacheDir()
+		process.env.DEVFLARE_CACHE_DIR = temporaryCacheDirectories.create('devflare-preview-registry-')
 		let databaseListRequests = 0
 		globalThis.fetch = mock(async (input: RequestInfo | URL) => {
 			const url = String(input)
 
 			if (url.includes('/accounts/acc_123/d1/database?page=1&per_page=50')) {
 				databaseListRequests += 1
-				return jsonResponse([
-					{
-						uuid: 'db_123',
-						name: 'devflare-registry',
-						version: 'alpha',
-						num_tables: 3,
-						file_size: 4096
-					}
-				], {
-					page: 1,
-					per_page: 50,
-					total_pages: 1,
-					count: 1,
-					total_count: 1
-				})
+				return createRegistryDatabaseListResponse([
+					createRegistryDatabaseRecord({ fileSize: 4096 })
+				])
 			}
 
 			throw new Error(`Unexpected fetch URL: ${url}`)
@@ -115,109 +149,43 @@ describe('preview registry', () => {
 	test('reconciles live preview and deployment records into the registry', async () => {
 		process.env.CLOUDFLARE_API_TOKEN = 'cf_test_token'
 		const recordedSql: string[] = []
-		globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
-			const url = String(input)
-
-			if (url.includes('/accounts/acc_123/d1/database?page=1&per_page=50')) {
-				return jsonResponse([
-					{
-						uuid: 'db_123',
-						name: 'devflare-registry',
-						version: 'alpha',
-						num_tables: 3,
-						file_size: 4096
+		globalThis.fetch = createPreviewRegistryFetch({
+			recordedSql,
+			versionsItems: [
+				{
+					id: defaultReconcileRequest.versionId,
+					number: 7,
+					metadata: {
+						author_id: 'user_123',
+						created_on: '2025-01-01T00:00:00.000Z',
+						modified_on: '2025-01-01T00:00:00.000Z',
+						hasPreview: true,
+						source: 'wrangler'
 					}
-				], {
-					page: 1,
-					per_page: 50,
-					total_pages: 1,
-					count: 1,
-					total_count: 1
-				})
-			}
-
-			if (url.endsWith('/accounts/acc_123/workers/subdomain')) {
-				return jsonResponse({
-					subdomain: 'example-subdomain'
-				})
-			}
-
-			if (url.includes('/accounts/acc_123/workers/scripts/demo-worker/versions?page=1&per_page=100')) {
-				return jsonResponse({
-					items: [
+				}
+			],
+			deployments: [
+				{
+					id: 'deployment_123',
+					created_on: '2025-01-02T00:00:00.000Z',
+					source: 'wrangler',
+					strategy: 'percentage',
+					versions: [
 						{
-							id: '5dba9570-33c4-4375-b784-e1b34ad01569',
-							number: 7,
-							metadata: {
-								author_id: 'user_123',
-								created_on: '2025-01-01T00:00:00.000Z',
-								modified_on: '2025-01-01T00:00:00.000Z',
-								hasPreview: true,
-								source: 'wrangler'
-							}
+							percentage: 100,
+							version_id: defaultReconcileRequest.versionId
 						}
-					]
-				})
-			}
-
-			if (url.endsWith('/accounts/acc_123/workers/scripts/demo-worker/deployments')) {
-				return jsonResponse({
-					deployments: [
-						{
-							id: 'deployment_123',
-							created_on: '2025-01-02T00:00:00.000Z',
-							source: 'wrangler',
-							strategy: 'percentage',
-							versions: [
-								{
-									percentage: 100,
-									version_id: '5dba9570-33c4-4375-b784-e1b34ad01569'
-								}
-							],
-							annotations: {
-								'workers/message': 'Deploy preview branch',
-								'workers/triggered_by': 'upload'
-							},
-							author_email: 'dev@example.com'
-						}
-					]
-				})
-			}
-
-			if (url.endsWith('/accounts/acc_123/d1/database/db_123/query')) {
-				const body = typeof init?.body === 'string' ? JSON.parse(init.body) : {}
-				const sql = String(body.sql ?? '')
-				recordedSql.push(sql)
-
-				if (sql.startsWith('SELECT payload_json FROM devflare_preview_records')) {
-					return createD1Result()
+					],
+					annotations: {
+						'workers/message': 'Deploy preview branch',
+						'workers/triggered_by': 'upload'
+					},
+					author_email: 'dev@example.com'
 				}
-
-				if (sql.startsWith('SELECT payload_json FROM devflare_preview_alias_records')) {
-					return createD1Result()
-				}
-
-				if (sql.startsWith('SELECT payload_json FROM devflare_deployment_records')) {
-					return createD1Result()
-				}
-
-				return createD1Result()
-			}
-
-			throw new Error(`Unexpected fetch URL: ${url}`)
-		}) as unknown as typeof fetch
-
-		const result = await reconcilePreviewRegistry({
-			accountId: 'acc_123',
-			workerName: 'demo-worker',
-			versionId: '5dba9570-33c4-4375-b784-e1b34ad01569',
-			previewAlias: 'feature-branch',
-			previewUrl: 'https://5dba9570-demo-worker.example-subdomain.workers.dev',
-			previewAliasUrl: 'https://feature-branch-demo-worker.example-subdomain.workers.dev',
-			branchName: 'feature/branch',
-			commitSha: 'abcdef1234567',
-			source: 'cli'
+			]
 		})
+
+		const result = await reconcilePreviewRegistry(defaultReconcileRequest)
 
 		expect(result.registry.databaseName).toBe('devflare-registry')
 		expect(result.previews).toHaveLength(1)
@@ -227,227 +195,76 @@ describe('preview registry', () => {
 		expect(result.previewAliases[0].aliasPreviewUrl).toBe('https://feature-branch-demo-worker.example-subdomain.workers.dev')
 		expect(result.deployments.some((record) => record.channel === 'preview')).toBe(true)
 		expect(result.deployments.some((record) => record.channel === 'production')).toBe(true)
-		expect(recordedSql.some((sql) => sql.startsWith('INSERT INTO devflare_preview_records'))).toBe(true)
-		expect(recordedSql.some((sql) => sql.startsWith('INSERT INTO devflare_preview_alias_records'))).toBe(true)
-		expect(recordedSql.some((sql) => sql.startsWith('INSERT INTO devflare_deployment_records'))).toBe(true)
+		expectRegistryInsertStatements(recordedSql)
 	})
 
 	test('records the freshly uploaded preview even when listWorkerVersions does not surface it yet', async () => {
 		process.env.CLOUDFLARE_API_TOKEN = 'cf_test_token'
 		const recordedSql: string[] = []
-		globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
-			const url = String(input)
-
-			if (url.includes('/accounts/acc_123/d1/database?page=1&per_page=50')) {
-				return jsonResponse([
-					{
-						uuid: 'db_123',
-						name: 'devflare-registry',
-						version: 'alpha',
-						num_tables: 3,
-						file_size: 4096
-					}
-				], {
-					page: 1,
-					per_page: 50,
-					total_pages: 1,
-					count: 1,
-					total_count: 1
-				})
-			}
-
-			if (url.endsWith('/accounts/acc_123/workers/subdomain')) {
-				return jsonResponse({
-					subdomain: 'example-subdomain'
-				})
-			}
-
-			if (url.includes('/accounts/acc_123/workers/scripts/demo-worker/versions?page=1&per_page=100')) {
-				return jsonResponse({ items: [] })
-			}
-
-			if (url.endsWith('/accounts/acc_123/workers/scripts/demo-worker/versions/5dba9570-33c4-4375-b784-e1b34ad01569')) {
-				return jsonResponse({
-					id: '5dba9570-33c4-4375-b784-e1b34ad01569',
-					number: 7,
-					metadata: {
-						author_id: 'user_123',
-						created_on: '2025-01-01T00:00:00.000Z',
-						modified_on: '2025-01-01T00:00:00.000Z',
-						hasPreview: false,
-						source: 'wrangler'
-					}
-				})
-			}
-
-			if (url.endsWith('/accounts/acc_123/workers/scripts/demo-worker/deployments')) {
-				return jsonResponse({ deployments: [] })
-			}
-
-			if (url.endsWith('/accounts/acc_123/d1/database/db_123/query')) {
-				const body = typeof init?.body === 'string' ? JSON.parse(init.body) : {}
-				const sql = String(body.sql ?? '')
-				recordedSql.push(sql)
-
-				if (sql.startsWith('SELECT payload_json FROM devflare_preview_records')) {
-					return createD1Result()
+		globalThis.fetch = createPreviewRegistryFetch({
+			recordedSql,
+			versionsItems: [],
+			versionDetail: {
+				id: defaultReconcileRequest.versionId,
+				number: 7,
+				metadata: {
+					author_id: 'user_123',
+					created_on: '2025-01-01T00:00:00.000Z',
+					modified_on: '2025-01-01T00:00:00.000Z',
+					hasPreview: false,
+					source: 'wrangler'
 				}
-
-				if (sql.startsWith('SELECT payload_json FROM devflare_preview_alias_records')) {
-					return createD1Result()
-				}
-
-				if (sql.startsWith('SELECT payload_json FROM devflare_deployment_records')) {
-					return createD1Result()
-				}
-
-				return createD1Result()
-			}
-
-			throw new Error(`Unexpected fetch URL: ${url}`)
-		}) as unknown as typeof fetch
-
-		const result = await reconcilePreviewRegistry({
-			accountId: 'acc_123',
-			workerName: 'demo-worker',
-			versionId: '5dba9570-33c4-4375-b784-e1b34ad01569',
-			previewAlias: 'feature-branch',
-			previewUrl: 'https://5dba9570-demo-worker.example-subdomain.workers.dev',
-			previewAliasUrl: 'https://feature-branch-demo-worker.example-subdomain.workers.dev',
-			branchName: 'feature/branch',
-			commitSha: 'abcdef1234567',
-			source: 'cli'
+			},
+			deployments: []
 		})
+
+		const result = await reconcilePreviewRegistry(defaultReconcileRequest)
 
 		expect(result.previews).toHaveLength(1)
 		expect(result.previewAliases).toHaveLength(1)
 		expect(result.deployments).toHaveLength(1)
 		expect(result.previews[0].versionId).toBe('5dba9570-33c4-4375-b784-e1b34ad01569')
 		expect(result.previews[0].previewUrl).toBe('https://5dba9570-demo-worker.example-subdomain.workers.dev')
-		expect(recordedSql.some((sql) => sql.startsWith('INSERT INTO devflare_preview_records'))).toBe(true)
-		expect(recordedSql.some((sql) => sql.startsWith('INSERT INTO devflare_preview_alias_records'))).toBe(true)
-		expect(recordedSql.some((sql) => sql.startsWith('INSERT INTO devflare_deployment_records'))).toBe(true)
+		expectRegistryInsertStatements(recordedSql)
 	})
 
 	test('preserves locally tracked previews when Cloudflare cannot enumerate them during reconcile', async () => {
 		process.env.CLOUDFLARE_API_TOKEN = 'cf_test_token'
 		const recordedSql: string[] = []
-		globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
-			const url = String(input)
-
-			if (url.includes('/accounts/acc_123/d1/database?page=1&per_page=50')) {
-				return jsonResponse([
-					{
-						uuid: 'db_123',
-						name: 'devflare-registry',
-						version: 'alpha',
-						num_tables: 3,
-						file_size: 4096
-					}
-				], {
-					page: 1,
-					per_page: 50,
-					total_pages: 1,
-					count: 1,
-					total_count: 1
+		globalThis.fetch = createPreviewRegistryFetch({
+			recordedSql,
+			versionsItems: [],
+			deployments: [],
+			previewRecords: [
+				createPreviewRecordFixture({
+					workerName: 'demo-worker',
+					versionId: defaultReconcileRequest.versionId,
+					previewUrl: defaultReconcileRequest.previewUrl,
+					alias: defaultReconcileRequest.previewAlias,
+					aliasPreviewUrl: defaultReconcileRequest.previewAliasUrl
 				})
-			}
-
-			if (url.endsWith('/accounts/acc_123/workers/subdomain')) {
-				return jsonResponse({
-					subdomain: 'example-subdomain'
+			],
+			previewAliasRecords: [
+				createPreviewAliasRecordFixture({
+					workerName: 'demo-worker',
+					alias: defaultReconcileRequest.previewAlias,
+					aliasPreviewUrl: defaultReconcileRequest.previewAliasUrl,
+					versionId: defaultReconcileRequest.versionId
 				})
-			}
-
-			if (url.includes('/accounts/acc_123/workers/scripts/demo-worker/versions?page=1&per_page=100')) {
-				return jsonResponse({ items: [] })
-			}
-
-			if (url.endsWith('/accounts/acc_123/workers/scripts/demo-worker/deployments')) {
-				return jsonResponse({ deployments: [] })
-			}
-
-			if (url.endsWith('/accounts/acc_123/d1/database/db_123/query')) {
-				const body = typeof init?.body === 'string' ? JSON.parse(init.body) : {}
-				const sql = String(body.sql ?? '')
-				recordedSql.push(sql)
-
-				if (sql.startsWith('SELECT payload_json FROM devflare_preview_records')) {
-					return createD1Result([
-						{
-							payload_json: JSON.stringify({
-								id: 'preview:demo-worker:5dba9570-33c4-4375-b784-e1b34ad01569',
-								kind: 'preview',
-								ver: 1,
-								createdAt: '2025-01-01T00:00:00.000Z',
-								updatedAt: '2025-01-02T00:00:00.000Z',
-								createdBy: 'user_123',
-								accountId: 'acc_123',
-								workerName: 'demo-worker',
-								versionId: '5dba9570-33c4-4375-b784-e1b34ad01569',
-								previewUrl: 'https://5dba9570-demo-worker.example-subdomain.workers.dev',
-								alias: 'feature-branch',
-								aliasPreviewUrl: 'https://feature-branch-demo-worker.example-subdomain.workers.dev',
-								source: 'cli',
-								status: 'active'
-							})
-						}
-					])
-				}
-
-				if (sql.startsWith('SELECT payload_json FROM devflare_preview_alias_records')) {
-					return createD1Result([
-						{
-							payload_json: JSON.stringify({
-								id: 'previewAlias:demo-worker:feature-branch',
-								kind: 'previewAlias',
-								ver: 1,
-								createdAt: '2025-01-01T00:00:00.000Z',
-								updatedAt: '2025-01-02T00:00:00.000Z',
-								createdBy: 'user_123',
-								accountId: 'acc_123',
-								workerName: 'demo-worker',
-								alias: 'feature-branch',
-								aliasPreviewUrl: 'https://feature-branch-demo-worker.example-subdomain.workers.dev',
-								versionId: '5dba9570-33c4-4375-b784-e1b34ad01569',
-								previewId: 'preview:demo-worker:5dba9570-33c4-4375-b784-e1b34ad01569',
-								source: 'cli',
-								status: 'active'
-							})
-						}
-					])
-				}
-
-				if (sql.startsWith('SELECT payload_json FROM devflare_deployment_records')) {
-					return createD1Result([
-						{
-							payload_json: JSON.stringify({
-								id: 'deployment:demo-worker:preview:demo-worker:5dba9570-33c4-4375-b784-e1b34ad01569',
-								kind: 'deployment',
-								ver: 1,
-								createdAt: '2025-01-01T00:00:00.000Z',
-								updatedAt: '2025-01-02T00:00:00.000Z',
-								createdBy: 'user_123',
-								accountId: 'acc_123',
-								workerName: 'demo-worker',
-								deploymentId: 'preview:demo-worker:5dba9570-33c4-4375-b784-e1b34ad01569',
-								channel: 'preview',
-								status: 'active',
-								versionId: '5dba9570-33c4-4375-b784-e1b34ad01569',
-								previewId: 'preview:demo-worker:5dba9570-33c4-4375-b784-e1b34ad01569',
-								environment: 'preview',
-								url: 'https://feature-branch-demo-worker.example-subdomain.workers.dev',
-								source: 'cli'
-							})
-						}
-					])
-				}
-
-				return createD1Result()
-			}
-
-			throw new Error(`Unexpected fetch URL: ${url}`)
-		}) as unknown as typeof fetch
+			],
+			deploymentRecords: [
+				createDeploymentRecordFixture({
+					id: 'deployment:demo-worker:preview:demo-worker:5dba9570-33c4-4375-b784-e1b34ad01569',
+					workerName: 'demo-worker',
+					deploymentId: 'preview:demo-worker:5dba9570-33c4-4375-b784-e1b34ad01569',
+					channel: 'preview',
+					versionId: defaultReconcileRequest.versionId,
+					previewId: 'preview:demo-worker:5dba9570-33c4-4375-b784-e1b34ad01569',
+					environment: 'preview',
+					url: defaultReconcileRequest.previewAliasUrl
+				})
+			]
+		})
 
 		const result = await reconcilePreviewRegistry({
 			accountId: 'acc_123',
@@ -465,132 +282,51 @@ describe('preview registry', () => {
 	test('retires a targeted preview, alias, and preview deployment without touching production records', async () => {
 		process.env.CLOUDFLARE_API_TOKEN = 'cf_test_token'
 		const recordedStatements: Array<{ sql: string; params: unknown[] }> = []
-		globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
-			const url = String(input)
-
-			if (url.includes('/accounts/acc_123/d1/database?page=1&per_page=50')) {
-				return jsonResponse([
-					{
-						uuid: 'db_123',
-						name: 'devflare-registry',
-						version: 'alpha',
-						num_tables: 3,
-						file_size: 4096
-					}
-				], {
-					page: 1,
-					per_page: 50,
-					total_pages: 1,
-					count: 1,
-					total_count: 1
+		globalThis.fetch = createPreviewRegistryFetch({
+			recordedStatements,
+			previewRecords: [
+				createPreviewRecordFixture({
+					workerName: 'demo-worker',
+					versionId: defaultReconcileRequest.versionId,
+					previewUrl: defaultReconcileRequest.previewUrl,
+					alias: defaultReconcileRequest.previewAlias,
+					aliasPreviewUrl: defaultReconcileRequest.previewAliasUrl,
+					branchName: defaultReconcileRequest.branchName
 				})
-			}
-
-			if (url.endsWith('/accounts/acc_123/d1/database/db_123/query')) {
-				const body = typeof init?.body === 'string' ? JSON.parse(init.body) : {}
-				const sql = String(body.sql ?? '')
-				recordedStatements.push({
-					sql,
-					params: Array.isArray(body.params) ? body.params : []
+			],
+			previewAliasRecords: [
+				createPreviewAliasRecordFixture({
+					workerName: 'demo-worker',
+					alias: defaultReconcileRequest.previewAlias,
+					aliasPreviewUrl: defaultReconcileRequest.previewAliasUrl,
+					versionId: defaultReconcileRequest.versionId,
+					branchName: defaultReconcileRequest.branchName
 				})
-
-				if (sql.startsWith('SELECT payload_json FROM devflare_preview_records')) {
-					return createD1Result([
-						{
-							payload_json: JSON.stringify({
-								id: 'preview:demo-worker:5dba9570-33c4-4375-b784-e1b34ad01569',
-								kind: 'preview',
-								ver: 1,
-								createdAt: '2025-01-01T00:00:00.000Z',
-								updatedAt: '2025-01-02T00:00:00.000Z',
-								createdBy: 'user_123',
-								accountId: 'acc_123',
-								workerName: 'demo-worker',
-								versionId: '5dba9570-33c4-4375-b784-e1b34ad01569',
-								previewUrl: 'https://5dba9570-demo-worker.example-subdomain.workers.dev',
-								alias: 'feature-branch',
-								aliasPreviewUrl: 'https://feature-branch-demo-worker.example-subdomain.workers.dev',
-								branchName: 'feature/branch',
-								source: 'cli',
-								status: 'active'
-							})
-						}
-					])
-				}
-
-				if (sql.startsWith('SELECT payload_json FROM devflare_preview_alias_records')) {
-					return createD1Result([
-						{
-							payload_json: JSON.stringify({
-								id: 'previewAlias:demo-worker:feature-branch',
-								kind: 'previewAlias',
-								ver: 1,
-								createdAt: '2025-01-01T00:00:00.000Z',
-								updatedAt: '2025-01-02T00:00:00.000Z',
-								createdBy: 'user_123',
-								accountId: 'acc_123',
-								workerName: 'demo-worker',
-								alias: 'feature-branch',
-								aliasPreviewUrl: 'https://feature-branch-demo-worker.example-subdomain.workers.dev',
-								versionId: '5dba9570-33c4-4375-b784-e1b34ad01569',
-								previewId: 'preview:demo-worker:5dba9570-33c4-4375-b784-e1b34ad01569',
-								branchName: 'feature/branch',
-								source: 'cli',
-								status: 'active'
-							})
-						}
-					])
-				}
-
-				if (sql.startsWith('SELECT payload_json FROM devflare_deployment_records')) {
-					return createD1Result([
-						{
-							payload_json: JSON.stringify({
-								id: 'deployment:demo-worker:preview:demo-worker:5dba9570-33c4-4375-b784-e1b34ad01569',
-								kind: 'deployment',
-								ver: 1,
-								createdAt: '2025-01-01T00:00:00.000Z',
-								updatedAt: '2025-01-02T00:00:00.000Z',
-								createdBy: 'user_123',
-								accountId: 'acc_123',
-								workerName: 'demo-worker',
-								deploymentId: 'preview:demo-worker:5dba9570-33c4-4375-b784-e1b34ad01569',
-								channel: 'preview',
-								status: 'active',
-								versionId: '5dba9570-33c4-4375-b784-e1b34ad01569',
-								previewId: 'preview:demo-worker:5dba9570-33c4-4375-b784-e1b34ad01569',
-								environment: 'preview',
-								url: 'https://feature-branch-demo-worker.example-subdomain.workers.dev',
-								source: 'cli'
-							})
-						},
-						{
-							payload_json: JSON.stringify({
-								id: 'deployment:demo-worker:deployment_123',
-								kind: 'deployment',
-								ver: 1,
-								createdAt: '2025-01-03T00:00:00.000Z',
-								updatedAt: '2025-01-03T00:00:00.000Z',
-								createdBy: 'user_123',
-								accountId: 'acc_123',
-								workerName: 'demo-worker',
-								deploymentId: 'deployment_123',
-								channel: 'production',
-								status: 'active',
-								versionId: '7dba9570-33c4-4375-b784-e1b34ad01569',
-								environment: 'production',
-								url: 'https://demo-worker.example-subdomain.workers.dev',
-								source: 'cli'
-							})
-						}
-					])
-				}
-
-				return createD1Result()
-			}
-
-			throw new Error(`Unexpected fetch URL: ${url}`)
-		}) as unknown as typeof fetch
+			],
+			deploymentRecords: [
+				createDeploymentRecordFixture({
+					id: 'deployment:demo-worker:preview:demo-worker:5dba9570-33c4-4375-b784-e1b34ad01569',
+					workerName: 'demo-worker',
+					deploymentId: 'preview:demo-worker:5dba9570-33c4-4375-b784-e1b34ad01569',
+					channel: 'preview',
+					versionId: defaultReconcileRequest.versionId,
+					previewId: 'preview:demo-worker:5dba9570-33c4-4375-b784-e1b34ad01569',
+					environment: 'preview',
+					url: defaultReconcileRequest.previewAliasUrl
+				}),
+				createDeploymentRecordFixture({
+					id: 'deployment:demo-worker:deployment_123',
+					workerName: 'demo-worker',
+					deploymentId: 'deployment_123',
+					channel: 'production',
+					versionId: '7dba9570-33c4-4375-b784-e1b34ad01569',
+					environment: 'production',
+					url: 'https://demo-worker.example-subdomain.workers.dev',
+					createdAt: '2025-01-03T00:00:00.000Z',
+					updatedAt: '2025-01-03T00:00:00.000Z'
+				})
+			]
+		})
 
 		const result = await retirePreviewRegistry({
 			accountId: 'acc_123',

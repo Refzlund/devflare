@@ -25,42 +25,89 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Resolve testing auth service deploy impact
+        id: auth-impact
+        uses: ./.github/actions/devflare-deploy-impact
+        with:
+          target-package: testing-auth-service
+          default-branch: ${{ github.event.repository.default_branch }}
+          event-name: ${{ github.event_name }}
+          event-action: ${{ github.event.action || '' }}
+          push-before: ${{ github.event.before || '' }}
+          pull-request-base-sha: ${{ github.event.pull_request.base.sha || '' }}
+          pull-request-head-sha: ${{ github.event.pull_request.head.sha || '' }}
+          extra-paths: |
+            apps/testing/worker-names.ts
+
+      - name: Resolve testing search service deploy impact
+        id: search-impact
+        uses: ./.github/actions/devflare-deploy-impact
+        with:
+          target-package: testing-search-service
+          default-branch: ${{ github.event.repository.default_branch }}
+          event-name: ${{ github.event_name }}
+          event-action: ${{ github.event.action || '' }}
+          push-before: ${{ github.event.before || '' }}
+          pull-request-base-sha: ${{ github.event.pull_request.base.sha || '' }}
+          pull-request-head-sha: ${{ github.event.pull_request.head.sha || '' }}
+          extra-paths: |
+            apps/testing/worker-names.ts
+
+      - name: Resolve testing main preview deploy impact
+        id: main-impact
+        uses: ./.github/actions/devflare-deploy-impact
+        with:
+          target-package: testing
+          default-branch: ${{ github.event.repository.default_branch }}
+          event-name: ${{ github.event_name }}
+          event-action: ${{ github.event.action || '' }}
+          push-before: ${{ github.event.before || '' }}
+          pull-request-base-sha: ${{ github.event.pull_request.base.sha || '' }}
+          pull-request-head-sha: ${{ github.event.pull_request.head.sha || '' }}
 
       - name: Deploy testing auth service
         id: auth
+        if: ${{ steps.auth-impact.outputs.should-deploy == 'true' }}
         continue-on-error: true
         uses: ./.github/actions/devflare-deploy
         with:
           working-directory: apps/testing/workers/auth-service
           install-working-directory: .
+          preview-scope: ${{ env.DEVFLARE_PREVIEW_BRANCH }}
           cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           cloudflare-account-id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Deploy testing search service
         id: search
+        if: ${{ steps.search-impact.outputs.should-deploy == 'true' }}
         continue-on-error: true
         uses: ./.github/actions/devflare-deploy
         with:
           working-directory: apps/testing/workers/search-service
           install-working-directory: .
-          environment: staging
+          preview-scope: ${{ env.DEVFLARE_PREVIEW_BRANCH }}
           cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           cloudflare-account-id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Deploy testing PR preview
         id: deploy
+        if: ${{ steps.main-impact.outputs.should-deploy == 'true' }}
         continue-on-error: true
         uses: ./.github/actions/devflare-deploy
         with:
           working-directory: apps/testing
           install-working-directory: .
-          environment: preview
+          preview-scope: ${{ env.DEVFLARE_PREVIEW_BRANCH }}
           cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           cloudflare-account-id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Verify testing PR preview runtime bindings
         id: verify
-        if: ${{ always() }}
+        if: ${{ steps.main-impact.outputs.should-deploy == 'true' && always() }}
         continue-on-error: true
         shell: bash
         run: |
@@ -103,13 +150,13 @@ jobs:
           rm -f "$status_file"
 
       - name: Publish testing PR preview feedback
-        if: ${{ always() }}
+        if: ${{ always() && (steps.auth-impact.outputs.should-deploy == 'true' || steps.search-impact.outputs.should-deploy == 'true' || steps.main-impact.outputs.should-deploy == 'true') }}
         uses: ./.github/actions/devflare-github-feedback
         with:
           github-token: ${{ github.token }}
           mode: comment
           operation: report
-          status: ${{ steps.auth.outputs.status == 'success' && steps.search.outputs.status == 'success' && steps.deploy.outputs.status == 'success' && steps.verify.outcome == 'success' && 'success' || 'failure' }}
+          status: ${{ (steps.auth-impact.outputs.should-deploy != 'true' || steps.auth.outputs.status == 'success') && (steps.search-impact.outputs.should-deploy != 'true' || steps.search.outputs.status == 'success') && (steps.main-impact.outputs.should-deploy != 'true' || (steps.deploy.outputs.status == 'success' && steps.verify.outcome == 'success')) && 'success' || 'failure' }}
           title: Testing PR preview
           comment-key: testing-preview
           pr-number: ${{ github.event.pull_request.number }}
@@ -123,16 +170,19 @@ jobs:
           log-excerpt: ${{ steps.deploy.outputs.log-excerpt }}
           summary: This pull request gets a stable PR-scoped testing preview link that is updated in place on every preview run.
           details-markdown: |
+            - Auth impact: `${{ steps.auth-impact.outputs.should-deploy == 'true' && 'deploy' || 'skip' }}` (`${{ steps.auth-impact.outputs.reason }}`)
             - Auth service version: `${{ steps.auth.outputs.version-id || 'not available' }}`
+            - Search impact: `${{ steps.search-impact.outputs.should-deploy == 'true' && 'deploy' || 'skip' }}` (`${{ steps.search-impact.outputs.reason }}`)
             - Search service version: `${{ steps.search.outputs.version-id || 'not available' }}`
-            - Runtime binding verification: `${{ steps.verify.outcome == 'success' && 'passed' || 'failed' }}`
-            - Preview strategy: PR-scoped Worker names plus the `preview` environment, because the main worker uses Durable Objects.
+            - Main preview impact: `${{ steps.main-impact.outputs.should-deploy == 'true' && 'deploy' || 'skip' }}` (`${{ steps.main-impact.outputs.reason }}`)
+            - Runtime binding verification: `${{ steps.main-impact.outputs.should-deploy != 'true' && 'skipped' || (steps.verify.outcome == 'success' && 'passed' || 'failed') }}`
+            - Preview strategy: named preview scope via `--preview <name>` so the testing worker family deploys directly to the PR-scoped target.
             - PR scope: `#${{ github.event.pull_request.number }}`
-            - Auth deploy status: `${{ steps.auth.outputs.status || (steps.auth.outcome == 'success' && 'success' || 'failure') }}`
+            - Auth deploy status: `${{ steps.auth-impact.outputs.should-deploy != 'true' && 'skipped' || steps.auth.outputs.status || (steps.auth.outcome == 'success' && 'success' || 'failure') }}`
             - Auth failure stage: `${{ steps.auth.outputs.failure-stage || 'n/a' }}`
-            - Search deploy status: `${{ steps.search.outputs.status || (steps.search.outcome == 'success' && 'success' || 'failure') }}`
+            - Search deploy status: `${{ steps.search-impact.outputs.should-deploy != 'true' && 'skipped' || steps.search.outputs.status || (steps.search.outcome == 'success' && 'success' || 'failure') }}`
             - Search failure stage: `${{ steps.search.outputs.failure-stage || 'n/a' }}`
-            - Main preview deploy status: `${{ steps.deploy.outputs.status || (steps.deploy.outcome == 'success' && 'success' || 'failure') }}`
+            - Main preview deploy status: `${{ steps.main-impact.outputs.should-deploy != 'true' && 'skipped' || steps.deploy.outputs.status || (steps.deploy.outcome == 'success' && 'success' || 'failure') }}`
             - Main preview failure stage: `${{ steps.deploy.outputs.failure-stage || 'n/a' }}`
 
       - name: Summarize testing PR preview
@@ -142,20 +192,31 @@ jobs:
           {
             echo '### Testing PR preview workflow'
             echo ''
-            echo '- Preview strategy: PR-scoped Worker names plus the `preview` environment because the main worker uses Durable Objects'
-            echo '- GitHub feedback: stable PR comment updated in place'
-            echo "- Final status: \`${{ steps.auth.outputs.status == 'success' && steps.search.outputs.status == 'success' && steps.deploy.outputs.status == 'success' && steps.verify.outcome == 'success' && 'success' || 'failure' }}\`"
+            echo '- Preview strategy: named preview scope via `--preview <name>` so the testing worker family deploys to one explicit PR target'
+            echo '- GitHub feedback: stable PR comment updated in place when a new preview deployment is necessary'
+            if [ "${{ steps.auth-impact.outputs.should-deploy }}" != 'true' ] && [ "${{ steps.search-impact.outputs.should-deploy }}" != 'true' ] && [ "${{ steps.main-impact.outputs.should-deploy }}" != 'true' ]; then
+              echo '- Final status: `skipped`'
+              echo '- Summary: all testing deployment targets were unaffected, so the workflow kept the existing PR preview family as-is'
+            else
+              echo "- Final status: \`${{ (steps.auth-impact.outputs.should-deploy != 'true' || steps.auth.outputs.status == 'success') && (steps.search-impact.outputs.should-deploy != 'true' || steps.search.outputs.status == 'success') && (steps.main-impact.outputs.should-deploy != 'true' || (steps.deploy.outputs.status == 'success' && steps.verify.outcome == 'success')) && 'success' || 'failure' }}\`"
+            fi
             echo "- PR scope: \`#${{ github.event.pull_request.number }}\`"
             echo "- Source branch: \`${{ github.event.pull_request.head.ref }}\`"
-            echo "- Auth deploy status: \`${{ steps.auth.outputs.status || (steps.auth.outcome == 'success' && 'success' || 'failure') }}\`"
+            echo "- Auth impact: \`${{ steps.auth-impact.outputs.should-deploy == 'true' && 'deploy' || 'skip' }}\`"
+            echo "- Auth impact reason: ${{ steps.auth-impact.outputs.reason }}"
+            echo "- Auth deploy status: \`${{ steps.auth-impact.outputs.should-deploy != 'true' && 'skipped' || steps.auth.outputs.status || (steps.auth.outcome == 'success' && 'success' || 'failure') }}\`"
             if [ -n "${{ steps.auth.outputs.failure-stage }}" ]; then
               echo "- Auth failure stage: \`${{ steps.auth.outputs.failure-stage }}\`"
             fi
-            echo "- Search deploy status: \`${{ steps.search.outputs.status || (steps.search.outcome == 'success' && 'success' || 'failure') }}\`"
+            echo "- Search impact: \`${{ steps.search-impact.outputs.should-deploy == 'true' && 'deploy' || 'skip' }}\`"
+            echo "- Search impact reason: ${{ steps.search-impact.outputs.reason }}"
+            echo "- Search deploy status: \`${{ steps.search-impact.outputs.should-deploy != 'true' && 'skipped' || steps.search.outputs.status || (steps.search.outcome == 'success' && 'success' || 'failure') }}\`"
             if [ -n "${{ steps.search.outputs.failure-stage }}" ]; then
               echo "- Search failure stage: \`${{ steps.search.outputs.failure-stage }}\`"
             fi
-            echo "- Main preview deploy status: \`${{ steps.deploy.outputs.status || (steps.deploy.outcome == 'success' && 'success' || 'failure') }}\`"
+            echo "- Main preview impact: \`${{ steps.main-impact.outputs.should-deploy == 'true' && 'deploy' || 'skip' }}\`"
+            echo "- Main preview impact reason: ${{ steps.main-impact.outputs.reason }}"
+            echo "- Main preview deploy status: \`${{ steps.main-impact.outputs.should-deploy != 'true' && 'skipped' || steps.deploy.outputs.status || (steps.deploy.outcome == 'success' && 'success' || 'failure') }}\`"
             if [ -n "${{ steps.deploy.outputs.failure-stage }}" ]; then
               echo "- Main preview failure stage: \`${{ steps.deploy.outputs.failure-stage }}\`"
             fi
@@ -180,24 +241,24 @@ jobs:
             if [ -n "${{ steps.deploy.outputs.exit-code }}" ]; then
               echo "- Main preview exit code: \`${{ steps.deploy.outputs.exit-code }}\`"
             fi
-            echo "- Runtime binding verification: \`${{ steps.verify.outcome == 'success' && 'passed' || 'failed' }}\`"
+            echo "- Runtime binding verification: \`${{ steps.main-impact.outputs.should-deploy != 'true' && 'skipped' || (steps.verify.outcome == 'success' && 'passed' || 'failed') }}\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Fail when any testing PR preview deploy or verification step did not succeed
-        if: ${{ always() && (steps.auth.outputs.status != 'success' || steps.search.outputs.status != 'success' || steps.deploy.outputs.status != 'success' || steps.verify.outcome == 'failure' || steps.auth.outcome == 'failure' || steps.search.outcome == 'failure' || steps.deploy.outcome == 'failure') }}
+        if: ${{ always() && ((steps.auth-impact.outputs.should-deploy == 'true' && (steps.auth.outputs.status != 'success' || steps.auth.outcome == 'failure')) || (steps.search-impact.outputs.should-deploy == 'true' && (steps.search.outputs.status != 'success' || steps.search.outcome == 'failure')) || (steps.main-impact.outputs.should-deploy == 'true' && (steps.deploy.outputs.status != 'success' || steps.verify.outcome == 'failure' || steps.deploy.outcome == 'failure'))) }}
         shell: bash
         env:
-          AUTH_STATUS: ${{ steps.auth.outputs.status || (steps.auth.outcome == 'success' && 'success' || 'failure') }}
+          AUTH_STATUS: ${{ steps.auth-impact.outputs.should-deploy != 'true' && 'skipped' || steps.auth.outputs.status || (steps.auth.outcome == 'success' && 'success' || 'failure') }}
           AUTH_FAILURE_STAGE: ${{ steps.auth.outputs.failure-stage }}
           AUTH_EXIT_CODE: ${{ steps.auth.outputs.exit-code }}
           AUTH_VERSION_ID: ${{ steps.auth.outputs.version-id }}
           AUTH_LOG_EXCERPT: ${{ steps.auth.outputs.log-excerpt }}
-          SEARCH_STATUS: ${{ steps.search.outputs.status || (steps.search.outcome == 'success' && 'success' || 'failure') }}
+          SEARCH_STATUS: ${{ steps.search-impact.outputs.should-deploy != 'true' && 'skipped' || steps.search.outputs.status || (steps.search.outcome == 'success' && 'success' || 'failure') }}
           SEARCH_FAILURE_STAGE: ${{ steps.search.outputs.failure-stage }}
           SEARCH_EXIT_CODE: ${{ steps.search.outputs.exit-code }}
           SEARCH_VERSION_ID: ${{ steps.search.outputs.version-id }}
           SEARCH_LOG_EXCERPT: ${{ steps.search.outputs.log-excerpt }}
-          DEPLOY_STATUS: ${{ steps.deploy.outputs.status || (steps.deploy.outcome == 'success' && 'success' || 'failure') }}
+          DEPLOY_STATUS: ${{ steps.main-impact.outputs.should-deploy != 'true' && 'skipped' || steps.deploy.outputs.status || (steps.deploy.outcome == 'success' && 'success' || 'failure') }}
           DEPLOY_FAILURE_STAGE: ${{ steps.deploy.outputs.failure-stage }}
           DEPLOY_EXIT_CODE: ${{ steps.deploy.outputs.exit-code }}
           DEPLOY_VERSION_ID: ${{ steps.deploy.outputs.version-id }}
@@ -208,7 +269,7 @@ jobs:
         run: |
           echo 'Testing PR preview deployment or runtime verification failed.' >&2
 
-          if [ "$AUTH_STATUS" != 'success' ]; then
+          if [ "$AUTH_STATUS" != 'success' ] && [ "$AUTH_STATUS" != 'skipped' ]; then
             echo '' >&2
             echo 'Testing auth service deploy failed.' >&2
             if [ -n "$AUTH_FAILURE_STAGE" ]; then
@@ -228,7 +289,7 @@ jobs:
             fi
           fi
 
-          if [ "$SEARCH_STATUS" != 'success' ]; then
+          if [ "$SEARCH_STATUS" != 'success' ] && [ "$SEARCH_STATUS" != 'skipped' ]; then
             echo '' >&2
             echo 'Testing search service deploy failed.' >&2
             if [ -n "$SEARCH_FAILURE_STAGE" ]; then
@@ -248,7 +309,7 @@ jobs:
             fi
           fi
 
-          if [ "$DEPLOY_STATUS" != 'success' ]; then
+          if [ "$DEPLOY_STATUS" != 'success' ] && [ "$DEPLOY_STATUS" != 'skipped' ]; then
             echo '' >&2
             echo 'Testing PR preview deploy failed.' >&2
             if [ -n "$DEPLOY_FAILURE_STAGE" ]; then
@@ -296,6 +357,14 @@ jobs:
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.6
+
+      - name: Restore Bun install cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-1.3.6-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-1.3.6-
 
       - name: Install shared workspace dependencies
         shell: bash
@@ -375,7 +444,6 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          DEVFLARE_PREVIEW_BRANCH: ${{ env.PREVIEW_BRANCH }}
         run: |
           set -euo pipefail
 
@@ -383,7 +451,7 @@ jobs:
 
           bunx --bun devflare previews cleanup-resources \
             --account "$CLOUDFLARE_ACCOUNT_ID" \
-            --env preview \
+            --scope "$PREVIEW_BRANCH" \
             --apply
 
       - name: Publish testing PR preview cleanup feedback

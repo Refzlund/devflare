@@ -9,6 +9,7 @@ import {
 	formatSupportedConfigFilenames,
 	resolveConfigCandidatePath
 } from '../config-path'
+import { asOptionalString, resolveCloudflareAccountId } from '../command-utils'
 import { bold, createCliTheme, dim, green, logLine, whiteDim, yellow } from '../ui'
 
 interface LoadedConfigRecord {
@@ -27,10 +28,6 @@ interface ConfigSelectionResult {
 	target: LoadedConfigRecord
 	localConfigAlreadyUpdated: boolean
 	allConfigs: LoadedConfigRecord[]
-}
-
-function asOptionalString(value: string | boolean | undefined): string | undefined {
-	return typeof value === 'string' && value.trim() ? value.trim() : undefined
 }
 
 function formatPathForLog(cwd: string, filePath: string): string {
@@ -154,22 +151,10 @@ async function resolveAccountId(
 	parsed: ParsedArgs,
 	config: DevflareConfig
 ): Promise<string | undefined> {
-	const explicitAccountId = asOptionalString(parsed.options.account)
-	if (explicitAccountId) {
-		return explicitAccountId
-	}
-
-	if (config.accountId) {
-		return config.accountId
-	}
-
-	const primary = await account.getPrimaryAccount()
-	if (!primary) {
-		return undefined
-	}
-
-	const effective = await account.getEffectiveAccountId(primary.id)
-	return effective.accountId
+	return resolveCloudflareAccountId({
+		explicitAccountId: asOptionalString(parsed.options.account),
+		configuredAccountId: config.accountId
+	})
 }
 
 function skipWhitespaceAndComments(source: string, start: number, end: number): number {
@@ -182,20 +167,9 @@ function skipWhitespaceAndComments(source: string, start: number, end: number): 
 			continue
 		}
 
-		if (char === '/' && source[index + 1] === '/') {
-			index += 2
-			while (index < end && source[index] !== '\n') {
-				index++
-			}
-			continue
-		}
-
-		if (char === '/' && source[index + 1] === '*') {
-			index += 2
-			while (index < end && !(source[index] === '*' && source[index + 1] === '/')) {
-				index++
-			}
-			index = Math.min(index + 2, end)
+		const nextIndex = consumeComment(source, index, end)
+		if (nextIndex !== null) {
+			index = nextIndex
 			continue
 		}
 
@@ -224,6 +198,30 @@ function consumeQuotedLiteral(source: string, start: number, end: number): numbe
 	}
 
 	throw new Error('Unterminated string literal in devflare config.')
+}
+
+function consumeComment(source: string, start: number, end: number): number | null {
+	if (source[start] !== '/') {
+		return null
+	}
+
+	if (source[start + 1] === '/') {
+		let index = start + 2
+		while (index < end && source[index] !== '\n') {
+			index++
+		}
+		return index
+	}
+
+	if (source[start + 1] === '*') {
+		let index = start + 2
+		while (index < end && !(source[index] === '*' && source[index + 1] === '/')) {
+			index++
+		}
+		return Math.min(index + 2, end)
+	}
+
+	return null
 }
 
 function findConfigObjectStart(source: string): number {
@@ -265,20 +263,9 @@ function getRootPropertySlices(source: string, objectStart: number): Array<{ sta
 			continue
 		}
 
-		if (char === '/' && source[index + 1] === '/') {
-			index += 2
-			while (index < source.length && source[index] !== '\n') {
-				index++
-			}
-			continue
-		}
-
-		if (char === '/' && source[index + 1] === '*') {
-			index += 2
-			while (index < source.length && !(source[index] === '*' && source[index + 1] === '/')) {
-				index++
-			}
-			index += 2
+		const nextIndex = consumeComment(source, index, source.length)
+		if (nextIndex !== null) {
+			index = nextIndex
 			continue
 		}
 
@@ -347,20 +334,9 @@ function findTopLevelColon(source: string, start: number, end: number): number {
 			continue
 		}
 
-		if (char === '/' && source[index + 1] === '/') {
-			index += 2
-			while (index < end && source[index] !== '\n') {
-				index++
-			}
-			continue
-		}
-
-		if (char === '/' && source[index + 1] === '*') {
-			index += 2
-			while (index < end && !(source[index] === '*' && source[index + 1] === '/')) {
-				index++
-			}
-			index += 2
+		const nextIndex = consumeComment(source, index, end)
+		if (nextIndex !== null) {
+			index = nextIndex
 			continue
 		}
 

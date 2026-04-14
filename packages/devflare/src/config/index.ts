@@ -6,8 +6,11 @@ export { defineConfig } from './define'
 export {
 	preview,
 	isPreviewScopedName,
+	resolvePreviewIdentifier,
 	materializePreviewScopedConfig,
 	materializePreviewScopedString,
+	type ResolvedPreviewIdentifier,
+	type PreviewIdentifierSource,
 	type PreviewScopeFn,
 	type PreviewScopeOptions,
 	type PreviewScopedName,

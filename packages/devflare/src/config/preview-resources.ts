@@ -101,6 +101,15 @@ interface PreviewScopedResourceLifecycleApi {
 	deleteHyperdrive: typeof deleteHyperdrive
 }
 
+interface PreviewScopedResourceLifecycleState {
+	namespaces: KVNamespaceInfo[]
+	databases: D1DatabaseInfo[]
+	buckets: R2BucketInfo[]
+	queues: QueueInfo[]
+	vectorizeIndexes: VectorizeIndexInfo[]
+	hyperdrives: HyperdriveConfigInfo[]
+}
+
 export interface PreviewScopedResourceLifecycleOptions extends PreviewResolutionOptions {
 	accountId?: string
 	cloudflare?: Partial<PreviewScopedResourceLifecycleApi>
@@ -278,6 +287,30 @@ async function resolveLifecycleAccountId(
 	return effective.accountId
 }
 
+async function loadPreviewScopedResourceLifecycleState(
+	accountId: string,
+	plan: PreviewScopedResourcePlan,
+	cloudflareApi: PreviewScopedResourceLifecycleApi
+): Promise<PreviewScopedResourceLifecycleState> {
+	const [namespaces, databases, buckets, queues, vectorizeIndexes, hyperdrives] = await Promise.all([
+		plan.kv.length > 0 ? cloudflareApi.listKVNamespaces(accountId) : Promise.resolve([] as KVNamespaceInfo[]),
+		plan.d1.length > 0 ? cloudflareApi.listD1Databases(accountId) : Promise.resolve([] as D1DatabaseInfo[]),
+		plan.r2.length > 0 ? cloudflareApi.listR2Buckets(accountId) : Promise.resolve([] as R2BucketInfo[]),
+		plan.queues.length > 0 ? cloudflareApi.listQueues(accountId) : Promise.resolve([] as QueueInfo[]),
+		plan.vectorize.length > 0 ? cloudflareApi.listVectorizeIndexes(accountId) : Promise.resolve([] as VectorizeIndexInfo[]),
+		plan.hyperdrive.length > 0 ? cloudflareApi.listHyperdrives(accountId) : Promise.resolve([] as HyperdriveConfigInfo[])
+	])
+
+	return {
+		namespaces,
+		databases,
+		buckets,
+		queues,
+		vectorizeIndexes,
+		hyperdrives
+	}
+}
+
 function findVectorizeIndexByName(
 	indexes: VectorizeIndexInfo[],
 	name: string
@@ -437,14 +470,14 @@ export async function preparePreviewScopedResourcesForDeploy(
 	const cloudflareApi = resolvePreviewScopedResourceLifecycleApi(options.cloudflare)
 	const accountId = await resolveLifecycleAccountId(config, options, cloudflareApi)
 
-	const [namespaces, databases, buckets, queues, vectorizeIndexes, hyperdrives] = await Promise.all([
-		plan.kv.length > 0 ? cloudflareApi.listKVNamespaces(accountId) : Promise.resolve([] as KVNamespaceInfo[]),
-		plan.d1.length > 0 ? cloudflareApi.listD1Databases(accountId) : Promise.resolve([] as D1DatabaseInfo[]),
-		plan.r2.length > 0 ? cloudflareApi.listR2Buckets(accountId) : Promise.resolve([] as R2BucketInfo[]),
-		plan.queues.length > 0 ? cloudflareApi.listQueues(accountId) : Promise.resolve([] as QueueInfo[]),
-		plan.vectorize.length > 0 ? cloudflareApi.listVectorizeIndexes(accountId) : Promise.resolve([] as VectorizeIndexInfo[]),
-		plan.hyperdrive.length > 0 ? cloudflareApi.listHyperdrives(accountId) : Promise.resolve([] as HyperdriveConfigInfo[])
-	])
+	const {
+		namespaces,
+		databases,
+		buckets,
+		queues,
+		vectorizeIndexes,
+		hyperdrives
+	} = await loadPreviewScopedResourceLifecycleState(accountId, plan, cloudflareApi)
 
 	for (const ref of plan.kv) {
 		if (findKVNamespaceByName(namespaces, ref.previewName)) {
@@ -571,14 +604,14 @@ export async function cleanupPreviewScopedResources(
 	const accountId = await resolveLifecycleAccountId(config, options, cloudflareApi)
 	const apply = options.apply === true
 
-	const [namespaces, databases, buckets, queues, vectorizeIndexes, hyperdrives] = await Promise.all([
-		plan.kv.length > 0 ? cloudflareApi.listKVNamespaces(accountId) : Promise.resolve([] as KVNamespaceInfo[]),
-		plan.d1.length > 0 ? cloudflareApi.listD1Databases(accountId) : Promise.resolve([] as D1DatabaseInfo[]),
-		plan.r2.length > 0 ? cloudflareApi.listR2Buckets(accountId) : Promise.resolve([] as R2BucketInfo[]),
-		plan.queues.length > 0 ? cloudflareApi.listQueues(accountId) : Promise.resolve([] as QueueInfo[]),
-		plan.vectorize.length > 0 ? cloudflareApi.listVectorizeIndexes(accountId) : Promise.resolve([] as VectorizeIndexInfo[]),
-		plan.hyperdrive.length > 0 ? cloudflareApi.listHyperdrives(accountId) : Promise.resolve([] as HyperdriveConfigInfo[])
-	])
+	const {
+		namespaces,
+		databases,
+		buckets,
+		queues,
+		vectorizeIndexes,
+		hyperdrives
+	} = await loadPreviewScopedResourceLifecycleState(accountId, plan, cloudflareApi)
 
 	const kvCandidates = plan.kv
 		.map((ref) => findKVNamespaceByName(namespaces, ref.previewName))

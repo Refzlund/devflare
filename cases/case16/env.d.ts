@@ -12,13 +12,8 @@ declare global {
 	}
 }
 
-declare module 'devflare/test' {
-	interface DevflareEnv {
-		WORKFLOW_STATE: KVNamespace
-		RESULTS: KVNamespace
-		MAX_RETRIES: string
-		RETRY_DELAY_MS: string
-	}
-}
-
-export {}
+/**
+ * Named entrypoints (none discovered - add ep.*.ts files to enable).
+ * Use with defineConfig<Entrypoints>() for type-safe cross-worker references.
+ */
+export type Entrypoints = string

@@ -11,12 +11,8 @@ declare global {
 	}
 }
 
-declare module 'devflare/test' {
-	interface DevflareEnv {
-		EMAIL_LOG: KVNamespace
-		EMAIL: SendEmail
-		FORWARD_ADDRESS: string
-	}
-}
-
-export { }
+/**
+ * Named entrypoints (none discovered - add ep.*.ts files to enable).
+ * Use with defineConfig<Entrypoints>() for type-safe cross-worker references.
+ */
+export type Entrypoints = string

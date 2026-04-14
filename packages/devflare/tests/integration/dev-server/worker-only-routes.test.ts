@@ -1,105 +1,19 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
-import { cp, mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
-import { createServer } from 'node:net'
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { fileURLToPath } from 'node:url'
-import { dirname, join } from 'pathe'
+import { join } from 'pathe'
 import { createDevServer, type DevServer } from '../../../src/dev-server'
+import {
+	cleanupTempDirs,
+	getAvailablePort,
+	installBuiltDevflare,
+	waitForResponseText
+} from '../helpers/built-devflare.helpers'
 
-const packageRoot = join(dirname(fileURLToPath(import.meta.url)), '../../../')
 const tempDirs: string[] = []
-let buildPromise: Promise<void> | null = null
-
-async function ensurePackageBuilt(): Promise<void> {
-	if (!buildPromise) {
-		buildPromise = (async () => {
-			const build = Bun.spawn(['bun', 'run', 'build'], {
-				cwd: packageRoot,
-				stdout: 'pipe',
-				stderr: 'pipe'
-			})
-
-			const [stdout, stderr, exitCode] = await Promise.all([
-				new Response(build.stdout).text(),
-				new Response(build.stderr).text(),
-				build.exited
-			])
-
-			if (exitCode !== 0) {
-				throw new Error([
-					'Package build failed',
-					stdout.trim(),
-					stderr.trim()
-				].filter(Boolean).join('\n\n'))
-			}
-		})()
-	}
-
-	await buildPromise
-}
-
-async function installBuiltDevflare(projectDir: string): Promise<void> {
-	await ensurePackageBuilt()
-
-	const packagedDevflareDir = join(projectDir, 'node_modules', 'devflare')
-	await mkdir(packagedDevflareDir, { recursive: true })
-	await cp(join(packageRoot, 'package.json'), join(packagedDevflareDir, 'package.json'))
-	await cp(join(packageRoot, 'dist'), join(packagedDevflareDir, 'dist'), { recursive: true })
-}
-
-async function getAvailablePort(): Promise<number> {
-	return await new Promise((resolvePromise, rejectPromise) => {
-		const server = createServer()
-
-		server.on('error', rejectPromise)
-		server.listen(0, '127.0.0.1', () => {
-			const address = server.address()
-			if (!address || typeof address === 'string') {
-				server.close(() => rejectPromise(new Error('Could not determine an available port')))
-				return
-			}
-
-			const { port } = address
-			server.close((error) => {
-				if (error) {
-					rejectPromise(error)
-					return
-				}
-
-				resolvePromise(port)
-			})
-		})
-	})
-}
-
-async function waitForResponseText(url: string, expectedText: string, timeoutMs = 8000): Promise<string> {
-	const deadline = Date.now() + timeoutMs
-	let lastError: unknown = null
-
-	while (Date.now() < deadline) {
-		try {
-			const response = await fetch(url)
-			const text = await response.text()
-			if (text === expectedText) {
-				return text
-			}
-			lastError = new Error(`Expected "${expectedText}", received "${text}"`)
-		} catch (error) {
-			lastError = error
-		}
-
-		await new Promise((resolvePromise) => setTimeout(resolvePromise, 200))
-	}
-
-	throw lastError instanceof Error
-		? lastError
-		: new Error(`Timed out waiting for response text "${expectedText}"`)
-}
 
 afterAll(async () => {
-	for (const tempDir of tempDirs) {
-		await rm(tempDir, { recursive: true, force: true })
-	}
+	await cleanupTempDirs(tempDirs)
 })
 
 describe('worker-only dev server file routes', () => {

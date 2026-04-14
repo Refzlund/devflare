@@ -3,48 +3,8 @@ import { mkdtemp, readFile, rm, writeFile, mkdir } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { runWorkerCommand } from '../../../src/cli/commands/worker'
-
-interface TestLogger {
-	info: ReturnType<typeof mock>
-	warn: ReturnType<typeof mock>
-	error: ReturnType<typeof mock>
-	success: ReturnType<typeof mock>
-	debug: ReturnType<typeof mock>
-	log: ReturnType<typeof mock>
-	messages: Array<{ level: string; args: unknown[] }>
-}
-
-function createLogger(): TestLogger {
-	const messages: Array<{ level: string; args: unknown[] }> = []
-
-	const createMethod = (level: string) => mock((...args: unknown[]) => {
-		messages.push({ level, args })
-	})
-
-	return {
-		info: createMethod('info'),
-		warn: createMethod('warn'),
-		error: createMethod('error'),
-		success: createMethod('success'),
-		debug: createMethod('debug'),
-		log: createMethod('log'),
-		messages
-	}
-}
-
-function jsonResponse(result: unknown, resultInfo?: Record<string, number>): Response {
-	return new Response(JSON.stringify({
-		success: true,
-		errors: [],
-		messages: [],
-		result,
-		...(resultInfo ? { result_info: resultInfo } : {})
-	}), {
-		headers: {
-			'Content-Type': 'application/json'
-		}
-	})
-}
+import { jsonResponse } from '../../helpers/cloudflare-api'
+import { createLogger } from '../../helpers/mock-logger'
 
 const originalFetch = globalThis.fetch
 const originalToken = process.env.CLOUDFLARE_API_TOKEN
@@ -85,49 +45,57 @@ async function writeConfigFile(rootDir: string, relativePath: string, workerName
 	return configPath
 }
 
+function mockRenameWorkerApi(fromName: string, toName: string): void {
+	globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
+		const url = String(input)
+		const method = init?.method ?? 'GET'
+
+		if (method === 'GET' && url.includes('/accounts/acc_123/workers/scripts?page=1&per_page=50')) {
+			return jsonResponse([
+				{
+					id: 'worker_1',
+					name: fromName,
+					created_on: '2026-04-08T00:00:00.000Z',
+					modified_on: '2026-04-08T00:00:00.000Z'
+				}
+			])
+		}
+
+		if (method === 'PATCH' && url.endsWith(`/accounts/acc_123/workers/workers/${fromName}`)) {
+			return jsonResponse({
+				id: 'worker_1',
+				name: toName
+			})
+		}
+
+		throw new Error(`Unexpected fetch request: ${method} ${url}`)
+	}) as typeof fetch
+}
+
+async function runRenameWorker(rootDir: string, fromName: string, toName: string, logger: ReturnType<typeof createLogger>) {
+	return await runWorkerCommand(
+		{
+			command: 'worker',
+			args: ['rename', fromName],
+			options: {
+				to: toName
+			}
+		},
+		logger as any,
+		{ cwd: rootDir }
+	)
+}
+
 describe('worker command', () => {
 	test('renames a remote Worker and updates the matching nested devflare config', async () => {
 		process.env.CLOUDFLARE_API_TOKEN = 'cf_test_token'
 		const rootDir = await createTempMonorepo()
 		const configPath = await writeConfigFile(rootDir, 'apps/documentation/devflare.config.ts', 'documentation')
 
-		globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
-			const url = String(input)
-			const method = init?.method ?? 'GET'
-
-			if (method === 'GET' && url.includes('/accounts/acc_123/workers/scripts?page=1&per_page=50')) {
-				return jsonResponse([
-					{
-						id: 'worker_1',
-						name: 'documentation',
-						created_on: '2026-04-08T00:00:00.000Z',
-						modified_on: '2026-04-08T00:00:00.000Z'
-					}
-				])
-			}
-
-			if (method === 'PATCH' && url.endsWith('/accounts/acc_123/workers/workers/documentation')) {
-				return jsonResponse({
-					id: 'worker_1',
-					name: 'devflare-documentation'
-				})
-			}
-
-			throw new Error(`Unexpected fetch request: ${method} ${url}`)
-		}) as typeof fetch
+		mockRenameWorkerApi('documentation', 'devflare-documentation')
 
 		const logger = createLogger()
-		const result = await runWorkerCommand(
-			{
-				command: 'worker',
-				args: ['rename', 'documentation'],
-				options: {
-					to: 'devflare-documentation'
-				}
-			},
-			logger as any,
-			{ cwd: rootDir }
-		)
+		const result = await runRenameWorker(rootDir, 'documentation', 'devflare-documentation', logger)
 
 		const updatedConfig = await readFile(configPath, 'utf-8')
 
@@ -143,43 +111,10 @@ describe('worker command', () => {
 		const rootDir = await createTempMonorepo()
 		const configPath = await writeConfigFile(rootDir, 'apps/documentation/devflare.config.ts', 'devflare-documentation')
 
-		globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
-			const url = String(input)
-			const method = init?.method ?? 'GET'
-
-			if (method === 'GET' && url.includes('/accounts/acc_123/workers/scripts?page=1&per_page=50')) {
-				return jsonResponse([
-					{
-						id: 'worker_1',
-						name: 'documentation',
-						created_on: '2026-04-08T00:00:00.000Z',
-						modified_on: '2026-04-08T00:00:00.000Z'
-					}
-				])
-			}
-
-			if (method === 'PATCH' && url.endsWith('/accounts/acc_123/workers/workers/documentation')) {
-				return jsonResponse({
-					id: 'worker_1',
-					name: 'devflare-documentation'
-				})
-			}
-
-			throw new Error(`Unexpected fetch request: ${method} ${url}`)
-		}) as typeof fetch
+		mockRenameWorkerApi('documentation', 'devflare-documentation')
 
 		const logger = createLogger()
-		const result = await runWorkerCommand(
-			{
-				command: 'worker',
-				args: ['rename', 'documentation'],
-				options: {
-					to: 'devflare-documentation'
-				}
-			},
-			logger as any,
-			{ cwd: rootDir }
-		)
+		const result = await runRenameWorker(rootDir, 'documentation', 'devflare-documentation', logger)
 
 		const updatedConfig = await readFile(configPath, 'utf-8')
 

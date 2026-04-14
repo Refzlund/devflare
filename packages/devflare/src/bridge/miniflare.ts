@@ -6,11 +6,10 @@
 
 import type { Miniflare as MiniflareType } from 'miniflare'
 import {
+	type DevflareConfig,
 	getLocalD1DatabaseIdentifier,
 	getLocalKVNamespaceIdentifier,
-	normalizeDOBinding,
-	type DevflareConfig,
-	type DurableObjectBinding
+	normalizeDOBinding
 } from '../config'
 
 // -----------------------------------------------------------------------------
@@ -80,6 +79,22 @@ interface MiniflareSendEmailConfig {
 		allowed_destination_addresses?: string[]
 		allowed_sender_addresses?: string[]
 	}>
+}
+
+type MiniflareRuntime = Awaited<ReturnType<typeof loadMiniflareRuntime>>
+type MfOptions = ConstructorParameters<MiniflareRuntime['Miniflare']>[0]
+type MfOptionsWithEmail = MfOptions & {
+	bindings?: MiniflareOptions['bindings']
+	d1Databases?: MiniflareOptions['d1Databases']
+	d1Persist?: string
+	durableObjects?: MiniflareOptions['durableObjects']
+	durableObjectsPersist?: string
+	email?: MiniflareSendEmailConfig
+	kvNamespaces?: MiniflareOptions['kvNamespaces']
+	kvPersist?: string
+	queueProducers?: Record<string, { queueName: string }>
+	r2Buckets?: MiniflareOptions['r2Buckets']
+	r2Persist?: string
 }
 
 // -----------------------------------------------------------------------------
@@ -284,109 +299,178 @@ function serializeR2Objects(result) {
 `
 }
 
-// -----------------------------------------------------------------------------
-// Miniflare Instance Creation
-// -----------------------------------------------------------------------------
-
-/**
- * Start a Miniflare instance with the given configuration
- */
-export async function startMiniflare(options: MiniflareOptions = {}): Promise<MiniflareInstance> {
-	// Dynamic import to avoid bundling issues
-	const { Miniflare, Log, LogLevel } = await import('miniflare')
-	type MfOptions = ConstructorParameters<typeof Miniflare>[0]
-	type MfOptionsWithEmail = MfOptions & {
-		email?: MiniflareSendEmailConfig
+function hasNamedBindings(bindings: string[] | Record<string, string> | undefined): boolean {
+	if (!bindings) {
+		return false
 	}
 
-	const port = options.port ?? 8787
-	const persistPath = options.persistPath ?? '.devflare/data'
+	if (Array.isArray(bindings)) {
+		return bindings.length > 0
+	}
 
-	// Build Miniflare configuration
-	const mfConfig: MfOptionsWithEmail = {
+	return Object.keys(bindings).length > 0
+}
+
+function resolvePersistPath(options: MiniflareOptions): string | undefined {
+	if (!options.persist) {
+		return undefined
+	}
+
+	if (typeof options.persist === 'string' && options.persist.trim().length > 0) {
+		return options.persist
+	}
+
+	return options.persistPath ?? '.devflare/data'
+}
+
+async function loadMiniflareRuntime() {
+	return await import('miniflare')
+}
+
+function createBaseMiniflareConfig(
+	options: MiniflareOptions,
+	runtime: MiniflareRuntime
+): MfOptionsWithEmail {
+	return {
 		modules: true,
 		script: generateGatewayScript(),
-		port,
+		port: options.port ?? 8787,
 		host: '127.0.0.1',
-		log: options.verbose ? new Log(LogLevel.DEBUG) : new Log(LogLevel.WARN),
+		log: options.verbose
+			? new runtime.Log(runtime.LogLevel.DEBUG)
+			: new runtime.Log(runtime.LogLevel.WARN),
 		compatibilityDate: options.compatibilityDate ?? '2024-01-01',
 		compatibilityFlags: options.compatibilityFlags ?? []
 	}
+}
 
-	// Helper to check if binding config has entries
-	const hasBindings = (val: string[] | Record<string, string> | undefined): boolean => {
-		if (!val) return false
-		if (Array.isArray(val)) return val.length > 0
-		return Object.keys(val).length > 0
+function applyKVNamespaceConfig(
+	config: MfOptionsWithEmail,
+	kvNamespaces: MiniflareOptions['kvNamespaces'],
+	persistPath: string | undefined
+): void {
+	if (!hasNamedBindings(kvNamespaces)) {
+		return
 	}
 
-	// Add KV namespaces
-	if (hasBindings(options.kvNamespaces)) {
-		mfConfig.kvNamespaces = options.kvNamespaces
-		if (options.persist) {
-			mfConfig.kvPersist = `${persistPath}/kv`
-		}
+	config.kvNamespaces = kvNamespaces
+	if (persistPath) {
+		config.kvPersist = `${persistPath}/kv`
+	}
+}
+
+function applyR2BucketConfig(
+	config: MfOptionsWithEmail,
+	r2Buckets: MiniflareOptions['r2Buckets'],
+	persistPath: string | undefined
+): void {
+	if (!hasNamedBindings(r2Buckets)) {
+		return
 	}
 
-	// Add R2 buckets
-	if (hasBindings(options.r2Buckets)) {
-		mfConfig.r2Buckets = options.r2Buckets
-		if (options.persist) {
-			mfConfig.r2Persist = `${persistPath}/r2`
-		}
+	config.r2Buckets = r2Buckets
+	if (persistPath) {
+		config.r2Persist = `${persistPath}/r2`
+	}
+}
+
+function applyD1DatabaseConfig(
+	config: MfOptionsWithEmail,
+	d1Databases: MiniflareOptions['d1Databases'],
+	persistPath: string | undefined
+): void {
+	if (!hasNamedBindings(d1Databases)) {
+		return
 	}
 
-	// Add D1 databases
-	if (hasBindings(options.d1Databases)) {
-		mfConfig.d1Databases = options.d1Databases
-		if (options.persist) {
-			mfConfig.d1Persist = `${persistPath}/d1`
-		}
+	config.d1Databases = d1Databases
+	if (persistPath) {
+		config.d1Persist = `${persistPath}/d1`
+	}
+}
+
+function applyDurableObjectConfig(
+	config: MfOptionsWithEmail,
+	durableObjects: MiniflareOptions['durableObjects'],
+	persistPath: string | undefined
+): void {
+	if (!durableObjects) {
+		return
 	}
 
-	// Add Durable Objects
-	if (options.durableObjects) {
-		mfConfig.durableObjects = options.durableObjects
-		if (options.persist) {
-			mfConfig.durableObjectsPersist = `${persistPath}/do`
-		}
+	config.durableObjects = durableObjects
+	if (persistPath) {
+		config.durableObjectsPersist = `${persistPath}/do`
+	}
+}
+
+function applySendEmailConfig(
+	config: MfOptionsWithEmail,
+	sendEmail: MiniflareOptions['sendEmail']
+): void {
+	if (!sendEmail) {
+		return
 	}
 
-	if (options.sendEmail) {
-		mfConfig.email = {
-			send_email: Object.entries(options.sendEmail).map(([name, config]) => ({
-				name,
-				...(config.destinationAddress && {
-					destination_address: config.destinationAddress
-				}),
-				...(config.allowedDestinationAddresses && {
-					allowed_destination_addresses: config.allowedDestinationAddresses
-				}),
-				...(config.allowedSenderAddresses && {
-					allowed_sender_addresses: config.allowedSenderAddresses
-				})
-			}))
-		}
+	config.email = {
+		send_email: Object.entries(sendEmail).map(([name, emailConfig]) => ({
+			name,
+			...(emailConfig.destinationAddress && {
+				destination_address: emailConfig.destinationAddress
+			}),
+			...(emailConfig.allowedDestinationAddresses && {
+				allowed_destination_addresses: emailConfig.allowedDestinationAddresses
+			}),
+			...(emailConfig.allowedSenderAddresses && {
+				allowed_sender_addresses: emailConfig.allowedSenderAddresses
+			})
+		}))
+	}
+}
+
+function applyBindingsConfig(
+	config: MfOptionsWithEmail,
+	bindings: MiniflareOptions['bindings']
+): void {
+	if (!bindings || Object.keys(bindings).length === 0) {
+		return
 	}
 
-	// Add environment variables
-	if (options.bindings && Object.keys(options.bindings).length > 0) {
-		mfConfig.bindings = options.bindings
+	config.bindings = bindings
+}
+
+function applyQueueConfig(
+	config: MfOptionsWithEmail,
+	queues: MiniflareOptions['queues']
+): void {
+	if (!queues?.length) {
+		return
 	}
 
-	// Add queues
-	if (options.queues?.length) {
-		mfConfig.queueProducers = Object.fromEntries(
-			options.queues.map((q) => [q, { queueName: q }])
-		)
-	}
+	config.queueProducers = Object.fromEntries(
+		queues.map((queueName) => [queueName, { queueName }])
+	)
+}
 
-	// Create Miniflare instance
-	const mf = new Miniflare(mfConfig as MfOptions)
+function createMiniflareConfig(
+	options: MiniflareOptions,
+	runtime: MiniflareRuntime
+): MfOptionsWithEmail {
+	const persistPath = resolvePersistPath(options)
+	const config = createBaseMiniflareConfig(options, runtime)
 
-	// Wait for ready
-	await mf.ready
+	applyKVNamespaceConfig(config, options.kvNamespaces, persistPath)
+	applyR2BucketConfig(config, options.r2Buckets, persistPath)
+	applyD1DatabaseConfig(config, options.d1Databases, persistPath)
+	applyDurableObjectConfig(config, options.durableObjects, persistPath)
+	applySendEmailConfig(config, options.sendEmail)
+	applyBindingsConfig(config, options.bindings)
+	applyQueueConfig(config, options.queues)
 
+	return config
+}
+
+function createMiniflareInstanceHandle(mf: MiniflareType): MiniflareInstance {
 	return {
 		ready: Promise.resolve(),
 
@@ -406,6 +490,21 @@ export async function startMiniflare(options: MiniflareOptions = {}): Promise<Mi
 
 		_mf: mf
 	}
+}
+
+// -----------------------------------------------------------------------------
+// Miniflare Instance Creation
+// -----------------------------------------------------------------------------
+
+/**
+ * Start a Miniflare instance with the given configuration
+ */
+export async function startMiniflare(options: MiniflareOptions = {}): Promise<MiniflareInstance> {
+	const runtime = await loadMiniflareRuntime()
+	const mf = new runtime.Miniflare(createMiniflareConfig(options, runtime) as MfOptions)
+	await mf.ready
+
+	return createMiniflareInstanceHandle(mf)
 }
 
 // -----------------------------------------------------------------------------

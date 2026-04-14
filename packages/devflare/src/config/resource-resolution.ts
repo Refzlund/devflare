@@ -1,7 +1,8 @@
 import { getPrimaryAccount, listD1Databases, listHyperdrives, listKVNamespaces } from '../cloudflare/account'
 import { getEffectiveAccountId } from '../cloudflare/preferences'
 import { loadConfig, type LoadConfigOptions } from './loader'
-import { resolveConfigForEnvironment } from './resolve'
+import { materializePreviewScopedConfig, type PreviewResolutionOptions } from './preview'
+import { mergeConfigForEnvironment, resolveConfigForEnvironment } from './resolve'
 import {
 	getLocalD1DatabaseIdentifier,
 	getLocalHyperdriveConfigIdentifier,
@@ -28,8 +29,24 @@ const defaultCloudflareApi: CloudflareConfigResolutionApi = {
 	listHyperdrives
 }
 
+type KVBindings = NonNullable<NonNullable<DevflareConfig['bindings']>['kv']>
+type D1Bindings = NonNullable<NonNullable<DevflareConfig['bindings']>['d1']>
+type HyperdriveBindings = NonNullable<NonNullable<DevflareConfig['bindings']>['hyperdrive']>
+
+interface NormalizedNameBinding {
+	id?: string
+	name?: string
+}
+
+interface PendingNameBinding {
+	bindingName: string
+	resourceName: string
+}
+
 export interface ResolveConfigResourcesOptions {
 	environment?: string
+	env?: PreviewResolutionOptions['env']
+	identifier?: string
 	accountId?: string
 	cloudflare?: Partial<CloudflareConfigResolutionApi>
 }
@@ -40,6 +57,8 @@ export interface ResolveMaterializedConfigResourcesOptions {
 }
 
 export interface LoadResolvedConfigOptions extends LoadConfigOptions {
+	env?: PreviewResolutionOptions['env']
+	identifier?: string
 	accountId?: string
 	cloudflare?: Partial<CloudflareConfigResolutionApi>
 }
@@ -65,34 +84,94 @@ function resolveCloudflareApi(
 	}
 }
 
-function materializeLocalKVBindings(
-	bindings: NonNullable<NonNullable<DevflareConfig['bindings']>['kv']>
+function materializeIdBindings<TBinding>(
+	bindings: Record<string, TBinding>,
+	resolveId: (binding: TBinding) => string
 ): Record<string, { id: string }> {
 	return Object.fromEntries(
 		Object.entries(bindings).map(([bindingName, bindingConfig]) => {
-			return [bindingName, { id: getLocalKVNamespaceIdentifier(bindingConfig) }]
+			return [bindingName, { id: resolveId(bindingConfig) }]
 		})
 	)
 }
 
-function materializeLocalD1Bindings(
-	bindings: NonNullable<NonNullable<DevflareConfig['bindings']>['d1']>
-): Record<string, { id: string }> {
-	return Object.fromEntries(
-		Object.entries(bindings).map(([bindingName, bindingConfig]) => {
-			return [bindingName, { id: getLocalD1DatabaseIdentifier(bindingConfig) }]
-		})
-	)
+function normalizeKVNameBinding(bindingConfig: KVBindings[string]): NormalizedNameBinding {
+	const normalized = normalizeKVBinding(bindingConfig)
+	return {
+		id: normalized.namespaceId,
+		name: normalized.name
+	}
 }
 
-function materializeLocalHyperdriveBindings(
-	bindings: NonNullable<NonNullable<DevflareConfig['bindings']>['hyperdrive']>
-): Record<string, { id: string }> {
-	return Object.fromEntries(
-		Object.entries(bindings).map(([bindingName, bindingConfig]) => {
-			return [bindingName, { id: getLocalHyperdriveConfigIdentifier(bindingConfig) }]
+function normalizeD1NameBinding(bindingConfig: D1Bindings[string]): NormalizedNameBinding {
+	const normalized = normalizeD1Binding(bindingConfig)
+	return {
+		id: normalized.databaseId,
+		name: normalized.name
+	}
+}
+
+function normalizeHyperdriveNameBinding(bindingConfig: HyperdriveBindings[string]): NormalizedNameBinding {
+	const normalized = normalizeHyperdriveBinding(bindingConfig)
+	return {
+		id: normalized.configurationId,
+		name: normalized.name
+	}
+}
+
+function collectPendingNameBindings<TBinding>(
+	bindings: Record<string, TBinding> | undefined,
+	normalizeBinding: (binding: TBinding) => NormalizedNameBinding
+): PendingNameBinding[] {
+	if (!bindings) {
+		return []
+	}
+
+	return Object.entries(bindings)
+		.map(([bindingName, bindingConfig]) => {
+			const normalized = normalizeBinding(bindingConfig)
+			return normalized.id
+				? null
+				: {
+					bindingName,
+					resourceName: normalized.name ?? ''
+				}
 		})
-	)
+		.filter((binding): binding is PendingNameBinding => binding !== null)
+}
+
+function materializeResolvedNameBindings<TBinding>(
+	bindings: Record<string, TBinding> | undefined,
+	normalizeBinding: (binding: TBinding) => NormalizedNameBinding,
+	idsByName: Map<string, string>
+): Record<string, { id: string }> | undefined {
+	if (!bindings) {
+		return undefined
+	}
+
+	return materializeIdBindings(bindings, (bindingConfig) => {
+		const normalized = normalizeBinding(bindingConfig)
+		return normalized.id ?? idsByName.get(normalized.name ?? '') ?? ''
+	})
+}
+
+function withResolvedIdBindings(
+	resolvedConfig: DevflareConfig,
+	bindings: {
+		kv?: Record<string, { id: string }>
+		d1?: Record<string, { id: string }>
+		hyperdrive?: Record<string, { id: string }>
+	}
+): DevflareConfig {
+	return {
+		...resolvedConfig,
+		bindings: {
+			...resolvedConfig.bindings,
+			...(bindings.kv ? { kv: bindings.kv } : {}),
+			...(bindings.d1 ? { d1: bindings.d1 } : {}),
+			...(bindings.hyperdrive ? { hyperdrive: bindings.hyperdrive } : {})
+		}
+	}
 }
 
 async function resolveLookupAccountId(
@@ -132,22 +211,44 @@ async function resolveLookupAccountId(
 	}
 }
 
-function formatMissingKVBindings(missing: Array<{ bindingName: string; namespaceName: string }>): string {
+function formatMissingBindings(missing: PendingNameBinding[]): string {
 	return missing
-		.map(({ bindingName, namespaceName }) => `${bindingName} → ${namespaceName}`)
+		.map(({ bindingName, resourceName }) => `${bindingName} → ${resourceName}`)
 		.join(', ')
 }
 
-function formatMissingD1Bindings(missing: Array<{ bindingName: string; databaseName: string }>): string {
-	return missing
-		.map(({ bindingName, databaseName }) => `${bindingName} → ${databaseName}`)
-		.join(', ')
-}
+async function resolveResourceIdsByName<TResource extends { id: string; name: string }>(
+	pendingBindings: PendingNameBinding[],
+	options: {
+		listResources: () => Promise<TResource[]>
+		listFailureMessage: string
+		missingFailureMessage: (missing: PendingNameBinding[]) => string
+	}
+): Promise<Map<string, string>> {
+	if (pendingBindings.length === 0) {
+		return new Map()
+	}
 
-function formatMissingHyperdriveBindings(missing: Array<{ bindingName: string; configurationName: string }>): string {
-	return missing
-		.map(({ bindingName, configurationName }) => `${bindingName} → ${configurationName}`)
-		.join(', ')
+	let resources: TResource[]
+	try {
+		resources = await options.listResources()
+	} catch (error) {
+		throw new ConfigResourceResolutionError(options.listFailureMessage, error)
+	}
+
+	const idsByName = new Map(
+		resources.map((resource) => [resource.name, resource.id])
+	)
+
+	const missingBindings = pendingBindings.filter(({ resourceName }) => {
+		return !idsByName.has(resourceName)
+	})
+
+	if (missingBindings.length > 0) {
+		throw new ConfigResourceResolutionError(options.missingFailureMessage(missingBindings))
+	}
+
+	return idsByName
 }
 
 /**
@@ -170,15 +271,11 @@ export function resolveConfigForLocalRuntime(
 		return resolvedConfig
 	}
 
-	return {
-		...resolvedConfig,
-		bindings: {
-			...resolvedConfig.bindings,
-			...(kvBindings ? { kv: materializeLocalKVBindings(kvBindings) } : {}),
-			...(d1Bindings ? { d1: materializeLocalD1Bindings(d1Bindings) } : {}),
-			...(hyperdriveBindings ? { hyperdrive: materializeLocalHyperdriveBindings(hyperdriveBindings) } : {})
-		}
-	}
+	return withResolvedIdBindings(resolvedConfig, {
+		kv: kvBindings ? materializeIdBindings(kvBindings, getLocalKVNamespaceIdentifier) : undefined,
+		d1: d1Bindings ? materializeIdBindings(d1Bindings, getLocalD1DatabaseIdentifier) : undefined,
+		hyperdrive: hyperdriveBindings ? materializeIdBindings(hyperdriveBindings, getLocalHyperdriveConfigIdentifier) : undefined
+	})
 }
 
 /**
@@ -197,187 +294,54 @@ export async function resolveMaterializedConfigResources(
 		return resolvedConfig
 	}
 
-	const pendingKVNameBindings = kvBindings
-		? Object.entries(kvBindings)
-			.map(([bindingName, bindingConfig]) => {
-				const normalized = normalizeKVBinding(bindingConfig)
-				return normalized.namespaceId
-					? null
-					: {
-						bindingName,
-						namespaceName: normalized.name ?? ''
-					}
-			})
-			.filter((binding): binding is { bindingName: string; namespaceName: string } => binding !== null)
-		: []
-
-	const pendingD1NameBindings = d1Bindings
-		? Object.entries(d1Bindings)
-			.map(([bindingName, bindingConfig]) => {
-				const normalized = normalizeD1Binding(bindingConfig)
-				return normalized.databaseId
-					? null
-					: {
-						bindingName,
-						databaseName: normalized.name ?? ''
-					}
-			})
-			.filter((binding): binding is { bindingName: string; databaseName: string } => binding !== null)
-		: []
-
-	const pendingHyperdriveNameBindings = hyperdriveBindings
-		? Object.entries(hyperdriveBindings)
-			.map(([bindingName, bindingConfig]) => {
-				const normalized = normalizeHyperdriveBinding(bindingConfig)
-				return normalized.configurationId
-					? null
-					: {
-						bindingName,
-						configurationName: normalized.name ?? ''
-					}
-			})
-			.filter((binding): binding is { bindingName: string; configurationName: string } => binding !== null)
-		: []
+	const pendingKVNameBindings = collectPendingNameBindings(kvBindings, normalizeKVNameBinding)
+	const pendingD1NameBindings = collectPendingNameBindings(d1Bindings, normalizeD1NameBinding)
+	const pendingHyperdriveNameBindings = collectPendingNameBindings(hyperdriveBindings, normalizeHyperdriveNameBinding)
 
 	if (
 		pendingKVNameBindings.length === 0
 		&& pendingD1NameBindings.length === 0
 		&& pendingHyperdriveNameBindings.length === 0
 	) {
-		return {
-			...resolvedConfig,
-			bindings: {
-				...resolvedConfig.bindings,
-				...(kvBindings ? { kv: materializeLocalKVBindings(kvBindings) } : {}),
-				...(d1Bindings ? { d1: materializeLocalD1Bindings(d1Bindings) } : {}),
-				...(hyperdriveBindings ? { hyperdrive: materializeLocalHyperdriveBindings(hyperdriveBindings) } : {})
-			}
-		}
+		return withResolvedIdBindings(resolvedConfig, {
+			kv: kvBindings ? materializeIdBindings(kvBindings, getLocalKVNamespaceIdentifier) : undefined,
+			d1: d1Bindings ? materializeIdBindings(d1Bindings, getLocalD1DatabaseIdentifier) : undefined,
+			hyperdrive: hyperdriveBindings ? materializeIdBindings(hyperdriveBindings, getLocalHyperdriveConfigIdentifier) : undefined
+		})
 	}
 
 	const cloudflareApi = resolveCloudflareApi(options.cloudflare)
 	const accountId = await resolveLookupAccountId(resolvedConfig, options, cloudflareApi)
 
-	let namespaceIdsByName = new Map<string, string>()
-	if (pendingKVNameBindings.length > 0) {
-		let namespaces
-		try {
-			namespaces = await cloudflareApi.listKVNamespaces(accountId)
-		} catch (error) {
-			throw new ConfigResourceResolutionError(
-				`Could not list KV namespaces for Cloudflare account ${accountId} while resolving name-based KV bindings.`,
-				error
-			)
+	const namespaceIdsByName = await resolveResourceIdsByName(pendingKVNameBindings, {
+		listResources: async () => cloudflareApi.listKVNamespaces(accountId),
+		listFailureMessage: `Could not list KV namespaces for Cloudflare account ${accountId} while resolving name-based KV bindings.`,
+		missingFailureMessage: (missingBindings) => {
+			return `Could not find KV namespace(s) for ${formatMissingBindings(missingBindings)} in Cloudflare account ${accountId}.`
 		}
+	})
 
-		namespaceIdsByName = new Map(
-			namespaces.map((namespace) => [namespace.name, namespace.id])
-		)
-
-		const missingKVBindings = pendingKVNameBindings.filter(({ namespaceName }) => {
-			return !namespaceIdsByName.has(namespaceName)
-		})
-
-		if (missingKVBindings.length > 0) {
-			throw new ConfigResourceResolutionError(
-				`Could not find KV namespace(s) for ${formatMissingKVBindings(missingKVBindings)} in Cloudflare account ${accountId}.`
-			)
+	const databaseIdsByName = await resolveResourceIdsByName(pendingD1NameBindings, {
+		listResources: async () => cloudflareApi.listD1Databases(accountId),
+		listFailureMessage: `Could not list D1 databases for Cloudflare account ${accountId} while resolving name-based D1 bindings.`,
+		missingFailureMessage: (missingBindings) => {
+			return `Could not find D1 database(s) for ${formatMissingBindings(missingBindings)} in Cloudflare account ${accountId}.`
 		}
-	}
+	})
 
-	let databaseIdsByName = new Map<string, string>()
-	if (pendingD1NameBindings.length > 0) {
-		let databases
-		try {
-			databases = await cloudflareApi.listD1Databases(accountId)
-		} catch (error) {
-			throw new ConfigResourceResolutionError(
-				`Could not list D1 databases for Cloudflare account ${accountId} while resolving name-based D1 bindings.`,
-				error
-			)
+	const hyperdriveIdsByName = await resolveResourceIdsByName(pendingHyperdriveNameBindings, {
+		listResources: async () => cloudflareApi.listHyperdrives(accountId),
+		listFailureMessage: `Could not list Hyperdrive configurations for Cloudflare account ${accountId} while resolving name-based Hyperdrive bindings.`,
+		missingFailureMessage: (missingBindings) => {
+			return `Could not find Hyperdrive configuration(s) for ${formatMissingBindings(missingBindings)} in Cloudflare account ${accountId}.`
 		}
+	})
 
-		databaseIdsByName = new Map(
-			databases.map((database) => [database.name, database.id])
-		)
-
-		const missingD1Bindings = pendingD1NameBindings.filter(({ databaseName }) => {
-			return !databaseIdsByName.has(databaseName)
-		})
-
-		if (missingD1Bindings.length > 0) {
-			throw new ConfigResourceResolutionError(
-				`Could not find D1 database(s) for ${formatMissingD1Bindings(missingD1Bindings)} in Cloudflare account ${accountId}.`
-			)
-		}
-	}
-
-	let hyperdriveIdsByName = new Map<string, string>()
-	if (pendingHyperdriveNameBindings.length > 0) {
-		let hyperdrives
-		try {
-			hyperdrives = await cloudflareApi.listHyperdrives(accountId)
-		} catch (error) {
-			throw new ConfigResourceResolutionError(
-				`Could not list Hyperdrive configurations for Cloudflare account ${accountId} while resolving name-based Hyperdrive bindings.`,
-				error
-			)
-		}
-
-		hyperdriveIdsByName = new Map(
-			hyperdrives.map((hyperdrive) => [hyperdrive.name, hyperdrive.id])
-		)
-
-		const missingHyperdriveBindings = pendingHyperdriveNameBindings.filter(({ configurationName }) => {
-			return !hyperdriveIdsByName.has(configurationName)
-		})
-
-		if (missingHyperdriveBindings.length > 0) {
-			throw new ConfigResourceResolutionError(
-				`Could not find Hyperdrive configuration(s) for ${formatMissingHyperdriveBindings(missingHyperdriveBindings)} in Cloudflare account ${accountId}.`
-			)
-		}
-	}
-
-	return {
-		...resolvedConfig,
-		bindings: {
-			...resolvedConfig.bindings,
-			...(kvBindings
-				? {
-					kv: Object.fromEntries(
-						Object.entries(kvBindings).map(([bindingName, bindingConfig]) => {
-							const normalized = normalizeKVBinding(bindingConfig)
-							const resolvedId = normalized.namespaceId ?? namespaceIdsByName.get(normalized.name ?? '') ?? ''
-							return [bindingName, { id: resolvedId }]
-						})
-					)
-				}
-				: {}),
-			...(d1Bindings
-				? {
-					d1: Object.fromEntries(
-						Object.entries(d1Bindings).map(([bindingName, bindingConfig]) => {
-							const normalized = normalizeD1Binding(bindingConfig)
-							const resolvedId = normalized.databaseId ?? databaseIdsByName.get(normalized.name ?? '') ?? ''
-							return [bindingName, { id: resolvedId }]
-						})
-					)
-				}
-				: {}),
-			...(hyperdriveBindings
-				? {
-					hyperdrive: Object.fromEntries(
-						Object.entries(hyperdriveBindings).map(([bindingName, bindingConfig]) => {
-							const normalized = normalizeHyperdriveBinding(bindingConfig)
-							const resolvedId = normalized.configurationId ?? hyperdriveIdsByName.get(normalized.name ?? '') ?? ''
-							return [bindingName, { id: resolvedId }]
-						})
-					)
-				}
-				: {})
-		}
-	}
+	return withResolvedIdBindings(resolvedConfig, {
+		kv: materializeResolvedNameBindings(kvBindings, normalizeKVNameBinding, namespaceIdsByName),
+		d1: materializeResolvedNameBindings(d1Bindings, normalizeD1NameBinding, databaseIdsByName),
+		hyperdrive: materializeResolvedNameBindings(hyperdriveBindings, normalizeHyperdriveNameBinding, hyperdriveIdsByName)
+	})
 }
 
 /**
@@ -388,7 +352,14 @@ export async function resolveConfigResources(
 	config: DevflareConfig,
 	options: ResolveConfigResourcesOptions = {}
 ): Promise<DevflareConfig> {
-	const resolvedConfig = resolveConfigForEnvironment(config, options.environment)
+	const resolvedConfig = materializePreviewScopedConfig(
+		mergeConfigForEnvironment(config, options.environment),
+		{
+			environment: options.environment,
+			env: options.env,
+			identifier: options.identifier
+		}
+	)
 
 	return resolveMaterializedConfigResources(resolvedConfig, {
 		accountId: options.accountId,

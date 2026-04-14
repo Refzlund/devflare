@@ -1,58 +1,96 @@
 import { afterEach, describe, expect, mock, test } from 'bun:test'
 import { runLoginCommand } from '../../../src/cli/commands/login'
 import { clearDependencies, setDependencies, type CliDependencies } from '../../../src/cli/dependencies'
-
-interface TestLogger {
-	info: ReturnType<typeof mock>
-	warn: ReturnType<typeof mock>
-	error: ReturnType<typeof mock>
-	success: ReturnType<typeof mock>
-	debug: ReturnType<typeof mock>
-	log: ReturnType<typeof mock>
-	messages: Array<{ level: string; args: unknown[] }>
-}
-
-const ANSI_REGEX = /\x1b\[[0-9;]*m/g
-
-function stripAnsi(value: string): string {
-	return value.replace(ANSI_REGEX, '')
-}
-
-function createLogger(): TestLogger {
-	const messages: Array<{ level: string; args: unknown[] }> = []
-
-	const createMethod = (level: string) => mock((...args: unknown[]) => {
-		messages.push({ level, args })
-	})
-
-	return {
-		info: createMethod('info'),
-		warn: createMethod('warn'),
-		error: createMethod('error'),
-		success: createMethod('success'),
-		debug: createMethod('debug'),
-		log: createMethod('log'),
-		messages
-	}
-}
-
-function jsonResponse(result: unknown, resultInfo?: Record<string, number>): Response {
-	return new Response(JSON.stringify({
-		success: true,
-		errors: [],
-		messages: [],
-		result,
-		...(resultInfo ? { result_info: resultInfo } : {})
-	}), {
-		headers: {
-			'Content-Type': 'application/json'
-		}
-	})
-}
+import { jsonResponse } from '../../helpers/cloudflare-api'
+import { createLogger, stripAnsi } from '../../helpers/mock-logger'
 
 const originalFetch = globalThis.fetch
 const originalToken = process.env.CLOUDFLARE_API_TOKEN
 const originalAccountId = process.env.CLOUDFLARE_ACCOUNT_ID
+
+function createAccountListResponse(): Response {
+	return jsonResponse([
+		{
+			id: 'acc_123',
+			name: 'Devflare Account',
+			type: 'standard'
+		}
+	], {
+		page: 1,
+		per_page: 50,
+		total_pages: 1,
+		count: 1,
+		total_count: 1
+	})
+}
+
+function createExecDependencies(
+	execImplementation: NonNullable<CliDependencies['exec']>['exec']
+): CliDependencies {
+	return {
+		fs: {} as CliDependencies['fs'],
+		exec: {
+			exec: execImplementation,
+			spawn: () => {
+				throw new Error('spawn should not be called')
+			}
+		}
+	}
+}
+
+function renderMessages(logger: ReturnType<typeof createLogger>): string[] {
+	return logger.messages.map((message) => stripAnsi(message.args.join(' ')))
+}
+
+function createRecordedExecDependencies(): {
+	execCalls: Array<{ command: string; args: string[] }>
+	deps: CliDependencies
+} {
+	const execCalls: Array<{ command: string; args: string[] }> = []
+	return {
+		execCalls,
+		deps: createExecDependencies(async (command, args = []) => {
+			execCalls.push({ command, args })
+			return {
+				exitCode: 0,
+				stdout: '',
+				stderr: '',
+				failed: false,
+				killed: false
+			}
+		})
+	}
+}
+
+function mockAuthenticatedAccountFetch(): void {
+	globalThis.fetch = mock(async (input: RequestInfo | URL) => {
+		const url = String(input)
+		if (url.includes('/accounts?page=1&per_page=50')) {
+			return createAccountListResponse()
+		}
+
+		throw new Error(`Unexpected fetch URL: ${url}`)
+	}) as typeof fetch
+}
+
+async function runLoginScenario(
+	logger: ReturnType<typeof createLogger>,
+	options: { force?: boolean } = {}
+) {
+	return await runLoginCommand(
+		{
+			command: 'login',
+			args: [],
+			options: options.force
+				? {
+					force: true
+				}
+				: {}
+		},
+		logger as any,
+		{}
+	)
+}
 
 afterEach(() => {
 	globalThis.fetch = originalFetch
@@ -72,59 +110,14 @@ afterEach(() => {
 describe('login command', () => {
 	test('skips Wrangler login when authentication already exists', async () => {
 		process.env.CLOUDFLARE_API_TOKEN = 'cf_test_token'
-		globalThis.fetch = mock(async (input: RequestInfo | URL) => {
-			const url = String(input)
-			if (url.includes('/accounts?page=1&per_page=50')) {
-				return jsonResponse([
-					{
-						id: 'acc_123',
-						name: 'Devflare Account',
-						type: 'standard'
-					}
-				], {
-					page: 1,
-					per_page: 50,
-					total_pages: 1,
-					count: 1,
-					total_count: 1
-				})
-			}
+		mockAuthenticatedAccountFetch()
 
-			throw new Error(`Unexpected fetch URL: ${url}`)
-		}) as typeof fetch
-
-		const execCalls: Array<{ command: string; args: string[] }> = []
-		const deps: CliDependencies = {
-			fs: {} as CliDependencies['fs'],
-			exec: {
-				exec: async (command, args = []) => {
-					execCalls.push({ command, args })
-					return {
-						exitCode: 0,
-						stdout: '',
-						stderr: '',
-						failed: false,
-						killed: false
-					}
-				},
-				spawn: () => {
-					throw new Error('spawn should not be called')
-				}
-			}
-		}
+		const { execCalls, deps } = createRecordedExecDependencies()
 		setDependencies(deps)
 
 		const logger = createLogger()
-		const result = await runLoginCommand(
-			{
-				command: 'login',
-				args: [],
-				options: {}
-			},
-			logger as any,
-			{}
-		)
-		const renderedMessages = logger.messages.map((message) => stripAnsi(message.args.join(' ')))
+		const result = await runLoginScenario(logger)
+		const renderedMessages = renderMessages(logger)
 
 		expect(result.exitCode).toBe(0)
 		expect(execCalls).toHaveLength(0)
@@ -134,61 +127,14 @@ describe('login command', () => {
 
 	test('runs Wrangler login when forced', async () => {
 		process.env.CLOUDFLARE_API_TOKEN = 'cf_test_token'
-		globalThis.fetch = mock(async (input: RequestInfo | URL) => {
-			const url = String(input)
-			if (url.includes('/accounts?page=1&per_page=50')) {
-				return jsonResponse([
-					{
-						id: 'acc_123',
-						name: 'Devflare Account',
-						type: 'standard'
-					}
-				], {
-					page: 1,
-					per_page: 50,
-					total_pages: 1,
-					count: 1,
-					total_count: 1
-				})
-			}
+		mockAuthenticatedAccountFetch()
 
-			throw new Error(`Unexpected fetch URL: ${url}`)
-		}) as typeof fetch
-
-		const execCalls: Array<{ command: string; args: string[] }> = []
-		const deps: CliDependencies = {
-			fs: {} as CliDependencies['fs'],
-			exec: {
-				exec: async (command, args = []) => {
-					execCalls.push({ command, args })
-					return {
-						exitCode: 0,
-						stdout: '',
-						stderr: '',
-						failed: false,
-						killed: false
-					}
-				},
-				spawn: () => {
-					throw new Error('spawn should not be called')
-				}
-			}
-		}
+		const { execCalls, deps } = createRecordedExecDependencies()
 		setDependencies(deps)
 
 		const logger = createLogger()
-		const result = await runLoginCommand(
-			{
-				command: 'login',
-				args: [],
-				options: {
-					force: true
-				}
-			},
-			logger as any,
-			{}
-		)
-		const renderedMessages = logger.messages.map((message) => stripAnsi(message.args.join(' ')))
+		const result = await runLoginScenario(logger, { force: true })
+		const renderedMessages = renderMessages(logger)
 
 		expect(result.exitCode).toBe(0)
 		expect(execCalls).toEqual([
@@ -230,21 +176,13 @@ describe('login command', () => {
 			throw new Error(`Unexpected fetch URL: ${url}`)
 		}) as typeof fetch
 
-		const deps: CliDependencies = {
-			fs: {} as CliDependencies['fs'],
-			exec: {
-				exec: async () => ({
-					exitCode: 0,
-					stdout: '',
-					stderr: '',
-					failed: false,
-					killed: false
-				}),
-				spawn: () => {
-					throw new Error('spawn should not be called')
-				}
-			}
-		}
+		const deps = createExecDependencies(async () => ({
+			exitCode: 0,
+			stdout: '',
+			stderr: '',
+			failed: false,
+			killed: false
+		}))
 		setDependencies(deps)
 
 		const logger = createLogger()
@@ -257,7 +195,7 @@ describe('login command', () => {
 			logger as any,
 			{}
 		)
-		const renderedMessages = logger.messages.map((message) => stripAnsi(message.args.join(' ')))
+		const renderedMessages = renderMessages(logger)
 
 		expect(result.exitCode).toBe(0)
 		expect(renderedMessages.some((message) => message.includes('Configured account: Configured Account (acc_123)'))).toBe(true)

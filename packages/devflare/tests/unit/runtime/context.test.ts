@@ -102,6 +102,16 @@ describe('runWithContext', () => {
 		})
 	})
 
+	test('establishes Durable Object alarm events automatically when using runWithContext', () => {
+		const mockEnv = { TEST: true }
+		const mockState = createMockState()
+
+		runWithContext(mockEnv, mockState, null, () => {
+			expect(getDurableObjectEvent().type).toBe('durable-object-alarm')
+			expect(getDurableObjectAlarmEvent().state).toBe(mockState)
+		}, 'durable-object-alarm')
+	})
+
 	test('initializes empty locals', () => {
 		const mockEnv = {}
 		const mockCtx = createMockCtx()
@@ -190,8 +200,13 @@ describe('event-first context accessors', () => {
 			expect(getFetchEvent()).toBe(fetchEvent)
 			expect(getFetchEvent().request).toBe(request)
 			expect(getFetchEvent().params.id).toBe('123')
-			expect(fetchEvent.url).toBe('https://example.com/users/123')
+			expect(fetchEvent.url).toBeInstanceOf(URL)
+			expect(fetchEvent.url.href).toBe('https://example.com/users/123')
+			expect(fetchEvent.url.pathname).toBe('/users/123')
 			expect(fetchEvent.request.url).toBe('https://example.com/users/123')
+			expect(Object.keys(fetchEvent)).toContain('url')
+			expect(Reflect.getOwnPropertyDescriptor(fetchEvent, 'url')?.value).toBeInstanceOf(URL)
+			expect((Reflect.getOwnPropertyDescriptor(fetchEvent, 'url')?.value as URL | undefined)?.href).toBe('https://example.com/users/123')
 		})
 	})
 

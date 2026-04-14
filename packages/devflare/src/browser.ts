@@ -18,7 +18,7 @@ export { env } from './env'
 export {
 	setBindingHints,
 	createEnvProxy,
-	initEnv,
+	initEnv
 } from './bridge/proxy'
 export type { EnvProxyOptions, BindingHints } from './bridge/proxy'
 export { BridgeClient, getClient } from './bridge/client'
@@ -31,17 +31,27 @@ export {
 	type DurableObjectOptions
 } from './decorators'
 
+type CliModule = typeof import('./cli')
+type ConfigModule = typeof import('./config')
+type TransformModule = typeof import('./transform')
+type MiniflareModule = typeof import('./bridge/miniflare')
+type BridgeServerModule = typeof import('./bridge/server')
+type TestModule = typeof import('./test')
+
+type ConfigNotFoundErrorArgs = ConstructorParameters<ConfigModule['ConfigNotFoundError']>
+type ConfigValidationErrorArgs = ConstructorParameters<ConfigModule['ConfigValidationError']>
+type ConfigResourceResolutionErrorArgs = ConstructorParameters<ConfigModule['ConfigResourceResolutionError']>
+
 function createUnsupportedApiError(name: string): Error {
 	return new Error(
-		`${name} is not available in worker/browser bundles. ` +
-		`Import it from the Node-side devflare package entry instead.`
+		`${name} is not available in worker/browser bundles. Import it from the Node-side devflare package entry instead.`
 	)
 }
 
-function unsupportedFunction<T extends (...args: any[]) => any>(name: string): T {
-	return ((..._args: any[]) => {
+function unsupportedFunction<TFunction>(name: string): TFunction {
+	return ((..._args: readonly unknown[]) => {
 		throw createUnsupportedApiError(name)
-	}) as unknown as T
+	}) as unknown as TFunction
 }
 
 function createUnsupportedObject<T extends object>(name: string): T {
@@ -61,24 +71,19 @@ function createUnsupportedObject<T extends object>(name: string): T {
 	})
 }
 
-export async function loadConfig(..._args: any[]): Promise<never> {
-	throw createUnsupportedApiError('loadConfig')
-}
+export const loadConfig = unsupportedFunction<ConfigModule['loadConfig']>('loadConfig')
+export const loadResolvedConfig = unsupportedFunction<ConfigModule['loadResolvedConfig']>('loadResolvedConfig')
 
-export async function loadResolvedConfig(..._args: any[]): Promise<never> {
-	throw createUnsupportedApiError('loadResolvedConfig')
-}
-
-export const compileConfig = unsupportedFunction('compileConfig')
-export const stringifyConfig = unsupportedFunction('stringifyConfig')
-export const configSchema = createUnsupportedObject<Record<string, unknown>>('configSchema')
-export const resolveConfigForLocalRuntime = unsupportedFunction('resolveConfigForLocalRuntime')
-export const resolveConfigResources = unsupportedFunction('resolveConfigResources')
+export const compileConfig = unsupportedFunction<ConfigModule['compileConfig']>('compileConfig')
+export const stringifyConfig = unsupportedFunction<ConfigModule['stringifyConfig']>('stringifyConfig')
+export const configSchema = createUnsupportedObject<ConfigModule['configSchema']>('configSchema')
+export const resolveConfigForLocalRuntime = unsupportedFunction<ConfigModule['resolveConfigForLocalRuntime']>('resolveConfigForLocalRuntime')
+export const resolveConfigResources = unsupportedFunction<ConfigModule['resolveConfigResources']>('resolveConfigResources')
 
 export class ConfigNotFoundError extends Error {
 	readonly code = 'CONFIG_NOT_FOUND'
 
-	constructor(..._args: any[]) {
+	constructor(..._args: ConfigNotFoundErrorArgs) {
 		super(createUnsupportedApiError('ConfigNotFoundError').message)
 		this.name = 'ConfigNotFoundError'
 	}
@@ -87,7 +92,7 @@ export class ConfigNotFoundError extends Error {
 export class ConfigValidationError extends Error {
 	readonly code = 'CONFIG_VALIDATION_ERROR'
 
-	constructor(..._args: any[]) {
+	constructor(..._args: ConfigValidationErrorArgs) {
 		super(createUnsupportedApiError('ConfigValidationError').message)
 		this.name = 'ConfigValidationError'
 	}
@@ -96,41 +101,41 @@ export class ConfigValidationError extends Error {
 export class ConfigResourceResolutionError extends Error {
 	readonly code = 'CONFIG_RESOURCE_RESOLUTION_ERROR'
 
-	constructor(..._args: any[]) {
+	constructor(..._args: ConfigResourceResolutionErrorArgs) {
 		super(createUnsupportedApiError('ConfigResourceResolutionError').message)
 		this.name = 'ConfigResourceResolutionError'
 	}
 }
 
-export const runCli = unsupportedFunction('runCli')
-export const parseArgs = unsupportedFunction('parseArgs')
+export const runCli = unsupportedFunction<CliModule['runCli']>('runCli')
+export const parseArgs = unsupportedFunction<CliModule['parseArgs']>('parseArgs')
 
-export const findDurableObjectClasses = unsupportedFunction('findDurableObjectClasses')
-export const findDurableObjectClassesDetailed = unsupportedFunction('findDurableObjectClassesDetailed')
-export const generateWrapper = unsupportedFunction('generateWrapper')
-export const transformDurableObject = unsupportedFunction('transformDurableObject')
-export const transformWorkerEntrypoint = unsupportedFunction('transformWorkerEntrypoint')
-export const findExportedFunctions = unsupportedFunction('findExportedFunctions')
-export const shouldTransformWorker = unsupportedFunction('shouldTransformWorker')
-export const generateRpcInterface = unsupportedFunction('generateRpcInterface')
+export const findDurableObjectClasses = unsupportedFunction<TransformModule['findDurableObjectClasses']>('findDurableObjectClasses')
+export const findDurableObjectClassesDetailed = unsupportedFunction<TransformModule['findDurableObjectClasses']>('findDurableObjectClassesDetailed')
+export const generateWrapper = unsupportedFunction<TransformModule['generateWrapper']>('generateWrapper')
+export const transformDurableObject = unsupportedFunction<TransformModule['transformDurableObject']>('transformDurableObject')
+export const transformWorkerEntrypoint = unsupportedFunction<TransformModule['transformWorkerEntrypoint']>('transformWorkerEntrypoint')
+export const findExportedFunctions = unsupportedFunction<TransformModule['findExportedFunctions']>('findExportedFunctions')
+export const shouldTransformWorker = unsupportedFunction<TransformModule['shouldTransformWorker']>('shouldTransformWorker')
+export const generateRpcInterface = unsupportedFunction<TransformModule['generateRpcInterface']>('generateRpcInterface')
 
-export const startMiniflare = unsupportedFunction('startMiniflare')
-export const startMiniflareFromConfig = unsupportedFunction('startMiniflareFromConfig')
-export const getMiniflare = unsupportedFunction('getMiniflare')
-export const stopMiniflare = unsupportedFunction('stopMiniflare')
-export const gateway = createUnsupportedObject<Record<string, unknown>>('gateway')
+export const startMiniflare = unsupportedFunction<MiniflareModule['startMiniflare']>('startMiniflare')
+export const startMiniflareFromConfig = unsupportedFunction<MiniflareModule['startMiniflareFromConfig']>('startMiniflareFromConfig')
+export const getMiniflare = unsupportedFunction<MiniflareModule['getMiniflare']>('getMiniflare')
+export const stopMiniflare = unsupportedFunction<MiniflareModule['stopMiniflare']>('stopMiniflare')
+export const gateway = createUnsupportedObject<BridgeServerModule['default']>('gateway')
 
-export const createTestContext = unsupportedFunction('createTestContext')
-export const createMockTestContext = unsupportedFunction('createMockTestContext')
-export const createMockKV = unsupportedFunction('createMockKV')
-export const createMockD1 = unsupportedFunction('createMockD1')
-export const createMockR2 = unsupportedFunction('createMockR2')
-export const createMockQueue = unsupportedFunction('createMockQueue')
-export const createMockEnv = unsupportedFunction('createMockEnv')
-export const withTestContext = unsupportedFunction('withTestContext')
-export const createBridgeTestContext = unsupportedFunction('createBridgeTestContext')
-export const stopBridgeTestContext = unsupportedFunction('stopBridgeTestContext')
-export const getBridgeTestContext = unsupportedFunction('getBridgeTestContext')
-export const testEnv = createUnsupportedObject<Record<string, unknown>>('testEnv')
+export const createTestContext = unsupportedFunction<TestModule['createTestContext']>('createTestContext')
+export const createMockTestContext = unsupportedFunction<TestModule['createMockTestContext']>('createMockTestContext')
+export const createMockKV = unsupportedFunction<TestModule['createMockKV']>('createMockKV')
+export const createMockD1 = unsupportedFunction<TestModule['createMockD1']>('createMockD1')
+export const createMockR2 = unsupportedFunction<TestModule['createMockR2']>('createMockR2')
+export const createMockQueue = unsupportedFunction<TestModule['createMockQueue']>('createMockQueue')
+export const createMockEnv = unsupportedFunction<TestModule['createMockEnv']>('createMockEnv')
+export const withTestContext = unsupportedFunction<TestModule['withTestContext']>('withTestContext')
+export const createBridgeTestContext = unsupportedFunction<TestModule['createBridgeTestContext']>('createBridgeTestContext')
+export const stopBridgeTestContext = unsupportedFunction<TestModule['stopBridgeTestContext']>('stopBridgeTestContext')
+export const getBridgeTestContext = unsupportedFunction<TestModule['getBridgeTestContext']>('getBridgeTestContext')
+export const testEnv = createUnsupportedObject<TestModule['testEnv']>('testEnv')
 
 export { defineConfig as default } from './config/define'

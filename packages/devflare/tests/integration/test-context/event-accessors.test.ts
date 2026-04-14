@@ -57,14 +57,17 @@ export default {
 `.trim())
 		await writeFile(join(projectDir, 'src', 'fetch.ts'), `
 import { getFetchEvent } from '${runtimeImportPath}'
+import type { FetchEvent } from '${runtimeImportPath}'
 
-export async function fetch(event) {
+export async function fetch({ url, request }: FetchEvent) {
 	const activeEvent = getFetchEvent()
 
 	return Response.json({
 		requestUrl: activeEvent.request.url,
-		sameRequest: activeEvent.request === event.request,
-		safeUrl: getFetchEvent.safe()?.request.url ?? null
+		eventUrl: activeEvent.url.href,
+		sameRequest: activeEvent.request === request,
+		sameUrl: activeEvent.url === url,
+		safeUrl: getFetchEvent.safe()?.url.href ?? null
 	})
 }
 `.trim())
@@ -106,12 +109,16 @@ export async function tail(event) {
 			expect(fetchResponse.status).toBe(200)
 			const fetchPayload = await fetchResponse.json() as {
 				requestUrl: string
+				eventUrl: string
 				sameRequest: boolean
+				sameUrl: boolean
 				safeUrl: string | null
 			}
 			expect(fetchPayload).toEqual({
 				requestUrl: 'http://localhost/inspect',
+				eventUrl: 'http://localhost/inspect',
 				sameRequest: true,
+				sameUrl: true,
 				safeUrl: 'http://localhost/inspect'
 			})
 

@@ -1,87 +1,180 @@
 <script lang="ts">
-	import {
-		PUBLIC_DOCUMENTATION_BUILD_SHA,
-		PUBLIC_DOCUMENTATION_BUILD_TIME
-	} from '$env/static/public'
+import LinkCard from '$lib/components/cards/LinkCard.svelte'
+import InlineText from '$lib/components/content/InlineText.svelte'
+import SectionHeading from '$lib/components/content/SectionHeading.svelte'
+import MiniSnippet from '$lib/components/home/MiniSnippet.svelte'
+import Surface from '$lib/components/layout/Surface.svelte'
+import PillLink from '$lib/components/navigation/PillLink.svelte'
+import { docPath, getDoc } from '$lib/docs/content'
+import type { DocPage } from '$lib/docs/types'
+import { m } from '$lib/paraglide/messages'
+import { localizeHref } from '$lib/paraglide/runtime'
 
-	const documentationBuildTimeIso = PUBLIC_DOCUMENTATION_BUILD_TIME
-	const documentationBuildTimeUtc = new Date(documentationBuildTimeIso).toUTCString()
-	const documentationBuildSha = PUBLIC_DOCUMENTATION_BUILD_SHA
+function pickDocs(slugs: string[]): DocPage[] {
+	return slugs.map((slug) => getDoc(slug)).filter((doc): doc is DocPage => Boolean(doc))
+}
 
-	const deployment = {
-		stage: 'Production',
-		codename: 'Evergreen',
-		badge: 'Production build',
-		description: 'This is the production deployment for the documentation app. It uses a separate evergreen palette and copy so you can compare it directly against both preview variants.',
-		expectedUrl: 'https://devflare-docs.refz.workers.dev',
-		footer: 'If this page is working, you should see a green-teal gradient, the Evergreen codename, a Production label, a build timestamp, and the current build revision.',
-		accent: 'from-emerald-300 via-teal-400 to-cyan-500',
-		panelClass: 'border-emerald-300/35 bg-emerald-400/10',
-		badgeClass: 'border-emerald-200/30 bg-emerald-300/15 text-emerald-50',
-		descriptionClass: 'text-emerald-50/85'
-	} as const
+const heroHighlights = [
+	m.home_cta_highlight_no_framework(),
+	m.home_cta_highlight_typed_env(),
+	m.home_cta_highlight_real_flow()
+]
 
-	const markers = [
-		'Traffic channel: production',
-		'Color signature: evergreen + teal',
-		'URL: devflare-docs.refz.workers.dev',
-		'Build marker: visible timestamp + revision'
-	] as const
+const libraryFeatures = [
+	{
+		label: m.home_feature_config_label(),
+		title: m.home_feature_config_title(),
+		description: m.home_feature_config_description(),
+		href: localizeHref(docPath('config-basics'))
+	},
+	{
+		label: m.home_feature_bindings_label(),
+		title: m.home_feature_bindings_title(),
+		description: m.home_feature_bindings_description(),
+		href: localizeHref(docPath('storage-bindings'))
+	},
+	{
+		label: m.home_feature_testing_label(),
+		title: m.home_feature_testing_title(),
+		description: m.home_feature_testing_description(),
+		href: localizeHref(docPath('testing-overview'))
+	},
+	{
+		label: m.home_feature_previews_label(),
+		title: m.home_feature_previews_title(),
+		description: m.home_feature_previews_description(),
+		href: localizeHref(docPath('preview-strategies'))
+	},
+	{
+		label: m.home_feature_composition_label(),
+		title: m.home_feature_composition_title(),
+		description: m.home_feature_composition_description(),
+		href: localizeHref(docPath('multi-workers'))
+	},
+	{
+		label: m.home_feature_frameworks_label(),
+		title: m.home_feature_frameworks_title(),
+		description: m.home_feature_frameworks_description(),
+		href: localizeHref(docPath('sveltekit-with-devflare'))
+	}
+]
+
+const nextActions = pickDocs([
+	'first-worker',
+	'first-bindings',
+	'first-unit-test',
+	'deploy-and-preview'
+])
+
+const starterSnippet = {
+	label: m.home_starter_snippet_label(),
+	title: m.home_starter_snippet_title(),
+	accent: 'cyan' as const,
+	lines: [
+		'bun add -d devflare',
+		'bunx --bun devflare types',
+		'bunx --bun devflare dev'
+	]
+}
+
+const firstWorkerHref = localizeHref(docPath('first-worker'))
+const whyDevflareHref = localizeHref(docPath('what-devflare-is'))
 </script>
 
 <svelte:head>
-	<title>{deployment.stage} · {deployment.codename} · Documentation</title>
+	<title>{m.home_title()}</title>
+	<meta
+		name="description"
+		content={m.home_meta_description()}
+	/>
 </svelte:head>
 
-<div class="min-h-screen bg-slate-950 px-6 py-16 text-white sm:px-10">
-	<div class="mx-auto flex max-w-4xl flex-col gap-8">
-		<section class={`overflow-hidden rounded-4xl border ${deployment.panelClass} shadow-2xl shadow-slate-950/60`}>
-			<div class={`h-2 w-full bg-linear-to-r ${deployment.accent}`}></div>
+<div class="space-y-12">
+	<Surface as="header" padding="lg">
+		<div class="grid gap-8 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] xl:items-start">
+			<div class="space-y-6">
+				<SectionHeading
+					eyebrow={m.home_hero_eyebrow()}
+					eyebrowTone="cyan"
+					title={m.home_hero_title()}
+					description={m.home_hero_description()}
+					titleTag="h1"
+					class="space-y-4"
+					titleClass="docs-display docs-text-strong"
+					descriptionClass="docs-copy-lg docs-text-body"
+				/>
 
-			<div class="space-y-8 p-8 sm:p-10">
-				<div class="flex flex-wrap items-center gap-3">
-					<span class={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.28em] ${deployment.badgeClass}`}>
-						{deployment.badge}
-					</span>
-					<span class="text-sm text-white/45">Distinct deployment marker</span>
+				<div class="flex flex-wrap gap-3">
+					<PillLink href={firstWorkerHref} label={m.home_primary_cta()} variant="primary" />
 				</div>
 
-				<div class="space-y-4">
-					<p class="text-sm uppercase tracking-[0.35em] text-white/45">{deployment.stage}</p>
-					<h1 class="text-4xl font-semibold tracking-tight text-balance sm:text-6xl">{deployment.codename}</h1>
-					<p class={`max-w-2xl text-lg leading-8 ${deployment.descriptionClass}`}>
-						{deployment.description}
-					</p>
-				</div>
+				<p class="docs-copy-sm docs-text-body max-w-2xl">
+					<InlineText text={m.home_hero_support()} />
+					<a
+						href={whyDevflareHref}
+						class="docs-focus-ring docs-surface-transition docs-text-accent ml-2 inline-flex items-center gap-1 rounded-md font-medium underline-offset-4 hover:underline"
+					>
+						{m.home_hero_support_link()}
+					</a>
+				</p>
 
-				<div class="grid gap-4 sm:grid-cols-3">
-					{#each markers as marker}
-						<div class="rounded-2xl border border-white/10 bg-black/20 px-4 py-4 text-sm text-white/75">
-							{marker}
-						</div>
+				<div class="docs-copy-sm docs-text-body flex flex-wrap gap-x-5 gap-y-2">
+					{#each heroHighlights as highlight}
+						<span class="inline-flex items-center gap-2">
+							<span class="docs-accent-dot h-1.5 w-1.5 rounded-full"></span>
+							<InlineText text={highlight} />
+						</span>
 					{/each}
 				</div>
-
-				<div class="grid gap-4 sm:grid-cols-3">
-					<div class="rounded-2xl border border-white/10 bg-black/25 p-5">
-						<p class="text-xs uppercase tracking-[0.3em] text-white/45">Expected URL</p>
-						<p class="mt-2 break-all font-mono text-sm text-white/80">{deployment.expectedUrl}</p>
-					</div>
-
-					<div class="rounded-2xl border border-white/10 bg-black/25 p-5">
-						<p class="text-xs uppercase tracking-[0.3em] text-white/45">Build time (UTC)</p>
-						<p class="mt-2 font-mono text-sm text-white/80">{documentationBuildTimeUtc}</p>
-						<p class="mt-2 break-all font-mono text-xs text-white/45">{documentationBuildTimeIso}</p>
-					</div>
-
-					<div class="rounded-2xl border border-white/10 bg-black/25 p-5">
-						<p class="text-xs uppercase tracking-[0.3em] text-white/45">Build revision</p>
-						<p class="mt-2 break-all font-mono text-sm text-white/80">{documentationBuildSha}</p>
-					</div>
-				</div>
-
-				<p class="text-sm text-white/55">{deployment.footer}</p>
 			</div>
-		</section>
-	</div>
+
+			<div class="space-y-4">
+				<MiniSnippet {...starterSnippet} />
+				<p class="docs-copy-sm docs-text-body">
+					<InlineText text={m.home_starter_body()} />
+				</p>
+			</div>
+		</div>
+	</Surface>
+
+	<section class="space-y-5">
+		<SectionHeading
+			eyebrow={m.home_library_eyebrow()}
+			title={m.home_library_title()}
+			description={m.home_library_description()}
+		/>
+
+		<div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+			{#each libraryFeatures as feature}
+				<LinkCard
+					href={feature.href}
+					label={feature.label}
+					title={feature.title}
+					description={feature.description}
+					tone="soft"
+				/>
+			{/each}
+		</div>
+	</section>
+
+	<section class="space-y-5">
+		<SectionHeading
+			eyebrow={m.home_actions_eyebrow()}
+			title={m.home_actions_title()}
+			description={m.home_actions_description()}
+		/>
+
+		<div class="grid gap-4 md:grid-cols-2">
+			{#each nextActions as doc}
+				<LinkCard
+					href={localizeHref(docPath(doc.slug))}
+					label={doc.group}
+					labelTone="slate"
+					title={doc.navTitle}
+					description={doc.summary}
+					variant="compact"
+				/>
+			{/each}
+		</div>
+	</section>
 </div>

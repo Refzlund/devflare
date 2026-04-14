@@ -2,20 +2,16 @@
 // Run `devflare types` to regenerate
 
 import type { KVNamespace, Queue } from '@cloudflare/workers-types'
-import type { Task } from './src/lib/types'
 
 declare global {
 	interface DevflareEnv {
 		RESULTS: KVNamespace
-		TASK_QUEUE: Queue<Task>
+		TASK_QUEUE: Queue
 	}
 }
 
-declare module 'devflare/test' {
-	interface DevflareEnv {
-		RESULTS: KVNamespace
-		TASK_QUEUE: Queue<Task>
-	}
-}
-
-export {}
+/**
+ * Named entrypoints (none discovered - add ep.*.ts files to enable).
+ * Use with defineConfig<Entrypoints>() for type-safe cross-worker references.
+ */
+export type Entrypoints = string

@@ -1,35 +1,10 @@
-import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'pathe'
 import { clearDependencies } from '../../../src/cli/dependencies'
 import { runDoctorCommand } from '../../../src/cli/commands/doctor'
-
-interface TestLogger {
-	info: ReturnType<typeof mock>
-	warn: ReturnType<typeof mock>
-	error: ReturnType<typeof mock>
-	success: ReturnType<typeof mock>
-	debug: ReturnType<typeof mock>
-	messages: Array<{ level: string; args: unknown[] }>
-}
-
-function createLogger(): TestLogger {
-	const messages: Array<{ level: string; args: unknown[] }> = []
-
-	const createMethod = (level: string) => mock((...args: unknown[]) => {
-		messages.push({ level, args })
-	})
-
-	return {
-		info: createMethod('info'),
-		warn: createMethod('warn'),
-		error: createMethod('error'),
-		success: createMethod('success'),
-		debug: createMethod('debug'),
-		messages
-	}
-}
+import { createLogger, renderMessages } from '../../helpers/mock-logger'
 
 async function writeProjectFiles(
 	projectDir: string,
@@ -90,15 +65,13 @@ describe('runDoctorCommand', () => {
 			{ cwd: projectDir }
 		)
 
-		const warnings = logger.messages
-			.filter((message) => message.level === 'warn' || message.level === 'error')
-			.map((message) => message.args.join(' '))
+		const renderedMessages = renderMessages(logger)
 
 		expect(result.exitCode).toBe(0)
-		expect(warnings.some((message) => message.includes('No vite.config found'))).toBe(false)
-		expect(warnings.some((message) => message.includes('vite required but not found'))).toBe(false)
-		expect(warnings.some((message) => message.includes('@cloudflare/vite-plugin required but not found'))).toBe(false)
-		expect(logger.messages.some((message) => message.args.join(' ').includes('worker-only mode'))).toBe(true)
+		expect(renderedMessages.some((message) => message.includes('No vite.config found'))).toBe(false)
+		expect(renderedMessages.some((message) => message.includes('vite required but not found'))).toBe(false)
+		expect(renderedMessages.some((message) => message.includes('@cloudflare/vite-plugin required but not found'))).toBe(false)
+		expect(renderedMessages.some((message) => message.includes('worker-only mode'))).toBe(true)
 	})
 
 	test('warns about missing vite.config only when the current package opted into Vite integration', async () => {
@@ -119,12 +92,10 @@ describe('runDoctorCommand', () => {
 			{ cwd: projectDir }
 		)
 
-		const warnings = logger.messages
-			.filter((message) => message.level === 'warn')
-			.map((message) => message.args.join(' '))
+		const renderedMessages = renderMessages(logger)
 
 		expect(result.exitCode).toBe(0)
-		expect(warnings.some((message) => message.includes('No vite.config found'))).toBe(true)
+		expect(renderedMessages.some((message) => message.includes('No vite.config found'))).toBe(true)
 	})
 
 	test('accepts .devflare/wrangler.jsonc as generated config output', async () => {
@@ -144,9 +115,10 @@ describe('runDoctorCommand', () => {
 			logger as any,
 			{ cwd: projectDir }
 		)
+		const renderedMessages = renderMessages(logger)
 
 		expect(result.exitCode).toBe(0)
-		expect(logger.messages.some((message) => message.args.join(' ').includes('.devflare/wrangler.jsonc'))).toBe(true)
+		expect(renderedMessages.some((message) => message.includes('.devflare/wrangler.jsonc'))).toBe(true)
 	})
 
 	test('supports --config with alternate supported config filenames', async () => {
@@ -164,9 +136,10 @@ describe('runDoctorCommand', () => {
 			logger as any,
 			{ cwd: projectDir }
 		)
+		const renderedMessages = renderMessages(logger)
 
 		expect(result.exitCode).toBe(0)
-		expect(logger.messages.some((message) => message.args.join(' ').includes('devflare.config.mts'))).toBe(true)
+		expect(renderedMessages.some((message) => message.includes('devflare.config.mts'))).toBe(true)
 	})
 
 	test('lists all supported config filenames when none are found', async () => {
@@ -184,11 +157,9 @@ describe('runDoctorCommand', () => {
 			logger as any,
 			{ cwd: projectDir }
 		)
+		const renderedMessages = renderMessages(logger)
 
 		expect(result.exitCode).toBe(1)
-		const failureMessages = logger.messages
-			.filter((message) => message.level === 'error')
-			.map((message) => message.args.join(' '))
-		expect(failureMessages.some((message) => message.includes('devflare.config.ts, devflare.config.mts, devflare.config.js, devflare.config.mjs'))).toBe(true)
+		expect(renderedMessages.some((message) => message.includes('devflare.config.ts, devflare.config.mts, devflare.config.js, devflare.config.mjs'))).toBe(true)
 	})
 })

@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+import { existsSync, readdirSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import { resolve } from 'pathe'
 import { createMockEnv } from '../../../src/test'
@@ -12,6 +13,7 @@ import {
 } from '../../../src/config'
 
 const repoRoot = resolve(import.meta.dirname, '../../../../../')
+const casesDir = resolve(repoRoot, 'cases')
 const testingAppDir = resolve(repoRoot, 'apps/testing')
 const documentationAppDir = resolve(repoRoot, 'apps/documentation')
 const testingFetchModulePath = pathToFileURL(resolve(testingAppDir, 'src/fetch.ts')).href
@@ -429,6 +431,19 @@ async function runTestingScheduled(config: DevflareConfig): Promise<TestingExamp
 }
 
 describe('repo example app configs', () => {
+	test('case example roots do not keep stale generated wrangler configs', () => {
+		const caseDirectories = readdirSync(casesDir, { withFileTypes: true })
+			.filter((entry) => entry.isDirectory() && /^case\d+(?:-.*)?$/.test(entry.name))
+
+		const staleConfigFiles = caseDirectories.flatMap((entry) => {
+			return ['wrangler.json', 'wrangler.jsonc']
+				.filter((fileName) => existsSync(resolve(casesDir, entry.name, fileName)))
+				.map((fileName) => `${entry.name}/${fileName}`)
+		})
+
+		expect(staleConfigFiles).toEqual([])
+	})
+
 	test('apps/testing covers the full binding matrix, uses preview-scoped resource names, and keeps production overrides', async () => {
 		const config = await loadConfig({ cwd: testingAppDir })
 		const preview = resolveConfigForEnvironment(config, 'preview')
@@ -632,11 +647,14 @@ describe('repo example app configs', () => {
 		})
 		expect(compiled.preview_urls).toBe(true)
 		expect(compiled.workers_dev).toBe(true)
-		expect(config.files?.fetch).toBe('.adapter-cloudflare/_worker.js')
+		expect(config.files?.fetch).toBe(false)
 		expect(config.previews?.includeCrons).toBe(false)
 		expect(config.assets).toEqual({
 			binding: 'ASSETS',
 			directory: '.adapter-cloudflare'
+		})
+		expect(config.wrangler?.passthrough).toEqual({
+			main: '.adapter-cloudflare/_worker.js'
 		})
 	})
 })

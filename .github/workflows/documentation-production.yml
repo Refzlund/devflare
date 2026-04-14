@@ -8,9 +8,9 @@ on:
     paths:
       - "apps/documentation/**"
       - "packages/devflare/**"
-      - ".github/actions/devflare-deploy/**"
-      - ".github/actions/devflare-github-feedback/**"
-      - ".github/workflows/documentation-production.yml"
+      - "package.json"
+      - "bun.lock"
+      - "turbo.json"
   workflow_dispatch:
 
 permissions:
@@ -28,24 +28,31 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
-
-      - name: Setup Bun for shared workspace dependencies
-        uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.3.6
+          fetch-depth: 0
 
-      - name: Install shared workspace dependencies
-        shell: bash
-        run: bun install --frozen-lockfile
+      - name: Resolve documentation deploy impact
+        id: impact
+        uses: ./.github/actions/devflare-deploy-impact
+        with:
+          target-package: documentation
+          default-branch: ${{ github.event.repository.default_branch }}
+          event-name: ${{ github.event_name }}
+          event-action: ""
+          push-before: ${{ github.event.before || '' }}
+          pull-request-base-sha: ""
+          pull-request-head-sha: ""
 
       - name: Deploy documentation production
         id: deploy
+        if: ${{ steps.impact.outputs.should-deploy == 'true' }}
         continue-on-error: true
         uses: ./.github/actions/devflare-deploy
         with:
           working-directory: apps/documentation
-          install-working-directory: apps/documentation
+          install-working-directory: .
           deploy-command: bun run deploy --
+          production: "true"
           deploy-message: Documentation production ${{ github.sha }} (run ${{ github.run_id }})
           deploy-tag: documentation-production-${{ github.run_id }}
           cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -82,7 +89,7 @@ jobs:
           exit 1
 
       - name: Publish production deployment feedback
-        if: ${{ always() }}
+        if: ${{ steps.impact.outputs.should-deploy == 'true' && always() }}
         uses: ./.github/actions/devflare-github-feedback
         with:
           github-token: ${{ github.token }}
@@ -108,24 +115,34 @@ jobs:
           {
             echo '### Documentation production workflow'
             echo ''
-            echo '- Deployment verification: handled by the deploy action via Cloudflare control-plane checks'
-            echo "- Live URL verification: ${{ steps.verify-live.outcome == 'success' && 'current build SHA observed on production' || (steps.verify-live.outcome == 'failure' && 'expected build SHA not visible on production' || 'skipped') }}"
-            echo '- GitHub feedback: production deployment status published'
-            echo "- Final status: \`${{ steps.deploy.outputs.status == 'success' && steps.verify-live.outcome != 'failure' && 'success' || 'failure' }}\`"
-            echo "- Production URL: ${{ steps.deploy.outputs.preview-url || env.DOCUMENTATION_PRODUCTION_URL }}"
-            if [ -n "${{ steps.deploy.outputs.failure-stage }}" ]; then
-              echo "- Failure stage: \`${{ steps.deploy.outputs.failure-stage }}\`"
-            fi
-            if [ -n "${{ steps.deploy.outputs.exit-code }}" ]; then
-              echo "- Exit code: \`${{ steps.deploy.outputs.exit-code }}\`"
-            fi
-            if [ -n "${{ steps.deploy.outputs.version-id }}" ]; then
-              echo "- Version ID: \`${{ steps.deploy.outputs.version-id }}\`"
+            echo '- Deploy target: explicit production via `--prod`'
+            echo "- Impact decision: \`${{ steps.impact.outputs.should-deploy == 'true' && 'deploy' || 'skip' }}\`"
+            echo "- Impact reason: ${{ steps.impact.outputs.reason }}"
+            if [ "${{ steps.impact.outputs.should-deploy }}" != 'true' ]; then
+              echo '- Deployment verification: skipped because the documentation workspace and its dependencies were unaffected'
+              echo '- GitHub feedback: skipped because no new deployment was needed'
+              echo "- Final status: \`skipped\`"
+              echo "- Production URL: $DOCUMENTATION_PRODUCTION_URL"
+            else
+              echo '- Deployment verification: handled by the deploy action via Cloudflare control-plane checks'
+              echo "- Live URL verification: ${{ steps.verify-live.outcome == 'success' && 'current build SHA observed on production' || (steps.verify-live.outcome == 'failure' && 'expected build SHA not visible on production' || 'skipped') }}"
+              echo '- GitHub feedback: production deployment status published'
+              echo "- Final status: \`${{ steps.deploy.outputs.status == 'success' && steps.verify-live.outcome != 'failure' && 'success' || 'failure' }}\`"
+              echo "- Production URL: ${{ steps.deploy.outputs.preview-url || env.DOCUMENTATION_PRODUCTION_URL }}"
+              if [ -n "${{ steps.deploy.outputs.failure-stage }}" ]; then
+                echo "- Failure stage: \`${{ steps.deploy.outputs.failure-stage }}\`"
+              fi
+              if [ -n "${{ steps.deploy.outputs.exit-code }}" ]; then
+                echo "- Exit code: \`${{ steps.deploy.outputs.exit-code }}\`"
+              fi
+              if [ -n "${{ steps.deploy.outputs.version-id }}" ]; then
+                echo "- Version ID: \`${{ steps.deploy.outputs.version-id }}\`"
+              fi
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Fail when documentation production deploy did not succeed
-        if: ${{ steps.deploy.outputs.status != 'success' || steps.deploy.outcome == 'failure' || steps.verify-live.outcome == 'failure' }}
+        if: ${{ steps.impact.outputs.should-deploy == 'true' && (steps.deploy.outputs.status != 'success' || steps.deploy.outcome == 'failure' || steps.verify-live.outcome == 'failure') }}
         shell: bash
         env:
           DEVFLARE_FAILURE_STAGE: ${{ steps.deploy.outputs.failure-stage }}

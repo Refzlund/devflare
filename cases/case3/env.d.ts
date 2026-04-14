@@ -12,15 +12,8 @@ declare global {
 	}
 }
 
-declare module 'devflare/test' {
-	interface DevflareEnv {
-		SESSION: DurableObjectNamespace<Rpc.DurableObjectBranded & import('./src/do.session').SessionStore>
-		TRACKER: DurableObjectNamespace<Rpc.DurableObjectBranded & import('./src/do.tracker').RequestTracker>
-		COUNTER: DurableObjectNamespace<Rpc.DurableObjectBranded & import('./do-service/do.counter').Counter>
-		RATE_LIMITER: DurableObjectNamespace<Rpc.DurableObjectBranded & import('./do-service/do.rate-limiter').RateLimiter>
-	}
-}
-
+/**
+ * Named entrypoints (none discovered - add ep.*.ts files to enable).
+ * Use with defineConfig<Entrypoints>() for type-safe cross-worker references.
+ */
 export type Entrypoints = string
-
-export {}

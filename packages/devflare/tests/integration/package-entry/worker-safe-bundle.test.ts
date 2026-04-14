@@ -1,12 +1,10 @@
 import { afterAll, describe, expect, test } from 'bun:test'
-import { cp, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { fileURLToPath } from 'node:url'
-import { dirname, join } from 'pathe'
+import { join } from 'pathe'
+import { cleanupTempDirs, installBuiltDevflare } from '../helpers/built-devflare.helpers'
 
-const packageRoot = join(dirname(fileURLToPath(import.meta.url)), '../../../')
 const tempDirs: string[] = []
-let buildPromise: Promise<void> | null = null
 
 interface BuildResult {
 	success: boolean
@@ -29,44 +27,11 @@ function formatBuildLogs(logs: Array<{ message?: string }>): string {
 	return logs.map((log) => log.message ?? String(log)).join('\n')
 }
 
-async function ensurePackageBuilt(): Promise<void> {
-	if (!buildPromise) {
-		buildPromise = (async () => {
-			const build = bun.spawn(['bun', 'run', 'build'], {
-				cwd: packageRoot,
-				stdout: 'pipe',
-				stderr: 'pipe'
-			})
-
-			const [stdout, stderr, exitCode] = await Promise.all([
-				new Response(build.stdout).text(),
-				new Response(build.stderr).text(),
-				build.exited
-			])
-
-			if (exitCode !== 0) {
-				throw new Error([
-					'Package build failed',
-					stdout.trim(),
-					stderr.trim()
-				].filter(Boolean).join('\n\n'))
-			}
-		})()
-	}
-
-	await buildPromise
-}
-
 async function createBundleResult(importSource: string, importedNames: string): Promise<BuildResult> {
-	await ensurePackageBuilt()
-
 	const tempDir = await mkdtemp(join(tmpdir(), 'devflare-worker-bundle-'))
 	tempDirs.push(tempDir)
 
-	const packagedDevflareDir = join(tempDir, 'node_modules', 'devflare')
-	await mkdir(packagedDevflareDir, { recursive: true })
-	await cp(join(packageRoot, 'package.json'), join(packagedDevflareDir, 'package.json'))
-	await cp(join(packageRoot, 'dist'), join(packagedDevflareDir, 'dist'), { recursive: true })
+	await installBuiltDevflare(tempDir)
 
 	await writeFile(
 		join(tempDir, 'entry.ts'),
@@ -86,9 +51,7 @@ async function createBundleResult(importSource: string, importedNames: string): 
 }
 
 afterAll(async () => {
-	for (const tempDir of tempDirs) {
-		await rm(tempDir, { recursive: true, force: true })
-	}
+	await cleanupTempDirs(tempDirs)
 })
 
 describe('worker-safe package entrypoints', () => {

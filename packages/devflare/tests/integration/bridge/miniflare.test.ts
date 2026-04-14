@@ -4,8 +4,11 @@
 // Tests the full bridge stack: Miniflare → Gateway Worker → RPC → Proxy
 // =============================================================================
 
-import { describe, test, expect, beforeAll, afterAll } from 'bun:test'
-import { startMiniflare, stopMiniflare, type MiniflareInstance } from '../../../src/bridge/miniflare'
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
+import { mkdtemp, readdir, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { type MiniflareInstance, startMiniflare, stopMiniflare } from '../../../src/bridge/miniflare'
 import { PORTS } from './_fixtures'
 
 describe('Miniflare Orchestration', () => {
@@ -101,6 +104,43 @@ describe('Multiple Miniflare Instances', () => {
 		} finally {
 			await mf1.dispose()
 			await mf2.dispose()
+		}
+	})
+
+	test('uses a string persist value as the persistence directory', async () => {
+		const persistDir = await mkdtemp(join(tmpdir(), 'devflare-miniflare-persist-'))
+		const persistPort = PORTS.case18Do + 1
+
+		try {
+			const firstInstance = await startMiniflare({
+				port: persistPort,
+				kvNamespaces: ['PERSIST_KV'],
+				persist: persistDir
+			})
+
+			try {
+				const kv = await firstInstance.getKVNamespace('PERSIST_KV')
+				await kv.put('persisted-key', 'persisted-value')
+			} finally {
+				await firstInstance.dispose()
+			}
+
+			expect((await readdir(persistDir)).length).toBeGreaterThan(0)
+
+			const secondInstance = await startMiniflare({
+				port: persistPort,
+				kvNamespaces: ['PERSIST_KV'],
+				persist: persistDir
+			})
+
+			try {
+				const kv = await secondInstance.getKVNamespace('PERSIST_KV')
+				expect(await kv.get('persisted-key', 'text')).toBe('persisted-value')
+			} finally {
+				await secondInstance.dispose()
+			}
+		} finally {
+			await rm(persistDir, { recursive: true, force: true })
 		}
 	})
 })

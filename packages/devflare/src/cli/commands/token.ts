@@ -36,6 +36,11 @@ type TokenOperation =
 	| { kind: 'delete'; requestedName?: string }
 	| { kind: 'delete-all' }
 
+interface NamedManagedTokenSelection {
+	tokenName: string
+	matchingTokens: AccountOwnedAPIToken[]
+}
+
 function getTrimmedStringOption(
 	options: ParsedArgs['options'],
 	key: string
@@ -185,6 +190,58 @@ async function resolveTokenName(
 	}
 
 	return normalizeDevflareTokenName(rawName)
+}
+
+async function resolveNamedManagedTokens(
+	accountId: string,
+	accountSource: string,
+	bootstrapToken: string,
+	requestedName: string | undefined,
+	logger: ConsolaInstance,
+	theme: ReturnType<typeof createCliTheme>,
+	options: {
+		promptMessage: string
+		actionLabel: string
+		multipleMatchMessage: string
+	}
+): Promise<CliResult | NamedManagedTokenSelection> {
+	const tokenName = await resolveTokenName(
+		requestedName,
+		logger,
+		theme,
+		options.promptMessage
+	)
+	if (!tokenName) {
+		return { exitCode: 0 }
+	}
+
+	logLine(logger)
+	logLine(logger, `${yellow('tokens', theme)} ${dim(`${options.actionLabel} a Devflare-managed account-owned token…`, theme)}`)
+	logLine(logger, `${dim('Account:', theme)} ${green(accountId, theme)} ${whiteDim(`(${accountSource})`, theme)}`)
+	logLine(logger, `${dim('Name:', theme)} ${green(tokenName, theme)}`)
+
+	const accountTokens = await listAccountOwnedAPITokens(accountId, {
+		...CLI_API_OPTIONS,
+		token: bootstrapToken
+	})
+	const matchingTokens = filterDevflareManagedTokens(accountTokens).filter((token) => token.name === tokenName)
+
+	if (matchingTokens.length === 0) {
+		logger.error(`No Devflare-managed token named ${tokenName} was found.`)
+		return { exitCode: 1 }
+	}
+
+	if (matchingTokens.length > 1) {
+		logLine(
+			logger,
+			dim(`Found ${matchingTokens.length} tokens with that name. ${options.multipleMatchMessage}.`, theme)
+		)
+	}
+
+	return {
+		tokenName,
+		matchingTokens
+	}
 }
 
 async function resolveRequestedAccountId(
@@ -373,39 +430,24 @@ async function rollManagedTokensByName(
 	logger: ConsolaInstance,
 	theme: ReturnType<typeof createCliTheme>
 ): Promise<CliResult> {
-	const tokenName = await resolveTokenName(
+	const selectedTokens = await resolveNamedManagedTokens(
+		accountId,
+		accountSource,
+		bootstrapToken,
 		requestedName,
 		logger,
 		theme,
-		'Enter the Devflare token name to roll:'
+		{
+			promptMessage: 'Enter the Devflare token name to roll:',
+			actionLabel: 'Rolling',
+			multipleMatchMessage: 'Rolling all exact matches'
+		}
 	)
-	if (!tokenName) {
-		return { exitCode: 0 }
+	if ('exitCode' in selectedTokens) {
+		return selectedTokens
 	}
 
-	logLine(logger)
-	logLine(logger, `${yellow('tokens', theme)} ${dim('Rolling a Devflare-managed account-owned token…', theme)}`)
-	logLine(logger, `${dim('Account:', theme)} ${green(accountId, theme)} ${whiteDim(`(${accountSource})`, theme)}`)
-	logLine(logger, `${dim('Name:', theme)} ${green(tokenName, theme)}`)
-
-	const accountTokens = await listAccountOwnedAPITokens(accountId, {
-		...CLI_API_OPTIONS,
-		token: bootstrapToken
-	})
-	const matchingTokens = filterDevflareManagedTokens(accountTokens).filter((token) => token.name === tokenName)
-
-	if (matchingTokens.length === 0) {
-		logger.error(`No Devflare-managed token named ${tokenName} was found.`)
-		return { exitCode: 1 }
-	}
-
-	if (matchingTokens.length > 1) {
-		logLine(
-			logger,
-			dim(`Found ${matchingTokens.length} tokens with that name. Rolling all exact matches.`, theme)
-		)
-	}
-
+	const { tokenName, matchingTokens } = selectedTokens
 	const rolledValues: string[] = []
 	for (const token of matchingTokens) {
 		const rolledValue = await rollAccountOwnedAPITokenValue(accountId, token.id, {
@@ -439,39 +481,24 @@ async function deleteManagedTokensByName(
 	logger: ConsolaInstance,
 	theme: ReturnType<typeof createCliTheme>
 ): Promise<CliResult> {
-	const tokenName = await resolveTokenName(
+	const selectedTokens = await resolveNamedManagedTokens(
+		accountId,
+		accountSource,
+		bootstrapToken,
 		requestedName,
 		logger,
 		theme,
-		'Enter the Devflare token name to delete:'
+		{
+			promptMessage: 'Enter the Devflare token name to delete:',
+			actionLabel: 'Deleting',
+			multipleMatchMessage: 'Deleting all exact matches'
+		}
 	)
-	if (!tokenName) {
-		return { exitCode: 0 }
+	if ('exitCode' in selectedTokens) {
+		return selectedTokens
 	}
 
-	logLine(logger)
-	logLine(logger, `${yellow('tokens', theme)} ${dim('Deleting a Devflare-managed account-owned token…', theme)}`)
-	logLine(logger, `${dim('Account:', theme)} ${green(accountId, theme)} ${whiteDim(`(${accountSource})`, theme)}`)
-	logLine(logger, `${dim('Name:', theme)} ${green(tokenName, theme)}`)
-
-	const accountTokens = await listAccountOwnedAPITokens(accountId, {
-		...CLI_API_OPTIONS,
-		token: bootstrapToken
-	})
-	const matchingTokens = filterDevflareManagedTokens(accountTokens).filter((token) => token.name === tokenName)
-
-	if (matchingTokens.length === 0) {
-		logger.error(`No Devflare-managed token named ${tokenName} was found.`)
-		return { exitCode: 1 }
-	}
-
-	if (matchingTokens.length > 1) {
-		logLine(
-			logger,
-			dim(`Found ${matchingTokens.length} tokens with that name. Deleting all exact matches.`, theme)
-		)
-	}
-
+	const { tokenName, matchingTokens } = selectedTokens
 	for (const token of matchingTokens) {
 		await deleteAccountOwnedAPIToken(accountId, token.id, {
 			...CLI_API_OPTIONS,

@@ -1,55 +1,21 @@
-import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { dirname, join } from 'pathe'
-import type { CliDependencies, ExecResult, ProcessRunner } from '../../../src/cli/dependencies'
 import { clearDependencies, setDependencies } from '../../../src/cli/dependencies'
 import { runTypesCommand } from '../../../src/cli/commands/types'
+import { createCliDependencies, createProcessRunner, successResult } from '../../helpers/process-runner'
+import { createLogger } from '../../helpers/mock-logger'
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '../../../')
 
-interface TestLogger {
-	info: ReturnType<typeof mock>
-	warn: ReturnType<typeof mock>
-	error: ReturnType<typeof mock>
-	success: ReturnType<typeof mock>
-	debug: ReturnType<typeof mock>
-	messages: Array<{ level: string; args: unknown[] }>
-}
-
-function createLogger(): TestLogger {
-	const messages: Array<{ level: string; args: unknown[] }> = []
-
-	const createMethod = (level: string) => mock((...args: unknown[]) => {
-		messages.push({ level, args })
-	})
-
-	return {
-		info: createMethod('info'),
-		warn: createMethod('warn'),
-		error: createMethod('error'),
-		success: createMethod('success'),
-		debug: createMethod('debug'),
-		messages
-	}
-}
-
-function createUnusedProcessRunner(): ProcessRunner {
-	return {
-		async exec(): Promise<ExecResult> {
-			return {
-				exitCode: 0,
-				stdout: '',
-				stderr: '',
-				failed: false,
-				killed: false
-			}
-		},
-		spawn() {
-			throw new Error('spawn() should not be called by runTypesCommand in this test')
-		}
-	}
+function createUnusedProcessRunner() {
+	return createProcessRunner(
+		() => successResult(),
+		[],
+		{ spawnErrorMessage: 'spawn() should not be called by runTypesCommand in this test' }
+	)
 }
 
 describe('runTypesCommand', () => {
@@ -112,12 +78,9 @@ export interface AdminEntrypointRpc {
 }
 `.trim())
 
-		setDependencies({
-			fs: await import('node:fs/promises') as CliDependencies['fs'],
-			exec: createUnusedProcessRunner()
-		})
+		setDependencies(createCliDependencies(createUnusedProcessRunner()))
 
-		const logger = createLogger()
+		const logger = createLogger({ includeLog: false })
 		const result = await runTypesCommand(
 			{ command: 'types', args: [], options: {} },
 			logger as any,
@@ -158,12 +121,9 @@ export default defineConfig({
 })
 `.trim())
 
-		setDependencies({
-			fs: await import('node:fs/promises') as CliDependencies['fs'],
-			exec: createUnusedProcessRunner()
-		})
+		setDependencies(createCliDependencies(createUnusedProcessRunner()))
 
-		const logger = createLogger()
+		const logger = createLogger({ includeLog: false })
 		const result = await runTypesCommand(
 			{ command: 'types', args: [], options: {} },
 			logger as any,
@@ -200,12 +160,9 @@ export default defineConfig({
 })
 `.trim())
 
-		setDependencies({
-			fs: await import('node:fs/promises') as CliDependencies['fs'],
-			exec: createUnusedProcessRunner()
-		})
+		setDependencies(createCliDependencies(createUnusedProcessRunner()))
 
-		const logger = createLogger()
+		const logger = createLogger({ includeLog: false })
 		const result = await runTypesCommand(
 			{ command: 'types', args: [], options: {} },
 			logger as any,
@@ -242,12 +199,9 @@ export default defineConfig({
 })
 `.trim())
 
-		setDependencies({
-			fs: await import('node:fs/promises') as CliDependencies['fs'],
-			exec: createUnusedProcessRunner()
-		})
+		setDependencies(createCliDependencies(createUnusedProcessRunner()))
 
-		const logger = createLogger()
+		const logger = createLogger({ includeLog: false })
 		const result = await runTypesCommand(
 			{ command: 'types', args: [], options: {} },
 			logger as any,

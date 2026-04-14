@@ -54,18 +54,20 @@
 	"files": [
 		"dist",
 		"bin",
-		"LLM.md",
-		"R2.md"
+		"LLM.md"
 	],
 	"scripts": {
+		"llm:generate": "bun ./scripts/generate-llm.ts",
 		"prebuild": "node -e \"require('fs').rmSync('./dist', { recursive: true, force: true })\"",
 		"build": "bun build ./src/index.ts ./src/browser.ts ./src/config-entry.ts ./src/cli/index.ts ./src/runtime/index.ts ./src/test/index.ts ./src/vite/index.ts ./src/sveltekit/index.ts ./src/cloudflare/index.ts ./src/decorators/index.ts --outdir ./dist --splitting --target node --packages=external && tsgo --declaration --emitDeclarationOnly --noEmit false --outDir ./dist",
 		"dev": "bun --watch ./src/cli/index.ts",
+		"prepack": "bun run llm:generate",
 		"test": "bun test",
 		"test:watch": "bun test --watch",
 		"typecheck": "tsgo --noEmit"
 	},
 	"dependencies": {
+		"@cloudflare/workers-types": "^4.20250109.0",
 		"@puppeteer/browsers": "^2.10.3",
 		"c12": "^2.0.1",
 		"chokidar": "^4.0.3",
@@ -82,12 +84,12 @@
 		"picomatch": "^4.0.3",
 		"puppeteer-core": "^24.5.0",
 		"rolldown": "^1.0.0-rc.12",
+		"wrangler": "^3.99.0",
 		"ws": "^8.19.0",
 		"zod": "^3.25.0"
 	},
 	"devDependencies": {
 		"@cloudflare/vite-plugin": "^1.0.0",
-		"@cloudflare/workers-types": "^4.20250109.0",
 		"@types/bun": "^1.1.14",
 		"@types/picomatch": "^4.0.2",
 		"@types/ws": "^8.18.1",
@@ -97,8 +99,7 @@
 	},
 	"peerDependencies": {
 		"@cloudflare/vite-plugin": "^1.0.0",
-		"vite": "^6.0.0 || ^7.0.0 || ^8.0.0",
-		"wrangler": "^3.99.0"
+		"vite": "^6.0.0 || ^7.0.0 || ^8.0.0"
 	},
 	"peerDependenciesMeta": {
 		"@cloudflare/vite-plugin": {

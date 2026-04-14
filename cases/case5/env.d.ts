@@ -11,17 +11,8 @@ declare global {
 	}
 }
 
-declare module 'devflare/test' {
-	interface DevflareEnv {
-		MATH_SERVICE: MathServiceInterface
-		ADMIN: AdminEntrypointInterface
-	}
-}
-
 /**
  * Named entrypoints discovered from ep.*.ts files.
  * Use with defineConfig<Entrypoints>() for type-safe cross-worker references.
  */
 export type Entrypoints = 'AdminEntrypoint'
-
-export { }

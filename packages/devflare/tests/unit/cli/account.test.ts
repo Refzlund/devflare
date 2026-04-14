@@ -1,47 +1,7 @@
 import { afterEach, describe, expect, mock, test } from 'bun:test'
 import { runAccountCommand } from '../../../src/cli/commands/account'
-
-interface TestLogger {
-	info: ReturnType<typeof mock>
-	warn: ReturnType<typeof mock>
-	error: ReturnType<typeof mock>
-	success: ReturnType<typeof mock>
-	debug: ReturnType<typeof mock>
-	log: ReturnType<typeof mock>
-	messages: Array<{ level: string; args: unknown[] }>
-}
-
-function createLogger(): TestLogger {
-	const messages: Array<{ level: string; args: unknown[] }> = []
-
-	const createMethod = (level: string) => mock((...args: unknown[]) => {
-		messages.push({ level, args })
-	})
-
-	return {
-		info: createMethod('info'),
-		warn: createMethod('warn'),
-		error: createMethod('error'),
-		success: createMethod('success'),
-		debug: createMethod('debug'),
-		log: createMethod('log'),
-		messages
-	}
-}
-
-function jsonResponse(result: unknown, resultInfo?: Record<string, number>): Response {
-	return new Response(JSON.stringify({
-		success: true,
-		errors: [],
-		messages: [],
-		result,
-		...(resultInfo ? { result_info: resultInfo } : {})
-	}), {
-		headers: {
-			'Content-Type': 'application/json'
-		}
-	})
-}
+import { jsonResponse } from '../../helpers/cloudflare-api'
+import { createLogger } from '../../helpers/mock-logger'
 
 const originalFetch = globalThis.fetch
 const originalToken = process.env.CLOUDFLARE_API_TOKEN

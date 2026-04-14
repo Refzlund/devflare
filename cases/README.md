@@ -60,6 +60,9 @@ case{N}/
 └── env.d.ts           # Generated types
 ```
 
+Generated Devflare and Wrangler outputs belong under `.devflare/` and `.wrangler/`.
+Case roots should not keep a generated `wrangler.jsonc` / `wrangler.json` file as source.
+
 ---
 
 ## Case Details

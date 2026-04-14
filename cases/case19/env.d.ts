@@ -9,10 +9,8 @@ declare global {
 	}
 }
 
-declare module 'devflare/test' {
-	interface DevflareEnv {
-		COUNTER: DurableObjectNamespace<Rpc.DurableObjectBranded & import('./src/do.counter').Counter>
-	}
-}
-
-export {}
+/**
+ * Named entrypoints (none discovered - add ep.*.ts files to enable).
+ * Use with defineConfig<Entrypoints>() for type-safe cross-worker references.
+ */
+export type Entrypoints = string

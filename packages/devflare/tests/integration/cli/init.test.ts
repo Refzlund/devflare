@@ -181,6 +181,8 @@ describe('init command integration', () => {
 			expect(fetchContent).not.toBeNull()
 			expect(fetchContent).toContain('export async function fetch')
 			expect(fetchContent).toContain('FetchEvent')
+			expect(fetchContent).toContain('fetch({ url }: FetchEvent)')
+			expect(fetchContent).toContain("url.pathname === '/'")
 			expect(fetchContent).toContain('Hello from Devflare')
 			expect(fetchContent).toContain('Hello from Devflare:')
 			expect(fetchContent).not.toContain('export default')
@@ -209,6 +211,7 @@ describe('init command integration', () => {
 			const appContent = harness.fs.getContent('/workspace/api-app/src/app.ts')
 			expect(appContent).not.toBeNull()
 			expect(appContent).toContain('export async function appFetch')
+			expect(appContent).toContain('appFetch({ url }: FetchEvent)')
 			expect(appContent).toContain("Response.json({ status: 'ok' })")
 			expect(appContent).not.toContain('src/routes')
 

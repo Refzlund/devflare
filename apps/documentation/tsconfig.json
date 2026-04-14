@@ -19,6 +19,7 @@
 	},
 	"include": [
 		"env.d.ts",
+		"src/**/*.d.ts",
 		"src/**/*.ts",
 		"src/**/*.svelte",
 		"devflare.config.ts",

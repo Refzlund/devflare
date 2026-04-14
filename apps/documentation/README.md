@@ -24,6 +24,38 @@ bun run deploy:preview
 bun run check
 ```
 
+## Monorepo + Turborepo workflow
+
+This app lives inside the repository's Bun + Turborepo workspace, so there are two layers to keep straight:
+
+- the repo root uses Turbo to orchestrate validation, caching, and impacted-package work
+- this package still owns the actual `devflare` config and deployment commands through `apps/documentation/devflare.config.ts`
+
+That means Turbo is the right tool for workspace-wide validation such as:
+
+- `bun run devflare:build`
+- `bun run devflare:check`
+- `bun run devflare:ci`
+- `bun run turbo build --filter=documentation`
+- `bun run turbo check --filter=documentation`
+
+But the actual deploy should still run from the package that owns the app:
+
+```sh
+# from the repo root
+bun run turbo build --filter=documentation
+bun run turbo check --filter=documentation
+
+# from apps/documentation
+bun run deploy -- --preview --branch-name feature-search
+bun run deploy -- --prod
+```
+
+In GitHub Actions, keep the same split:
+
+- use Turbo or path-aware workflow conditions to decide whether the docs app needs work
+- run the deploy step with `working-directory: apps/documentation` (or equivalent) so `devflare` resolves this package's local config on purpose
+
 ## Notes
 
 - Do not add a hand-maintained `wrangler.jsonc` next to `devflare.config.ts`

@@ -13,7 +13,7 @@ import {
 	AuthenticationError,
 	type APIClientOptions
 } from '../../cloudflare'
-import { loadConfig, resolveConfigPath } from '../../config/loader'
+import { getConfiguredAccountId } from '../command-utils'
 import {
 	getGlobalDefaultAccountId,
 	setGlobalDefaultAccountId,
@@ -73,30 +73,6 @@ const CLI_API_OPTIONS: APIClientOptions = { timeout: 10000 }
 // -----------------------------------------------------------------------------
 // Helpers
 // -----------------------------------------------------------------------------
-
-async function getConfiguredAccountId(cwd: string): Promise<string | undefined> {
-	const workspaceAccountId = getWorkspaceAccountId()
-	if (workspaceAccountId) {
-		return workspaceAccountId
-	}
-
-	const envAccountId = process.env.CLOUDFLARE_ACCOUNT_ID?.trim()
-	if (envAccountId) {
-		return envAccountId
-	}
-
-	const configPath = await resolveConfigPath(cwd)
-	if (!configPath) {
-		return undefined
-	}
-
-	try {
-		const config = await loadConfig({ cwd })
-		return config.accountId
-	} catch {
-		return undefined
-	}
-}
 
 function formatDate(date: Date | undefined): string {
 	if (!date) return 'N/A'
@@ -201,29 +177,29 @@ export async function runAccountCommand(
 
 		switch (subcommand) {
 			case 'workers':
-					return await showWorkers(accountId, logger, theme)
+				return await showWorkers(accountId, logger, theme)
 
 			case 'kv':
-					return await showKV(accountId, logger, theme)
+				return await showKV(accountId, logger, theme)
 
 			case 'd1':
-					return await showD1(accountId, logger, theme)
+				return await showD1(accountId, logger, theme)
 
 			case 'r2':
-					return await showR2(accountId, logger, theme)
+				return await showR2(accountId, logger, theme)
 
 			case 'vectorize':
-					return await showVectorize(accountId, logger, theme)
+				return await showVectorize(accountId, logger, theme)
 
 			case 'limits':
-					return await handleLimits(accountId, parsed, logger, theme)
+				return await handleLimits(accountId, parsed, logger, theme)
 
 			case 'usage':
-					return await showUsage(accountId, logger, theme)
+				return await showUsage(accountId, logger, theme)
 
 			case 'info':
 			default:
-					return await showAccountOverview(accountId, logger, theme)
+				return await showAccountOverview(accountId, logger, theme)
 		}
 	} catch (error) {
 		if (error instanceof AuthenticationError) {
@@ -292,7 +268,7 @@ async function showAccountOverview(
 	}
 
 	// Show all accounts with proper badges
-	for (let i = 0; i < accounts.length; i++) {
+	for (let i = 0;i < accounts.length;i++) {
 		const acc = accounts[i]
 		const isWorkspace = acc.id === workspaceId
 		const isGlobal = acc.id === globalId

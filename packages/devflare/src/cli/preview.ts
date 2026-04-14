@@ -1,5 +1,4 @@
 type PreviewAliasSource =
-	| 'preview-alias'
 	| 'branch-name'
 	| 'github-head-ref'
 	| 'github-ref-name'
@@ -13,7 +12,6 @@ export interface ResolvedPreviewAlias {
 }
 
 export interface ResolvePreviewAliasOptions {
-	explicitAlias?: string
 	branchName?: string
 	workerName?: string
 	env?: NodeJS.ProcessEnv
@@ -96,7 +94,6 @@ export async function resolvePreviewAlias(
 ): Promise<ResolvedPreviewAlias> {
 	const env = options.env ?? process.env
 	const candidates: Array<{ value?: string; source: PreviewAliasSource }> = [
-		{ value: options.explicitAlias, source: 'preview-alias' },
 		{ value: options.branchName, source: 'branch-name' },
 		{ value: env.GITHUB_HEAD_REF, source: 'github-head-ref' },
 		{ value: env.GITHUB_REF_NAME, source: 'github-ref-name' },
@@ -125,7 +122,7 @@ export async function resolvePreviewAlias(
 	}
 
 	throw new Error(
-		'Preview deploys need a stable alias source. Pass --preview-alias <alias>, pass --branch-name <branch>, or run from CI/git with branch metadata available.'
+		'Preview deploys need a stable alias source. Pass --branch-name <branch>, or run from CI/git with branch metadata available.'
 	)
 }
 

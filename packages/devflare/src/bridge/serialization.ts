@@ -72,7 +72,7 @@ export async function serializeRequest(
 		// Always read the body as bytes for reliability
 		// Stream handling is complex and often unreliable across RPC
 		const bytes = await request.arrayBuffer()
-		
+
 		if (bytes.byteLength > threshold) {
 			// Large body → HTTP transfer
 			body = { type: 'http', transferId: crypto.randomUUID() }
@@ -150,7 +150,7 @@ export async function serializeResponse(
 		// Always read the body as bytes for reliability
 		// Stream handling is complex and often unreliable across RPC
 		const bytes = await response.arrayBuffer()
-		
+
 		if (bytes.byteLength > threshold) {
 			// Large body → HTTP transfer
 			body = { type: 'http', transferId: crypto.randomUUID() }
@@ -387,9 +387,31 @@ interface SerializedR2Object {
 	bodyData?: string  // Base64-encoded body (only for R2ObjectBody)
 }
 
-/** Deserialize R2Object (metadata only) */
-function deserializeR2Object(obj: Record<string, unknown>): R2Object {
-	const serialized = obj as unknown as SerializedR2Object
+function applySerializedHttpMetadata(
+	headers: Headers,
+	httpMetadata?: R2HTTPMetadata
+): void {
+	if (httpMetadata?.contentType) {
+		headers.set('Content-Type', httpMetadata.contentType)
+	}
+	if (httpMetadata?.contentLanguage) {
+		headers.set('Content-Language', httpMetadata.contentLanguage)
+	}
+	if (httpMetadata?.contentDisposition) {
+		headers.set('Content-Disposition', httpMetadata.contentDisposition)
+	}
+	if (httpMetadata?.contentEncoding) {
+		headers.set('Content-Encoding', httpMetadata.contentEncoding)
+	}
+	if (httpMetadata?.cacheControl) {
+		headers.set('Cache-Control', httpMetadata.cacheControl)
+	}
+	if (httpMetadata?.cacheExpiry) {
+		headers.set('Expires', new Date(httpMetadata.cacheExpiry).toUTCString())
+	}
+}
+
+function createSerializedR2Metadata(serialized: SerializedR2Object) {
 	return {
 		key: serialized.key,
 		version: serialized.version,
@@ -403,25 +425,16 @@ function deserializeR2Object(obj: Record<string, unknown>): R2Object {
 		range: serialized.range,
 		storageClass: serialized.storageClass as any,
 		writeHttpMetadata(headers: Headers): void {
-			if (serialized.httpMetadata?.contentType) {
-				headers.set('Content-Type', serialized.httpMetadata.contentType)
-			}
-			if (serialized.httpMetadata?.contentLanguage) {
-				headers.set('Content-Language', serialized.httpMetadata.contentLanguage)
-			}
-			if (serialized.httpMetadata?.contentDisposition) {
-				headers.set('Content-Disposition', serialized.httpMetadata.contentDisposition)
-			}
-			if (serialized.httpMetadata?.contentEncoding) {
-				headers.set('Content-Encoding', serialized.httpMetadata.contentEncoding)
-			}
-			if (serialized.httpMetadata?.cacheControl) {
-				headers.set('Cache-Control', serialized.httpMetadata.cacheControl)
-			}
-			if (serialized.httpMetadata?.cacheExpiry) {
-				headers.set('Expires', new Date(serialized.httpMetadata.cacheExpiry).toUTCString())
-			}
+			applySerializedHttpMetadata(headers, serialized.httpMetadata)
 		}
+	}
+}
+
+/** Deserialize R2Object (metadata only) */
+function deserializeR2Object(obj: Record<string, unknown>): R2Object {
+	const serialized = obj as unknown as SerializedR2Object
+	return {
+		...createSerializedR2Metadata(serialized)
 	} as R2Object
 }
 
@@ -432,17 +445,7 @@ function deserializeR2ObjectBody(obj: Record<string, unknown>): R2ObjectBody {
 
 	// Create a fake R2ObjectBody with working methods
 	const r2ObjectBody = {
-		key: serialized.key,
-		version: serialized.version,
-		size: serialized.size,
-		etag: serialized.etag,
-		httpEtag: serialized.httpEtag,
-		checksums: serialized.checksums,
-		uploaded: serialized.uploaded ? new Date(serialized.uploaded) : new Date(),
-		httpMetadata: serialized.httpMetadata,
-		customMetadata: serialized.customMetadata,
-		range: serialized.range,
-		storageClass: serialized.storageClass as any,
+		...createSerializedR2Metadata(serialized),
 		// Body as ReadableStream
 		body: new ReadableStream<Uint8Array>({
 			start(controller) {
@@ -472,26 +475,6 @@ function deserializeR2ObjectBody(obj: Record<string, unknown>): R2ObjectBody {
 			// Convert to ArrayBuffer for wider compatibility
 			const buffer = bodyBytes.buffer.slice(bodyBytes.byteOffset, bodyBytes.byteOffset + bodyBytes.byteLength) as ArrayBuffer
 			return new Blob([buffer], { type: contentType })
-		},
-		writeHttpMetadata(headers: Headers): void {
-			if (serialized.httpMetadata?.contentType) {
-				headers.set('Content-Type', serialized.httpMetadata.contentType)
-			}
-			if (serialized.httpMetadata?.contentLanguage) {
-				headers.set('Content-Language', serialized.httpMetadata.contentLanguage)
-			}
-			if (serialized.httpMetadata?.contentDisposition) {
-				headers.set('Content-Disposition', serialized.httpMetadata.contentDisposition)
-			}
-			if (serialized.httpMetadata?.contentEncoding) {
-				headers.set('Content-Encoding', serialized.httpMetadata.contentEncoding)
-			}
-			if (serialized.httpMetadata?.cacheControl) {
-				headers.set('Cache-Control', serialized.httpMetadata.cacheControl)
-			}
-			if (serialized.httpMetadata?.cacheExpiry) {
-				headers.set('Expires', new Date(serialized.httpMetadata.cacheExpiry).toUTCString())
-			}
 		}
 	}
 
@@ -510,7 +493,7 @@ export function base64Encode(bytes: Uint8Array): string {
 	}
 	// Fallback for browser/worker environments
 	let binary = ''
-	for (let i = 0; i < bytes.byteLength; i++) {
+	for (let i = 0;i < bytes.byteLength;i++) {
 		binary += String.fromCharCode(bytes[i])
 	}
 	return btoa(binary)
@@ -525,7 +508,7 @@ export function base64Decode(str: string): Uint8Array {
 	// Fallback for browser/worker environments
 	const binary = atob(str)
 	const bytes = new Uint8Array(binary.length)
-	for (let i = 0; i < binary.length; i++) {
+	for (let i = 0;i < binary.length;i++) {
 		bytes[i] = binary.charCodeAt(i)
 	}
 	return bytes

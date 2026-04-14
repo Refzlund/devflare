@@ -5,20 +5,19 @@
 // Storage: Devflare-managed KV namespace in user's Cloudflare account
 // =============================================================================
 
-import { apiGet, apiPost, kvGet, kvPut } from './api'
+import { kvGet, kvPut } from './api'
+import { DEVFLARE_KV_NAMESPACE_TITLE, getOrCreateNamedKVNamespace } from './kv-namespace'
 import type {
 	CloudflareService,
 	UsageLimits,
 	UsageRecord,
-	UsageSummary,
-	KVNamespace
+	UsageSummary
 } from './types'
 
 // -----------------------------------------------------------------------------
 // Constants
 // -----------------------------------------------------------------------------
 
-const DEVFLARE_KV_NAMESPACE_TITLE = 'devflare-usage'
 const USAGE_KEY_PREFIX = 'usage:'
 const LIMITS_KEY = 'limits'
 
@@ -38,23 +37,7 @@ const DEFAULT_LIMITS: UsageLimits = {
  * Find or create the devflare-managed KV namespace
  */
 async function getOrCreateUsageNamespace(accountId: string): Promise<string> {
-	// First, try to find existing namespace
-	const namespaces = await apiGet<KVNamespace[]>(
-		`/accounts/${accountId}/storage/kv/namespaces`
-	)
-
-	const existing = namespaces.find((ns) => ns.title === DEVFLARE_KV_NAMESPACE_TITLE)
-	if (existing) {
-		return existing.id
-	}
-
-	// Create new namespace
-	const created = await apiPost<KVNamespace>(
-		`/accounts/${accountId}/storage/kv/namespaces`,
-		{ title: DEVFLARE_KV_NAMESPACE_TITLE }
-	)
-
-	return created.id
+	return getOrCreateNamedKVNamespace(accountId, DEVFLARE_KV_NAMESPACE_TITLE)
 }
 
 // -----------------------------------------------------------------------------

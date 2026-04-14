@@ -7,17 +7,7 @@ import {
 	getViteBuildCleanupTargets
 } from '../../../src/cli/commands/build-artifacts'
 import type { WranglerConfig } from '../../../src/config/compiler'
-
-function createLogger() {
-	return {
-		info() {},
-		warn() {},
-		error() {},
-		success() {},
-		debug() {},
-		log() {}
-	}
-}
+import { createLogger } from '../../helpers/mock-logger'
 
 describe('build artifact cleanup helpers', () => {
 	test('deduplicates worker cleanup when the main entry lives inside assets.directory', () => {

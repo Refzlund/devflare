@@ -1,58 +1,67 @@
 import { afterEach, describe, expect, mock, test } from 'bun:test'
 import { runTokenCommand } from '../../../src/cli/commands/token'
+import { jsonResponse } from '../../helpers/cloudflare-api'
+import { createLogger as createBaseLogger, stripAnsi, type TestLogger as BaseTestLogger } from '../../helpers/mock-logger'
 
-interface TestLogger {
-	info: ReturnType<typeof mock>
-	warn: ReturnType<typeof mock>
-	error: ReturnType<typeof mock>
-	success: ReturnType<typeof mock>
-	debug: ReturnType<typeof mock>
-	log: ReturnType<typeof mock>
+interface TestLogger extends BaseTestLogger {
 	prompt: ReturnType<typeof mock>
-	messages: Array<{ level: string; args: unknown[] }>
 }
 
-const ANSI_REGEX = /\x1b\[[0-9;]*m/g
-
-function stripAnsi(value: string): string {
-	return value.replace(ANSI_REGEX, '')
+interface RecordedTokenRequest {
+	url: string
+	authorization?: string | null
+	method: string
+	body?: string
 }
 
-function createLogger(options: { promptResult?: string | symbol } = {}): TestLogger {
-	const messages: Array<{ level: string; args: unknown[] }> = []
-
-	const createMethod = (level: string) => mock((...args: unknown[]) => {
-		messages.push({ level, args })
-	})
+function createPromptLogger(options: { promptResult?: string | symbol } = {}): TestLogger {
+	const logger = createBaseLogger() as TestLogger
 	const prompt = mock(async (...args: unknown[]) => {
-		messages.push({ level: 'prompt', args })
+		logger.messages.push({ level: 'prompt', args })
 		return options.promptResult ?? 'preview'
 	})
 
-	return {
-		info: createMethod('info'),
-		warn: createMethod('warn'),
-		error: createMethod('error'),
-		success: createMethod('success'),
-		debug: createMethod('debug'),
-		log: createMethod('log'),
-		prompt,
-		messages
-	}
+	logger.prompt = prompt
+	return logger
 }
 
-function jsonResponse(result: unknown, resultInfo?: Record<string, number>): Response {
-	return new Response(JSON.stringify({
-		success: true,
-		errors: [],
-		messages: [],
-		result,
-		...(resultInfo ? { result_info: resultInfo } : {})
-	}), {
-		headers: {
-			'Content-Type': 'application/json'
-		}
+function createPaginatedResponse(items: Array<Record<string, unknown>>): Response {
+	return jsonResponse(items, {
+		page: 1,
+		per_page: 50,
+		total_pages: 1,
+		count: items.length,
+		total_count: items.length
 	})
+}
+
+function createAccountListResponse(): Response {
+	return createPaginatedResponse([
+		{
+			id: 'acc_123',
+			name: 'Devflare Account',
+			type: 'standard'
+		}
+	])
+}
+
+function captureRecordedTokenRequest(
+	requests: RecordedTokenRequest[],
+	input: RequestInfo | URL,
+	init?: RequestInit
+): RecordedTokenRequest {
+	const request = {
+		url: String(input),
+		authorization: new Headers(init?.headers).get('Authorization'),
+		method: init?.method ?? 'GET',
+		body: typeof init?.body === 'string' ? init.body : undefined
+	}
+	requests.push(request)
+	return request
+}
+
+function renderMessages(logger: BaseTestLogger): string[] {
+	return logger.messages.map((message) => stripAnsi(message.args.join(' ')))
 }
 
 const originalFetch = globalThis.fetch
@@ -63,40 +72,16 @@ afterEach(() => {
 
 describe('token command', () => {
 	test('creates a new Devflare-managed account-owned token from a bootstrap token', async () => {
-		const requests: Array<{
-			url: string
-			authorization: string | null
-			method: string
-			body?: string
-		}> = []
+		const requests: RecordedTokenRequest[] = []
 		globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
-			const url = String(input)
-			const authorization = new Headers(init?.headers).get('Authorization')
-			requests.push({
-				url,
-				authorization,
-				method: init?.method ?? 'GET',
-				body: typeof init?.body === 'string' ? init.body : undefined
-			})
+			const { url } = captureRecordedTokenRequest(requests, input, init)
 
 			if (url.includes('/accounts?page=1&per_page=50')) {
-				return jsonResponse([
-					{
-						id: 'acc_123',
-						name: 'Devflare Account',
-						type: 'standard'
-					}
-				], {
-					page: 1,
-					per_page: 50,
-					total_pages: 1,
-					count: 1,
-					total_count: 1
-				})
+				return createAccountListResponse()
 			}
 
 			if (url.includes('/accounts/acc_123/tokens/permission_groups?page=1&per_page=50')) {
-				return jsonResponse([
+				return createPaginatedResponse([
 					{
 						id: 'group-workers',
 						name: 'Workers Scripts Write',
@@ -112,13 +97,7 @@ describe('token command', () => {
 						name: 'Account WAF Write',
 						scopes: ['com.cloudflare.api.account']
 					}
-				], {
-					page: 1,
-					per_page: 50,
-					total_pages: 1,
-					count: 3,
-					total_count: 3
-				})
+				])
 			}
 
 			if (url.endsWith('/accounts/acc_123/tokens')) {
@@ -132,7 +111,7 @@ describe('token command', () => {
 			throw new Error(`Unexpected fetch URL: ${url}`)
 		}) as unknown as typeof fetch
 
-		const logger = createLogger()
+		const logger = createPromptLogger()
 		const result = await runTokenCommand(
 			{
 				command: 'tokens',
@@ -144,7 +123,7 @@ describe('token command', () => {
 			logger as any,
 			{}
 		)
-		const renderedMessages = logger.messages.map((message) => stripAnsi(message.args.join(' ')))
+		const renderedMessages = renderMessages(logger)
 		const createRequest = requests.find((request) => request.method === 'POST')
 		const createRequestBody = JSON.parse(createRequest?.body ?? '{}') as {
 			name?: string
@@ -166,40 +145,16 @@ describe('token command', () => {
 	})
 
 	test('creates an all-flags token from reusable account-scoped permissions only', async () => {
-		const requests: Array<{
-			url: string
-			authorization: string | null
-			method: string
-			body?: string
-		}> = []
+		const requests: RecordedTokenRequest[] = []
 		globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
-			const url = String(input)
-			const authorization = new Headers(init?.headers).get('Authorization')
-			requests.push({
-				url,
-				authorization,
-				method: init?.method ?? 'GET',
-				body: typeof init?.body === 'string' ? init.body : undefined
-			})
+			const { url } = captureRecordedTokenRequest(requests, input, init)
 
 			if (url.includes('/accounts?page=1&per_page=50')) {
-				return jsonResponse([
-					{
-						id: 'acc_123',
-						name: 'Devflare Account',
-						type: 'standard'
-					}
-				], {
-					page: 1,
-					per_page: 50,
-					total_pages: 1,
-					count: 1,
-					total_count: 1
-				})
+				return createAccountListResponse()
 			}
 
 			if (url.includes('/accounts/acc_123/tokens/permission_groups?page=1&per_page=50')) {
-				return jsonResponse([
+				return createPaginatedResponse([
 					{
 						id: 'group-workers-account',
 						name: 'Workers Scripts Write',
@@ -225,13 +180,7 @@ describe('token command', () => {
 						name: 'Account API Tokens Write',
 						scopes: ['com.cloudflare.api.account']
 					}
-				], {
-					page: 1,
-					per_page: 50,
-					total_pages: 1,
-					count: 5,
-					total_count: 5
-				})
+				])
 			}
 
 			if (url.endsWith('/accounts/acc_123/tokens')) {
@@ -245,7 +194,7 @@ describe('token command', () => {
 			throw new Error(`Unexpected fetch URL: ${url}`)
 		}) as unknown as typeof fetch
 
-		const logger = createLogger()
+		const logger = createPromptLogger()
 		const result = await runTokenCommand(
 			{
 				command: 'tokens',
@@ -258,7 +207,7 @@ describe('token command', () => {
 			logger as any,
 			{}
 		)
-		const renderedMessages = logger.messages.map((message) => stripAnsi(message.args.join(' ')))
+		const renderedMessages = renderMessages(logger)
 		const createRequest = requests.find((request) => request.method === 'POST')
 		const createRequestBody = JSON.parse(createRequest?.body ?? '{}') as {
 			name?: string
@@ -288,35 +237,17 @@ describe('token command', () => {
 			})
 
 			if (url.includes('/accounts?page=1&per_page=50')) {
-				return jsonResponse([
-					{
-						id: 'acc_123',
-						name: 'Devflare Account',
-						type: 'standard'
-					}
-				], {
-					page: 1,
-					per_page: 50,
-					total_pages: 1,
-					count: 1,
-					total_count: 1
-				})
+				return createAccountListResponse()
 			}
 
 			if (url.includes('/accounts/acc_123/tokens/permission_groups?page=1&per_page=50')) {
-				return jsonResponse([
+				return createPaginatedResponse([
 					{
 						id: 'group-workers',
 						name: 'Workers Scripts Write',
 						scopes: ['com.cloudflare.api.account']
 					}
-				], {
-					page: 1,
-					per_page: 50,
-					total_pages: 1,
-					count: 1,
-					total_count: 1
-				})
+				])
 			}
 
 			if (url.endsWith('/accounts/acc_123/tokens')) {
@@ -330,7 +261,7 @@ describe('token command', () => {
 			throw new Error(`Unexpected fetch URL: ${url}`)
 		}) as unknown as typeof fetch
 
-		const logger = createLogger({ promptResult: 'preview' })
+		const logger = createPromptLogger({ promptResult: 'preview' })
 		const result = await runTokenCommand(
 			{
 				command: 'tokens',
@@ -355,23 +286,11 @@ describe('token command', () => {
 			const url = String(input)
 
 			if (url.includes('/accounts?page=1&per_page=50')) {
-				return jsonResponse([
-					{
-						id: 'acc_123',
-						name: 'Devflare Account',
-						type: 'standard'
-					}
-				], {
-					page: 1,
-					per_page: 50,
-					total_pages: 1,
-					count: 1,
-					total_count: 1
-				})
+				return createAccountListResponse()
 			}
 
 			if (url.includes('/accounts/acc_123/tokens?page=1&per_page=50')) {
-				return jsonResponse([
+				return createPaginatedResponse([
 					{
 						id: 'token_123',
 						name: 'devflare-preview',
@@ -384,19 +303,13 @@ describe('token command', () => {
 						status: 'active',
 						modified_on: '2026-04-08T10:10:00.000Z'
 					}
-				], {
-					page: 1,
-					per_page: 50,
-					total_pages: 1,
-					count: 2,
-					total_count: 2
-				})
+				])
 			}
 
 			throw new Error(`Unexpected fetch URL: ${url}`)
 		}) as unknown as typeof fetch
 
-		const logger = createLogger()
+		const logger = createPromptLogger()
 		const result = await runTokenCommand(
 			{
 				command: 'tokens',
@@ -408,7 +321,7 @@ describe('token command', () => {
 			logger as any,
 			{}
 		)
-		const renderedMessages = logger.messages.map((message) => stripAnsi(message.args.join(' ')))
+		const renderedMessages = renderMessages(logger)
 
 		expect(result.exitCode).toBe(0)
 		expect(result.output).toBe('preview')
@@ -419,37 +332,16 @@ describe('token command', () => {
 	})
 
 	test('rolls a normalized Devflare-managed token name without deleting and recreating it', async () => {
-		const requests: Array<{
-			url: string
-			method: string
-			body?: string
-		}> = []
+		const requests: RecordedTokenRequest[] = []
 		globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
-			const url = String(input)
-			requests.push({
-				url,
-				method: init?.method ?? 'GET',
-				body: typeof init?.body === 'string' ? init.body : undefined
-			})
+			const { url } = captureRecordedTokenRequest(requests, input, init)
 
 			if (url.includes('/accounts?page=1&per_page=50')) {
-				return jsonResponse([
-					{
-						id: 'acc_123',
-						name: 'Devflare Account',
-						type: 'standard'
-					}
-				], {
-					page: 1,
-					per_page: 50,
-					total_pages: 1,
-					count: 1,
-					total_count: 1
-				})
+				return createAccountListResponse()
 			}
 
 			if (url.includes('/accounts/acc_123/tokens?page=1&per_page=50')) {
-				return jsonResponse([
+				return createPaginatedResponse([
 					{
 						id: 'token_123',
 						name: 'devflare-preview',
@@ -460,13 +352,7 @@ describe('token command', () => {
 						name: 'manual-token',
 						status: 'active'
 					}
-				], {
-					page: 1,
-					per_page: 50,
-					total_pages: 1,
-					count: 2,
-					total_count: 2
-				})
+				])
 			}
 
 			if (init?.method === 'PUT' && url.endsWith('/accounts/acc_123/tokens/token_123/value')) {
@@ -476,7 +362,7 @@ describe('token command', () => {
 			throw new Error(`Unexpected fetch URL: ${url}`)
 		}) as unknown as typeof fetch
 
-		const logger = createLogger()
+		const logger = createPromptLogger()
 		const result = await runTokenCommand(
 			{
 				command: 'tokens',
@@ -488,7 +374,7 @@ describe('token command', () => {
 			logger as any,
 			{}
 		)
-		const renderedMessages = logger.messages.map((message) => stripAnsi(message.args.join(' ')))
+		const renderedMessages = renderMessages(logger)
 		const rollRequest = requests.find((request) => request.method === 'PUT')
 
 		expect(result.exitCode).toBe(0)
@@ -506,23 +392,11 @@ describe('token command', () => {
 			const url = String(input)
 
 			if (url.includes('/accounts?page=1&per_page=50')) {
-				return jsonResponse([
-					{
-						id: 'acc_123',
-						name: 'Devflare Account',
-						type: 'standard'
-					}
-				], {
-					page: 1,
-					per_page: 50,
-					total_pages: 1,
-					count: 1,
-					total_count: 1
-				})
+				return createAccountListResponse()
 			}
 
 			if (url.includes('/accounts/acc_123/tokens?page=1&per_page=50')) {
-				return jsonResponse([
+				return createPaginatedResponse([
 					{
 						id: 'token_123',
 						name: 'devflare-preview',
@@ -533,13 +407,7 @@ describe('token command', () => {
 						name: 'manual-token',
 						status: 'active'
 					}
-				], {
-					page: 1,
-					per_page: 50,
-					total_pages: 1,
-					count: 2,
-					total_count: 2
-				})
+				])
 			}
 
 			if (init?.method === 'DELETE' && url.endsWith('/accounts/acc_123/tokens/token_123')) {
@@ -550,7 +418,7 @@ describe('token command', () => {
 			throw new Error(`Unexpected fetch URL: ${url}`)
 		}) as unknown as typeof fetch
 
-		const logger = createLogger()
+		const logger = createPromptLogger()
 		const result = await runTokenCommand(
 			{
 				command: 'tokens',
@@ -562,7 +430,7 @@ describe('token command', () => {
 			logger as any,
 			{}
 		)
-		const renderedMessages = logger.messages.map((message) => stripAnsi(message.args.join(' ')))
+		const renderedMessages = renderMessages(logger)
 
 		expect(result.exitCode).toBe(0)
 		expect(result.output).toBe('token_123')
@@ -578,23 +446,11 @@ describe('token command', () => {
 			const url = String(input)
 
 			if (url.includes('/accounts?page=1&per_page=50')) {
-				return jsonResponse([
-					{
-						id: 'acc_123',
-						name: 'Devflare Account',
-						type: 'standard'
-					}
-				], {
-					page: 1,
-					per_page: 50,
-					total_pages: 1,
-					count: 1,
-					total_count: 1
-				})
+				return createAccountListResponse()
 			}
 
 			if (url.includes('/accounts/acc_123/tokens?page=1&per_page=50')) {
-				return jsonResponse([
+				return createPaginatedResponse([
 					{
 						id: 'token_123',
 						name: 'devflare-preview-a',
@@ -610,13 +466,7 @@ describe('token command', () => {
 						name: 'devflare-preview-b',
 						status: 'disabled'
 					}
-				], {
-					page: 1,
-					per_page: 50,
-					total_pages: 1,
-					count: 3,
-					total_count: 3
-				})
+				])
 			}
 
 			if (init?.method === 'DELETE' && url.includes('/accounts/acc_123/tokens/token_')) {
@@ -627,7 +477,7 @@ describe('token command', () => {
 			throw new Error(`Unexpected fetch URL: ${url}`)
 		}) as unknown as typeof fetch
 
-		const logger = createLogger()
+		const logger = createPromptLogger()
 		const result = await runTokenCommand(
 			{
 				command: 'tokens',
@@ -639,7 +489,7 @@ describe('token command', () => {
 			logger as any,
 			{}
 		)
-		const renderedMessages = logger.messages.map((message) => stripAnsi(message.args.join(' ')))
+		const renderedMessages = renderMessages(logger)
 
 		expect(result.exitCode).toBe(0)
 		expect(result.output).toBe('token_123\ntoken_125')
@@ -652,7 +502,7 @@ describe('token command', () => {
 	})
 
 	test('requires a bootstrap token argument', async () => {
-		const logger = createLogger()
+		const logger = createPromptLogger()
 		const result = await runTokenCommand(
 			{
 				command: 'tokens',
@@ -670,7 +520,7 @@ describe('token command', () => {
 	})
 
 	test('shows a usage summary without logging an error when no token operation is selected', async () => {
-		const logger = createLogger()
+		const logger = createPromptLogger()
 		const result = await runTokenCommand(
 			{
 				command: 'tokens',
@@ -680,7 +530,7 @@ describe('token command', () => {
 			logger as any,
 			{}
 		)
-		const renderedMessages = logger.messages.map((message) => stripAnsi(message.args.join(' ')))
+		const renderedMessages = renderMessages(logger)
 
 		expect(result.exitCode).toBe(1)
 		expect(logger.messages.some((message) => message.level === 'error')).toBe(false)

@@ -12,14 +12,13 @@
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
-import { apiGet, apiPost, kvGet, kvPut } from './api'
-import type { KVNamespace } from './types'
+import { kvGet, kvPut } from './api'
+import { DEVFLARE_KV_NAMESPACE_TITLE, getOrCreateNamedKVNamespace } from './kv-namespace'
 
 // -----------------------------------------------------------------------------
 // Constants
 // -----------------------------------------------------------------------------
 
-const DEVFLARE_KV_NAMESPACE_TITLE = 'devflare-usage'
 const GLOBAL_ACCOUNT_KEY = 'settings:defaultAccountId'
 const LOCAL_CACHE_DIR = '.devflare'
 const LOCAL_CACHE_FILE = 'preferences.json'
@@ -170,24 +169,9 @@ export function setWorkspaceAccountId(accountId: string): string {
  * Find or create the devflare-managed KV namespace
  * (Reuses the same namespace as usage tracking)
  */
+
 async function getOrCreatePreferencesNamespace(accountId: string): Promise<string> {
-	// First, try to find existing namespace
-	const namespaces = await apiGet<KVNamespace[]>(
-		`/accounts/${accountId}/storage/kv/namespaces`
-	)
-
-	const existing = namespaces.find((ns) => ns.title === DEVFLARE_KV_NAMESPACE_TITLE)
-	if (existing) {
-		return existing.id
-	}
-
-	// Create new namespace
-	const created = await apiPost<KVNamespace>(
-		`/accounts/${accountId}/storage/kv/namespaces`,
-		{ title: DEVFLARE_KV_NAMESPACE_TITLE }
-	)
-
-	return created.id
+	return getOrCreateNamedKVNamespace(accountId, DEVFLARE_KV_NAMESPACE_TITLE)
 }
 
 // -----------------------------------------------------------------------------
