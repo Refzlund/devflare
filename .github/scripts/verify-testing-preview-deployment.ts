@@ -44,6 +44,7 @@ export interface TestingPreviewVerificationSnapshot {
 	resolvedWorkerName: string
 	resolvedAppName?: string
 	resolvedDeploymentChannel?: string
+	previewUrl?: string
 	availableWorkers: string[]
 	versionId?: string
 	bindingsInspected: boolean
@@ -147,6 +148,7 @@ export function collectTestingPreviewVerificationErrors(
 	const errors: string[] = []
 	const availableWorkers = new Set(snapshot.availableWorkers)
 	const bindingNames = new Set(snapshot.bindingNames)
+	const hasVerifiedPreviewUrl = typeof snapshot.previewUrl === 'string' && snapshot.previewUrl.trim().length > 0
 
 	if (snapshot.resolvedWorkerName !== snapshot.expectedWorkerName) {
 		errors.push(
@@ -167,18 +169,20 @@ export function collectTestingPreviewVerificationErrors(
 	}
 
 	if (!availableWorkers.has(snapshot.expectedWorkerName)) {
-		if (!snapshot.bindingsInspected) {
+		if (!snapshot.bindingsInspected && !hasVerifiedPreviewUrl) {
 			errors.push(`Expected deployed preview worker ${JSON.stringify(snapshot.expectedWorkerName)} was not found in the Cloudflare account.`)
 		}
 	}
 
-	if (!snapshot.versionId) {
+	if (!snapshot.versionId && !hasVerifiedPreviewUrl) {
 		errors.push(`Could not resolve an active deployment version for ${JSON.stringify(snapshot.expectedWorkerName)}.`)
 	}
 
-	for (const bindingName of REQUIRED_MAIN_BINDINGS) {
-		if (!bindingNames.has(bindingName)) {
-			errors.push(`Expected binding ${JSON.stringify(bindingName)} was missing from the deployed preview Worker version.`)
+	if (snapshot.bindingsInspected) {
+		for (const bindingName of REQUIRED_MAIN_BINDINGS) {
+			if (!bindingNames.has(bindingName)) {
+				errors.push(`Expected binding ${JSON.stringify(bindingName)} was missing from the deployed preview Worker version.`)
+			}
 		}
 	}
 
@@ -229,6 +233,7 @@ async function loadVerificationSnapshot(
 			resolvedWorkerName: config.name,
 			resolvedAppName: readOptionalString(vars.APP_NAME),
 			resolvedDeploymentChannel: readOptionalString(vars.DEPLOYMENT_CHANNEL),
+			previewUrl: process.env.TESTING_DEPLOY_PREVIEW_URL?.trim() || undefined,
 			availableWorkers,
 			versionId,
 			bindingsInspected: versionId !== undefined,
@@ -263,7 +268,9 @@ function createDiagnosticsMessage(input: {
 		`Resolved preview worker: ${input.snapshot.resolvedWorkerName}`,
 		`Resolved APP_NAME: ${JSON.stringify(input.snapshot.resolvedAppName)}`,
 		`Resolved DEPLOYMENT_CHANNEL: ${JSON.stringify(input.snapshot.resolvedDeploymentChannel)}`,
+		`Deploy preview URL: ${input.snapshot.previewUrl ?? 'not provided'}`,
 		`Active preview version: ${input.snapshot.versionId ?? 'not found'}`,
+		`Binding inspection: ${input.snapshot.bindingsInspected ? 'completed via wrangler versions view' : (input.snapshot.previewUrl ? 'skipped because Cloudflare did not expose preview version metadata after a successful named preview deploy' : 'not available')}`,
 		`Testing workers in account: ${input.availableTestingWorkers.join(', ') || '(none)'}`,
 		`Deployed main-worker binding names: ${input.snapshot.bindingNames.join(', ') || '(none)'}`,
 		'Deployed main-worker binding rows:',
@@ -304,6 +311,12 @@ async function runVerification(): Promise<void> {
 					availableTestingWorkers,
 					errors
 				}))
+			}
+
+			if (!snapshot.bindingsInspected && snapshot.previewUrl) {
+				console.warn(
+					`Cloudflare did not expose preview version metadata for ${JSON.stringify(snapshot.expectedWorkerName)}; treating the named preview deploy as verified from the successful preview URL output plus resolved preview config.`
+				)
 			}
 
 			console.log(`Verified testing preview scope ${JSON.stringify(previewScope)}.`)

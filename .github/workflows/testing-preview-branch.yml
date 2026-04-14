@@ -122,6 +122,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           TESTING_DEPLOY_VERSION_ID: ${{ steps.deploy.outputs.version-id }}
+          TESTING_DEPLOY_PREVIEW_URL: ${{ steps.deploy.outputs.preview-url }}
           TESTING_VERIFICATION_ATTEMPTS: "5"
           TESTING_VERIFICATION_DELAY_MS: "3000"
         run: |
@@ -162,7 +163,7 @@ jobs:
             - Search service version: `${{ steps.search.outputs.version-id || 'not available' }}`
             - Main preview impact: `${{ steps.main-impact.outputs.should-deploy == 'true' && 'deploy' || 'skip' }}` (`${{ steps.main-impact.outputs.reason }}`)
             - Deployed binding verification: `${{ steps.main-impact.outputs.should-deploy != 'true' && 'skipped' || (steps.verify.outcome == 'success' && 'passed' || 'failed') }}`
-            - Verification mode: CI inspects the deployed preview Worker version directly (using the deploy step version output when available) plus the preview worker inventory because the testing preview URL is protected by Cloudflare Access.
+            - Verification mode: CI inspects deployed preview Worker metadata directly when Cloudflare exposes it, and otherwise falls back to the successful named-preview deploy output plus resolved preview config because the testing preview URL is protected by Cloudflare Access.
             - Preview strategy: named preview scope via `--preview <branch>` so the testing worker family deploys to the same explicit branch target.
             - Auth deploy status: `${{ steps.auth-impact.outputs.should-deploy != 'true' && 'skipped' || steps.auth.outputs.status || (steps.auth.outcome == 'success' && 'success' || 'failure') }}`
             - Auth failure stage: `${{ steps.auth.outputs.failure-stage || 'n/a' }}`
@@ -223,7 +224,7 @@ jobs:
               echo "- Main preview exit code: \`${{ steps.deploy.outputs.exit-code }}\`"
             fi
             echo "- Deployed binding verification: \`${{ steps.main-impact.outputs.should-deploy != 'true' && 'skipped' || (steps.verify.outcome == 'success' && 'passed' || 'failed') }}\`"
-            echo '- Verification mode: Cloudflare API plus Wrangler inspection (the testing preview URL itself is Cloudflare Access protected)'
+            echo '- Verification mode: Cloudflare API plus Wrangler inspection when preview version metadata is available, otherwise a successful named-preview deploy output plus resolved preview config (the testing preview URL itself is Cloudflare Access protected)'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Fail when any testing branch preview deploy or verification step did not succeed

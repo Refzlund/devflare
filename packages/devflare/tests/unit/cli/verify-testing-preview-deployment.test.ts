@@ -36,7 +36,7 @@ describe('testing preview deployment verifier', () => {
 		expect(errors).toEqual([])
 	})
 
-	test('reports preview config drift, a missing main worker, and missing bindings', () => {
+	test('reports preview config drift and missing control-plane metadata when binding inspection never ran', () => {
 		const errors = collectTestingPreviewVerificationErrors({
 			expectedAppName: DEFAULT_EXPECTED_APP_NAME,
 			expectedDeploymentChannel: DEFAULT_EXPECTED_DEPLOYMENT_CHANNEL,
@@ -55,6 +55,22 @@ describe('testing preview deployment verifier', () => {
 		expect(errors).toContain('Resolved DEPLOYMENT_CHANNEL was "development" instead of "preview".')
 		expect(errors).toContain('Expected deployed preview worker "devflare-testing-binding-matrix-pr-1" was not found in the Cloudflare account.')
 		expect(errors).toContain('Could not resolve an active deployment version for "devflare-testing-binding-matrix-pr-1".')
+	})
+
+	test('reports missing bindings when a preview Worker version was inspected', () => {
+		const errors = collectTestingPreviewVerificationErrors({
+			expectedAppName: DEFAULT_EXPECTED_APP_NAME,
+			expectedDeploymentChannel: DEFAULT_EXPECTED_DEPLOYMENT_CHANNEL,
+			expectedWorkerName: 'devflare-testing-binding-matrix-pr-1',
+			resolvedWorkerName: 'devflare-testing-binding-matrix-pr-1',
+			resolvedAppName: DEFAULT_EXPECTED_APP_NAME,
+			resolvedDeploymentChannel: DEFAULT_EXPECTED_DEPLOYMENT_CHANNEL,
+			availableWorkers: ['devflare-testing-binding-matrix-pr-1'],
+			versionId: 'version-123',
+			bindingsInspected: true,
+			bindingNames: ['SESSIONS', 'AUTH_SERVICE']
+		})
+
 		expect(errors).toContain('Expected binding "SESSION_ROOM" was missing from the deployed preview Worker version.')
 		expect(errors).toContain('Expected binding "POSTGRES" was missing from the deployed preview Worker version.')
 	})
@@ -88,6 +104,28 @@ describe('testing preview deployment verifier', () => {
 			versionId: 'version-789',
 			bindingsInspected: true,
 			bindingNames: [...REQUIRED_MAIN_BINDINGS]
+		})
+
+		expect(errors).toEqual([])
+	})
+
+	test('accepts a named preview deploy when Cloudflare withholds preview version metadata', () => {
+		const errors = collectTestingPreviewVerificationErrors({
+			expectedAppName: DEFAULT_EXPECTED_APP_NAME,
+			expectedDeploymentChannel: DEFAULT_EXPECTED_DEPLOYMENT_CHANNEL,
+			expectedWorkerName: 'devflare-testing-binding-matrix-next',
+			resolvedWorkerName: 'devflare-testing-binding-matrix-next',
+			resolvedAppName: DEFAULT_EXPECTED_APP_NAME,
+			resolvedDeploymentChannel: DEFAULT_EXPECTED_DEPLOYMENT_CHANNEL,
+			previewUrl: 'https://devflare-testing-binding-matrix-next.example.workers.dev',
+			availableWorkers: [
+				'devflare-testing-auth-service',
+				'devflare-testing-binding-matrix',
+				'devflare-testing-search-service'
+			],
+			versionId: undefined,
+			bindingsInspected: false,
+			bindingNames: []
 		})
 
 		expect(errors).toEqual([])
