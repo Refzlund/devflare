@@ -116,6 +116,7 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          TESTING_DEPLOY_VERSION_ID: ${{ steps.deploy.outputs.version-id }}
           TESTING_VERIFICATION_ATTEMPTS: "5"
           TESTING_VERIFICATION_DELAY_MS: "3000"
         run: |
@@ -154,7 +155,7 @@ jobs:
             - Search service version: `${{ steps.search.outputs.version-id || 'not available' }}`
             - Main preview impact: `${{ steps.main-impact.outputs.should-deploy == 'true' && 'deploy' || 'skip' }}` (`${{ steps.main-impact.outputs.reason }}`)
             - Deployed binding verification: `${{ steps.main-impact.outputs.should-deploy != 'true' && 'skipped' || (steps.verify.outcome == 'success' && 'passed' || 'failed') }}`
-            - Verification mode: CI inspects the deployed preview Worker version plus the preview worker inventory because the testing preview URL is protected by Cloudflare Access.
+            - Verification mode: CI inspects the deployed preview Worker version directly (using the deploy step version output when available) plus the preview worker inventory because the testing preview URL is protected by Cloudflare Access.
             - Preview strategy: named preview scope via `--preview <name>` so the testing worker family deploys directly to the PR-scoped target.
             - PR scope: `#${{ github.event.pull_request.number }}`
             - Auth deploy status: `${{ steps.auth-impact.outputs.should-deploy != 'true' && 'skipped' || steps.auth.outputs.status || (steps.auth.outcome == 'success' && 'success' || 'failure') }}`

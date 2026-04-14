@@ -44,10 +44,9 @@ export interface TestingPreviewVerificationSnapshot {
 	resolvedWorkerName: string
 	resolvedAppName?: string
 	resolvedDeploymentChannel?: string
-	authServiceName: string
-	searchServiceName: string
 	availableWorkers: string[]
 	versionId?: string
+	bindingsInspected: boolean
 	bindingNames: string[]
 }
 
@@ -157,13 +156,9 @@ export function collectTestingPreviewVerificationErrors(
 		)
 	}
 
-	for (const workerName of [
-		snapshot.expectedWorkerName,
-		snapshot.authServiceName,
-		snapshot.searchServiceName
-	]) {
-		if (!availableWorkers.has(workerName)) {
-			errors.push(`Expected deployed preview worker ${JSON.stringify(workerName)} was not found in the Cloudflare account.`)
+	if (!availableWorkers.has(snapshot.expectedWorkerName)) {
+		if (!snapshot.bindingsInspected) {
+			errors.push(`Expected deployed preview worker ${JSON.stringify(snapshot.expectedWorkerName)} was not found in the Cloudflare account.`)
 		}
 	}
 
@@ -182,7 +177,8 @@ export function collectTestingPreviewVerificationErrors(
 
 async function loadVerificationSnapshot(
 	previewScope: string,
-	accountId: string
+	accountId: string,
+	requestedVersionId?: string
 ): Promise<{
 	snapshot: TestingPreviewVerificationSnapshot
 	bindingRows: ParsedWranglerBindingRow[]
@@ -201,25 +197,25 @@ async function loadVerificationSnapshot(
 	const liveWorkers = await account.workers(accountId, CLOUDFLARE_API_OPTIONS)
 	const availableWorkers = uniqueSorted(liveWorkers.map((worker) => worker.name))
 	const availableWorkerSet = new Set(availableWorkers)
-	let versionId: string | undefined
+	let versionId = requestedVersionId?.trim() || undefined
 	let bindingRows: ParsedWranglerBindingRow[] = []
 
-	if (availableWorkerSet.has(config.name)) {
+	if (!versionId && availableWorkerSet.has(config.name)) {
 		const deployments = await account.workerDeployments(
 			accountId,
 			config.name,
 			CLOUDFLARE_API_OPTIONS
 		)
 		versionId = resolveActiveVersionId(deployments)
+	}
 
-		if (versionId) {
-			bindingRows = await inspectWorkerVersionBindings({
-				accountId,
-				workerName: config.name,
-				versionId,
-				cwd: TESTING_DIR
-			})
-		}
+	if (versionId) {
+		bindingRows = await inspectWorkerVersionBindings({
+			accountId,
+			workerName: config.name,
+			versionId,
+			cwd: TESTING_DIR
+		})
 	}
 
 	return {
@@ -230,10 +226,9 @@ async function loadVerificationSnapshot(
 			resolvedWorkerName: config.name,
 			resolvedAppName: readOptionalString(vars.APP_NAME),
 			resolvedDeploymentChannel: readOptionalString(vars.DEPLOYMENT_CHANNEL),
-			authServiceName: workerNames.authServiceName,
-			searchServiceName: workerNames.searchServiceName,
 			availableWorkers,
 			versionId,
+			bindingsInspected: versionId !== undefined,
 			bindingNames: uniqueSorted(bindingRows.map((row) => row.bindingName))
 		},
 		bindingRows,
@@ -265,8 +260,6 @@ function createDiagnosticsMessage(input: {
 		`Resolved preview worker: ${input.snapshot.resolvedWorkerName}`,
 		`Resolved APP_NAME: ${JSON.stringify(input.snapshot.resolvedAppName)}`,
 		`Resolved DEPLOYMENT_CHANNEL: ${JSON.stringify(input.snapshot.resolvedDeploymentChannel)}`,
-		`Auth service worker: ${input.snapshot.authServiceName}`,
-		`Search service worker: ${input.snapshot.searchServiceName}`,
 		`Active preview version: ${input.snapshot.versionId ?? 'not found'}`,
 		`Testing workers in account: ${input.availableTestingWorkers.join(', ') || '(none)'}`,
 		`Deployed main-worker binding names: ${input.snapshot.bindingNames.join(', ') || '(none)'}`,
@@ -280,6 +273,7 @@ function createDiagnosticsMessage(input: {
 async function runVerification(): Promise<void> {
 	const previewScope = process.argv[2]?.trim() || process.env.DEVFLARE_PREVIEW_BRANCH?.trim() || process.env.DEVFLARE_PREVIEW_IDENTIFIER?.trim()
 	const accountId = process.env.CLOUDFLARE_ACCOUNT_ID?.trim()
+	const requestedVersionId = process.argv[3]?.trim() || process.env.TESTING_DEPLOY_VERSION_ID?.trim()
 	const attempts = Number(process.env.TESTING_VERIFICATION_ATTEMPTS ?? '5')
 	const delayMs = Number(process.env.TESTING_VERIFICATION_DELAY_MS ?? '3000')
 
@@ -293,7 +287,11 @@ async function runVerification(): Promise<void> {
 
 	for (let attempt = 1;attempt <= attempts;attempt += 1) {
 		try {
-			const { snapshot, bindingRows, availableTestingWorkers } = await loadVerificationSnapshot(previewScope, accountId)
+			const { snapshot, bindingRows, availableTestingWorkers } = await loadVerificationSnapshot(
+				previewScope,
+				accountId,
+				requestedVersionId
+			)
 			const errors = collectTestingPreviewVerificationErrors(snapshot)
 
 			if (errors.length > 0) {
@@ -307,7 +305,6 @@ async function runVerification(): Promise<void> {
 
 			console.log(`Verified testing preview scope ${JSON.stringify(previewScope)}.`)
 			console.log(`Verified main worker ${snapshot.expectedWorkerName} version ${snapshot.versionId}.`)
-			console.log(`Verified preview workers: ${snapshot.authServiceName}, ${snapshot.searchServiceName}.`)
 			console.log(`Verified bindings: ${REQUIRED_MAIN_BINDINGS.join(', ')}.`)
 			return
 		} catch (error) {

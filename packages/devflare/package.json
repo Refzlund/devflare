@@ -58,7 +58,6 @@
 	],
 	"scripts": {
 		"llm:generate": "bun ./scripts/generate-llm.ts",
-		"prebuild": "node -e \"require('fs').rmSync('./dist', { recursive: true, force: true })\"",
 		"build": "bun build ./src/index.ts ./src/browser.ts ./src/config-entry.ts ./src/cli/index.ts ./src/runtime/index.ts ./src/test/index.ts ./src/vite/index.ts ./src/sveltekit/index.ts ./src/cloudflare/index.ts ./src/decorators/index.ts --outdir ./dist --splitting --target node --packages=external && tsgo --declaration --emitDeclarationOnly --noEmit false --outDir ./dist",
 		"dev": "bun --watch ./src/cli/index.ts",
 		"prepack": "bun run llm:generate",

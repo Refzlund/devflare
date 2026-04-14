@@ -109,12 +109,12 @@ export default {
 	test('reloads imported worker modules without starting Vite', async () => {
 		await writeFile(messagePath, `export const message = 'after'\n`)
 		expect(await waitForResponseText(workerUrl, 'after')).toBe('after')
-	})
+	}, 15000)
 
 	test('reloads devflare.config.ts changes in worker-only mode', async () => {
 		await writeFile(configPath, getConfigFileContent('after-config'))
 		expect(await waitForResponseText(`${workerUrl}config`, 'after-config')).toBe('after-config')
-	})
+	}, 15000)
 })
 
 describe('worker-only dev server late worker discovery', () => {

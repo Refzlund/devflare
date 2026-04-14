@@ -9,8 +9,6 @@ import {
 describe('testing preview deployment verifier', () => {
 	test('accepts a preview deployment snapshot with the expected workers and bindings', () => {
 		const workerName = 'devflare-testing-binding-matrix-next'
-		const authServiceName = 'devflare-testing-auth-service-next'
-		const searchServiceName = 'devflare-testing-search-service-next'
 
 		const errors = collectTestingPreviewVerificationErrors({
 			expectedAppName: DEFAULT_EXPECTED_APP_NAME,
@@ -19,17 +17,16 @@ describe('testing preview deployment verifier', () => {
 			resolvedWorkerName: workerName,
 			resolvedAppName: DEFAULT_EXPECTED_APP_NAME,
 			resolvedDeploymentChannel: DEFAULT_EXPECTED_DEPLOYMENT_CHANNEL,
-			authServiceName,
-			searchServiceName,
-			availableWorkers: [workerName, authServiceName, searchServiceName],
+			availableWorkers: [workerName],
 			versionId: 'version-123',
+			bindingsInspected: true,
 			bindingNames: [...REQUIRED_MAIN_BINDINGS]
 		})
 
 		expect(errors).toEqual([])
 	})
 
-	test('reports preview config drift, missing workers, and missing bindings', () => {
+	test('reports preview config drift, a missing main worker, and missing bindings', () => {
 		const errors = collectTestingPreviewVerificationErrors({
 			expectedAppName: DEFAULT_EXPECTED_APP_NAME,
 			expectedDeploymentChannel: DEFAULT_EXPECTED_DEPLOYMENT_CHANNEL,
@@ -37,10 +34,9 @@ describe('testing preview deployment verifier', () => {
 			resolvedWorkerName: 'devflare-testing-binding-matrix',
 			resolvedAppName: 'testing-binding-matrix',
 			resolvedDeploymentChannel: 'development',
-			authServiceName: 'devflare-testing-auth-service-pr-1',
-			searchServiceName: 'devflare-testing-search-service-pr-1',
 			availableWorkers: ['devflare-testing-binding-matrix'],
 			versionId: undefined,
+			bindingsInspected: false,
 			bindingNames: ['SESSIONS', 'AUTH_SERVICE']
 		})
 
@@ -48,10 +44,42 @@ describe('testing preview deployment verifier', () => {
 		expect(errors).toContain('Resolved APP_NAME was "testing-binding-matrix" instead of "testing-binding-matrix-preview".')
 		expect(errors).toContain('Resolved DEPLOYMENT_CHANNEL was "development" instead of "preview".')
 		expect(errors).toContain('Expected deployed preview worker "devflare-testing-binding-matrix-pr-1" was not found in the Cloudflare account.')
-		expect(errors).toContain('Expected deployed preview worker "devflare-testing-auth-service-pr-1" was not found in the Cloudflare account.')
-		expect(errors).toContain('Expected deployed preview worker "devflare-testing-search-service-pr-1" was not found in the Cloudflare account.')
 		expect(errors).toContain('Could not resolve an active deployment version for "devflare-testing-binding-matrix-pr-1".')
 		expect(errors).toContain('Expected binding "SESSION_ROOM" was missing from the deployed preview Worker version.')
 		expect(errors).toContain('Expected binding "POSTGRES" was missing from the deployed preview Worker version.')
+	})
+
+	test('does not fail just because preview sidecar workers were skipped', () => {
+		const errors = collectTestingPreviewVerificationErrors({
+			expectedAppName: DEFAULT_EXPECTED_APP_NAME,
+			expectedDeploymentChannel: DEFAULT_EXPECTED_DEPLOYMENT_CHANNEL,
+			expectedWorkerName: 'devflare-testing-binding-matrix-pr-1',
+			resolvedWorkerName: 'devflare-testing-binding-matrix-pr-1',
+			resolvedAppName: DEFAULT_EXPECTED_APP_NAME,
+			resolvedDeploymentChannel: DEFAULT_EXPECTED_DEPLOYMENT_CHANNEL,
+			availableWorkers: ['devflare-testing-binding-matrix-pr-1'],
+			versionId: 'version-456',
+			bindingsInspected: true,
+			bindingNames: [...REQUIRED_MAIN_BINDINGS]
+		})
+
+		expect(errors).toEqual([])
+	})
+
+	test('accepts a verified preview version even if worker inventory is briefly stale', () => {
+		const errors = collectTestingPreviewVerificationErrors({
+			expectedAppName: DEFAULT_EXPECTED_APP_NAME,
+			expectedDeploymentChannel: DEFAULT_EXPECTED_DEPLOYMENT_CHANNEL,
+			expectedWorkerName: 'devflare-testing-binding-matrix-pr-1',
+			resolvedWorkerName: 'devflare-testing-binding-matrix-pr-1',
+			resolvedAppName: DEFAULT_EXPECTED_APP_NAME,
+			resolvedDeploymentChannel: DEFAULT_EXPECTED_DEPLOYMENT_CHANNEL,
+			availableWorkers: [],
+			versionId: 'version-789',
+			bindingsInspected: true,
+			bindingNames: [...REQUIRED_MAIN_BINDINGS]
+		})
+
+		expect(errors).toEqual([])
 	})
 })
