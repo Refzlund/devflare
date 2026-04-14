@@ -82,8 +82,8 @@ describe('build artifact cleanup helpers', () => {
 		const busyError = Object.assign(new Error('busy'), {
 			code: 'EBUSY'
 		})
-		const access = mock(async () => {})
-		const rename = mock(async () => {})
+		const access = mock(async () => { })
+		const rename = mock(async () => { })
 		const rm = mock(async (targetPath: string) => {
 			if (targetPath.includes('.devflare-stale-')) {
 				return
@@ -122,7 +122,7 @@ describe('build artifact cleanup helpers', () => {
 		const busyError = Object.assign(new Error('busy'), {
 			code: 'EBUSY'
 		})
-		const access = mock(async () => {})
+		const access = mock(async () => { })
 		const rename = mock(async () => {
 			throw busyError
 		})
@@ -155,8 +155,8 @@ describe('build artifact cleanup helpers', () => {
 		const deniedError = Object.assign(new Error('denied'), {
 			code: 'EACCES'
 		})
-		const access = mock(async () => {})
-		const rename = mock(async () => {})
+		const access = mock(async () => { })
+		const rename = mock(async () => { })
 		const rm = mock(async () => {
 			throw deniedError
 		})
