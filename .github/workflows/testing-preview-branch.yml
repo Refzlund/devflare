@@ -113,49 +113,25 @@ jobs:
           cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           cloudflare-account-id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-      - name: Verify testing branch preview runtime bindings
+      - name: Verify testing branch preview deployed bindings
         id: verify
         if: ${{ steps.main-impact.outputs.should-deploy == 'true' && always() }}
         continue-on-error: true
         shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          TESTING_VERIFICATION_ATTEMPTS: "5"
+          TESTING_VERIFICATION_DELAY_MS: "3000"
         run: |
           set -euo pipefail
 
           if [ -z "${{ steps.deploy.outputs.preview-url }}" ]; then
-            echo 'Expected the deploy action to return a preview-url output.' >&2
+            echo 'Expected the deploy action to return a preview-url output for GitHub feedback.' >&2
             exit 1
           fi
 
-          status_file="$(mktemp)"
-          curl --fail --silent --show-error --location \
-            --retry 10 \
-            --retry-all-errors \
-            --retry-delay 3 \
-            "${{ steps.deploy.outputs.preview-url }}/status" > "$status_file"
-
-          python3 - "$status_file" <<'PY'
-          import json
-          import os
-          import sys
-
-          with open(sys.argv[1], 'r', encoding='utf-8') as handle:
-            payload = json.load(handle)
-
-          assert payload['appName'] == os.environ['TESTING_EXPECTED_APP_NAME'], payload
-          assert payload['deploymentChannel'] == os.environ['TESTING_EXPECTED_DEPLOYMENT_CHANNEL'], payload
-
-          for key in (
-            'hasDurableObjectBindings',
-            'hasServiceBindings',
-            'hasVectorizeBindings',
-            'hasAnalyticsBindings',
-            'hasSendEmailBindings',
-            'hasHyperdriveBinding'
-          ):
-            assert payload[key] is True, (key, payload)
-          PY
-
-          rm -f "$status_file"
+          bun .github/scripts/verify-testing-preview-deployment.ts "$DEVFLARE_PREVIEW_BRANCH"
 
       - name: Publish testing branch preview feedback
         if: ${{ always() && (steps.auth-impact.outputs.should-deploy == 'true' || steps.search-impact.outputs.should-deploy == 'true' || steps.main-impact.outputs.should-deploy == 'true') }}
@@ -184,7 +160,8 @@ jobs:
             - Search impact: `${{ steps.search-impact.outputs.should-deploy == 'true' && 'deploy' || 'skip' }}` (`${{ steps.search-impact.outputs.reason }}`)
             - Search service version: `${{ steps.search.outputs.version-id || 'not available' }}`
             - Main preview impact: `${{ steps.main-impact.outputs.should-deploy == 'true' && 'deploy' || 'skip' }}` (`${{ steps.main-impact.outputs.reason }}`)
-            - Runtime binding verification: `${{ steps.main-impact.outputs.should-deploy != 'true' && 'skipped' || (steps.verify.outcome == 'success' && 'passed' || 'failed') }}`
+            - Deployed binding verification: `${{ steps.main-impact.outputs.should-deploy != 'true' && 'skipped' || (steps.verify.outcome == 'success' && 'passed' || 'failed') }}`
+            - Verification mode: CI inspects the deployed preview Worker version plus the preview worker inventory because the testing preview URL is protected by Cloudflare Access.
             - Preview strategy: named preview scope via `--preview <branch>` so the testing worker family deploys to the same explicit branch target.
             - Auth deploy status: `${{ steps.auth-impact.outputs.should-deploy != 'true' && 'skipped' || steps.auth.outputs.status || (steps.auth.outcome == 'success' && 'success' || 'failure') }}`
             - Auth failure stage: `${{ steps.auth.outputs.failure-stage || 'n/a' }}`
@@ -234,9 +211,9 @@ jobs:
             fi
             echo "- Branch scope: \`$DEVFLARE_PREVIEW_BRANCH\`"
             if [ -n "${{ steps.deploy.outputs.preview-url }}" ]; then
-              echo "- Reachable URL: ${{ steps.deploy.outputs.preview-url }}"
-              echo "- Verified response appName: \`$TESTING_EXPECTED_APP_NAME\`"
-              echo "- Verified response deploymentChannel: \`$TESTING_EXPECTED_DEPLOYMENT_CHANNEL\`"
+              echo "- Preview URL: ${{ steps.deploy.outputs.preview-url }}"
+              echo "- Verified preview config APP_NAME: \`$TESTING_EXPECTED_APP_NAME\`"
+              echo "- Verified preview config DEPLOYMENT_CHANNEL: \`$TESTING_EXPECTED_DEPLOYMENT_CHANNEL\`"
             fi
             if [ -n "${{ steps.deploy.outputs.version-id }}" ]; then
               echo "- Preview version ID: \`${{ steps.deploy.outputs.version-id }}\`"
@@ -244,7 +221,8 @@ jobs:
             if [ -n "${{ steps.deploy.outputs.exit-code }}" ]; then
               echo "- Main preview exit code: \`${{ steps.deploy.outputs.exit-code }}\`"
             fi
-            echo "- Runtime binding verification: \`${{ steps.main-impact.outputs.should-deploy != 'true' && 'skipped' || (steps.verify.outcome == 'success' && 'passed' || 'failed') }}\`"
+            echo "- Deployed binding verification: \`${{ steps.main-impact.outputs.should-deploy != 'true' && 'skipped' || (steps.verify.outcome == 'success' && 'passed' || 'failed') }}\`"
+            echo '- Verification mode: Cloudflare API plus Wrangler inspection (the testing preview URL itself is Cloudflare Access protected)'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Fail when any testing branch preview deploy or verification step did not succeed
@@ -269,7 +247,7 @@ jobs:
           DEPLOY_LOG_EXCERPT: ${{ steps.deploy.outputs.log-excerpt }}
           VERIFY_OUTCOME: ${{ steps.verify.outcome }}
         run: |
-          echo 'Testing branch preview deployment or runtime verification failed.' >&2
+          echo 'Testing branch preview deployment or deployed-binding verification failed.' >&2
 
           if [ "$AUTH_STATUS" != 'success' ] && [ "$AUTH_STATUS" != 'skipped' ]; then
             echo '' >&2
@@ -336,7 +314,7 @@ jobs:
 
           if [ "$VERIFY_OUTCOME" = 'failure' ]; then
             echo '' >&2
-            echo 'Runtime binding verification failed. Inspect the "Verify testing branch preview runtime bindings" step for the curl or Python assertion details.' >&2
+            echo 'Deployed binding verification failed. Inspect the "Verify testing branch preview deployed bindings" step for the Cloudflare API and Wrangler inspection diagnostics.' >&2
           fi
 
           exit 1
