@@ -6,10 +6,12 @@ const githubApiBaseUrl = process.env.GITHUB_API_URL?.trim() ||
 
 function getInputEnvironmentKeys(name) {
 	const normalizedName = name.replace(/ /g, "_").toUpperCase();
-	return [...new Set([
-		`INPUT_${normalizedName}`,
-		`INPUT_${normalizedName.replace(/-/g, "_")}`,
-	])];
+	return [
+		...new Set([
+			`INPUT_${normalizedName}`,
+			`INPUT_${normalizedName.replace(/-/g, "_")}`,
+		]),
+	];
 }
 
 export function getInput(name) {
@@ -655,6 +657,8 @@ export async function main() {
 	}
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (
+	process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href
+) {
 	await main();
 }
