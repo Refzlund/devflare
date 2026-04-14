@@ -54,6 +54,33 @@ jobs:
           cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           cloudflare-account-id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
+      - name: Validate documentation PR preview target
+        id: validate-preview
+        if: ${{ steps.impact.outputs.should-deploy == 'true' && steps.deploy.outputs.status == 'success' && always() }}
+        continue-on-error: true
+        shell: bash
+        env:
+          DEVFLARE_PREVIEW_URL: ${{ steps.deploy.outputs.preview-url }}
+          DEVFLARE_EXPECTED_PREVIEW_WORKER: devflare-docs-pr-${{ github.event.pull_request.number }}
+          DEVFLARE_PRODUCTION_URL: ${{ env.DOCUMENTATION_PRODUCTION_URL }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "$DEVFLARE_PREVIEW_URL" ]; then
+            echo 'Expected documentation PR preview deployment to produce a preview URL.' >&2
+            exit 1
+          fi
+
+          if [ "$DEVFLARE_PREVIEW_URL" = "$DEVFLARE_PRODUCTION_URL" ]; then
+            echo "Documentation PR preview resolved to the production URL: $DEVFLARE_PREVIEW_URL" >&2
+            exit 1
+          fi
+
+          if [[ "$DEVFLARE_PREVIEW_URL" != *"$DEVFLARE_EXPECTED_PREVIEW_WORKER"* ]]; then
+            echo "Documentation PR preview resolved to $DEVFLARE_PREVIEW_URL, which does not contain the expected preview worker name $DEVFLARE_EXPECTED_PREVIEW_WORKER." >&2
+            exit 1
+          fi
+
       - name: Publish documentation PR preview feedback
         if: ${{ steps.impact.outputs.should-deploy == 'true' && always() }}
         uses: ./.github/actions/devflare-github-feedback
@@ -61,7 +88,7 @@ jobs:
           github-token: ${{ github.token }}
           mode: comment
           operation: report
-          status: ${{ steps.deploy.outputs.status == 'success' && 'success' || 'failure' }}
+          status: ${{ steps.deploy.outputs.status == 'success' && steps.validate-preview.outcome != 'failure' && 'success' || 'failure' }}
           title: Documentation PR preview
           comment-key: documentation-preview
           pr-number: ${{ github.event.pull_request.number }}
@@ -69,7 +96,6 @@ jobs:
           ref-name: ${{ github.event.pull_request.head.ref }}
           sha: ${{ github.event.pull_request.head.sha }}
           preview-url: ${{ steps.deploy.outputs.preview-url }}
-          production-url: ${{ env.DOCUMENTATION_PRODUCTION_URL }}
           version-id: ${{ steps.deploy.outputs.version-id }}
           log-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           log-excerpt: ${{ steps.deploy.outputs.log-excerpt }}
@@ -87,13 +113,18 @@ jobs:
             echo "- Impact reason: ${{ steps.impact.outputs.reason }}"
             if [ "${{ steps.impact.outputs.should-deploy }}" = 'true' ]; then
               echo '- GitHub feedback: stable PR comment updated in place'
-              echo "- Final status: \`${{ steps.deploy.outputs.status || (steps.deploy.outcome == 'success' && 'success' || 'failure') }}\`"
+              echo "- Final status: \`${{ steps.deploy.outputs.status == 'success' && steps.validate-preview.outcome != 'failure' && 'success' || (steps.deploy.outputs.status || (steps.deploy.outcome == 'success' && 'success' || 'failure')) }}\`"
             else
               echo '- GitHub feedback: skipped because no preview deployment was needed'
               echo '- Final status: `skipped`'
             fi
             echo "- PR scope: \`#${{ github.event.pull_request.number }}\`"
             echo "- Source branch: \`${{ github.event.pull_request.head.ref }}\`"
+            if [ "${{ steps.validate-preview.outcome }}" = 'failure' ]; then
+              echo '- Preview target verification: `failed`'
+            elif [ "${{ steps.validate-preview.outcome }}" = 'success' ]; then
+              echo '- Preview target verification: `passed`'
+            fi
             if [ -n "${{ steps.deploy.outputs.failure-stage }}" ]; then
               echo "- Failure stage: \`${{ steps.deploy.outputs.failure-stage }}\`"
             fi
@@ -103,14 +134,13 @@ jobs:
             if [ -n "${{ steps.deploy.outputs.preview-url }}" ]; then
               echo "- Preview URL: ${{ steps.deploy.outputs.preview-url }}"
             fi
-            echo "- Production URL: $DOCUMENTATION_PRODUCTION_URL"
             if [ -n "${{ steps.deploy.outputs.version-id }}" ]; then
               echo "- Version ID: \`${{ steps.deploy.outputs.version-id }}\`"
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Fail when documentation PR preview deploy did not succeed
-        if: ${{ steps.impact.outputs.should-deploy == 'true' && (steps.deploy.outputs.status != 'success' || steps.deploy.outcome == 'failure') }}
+        if: ${{ steps.impact.outputs.should-deploy == 'true' && (steps.deploy.outputs.status != 'success' || steps.deploy.outcome == 'failure' || steps.validate-preview.outcome == 'failure') }}
         shell: bash
         env:
           DEVFLARE_FAILURE_STAGE: ${{ steps.deploy.outputs.failure-stage }}
@@ -118,8 +148,12 @@ jobs:
           DEVFLARE_DEPLOY_VERSION_ID: ${{ steps.deploy.outputs.version-id }}
           DEVFLARE_PREVIEW_URL: ${{ steps.deploy.outputs.preview-url }}
           DEVFLARE_DEPLOY_LOG_EXCERPT: ${{ steps.deploy.outputs.log-excerpt }}
+          DEVFLARE_PREVIEW_VALIDATION_OUTCOME: ${{ steps.validate-preview.outcome }}
         run: |
           echo 'Documentation PR preview deployment failed.' >&2
+          if [ "$DEVFLARE_PREVIEW_VALIDATION_OUTCOME" = 'failure' ]; then
+            echo 'Preview target validation failed.' >&2
+          fi
           if [ -n "$DEVFLARE_FAILURE_STAGE" ]; then
             echo "Failure stage: $DEVFLARE_FAILURE_STAGE" >&2
           fi

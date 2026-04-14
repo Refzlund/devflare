@@ -132,4 +132,41 @@ describe('devflare-github-feedback action', () => {
 
 		await expect(main()).rejects.toThrow('Resource not accessible by integration')
 	})
+
+	test('does not include production URLs in preview PR comments even when provided', async () => {
+		const tempDir = mkdtempSync(join(tmpdir(), 'devflare-github-feedback-'))
+		temporaryDirectories.add(tempDir)
+		const outputPath = writeOutputFile(tempDir)
+		setCommentModeEnvironment(outputPath)
+		process.env.INPUT_DEPLOYMENT_KIND = 'preview'
+		process.env.INPUT_PREVIEW_URL = 'https://devflare-docs-pr-1.refz.workers.dev'
+		process.env.INPUT_PRODUCTION_URL = 'https://devflare-docs.refz.workers.dev'
+
+		let postedCommentBody = ''
+
+		globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
+			const url = String(input)
+			const method = init?.method ?? 'GET'
+
+			if (
+				method === 'GET' &&
+				url.endsWith('/repos/Refzlund/devflare/issues/1/comments?per_page=100')
+			) {
+				return createGitHubJsonResponse([], 200)
+			}
+
+			if (method === 'POST' && url.endsWith('/repos/Refzlund/devflare/issues/1/comments')) {
+				postedCommentBody = String(init?.body ?? '')
+				return createGitHubJsonResponse({ id: 123 }, 201)
+			}
+
+			throw new Error(`Unexpected fetch request: ${method} ${url}`)
+		}) as unknown as typeof fetch
+
+		await expect(main()).resolves.toBeUndefined()
+
+		expect(postedCommentBody).toContain('Preview URL: [https://devflare-docs-pr-1.refz.workers.dev](https://devflare-docs-pr-1.refz.workers.dev)')
+		expect(postedCommentBody).not.toContain('Production URL')
+		expect(postedCommentBody).not.toContain('https://devflare-docs.refz.workers.dev')
+	})
 })

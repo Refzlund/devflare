@@ -16,6 +16,7 @@ const repoRoot = resolve(import.meta.dirname, '../../../../../')
 const casesDir = resolve(repoRoot, 'cases')
 const testingAppDir = resolve(repoRoot, 'apps/testing')
 const documentationAppDir = resolve(repoRoot, 'apps/documentation')
+const documentationConfigModulePath = pathToFileURL(resolve(documentationAppDir, 'devflare.config.ts')).href
 const testingFetchModulePath = pathToFileURL(resolve(testingAppDir, 'src/fetch.ts')).href
 const testingQueueModulePath = pathToFileURL(resolve(testingAppDir, 'src/queue.ts')).href
 const testingScheduledModulePath = pathToFileURL(resolve(testingAppDir, 'src/scheduled.ts')).href
@@ -656,5 +657,27 @@ describe('repo example app configs', () => {
 		expect(config.wrangler?.passthrough).toEqual({
 			main: '.adapter-cloudflare/_worker.js'
 		})
+	})
+
+	test('apps/documentation resolves a dedicated worker name for named preview deploys', async () => {
+		const originalPreviewIdentifier = process.env.DEVFLARE_PREVIEW_IDENTIFIER
+
+		try {
+			process.env.DEVFLARE_PREVIEW_IDENTIFIER = 'pr-1'
+
+			const documentationConfigModule = await import(
+				`${documentationConfigModulePath}?preview-worker-name-test=${Date.now()}`
+			)
+			const compiled = compileConfig(documentationConfigModule.default)
+
+			expect(documentationConfigModule.default.name).toBe('devflare-docs-pr-1')
+			expect(compiled.name).toBe('devflare-docs-pr-1')
+		} finally {
+			if (originalPreviewIdentifier === undefined) {
+				delete process.env.DEVFLARE_PREVIEW_IDENTIFIER
+			} else {
+				process.env.DEVFLARE_PREVIEW_IDENTIFIER = originalPreviewIdentifier
+			}
+		}
 	})
 })
