@@ -6,11 +6,11 @@
 // Queue handler is tested via cf.queue.trigger() for direct handler invocation.
 // =============================================================================
 
-import { describe, test, expect, beforeAll, afterAll, beforeEach } from 'bun:test'
+import { describe, test, expect, beforeAll, afterAll } from 'bun:test'
 import { createTestContext, cf } from 'devflare/test'
 import { env } from 'devflare'
 import { processTask } from '../src/lib/tasks'
-import type { Task, Env } from '../src/lib/types'
+import type { Task } from '../src/lib/types'
 
 // -----------------------------------------------------------------------------
 // Test Setup
@@ -29,12 +29,6 @@ describe('Case 6: Queues & Crons', () => {
 	// Pure Logic Tests (no bindings needed)
 	// -------------------------------------------------------------------------
 	describe('processTask (pure logic)', () => {
-		// This is pure business logic - just needs a minimal env shape
-		const minimalEnv = {
-			TASK_QUEUE: {} as Queue<Task>,
-			RESULTS: {} as KVNamespace
-		}
-
 		test('processes "process" task type', async () => {
 			const task: Task = {
 				id: 'task-1',
@@ -43,7 +37,7 @@ describe('Case 6: Queues & Crons', () => {
 				createdAt: Date.now()
 			}
 
-			const result = await processTask(task, minimalEnv)
+			const result = await processTask(task)
 
 			expect(result).toEqual({ processed: true, data: { value: 42 } })
 		})
@@ -56,7 +50,7 @@ describe('Case 6: Queues & Crons', () => {
 				createdAt: Date.now()
 			}
 
-			const result = await processTask(task, minimalEnv)
+			const result = await processTask(task)
 
 			expect(result).toEqual({ cleaned: true, items: 0 })
 		})
@@ -69,7 +63,7 @@ describe('Case 6: Queues & Crons', () => {
 				createdAt: Date.now()
 			}
 
-			const result = await processTask(task, minimalEnv)
+			const result = await processTask(task)
 
 			expect(result).toEqual({
 				notified: true,
@@ -85,7 +79,7 @@ describe('Case 6: Queues & Crons', () => {
 				createdAt: Date.now()
 			}
 
-			await expect(processTask(task, minimalEnv)).rejects.toThrow(
+			await expect(processTask(task)).rejects.toThrow(
 				'Unknown task type: unknown'
 			)
 		})

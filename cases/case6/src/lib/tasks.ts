@@ -4,12 +4,13 @@
 // Business logic for processing tasks, can be tested independently
 // =============================================================================
 
-import type { Task, Env } from './types'
+import { env } from 'devflare'
+import type { Task } from './types'
 
 /**
  * Process a task based on its type
  */
-export async function processTask(task: Task, env: Env): Promise<unknown> {
+export async function processTask(task: Task): Promise<unknown> {
 	switch (task.type) {
 		case 'process':
 			return { processed: true, data: task.data }
@@ -28,7 +29,7 @@ export async function processTask(task: Task, env: Env): Promise<unknown> {
 /**
  * Cleanup old results from KV
  */
-export async function cleanupOldResults(env: Env): Promise<void> {
+export async function cleanupOldResults(): Promise<void> {
 	const list = await env.RESULTS.list({ prefix: 'result:' })
 
 	// In real implementation, check timestamps and delete old entries
@@ -42,7 +43,7 @@ export async function cleanupOldResults(env: Env): Promise<void> {
 /**
  * Generate weekly report
  */
-export async function generateWeeklyReport(env: Env): Promise<void> {
+export async function generateWeeklyReport(): Promise<void> {
 	const list = await env.RESULTS.list({ prefix: 'result:' })
 
 	await env.RESULTS.put('report:weekly', JSON.stringify({

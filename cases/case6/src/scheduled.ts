@@ -4,8 +4,8 @@
 // Scheduled handler - runs on cron triggers
 // =============================================================================
 
-import type { ScheduledController } from '@cloudflare/workers-types'
-import type { Env } from './lib/types'
+import { env } from 'devflare'
+import type { ScheduledEvent } from 'devflare/runtime'
 import { cleanupOldResults, generateWeeklyReport } from './lib/tasks'
 
 /**
@@ -13,19 +13,17 @@ import { cleanupOldResults, generateWeeklyReport } from './lib/tasks'
  * Runs on cron triggers defined in devflare.config.ts
  */
 export default async function scheduled(
-	controller: ScheduledController,
-	env: Env,
-	ctx: ExecutionContext
+	event: ScheduledEvent
 ): Promise<void> {
-	const cron = controller.cron
+	const cron = event.cron
 
 	// Every 6 hours - cleanup old results
 	if (cron === '0 */6 * * *') {
-		ctx.waitUntil(cleanupOldResults(env))
+		event.ctx.waitUntil(cleanupOldResults())
 	}
 
 	// Every Monday at midnight - weekly report
 	if (cron === '0 0 * * 1') {
-		ctx.waitUntil(generateWeeklyReport(env))
+		event.ctx.waitUntil(generateWeeklyReport())
 	}
 }

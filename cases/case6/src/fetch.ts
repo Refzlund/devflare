@@ -7,15 +7,14 @@
 // - src/scheduled.ts for cron handlers
 // =============================================================================
 
-import type { Task, Env } from './lib/types'
+import { env } from 'devflare'
+import type { Task } from './lib/types'
 
 /**
  * HTTP handler - accepts tasks and sends to queue
  */
 export default async function fetch(
-	request: Request,
-	env: Env,
-	ctx: ExecutionContext
+	request: Request
 ): Promise<Response> {
 	const url = new URL(request.url)
 
