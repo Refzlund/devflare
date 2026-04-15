@@ -67,8 +67,8 @@ describe('worker-safe package entrypoints', () => {
 		expect(formatBuildLogs(result.logs)).toBe('')
 	})
 
-	test('runtime entry exports handle() and resolve() for routing helpers', async () => {
-		const result = await createBundleResult('devflare/runtime', 'handle, resolve, sequence, pipe')
+	test('runtime entry exports fetch middleware helpers', async () => {
+		const result = await createBundleResult('devflare/runtime', 'sequence, resolveFetchHandler, invokeFetchHandler, createResolveFetch, invokeFetchModule')
 		expect(result.success).toBe(true)
 		expect(formatBuildLogs(result.logs)).toBe('')
 	})

@@ -492,7 +492,7 @@ export default {
 		},
 		hyperdrive: {
 			DB: 'app-postgres',
-			LEGACY_DB: { id: 'existing-hyperdrive-id' }
+				ANALYTICS_DB: { id: 'existing-hyperdrive-id' }
 		},
 		r2: {
 			ASSETS: 'app-assets'
@@ -591,9 +591,7 @@ Current behavior:
 - `devflare previews` lists stable workers plus discovered dedicated preview scopes for the current worker family using live Cloudflare Worker names
 - `devflare previews bindings` resolves preview-scoped resources for one scope and shows how many deployed workers reference them
 - `devflare previews cleanup` deletes dedicated preview Workers plus preview-scoped KV, D1, R2, Queue, Vectorize, and reusable Hyperdrive resources for one scope or every discovered scope; it is a dry run unless `--apply` is present
-- the legacy `devflare previews cleanup-resources` spelling is still accepted as a compatibility alias, but `cleanup` is the documented public command
-- the old registry-maintenance verbs (`provision`, `reconcile`, and `retire`) are no longer part of the public `previews` surface
-- `devflare deploy` still performs best-effort internal preview metadata synchronization after successful deploys so cleanup flows can retire deleted preview workers cleanly without extra CI glue
+- `devflare deploy` still performs best-effort internal preview metadata synchronization after successful deploys so cleanup flows can remove deleted preview workers cleanly without extra CI glue
 
 ### Manage Devflare tokens
 
@@ -619,8 +617,6 @@ bunx --bun devflare tokens <bootstrap-token> --list
 bunx --bun devflare tokens <bootstrap-token> --delete preview
 bunx --bun devflare tokens <bootstrap-token> --delete-all
 ```
-
-The legacy singular `devflare token <bootstrap-token>` create flow is still accepted as a compatibility alias, but `tokens` is now the documented public surface.
 
 ### Thin GitHub Action and caller workflows
 
@@ -827,9 +823,8 @@ Every top-level command supports `--help`, and nested command groups support bot
 | `devflare ai` | show Workers AI model pricing info |
 | `devflare remote` | manage remote test mode |
 
-Legacy aliases:
+Command defaults:
 
-- `devflare token` is the legacy alias for `devflare tokens`
 - `devflare config` defaults to `devflare config print`
 - `devflare previews` defaults to `devflare previews list`
 - `devflare productions` defaults to `devflare productions list`

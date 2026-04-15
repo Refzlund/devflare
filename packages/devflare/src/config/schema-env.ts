@@ -1,10 +1,8 @@
 import { z } from 'zod'
 import {
-	buildConfigSchema,
 	rolldownConfigSchema,
 	viteConfigSchema
 } from './schema-build'
-import { normalizeLegacyBuildAndViteConfig } from './schema-legacy'
 import { bindingsSchema } from './schema-bindings'
 import {
 	assetsConfigSchema,
@@ -61,13 +59,6 @@ export const envConfigSchema = z.object({
 	wrangler: wranglerConfigSchema
 }).partial()
 
-export const envConfigSchemaInner = envConfigSchema.extend({
-	/** @deprecated Use `rolldown` instead. */
-	build: buildConfigSchema,
-	/** @deprecated Use `vite.plugins` instead. */
-	plugins: z.array(z.unknown()).optional()
-}).transform((config): z.infer<typeof envConfigSchema> => {
-	return normalizeLegacyBuildAndViteConfig(config)
-})
+export const envConfigSchemaInner = envConfigSchema
 
 export type DevflareEnvConfig = z.output<typeof envConfigSchemaInner>

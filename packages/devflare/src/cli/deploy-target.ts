@@ -26,12 +26,6 @@ export function resolveDeployTarget(
 	const previewScopeRaw = asOptionalString(previewOption)
 	const wantsPreview = previewOption === true || Boolean(previewScopeRaw)
 
-	if (parsed.options['preview-alias'] !== undefined) {
-		throw new Error(
-			'Devflare deploy no longer accepts --preview-alias. Use --preview <name> for named preview deploys, or keep bare --preview and let the alias come from --branch-name, CI, or git metadata.'
-		)
-	}
-
 	if (!wantsProduction && !wantsPreview) {
 		if (options.requireExplicitTarget === true) {
 			throw new Error(

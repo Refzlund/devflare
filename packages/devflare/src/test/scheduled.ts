@@ -136,8 +136,7 @@ async function trigger(
 	if (typeof scheduledHandler !== 'function') {
 		throw new Error(
 			`Scheduled handler at "${scheduledHandlerPath}" must export a default function or named "scheduled" export.\n` +
-			`Expected: export async function scheduled(event) { ... }\n` +
-			`Legacy compatibility is still supported for scheduled(controller, env, ctx).`
+			+ `Expected: export async function scheduled(event) { ... }`
 		)
 	}
 
@@ -168,7 +167,7 @@ async function trigger(
 		// Call the handler
 		await runWithEventContext(
 			scheduledEvent,
-			() => scheduledHandler(scheduledEvent, env, ctx)
+			() => scheduledHandler(scheduledEvent)
 		)
 
 		// Wait for all waitUntil promises

@@ -80,15 +80,10 @@ export { createContextProxy, ContextAccessError } from './validation'
 // Middleware system (safe for workers)
 export {
 	sequence,
-	handle,
-	resolve,
-	pipe,
 	resolveFetchHandler,
 	invokeFetchHandler,
 	createResolveFetch,
 	invokeFetchModule,
-	type Middleware,
-	type Handler,
 	type Awaitable,
 	type ResolveFetch,
 	type FetchMiddleware

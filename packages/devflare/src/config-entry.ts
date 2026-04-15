@@ -22,8 +22,6 @@ export {
 
 export {
 	ref,
-	resolveRef,
-	serviceBinding,
 	type RefResult,
 	type WorkerBinding,
 	type WorkerBindingAccessor,

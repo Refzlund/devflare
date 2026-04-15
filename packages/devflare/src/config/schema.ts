@@ -14,12 +14,9 @@
 
 import { z } from 'zod'
 import {
-	buildConfigSchema,
 	rolldownConfigSchema,
-	viteConfigSchema,
-	type LegacyBuildConfig
+	viteConfigSchema
 } from './schema-build'
-import { normalizeLegacyBuildAndViteConfig } from './schema-legacy'
 import { bindingsSchema } from './schema-bindings'
 import { envConfigSchemaInner } from './schema-env'
 import {
@@ -131,23 +128,13 @@ const canonicalConfigSchema = z.object({
 	wrangler: wranglerConfigSchema
 })
 
-export const configSchema = canonicalConfigSchema.extend({
-	/** @deprecated Use `rolldown` instead. */
-	build: buildConfigSchema,
-
-	/** @deprecated Use `vite.plugins` instead. */
-	plugins: z.array(z.unknown()).optional()
-}).transform((config): z.infer<typeof canonicalConfigSchema> => {
-	return normalizeLegacyBuildAndViteConfig(config)
-})
+export const configSchema = canonicalConfigSchema
 
 /** Output type after Zod validation and transforms */
 export type DevflareConfig = z.output<typeof configSchema>
 
 /** Input type for defineConfig - before Zod transforms apply defaults */
 export type DevflareConfigInput = z.input<typeof configSchema>
-
-export type BuildConfig = LegacyBuildConfig
 
 export type { DevflareRolldownOptions, DevflareRolldownOutputOptions, RolldownConfig, ViteConfig } from './schema-build'
 export type {

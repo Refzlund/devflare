@@ -453,7 +453,7 @@ describe('repo example app configs', () => {
 		const compiled = compileConfig(resolveConfigForLocalRuntime(config))
 
 		expect(Object.keys(config.bindings?.kv ?? {}).sort()).toEqual(['CACHE', 'SESSIONS'])
-		expect(Object.keys(config.bindings?.d1 ?? {}).sort()).toEqual(['AUDIT_DB', 'LEGACY_DB', 'PRIMARY_DB'])
+		expect(Object.keys(config.bindings?.d1 ?? {}).sort()).toEqual(['AUDIT_DB', 'PRIMARY_DB', 'REPORTING_DB'])
 		expect(Object.keys(config.bindings?.r2 ?? {}).sort()).toEqual(['ARCHIVE', 'ASSETS'])
 		expect(Object.keys(config.bindings?.durableObjects ?? {}).sort()).toEqual([
 			'COLLABORATION_STATE',
@@ -575,7 +575,7 @@ describe('repo example app configs', () => {
 			expect(plan.d1.map((ref) => ref.previewName)).toEqual([
 				'devflare-testing-primary-db-next',
 				'devflare-testing-audit-db-next',
-				'devflare-testing-legacy-db-next'
+				'devflare-testing-reporting-db-next'
 			])
 			expect(plan.queues.map((ref) => ref.previewName).sort()).toEqual([
 				'devflare-testing-emails-dlq-next',

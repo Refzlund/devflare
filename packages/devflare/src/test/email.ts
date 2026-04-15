@@ -161,17 +161,17 @@ function createRawEmailStream(rawEmail: string): ReadableStream<Uint8Array> {
 	})
 }
 
-function resolveEmailHandler(module: Record<string, unknown>): ((message: unknown, env: Record<string, unknown>, ctx: ExecutionContext) => Promise<unknown> | unknown) | null {
+function resolveEmailHandler(module: Record<string, unknown>): ((event: unknown) => Promise<unknown> | unknown) | null {
 	if (typeof module.default === 'function') {
-		return module.default as (message: unknown, env: Record<string, unknown>, ctx: ExecutionContext) => Promise<unknown> | unknown
+		return module.default as (event: unknown) => Promise<unknown> | unknown
 	}
 
 	if (module.default && typeof (module.default as Record<string, unknown>).email === 'function') {
-		return ((module.default as Record<string, unknown>).email as Function).bind(module.default) as (message: unknown, env: Record<string, unknown>, ctx: ExecutionContext) => Promise<unknown> | unknown
+		return ((module.default as Record<string, unknown>).email as Function).bind(module.default) as (event: unknown) => Promise<unknown> | unknown
 	}
 
 	if (typeof module.email === 'function') {
-		return module.email as (message: unknown, env: Record<string, unknown>, ctx: ExecutionContext) => Promise<unknown> | unknown
+		return module.email as (event: unknown) => Promise<unknown> | unknown
 	}
 
 	return null
@@ -208,8 +208,7 @@ async function send(options: EmailSendOptions): Promise<Response> {
 		if (!emailHandler) {
 			throw new Error(
 				`Email handler at "${emailHandlerPath}" must export a default function or named "email" export.\n` +
-				`Expected: export async function email(message) { ... }\n` +
-				`Legacy compatibility is still supported for email(message, env, ctx).`
+				+ `Expected: export async function email(message) { ... }`
 			)
 		}
 
@@ -257,7 +256,7 @@ async function send(options: EmailSendOptions): Promise<Response> {
 
 		await runWithEventContext(
 			emailEvent,
-			() => emailHandler(emailEvent, runtimeEnv, ctx)
+			() => emailHandler(emailEvent)
 		)
 
 		await Promise.all(waitUntilPromises)

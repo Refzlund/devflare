@@ -67,7 +67,7 @@ describe('devflarePreviewRecordSchema', () => {
 })
 
 describe('devflarePreviewAliasRecordSchema', () => {
-	test('enforces Cloudflare-safe preview alias names', () => {
+	test('enforces Cloudflare-safe preview names', () => {
 		expect(() => {
 			devflarePreviewAliasRecordSchema.parse({
 				id: 'alias:documentation:Invalid Alias',
@@ -81,7 +81,7 @@ describe('devflarePreviewAliasRecordSchema', () => {
 				aliasPreviewUrl: 'https://acceptance-sweep-documentation.refz.workers.dev/',
 				versionId: '5dba9570-33c4-4375-b784-e1b34ad01569'
 			})
-		}).toThrow('Preview aliases must start with a lowercase letter')
+		}).toThrow('Preview names must start with a lowercase letter')
 	})
 })
 

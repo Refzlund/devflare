@@ -183,7 +183,7 @@ console.log('stub wrangler binary')
 		expect(deployExecution?.args).toContain('documentation-production-123')
 	})
 
-	test('deploy uses branch metadata to derive preview aliases and surfaces preview metadata', async () => {
+	test('deploy uploads a preview version and surfaces preview metadata', async () => {
 		await writeProjectFiles(projectDir, { withViteConfig: false, withViteDeps: false })
 
 		const executions: ExecInvocation[] = []
@@ -191,7 +191,7 @@ console.log('stub wrangler binary')
 		setDependencies(createCliDependencies(
 			createProcessRunner((command, args) => {
 				if (command === 'bunx' && args[0] === 'wrangler' && args[1] === 'versions' && args[2] === 'upload') {
-					return successResult('Version ID: version-123\nPreview URL: https://preview.example.workers.dev\nPreview Alias URL: https://worker-build-test-feature-branch.example.workers.dev')
+					return successResult('Version ID: version-123\nPreview URL: https://preview.example.workers.dev')
 				}
 
 				return successResult()
@@ -213,12 +213,7 @@ console.log('stub wrangler binary')
 
 		expect(result.exitCode).toBe(0)
 		const previewExecution = executions.find(({ command, args }) => command === 'bunx' && args[0] === 'wrangler' && args[1] === 'versions' && args[2] === 'upload')
-		expect(previewExecution?.args).toContain('--preview-alias')
-		expect(previewExecution?.args).toContain('feature-branch')
-		expect(logger.messages.some((message) => {
-			const line = message.args.join(' ').toLowerCase()
-			return line.includes('preview alias') && line.includes('feature-branch')
-		})).toBe(true)
+		expect(previewExecution?.args).toEqual(['wrangler', 'versions', 'upload'])
 		expect(logger.messages.some((message) => message.args.join(' ').includes('Version ID: version-123'))).toBe(true)
 		expect(logger.messages.some((message) => message.args.join(' ').includes('Preview URL: https://preview.example.workers.dev'))).toBe(true)
 	})
@@ -264,54 +259,6 @@ console.log('stub wrangler binary')
 
 		expect(result.exitCode).toBe(0)
 		expect(logger.messages.some((message) => message.args.join(' ').includes('Verified preview upload in Cloudflare control plane for version version-123'))).toBe(true)
-	})
-
-	test('deploy derives preview alias urls from the workers.dev subdomain when wrangler omits them', async () => {
-		await writeAccountProjectFiles(projectDir, {
-			accountId: TEST_ACCOUNT_ID,
-			workerName: 'worker-build-test'
-		})
-
-		const executions: ExecInvocation[] = []
-		const logger = createLogger()
-
-		globalThis.fetch = mock(async () => new Response(JSON.stringify({
-			success: true,
-			result: { subdomain: 'example-subdomain' },
-			errors: [],
-			messages: []
-		}), {
-			status: 200,
-			headers: { 'Content-Type': 'application/json' }
-		})) as unknown as typeof fetch
-		process.env.CLOUDFLARE_API_TOKEN = 'test-token'
-
-		setDependencies(createCliDependencies(
-			createProcessRunner((command, args) => {
-				if (command === 'bunx' && args[0] === 'wrangler' && args[1] === 'versions' && args[2] === 'upload') {
-					return successResult('Worker Version ID: version-123')
-				}
-
-				return successResult()
-			}, executions)
-		))
-
-		const result = await runDeployCommand(
-			{
-				command: 'deploy',
-				args: [],
-				options: {
-					preview: true,
-					'branch-name': 'feature/branch'
-				}
-			},
-			logger as any,
-			{ cwd: projectDir }
-		)
-
-		expect(result.exitCode).toBe(0)
-		expect(logger.messages.some((message) => message.args.join(' ').includes('Version ID: version-123'))).toBe(true)
-		expect(logger.messages.some((message) => message.args.join(' ').includes('Preview Alias URL: https://feature-branch-worker-build-test.example-subdomain.workers.dev'))).toBe(true)
 	})
 
 	test('deploy derives branch-scoped preview urls from the workers.dev subdomain when wrangler omits them', async () => {

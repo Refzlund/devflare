@@ -27,27 +27,6 @@ const REMOTE_ONLY_SERVICES: Set<CloudflareService> = new Set([
 	'vectorize'
 ])
 
-/**
- * Check if remote mode is explicitly enabled via environment variable.
- * Supports DEVFLARE_REMOTE=1, true, yes
- * 
- * @deprecated Use isRemoteModeActive() instead, which also checks stored config.
- * 
- * @example
- * ```ts
- * import { isRemoteModeEnabled } from 'devflare/test'
- * 
- * if (isRemoteModeEnabled()) {
- *   // Use real remote bindings
- * } else {
- *   // Use local emulation or skip
- * }
- * ```
- */
-export function isRemoteModeEnabled(): boolean {
-	return isRemoteModeActive()
-}
-
 // -----------------------------------------------------------------------------
 // Skip Check Implementation
 // -----------------------------------------------------------------------------
@@ -155,7 +134,7 @@ async function computeSkip(service: CloudflareService): Promise<boolean> {
 			console.log(`⏭️  ${service.toUpperCase()} tests skipped: ${message}`)
 			return true
 		}
-		
+
 		// Unexpected error — rethrow to fail tests
 		throw error
 	}

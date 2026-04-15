@@ -29,17 +29,17 @@ describe('config resource resolution', () => {
 				kv: {
 					CACHE: { name: 'cache-kv' },
 					SESSIONS: { id: 'sessions-kv-id' },
-					LEGACY_CACHE: 'legacy-cache-kv'
+					REPORTING_CACHE: 'reporting-cache-kv'
 				},
 				d1: {
 					DB: { name: 'main-db' },
 					AUDIT: { id: 'audit-db-id' },
-					LEGACY: 'legacy-db'
+					REPORTING: 'reporting-db'
 				},
 				hyperdrive: {
 					POSTGRES: { name: 'devflare-testing' },
 					REPLICA: { id: 'replica-hyperdrive-id' },
-					LEGACY_POSTGRES: 'legacy-postgres'
+					REPORTING_POSTGRES: 'reporting-postgres'
 				}
 			}
 		})
@@ -47,17 +47,17 @@ describe('config resource resolution', () => {
 		expect(result.bindings?.kv).toEqual({
 			CACHE: { id: 'cache-kv' },
 			SESSIONS: { id: 'sessions-kv-id' },
-			LEGACY_CACHE: { id: 'legacy-cache-kv' }
+			REPORTING_CACHE: { id: 'reporting-cache-kv' }
 		})
 		expect(result.bindings?.d1).toEqual({
 			DB: { id: 'main-db' },
 			AUDIT: { id: 'audit-db-id' },
-			LEGACY: { id: 'legacy-db' }
+			REPORTING: { id: 'reporting-db' }
 		})
 		expect(result.bindings?.hyperdrive).toEqual({
 			POSTGRES: { id: 'devflare-testing' },
 			REPLICA: { id: 'replica-hyperdrive-id' },
-			LEGACY_POSTGRES: { id: 'legacy-postgres' }
+			REPORTING_POSTGRES: { id: 'reporting-postgres' }
 		})
 	})
 
@@ -73,17 +73,17 @@ describe('config resource resolution', () => {
 		}))
 		const listKVNamespaces = mock(async () => ([
 			{ id: 'resolved-cache-kv-id', name: 'cache-kv' },
-			{ id: 'legacy-cache-kv-id', name: 'legacy-cache-kv' },
+			{ id: 'reporting-cache-kv-id', name: 'reporting-cache-kv' },
 			{ id: 'sessions-kv-id', name: 'sessions-kv' }
 		]))
 		const listD1Databases = mock(async () => ([
 			{ id: 'resolved-db-id', name: 'main-db' },
 			{ id: 'analytics-db-id', name: 'analytics-db' },
-			{ id: 'legacy-db-id', name: 'legacy-db' }
+			{ id: 'reporting-db-id', name: 'reporting-db' }
 		]))
 		const listHyperdrives = mock(async () => ([
 			{ id: 'resolved-postgres-id', name: 'devflare-testing' },
-			{ id: 'legacy-postgres-id', name: 'legacy-postgres' },
+			{ id: 'reporting-postgres-id', name: 'reporting-postgres' },
 			{ id: 'replica-hyperdrive-id', name: 'replica-postgres' }
 		]))
 
@@ -92,17 +92,17 @@ describe('config resource resolution', () => {
 			bindings: {
 				kv: {
 					CACHE: { name: 'cache-kv' },
-					LEGACY_CACHE: 'legacy-cache-kv',
+					REPORTING_CACHE: 'reporting-cache-kv',
 					SESSIONS: { id: 'sessions-kv-id' }
 				},
 				d1: {
 					DB: { name: 'main-db' },
 					ANALYTICS: { id: 'analytics-db-id' },
-					LEGACY: 'legacy-db'
+					REPORTING: 'reporting-db'
 				},
 				hyperdrive: {
 					POSTGRES: { name: 'devflare-testing' },
-					LEGACY_POSTGRES: 'legacy-postgres',
+					REPORTING_POSTGRES: 'reporting-postgres',
 					REPLICA: { id: 'replica-hyperdrive-id' }
 				},
 				r2: {
@@ -121,17 +121,17 @@ describe('config resource resolution', () => {
 
 		expect(result.bindings?.kv).toEqual({
 			CACHE: { id: 'resolved-cache-kv-id' },
-			LEGACY_CACHE: { id: 'legacy-cache-kv-id' },
+			REPORTING_CACHE: { id: 'reporting-cache-kv-id' },
 			SESSIONS: { id: 'sessions-kv-id' }
 		})
 		expect(result.bindings?.d1).toEqual({
 			DB: { id: 'resolved-db-id' },
 			ANALYTICS: { id: 'analytics-db-id' },
-			LEGACY: { id: 'legacy-db-id' }
+			REPORTING: { id: 'reporting-db-id' }
 		})
 		expect(result.bindings?.hyperdrive).toEqual({
 			POSTGRES: { id: 'resolved-postgres-id' },
-			LEGACY_POSTGRES: { id: 'legacy-postgres-id' },
+			REPORTING_POSTGRES: { id: 'reporting-postgres-id' },
 			REPLICA: { id: 'replica-hyperdrive-id' }
 		})
 		expect(result.bindings?.r2).toEqual({

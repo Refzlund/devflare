@@ -184,7 +184,7 @@ function ensureIntellisenseHook(): void {
 export function normalizeSnippet(snippet: DocCodeSnippet): NormalizedCodeSnippet {
 	const files = snippet.files?.length
 		? snippet.files.map((file, index) => normalizeFile(file, snippet, index))
-		: [normalizeLegacyFile(snippet)]
+		: [normalizeSingleFileSnippet(snippet)]
 	const activeFile = resolveInitialActiveFile(snippet.activeFile, files)
 	const structureEntries = resolveStructureEntries(snippet, files)
 	const structure = normalizeStructure(structureEntries, files, activeFile)
@@ -203,7 +203,7 @@ export function getCopyCode(file: NormalizedCodeFile): string {
 	return file.copyCode
 }
 
-function normalizeLegacyFile(snippet: DocCodeSnippet): NormalizedCodeFile {
+function normalizeSingleFileSnippet(snippet: DocCodeSnippet): NormalizedCodeFile {
 	const displayPath = snippet.filename
 		? normalizePath(snippet.filename)
 		: inferSnippetPath(snippet)

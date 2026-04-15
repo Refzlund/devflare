@@ -58,13 +58,13 @@ describe('configSchema', () => {
 			}
 		})
 
-		test('normalizes legacy environment build/plugins aliases', () => {
+		test('rejects unsupported environment-level build and plugin shorthand', () => {
 			const result = configSchema.safeParse({
 				name: 'my-worker',
 				compatibilityDate: '2025-01-07',
 				env: {
 					preview: {
-						plugins: [{ name: 'legacy-preview-plugin' }],
+						plugins: [{ name: 'preview-plugin' }],
 						build: {
 							minify: true,
 							rolldownOptions: {
@@ -75,12 +75,7 @@ describe('configSchema', () => {
 				}
 			})
 
-			expect(result.success).toBe(true)
-			if (result.success) {
-				expect(result.data.env?.preview?.vite?.plugins).toEqual([{ name: 'legacy-preview-plugin' }])
-				expect(result.data.env?.preview?.rolldown?.minify).toBe(true)
-				expect(result.data.env?.preview?.rolldown?.options?.external).toEqual(['cloudflare:workers'])
-			}
+			expect(result.success).toBe(false)
 		})
 	})
 
@@ -127,7 +122,7 @@ describe('configSchema', () => {
 			}
 		})
 
-		test('normalizes legacy build alias into rolldown output', () => {
+		test('rejects unsupported top-level build shorthand', () => {
 			const result = configSchema.safeParse({
 				name: 'my-worker',
 				compatibilityDate: '2025-01-07',
@@ -141,13 +136,7 @@ describe('configSchema', () => {
 				}
 			})
 
-			expect(result.success).toBe(true)
-			if (result.success) {
-				expect(result.data.rolldown?.target).toBe('esnext')
-				expect(result.data.rolldown?.minify).toBe(true)
-				expect(result.data.rolldown?.options?.external).toEqual(['cloudflare:workers'])
-				expect('build' in (result.data as Record<string, unknown>)).toBe(false)
-			}
+			expect(result.success).toBe(false)
 		})
 	})
 
@@ -169,18 +158,14 @@ describe('configSchema', () => {
 			}
 		})
 
-		test('normalizes legacy plugins alias into vite.plugins', () => {
+		test('rejects unsupported top-level plugins shorthand', () => {
 			const result = configSchema.safeParse({
 				name: 'my-worker',
 				compatibilityDate: '2025-01-07',
-				plugins: [{ name: 'legacy-vite-plugin' }]
+				plugins: [{ name: 'vite-plugin' }]
 			})
 
-			expect(result.success).toBe(true)
-			if (result.success) {
-				expect(result.data.vite?.plugins).toEqual([{ name: 'legacy-vite-plugin' }])
-				expect('plugins' in (result.data as Record<string, unknown>)).toBe(false)
-			}
+			expect(result.success).toBe(false)
 		})
 	})
 })

@@ -21,10 +21,7 @@ import {
 	formatWorkersDevUrl,
 	mergeParsedWranglerDeployOutputs,
 	parseWranglerDeployOutput,
-	parseWranglerStructuredOutput,
-	formatPreviewAliasUrl,
-	resolvePreviewAlias,
-	sanitizePreviewAlias
+	parseWranglerStructuredOutput
 } from '../preview'
 import {
 	applyResolvedDeployTarget,
@@ -33,7 +30,7 @@ import {
 } from '../deploy-target'
 import { applyDeploymentStrategy, describeDeploymentStrategy } from '../deploy-strategy'
 import { reconcilePreviewRegistry } from '../../cloudflare/preview-registry'
-import { createCliTheme, dim, green, logLine, whiteDim, yellow, yellowBold } from '../ui'
+import { createCliTheme, dim, green, logLine, yellow, yellowBold } from '../ui'
 import { resolvePackageSpecifier } from '../../utils/resolve-package'
 
 async function getCurrentGitBranch(cwd: string): Promise<string | null> {
@@ -425,32 +422,10 @@ export async function runDeployCommand(
 			logLine(logger, `${dim('worker', theme)} ${green(prepared.config.name, theme)}`)
 			const localWranglerExecutable = await resolveLocalWranglerExecutable(cwd, deps.fs)
 
-			let resolvedPreviewAlias: Awaited<ReturnType<typeof resolvePreviewAlias>> | undefined
-			if (preview) {
-				try {
-					resolvedPreviewAlias = await resolvePreviewAlias({
-						branchName: resolvedPreviewScopeName,
-						workerName: prepared.config.name,
-						getGitBranch: () => getCurrentGitBranch(cwd)
-					})
-				} catch (error) {
-					const message = error instanceof Error ? error.message : String(error)
-					if (!message.includes('Preview deploys need a stable alias source.')) {
-						throw error
-					}
-				}
-			}
-			const branchScopedPreviewWorkerName = prepared.config.name
 			const isBranchScopedPreviewDeployment = !preview
 				&& environment === 'preview'
 				&& typeof resolvedPreviewScopeName === 'string'
 				&& resolvedPreviewScopeName.length > 0
-			const branchScopedPreviewAlias = isBranchScopedPreviewDeployment
-				&& typeof resolvedPreviewScopeName === 'string'
-				&& typeof branchScopedPreviewWorkerName === 'string'
-				&& branchScopedPreviewWorkerName.length > 0
-				? sanitizePreviewAlias(resolvedPreviewScopeName, branchScopedPreviewWorkerName)
-				: undefined
 
 			if (preview) {
 				logger.warn('Cloudflare preview uploads cannot be the first upload for a brand-new Worker.')
@@ -460,8 +435,6 @@ export async function runDeployCommand(
 				if (prepared.config.migrations && prepared.config.migrations.length > 0) {
 					logger.warn('Cloudflare versions upload does not currently support Durable Object migrations.')
 				}
-				logLine(logger, `${dim('preview alias', theme)} ${green(resolvedPreviewAlias?.alias ?? 'auto', theme)}`)
-				logLine(logger, `${dim('alias source', theme)} ${whiteDim(resolvedPreviewAlias?.source ?? 'unknown', theme)}`)
 			}
 
 			// Deploy with wrangler
@@ -490,10 +463,6 @@ export async function runDeployCommand(
 
 			if (deployTag?.trim()) {
 				wranglerArgs.push('--tag', deployTag.trim())
-			}
-
-			if (resolvedPreviewAlias?.alias) {
-				wranglerArgs.push('--preview-alias', resolvedPreviewAlias.alias)
 			}
 
 			const deployProc = await deps.exec.exec(wranglerCommand, wranglerArgs, {
@@ -529,7 +498,7 @@ export async function runDeployCommand(
 			)
 			const parsedStructuredOutput = structuredOutput
 				? parseWranglerStructuredOutput(structuredOutput)
-				: { urls: [], versionId: undefined, previewUrl: undefined, previewAliasUrl: undefined }
+				: { urls: [], versionId: undefined, previewUrl: undefined }
 			const parsedOutput = mergeParsedWranglerDeployOutputs(parsedConsoleOutput, parsedStructuredOutput)
 			const configuredAccountId = normalizeCloudflareAccountId(prepared.config.accountId)
 				?? normalizeCloudflareAccountId(process.env.CLOUDFLARE_ACCOUNT_ID)
@@ -547,32 +516,7 @@ export async function runDeployCommand(
 			}
 			let resolvedVersionId = parsedOutput.versionId
 			let resolvedPreviewUrl = parsedOutput.previewUrl
-			let previewAliasUrl = parsedOutput.previewAliasUrl
 			let loggedVersionId = false
-
-			if (
-				preview
-				&& !previewAliasUrl
-				&& resolvedPreviewAlias?.alias
-			) {
-				resolvedAccountId = await ensureResolvedAccountId()
-			}
-
-			if (
-				preview
-				&& !previewAliasUrl
-				&& resolvedPreviewAlias?.alias
-				&& resolvedAccountId
-			) {
-				const workersSubdomain = await getWorkersSubdomain(resolvedAccountId)
-				if (workersSubdomain) {
-					previewAliasUrl = formatPreviewAliasUrl(
-						resolvedPreviewAlias.alias,
-						prepared.config.name,
-						workersSubdomain
-					)
-				}
-			}
 
 			if (!preview && !resolvedVersionId && !isBranchScopedPreviewDeployment) {
 				resolvedAccountId = await ensureResolvedAccountId()
@@ -685,10 +629,6 @@ export async function runDeployCommand(
 				}
 			}
 
-			if (preview && previewAliasUrl) {
-				logger.success(`Preview Alias URL: ${previewAliasUrl}`)
-			}
-
 			if ((preview || isBranchScopedPreviewDeployment) && resolvedPreviewUrl) {
 				logger.success(`Preview URL: ${resolvedPreviewUrl}`)
 			}
@@ -736,17 +676,12 @@ export async function runDeployCommand(
 			}
 
 			if (resolvedAccountId) {
-				const previewRegistryAlias = preview
-					? resolvedPreviewAlias?.alias
-					: branchScopedPreviewAlias
+				const previewRegistryAlias = isBranchScopedPreviewDeployment
+					? deployTarget.previewScope
+					: undefined
 				const previewRegistryUrl = preview || isBranchScopedPreviewDeployment
 					? resolvedPreviewUrl
 					: undefined
-				const previewRegistryAliasUrl = preview
-					? previewAliasUrl
-					: isBranchScopedPreviewDeployment
-						? resolvedPreviewUrl
-						: undefined
 
 				try {
 					await reconcilePreviewRegistry({
@@ -755,7 +690,6 @@ export async function runDeployCommand(
 						versionId: resolvedVersionId,
 						previewAlias: previewRegistryAlias,
 						previewUrl: previewRegistryUrl,
-						previewAliasUrl: previewRegistryAliasUrl,
 						branchName: resolvedPreviewScopeName,
 						commitSha: process.env.GITHUB_SHA,
 						source: inferRecordSource(),

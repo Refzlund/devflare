@@ -2,7 +2,7 @@
 // Case 17: Plugin Namespace Example - Fetch Handler
 // =============================================================================
 // Demonstrates plugin-shaped placeholders and virtual-module usage in source.
-// The case name is legacy; this file should not be read as proof that the main
+// The case folder name is historical; this file should not be read as proof that the main
 // worker pipeline already supports arbitrary Rolldown plugins end-to-end.
 // =============================================================================
 

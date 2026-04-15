@@ -59,8 +59,7 @@ export const MISC_HELP_PAGES: HelpPage[] = [
 			'devflare tokens <bootstrap-token> --new [name] [--account <id>] [--all-flags]',
 			'devflare tokens <bootstrap-token> --roll [name] [--account <id>]',
 			'devflare tokens <bootstrap-token> --delete [name] [--account <id>]',
-			'devflare tokens <bootstrap-token> --delete-all [--account <id>]',
-			'devflare token <bootstrap-token> [--name <name>]'
+			'devflare tokens <bootstrap-token> --delete-all [--account <id>]'
 		],
 		description: [
 			'Creates, lists, rolls, and deletes Devflare-managed account-owned API tokens using a bootstrap token that already has token-management permissions.',
@@ -76,10 +75,8 @@ export const MISC_HELP_PAGES: HelpPage[] = [
 			entry('--delete [name]', 'Delete a Devflare-managed token by name'),
 			entry('--delete-all', 'Delete every Devflare-managed token in the selected account'),
 			entry('--account <id>', 'Use a specific Cloudflare account'),
-			entry('--all-flags', 'With `--new`, include every reusable account-scoped permission group'),
-			entry('--name <name>', 'Legacy alias used with the `token` command form')
+			entry('--all-flags', 'With `--new`, include every reusable account-scoped permission group')
 		],
-		aliases: ['token'],
 		examples: [
 			entry('devflare tokens $BOOTSTRAP --list', 'List managed tokens'),
 			entry('devflare tokens $BOOTSTRAP --new preview', 'Create a managed token named `devflare-preview`'),
@@ -87,8 +84,7 @@ export const MISC_HELP_PAGES: HelpPage[] = [
 			entry('devflare tokens $BOOTSTRAP --delete-all', 'Delete every Devflare-managed token for the selected account')
 		],
 		notes: [
-			'Cloudflare only returns token secrets once for create and roll operations, so store them immediately.',
-			'`token` remains a legacy alias for the create flow and is canonicalized to the `tokens` help page.'
+			'Cloudflare only returns token secrets once for create and roll operations, so store them immediately.'
 		]
 	},
 	{

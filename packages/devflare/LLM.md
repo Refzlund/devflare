@@ -73,8 +73,8 @@ Deploy explicitly, choose the right preview model, manage preview lifecycle clea
   - [Control-plane operations](/docs/control-plane-operations) — Devflare’s deeper CLI families exist so account selection, live production inspection, Worker renames, token lifecycle, and remote paid-test gates stay documented instead of dissolving into ad-hoc command snippets.
   - [devflare/cloudflare](/docs/cloudflare-api) — The `devflare/cloudflare` subpath exposes the same account-aware building blocks the CLI uses for auth, resource inventory, usage and limits, preview registry access, preferences, and managed token workflows.
 
-- **Preview lifecycle** — Inspect, reconcile, retire, and clean up preview scopes after they exist so preview infrastructure does not sprawl.
-  - [Preview operations](/docs/preview-operations) — The preview registry is D1-backed and gives Devflare a durable record of preview, alias, and deployment state so cleanup and reconciliation do not have to depend on fragile one-off scripts.
+- **Preview lifecycle** — Inspect and clean up preview scopes after they exist so preview infrastructure does not sprawl.
+  - [Preview operations](/docs/preview-operations) — The preview registry is D1-backed and gives Devflare a durable record of preview scope and deployment state so cleanup does not have to depend on fragile one-off scripts.
 
 - **Verification** — Use runtime-shaped tests and keep automation observable enough to trust during releases.
   - [Testing & automation](/docs/testing-and-automation) — Keep local harness detail on the dedicated testing pages, then promote only the right runtime-shaped checks into thin, observable automation.
@@ -968,7 +968,7 @@ The project tree does not need to become more complicated for the first deploy. 
 | --- | --- |
 | Best for | The first named preview deploy and cleanup loop |
 | Preview command | `bunx --bun devflare deploy --preview <name>` |
-| Cleanup command | `bunx --bun devflare previews cleanup-resources --scope <name> --apply` |
+| Cleanup command | `bunx --bun devflare previews cleanup --scope <name> --apply` |
 
 #### Deploy a named preview
 
@@ -1004,9 +1004,9 @@ bunx --bun devflare deploy --preview next
 
 Preview cleanup should use the same scope name you deployed with. That keeps teardown reviewable and stops preview-only resources from lingering just because nobody remembers the exact branch name later.
 
-If the preview owns preview-only resources, `cleanup-resources` is the quickest way to remove them. Use the exact same scope string you deployed with so the target stays unmistakable.
+If the preview owns preview-only resources, `cleanup` is the quickest way to remove them. Use the exact same scope string you deployed with so the target stays unmistakable.
 
-If you later need richer lifecycle management, the dedicated preview operations docs cover retire, reconcile, and broader cleanup. For the first loop, resource cleanup is enough to understand the shape.
+If you later need richer lifecycle management, the dedicated preview operations docs cover scope inspection, cleanup planning, and broader cleanup runs. For the first loop, resource cleanup is enough to understand the shape.
 
 ##### Key points
 
@@ -1025,7 +1025,7 @@ The cleanup command should feel like the mirror image of the deploy command: sam
 ###### File — cleanup-preview.sh
 
 ```bash
-bunx --bun devflare previews cleanup-resources --scope next --apply
+bunx --bun devflare previews cleanup --scope next --apply
 ```
 
 #### What to read next
@@ -1085,7 +1085,7 @@ From there, the CLI keeps the same shape all the way down. `devflare help deploy
 bunx --bun devflare --help
 bunx --bun devflare help deploy
 bunx --bun devflare previews --help
-bunx --bun devflare previews cleanup-resources --help
+bunx --bun devflare previews cleanup --help
 bunx --bun devflare productions rollback --help
 ```
 
@@ -1104,10 +1104,10 @@ bunx --bun devflare productions rollback --help
 | `config` | Print resolved config. | `print`, raw Devflare JSON, or compiled Wrangler JSON. |
 | `account` | Inspect Cloudflare account inventories and limits. | Resource lists, usage limits, and interactive global/workspace selection. |
 | `login` | Authenticate with Cloudflare via Wrangler. | `--force` behavior and reuse of existing sessions. |
-| `previews` | Operate on preview lifecycle state. | `bindings`, `provision`, `reconcile`, `cleanup`, `retire`, and `cleanup-resources`. |
+| `previews` | Operate on preview lifecycle state. | `list`, `bindings`, and `cleanup`. |
 | `productions` | Inspect and mutate live production state. | `versions`, `rollback`, and `delete`. |
 | `worker` | Run Worker control-plane operations. | Currently `rename`, plus config-sync expectations. |
-| `tokens` | Manage Devflare-managed account-owned API tokens. | List, create, roll, delete, and the legacy `token` alias. |
+| `tokens` | Manage Devflare-managed account-owned API tokens. | List, create, roll, and delete managed tokens. |
 | `ai` | Print the bundled Workers AI pricing snapshot. | Read-only pricing surface; verify current rates in Cloudflare docs when it matters. |
 | `remote` | Toggle remote test mode for paid features. | `status`, `enable`, and `disable`. |
 | `help` | Render root or command-specific help. | Nested help resolution for command families and subcommands. |
@@ -1146,7 +1146,7 @@ Use the built-in help for exact flags, then use the docs pages below for the ope
 
 - **Control-plane operations** — Open this page for account selection, live production inspection, rollback or delete posture, worker rename, token bootstrap, and remote-mode gates. ([link](/docs/control-plane-operations))
 - **devflare/cloudflare** — Open this page when a script or tool should use the same account, registry, usage, and token helpers the CLI builds on. ([link](/docs/cloudflare-api))
-- **Preview operations** — Open this page when the question is preview registry inspection, reconciliation, retirement, or resource cleanup. ([link](/docs/preview-operations))
+- **Preview operations** — Open this page when the question is preview registry inspection or resource cleanup. ([link](/docs/preview-operations))
 - **Production deploys** — Open this page when the question is the deploy target and preflight inspection rather than later control-plane changes. ([link](/docs/production-deploys))
 
 ##### Key points
@@ -1157,7 +1157,7 @@ Use the built-in help for exact flags, then use the docs pages below for the ope
 
 > **Warning — The sharp edges live one level deeper**
 >
-> `previews cleanup-resources`, `previews retire`, `productions rollback`, and `productions delete` all carry behavior and safety notes that are too specific for the root CLI map. Read their help and the dedicated docs page before treating them as copy-paste habits.
+> `previews cleanup`, `productions rollback`, and `productions delete` all carry behavior and safety notes that are too specific for the root CLI map. Read their help and the dedicated docs page before treating them as copy-paste habits.
 
 #### Most packages still live in one boring, reliable command loop
 
@@ -1199,11 +1199,11 @@ bunx --bun devflare productions versions
 
 - **`config print`** — Best when you need to see the resolved Devflare config or compiled Wrangler-facing shape before trusting a build or deploy.
 - **`doctor`** — Best when config resolution, generated artifacts, or local Vite detection feel hard to trace and need a sharper diagnostic pass.
-- **`previews` / `productions`** — Best when the question is no longer “can I deploy?” but “what exists right now, and what should I retire, roll back, or inspect?”
+- **`previews` / `productions`** — Best when the question is no longer “can I deploy?” but “what exists right now, and what should I clean up, roll back, or inspect?”
 
 > **Warning — Keep commands package-local**
 >
-> Run Devflare from the package that owns the config you actually mean to resolve. In monorepos, Turbo can decide what changed, but package-local `devflare` commands still decide what gets built, deployed, reconciled, or cleaned up.
+> Run Devflare from the package that owns the config you actually mean to resolve. In monorepos, Turbo can decide what changed, but package-local `devflare` commands still decide what gets built, deployed, inspected, or cleaned up.
 
 ---
 
@@ -2624,7 +2624,7 @@ Preview config in Devflare is not only “set `env.preview` and hope for the bes
 | --- | --- |
 | Authoring primitive | `preview.scope()` from `devflare/config` |
 | Typical result | `notes-cache-kv` → `notes-cache-kv-next` for a `next` preview scope |
-| Main lifecycle command | `bunx --bun devflare previews cleanup-resources --scope <name> --apply` |
+| Main lifecycle command | `bunx --bun devflare previews cleanup --scope <name> --apply` |
 | Best for | Previews that need their own disposable state instead of borrowing production infrastructure |
 
 #### Mark preview-owned bindings in config instead of mutating production names at deploy time
@@ -2740,21 +2740,21 @@ That is what keeps previews fast to create and safe to tear down. The preview ow
 
 - **Need the overlay story too?** — Open the environments page when the question is which config lanes differ by preview or production beyond resource naming. ([link](/docs/config-environments))
 - **Need the preview topology decision?** — Open the preview strategy page when the real question is same-worker uploads versus branch-scoped worker families. ([link](/docs/preview-strategies))
-- **Need lifecycle and cleanup commands?** — Open preview operations when the question moves from authoring config to registry inspection, retirement, reconciliation, or cleanup policy. ([link](/docs/preview-operations))
+- **Need lifecycle and cleanup commands?** — Open preview operations when the question moves from authoring config to registry inspection or cleanup policy. ([link](/docs/preview-operations))
 
 ##### Steps
 
 1. Author preview-owned bindings with `preview.scope()` in the main config.
 2. Deploy the preview with an explicit scope such as `--preview next` when the resource names should map to one known preview deployment.
 3. Inspect that scope with `devflare previews bindings --scope next` when you want the resolved targets and worker associations spelled out clearly.
-4. Clean up the same preview later with `devflare previews cleanup-resources --scope next --apply`.
+4. Clean up the same preview later with `devflare previews cleanup --scope next --apply`.
 
 ##### Example — One scope in, the same scope back out
 
 ```bash
 bunx --bun devflare deploy --preview next
 bunx --bun devflare previews bindings --scope next
-bunx --bun devflare previews cleanup-resources --scope next --apply
+bunx --bun devflare previews cleanup --scope next --apply
 ```
 
 ---
@@ -3132,7 +3132,7 @@ By the time you are considering these helpers, the normal app-facing story shoul
 | Navigation title | sequence(...) |
 | Eyebrow | Runtime helper |
 
-Devflare treats request-wide middleware as a first-class runtime primitive. `sequence(...)` composes `(event, resolve)` middleware for workers, keeps broad concerns readable, and still preserves compatibility with the older handler-composition form.
+Devflare treats request-wide middleware as a first-class runtime primitive. `sequence(...)` composes `(event, resolve)` middleware for workers and keeps broad concerns readable without burying them in one monolithic fetch file.
 
 #### At a glance
 
@@ -3200,8 +3200,6 @@ export async function GET({ params }: FetchEvent): Promise<Response> {
 Calling `resolve(event)` continues into the next middleware in the chain, or into the matched route/module-level handler once no more middleware remains. That makes the order of the chain explicit instead of hidden inside nested helper calls.
 
 `resolve(event)` may also receive a replacement `FetchEvent`. That is the supported way for middleware to forward a modified request, preserved params, or updated locals into the next stage deliberately.
-
-If you need to keep compatibility with older Devflare code, `sequence(...)` still supports the legacy handler-composition form, but the `(event, resolve)` shape is the modern one to prefer for worker HTTP flows.
 
 ##### Key points
 
@@ -4400,12 +4398,12 @@ After deploy, the workflows in this repo publish GitHub feedback on purpose. The
 
 This is where thin workflows pay off: reporting stays separate from deploy mechanics, and a failed live verification or preview verification can be surfaced cleanly without hiding inside one giant shell step.
 
-Keep the reusable action outputs in mind too: `devflare-deploy-impact` returns `should-deploy`, `reason`, `comparison-base`, `comparison-head`, `changed-workspaces`, and `changed-files`; `devflare-deploy` returns `preview-alias`, `preview-url`, `version-id`, `verification-note`, `status`, `failure-stage`, `exit-code`, and `log-excerpt`; and `devflare-github-feedback` returns `comment-id`, `deployment-id`, and `pr-number` for later jobs that need to update, retire, or cross-link that feedback.
+Keep the reusable action outputs in mind too: `devflare-deploy-impact` returns `should-deploy`, `reason`, `comparison-base`, `comparison-head`, `changed-workspaces`, and `changed-files`; `devflare-deploy` returns `preview-url`, `version-id`, `verification-note`, `status`, `failure-stage`, `exit-code`, and `log-excerpt`; and `devflare-github-feedback` returns `comment-id`, `deployment-id`, and `pr-number` for later jobs that need to update, close, or cross-link that feedback.
 
 ##### Key points
 
 - Use `devflare-github-feedback` for PR comments, GitHub deployments, or both.
-- Keep preview aliases or production URLs visible in workflow output so reviewers do not need to scrape logs.
+- Keep preview URLs or production URLs visible in workflow output so reviewers do not need to scrape logs.
 - Fail the workflow explicitly when deploy verification or live verification says the result is not trustworthy.
 - Use `GITHUB_STEP_SUMMARY` to leave a small readable outcome instead of forcing readers to decode every raw step.
 
@@ -4413,7 +4411,7 @@ Keep the reusable action outputs in mind too: `devflare-deploy-impact` returns `
 
 | Workflow file | When it runs | GitHub feedback |
 | --- | --- | --- |
-| `preview.yml` | Non-default branch pushes, selected PR lifecycle events, branch deletion, or manual cleanup dispatch | Branch deployment feedback, grouped PR comment sections, and inactive cleanup updates for retired previews. |
+| `preview.yml` | Non-default branch pushes, selected PR lifecycle events, branch deletion, or manual cleanup dispatch | Branch deployment feedback, grouped PR comment sections, and inactive cleanup updates for cleaned-up previews. |
 | `documentation-production.yml` | Default branch pushes or manual dispatch for docs production | Production deployment record plus live URL verification. |
 | `workspace-ci.yml` | Workspace PRs, selected branch pushes, or manual dispatch | No deployment feedback; validation stays separate from deploy policy. |
 
@@ -4427,7 +4425,7 @@ This repo keeps cleanup as first-class automation inside `preview.yml`. Deleted 
 
 Each cleanup job checks out the default branch, reuses the shared workspace setup action, runs `devflare previews cleanup --scope <name> --apply` for the relevant package, and then marks the matching GitHub deployment or grouped PR comment section inactive.
 
-That keeps teardown reviewable: you can still see which workflow retires preview-owned resources and which feedback surfaces get marked inactive, but without splitting the lifecycle across six nearly-identical workflow files.
+That keeps teardown reviewable: you can still see which workflow removes preview-owned resources and which feedback surfaces get marked inactive, but without splitting the lifecycle across six nearly-identical workflow files.
 
 ##### Highlights
 
@@ -4437,7 +4435,7 @@ That keeps teardown reviewable: you can still see which workflow retires preview
 
 - Branch deletion cleanup and manual branch cleanup dispatches now live in the same shared workflow file.
 - PR closure cleanup lives beside the preview deploy jobs so the open-update-close lifecycle stays reviewable in one place.
-- Cleanup retires preview records first, then removes preview-owned infrastructure, then marks GitHub feedback inactive.
+- Cleanup updates preview records, then removes preview-owned infrastructure, then marks GitHub feedback inactive.
 
 ##### Example — The shared preview workflow keeps cleanup visible beside deploy logic
 
@@ -4726,7 +4724,7 @@ bunx --bun devflare deploy --preview pr-123
 
 cd ../../
 bunx --bun devflare deploy --preview pr-123
-bunx --bun devflare previews cleanup-resources --scope pr-123 --apply
+bunx --bun devflare previews cleanup --scope pr-123 --apply
 ```
 
 ---
@@ -4756,9 +4754,9 @@ Preview complexity usually comes from choosing the wrong model, not from the com
 
 Both preview targets resolve `config.env.preview` and can materialize `preview.scope()` names. Bare `--preview` keeps the same-worker preview upload flow and uses the synthetic `preview` identifier, while named `--preview <name>` swaps that identifier for an explicit scope and can pair naturally with branch-scoped preview workers when your config is wired for that pattern.
 
-Plain `--preview` can still derive alias metadata from `--branch-name`, CI metadata, or the current git branch, but that alias is separate from the synthetic `preview` identifier used for preview-scoped resource names.
+Plain `--preview` can still receive `--branch-name`, CI metadata, or the current git branch when your workflow wants branch context in logs or deploy messages, but preview-scoped resource names still use the synthetic `preview` identifier unless you pick an explicit scope.
 
-The action metadata in this repo still carries a `preview-alias` input for same-worker uploads, and some live workflows still use it. Treat that as repo drift rather than a second CLI deploy target model. New automation should lean on `--branch-name`-style alias derivation or just use named preview scopes directly.
+When the preview needs stronger isolation or cleaner cleanup ergonomics, prefer named preview scopes directly instead of layering extra naming conventions onto same-worker uploads.
 
 ##### Reference table
 
@@ -4961,7 +4959,7 @@ bunx --bun devflare remote disable
 ##### Highlights
 
 - **devflare/cloudflare** — Open the library API page when a script or tool should use the same auth, inventory, registry, usage, or token helpers that the CLI command families use internally. ([link](/docs/cloudflare-api))
-- **Preview operations** — Open the preview lifecycle page when the job is inspection, reconciliation, retirement, or resource cleanup for preview scopes. ([link](/docs/preview-operations))
+- **Preview operations** — Open the preview lifecycle page when the job is inspection or resource cleanup for preview scopes. ([link](/docs/preview-operations))
 - **GitHub workflows** — Open the workflow page when those operator commands need to become reviewable CI jobs with feedback, cleanup, and permissions. ([link](/docs/github-workflows))
 - **Production deploys** — Open the production deploy page when the question is the deploy target itself rather than the later control-plane inspection or rollback flow. ([link](/docs/production-deploys))
 
@@ -5051,7 +5049,7 @@ for (const worker of workers) {
 
 Devflare exports preview-registry helpers plus the shared registry schemas and errors so custom tooling can inspect or update preview metadata without guessing the record shape.
 
-That is especially useful for automation that wants to reconcile preview URLs, aliases, or cleanup state while staying aligned with the same contract the CLI and GitHub actions use.
+That is especially useful for automation that wants to inspect preview URLs, scope metadata, or cleanup state while staying aligned with the same contract the CLI and GitHub actions use.
 
 ##### Key points
 
@@ -5064,14 +5062,14 @@ That is especially useful for automation that wants to reconcile preview URLs, a
 ##### Highlights
 
 - **Control-plane operations** — Go back to the CLI-oriented page when the question is operator workflow, dry-run safety, rollback posture, or command-family behavior. ([link](/docs/control-plane-operations))
-- **Preview operations** — Open the preview lifecycle page when your tool needs the broader policy around reconcile, retire, and cleanup flows. ([link](/docs/preview-operations))
+- **Preview operations** — Open the preview lifecycle page when your tool needs the broader policy around preview inspection and cleanup flows. ([link](/docs/preview-operations))
 - **GitHub workflows** — Open the workflow page when your automation question is really about CI structure, action outputs, or PR feedback instead of raw Cloudflare helpers. ([link](/docs/github-workflows))
 
 ---
 
-### Use the preview registry commands to inspect, reconcile, retire, and clean up previews
+### Use preview commands to inspect and clean up previews
 
-> The preview registry is D1-backed and gives Devflare a durable record of preview, alias, and deployment state so cleanup and reconciliation do not have to depend on fragile one-off scripts.
+> The preview registry is D1-backed and gives Devflare a durable record of preview scope and deployment state so cleanup does not have to depend on fragile one-off scripts.
 
 | Field | Value |
 | --- | --- |
@@ -5080,7 +5078,7 @@ That is especially useful for automation that wants to reconcile preview URLs, a
 | Navigation title | Preview operations |
 | Eyebrow | Preview lifecycle |
 
-Once previews exist, lifecycle management matters as much as deployment. The preview registry commands are the public surface for understanding what exists, bringing state back in sync, and tearing down preview-only resources deliberately.
+Once previews exist, lifecycle management matters as much as deployment. The preview commands are the public surface for understanding what exists and tearing down preview-only resources deliberately.
 
 #### At a glance
 
@@ -5092,9 +5090,9 @@ Once previews exist, lifecycle management matters as much as deployment. The pre
 
 #### Why the preview registry exists
 
-Cloudflare discovery alone is not enough for a clean preview lifecycle story. The D1-backed registry lets Devflare track preview, alias, and deployment records in a way that supports reconciliation, retirement, and cleanup commands later.
+Cloudflare discovery alone is not enough for a clean preview lifecycle story. The D1-backed registry lets Devflare track preview scope and deployment records in a way that supports reliable inspection and cleanup later.
 
-`previews provision` creates or reuses the default `devflare-registry` database, and later deploy flows try to keep that registry synchronized as preview deploys happen. If that sync warns or falls behind, `reconcile` is the documented recovery path.
+Devflare creates and updates that registry as preview deploys happen, so the `previews` and `cleanup` commands can stay focused on real preview state instead of guesswork.
 
 That is what lets preview operations stay a documented CLI surface instead of becoming a pile of CI-only command glue.
 
@@ -5104,30 +5102,25 @@ That is what lets preview operations stay a documented CLI surface instead of be
 
 - Use `previews` for a summary view of preview scopes.
 - Use `bindings --scope <name>` when you want to understand which workers currently reference one named preview scope; otherwise the identifier comes from the same preview env vars your automation already set.
-- Use `reconcile` when registry state needs to be synced against current Cloudflare state.
 - Prefer explicit scope selectors when you know the target, and reserve broad cleanup runs for the moments when the whole preview fleet genuinely needs attention.
-- Without `--scope`, `cleanup-resources` first respects `DEVFLARE_PREVIEW_IDENTIFIER`, `DEVFLARE_PREVIEW_PR`, or `DEVFLARE_PREVIEW_BRANCH`, and only then falls back to the synthetic `preview` scope. Use `--all` when you mean every discovered scope for the worker family, not just that resolved default.
+- Without `--scope`, `cleanup` first respects `DEVFLARE_PREVIEW_IDENTIFIER`, `DEVFLARE_PREVIEW_PR`, or `DEVFLARE_PREVIEW_BRANCH`, and only then falls back to the synthetic `preview` scope. Use `--all` when you mean every discovered scope for the worker family, not just that resolved default.
 
 ##### Example — Preview lifecycle commands
 
 ```bash
 bunx --bun devflare previews
-bunx --bun devflare previews provision
 bunx --bun devflare previews bindings --scope next
-bunx --bun devflare previews reconcile --worker documentation
-bunx --bun devflare previews retire --worker documentation --branch feature-search --apply
 bunx --bun devflare previews cleanup --days 7 --apply
-bunx --bun devflare previews cleanup-resources --scope next --apply
+bunx --bun devflare previews cleanup --scope next --apply
 ```
 
 #### Cleanup should be specific
 
 ##### Key points
 
-- `retire` retires matching registry records by branch, alias, version, or commit selector; it does not delete the underlying Cloudflare resources by itself.
 - `cleanup` soft-deletes stale registry records after an age threshold instead of immediately pretending the historical metadata never existed.
-- `cleanup-resources` deletes preview-only resources and can also delete dedicated preview worker scripts for the targeted scope.
-- Stable shared workers are not deleted by `cleanup-resources`; same-worker preview aliases only lose matching preview-scoped account resources.
+- `cleanup` deletes preview-only resources and can also delete dedicated preview worker scripts for the targeted scope.
+- Stable shared workers are not deleted by `cleanup`; same-worker preview uploads only lose matching preview-scoped account resources.
 - Analytics Engine datasets and Browser Rendering bindings are reported as warnings instead of deleted resources, and preview-scoped Hyperdrive cleanup only removes preview configs that already exist.
 
 > **Important — Good cleanup hygiene**
@@ -5200,7 +5193,7 @@ The main habit is to promote the check that matches the behavior you actually ne
 
 ##### Highlights
 
-- **Preview operations** — Use the preview page when a runtime check depends on preview-scoped resources, reconciliation, retirement, or cleanup behavior. ([link](/docs/preview-operations))
+- **Preview operations** — Use the preview page when a runtime check depends on preview-scoped resources, scope inspection, or cleanup behavior. ([link](/docs/preview-operations))
 - **Production deploys** — Use the production page when the check is really about the deploy target, compiled output, or preflight inspection before release. ([link](/docs/production-deploys))
 - **GitHub workflows** — Use the workflow page when those promoted checks need to become reviewable Actions jobs with explicit triggers, permissions, and feedback. ([link](/docs/github-workflows))
 
@@ -5762,7 +5755,7 @@ export default defineConfig({
 		kv: {
 			CACHE: 'cache-kv',
 			SESSIONS: { name: 'sessions-kv' },
-			LEGACY_CACHE: { id: 'kv-namespace-id' }
+				REPORTING_CACHE: { id: 'kv-namespace-id' }
 		}
 	}
 })
@@ -5856,7 +5849,7 @@ export default defineConfig({
 		kv: {
 			CACHE: 'cache-kv',
 			SESSIONS: { name: 'sessions-kv' },
-			LEGACY_CACHE: { id: 'kv-namespace-id' }
+				REPORTING_CACHE: { id: 'kv-namespace-id' }
 		}
 	}
 })
@@ -6087,7 +6080,7 @@ export default defineConfig({
 		d1: {
 			DB: 'app-db',
 			AUDIT: { name: 'audit-db' },
-			LEGACY: { id: 'd1-database-id' }
+				REPORTING: { id: 'd1-database-id' }
 		}
 	}
 })
@@ -6181,7 +6174,7 @@ export default defineConfig({
 		d1: {
 			DB: 'app-db',
 			AUDIT: { name: 'audit-db' },
-			LEGACY: { id: 'd1-database-id' }
+				REPORTING: { id: 'd1-database-id' }
 		}
 	}
 })
@@ -8063,7 +8056,7 @@ export default defineConfig({
 	bindings: {
 		hyperdrive: {
 			DB: 'app-postgres',
-			LEGACY_DB: { id: 'hyperdrive-id' }
+				ANALYTICS_DB: { id: 'hyperdrive-id' }
 		}
 	}
 })
@@ -8156,7 +8149,7 @@ export default defineConfig({
 	bindings: {
 		hyperdrive: {
 			DB: 'app-postgres',
-			LEGACY_DB: { id: 'hyperdrive-id' }
+				ANALYTICS_DB: { id: 'hyperdrive-id' }
 		}
 	}
 })

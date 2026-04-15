@@ -44,7 +44,7 @@ export const PREVIEW_HELP_PAGES: HelpPage[] = [
 			'The default `list` view can aggregate every configured package from a monorepo root. `bindings` and `cleanup` still need one configured package, so run them inside that package or pass `--config <path>`.',
 			'`bindings` and `cleanup` default to preview-oriented config resolution already, so `--env preview` is usually redundant unless your project stores preview bindings under a different env key.',
 			'`cleanup` removes preview-only Cloudflare resources for the targeted scope and also deletes dedicated preview Worker scripts when that scope is deployed as branch-scoped Workers. Service bindings, Durable Object bindings, and routes attached only to those dedicated preview Workers disappear with them.',
-			'Stable shared Workers are never deleted by `cleanup`. The legacy `cleanup-resources` alias still works, but `cleanup` is the documented public command.'
+			'Stable shared Workers are never deleted by `cleanup`.'
 		]
 	},
 	createPreviewSubcommandPage(
@@ -124,7 +124,6 @@ export const PREVIEW_HELP_PAGES: HelpPage[] = [
 			'Dedicated preview Worker scripts are candidates only when their names resolve to the targeted preview scope. Stable shared Workers are never deleted.',
 			'Without `--scope`, the command defaults to the synthetic `preview` scope. Use `--all` when you want every discovered preview scope instead of just that default.',
 			'Deleting dedicated preview Worker scripts removes preview-only service bindings, Durable Object bindings, and routes owned solely by those Workers.',
-			'The legacy `cleanup-resources` alias still works for compatibility, but `cleanup` is the documented public command.',
 			'Omit `--env preview` unless your config stores preview bindings under a different env key.',
 			'Analytics Engine datasets and Browser Rendering bindings are intentionally reported as warnings instead of deleted resources.'
 		]

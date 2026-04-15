@@ -744,7 +744,7 @@ export default defineConfig({
 						code: String.raw`bunx --bun devflare --help
 bunx --bun devflare help deploy
 bunx --bun devflare previews --help
-bunx --bun devflare previews cleanup-resources --help
+bunx --bun devflare previews cleanup --help
 bunx --bun devflare productions rollback --help`
 					}
 				],
@@ -778,10 +778,10 @@ bunx --bun devflare productions rollback --help`
 						['`config`', 'Print resolved config.', '`print`, raw Devflare JSON, or compiled Wrangler JSON.'],
 						['`account`', 'Inspect Cloudflare account inventories and limits.', 'Resource lists, usage limits, and interactive global/workspace selection.'],
 						['`login`', 'Authenticate with Cloudflare via Wrangler.', '`--force` behavior and reuse of existing sessions.'],
-						['`previews`', 'Operate on preview lifecycle state.', '`bindings`, `provision`, `reconcile`, `cleanup`, `retire`, and `cleanup-resources`.'],
+						['`previews`', 'Operate on preview lifecycle state.', '`list`, `bindings`, and `cleanup`.'],
 						['`productions`', 'Inspect and mutate live production state.', '`versions`, `rollback`, and `delete`.'],
 						['`worker`', 'Run Worker control-plane operations.', 'Currently `rename`, plus config-sync expectations.'],
-						['`tokens`', 'Manage Devflare-managed account-owned API tokens.', 'List, create, roll, delete, and the legacy `token` alias.'],
+						['`tokens`', 'Manage Devflare-managed account-owned API tokens.', 'List, create, roll, and delete managed tokens.'],
 						['`ai`', 'Print the bundled Workers AI pricing snapshot.', 'Read-only pricing surface; verify current rates in Cloudflare docs when it matters.'],
 						['`remote`', 'Toggle remote test mode for paid features.', '`status`, `enable`, and `disable`.'],
 						['`help`', 'Render root or command-specific help.', 'Nested help resolution for command families and subcommands.'],
@@ -840,7 +840,7 @@ bunx --bun devflare productions rollback --help`
 						label: 'Ship & operate',
 						meta: 'Preview lifecycle',
 						title: 'Preview operations',
-						body: 'Open this page when the question is preview registry inspection, reconciliation, retirement, or resource cleanup.'
+						body: 'Open this page when the question is preview registry inspection or resource cleanup.'
 					},
 					{
 						href: docsLink('production-deploys'),
@@ -860,7 +860,7 @@ bunx --bun devflare productions rollback --help`
 						tone: 'warning',
 						title: 'The sharp edges live one level deeper',
 						body: [
-							'`previews cleanup-resources`, `previews retire`, `productions rollback`, and `productions delete` all carry behavior and safety notes that are too specific for the root CLI map. Read their help and the dedicated docs page before treating them as copy-paste habits.'
+							'`previews cleanup`, `productions rollback`, and `productions delete` all carry behavior and safety notes that are too specific for the root CLI map. Read their help and the dedicated docs page before treating them as copy-paste habits.'
 						]
 					}
 				]
@@ -913,7 +913,7 @@ bunx --bun devflare productions versions`
 					},
 					{
 						title: '`previews` / `productions`',
-						body: 'Best when the question is no longer “can I deploy?” but “what exists right now, and what should I retire, roll back, or inspect?”'
+						body: 'Best when the question is no longer “can I deploy?” but “what exists right now, and what should I clean up, roll back, or inspect?”'
 					}
 				],
 				callouts: [
@@ -921,7 +921,7 @@ bunx --bun devflare productions versions`
 						tone: 'warning',
 						title: 'Keep commands package-local',
 						body: [
-							'Run Devflare from the package that owns the config you actually mean to resolve. In monorepos, Turbo can decide what changed, but package-local `devflare` commands still decide what gets built, deployed, reconciled, or cleaned up.'
+							'Run Devflare from the package that owns the config you actually mean to resolve. In monorepos, Turbo can decide what changed, but package-local `devflare` commands still decide what gets built, deployed, inspected, or cleaned up.'
 						]
 					}
 				]
@@ -938,7 +938,7 @@ bunx --bun devflare productions versions`
 		summary:
 			'Use `sequence(...)` from `devflare/runtime` when broad HTTP concerns must wrap route resolution or another fetch handler in a clear top-to-bottom order.',
 		description:
-			'Devflare treats request-wide middleware as a first-class runtime primitive. `sequence(...)` composes `(event, resolve)` middleware for workers, keeps broad concerns readable, and still preserves compatibility with the older handler-composition form.',
+			'Devflare treats request-wide middleware as a first-class runtime primitive. `sequence(...)` composes `(event, resolve)` middleware for workers and keeps broad concerns readable without burying them in one monolithic fetch file.',
 		highlights: [
 			'Import `sequence` from `devflare/runtime` for worker fetch middleware.',
 			'Keep global concerns like CORS, auth, request ids, and response shaping in the sequence chain, not in route leaves.',
@@ -1034,8 +1034,7 @@ export async function GET({ params }: FetchEvent): Promise<Response> {
 				title: 'Understand what `resolve(event)` actually means',
 				paragraphs: [
 					'Calling `resolve(event)` continues into the next middleware in the chain, or into the matched route/module-level handler once no more middleware remains. That makes the order of the chain explicit instead of hidden inside nested helper calls.',
-					'`resolve(event)` may also receive a replacement `FetchEvent`. That is the supported way for middleware to forward a modified request, preserved params, or updated locals into the next stage deliberately.',
-					'If you need to keep compatibility with older Devflare code, `sequence(...)` still supports the legacy handler-composition form, but the `(event, resolve)` shape is the modern one to prefer for worker HTTP flows.'
+					'`resolve(event)` may also receive a replacement `FetchEvent`. That is the supported way for middleware to forward a modified request, preserved params, or updated locals into the next stage deliberately.'
 				],
 				bullets: [
 					'`fetch` and `handle` are aliases for the primary fetch entry, so export one or the other, not both.',

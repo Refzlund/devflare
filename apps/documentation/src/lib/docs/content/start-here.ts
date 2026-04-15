@@ -1315,7 +1315,7 @@ bunx --bun devflare dev`
 		facts: [
 			{ label: 'Best for', value: 'The first named preview deploy and cleanup loop' },
 			{ label: 'Preview command', value: '`bunx --bun devflare deploy --preview <name>`' },
-			{ label: 'Cleanup command', value: '`bunx --bun devflare previews cleanup-resources --scope <name> --apply`' }
+			{ label: 'Cleanup command', value: '`bunx --bun devflare previews cleanup --scope <name> --apply`' }
 		],
 		sourcePages: ['deploy-preview-cli.md', 'README.md'],
 		sections: [
@@ -1370,8 +1370,8 @@ bunx --bun devflare deploy --preview next`
 				description:
 					'Preview cleanup should use the same scope name you deployed with. That keeps teardown reviewable and stops preview-only resources from lingering just because nobody remembers the exact branch name later.',
 				paragraphs: [
-					'If the preview owns preview-only resources, `cleanup-resources` is the quickest way to remove them. Use the exact same scope string you deployed with so the target stays unmistakable.',
-					'If you later need richer lifecycle management, the dedicated preview operations docs cover retire, reconcile, and broader cleanup. For the first loop, resource cleanup is enough to understand the shape.'
+					'If the preview owns preview-only resources, `cleanup` is the quickest way to remove them. Use the exact same scope string you deployed with so the target stays unmistakable.',
+					'If you later need richer lifecycle management, the dedicated preview operations docs cover scope inspection, cleanup planning, and broader cleanup runs. For the first loop, resource cleanup is enough to understand the shape.'
 				],
 				snippets: [
 					{
@@ -1389,7 +1389,7 @@ bunx --bun devflare deploy --preview next`
 							{ path: 'env.d.ts', muted: true },
 							{ path: 'cleanup-preview.sh' }
 						],
-						code: String.raw`bunx --bun devflare previews cleanup-resources --scope next --apply`
+						code: String.raw`bunx --bun devflare previews cleanup --scope next --apply`
 					}
 				],
 				bullets: [

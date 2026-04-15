@@ -42,7 +42,6 @@ export const CORE_HELP_PAGES: HelpPage[] = [
 			entry('devflare help deploy', 'Show the detailed deploy help page')
 		],
 		notes: [
-			'`token` remains a legacy alias for `tokens`.',
 			'Commands that support `--config` and `--env` document that explicitly in their own help pages.'
 		]
 	},
@@ -138,17 +137,17 @@ export const CORE_HELP_PAGES: HelpPage[] = [
 		],
 		description: [
 			'Deploy requires an explicit target: production via `--prod` / `--production`, or preview via `--preview`.',
-			'Named preview deploys such as `--preview next` or `--preview pr-1` target `config.env.preview`, provision preview-scoped resources automatically, and deploy branch-scoped preview Workers when your config is wired for them. Bare `--preview` keeps the same-worker preview upload flow and derives any preview alias from `--branch-name`, CI metadata, or the current git branch.'
+			'Named preview deploys such as `--preview next` or `--preview pr-1` target `config.env.preview`, provision preview-scoped resources automatically, and deploy branch-scoped preview Workers when your config is wired for them. Bare `--preview` keeps the same-worker preview upload flow and can still use `--branch-name` or CI/git metadata for preview-aware naming.'
 		],
 		options: [
 			entry('--prod', 'Deploy to the production environment explicitly'),
 			entry('--production', 'Long-form alias for --prod'),
-			entry('--preview', 'Deploy a same-worker preview upload. Devflare derives any preview alias from `--branch-name`, CI metadata, or the current git branch'),
+			entry('--preview', 'Deploy a same-worker preview upload'),
 			entry('--preview <name>', 'Deploy a named preview scope such as `next` or `pr-1`'),
 			entry('--config <path>', 'Use a specific devflare config file'),
 			entry('--env <name>', 'Usually unnecessary because the explicit target already pins production vs preview. If you pass it, it must match that target'),
 			entry('--dry-run', 'Print the synthesized Wrangler config and skip the actual deployment'),
-			entry('--branch-name <branch>', 'Derive preview alias metadata for bare same-worker preview uploads. Named preview deploys should pass the scope directly as `--preview <name>`'),
+			entry('--branch-name <branch>', 'Provide explicit branch metadata for preview-aware naming when your workflow needs it'),
 			entry('--message <text>', 'Attach an explicit Wrangler deployment/version message'),
 			entry('--tag <text>', 'Attach an explicit Wrangler version tag'),
 			entry('--debug', 'Print stack traces when deployment orchestration fails')
@@ -158,7 +157,7 @@ export const CORE_HELP_PAGES: HelpPage[] = [
 			entry('devflare deploy --production --message "Release"', 'Deploy to production with an explicit deployment message'),
 			entry('devflare deploy --preview next', 'Deploy the named `next` preview scope and provision preview-scoped resources automatically'),
 			entry('devflare deploy --preview pr-1', 'Deploy the named `pr-1` preview scope directly'),
-			entry('devflare deploy --preview --branch-name feature-branch', 'Upload a same-worker preview version and derive its alias from the provided branch name'),
+			entry('devflare deploy --preview --branch-name feature-branch', 'Upload a same-worker preview version with explicit branch metadata'),
 			entry('devflare deploy --preview next --dry-run', 'Inspect the generated named-preview Wrangler config without deploying')
 		],
 		notes: [

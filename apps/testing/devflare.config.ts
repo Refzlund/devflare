@@ -35,7 +35,7 @@ export default defineConfig({
 		d1: {
 			PRIMARY_DB: pv('devflare-testing-primary-db'),
 			AUDIT_DB: pv('devflare-testing-audit-db'),
-			LEGACY_DB: pv('devflare-testing-legacy-db')
+			REPORTING_DB: pv('devflare-testing-reporting-db')
 		},
 
 		r2: {

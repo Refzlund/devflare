@@ -123,7 +123,7 @@ interface TestingEnv {
 	SESSIONS: KVNamespace
 	PRIMARY_DB: D1Database
 	AUDIT_DB: D1Database
-	LEGACY_DB: D1Database
+	REPORTING_DB: D1Database
 	ASSETS: R2Bucket
 	ARCHIVE: R2Bucket
 	SESSION_ROOM: DurableObjectNamespaceLike<SessionRoomStub>
@@ -171,7 +171,7 @@ function createBindingsSummary(env: TestingEnv): Record<string, unknown> {
 		d1: {
 			PRIMARY_DB: Boolean(env.PRIMARY_DB),
 			AUDIT_DB: Boolean(env.AUDIT_DB),
-			LEGACY_DB: Boolean(env.LEGACY_DB)
+			REPORTING_DB: Boolean(env.REPORTING_DB)
 		},
 		r2: {
 			ASSETS: Boolean(env.ASSETS),
@@ -311,7 +311,7 @@ async function smokeD1(env: TestingEnv): Promise<Record<string, unknown>> {
 	return {
 		primary: await runD1HealthCheck(env.PRIMARY_DB),
 		audit: await runD1HealthCheck(env.AUDIT_DB),
-		legacy: await runD1HealthCheck(env.LEGACY_DB)
+		reporting: await runD1HealthCheck(env.REPORTING_DB)
 	}
 }
 
@@ -449,7 +449,7 @@ async function smokeHyperdrive(env: TestingEnv): Promise<Record<string, unknown>
 
 		try {
 			const opened = await socket.opened
-		return {
+			return {
 				mode: 'socket',
 				hasConnectionString: Boolean(env.POSTGRES.connectionString),
 				remoteAddress: opened.remoteAddress ?? null,

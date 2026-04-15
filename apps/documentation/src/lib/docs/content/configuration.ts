@@ -275,7 +275,7 @@ export default defineConfig({
 
 const previewBindingsLifecycleCode = String.raw`bunx --bun devflare deploy --preview next
 bunx --bun devflare previews bindings --scope next
-bunx --bun devflare previews cleanup-resources --scope next --apply`
+bunx --bun devflare previews cleanup --scope next --apply`
 
 const workerSurfacesConfigCode = String.raw`import { defineConfig } from 'devflare/config'
 
@@ -705,14 +705,14 @@ export const configurationDocs: DocPage[] = [
 		highlights: [
 			'`preview.scope()` marks authored names once; non-preview work resolves back to the base name, while preview deploys materialize a scope such as `preview` or `next` into the binding target.',
 			'Plain `--preview` uses the synthetic `preview` identifier, while named `--preview next` or `--scope next` resolves the same config to `*-next` resources.',
-			'Preview-scoped resources stay associated with one preview deployment, so the same scope can be inspected and later deleted with `devflare previews cleanup-resources --scope <name> --apply`.',
+			'Preview-scoped resources stay associated with one preview deployment, so the same scope can be inspected and later deleted with `devflare previews cleanup --scope <name> --apply`.',
 			'KV, D1, R2, queues, and Vectorize are the main lifecycle-managed preview resource families; other bindings have more specific caveats.',
 			'Production databases, buckets, and queues stay out of the blast radius because preview deploys resolve different resource names instead of reusing production names by accident.'
 		],
 		facts: [
 			{ label: 'Authoring primitive', value: '`preview.scope()` from `devflare/config`' },
 			{ label: 'Typical result', value: '`notes-cache-kv` → `notes-cache-kv-next` for a `next` preview scope' },
-			{ label: 'Main lifecycle command', value: '`bunx --bun devflare previews cleanup-resources --scope <name> --apply`' },
+			{ label: 'Main lifecycle command', value: '`bunx --bun devflare previews cleanup --scope <name> --apply`' },
 			{ label: 'Best for', value: 'Previews that need their own disposable state instead of borrowing production infrastructure' }
 		],
 		sourcePages: [
@@ -807,7 +807,7 @@ export const configurationDocs: DocPage[] = [
 					'Author preview-owned bindings with `preview.scope()` in the main config.',
 					'Deploy the preview with an explicit scope such as `--preview next` when the resource names should map to one known preview deployment.',
 					'Inspect that scope with `devflare previews bindings --scope next` when you want the resolved targets and worker associations spelled out clearly.',
-					'Clean up the same preview later with `devflare previews cleanup-resources --scope next --apply`.'
+					'Clean up the same preview later with `devflare previews cleanup --scope next --apply`.'
 				],
 				snippets: [
 					{
@@ -832,7 +832,7 @@ export const configurationDocs: DocPage[] = [
 					{
 						label: 'Ship & operate',
 						title: 'Need lifecycle and cleanup commands?',
-						body: 'Open preview operations when the question moves from authoring config to registry inspection, retirement, reconciliation, or cleanup policy.',
+						body: 'Open preview operations when the question moves from authoring config to registry inspection or cleanup policy.',
 						href: docsLink('preview-operations')
 					}
 				]

@@ -1957,7 +1957,7 @@ const definitions: IntellisenseDefinition[] = [
 		codeIncludes: ['devflare previews'],
 		summary: 'Inspect preview scopes, preview resources, and current preview registry state.',
 		detail:
-			'Use this when preview infrastructure already exists and you need to reconcile, inspect, or clean it up instead of only deploying a new preview.',
+			'Use this when preview infrastructure already exists and you need to inspect or clean it up instead of only deploying a new preview.',
 		requirement: 'contextual',
 		availableIn: 'Terminal commands and automation scripts',
 		references: [

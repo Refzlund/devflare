@@ -8,7 +8,7 @@
 
 // Safe config utilities
 export { defineConfig } from './config/define'
-export { ref, resolveRef, serviceBinding } from './config/ref'
+export { ref } from './config/ref'
 
 // Safe runtime-facing exports
 export { workerName } from './workerName'

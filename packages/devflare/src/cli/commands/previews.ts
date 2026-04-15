@@ -50,16 +50,6 @@ import {
 	type WorkerNameSource
 } from './previews-support/types'
 
-const LEGACY_PREVIEW_SUBCOMMAND_ALIASES = {
-	'cleanup-resources': 'cleanup'
-} as const
-
-const REMOVED_PREVIEW_SUBCOMMANDS = new Set([
-	'provision',
-	'reconcile',
-	'retire'
-])
-
 const CLI_API_OPTIONS: APIClientOptions = {
 	timeout: 10000
 }
@@ -616,13 +606,9 @@ async function runListSubcommand(
 	return { exitCode: 0 }
 }
 
-function resolveLegacyPreviewSubcommand(rawSubcommand: string | undefined): PreviewSubcommand | undefined {
+function resolvePreviewSubcommand(rawSubcommand: string | undefined): PreviewSubcommand | undefined {
 	if (!rawSubcommand) {
 		return undefined
-	}
-
-	if (rawSubcommand in LEGACY_PREVIEW_SUBCOMMAND_ALIASES) {
-		return LEGACY_PREVIEW_SUBCOMMAND_ALIASES[rawSubcommand as keyof typeof LEGACY_PREVIEW_SUBCOMMAND_ALIASES]
 	}
 
 	if (isPreviewSubcommand(rawSubcommand)) {
@@ -630,12 +616,6 @@ function resolveLegacyPreviewSubcommand(rawSubcommand: string | undefined): Prev
 	}
 
 	return undefined
-}
-
-function showRemovedPreviewSubcommandError(logger: ConsolaInstance, subcommand: string): CliResult {
-	logger.error(`The \`devflare previews ${subcommand}\` subcommand was removed during the dedicated-preview-worker cleanup.`)
-	logger.info('Use `devflare previews` to inspect live preview scopes, `devflare previews bindings` to inspect preview bindings, or `devflare previews cleanup --scope <name> --apply` to remove a preview scope.')
-	return { exitCode: 1 }
 }
 
 export async function runPreviewsCommand(
@@ -651,24 +631,16 @@ export async function runPreviewsCommand(
 	}
 
 	const rawSubcommand = parsed.args[0]
-	if (rawSubcommand && REMOVED_PREVIEW_SUBCOMMANDS.has(rawSubcommand)) {
-		return showRemovedPreviewSubcommandError(logger, rawSubcommand)
-	}
-
-	const subcommand = resolveLegacyPreviewSubcommand(rawSubcommand) ?? 'list'
+	const subcommand = resolvePreviewSubcommand(rawSubcommand) ?? 'list'
 	const includeAll = parsed.options.all === true
 	const theme: PreviewOutputTheme = {
 		useColor: shouldUseColor(parsed.options as Record<string, string | boolean>)
 	}
 
-	if (rawSubcommand && !resolveLegacyPreviewSubcommand(rawSubcommand)) {
+	if (rawSubcommand && !resolvePreviewSubcommand(rawSubcommand)) {
 		logger.error(`Unknown previews subcommand: ${rawSubcommand}`)
 		logger.info(`Available previews subcommands: ${PREVIEW_SUBCOMMANDS.join(', ')}`)
 		return { exitCode: 1 }
-	}
-
-	if (rawSubcommand === 'cleanup-resources') {
-		logger.warn('`devflare previews cleanup-resources` is deprecated; use `devflare previews cleanup` instead.')
 	}
 
 	try {

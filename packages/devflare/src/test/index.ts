@@ -37,20 +37,8 @@ export {
 	type DOBindingResolution
 } from './resolve-service-bindings'
 
-// Multi-worker test context (deprecated - use createTestContext instead)
-// These exports are kept for backwards compatibility
-export {
-	/** @deprecated Use createTestContext() instead */
-	createMultiWorkerContext,
-	/** @deprecated Use worker.ts pattern instead */
-	createEntrypointScript,
-	type WorkerConfig,
-	type MultiWorkerContextOptions,
-	type MultiWorkerContext
-} from './multi-worker-context'
-
 // Skip helper for conditional test execution
-export { shouldSkip, isRemoteModeEnabled } from './should-skip'
+export { shouldSkip } from './should-skip'
 
 // Mock utilities (for unit testing without Miniflare)
 export {

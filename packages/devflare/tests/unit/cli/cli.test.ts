@@ -121,12 +121,6 @@ describe('parseArgs', () => {
 		expect(result.options.roll).toBe('preview')
 	})
 
-	test('keeps the legacy token alias working', () => {
-		const result = parseArgs(['token', 'bootstrap-token'])
-		expect(result.command).toBe('token')
-		expect(result.args).toEqual(['bootstrap-token'])
-	})
-
 	test('parses login command', () => {
 		const result = parseArgs(['login', '--force'])
 		expect(result.command).toBe('login')
@@ -193,14 +187,13 @@ describe('runCli', () => {
 		expect(result.exitCode).toBe(1)
 	})
 
-	test('shows deploy help with named preview syntax and no preview-alias option', async () => {
+	test('shows deploy help with explicit preview targeting syntax', async () => {
 		const result = await runCli(['deploy', '--help'], { silent: true })
 
 		expect(result.exitCode).toBe(0)
 		expect(result.output).toContain('devflare deploy --preview <name> [--config <path>] [--message <text>] [--tag <text>]')
 		expect(result.output).toContain('devflare deploy --preview [--config <path>] [--branch-name <branch>] [--message <text>] [--tag <text>]')
 		expect(result.output).toContain('--preview <name> — Deploy a named preview scope such as `next` or `pr-1`')
-		expect(result.output).not.toContain('--preview-alias')
 	})
 
 	test('shows preview cleanup help', async () => {
@@ -286,7 +279,6 @@ describe('runCli', () => {
 			{ argv: ['productions', '--help'], snippet: 'devflare productions Inspect and manage live production Workers and deployments' },
 			{ argv: ['worker', '--help'], snippet: 'devflare worker Rename and manage Worker control-plane operations' },
 			{ argv: ['tokens', '--help'], snippet: 'devflare tokens Manage Devflare-managed Cloudflare API tokens' },
-			{ argv: ['token', '--help'], snippet: 'devflare tokens Manage Devflare-managed Cloudflare API tokens' },
 			{ argv: ['ai', '--help'], snippet: 'devflare ai Show Workers AI pricing information' },
 			{ argv: ['remote', '--help'], snippet: 'devflare remote Manage remote test mode for paid Cloudflare features' },
 			{ argv: ['help', 'help'], snippet: 'devflare help Show command overview or command-specific help' },

@@ -634,7 +634,7 @@ export async function runWorkerCommand(
 		}
 
 		logLine(logger)
-		logLine(logger, `${yellow('preview urls', theme)} ${dim('Existing preview aliases and URLs may continue using the old Worker name until you upload fresh previews for the renamed Worker.', theme)}`)
+		logLine(logger, `${yellow('preview urls', theme)} ${dim('Existing preview URLs and registry entries may continue using the old Worker name until you upload fresh previews for the renamed Worker.', theme)}`)
 		logLine(logger, dim('Future deploys and preview uploads from this config will target the new Worker name.', theme))
 
 		return { exitCode: 0 }

@@ -209,7 +209,7 @@ bunx --bun devflare remote disable`
 					{
 						label: 'Ship & operate',
 						title: 'Preview operations',
-						body: 'Open the preview lifecycle page when the job is inspection, reconciliation, retirement, or resource cleanup for preview scopes.',
+						body: 'Open the preview lifecycle page when the job is inspection or resource cleanup for preview scopes.',
 						href: docsLink('preview-operations')
 					},
 					{
@@ -332,7 +332,7 @@ for (const worker of workers) {
 				title: 'Preview registry helpers and schemas are public on purpose',
 				paragraphs: [
 					'Devflare exports preview-registry helpers plus the shared registry schemas and errors so custom tooling can inspect or update preview metadata without guessing the record shape.',
-					'That is especially useful for automation that wants to reconcile preview URLs, aliases, or cleanup state while staying aligned with the same contract the CLI and GitHub actions use.'
+					'That is especially useful for automation that wants to inspect preview URLs, scope metadata, or cleanup state while staying aligned with the same contract the CLI and GitHub actions use.'
 				],
 				bullets: [
 					'Use schema exports such as `devflarePreviewRecordSchema` when you need to validate preview-registry data in your own tooling.',
@@ -353,7 +353,7 @@ for (const worker of workers) {
 					{
 						label: 'Ship & operate',
 						title: 'Preview operations',
-						body: 'Open the preview lifecycle page when your tool needs the broader policy around reconcile, retire, and cleanup flows.',
+						body: 'Open the preview lifecycle page when your tool needs the broader policy around preview inspection and cleanup flows.',
 						href: docsLink('preview-operations')
 					},
 					{

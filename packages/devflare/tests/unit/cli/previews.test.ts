@@ -40,30 +40,7 @@ afterEach(() => {
 })
 
 describe('previews command', () => {
-	test('rejects removed registry maintenance subcommands with migration guidance', async () => {
-		process.env.CLOUDFLARE_API_TOKEN = 'cf_test_token'
-		const removedSubcommands = ['provision', 'reconcile', 'retire'] as const
-
-		for (const subcommand of removedSubcommands) {
-			const logger = createLogger()
-			const result = await runPreviewsCommand(
-				{
-					command: 'previews',
-					args: [subcommand],
-					options: {}
-				},
-				logger as any,
-				{}
-			)
-
-			expect(result.exitCode).toBe(1)
-			expect(logger.messages.some((message) => message.args.join(' ').includes(`devflare previews ${subcommand}`))).toBe(true)
-			expect(logger.messages.some((message) => message.args.join(' ').includes('dedicated-preview-worker cleanup'))).toBe(true)
-			expect(logger.messages.some((message) => message.args.join(' ').includes('devflare previews cleanup --scope <name> --apply'))).toBe(true)
-		}
-	})
-
-	test('no longer treats a positional worker name as a raw registry shorthand', async () => {
+	test('rejects unknown subcommands', async () => {
 		process.env.CLOUDFLARE_API_TOKEN = 'cf_test_token'
 		const logger = createLogger()
 		const result = await runPreviewsCommand(
@@ -83,10 +60,10 @@ describe('previews command', () => {
 		expect(logger.messages.some((message) => message.args.join(' ').includes('Available previews subcommands: list, bindings, cleanup'))).toBe(true)
 	})
 
-	test('cleanup-resources remains as a compatibility alias for cleanup', async () => {
+	test('cleanup performs a dry run by default', async () => {
 		process.env.CLOUDFLARE_API_TOKEN = 'cf_test_token'
-		const projectDir = temporaryCacheDirectories.create('devflare-previews-cleanup-alias-')
-		writePreviewProject(projectDir, 'demo-preview-cleanup-alias')
+		const projectDir = temporaryCacheDirectories.create('devflare-previews-cleanup-')
+		writePreviewProject(projectDir, 'demo-preview-cleanup')
 
 		globalThis.fetch = mock(async (input: RequestInfo | URL) => {
 			const url = String(input)
@@ -128,7 +105,7 @@ describe('previews command', () => {
 		const result = await runPreviewsCommand(
 			{
 				command: 'previews',
-				args: ['cleanup-resources'],
+				args: ['cleanup'],
 				options: {
 					account: 'acc_123'
 				}
@@ -139,7 +116,6 @@ describe('previews command', () => {
 		const renderedMessages = renderMessages(logger)
 
 		expect(result.exitCode).toBe(0)
-		expect(renderedMessages.some((message) => message.includes('cleanup-resources') && message.includes('deprecated'))).toBe(true)
 		expect(renderedMessages.some((message) => message.includes('Preview cleanup dry run complete'))).toBe(true)
 	})
 

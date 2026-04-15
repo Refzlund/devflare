@@ -1,10 +1,6 @@
 // =============================================================================
 // Middleware System — Composable request handling
 // =============================================================================
-// Supports both:
-// - legacy zero-arg handler composition via handle()/sequence()(handler)
-// - SvelteKit-style fetch middleware via sequence(m1, m2) and resolve(event)
-// =============================================================================
 
 import { runWithEventContext, type FetchEvent } from './context'
 
@@ -12,27 +8,12 @@ type AnyFunction = (...args: any[]) => any
 type FetchModule = Record<string, unknown>
 
 const FETCH_SEQUENCE_SYMBOL = Symbol.for('devflare.fetch-sequence')
-const FETCH_INVOCATION_MODE_SYMBOL = Symbol.for('devflare.fetch-invocation-mode')
-
-type FetchInvocationMode = 'legacy' | 'resolve'
+const FETCH_RESOLVE_STYLE_SYMBOL = Symbol.for('devflare.fetch-resolve-style')
 
 /**
  * Promise-or-value helper used by worker-safe runtime APIs.
  */
 export type Awaitable<T> = T | Promise<T>
-
-/**
- * A legacy zero-arg handler that returns a Response.
- * Can return null to indicate "pass through" to the next handler.
- */
-export type Handler = () => Awaitable<Response | null>
-
-/**
- * Legacy middleware function that wraps a zero-arg handler.
- *
- * This remains supported for backwards compatibility.
- */
-export type Middleware = (next: () => Promise<Response>) => Awaitable<Response>
 
 /**
  * Resolve the next request-wide middleware or module-local leaf handler.
@@ -43,7 +24,7 @@ export type Middleware = (next: () => Promise<Response>) => Awaitable<Response>
 export type ResolveFetch<TEvent extends FetchEvent = FetchEvent> = (event?: TEvent) => Promise<Response>
 
 /**
- * SvelteKit-style fetch middleware.
+ * Request-wide fetch middleware.
  *
  * These are intended for the single module-level fetch entry export such as:
  * - `export const fetch = sequence(corsHandle, appFetch)`
@@ -69,22 +50,15 @@ function isFunction(value: unknown): value is AnyFunction {
 	return typeof value === 'function'
 }
 
-function markFetchInvocationMode<T extends AnyFunction>(
-	handler: T,
-	mode: FetchInvocationMode
-): T {
-	Object.defineProperty(handler, FETCH_INVOCATION_MODE_SYMBOL, {
-		value: mode,
+function markResolveStyle<T extends AnyFunction>(handler: T): T {
+	Object.defineProperty(handler, FETCH_RESOLVE_STYLE_SYMBOL, {
+		value: true,
 		enumerable: false,
 		configurable: true,
 		writable: false
 	})
 
 	return handler
-}
-
-function getFetchInvocationMode(handler: AnyFunction): FetchInvocationMode | null {
-	return ((handler as unknown as Record<PropertyKey, unknown>)[FETCH_INVOCATION_MODE_SYMBOL] as FetchInvocationMode | undefined) ?? null
 }
 
 function splitParameterList(source: string): string[] {
@@ -133,9 +107,8 @@ function getFunctionParameterNames(handler: AnyFunction): string[] {
 }
 
 function isResolveStyleFunction(handler: AnyFunction): boolean {
-	const mode = getFetchInvocationMode(handler)
-	if (mode) {
-		return mode === 'resolve'
+	if ((handler as unknown as Record<PropertyKey, unknown>)[FETCH_RESOLVE_STYLE_SYMBOL]) {
+		return true
 	}
 
 	if ((handler as unknown as Record<PropertyKey, unknown>)[FETCH_SEQUENCE_SYMBOL]) {
@@ -162,38 +135,9 @@ function bindMethod(target: unknown, key: string): AnyFunction | null {
 	}
 
 	const boundHandler = value.bind(target)
-	if (isResolveStyleFunction(value)) {
-		return markFetchInvocationMode(boundHandler, 'resolve')
-	}
-
-	return boundHandler
-}
-
-function createLegacySequence(middlewares: Middleware[]): (handler: Handler) => Handler {
-	return (handler: Handler): Handler => {
-		if (middlewares.length === 0) {
-			return async () => {
-				const response = await handler()
-				return response ?? createNotFoundResponse()
-			}
-		}
-
-		return async (): Promise<Response> => {
-			let index = 0
-
-			const executeMiddleware = async (): Promise<Response> => {
-				if (index < middlewares.length) {
-					const middleware = middlewares[index++]
-					return middleware(executeMiddleware)
-				}
-
-				const response = await handler()
-				return response ?? createNotFoundResponse()
-			}
-
-			return executeMiddleware()
-		}
-	}
+	return isResolveStyleFunction(value)
+		? markResolveStyle(boundHandler)
+		: boundHandler
 }
 
 function createFetchSequence<TEvent extends FetchEvent>(
@@ -219,33 +163,12 @@ function createFetchSequence<TEvent extends FetchEvent>(
 }
 
 /**
- * Composes multiple middlewares.
- *
- * Supported forms:
- * - Legacy: `sequence(m1, m2)(handle(h1, h2))`
- * - Primary fetch entry: `export const fetch = sequence(m1, m2, appFetch)`
- * - SvelteKit-flavoured alias: `export const handle = sequence(m1, m2, appFetch)`
+ * Compose request-wide middleware into a single fetch surface.
  */
-export function sequence(...middlewares: Middleware[]): (handler: Handler) => Handler
 export function sequence<TEvent extends FetchEvent = FetchEvent>(
 	...middlewares: FetchMiddleware<TEvent>[]
-): FetchMiddleware<TEvent>
-export function sequence<TEvent extends FetchEvent = FetchEvent>(
-	...middlewares: Array<Middleware | FetchMiddleware<TEvent>>
-): ((handler: Handler) => Handler) & FetchMiddleware<TEvent> {
-	const legacySequence = createLegacySequence(middlewares as Middleware[])
-	const fetchSequence = createFetchSequence(middlewares as FetchMiddleware<TEvent>[])
-
-	const composed = (...args: unknown[]) => {
-		if (args.length === 1 && isFunction(args[0])) {
-			return legacySequence(args[0] as Handler)
-		}
-
-		return fetchSequence(
-			args[0] as TEvent,
-			(args[1] as ResolveFetch<TEvent> | undefined) ?? (async () => createNotFoundResponse())
-		)
-	}
+): FetchMiddleware<TEvent> {
+	const composed = createFetchSequence(middlewares)
 
 	Object.defineProperty(composed, FETCH_SEQUENCE_SYMBOL, {
 		value: true,
@@ -254,42 +177,7 @@ export function sequence<TEvent extends FetchEvent = FetchEvent>(
 		writable: false
 	})
 
-	return composed as ((handler: Handler) => Handler) & FetchMiddleware<TEvent>
-}
-
-/**
- * Chains multiple handlers, trying each until one returns a Response.
- */
-export function handle(...handlers: Handler[]): Handler {
-	return async (): Promise<Response | null> => {
-		for (const handler of handlers) {
-			const response = await handler()
-			if (response !== null) {
-				return response
-			}
-		}
-
-		return null
-	}
-}
-
-/**
- * Backwards-compatible alias for handle().
- *
- * @deprecated Use handle() instead.
- */
-export function resolve(...handlers: Handler[]): Handler {
-	return handle(...handlers)
-}
-
-/**
- * Creates a handler that applies legacy middleware before running handle().
- */
-export function pipe(
-	middlewares: Middleware[],
-	handlers: Handler[]
-): Handler {
-	return createLegacySequence(middlewares)(handle(...handlers))
+	return markResolveStyle(composed)
 }
 
 function getDefaultHandleHandler(module: FetchModule): AnyFunction | null {
@@ -356,9 +244,9 @@ function assertSinglePrimaryFetchEntry(candidates: PrimaryFetchEntryCandidate[])
 
 	const foundEntries = candidates.map(({ name }) => `"${name}"`).join(', ')
 	throw new Error(
-		`Ambiguous fetch entry module. Export exactly one primary fetch entry per module. ` +
-		`Use either "fetch" or "handle" (or one default equivalent), not both. ` +
-		`Found: ${foundEntries}`
+		`Ambiguous fetch entry module. Export exactly one primary fetch entry per module. `
+		+ `Use either "fetch" or "handle" (or one default equivalent), not both. `
+		+ `Found: ${foundEntries}`
 	)
 }
 
@@ -415,20 +303,8 @@ async function invokeResolvedFetchHandler<TEvent extends FetchEvent>(
 		return handler(event, async () => createNotFoundResponse())
 	}
 
-	if (handler.length >= 4) {
-		return handler(event, event.env, event.ctx, event.params)
-	}
-
-	if (handler.length === 3) {
-		return handler(event, event.env, event.ctx)
-	}
-
 	if (handler.length === 2) {
 		return handler(event, event.params)
-	}
-
-	if (handler.length === 0) {
-		return handler()
 	}
 
 	return handler(event)
@@ -448,13 +324,11 @@ export function resolveFetchHandler(module: FetchModule): AnyFunction | null {
 }
 
 /**
- * Invoke a fetch entry handler with the correct calling convention.
+ * Invoke a fetch entry handler with the supported calling conventions.
  *
  * This supports:
  * - `fetch(event)`
  * - `fetch(event, resolve)` / `handle(event, resolve)`
- * - legacy `fetch(request, env, ctx)`
- * - legacy zero-arg handlers that rely on AsyncLocalStorage
  */
 export async function invokeFetchHandler<TEvent extends FetchEvent>(
 	handler: unknown,
@@ -467,26 +341,6 @@ export async function invokeFetchHandler<TEvent extends FetchEvent>(
 
 	if (isResolveStyleFunction(handler)) {
 		const response = await handler(event, resolve)
-		return response ?? createNotFoundResponse()
-	}
-
-	if (handler.length >= 4) {
-		const response = await handler(event, event.env, event.ctx, event.params)
-		return response ?? createNotFoundResponse()
-	}
-
-	if (handler.length === 3) {
-		const response = await handler(event, event.env, event.ctx)
-		return response ?? createNotFoundResponse()
-	}
-
-	if (handler.length === 2) {
-		const response = await handler(event, event.env)
-		return response ?? createNotFoundResponse()
-	}
-
-	if (handler.length === 0) {
-		const response = await handler()
 		return response ?? createNotFoundResponse()
 	}
 
@@ -534,8 +388,8 @@ export function createResolveFetch<TEvent extends FetchEvent>(
  * Invoke the resolved fetch surface for a module.
  *
  * This lets runtime wrappers support a single request-wide `handle` or
- * `fetch` export, legacy default exports, and compatibility fallbacks like
- * method exports such as `GET()`.
+ * `fetch` export, default exports, and same-module method handlers such as
+ * `GET()`.
  */
 export async function invokeFetchModule<TEvent extends FetchEvent>(
 	module: FetchModule,

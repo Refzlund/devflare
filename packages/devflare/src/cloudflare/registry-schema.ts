@@ -19,7 +19,7 @@ const commitShaSchema = z.string().regex(/^[a-f0-9]{7,40}$/i, {
 	message: 'Commit SHA must be 7 to 40 hexadecimal characters'
 })
 const previewAliasSchema = z.string().regex(/^[a-z][a-z0-9-]*$/, {
-	message: 'Preview aliases must start with a lowercase letter and contain only lowercase letters, numbers, and dashes'
+	message: 'Preview names must start with a lowercase letter and contain only lowercase letters, numbers, and dashes'
 })
 
 // Cloudflare's API surfaces author/user identifiers as strings, but accepting a

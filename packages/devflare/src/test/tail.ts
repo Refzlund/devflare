@@ -182,8 +182,7 @@ async function trigger(
 	if (typeof tailHandler !== 'function') {
 		throw new Error(
 			`Tail handler at "${tailHandlerPath}" must export a default function or named "tail" export.\n` +
-			`Expected: export async function tail(event) { ... }\n` +
-			`Legacy compatibility is still supported for tail(events, env, ctx).`
+			+ `Expected: export async function tail(event) { ... }`
 		)
 	}
 
@@ -205,7 +204,7 @@ async function trigger(
 		// Call the handler
 		await runWithEventContext(
 			tailEvent,
-			() => tailHandler(tailEvent, env, ctx)
+			() => tailHandler(tailEvent)
 		)
 
 		// Wait for all waitUntil promises

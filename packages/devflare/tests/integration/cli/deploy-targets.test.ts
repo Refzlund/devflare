@@ -87,7 +87,7 @@ describe('deploy target integration', () => {
 		expect(process.env.DEVFLARE_PREVIEW_BRANCH).toBe('next')
 	})
 
-	test('deploy rejects --preview-alias and points callers to supported preview naming', async () => {
+	test('deploy requires named preview scope and branch metadata to agree', async () => {
 		const logger = createLogger()
 
 		const result = await runDeployCommand(
@@ -95,8 +95,8 @@ describe('deploy target integration', () => {
 				command: 'deploy',
 				args: [],
 				options: {
-					preview: true,
-					'preview-alias': 'feature-branch'
+					preview: 'next',
+					'branch-name': 'feature-branch'
 				}
 			},
 			logger as any,
@@ -105,8 +105,7 @@ describe('deploy target integration', () => {
 		const renderedMessages = renderMessages(logger)
 
 		expect(result.exitCode).toBe(1)
-		expect(renderedMessages.some((message) => message.includes('no longer accepts --preview-alias'))).toBe(true)
-		expect(renderedMessages.some((message) => message.includes('--preview <name>'))).toBe(true)
+		expect(renderedMessages.some((message) => message.includes('Named preview deploys use the --preview value as the preview scope'))).toBe(true)
 	})
 
 	test('deploy --preview <name> deploys a named preview scope with branch-scoped worker naming', async () => {

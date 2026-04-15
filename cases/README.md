@@ -588,7 +588,7 @@ export const transport = {
 ---
 
 ### Case 17: Plugin Namespace Example
-**Description**: Legacy case name aside, this example currently demonstrates custom plugin-shaped metadata and virtual-module patterns around the `vite` namespace; it is **not** an end-to-end proof that the main worker pipeline accepts arbitrary Rolldown plugins.  
+**Description**: The case folder name is historical; this example currently demonstrates custom plugin-shaped metadata and virtual-module patterns around the `vite` namespace, but it is **not** an end-to-end proof that the main worker pipeline accepts arbitrary Rolldown plugins.  
 **Local Dev**: ✅ Full local simulation  
 **Status**: ✅ Complete
 

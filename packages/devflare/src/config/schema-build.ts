@@ -54,52 +54,5 @@ export const viteConfigSchema = z.object({
 	plugins: z.array(z.unknown()).optional()
 }).catchall(z.unknown()).optional()
 
-/**
- * Legacy build alias for backward compatibility.
- * Prefer top-level `rolldown` in new configs.
- */
-export const buildConfigSchema = z.object({
-	/**
-	 * Legacy alias for `rolldown.target`.
-	 * @example 'es2022'
-	 */
-	target: z.string().optional(),
-	/** Legacy alias for `rolldown.minify`. */
-	minify: z.boolean().optional(),
-	/** Legacy alias for `rolldown.sourcemap`. */
-	sourcemap: z.boolean().optional(),
-	/** Legacy alias for `rolldown.options`. */
-	rolldownOptions: rolldownOptionsSchema.optional()
-}).optional()
-
-export type LegacyBuildConfig = z.infer<typeof buildConfigSchema>
-
-export function normalizeViteConfig(
-	vite: z.infer<typeof viteConfigSchema>,
-	plugins: unknown[] | undefined
-): z.infer<typeof viteConfigSchema> {
-	const normalizedVite = {
-		...(plugins !== undefined ? { plugins } : {}),
-		...(vite ?? {})
-	}
-
-	return Object.keys(normalizedVite).length > 0 ? normalizedVite : undefined
-}
-
-export function normalizeRolldownConfig(
-	rolldown: z.infer<typeof rolldownConfigSchema>,
-	build: LegacyBuildConfig | undefined
-): z.infer<typeof rolldownConfigSchema> {
-	const normalizedRolldown = {
-		...(build?.target !== undefined ? { target: build.target } : {}),
-		...(build?.minify !== undefined ? { minify: build.minify } : {}),
-		...(build?.sourcemap !== undefined ? { sourcemap: build.sourcemap } : {}),
-		...(build?.rolldownOptions !== undefined ? { options: build.rolldownOptions } : {}),
-		...(rolldown ?? {})
-	}
-
-	return Object.keys(normalizedRolldown).length > 0 ? normalizedRolldown : undefined
-}
-
 export type RolldownConfig = z.output<typeof rolldownConfigSchema>
 export type ViteConfig = z.output<typeof viteConfigSchema>

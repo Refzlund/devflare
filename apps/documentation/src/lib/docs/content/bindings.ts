@@ -624,7 +624,7 @@ export default defineConfig({
 		kv: {
 			CACHE: 'cache-kv',
 			SESSIONS: { name: 'sessions-kv' },
-			LEGACY_CACHE: { id: 'kv-namespace-id' }
+				REPORTING_CACHE: { id: 'kv-namespace-id' }
 		}
 	}
 })`
@@ -842,7 +842,7 @@ export default defineConfig({
 		d1: {
 			DB: 'app-db',
 			AUDIT: { name: 'audit-db' },
-			LEGACY: { id: 'd1-database-id' }
+				REPORTING: { id: 'd1-database-id' }
 		}
 	}
 })`
@@ -2378,7 +2378,7 @@ export default defineConfig({
 	bindings: {
 		hyperdrive: {
 			DB: 'app-postgres',
-			LEGACY_DB: { id: 'hyperdrive-id' }
+				ANALYTICS_DB: { id: 'hyperdrive-id' }
 		}
 	}
 })`

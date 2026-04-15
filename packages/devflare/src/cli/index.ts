@@ -198,7 +198,6 @@ export async function runCli(
 			return runWorker(parsed, logger, options)
 
 		case 'tokens':
-		case 'token':
 			return runToken(parsed, logger, options)
 
 		case 'ai':

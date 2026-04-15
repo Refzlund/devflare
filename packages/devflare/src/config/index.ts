@@ -48,7 +48,6 @@ export {
 	type AssetsConfig,
 	type ViteConfig,
 	type RolldownConfig,
-	type BuildConfig,
 	type MigrationConfig
 } from './schema'
 export { compileConfig, stringifyConfig, writeWranglerConfig, type WranglerConfig } from './compiler'
@@ -74,8 +73,6 @@ export {
 // Cross-config referencing
 export {
 	ref,
-	resolveRef,
-	serviceBinding,
 	type RefResult,
 	type WorkerBinding,
 	type WorkerBindingAccessor,

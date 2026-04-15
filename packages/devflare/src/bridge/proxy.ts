@@ -649,11 +649,6 @@ export const bridgeEnv: Record<string, unknown> = new Proxy({} as Record<string,
 })
 
 /**
- * @deprecated Use `bridgeEnv` instead to avoid confusion with runtime `env`
- */
-export const env = bridgeEnv
-
-/**
  * Initialize the env proxy with specific options
  */
 export function initEnv(options: EnvProxyOptions = {}): Record<string, unknown> {

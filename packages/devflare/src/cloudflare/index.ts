@@ -316,7 +316,7 @@ export const account = {
 	/** List tracked preview, alias, and deployment records from the Devflare registry */
 	listTrackedRegistryState,
 
-	/** List tracked preview alias records from the Devflare registry */
+	/** List tracked preview-name records from the Devflare registry */
 	listTrackedPreviewAliasRecords,
 
 	/** List tracked deployment records from the Devflare registry */

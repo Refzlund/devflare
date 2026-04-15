@@ -1,20 +1,18 @@
 // =============================================================================
-// Middleware System Tests — sequence() and handle()
+// Middleware System Tests — sequence() and fetch module dispatch
 // =============================================================================
 
 import { describe, expect, test } from 'bun:test'
 import {
+	createResolveFetch,
+	invokeFetchHandler,
 	invokeFetchModule,
+	resolveFetchHandler,
 	sequence,
-	handle,
-	resolve,
-	type FetchMiddleware,
-	type Middleware,
-	type Handler
+	type FetchMiddleware
 } from '../../../src/runtime/middleware'
-import { createFetchEvent, runWithContext, runWithEventContext } from '../../../src/runtime/context'
+import { createFetchEvent, runWithEventContext } from '../../../src/runtime/context'
 
-/** Helper to create a mock ExecutionContext */
 function createMockCtx(): ExecutionContext {
 	return {
 		waitUntil: () => { },
@@ -25,291 +23,19 @@ function createMockCtx(): ExecutionContext {
 
 describe('sequence()', () => {
 	test('executes middlewares in order', async () => {
-		const order: number[] = []
-
-		const m1: Middleware = async (next) => {
-			order.push(1)
-			const response = await next()
-			order.push(4)
-			return response
-		}
-
-		const m2: Middleware = async (next) => {
-			order.push(2)
-			const response = await next()
-			order.push(3)
-			return response
-		}
-
-		const handler: Handler = async () => {
-			return new Response('OK')
-		}
-
-		const composed = sequence(m1, m2)(handler)
-
-		const mockEnv = {}
-		const mockCtx = createMockCtx()
-		const request = new Request('https://example.com')
-
-		const response = await runWithContext(mockEnv, mockCtx, request, () => composed())
-
-		expect(order).toEqual([1, 2, 3, 4])
-		expect(await response!.text()).toBe('OK')
-	})
-
-	test('works with empty middleware array', async () => {
-		const handler: Handler = async () => new Response('Direct')
-		const composed = sequence()(handler)
-
-		const mockEnv = {}
-		const mockCtx = createMockCtx()
-
-		const response = await runWithContext(mockEnv, mockCtx, null, () => composed())
-		expect(await response!.text()).toBe('Direct')
-	})
-
-	test('works with single middleware', async () => {
-		const m1: Middleware = async (next) => {
-			const response = await next()
-			return new Response(`Wrapped: ${await response.text()}`)
-		}
-
-		const handler: Handler = async () => new Response('Content')
-		const composed = sequence(m1)(handler)
-
-		const mockEnv = {}
-		const mockCtx = createMockCtx()
-
-		const response = await runWithContext(mockEnv, mockCtx, null, () => composed())
-		expect(await response!.text()).toBe('Wrapped: Content')
-	})
-
-	test('middleware can short-circuit', async () => {
-		const order: number[] = []
-
-		const authMiddleware: Middleware = async (next) => {
-			order.push(1)
-			// Simulate auth failure - short circuit
-			return new Response('Unauthorized', { status: 401 })
-		}
-
-		const m2: Middleware = async (next) => {
-			order.push(2)
-			return next()
-		}
-
-		const handler: Handler = async () => {
-			order.push(3)
-			return new Response('OK')
-		}
-
-		const composed = sequence(authMiddleware, m2)(handler)
-
-		const mockEnv = {}
-		const mockCtx = createMockCtx()
-
-		const response = await runWithContext(mockEnv, mockCtx, null, () => composed())
-
-		expect(order).toEqual([1]) // Only first middleware ran
-		expect(response!.status).toBe(401)
-	})
-
-	test('middleware can modify response on way out', async () => {
-		const addHeader: Middleware = async (next) => {
-			const response = await next()
-			const newResponse = new Response(response.body, response)
-			newResponse.headers.set('X-Custom', 'added')
-			return newResponse
-		}
-
-		const handler: Handler = async () => new Response('Body')
-		const composed = sequence(addHeader)(handler)
-
-		const mockEnv = {}
-		const mockCtx = createMockCtx()
-
-		const response = await runWithContext(mockEnv, mockCtx, null, () => composed())
-
-		expect(response!.headers.get('X-Custom')).toBe('added')
-	})
-
-	test('error propagates correctly', async () => {
-		const throwingMiddleware: Middleware = async () => {
-			throw new Error('Middleware error')
-		}
-
-		const handler: Handler = async () => new Response('OK')
-		const composed = sequence(throwingMiddleware)(handler)
-
-		const mockEnv = {}
-		const mockCtx = createMockCtx()
-
-		await expect(
-			runWithContext(mockEnv, mockCtx, null, () => composed())
-		).rejects.toThrow('Middleware error')
-	})
-})
-
-describe('handle()', () => {
-	test('chains handlers with fallthrough', async () => {
 		const order: string[] = []
 
-		const h1: Handler = async () => {
-			order.push('h1')
-			return null // Pass through
-		}
-
-		const h2: Handler = async () => {
-			order.push('h2')
-			return new Response('Handled by h2')
-		}
-
-		const h3: Handler = async () => {
-			order.push('h3')
-			return new Response('Should not reach')
-		}
-
-		const composed = handle(h1, h2, h3)
-
-		const mockEnv = {}
-		const mockCtx = createMockCtx()
-
-		const response = await runWithContext(mockEnv, mockCtx, null, () => composed())
-
-		expect(order).toEqual(['h1', 'h2'])
-		expect(await response!.text()).toBe('Handled by h2')
-	})
-
-	test('returns null if no handler responds', async () => {
-		const h1: Handler = async () => null
-		const h2: Handler = async () => null
-
-		const composed = handle(h1, h2)
-
-		const mockEnv = {}
-		const mockCtx = createMockCtx()
-
-		const response = await runWithContext(mockEnv, mockCtx, null, () => composed())
-
-		expect(response).toBeNull()
-	})
-
-	test('works with single handler', async () => {
-		const handler: Handler = async () => new Response('Single')
-		const composed = handle(handler)
-
-		const mockEnv = {}
-		const mockCtx = createMockCtx()
-
-		const response = await runWithContext(mockEnv, mockCtx, null, () => composed())
-
-		expect(await response!.text()).toBe('Single')
-	})
-
-	test('first responding handler wins', async () => {
-		const h1: Handler = async () => new Response('First')
-		const h2: Handler = async () => new Response('Second')
-
-		const composed = handle(h1, h2)
-
-		const mockEnv = {}
-		const mockCtx = createMockCtx()
-
-		const response = await runWithContext(mockEnv, mockCtx, null, () => composed())
-
-		expect(await response!.text()).toBe('First')
-	})
-
-	test('error propagates from handler', async () => {
-		const throwingHandler: Handler = async () => {
-			throw new Error('Handler error')
-		}
-
-		const composed = handle(throwingHandler)
-
-		const mockEnv = {}
-		const mockCtx = createMockCtx()
-
-		await expect(
-			runWithContext(mockEnv, mockCtx, null, () => composed())
-		).rejects.toThrow('Handler error')
-	})
-})
-
-describe('resolve() compatibility alias', () => {
-	test('preserves handler chaining behavior', async () => {
-		const order: string[] = []
-
-		const h1: Handler = async () => {
-			order.push('h1')
-			return null
-		}
-
-		const h2: Handler = async () => {
-			order.push('h2')
-			return new Response('Handled by h2')
-		}
-
-		const composed = resolve(h1, h2)
-
-		const mockEnv = {}
-		const mockCtx = createMockCtx()
-
-		const response = await runWithContext(mockEnv, mockCtx, null, () => composed())
-
-		expect(order).toEqual(['h1', 'h2'])
-		expect(await response!.text()).toBe('Handled by h2')
-	})
-})
-
-describe('sequence() + handle() integration', () => {
-	test('middleware wraps resolved handlers', async () => {
-		const log: string[] = []
-
-		const loggingMiddleware: Middleware = async (next) => {
-			log.push('before')
-			const response = await next()
-			log.push('after')
-			return response
-		}
-
-		const skipHandler: Handler = async () => {
-			log.push('skip')
-			return null
-		}
-
-		const actualHandler: Handler = async () => {
-			log.push('actual')
-			return new Response('Done')
-		}
-
-		const composed = sequence(loggingMiddleware)(handle(skipHandler, actualHandler))
-
-		const mockEnv = {}
-		const mockCtx = createMockCtx()
-
-		const response = await runWithContext(mockEnv, mockCtx, null, () => composed())
-
-		expect(log).toEqual(['before', 'skip', 'actual', 'after'])
-		expect(await response!.text()).toBe('Done')
-	})
-})
-
-describe('request-wide fetch middleware', () => {
-	test('sequence(handle1, handle2) resolves in SvelteKit order', async () => {
-		const order: string[] = []
-
-		const handle1: FetchMiddleware = async (event, resolve) => {
-			order.push('handle1-before')
+		const middleware1: FetchMiddleware = async (event, resolve) => {
+			order.push('m1-before')
 			const response = await resolve(event)
-			order.push('handle1-after')
+			order.push('m1-after')
 			return response
 		}
 
-		const handle2: FetchMiddleware = async (event, resolve) => {
-			order.push('handle2-before')
+		const middleware2: FetchMiddleware = async (event, resolve) => {
+			order.push('m2-before')
 			const response = await resolve(event)
-			order.push('handle2-after')
+			order.push('m2-after')
 			return response
 		}
 
@@ -320,22 +46,214 @@ describe('request-wide fetch middleware', () => {
 		)
 
 		const response = await runWithEventContext(fetchEvent, async () => {
-			return sequence(handle1, handle2)(fetchEvent, async () => {
-				order.push('GET')
+			return sequence(middleware1, middleware2)(fetchEvent, async () => {
+				order.push('leaf')
 				return new Response('OK')
 			})
 		})
 
-		expect(order).toEqual([
-			'handle1-before',
-			'handle2-before',
-			'GET',
-			'handle2-after',
-			'handle1-after'
-		])
+		expect(order).toEqual(['m1-before', 'm2-before', 'leaf', 'm2-after', 'm1-after'])
 		expect(await response.text()).toBe('OK')
 	})
 
+	test('passes through when no middleware is configured', async () => {
+		const fetchEvent = createFetchEvent(
+			new Request('https://example.com/direct'),
+			{},
+			createMockCtx()
+		)
+
+		const response = await runWithEventContext(fetchEvent, async () => {
+			return sequence()(fetchEvent, async () => new Response('Direct'))
+		})
+
+		expect(await response.text()).toBe('Direct')
+	})
+
+	test('can short-circuit the chain', async () => {
+		const order: string[] = []
+
+		const authMiddleware: FetchMiddleware = async () => {
+			order.push('auth')
+			return new Response('Unauthorized', { status: 401 })
+		}
+
+		const skippedMiddleware: FetchMiddleware = async (event, resolve) => {
+			order.push('skipped')
+			return resolve(event)
+		}
+
+		const fetchEvent = createFetchEvent(
+			new Request('https://example.com/secure'),
+			{},
+			createMockCtx()
+		)
+
+		const response = await runWithEventContext(fetchEvent, async () => {
+			return sequence(authMiddleware, skippedMiddleware)(fetchEvent, async () => {
+				order.push('leaf')
+				return new Response('OK')
+			})
+		})
+
+		expect(order).toEqual(['auth'])
+		expect(response.status).toBe(401)
+	})
+
+	test('can modify the response on the way out', async () => {
+		const addHeader: FetchMiddleware = async (event, resolve) => {
+			const response = await resolve(event)
+			const wrapped = new Response(response.body, response)
+			wrapped.headers.set('X-Custom', 'added')
+			return wrapped
+		}
+
+		const fetchEvent = createFetchEvent(
+			new Request('https://example.com/body'),
+			{},
+			createMockCtx()
+		)
+
+		const response = await runWithEventContext(fetchEvent, async () => {
+			return sequence(addHeader)(fetchEvent, async () => new Response('Body'))
+		})
+
+		expect(response.headers.get('X-Custom')).toBe('added')
+	})
+
+	test('propagates errors', async () => {
+		const throwingMiddleware: FetchMiddleware = async () => {
+			throw new Error('Middleware error')
+		}
+
+		const fetchEvent = createFetchEvent(
+			new Request('https://example.com/error'),
+			{},
+			createMockCtx()
+		)
+
+		await expect(runWithEventContext(fetchEvent, async () => {
+			return sequence(throwingMiddleware)(fetchEvent, async () => new Response('OK'))
+		})).rejects.toThrow('Middleware error')
+	})
+})
+
+describe('resolveFetchHandler()', () => {
+	test('returns null when the module only exports method handlers', () => {
+		expect(resolveFetchHandler({
+			async GET() {
+				return new Response('ok')
+			}
+		})).toBeNull()
+	})
+
+	test('returns the primary fetch entry when one is present', () => {
+		const fetch = async () => new Response('ok')
+		expect(resolveFetchHandler({ fetch })).toBe(fetch)
+	})
+})
+
+describe('invokeFetchHandler()', () => {
+	test('supports resolve-style handlers', async () => {
+		const fetchEvent = createFetchEvent(
+			new Request('https://example.com/resolve-style'),
+			{},
+			createMockCtx()
+		)
+
+		const response = await runWithEventContext(fetchEvent, async () => {
+			return invokeFetchHandler(async (event, resolve) => {
+				const downstream = await resolve(event)
+				return new Response(`wrapped:${await downstream.text()}`)
+			}, fetchEvent, async () => new Response('ok'))
+		})
+
+		expect(await response.text()).toBe('wrapped:ok')
+	})
+
+	test('invokes event handlers without a resolve callback', async () => {
+		const fetchEvent = createFetchEvent(
+			new Request('https://example.com/items/123'),
+			{},
+			createMockCtx(),
+			{ params: { id: '123' } }
+		)
+
+		const response = await runWithEventContext(fetchEvent, async () => {
+			return invokeFetchHandler(async (event) => {
+				return new Response(event.params.id)
+			}, fetchEvent)
+		})
+
+		expect(await response.text()).toBe('123')
+	})
+})
+
+describe('createResolveFetch()', () => {
+	test('dispatches to matching method exports', async () => {
+		const fetchEvent = createFetchEvent(
+			new Request('https://example.com/api/users', { method: 'GET' }),
+			{},
+			createMockCtx()
+		)
+
+		const response = await runWithEventContext(fetchEvent, async () => {
+			const resolve = createResolveFetch({
+				async GET() {
+					return new Response('method-response')
+				}
+			}, null, fetchEvent)
+
+			return resolve(fetchEvent)
+		})
+
+		expect(await response.text()).toBe('method-response')
+	})
+
+	test('reuses GET for HEAD without a response body', async () => {
+		const fetchEvent = createFetchEvent(
+			new Request('https://example.com/api/head', { method: 'HEAD' }),
+			{},
+			createMockCtx()
+		)
+
+		const response = await runWithEventContext(fetchEvent, async () => {
+			const resolve = createResolveFetch({
+				async GET() {
+					return new Response('body')
+				}
+			}, null, fetchEvent)
+
+			return resolve(fetchEvent)
+		})
+
+		expect(response.status).toBe(200)
+		expect(await response.text()).toBe('')
+	})
+
+	test('passes route params as the second argument to method handlers', async () => {
+		const fetchEvent = createFetchEvent(
+			new Request('https://example.com/api/users/42', { method: 'GET' }),
+			{},
+			createMockCtx(),
+			{ params: { id: '42' } }
+		)
+
+		const response = await runWithEventContext(fetchEvent, async () => {
+			const resolve = createResolveFetch({
+				async GET(_event, params: { id: string }) {
+					return new Response(params.id)
+				}
+			}, null, fetchEvent)
+
+			return resolve(fetchEvent)
+		})
+
+		expect(await response.text()).toBe('42')
+	})
+})
+
+describe('invokeFetchModule()', () => {
 	test('rejects modules that export both named handle and named fetch', async () => {
 		const fetchEvent = createFetchEvent(
 			new Request('https://example.com/api'),
@@ -372,7 +290,7 @@ describe('request-wide fetch middleware', () => {
 		})).rejects.toThrow('Export exactly one primary fetch entry per module')
 	})
 
-	test('named handle resolves to HTTP method exports', async () => {
+	test('uses named handle to wrap HTTP method exports', async () => {
 		const order: string[] = []
 
 		const handle1: FetchMiddleware = async (event, resolve) => {
@@ -415,13 +333,13 @@ describe('request-wide fetch middleware', () => {
 		expect(await response.text()).toBe('method-response')
 	})
 
-	test('named fetch can be a single exported middleware chain', async () => {
+	test('supports a named fetch export as the primary module entry', async () => {
 		const order: string[] = []
 
-		const handle1: FetchMiddleware = async (event, resolve) => {
-			order.push('handle-before')
+		const middleware: FetchMiddleware = async (event, resolve) => {
+			order.push('before')
 			const response = await resolve(event)
-			order.push('handle-after')
+			order.push('after')
 			return response
 		}
 
@@ -433,34 +351,49 @@ describe('request-wide fetch middleware', () => {
 
 		const response = await runWithEventContext(fetchEvent, async () => {
 			return invokeFetchModule({
-				fetch: sequence(handle1, async () => {
+				fetch: sequence(middleware, async () => {
 					order.push('fetch')
 					return new Response('ok')
 				})
 			}, fetchEvent)
 		})
 
-		expect(order).toEqual(['handle-before', 'fetch', 'handle-after'])
+		expect(order).toEqual(['before', 'fetch', 'after'])
 		expect(await response.text()).toBe('ok')
 	})
 
-	test('legacy two-parameter fetch(request, env) still works', async () => {
+	test('supports a default fetch(event) export', async () => {
 		const fetchEvent = createFetchEvent(
-			new Request('https://example.com/legacy'),
-			{ message: 'legacy-ok' },
+			new Request('https://example.com/default-fetch'),
+			{ message: 'ok' },
 			createMockCtx()
 		)
 
 		const response = await runWithEventContext(fetchEvent, async () => {
 			return invokeFetchModule({
 				default: {
-					async fetch(_request: Request, env: { message: string }) {
-						return new Response(env.message)
+					async fetch(event: typeof fetchEvent) {
+						return new Response(event.env.message)
 					}
 				}
 			}, fetchEvent)
 		})
 
-		expect(await response.text()).toBe('legacy-ok')
+		expect(await response.text()).toBe('ok')
+	})
+
+	test('returns 404 when the module exposes no primary entry or method handler', async () => {
+		const fetchEvent = createFetchEvent(
+			new Request('https://example.com/missing'),
+			{},
+			createMockCtx()
+		)
+
+		const response = await runWithEventContext(fetchEvent, async () => {
+			return invokeFetchModule({}, fetchEvent)
+		})
+
+		expect(response.status).toBe(404)
+		expect(await response.text()).toBe('Not Found')
 	})
 })

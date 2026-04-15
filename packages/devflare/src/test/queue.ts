@@ -187,8 +187,7 @@ async function trigger<T = unknown>(
 	if (typeof queueHandler !== 'function') {
 		throw new Error(
 			`Queue handler at "${queueHandlerPath}" must export a default function or named "queue" export.\n` +
-			`Expected: export async function queue(event) { ... }\n` +
-			`Legacy compatibility is still supported for queue(batch, env, ctx).`
+			+ `Expected: export async function queue(event) { ... }`
 		)
 	}
 
@@ -223,7 +222,7 @@ async function trigger<T = unknown>(
 	// Call the handler
 	await runWithEventContext(
 		queueEvent,
-		() => queueHandler(queueEvent, env, ctx)
+		() => queueHandler(queueEvent)
 	)
 
 	// Wait for all waitUntil promises

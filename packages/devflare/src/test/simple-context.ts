@@ -643,7 +643,4 @@ export interface TestEnv {
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface DevflareEnv { }
 
-/**
- * @deprecated Use `import { env } from 'devflare'` instead.
- */
 export { env } from '../env'

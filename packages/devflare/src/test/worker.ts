@@ -177,8 +177,7 @@ async function fetch(
 			`- request-wide \"handle\" middleware\n` +
 			`- named \"fetch\"\n` +
 			`- default fetch handler\n` +
-			`- HTTP method exports such as \"GET\" or \"POST\"\n` +
-			`Legacy compatibility is still supported for fetch(request, env, ctx).`
+			`- HTTP method exports such as \"GET\" or \"POST\"`
 		)
 	}
 

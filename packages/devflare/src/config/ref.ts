@@ -50,8 +50,8 @@ type ExtractEntrypoints<TConfig> = TConfig extends TypedConfig<infer E> ? E : st
  */
 type ExtractConfig<TImport> = TImport extends () => Promise<infer TModule>
 	? TModule extends { default: infer TConfig }
-		? TConfig
-		: TModule
+	? TConfig
+	: TModule
 	: DevflareConfigInput
 
 /**
@@ -373,49 +373,3 @@ export function ref<TImport extends () => Promise<{ default: DevflareConfigInput
 
 	return proxy
 }
-
-// -----------------------------------------------------------------------------
-// Legacy API (deprecated)
-// -----------------------------------------------------------------------------
-
-/**
- * @deprecated Use `ref()` instead and call `.resolve()` if you need immediate access.
- */
-export async function resolveRef<TConfig extends DevflareConfigInput>(
-	configImport: ConfigImport<TConfig>,
-	options?: { workerName?: string; entrypoint?: string }
-): Promise<RefResult<TConfig>> {
-	const result = options?.workerName
-		? ref(options.workerName, configImport as () => Promise<{ default: TConfig }>)
-		: ref(configImport as () => Promise<{ default: TConfig }>)
-
-	await result.resolve()
-	return result as RefResult<TConfig>
-}
-
-/**
- * @deprecated Use `refResult.worker` or `refResult.worker('entrypoint')` instead.
- */
-export function serviceBinding(
-	refOrLegacy: RefResult | { name: string; entrypoint?: string; config?: unknown; configPath?: string },
-	options?: { entrypoint?: string }
-): WorkerBinding {
-	// Handle RefResult (new API)
-	if ('worker' in refOrLegacy) {
-		const entrypoint = options?.entrypoint
-		return entrypoint ? refOrLegacy.worker(entrypoint) : refOrLegacy.worker
-	}
-
-	// Handle legacy format
-	const entrypoint = options?.entrypoint ?? (refOrLegacy as { entrypoint?: string }).entrypoint
-	return {
-		service: refOrLegacy.name,
-		...(entrypoint && { entrypoint }),
-		__ref: refOrLegacy as RefResult
-	}
-}
-
-/**
- * @deprecated Legacy type alias
- */
-export type ServiceBindingWithRef = WorkerBinding

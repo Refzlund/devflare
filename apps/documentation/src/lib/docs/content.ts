@@ -164,7 +164,7 @@ const docStructure: DocGroupDefinition[] = [
 				id: 'preview-lifecycle',
 				title: 'Preview lifecycle',
 				description:
-					'Inspect, reconcile, retire, and clean up preview scopes after they exist so preview infrastructure does not sprawl.',
+					'Inspect and clean up preview scopes after they exist so preview infrastructure does not sprawl.',
 				slugs: ['preview-operations']
 			},
 			{

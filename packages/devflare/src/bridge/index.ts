@@ -65,7 +65,6 @@ export {
 	type BindingHints,
 	createEnvProxy,
 	bridgeEnv,
-	env,
 	initEnv,
 	setBindingHints
 } from './proxy'

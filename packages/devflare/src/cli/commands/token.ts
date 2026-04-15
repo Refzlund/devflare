@@ -90,7 +90,7 @@ function logUsage(
 }
 
 function resolveTokenOperation(parsed: ParsedArgs): TokenOperation | string {
-	const newOption = parsed.options.new ?? parsed.options.name
+	const newOption = parsed.options.new
 	const rollOption = parsed.options.roll
 	const deleteOption = parsed.options.delete
 	const requestedOperations = [
@@ -100,20 +100,12 @@ function resolveTokenOperation(parsed: ParsedArgs): TokenOperation | string {
 		parsed.options.list === true ? 'list' : null,
 		parsed.options['delete-all'] === true ? 'delete-all' : null
 	].filter(Boolean) as Array<'new' | 'roll' | 'delete' | 'list' | 'delete-all'>
-	const useLegacyCreateAlias = parsed.command === 'token' && requestedOperations.length === 0
 
-	if (parsed.options['all-flags'] && !requestedOperations.includes('new') && !useLegacyCreateAlias) {
+	if (parsed.options['all-flags'] && !requestedOperations.includes('new')) {
 		return '--all-flags can only be used together with --new.'
 	}
 
 	if (requestedOperations.length === 0) {
-		if (useLegacyCreateAlias) {
-			return {
-				kind: 'new',
-				requestedName: getTrimmedStringOption(parsed.options, 'name')
-			}
-		}
-
 		return 'Choose one token operation: --list, --new, --roll, --delete, or --delete-all.'
 	}
 
