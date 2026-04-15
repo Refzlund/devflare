@@ -153,7 +153,7 @@ export function createWorkerVersionDetail(
 			...(options.authorId ? { author_id: options.authorId } : {}),
 			...(options.createdOn ? { created_on: options.createdOn } : {}),
 			...(options.modifiedOn ? { modified_on: options.modifiedOn } : {}),
-			hasPreview: options.hasPreview === true,
+			has_preview: options.hasPreview === true,
 			source: options.source ?? 'wrangler'
 		}
 	}

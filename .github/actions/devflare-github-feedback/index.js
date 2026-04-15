@@ -176,12 +176,12 @@ function getStatusPresentation(config) {
 			};
 		}
 
-			case "skipped": {
-				return {
-					emoji: "⏭️",
-					suffix: "was unchanged",
-				};
-			}
+		case "skipped": {
+			return {
+				emoji: "⏭️",
+				suffix: "was unchanged",
+			};
+		}
 
 		case "failure": {
 			return {
@@ -237,7 +237,9 @@ function buildSummary(config) {
 
 function buildCommentHeading(config, headingLevel = 2) {
 	const presentation = getStatusPresentation(config);
-	return `${"#".repeat(headingLevel)} ${presentation.emoji} ${config.title} ${presentation.suffix}`;
+	return `${
+		"#".repeat(headingLevel)
+	} ${presentation.emoji} ${config.title} ${presentation.suffix}`;
 }
 
 export function buildCommentBody(
@@ -335,7 +337,8 @@ function getCommentGroupTitle(config) {
 }
 
 function getCommentGroupSummary(config) {
-	return config.commentGroupSummary ?? "This single comment tracks the latest deployment feedback for this pull request and is updated in place by the related Devflare workflows.";
+	return config.commentGroupSummary ??
+		"This single comment tracks the latest deployment feedback for this pull request and is updated in place by the related Devflare workflows.";
 }
 
 function getCommentSectionStartMarker(commentKey, sectionKey) {
@@ -370,9 +373,10 @@ export function parseGroupedCommentSections(commentKey, body) {
 }
 
 export function buildGroupedCommentBody(config, sections) {
-	const orderedSections = [...sections.entries()].sort(([leftKey], [rightKey]) =>
-		leftKey.localeCompare(rightKey),
-	);
+	const orderedSections = [...sections.entries()].sort((
+		[leftKey],
+		[rightKey],
+	) => leftKey.localeCompare(rightKey));
 	const lines = [
 		config.commentMarker,
 		`## ${getCommentGroupTitle(config)}`,
@@ -410,15 +414,20 @@ function buildGroupedCommentSectionBody(config) {
 function mergeGroupedCommentSections(config, comments) {
 	const sections = new Map();
 	for (const comment of sortCommentsById(comments)) {
-		for (const [sectionKey, sectionBody] of parseGroupedCommentSections(
-			config.commentKey,
-			comment.body,
-		)) {
+		for (
+			const [sectionKey, sectionBody] of parseGroupedCommentSections(
+				config.commentKey,
+				comment.body,
+			)
+		) {
 			sections.set(sectionKey, sectionBody);
 		}
 	}
 
-	sections.set(config.commentSectionKey, buildGroupedCommentSectionBody(config));
+	sections.set(
+		config.commentSectionKey,
+		buildGroupedCommentSectionBody(config),
+	);
 	return sections;
 }
 
@@ -432,9 +441,9 @@ function buildDeploymentDescription(config) {
 			return truncate(`${config.title} deployed successfully`, 140);
 		}
 
-			case "skipped": {
-				return truncate(`${config.title} was unchanged`, 140);
-			}
+		case "skipped": {
+			return truncate(`${config.title} was unchanged`, 140);
+		}
 
 		case "failure": {
 			return truncate(`${config.title} failed`, 140);
@@ -611,7 +620,12 @@ async function dedupePrComments(config, prNumber, body) {
 	const [canonicalComment, ...duplicateComments] = matchingComments;
 	let commentId = canonicalComment.id;
 	if (canonicalComment.body !== body) {
-		commentId = await updatePrComment(config, canonicalComment.id, body, prNumber);
+		commentId = await updatePrComment(
+			config,
+			canonicalComment.id,
+			body,
+			prNumber,
+		);
 	}
 
 	for (const duplicateComment of duplicateComments) {

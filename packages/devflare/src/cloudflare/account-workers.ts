@@ -19,6 +19,7 @@ interface WorkerVersionsListResult {
 			author_id?: string
 			created_on?: string
 			modified_on?: string
+			has_preview?: boolean
 			hasPreview?: boolean
 			source?: string
 		}
@@ -33,6 +34,7 @@ interface WorkerVersionDetailResult {
 		author_id?: string
 		created_on?: string
 		modified_on?: string
+		has_preview?: boolean
 		hasPreview?: boolean
 		source?: string
 	}
@@ -124,7 +126,7 @@ function mapWorkerVersionInfo(
 			authorId: version.metadata?.author_id,
 			createdOn: version.metadata?.created_on ? new Date(version.metadata.created_on) : undefined,
 			modifiedOn: version.metadata?.modified_on ? new Date(version.metadata.modified_on) : undefined,
-			hasPreview: version.metadata?.hasPreview === true,
+			hasPreview: version.metadata?.has_preview === true || version.metadata?.hasPreview === true,
 			source: version.metadata?.source
 		}
 	}

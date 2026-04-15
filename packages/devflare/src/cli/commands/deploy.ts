@@ -653,7 +653,7 @@ export async function runDeployCommand(
 			}
 
 			if ((preview || isBranchScopedPreviewDeployment) && resolvedPreviewUrl) {
-				logger.success(`Preview URL: ${resolvedPreviewUrl}`)
+				logLine(logger, `Preview URL: ${resolvedPreviewUrl}`)
 			}
 
 			if (shouldVerifyDeployControlPlane()) {
