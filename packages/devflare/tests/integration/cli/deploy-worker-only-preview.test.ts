@@ -356,7 +356,7 @@ console.log('stub wrangler binary')
 		expect(logger.messages.some((message) => {
 			const line = message.args.join(' ')
 			return line.includes('Deployment verification note:')
-				&& line.includes('branch-scoped preview deploy as successful')
+				&& line.includes('preview-scope deploy as successful')
 		})).toBe(true)
 		expect(requestedUrls).toContain(
 			`https://api.cloudflare.com/client/v4/accounts/${TEST_ACCOUNT_ID}/workers/subdomain`

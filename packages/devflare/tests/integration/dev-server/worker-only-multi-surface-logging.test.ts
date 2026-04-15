@@ -51,27 +51,25 @@ export default {
 `.trim(),
 			files: {
 				'src/fetch.ts': `
-export default {
-	async fetch(request, env) {
-		const url = new URL(request.url)
+export default async function fetch(event) {
+	const url = event.url
 
-		if (url.pathname === '/fetch-log') {
-			console.log('FETCH_LOG_FROM_HANDLER')
-			return new Response('fetch-ok')
-		}
-
-		if (url.pathname === '/do-log') {
-			const id = env.LOGGER.idFromName('logs')
-			return env.LOGGER.get(id).fetch('http://do/log')
-		}
-
-		if (url.pathname === '/queue-log' && request.method === 'POST') {
-			await env.TASK_QUEUE.send({ surface: 'queue' })
-			return new Response('queued', { status: 202 })
-		}
-
-		return new Response('not-found', { status: 404 })
+	if (url.pathname === '/fetch-log') {
+		console.log('FETCH_LOG_FROM_HANDLER')
+		return new Response('fetch-ok')
 	}
+
+	if (url.pathname === '/do-log') {
+		const id = event.env.LOGGER.idFromName('logs')
+		return event.env.LOGGER.get(id).fetch('http://do/log')
+	}
+
+	if (url.pathname === '/queue-log' && event.request.method === 'POST') {
+		await event.env.TASK_QUEUE.send({ surface: 'queue' })
+		return new Response('queued', { status: 202 })
+	}
+
+	return new Response('not-found', { status: 404 })
 }
 `.trim(),
 				'src/queue.ts': `

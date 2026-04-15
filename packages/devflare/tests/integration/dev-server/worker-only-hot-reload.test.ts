@@ -66,16 +66,14 @@ export default defineConfig({
 		await writeFile(join(projectDir, 'src', 'fetch.ts'), `
 import { message } from './lib/message'
 
-export default {
-	async fetch(request, env) {
-		const url = new URL(request.url)
+export default async function fetch(event) {
+	const url = event.url
 
-		if (url.pathname === '/config') {
-			return new Response(String(env.MESSAGE))
-		}
-
-		return new Response(message)
+	if (url.pathname === '/config') {
+		return new Response(String(event.env.MESSAGE))
 	}
+
+	return new Response(message)
 }
 `)
 

@@ -128,7 +128,7 @@ const canonicalConfigSchema = z.object({
 	wrangler: wranglerConfigSchema
 })
 
-export const configSchema = canonicalConfigSchema
+export const configSchema = canonicalConfigSchema.strict()
 
 /** Output type after Zod validation and transforms */
 export type DevflareConfig = z.output<typeof configSchema>

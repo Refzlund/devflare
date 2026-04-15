@@ -45,26 +45,24 @@ export default {
 `.trim(),
 			files: {
 				'src/fetch.ts': `
-export default {
-	async fetch(request, env) {
-		const url = new URL(request.url)
+export default async function fetch(event) {
+	const url = event.url
 
-		if (url.pathname === '/enqueue' && request.method === 'POST') {
-			await env.TASK_QUEUE.send({ value: 'queued' })
-			return new Response('queued', { status: 202 })
-		}
-
-		if (url.pathname === '/result') {
-			return new Response((await env.RESULTS.get('queue-result')) ?? 'pending')
-		}
-
-		return new Response('not-found', { status: 404 })
+	if (url.pathname === '/enqueue' && event.request.method === 'POST') {
+		await event.env.TASK_QUEUE.send({ value: 'queued' })
+		return new Response('queued', { status: 202 })
 	}
+
+	if (url.pathname === '/result') {
+		return new Response((await event.env.RESULTS.get('queue-result')) ?? 'pending')
+	}
+
+	return new Response('not-found', { status: 404 })
 }
 `.trim(),
 				'src/queue.ts': `
-export default async function queue(batch, env) {
-	for (const message of batch.messages) {
+export default async function queue(event, env) {
+	for (const message of event.messages) {
 		await env.RESULTS.put('queue-result', String(message.body.value))
 		message.ack()
 	}
@@ -124,21 +122,19 @@ export default {
 `.trim(),
 			files: {
 				'src/fetch.ts': `
-export default {
-	async fetch(request, env) {
-		const url = new URL(request.url)
+export default async function fetch(event) {
+	const url = event.url
 
-		if (url.pathname === '/result') {
-			return new Response((await env.RESULTS.get('scheduled-result')) ?? 'pending')
-		}
-
-		return new Response('not-found', { status: 404 })
+	if (url.pathname === '/result') {
+		return new Response((await event.env.RESULTS.get('scheduled-result')) ?? 'pending')
 	}
+
+	return new Response('not-found', { status: 404 })
 }
 `.trim(),
 				'src/scheduled.ts': `
-export default async function scheduled(controller, env) {
-	await env.RESULTS.put('scheduled-result', controller.cron || 'missing-cron')
+export default async function scheduled(event, env) {
+	await env.RESULTS.put('scheduled-result', event.cron || 'missing-cron')
 }
 `.trim()
 			}
@@ -204,21 +200,19 @@ export default {
 `.trim(),
 			files: {
 				'src/fetch.ts': `
-export default {
-	async fetch(request, env) {
-		const url = new URL(request.url)
+export default async function fetch(event) {
+	const url = event.url
 
-		if (url.pathname === '/result') {
-			return new Response((await env.EMAIL_LOG.get('email-result')) ?? 'pending')
-		}
-
-		return new Response('not-found', { status: 404 })
+	if (url.pathname === '/result') {
+		return new Response((await event.env.EMAIL_LOG.get('email-result')) ?? 'pending')
 	}
+
+	return new Response('not-found', { status: 404 })
 }
 `.trim(),
 				'src/email.ts': `
-export async function email(message, env) {
-	await env.EMAIL_LOG.put('email-result', message.from + '->' + message.to)
+export async function email(event, env) {
+	await env.EMAIL_LOG.put('email-result', event.from + '->' + event.to)
 }
 `.trim()
 			}

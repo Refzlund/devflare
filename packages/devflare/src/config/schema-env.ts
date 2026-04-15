@@ -57,7 +57,7 @@ export const envConfigSchema = z.object({
 	vite: viteConfigSchema,
 	/** Override wrangler passthrough */
 	wrangler: wranglerConfigSchema
-}).partial()
+}).partial().strict()
 
 export const envConfigSchemaInner = envConfigSchema
 

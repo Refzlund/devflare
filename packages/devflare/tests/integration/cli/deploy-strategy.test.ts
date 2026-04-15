@@ -53,14 +53,14 @@ describe('deploy strategy integration', () => {
 		])
 		expect(defaultWranglerConfig.triggers?.crons).toEqual(['0 * * * *'])
 
-		expect(branchScopedPreview.strategy).toBe('branch-scoped-preview')
+		expect(branchScopedPreview.strategy).toBe('preview-scope')
 		expect(branchScopedPreview.omittedResources).toEqual(['queue-consumers', 'cron-triggers'])
 		expect(branchPreviewWranglerConfig.queues?.producers).toEqual([
 			{ binding: 'TASK_QUEUE', queue: 'task-queue' }
 		])
 		expect(branchPreviewWranglerConfig.queues?.consumers).toBeUndefined()
 		expect(branchPreviewWranglerConfig.triggers).toBeUndefined()
-		expect(describeDeploymentStrategy(branchScopedPreview)).toContain('Branch-scoped preview deploy detected')
+		expect(describeDeploymentStrategy(branchScopedPreview)).toContain('Named preview-scope deploy detected')
 	})
 
 	test('branch-scoped preview deploy strategy keeps cron triggers when previews.includeCrons is enabled', () => {
@@ -71,7 +71,7 @@ describe('deploy strategy integration', () => {
 		})
 		const branchPreviewWranglerConfig = compileConfig(branchScopedPreview.config)
 
-		expect(branchScopedPreview.strategy).toBe('branch-scoped-preview')
+		expect(branchScopedPreview.strategy).toBe('preview-scope')
 		expect(branchScopedPreview.omittedResources).toEqual(['queue-consumers'])
 		expect(branchPreviewWranglerConfig.queues?.consumers).toBeUndefined()
 		expect(branchPreviewWranglerConfig.triggers?.crons).toEqual(['0 * * * *'])
