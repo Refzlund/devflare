@@ -307,7 +307,7 @@ console.log('stub wrangler binary')
 		expect(logger.messages.some((message) => message.args.join(' ').includes('Preview URL: https://worker-build-test-next.example-subdomain.workers.dev'))).toBe(true)
 	})
 
-	test('deploy accepts branch-scoped preview deploys when Cloudflare does not expose a Worker version id', async () => {
+	test('deploy resolves branch-scoped preview version ids from Cloudflare when Wrangler omits them', async () => {
 		await writeAccountProjectFiles(projectDir, {
 			accountId: TEST_ACCOUNT_ID,
 			workerName: 'worker-build-test-next'
@@ -323,6 +323,40 @@ console.log('stub wrangler binary')
 
 			if (url.endsWith(`/accounts/${TEST_ACCOUNT_ID}/workers/subdomain`)) {
 				return cloudflareApiResponse({ subdomain: 'example-subdomain' })
+			}
+
+			if (url.includes('/workers/scripts/worker-build-test-next/versions?page=1&per_page=100')) {
+				return cloudflareApiResponse({
+					items: [
+						createWorkerVersionDetail('version-from-list', {
+							hasPreview: true,
+							createdOn: new Date().toISOString(),
+							modifiedOn: new Date().toISOString()
+						})
+					]
+				})
+			}
+
+			if (url.includes('/workers/scripts/worker-build-test-next/versions/version-from-list')) {
+				return cloudflareApiResponse(createWorkerVersionDetail('version-from-list'))
+			}
+
+			if (url.endsWith('/workers/scripts/worker-build-test-next/deployments')) {
+				return cloudflareApiResponse({
+					deployments: [
+						{
+							id: 'deployment-from-list',
+							created_on: new Date().toISOString(),
+							source: 'wrangler',
+							strategy: 'percentage',
+							author_email: 'test@example.com',
+							versions: [{
+								percentage: 100,
+								version_id: 'version-from-list'
+							}]
+						}
+					]
+				})
 			}
 
 			throw new Error(`Unexpected Cloudflare request: ${url}`)
@@ -353,15 +387,95 @@ console.log('stub wrangler binary')
 
 		expect(result.exitCode).toBe(0)
 		expect(logger.messages.some((message) => message.args.join(' ').includes('Preview URL: https://worker-build-test-next.example-subdomain.workers.dev'))).toBe(true)
-		expect(logger.messages.some((message) => {
-			const line = message.args.join(' ')
-			return line.includes('Deployment verification note:')
-				&& line.includes('preview-scope deploy as successful')
-		})).toBe(true)
+		expect(logger.messages.some((message) => message.args.join(' ').includes('Version ID: version-from-list'))).toBe(true)
+		expect(logger.messages.some((message) => message.args.join(' ').includes('Resolved version id from Cloudflare version metadata'))).toBe(true)
+		expect(logger.messages.some((message) => message.args.join(' ').includes('Verified Cloudflare deployment deployment-from-list for version version-from-list'))).toBe(true)
 		expect(requestedUrls).toContain(
 			`https://api.cloudflare.com/client/v4/accounts/${TEST_ACCOUNT_ID}/workers/subdomain`
 		)
-		expect(requestedUrls.some((url) => url.includes('/workers/scripts/worker-build-test-next/versions'))).toBe(false)
-		expect(requestedUrls.some((url) => url.endsWith('/workers/scripts/worker-build-test-next/deployments'))).toBe(false)
+		expect(requestedUrls.some((url) => url.includes('/workers/scripts/worker-build-test-next/versions?page=1&per_page=100'))).toBe(true)
+		expect(requestedUrls.some((url) => url.endsWith('/workers/scripts/worker-build-test-next/deployments'))).toBe(true)
+	})
+
+	test('deploy fails strict branch-scoped preview deploys when Cloudflare cannot expose a fresh version id', async () => {
+		await writeAccountProjectFiles(projectDir, {
+			accountId: TEST_ACCOUNT_ID,
+			workerName: 'worker-build-test-next'
+		})
+
+		const executions: ExecInvocation[] = []
+		const logger = createLogger()
+		const requestedUrls: string[] = []
+
+		globalThis.fetch = mock(async (input: RequestInfo | URL) => {
+			const url = String(input)
+			requestedUrls.push(url)
+
+			if (url.endsWith(`/accounts/${TEST_ACCOUNT_ID}/workers/subdomain`)) {
+				return cloudflareApiResponse({ subdomain: 'example-subdomain' })
+			}
+
+			if (url.includes('/workers/scripts/worker-build-test-next/versions?page=1&per_page=100')) {
+				return cloudflareApiResponse({
+					items: [
+						createWorkerVersionDetail('stale-version', {
+							hasPreview: true,
+							createdOn: '2026-01-01T00:00:00.000Z',
+							modifiedOn: '2026-01-01T00:00:00.000Z'
+						})
+					]
+				})
+			}
+
+			if (url.endsWith('/workers/scripts/worker-build-test-next/deployments')) {
+				return cloudflareApiResponse({
+					deployments: [
+						{
+							id: 'stale-deployment',
+							created_on: '2026-01-01T00:00:00.000Z',
+							source: 'wrangler',
+							strategy: 'percentage',
+							author_email: 'test@example.com',
+							versions: [{
+								percentage: 100,
+								version_id: 'stale-version'
+							}]
+						}
+					]
+				})
+			}
+
+			throw new Error(`Unexpected Cloudflare request: ${url}`)
+		}) as unknown as typeof fetch
+		enableStrictDeployVerification({ accountId: TEST_ACCOUNT_ID, delayMs: '0' })
+
+		setDependencies(createCliDependencies(
+			createProcessRunner((command, args) => {
+				if (command === 'bunx' && args[0] === 'wrangler' && args[1] === 'deploy') {
+					return successResult('Deployed successfully')
+				}
+
+				return successResult()
+			}, executions)
+		))
+
+		const result = await runDeployCommand(
+			{
+				command: 'deploy',
+				args: [],
+				options: {
+					preview: 'next'
+				}
+			},
+			logger as any,
+			{ cwd: projectDir }
+		)
+
+		expect(result.exitCode).toBe(1)
+		expect(logger.messages.some((message) => message.args.join(' ').includes('Preview URL: https://worker-build-test-next.example-subdomain.workers.dev'))).toBe(true)
+		expect(logger.messages.some((message) => message.args.join(' ').includes('Deployment verification failed: Wrangler did not return a Worker version id'))).toBe(true)
+		expect(logger.messages.some((message) => message.args.join(' ').includes('preview-scope deploy as successful'))).toBe(false)
+		expect(requestedUrls.some((url) => url.includes('/workers/scripts/worker-build-test-next/versions?page=1&per_page=100'))).toBe(true)
+		expect(requestedUrls.some((url) => url.endsWith('/workers/scripts/worker-build-test-next/deployments'))).toBe(true)
 	})
 })

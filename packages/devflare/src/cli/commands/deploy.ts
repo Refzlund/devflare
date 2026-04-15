@@ -540,13 +540,12 @@ export async function runDeployCommand(
 			if (
 				!resolvedVersionId
 				&& resolvedAccountId
-				&& !(isBranchScopedPreviewDeployment && resolvedPreviewUrl)
 			) {
 				try {
 					resolvedVersionId = await resolveVersionIdFromLatestWorkerVersion({
 						accountId: resolvedAccountId,
 						workerName: prepared.config.name,
-						preview,
+						preview: preview || isBranchScopedPreviewDeployment,
 						deployedAfter: deployStartedAt
 					})
 
@@ -559,6 +558,30 @@ export async function runDeployCommand(
 				} catch (error) {
 					const message = error instanceof Error ? error.message : String(error)
 					versionRecoveryDiagnostics.push(`version lookup: ${message}`)
+				}
+			}
+
+			if (isBranchScopedPreviewDeployment && !resolvedVersionId && resolvedAccountId) {
+				try {
+					const fallbackDeployment = await resolveVersionIdFromLatestProductionDeployment({
+						accountId: resolvedAccountId,
+						workerName: prepared.config.name,
+						deployedAfter: deployStartedAt
+					})
+
+					resolvedVersionId = fallbackDeployment.versionId
+					logger.success(`Version ID: ${resolvedVersionId}`)
+					loggedVersionId = true
+					logLine(
+						logger,
+						dim(
+							`Resolved version id from Cloudflare deployment ${fallbackDeployment.deploymentId}`,
+							theme
+						)
+					)
+				} catch (error) {
+					const message = error instanceof Error ? error.message : String(error)
+					versionRecoveryDiagnostics.push(`deployment lookup: ${message}`)
 				}
 			}
 
@@ -635,19 +658,13 @@ export async function runDeployCommand(
 
 			if (shouldVerifyDeployControlPlane()) {
 				if (!resolvedVersionId) {
-					if (isBranchScopedPreviewDeployment && resolvedPreviewUrl) {
-						logger.warn(
-							`Deployment verification note: Wrangler completed the named preview-scope deploy for Worker "${prepared.config.name}" and exposed ${resolvedPreviewUrl}, but Cloudflare did not return a Worker version id. Devflare is treating this preview-scope deploy as successful because named preview workers can lag in control-plane version metadata.`
-						)
-					} else {
-						const recoveryDetails = versionRecoveryDiagnostics.length > 0
-							? ` Cloudflare fallback checks also failed: ${versionRecoveryDiagnostics.join(' | ')}`
-							: ''
-						logger.error(
-							`Deployment verification failed: Wrangler did not return a Worker version id, so Devflare could not prove which version Cloudflare accepted.${recoveryDetails}`
-						)
-						return { exitCode: 1, output: structuredOutput }
-					}
+					const recoveryDetails = versionRecoveryDiagnostics.length > 0
+						? ` Cloudflare fallback checks also failed: ${versionRecoveryDiagnostics.join(' | ')}`
+						: ''
+					logger.error(
+						`Deployment verification failed: Wrangler did not return a Worker version id, so Devflare could not prove which version Cloudflare accepted.${recoveryDetails}`
+					)
+					return { exitCode: 1, output: structuredOutput }
 				} else {
 					resolvedAccountId = await ensureResolvedAccountId()
 
