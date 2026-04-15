@@ -1,4 +1,4 @@
-﻿import type { DocCodeTreeEntry, DocPage } from '../types'
+﻿import type { DocPage } from '../types'
 
 const workflowRepoBase = 'https://github.com/Refzlund/devflare/blob/next/.github/workflows'
 const workflowActionSourceBase = 'https://github.com/Refzlund/devflare/blob/next/.github/actions'
@@ -9,27 +9,6 @@ const workflowLink = (file: string): string => `${workflowRepoBase}/${file}`
 const workflowActionSourceLink = (action: string): string => `${workflowActionSourceBase}/${action}/action.yml`
 const workflowActionUse = (action: string): string => `${workflowActionRepo}/${action}@${workflowActionRef}`
 const docsLink = (slug: string): string => `/docs/${slug}`
-
-const workflowDirectoryStructure: DocCodeTreeEntry[] = [
-	{ path: '.github', kind: 'folder' },
-	{ path: '.github/workflows', kind: 'folder' },
-	{ path: '.github/workflows/workspace-ci.yml' },
-	{ path: '.github/workflows/preview.yml' },
-	{ path: '.github/workflows/documentation-production.yml' }
-]
-
-const documentationWorkflowStructure: DocCodeTreeEntry[] = [
-	{ path: '.github', kind: 'folder' },
-	{ path: '.github/workflows', kind: 'folder' },
-	{ path: '.github/workflows/preview.yml' },
-	{ path: '.github/workflows/documentation-production.yml' }
-]
-
-const testingWorkflowStructure: DocCodeTreeEntry[] = [
-	{ path: '.github', kind: 'folder' },
-	{ path: '.github/workflows', kind: 'folder' },
-	{ path: '.github/workflows/preview.yml' }
-]
 
 const documentationPreviewWorkflowCode = String.raw`name: Preview
 
@@ -237,12 +216,10 @@ export const shipOperateDocs: DocPage[] = [
 					{
 						title: 'Workspace CI keeps the validation lane in view',
 						description:
-							'The active file is the real repo workflow under `.github/workflows/workspace-ci.yml`, and the highlighted lines keep the validation job in focus so it reads like cached verification rather than a hidden deploy path.',
-						activeFile: '.github/workflows/workspace-ci.yml',
-						structure: workflowDirectoryStructure,
+							'This excerpt comes from the real repo workflow under `.github/workflows/workspace-ci.yml`, and the highlighted lines keep the validation job in focus so it reads like cached verification rather than a hidden deploy path.',
 						files: [
 							{
-								path: '.github/workflows/workspace-ci.yml',
+								label: 'workspace-ci.yml',
 								language: 'yaml',
 								focusLines: [[15, 21]],
 								code: String.raw`name: Workspace CI
@@ -295,12 +272,10 @@ jobs:
 					{
 						title: 'Prepare the documentation preview job',
 						description:
-							'Action references use the public `Refzlund/devflare/...@next` form.',
-						activeFile: '.github/workflows/preview.yml',
-						structure: documentationWorkflowStructure,
+							'Excerpt from `.github/workflows/preview.yml`. Action references use the public `Refzlund/devflare/...@next` form.',
 						files: [
 							{
-								path: '.github/workflows/preview.yml',
+								label: 'preview.yml',
 								language: 'yaml',
 								focusLines: [[13, 15]],
 								code: documentationPreviewWorkflowCode
@@ -310,12 +285,10 @@ jobs:
 					{
 						title: 'Impact check before Cloudflare work',
 						description:
-							'Skips the deploy when the package did not change.',
-						activeFile: '.github/workflows/preview.yml',
-						structure: documentationWorkflowStructure,
+							'Excerpt from `.github/workflows/preview.yml`. Skips the deploy when the package did not change.',
 						files: [
 							{
-								path: '.github/workflows/preview.yml',
+								label: 'preview.yml',
 								language: 'yaml',
 								focusLines: [[17, 21]],
 								code: documentationPreviewWorkflowCode
@@ -325,12 +298,10 @@ jobs:
 					{
 						title: 'Branch and PR deploy targets',
 						description:
-							'Two separate `devflare-deploy` calls keep branch and PR scopes reviewable.',
-						activeFile: '.github/workflows/preview.yml',
-						structure: documentationWorkflowStructure,
+							'Excerpt from `.github/workflows/preview.yml`. Two separate `devflare-deploy` calls keep branch and PR scopes reviewable.',
 						files: [
 							{
-								path: '.github/workflows/preview.yml',
+								label: 'preview.yml',
 								language: 'yaml',
 								focusLines: [[23, 33], [35, 45]],
 								code: documentationPreviewWorkflowCode
@@ -340,12 +311,10 @@ jobs:
 					{
 						title: 'PR feedback',
 						description:
-							'Feedback runs after the deploy decisions are made.',
-						activeFile: '.github/workflows/preview.yml',
-						structure: documentationWorkflowStructure,
+							'Excerpt from `.github/workflows/preview.yml`. Feedback runs after the deploy decisions are made.',
 						files: [
 							{
-								path: '.github/workflows/preview.yml',
+								label: 'preview.yml',
 								language: 'yaml',
 								focusLines: [[47, 51]],
 								code: documentationPreviewWorkflowCode
@@ -426,12 +395,10 @@ jobs:
 					{
 						title: 'Documentation branch cleanup',
 						description:
-							'Uses the public feedback action reference.',
-						activeFile: '.github/workflows/preview.yml',
-						structure: testingWorkflowStructure,
+							'Excerpt from `.github/workflows/preview.yml`. Uses the public feedback action reference.',
 						files: [
 							{
-								path: '.github/workflows/preview.yml',
+								label: 'preview.yml',
 								language: 'yaml',
 								focusLines: [[10, 17]],
 								code: previewCleanupWorkflowCode
@@ -441,12 +408,10 @@ jobs:
 					{
 						title: 'Testing PR cleanup',
 						description:
-							'Same pattern, PR-scoped.',
-						activeFile: '.github/workflows/preview.yml',
-						structure: testingWorkflowStructure,
+							'Excerpt from `.github/workflows/preview.yml`. Same pattern, PR-scoped.',
 						files: [
 							{
-								path: '.github/workflows/preview.yml',
+								label: 'preview.yml',
 								language: 'yaml',
 								focusLines: [[21, 28]],
 								code: previewCleanupWorkflowCode
@@ -473,12 +438,10 @@ jobs:
 					{
 						title: 'Shared workspace setup',
 						description:
-							'One setup action, then per-package deploys.',
-						activeFile: '.github/workflows/preview.yml',
-						structure: testingWorkflowStructure,
+							'Excerpt from `.github/workflows/preview.yml`. One setup action, then per-package deploys.',
 						files: [
 							{
-								path: '.github/workflows/preview.yml',
+								label: 'preview.yml',
 								language: 'yaml',
 								focusLines: [6],
 								code: testingPreviewWorkflowCode
@@ -488,12 +451,10 @@ jobs:
 					{
 						title: 'Per-package deploys with shared scope',
 						description:
-							'Each package gets its own `devflare-deploy` call and visible `working-directory`.',
-						activeFile: '.github/workflows/preview.yml',
-						structure: testingWorkflowStructure,
+							'Excerpt from `.github/workflows/preview.yml`. Each package gets its own `devflare-deploy` call and visible `working-directory`.',
 						files: [
 							{
-								path: '.github/workflows/preview.yml',
+								label: 'preview.yml',
 								language: 'yaml',
 								focusLines: [[8, 14], [16, 22], [24, 30]],
 								code: testingPreviewWorkflowCode
@@ -503,12 +464,10 @@ jobs:
 					{
 						title: 'Separate deployment and PR feedback',
 						description:
-							'Deployment records and PR comments stay independent.',
-						activeFile: '.github/workflows/preview.yml',
-						structure: testingWorkflowStructure,
+							'Excerpt from `.github/workflows/preview.yml`. Deployment records and PR comments stay independent.',
 						files: [
 							{
-								path: '.github/workflows/preview.yml',
+								label: 'preview.yml',
 								language: 'yaml',
 								focusLines: [[32, 39]],
 								code: testingPreviewWorkflowCode
