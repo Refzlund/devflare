@@ -137,7 +137,7 @@ export const CORE_HELP_PAGES: HelpPage[] = [
 		],
 		description: [
 			'Deploy requires an explicit target: production via `--prod` / `--production`, or preview via `--preview`.',
-			'Named preview deploys such as `--preview next` or `--preview pr-1` target `config.env.preview`, provision preview-scoped resources automatically, and deploy branch-scoped preview Workers when your config is wired for them. Bare `--preview` keeps the same-worker preview upload flow and can still use `--branch-name` or CI/git metadata for preview-aware naming.'
+			'Named preview deploys such as `--preview next` or `--preview pr-1` target `config.env.preview`, provision preview-scoped resources automatically, and deploy dedicated preview-scope Workers when your config is wired for them. Bare `--preview` keeps the same-worker preview upload flow and can still use `--branch-name` or CI/git metadata for preview-aware naming.'
 		],
 		options: [
 			entry('--prod', 'Deploy to the production environment explicitly'),

@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import {
 	devflareAccountRecordSchema,
 	devflarePreviewRecordSchema,
-	devflarePreviewAliasRecordSchema,
+	devflarePreviewScopeRecordSchema,
 	devflareDeploymentRecordSchema,
 	devflareAccountLayerRecordSchema
 } from '../../../src/cloudflare/registry-schema'
@@ -26,7 +26,7 @@ describe('devflareAccountRecordSchema', () => {
 })
 
 describe('devflarePreviewRecordSchema', () => {
-	test('accepts preview records with alias metadata', () => {
+	test('accepts preview records with scope metadata', () => {
 		const record = devflarePreviewRecordSchema.parse({
 			id: 'preview:documentation:5dba9570',
 			kind: 'preview',
@@ -37,8 +37,8 @@ describe('devflarePreviewRecordSchema', () => {
 			workerName: 'documentation',
 			versionId: '5dba9570-33c4-4375-b784-e1b34ad01569',
 			previewUrl: 'https://5dba9570-documentation.refz.workers.dev/',
-			alias: 'acceptance-sweep',
-			aliasPreviewUrl: 'https://acceptance-sweep-documentation.refz.workers.dev/',
+			scope: 'acceptance-sweep',
+			scopeUrl: 'https://acceptance-sweep-documentation.refz.workers.dev/',
 			branchName: 'feature/preview-registry',
 			commitSha: 'abcdef1234567890',
 			source: 'cli'
@@ -48,7 +48,7 @@ describe('devflarePreviewRecordSchema', () => {
 		expect(record.source).toBe('cli')
 	})
 
-	test('rejects alias preview URLs when no alias is present', () => {
+	test('rejects scope URLs when no scope is present', () => {
 		expect(() => {
 			devflarePreviewRecordSchema.parse({
 				id: 'preview:documentation:orphan',
@@ -60,25 +60,25 @@ describe('devflarePreviewRecordSchema', () => {
 				workerName: 'documentation',
 				versionId: '5dba9570-33c4-4375-b784-e1b34ad01569',
 				previewUrl: 'https://5dba9570-documentation.refz.workers.dev/',
-				aliasPreviewUrl: 'https://acceptance-sweep-documentation.refz.workers.dev/'
+				scopeUrl: 'https://acceptance-sweep-documentation.refz.workers.dev/'
 			})
-		}).toThrow('aliasPreviewUrl requires alias to be set')
+		}).toThrow('scopeUrl requires scope to be set')
 	})
 })
 
-describe('devflarePreviewAliasRecordSchema', () => {
+describe('devflarePreviewScopeRecordSchema', () => {
 	test('enforces Cloudflare-safe preview names', () => {
 		expect(() => {
-			devflarePreviewAliasRecordSchema.parse({
-				id: 'alias:documentation:Invalid Alias',
-				kind: 'previewAlias',
+			devflarePreviewScopeRecordSchema.parse({
+				id: 'previewScope:documentation:Invalid Alias',
+				kind: 'previewScope',
 				ver: 1,
 				createdAt: '2026-04-08T12:00:00.000Z',
 				createdBy: 'user-123',
 				accountId: TEST_ACCOUNT_ID,
 				workerName: 'documentation',
-				alias: 'Invalid Alias',
-				aliasPreviewUrl: 'https://acceptance-sweep-documentation.refz.workers.dev/',
+				scope: 'Invalid Alias',
+				scopeUrl: 'https://acceptance-sweep-documentation.refz.workers.dev/',
 				versionId: '5dba9570-33c4-4375-b784-e1b34ad01569'
 			})
 		}).toThrow('Preview names must start with a lowercase letter')
@@ -121,7 +121,10 @@ describe('devflareAccountLayerRecordSchema', () => {
 			source: 'github-action'
 		})
 
-		expect(record.kind).toBe('deployment')
+		if (record.kind !== 'deployment') {
+			throw new Error(`Expected deployment record, received ${record.kind}`)
+		}
+
 		expect(record.channel).toBe('production')
 	})
 })

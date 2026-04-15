@@ -40,7 +40,7 @@ export const operationsDocs: DocPage[] = [
 				paragraphs: [
 					'The safest operational habit in Devflare is to resolve account context first. The CLI can infer an account from several places, but when real inventory, preview cleanup, token management, or production control-plane changes are involved, you should know which lane won.',
 					'Not every command family resolves those lanes in the same order. Inventory-oriented commands, `productions` discovery, other config-backed operator commands, and token management each consult a slightly different subset of explicit flags, workspace settings, environment, config, and authenticated-account fallbacks.',
-					'That is why `login`, `account`, and the global or workspace account selectors exist. They make the account story explicit before the deeper command families start reading or mutating Cloudflare state.'
+					'`login`, `account`, and the global or workspace account selectors exist for this reason. They make the account story explicit before the deeper command families start reading or mutating Cloudflare state.'
 				],
 				snippets: [
 					{
@@ -167,7 +167,7 @@ bunx --bun devflare ai`
 			},
 			{
 				id: 'remote-mode',
-				title: 'Gate paid remote test flows on purpose',
+				title: 'Gate paid remote test flows explicitly',
 				paragraphs: [
 					'Remote mode exists so paid Cloudflare features like AI or Vectorize do not get exercised casually by every local or CI run. The command family is deliberately small: inspect current status, enable it for a bounded window, or disable it again.',
 					'That keeps the cost story visible. If remote tests are going to hit real infrastructure, the activation should be reviewable in command history or workflow logs instead of quietly implied.'
@@ -329,7 +329,7 @@ for (const worker of workers) {
 			},
 			{
 				id: 'preview-registry-and-schemas',
-				title: 'Preview registry helpers and schemas are public on purpose',
+				title: 'Preview registry helpers and schemas are public by design',
 				paragraphs: [
 					'Devflare exports preview-registry helpers plus the shared registry schemas and errors so custom tooling can inspect or update preview metadata without guessing the record shape.',
 					'That is especially useful for automation that wants to inspect preview URLs, scope metadata, or cleanup state while staying aligned with the same contract the CLI and GitHub actions use.'

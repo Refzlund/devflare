@@ -9,7 +9,7 @@ import {
 	capturePreviewTestEnvironmentSnapshot,
 	createD1ResultsResponse,
 	createDeploymentRecordFixture,
-	createPreviewAliasRecordFixture,
+	createPreviewScopeRecordFixture,
 	createPreviewRecordFixture,
 	createRegistryDatabaseListResponse,
 	createRegistryDatabaseRecord,
@@ -24,9 +24,9 @@ const defaultReconcileRequest = {
 	accountId: 'acc_123',
 	workerName: 'demo-worker',
 	versionId: '5dba9570-33c4-4375-b784-e1b34ad01569',
-	previewAlias: 'feature-branch',
+	previewScope: 'feature-branch',
 	previewUrl: 'https://5dba9570-demo-worker.example-subdomain.workers.dev',
-	previewAliasUrl: 'https://feature-branch-demo-worker.example-subdomain.workers.dev',
+	previewScopeUrl: 'https://feature-branch-demo-worker.example-subdomain.workers.dev',
 	branchName: 'feature/branch',
 	commitSha: 'abcdef1234567',
 	source: 'cli' as const
@@ -38,7 +38,7 @@ function createPreviewRegistryFetch(options: {
 	versionDetail?: Record<string, unknown>
 	deployments?: Array<Record<string, unknown>>
 	previewRecords?: Array<Record<string, unknown>>
-	previewAliasRecords?: Array<Record<string, unknown>>
+	previewScopeRecords?: Array<Record<string, unknown>>
 	deploymentRecords?: Array<Record<string, unknown>>
 	recordedStatements?: Array<{ sql: string; params: unknown[] }>
 } = {}): typeof fetch {
@@ -90,8 +90,8 @@ function createPreviewRegistryFetch(options: {
 				return createD1ResultsResponse((options.previewRecords ?? []).map(createSerializedRegistryRecord))
 			}
 
-			if (sql.startsWith('SELECT payload_json FROM devflare_preview_alias_records')) {
-				return createD1ResultsResponse((options.previewAliasRecords ?? []).map(createSerializedRegistryRecord))
+			if (sql.startsWith('SELECT payload_json FROM devflare_preview_scope_records')) {
+				return createD1ResultsResponse((options.previewScopeRecords ?? []).map(createSerializedRegistryRecord))
 			}
 
 			if (sql.startsWith('SELECT payload_json FROM devflare_deployment_records')) {
@@ -107,7 +107,7 @@ function createPreviewRegistryFetch(options: {
 
 function expectRegistryInsertStatements(recordedSql: string[]): void {
 	expect(recordedSql.some((sql) => sql.startsWith('INSERT INTO devflare_preview_records'))).toBe(true)
-	expect(recordedSql.some((sql) => sql.startsWith('INSERT INTO devflare_preview_alias_records'))).toBe(true)
+	expect(recordedSql.some((sql) => sql.startsWith('INSERT INTO devflare_preview_scope_records'))).toBe(true)
 	expect(recordedSql.some((sql) => sql.startsWith('INSERT INTO devflare_deployment_records'))).toBe(true)
 }
 
@@ -189,10 +189,10 @@ describe('preview registry', () => {
 
 		expect(result.registry.databaseName).toBe('devflare-registry')
 		expect(result.previews).toHaveLength(1)
-		expect(result.previewAliases).toHaveLength(1)
+		expect(result.previewScopes).toHaveLength(1)
 		expect(result.deployments).toHaveLength(2)
-		expect(result.previews[0].alias).toBe('feature-branch')
-		expect(result.previewAliases[0].aliasPreviewUrl).toBe('https://feature-branch-demo-worker.example-subdomain.workers.dev')
+		expect(result.previews[0].scope).toBe('feature-branch')
+		expect(result.previewScopes[0].scopeUrl).toBe('https://feature-branch-demo-worker.example-subdomain.workers.dev')
 		expect(result.deployments.some((record) => record.channel === 'preview')).toBe(true)
 		expect(result.deployments.some((record) => record.channel === 'production')).toBe(true)
 		expectRegistryInsertStatements(recordedSql)
@@ -221,7 +221,7 @@ describe('preview registry', () => {
 		const result = await reconcilePreviewRegistry(defaultReconcileRequest)
 
 		expect(result.previews).toHaveLength(1)
-		expect(result.previewAliases).toHaveLength(1)
+		expect(result.previewScopes).toHaveLength(1)
 		expect(result.deployments).toHaveLength(1)
 		expect(result.previews[0].versionId).toBe('5dba9570-33c4-4375-b784-e1b34ad01569')
 		expect(result.previews[0].previewUrl).toBe('https://5dba9570-demo-worker.example-subdomain.workers.dev')
@@ -240,15 +240,15 @@ describe('preview registry', () => {
 					workerName: 'demo-worker',
 					versionId: defaultReconcileRequest.versionId,
 					previewUrl: defaultReconcileRequest.previewUrl,
-					alias: defaultReconcileRequest.previewAlias,
-					aliasPreviewUrl: defaultReconcileRequest.previewAliasUrl
+					scope: defaultReconcileRequest.previewScope,
+					scopeUrl: defaultReconcileRequest.previewScopeUrl
 				})
 			],
-			previewAliasRecords: [
-				createPreviewAliasRecordFixture({
+			previewScopeRecords: [
+				createPreviewScopeRecordFixture({
 					workerName: 'demo-worker',
-					alias: defaultReconcileRequest.previewAlias,
-					aliasPreviewUrl: defaultReconcileRequest.previewAliasUrl,
+					scope: defaultReconcileRequest.previewScope,
+					scopeUrl: defaultReconcileRequest.previewScopeUrl,
 					versionId: defaultReconcileRequest.versionId
 				})
 			],
@@ -261,7 +261,7 @@ describe('preview registry', () => {
 					versionId: defaultReconcileRequest.versionId,
 					previewId: 'preview:demo-worker:5dba9570-33c4-4375-b784-e1b34ad01569',
 					environment: 'preview',
-					url: defaultReconcileRequest.previewAliasUrl
+					url: defaultReconcileRequest.previewScopeUrl
 				})
 			]
 		})
@@ -272,14 +272,14 @@ describe('preview registry', () => {
 		})
 
 		expect(result.previews).toHaveLength(0)
-		expect(result.previewAliases).toHaveLength(0)
+		expect(result.previewScopes).toHaveLength(0)
 		expect(result.deployments).toHaveLength(0)
 		expect(recordedSql.some((sql) => sql.startsWith('INSERT INTO devflare_preview_records'))).toBe(false)
-		expect(recordedSql.some((sql) => sql.startsWith('INSERT INTO devflare_preview_alias_records'))).toBe(false)
+		expect(recordedSql.some((sql) => sql.startsWith('INSERT INTO devflare_preview_scope_records'))).toBe(false)
 		expect(recordedSql.some((sql) => sql.startsWith('INSERT INTO devflare_deployment_records'))).toBe(false)
 	})
 
-	test('retires a targeted preview, alias, and preview deployment without touching production records', async () => {
+	test('retires a targeted preview, scope, and preview deployment without touching production records', async () => {
 		process.env.CLOUDFLARE_API_TOKEN = 'cf_test_token'
 		const recordedStatements: Array<{ sql: string; params: unknown[] }> = []
 		globalThis.fetch = createPreviewRegistryFetch({
@@ -289,16 +289,16 @@ describe('preview registry', () => {
 					workerName: 'demo-worker',
 					versionId: defaultReconcileRequest.versionId,
 					previewUrl: defaultReconcileRequest.previewUrl,
-					alias: defaultReconcileRequest.previewAlias,
-					aliasPreviewUrl: defaultReconcileRequest.previewAliasUrl,
+					scope: defaultReconcileRequest.previewScope,
+					scopeUrl: defaultReconcileRequest.previewScopeUrl,
 					branchName: defaultReconcileRequest.branchName
 				})
 			],
-			previewAliasRecords: [
-				createPreviewAliasRecordFixture({
+			previewScopeRecords: [
+				createPreviewScopeRecordFixture({
 					workerName: 'demo-worker',
-					alias: defaultReconcileRequest.previewAlias,
-					aliasPreviewUrl: defaultReconcileRequest.previewAliasUrl,
+					scope: defaultReconcileRequest.previewScope,
+					scopeUrl: defaultReconcileRequest.previewScopeUrl,
 					versionId: defaultReconcileRequest.versionId,
 					branchName: defaultReconcileRequest.branchName
 				})
@@ -312,7 +312,7 @@ describe('preview registry', () => {
 					versionId: defaultReconcileRequest.versionId,
 					previewId: 'preview:demo-worker:5dba9570-33c4-4375-b784-e1b34ad01569',
 					environment: 'preview',
-					url: defaultReconcileRequest.previewAliasUrl
+					url: defaultReconcileRequest.previewScopeUrl
 				}),
 				createDeploymentRecordFixture({
 					id: 'deployment:demo-worker:deployment_123',
@@ -331,12 +331,12 @@ describe('preview registry', () => {
 		const result = await retirePreviewRegistry({
 			accountId: 'acc_123',
 			workerName: 'demo-worker',
-			branchName: 'feature/branch',
+			previewScope: 'feature-branch',
 			apply: true
 		})
 
 		expect(result.candidates.previews).toHaveLength(1)
-		expect(result.candidates.aliases).toHaveLength(1)
+		expect(result.candidates.scopes).toHaveLength(1)
 		expect(result.candidates.deployments).toHaveLength(1)
 		expect(result.candidates.deployments[0].channel).toBe('preview')
 		expect(

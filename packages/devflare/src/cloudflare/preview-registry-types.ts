@@ -2,7 +2,7 @@ import type { ConsolaInstance } from 'consola'
 import type { APIClientOptions } from './api'
 import type {
 	DevflareDeploymentRecord,
-	DevflarePreviewAliasRecord,
+	DevflarePreviewScopeRecord,
 	DevflarePreviewRecord,
 	DevflareRecordSource
 } from './registry-schema'
@@ -49,9 +49,9 @@ export interface ReconcilePreviewRegistryOptions {
 	workerName: string
 	databaseName?: string
 	apiOptions?: APIClientOptions
-	previewAlias?: string
+	previewScope?: string
 	previewUrl?: string
-	previewAliasUrl?: string
+	previewScopeUrl?: string
 	branchName?: string
 	commitSha?: string
 	versionId?: string
@@ -64,7 +64,7 @@ export interface ReconcilePreviewRegistryOptions {
 export interface ReconcilePreviewRegistryResult {
 	registry: PreviewRegistryContext
 	previews: DevflarePreviewRecord[]
-	previewAliases: DevflarePreviewAliasRecord[]
+	previewScopes: DevflarePreviewScopeRecord[]
 	deployments: DevflareDeploymentRecord[]
 }
 
@@ -82,11 +82,11 @@ export interface CleanupPreviewRegistryOptions {
 export interface CleanupPreviewRegistryResult {
 	registry: PreviewRegistryContext
 	previews: DevflarePreviewRecord[]
-	aliases: DevflarePreviewAliasRecord[]
+	scopes: DevflarePreviewScopeRecord[]
 	deployments: DevflareDeploymentRecord[]
 	candidates: {
 		previews: DevflarePreviewRecord[]
-		aliases: DevflarePreviewAliasRecord[]
+		scopes: DevflarePreviewScopeRecord[]
 		deployments: DevflareDeploymentRecord[]
 	}
 	applied: boolean
@@ -98,7 +98,7 @@ export interface RetirePreviewRegistryOptions {
 	databaseName?: string
 	apiOptions?: APIClientOptions
 	branchName?: string
-	previewAlias?: string
+	previewScope?: string
 	versionId?: string
 	commitSha?: string
 	apply?: boolean
@@ -109,11 +109,11 @@ export interface RetirePreviewRegistryOptions {
 export interface RetirePreviewRegistryResult {
 	registry: PreviewRegistryContext
 	previews: DevflarePreviewRecord[]
-	aliases: DevflarePreviewAliasRecord[]
+	scopes: DevflarePreviewScopeRecord[]
 	deployments: DevflareDeploymentRecord[]
 	candidates: {
 		previews: DevflarePreviewRecord[]
-		aliases: DevflarePreviewAliasRecord[]
+		scopes: DevflarePreviewScopeRecord[]
 		deployments: DevflareDeploymentRecord[]
 	}
 	applied: boolean

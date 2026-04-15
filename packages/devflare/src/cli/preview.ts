@@ -21,17 +21,6 @@ function normalizeWorkersSubdomain(accountSubdomain: string): string {
 		.replace(/\.workers\.dev\/?$/i, '')
 }
 
-
-export function formatPreviewAliasUrl(
-	alias: string,
-	workerName: string,
-	accountSubdomain: string
-): string {
-	const normalizedSubdomain = normalizeWorkersSubdomain(accountSubdomain)
-
-	return `https://${alias}-${workerName}.${normalizedSubdomain}.workers.dev`
-}
-
 export function formatWorkersDevUrl(
 	workerName: string,
 	accountSubdomain: string

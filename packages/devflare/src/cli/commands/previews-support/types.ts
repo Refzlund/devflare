@@ -2,7 +2,7 @@ import type { PreviewIdentifierSource } from '../../../config'
 import { cleanupPreviewScopedResources } from '../../../config/preview-resources'
 import type {
 	DevflareDeploymentRecord,
-	DevflarePreviewAliasRecord,
+	DevflarePreviewScopeRecord,
 	DevflarePreviewRecord,
 	PreviewRegistryContext
 } from '../../../cloudflare'
@@ -44,7 +44,7 @@ export interface TableColumn<Row> {
 export interface WorkerDisplayGroup {
 	workerName: string
 	previews: DevflarePreviewRecord[]
-	aliases: DevflarePreviewAliasRecord[]
+	scopes: DevflarePreviewScopeRecord[]
 	deployments: DevflareDeploymentRecord[]
 	latestTimestamp: number
 }
@@ -104,7 +104,7 @@ export interface PreviewStateScope {
 
 export interface PreviewRegistryRows {
 	previews: DevflarePreviewRecord[]
-	aliases: DevflarePreviewAliasRecord[]
+	scopes: DevflarePreviewScopeRecord[]
 	deployments: DevflareDeploymentRecord[]
 }
 

@@ -215,7 +215,7 @@ describe('runCli', () => {
 		expect(viaFlag.output).toContain('devflare previews Inspect and clean dedicated preview Worker scopes')
 		expect(viaFlag.output).toContain('devflare previews cleanup [--config <path>] [--env <name>] [--scope <name> | --all] [--account <id>] [--apply]')
 		expect(viaFlag.output).toContain('--scope <name>')
-		expect(viaFlag.output).toContain('`cleanup` removes preview-only Cloudflare resources for the targeted scope and also deletes dedicated preview Worker scripts')
+		expect(viaFlag.output).toContain('`cleanup` removes preview-only Cloudflare resources for the targeted scope and also deletes dedicated preview-scope Worker scripts')
 	})
 
 	test('shows nested help for preview cleanup', async () => {

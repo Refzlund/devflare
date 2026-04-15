@@ -357,7 +357,7 @@ export const startHereDocs: DocPage[] = [
 		],
 		facts: [
 			{ label: 'Best for', value: 'Teams that want Cloudflare power without accumulating setup glue' },
-			{ label: 'Architecture shape', value: 'Config, runtime, tests, framework integration, and Cloudflare ops stay split on purpose' },
+			{ label: 'Architecture shape', value: 'Config, runtime, tests, framework integration, and Cloudflare ops are separate by design' },
 			{ label: 'Build lane', value: 'Rolldown composes worker and Durable Object artifacts; Vite stays optional' },
 			{ label: 'Still true', value: 'Cloudflare limits and Wrangler-compatible output still matter' }
 		],
@@ -422,7 +422,7 @@ export const startHereDocs: DocPage[] = [
 				id: 'why-the-codebase-stays-coherent',
 				title: 'Why the codebase stays coherent as the app grows',
 				description:
-					'The implementation is split by environment and lifecycle on purpose so the worker story can grow without collapsing into one giant tool blob.',
+					'The implementation splits by environment and lifecycle so the worker story can grow without collapsing into one giant tool blob.',
 				paragraphs: [
 					'`devflare/config` is for authored config, `devflare/runtime` is for worker code, `devflare/test` is for harnesses, and `devflare/vite` or `devflare/sveltekit` only join the picture when the package grows into a real app host. That split is one of the package\'s quiet strengths.',
 					'The build and local-dev story stays honest too. Rolldown is the worker builder, generated entrypoints keep worker surfaces explicit, and Vite or SvelteKit can sit outside the worker runtime instead of swallowing it.'
@@ -996,9 +996,9 @@ bunx --bun devflare dev`
 				callouts: [
 					{
 						tone: 'success',
-						title: 'Keep the first test boring on purpose',
+						title: 'Keep the first test boring',
 						body: [
-							'If the first test is obvious, failures are obvious too. That is exactly what you want while the worker is still tiny.'
+							'If the first test is obvious, failures are obvious too. That is what you want while the worker is still tiny.'
 						]
 					}
 				]
@@ -1301,9 +1301,9 @@ bunx --bun devflare dev`
 		navTitle: 'Deploy and Preview',
 		readTime: '4 min read',
 		eyebrow: 'Ship it',
-		title: 'Deploy one preview on purpose, then delete it cleanly when you are done',
+		title: 'Deploy one preview, then delete it cleanly',
 		summary:
-			'Take the same starter worker and ship one named preview on purpose, then remove that same preview scope cleanly when you are done.',
+			'Take the same starter worker, ship one named preview, then remove that preview scope cleanly.',
 		description:
 			'The project tree does not need to become more complicated for the first deploy. Use the same small worker, one memorable preview name, and one equally explicit cleanup command.',
 		highlights: [
@@ -1400,7 +1400,7 @@ bunx --bun devflare deploy --preview next`
 				callouts: [
 					{
 						tone: 'warning',
-						title: 'Delete previews on purpose too',
+						title: 'Delete previews explicitly too',
 						body: [
 							'Preview environments get messy when deploys are automated but cleanup rules live only in people’s heads. Use the same explicit naming discipline for teardown that you used for deploy.'
 						]
@@ -1596,7 +1596,7 @@ export function currentPath(): string {
 				],
 				snippets: [
 					{
-						title: 'The important part of `runWithEventContext()` is small on purpose',
+						title: 'The important part of `runWithEventContext()` is intentionally small',
 						language: 'ts',
 						code: String.raw`const context = {
 	env: event.env,
@@ -1660,13 +1660,14 @@ return storage.run(context, fn)`
 						['Tail handler', '`TailEvent`', '`getTailEvent()`'],
 						['Durable Object fetch', '`DurableObjectFetchEvent`', '`getDurableObjectFetchEvent()`'],
 						['Durable Object alarm', '`DurableObjectAlarmEvent`', '`getDurableObjectAlarmEvent()`'],
-						['Durable Object WebSocket message / close / error', 'Dedicated WebSocket event types', '`getDurableObjectWebSocketMessageEvent()`, `getDurableObjectWebSocketCloseEvent()`, `getDurableObjectWebSocketErrorEvent()`']
+						['Durable Object WebSocket message / close / error', 'Dedicated WebSocket event types', '`getDurableObjectWebSocketMessageEvent()`, `getDurableObjectWebSocketCloseEvent()`, `getDurableObjectWebSocketErrorEvent()`'],
+						['Any Durable Object surface', '`DurableObjectEvent`', '`getDurableObjectEvent()`']
 					]
 				},
 				paragraphs: [
 					'Worker surfaces expose `event.ctx` as the current `ExecutionContext`. Durable Object surfaces expose `event.ctx` as the current `DurableObjectState`, and Devflare also aliases that same value as `event.state` for clarity.',
-					'For fetch and Durable Object fetch, Devflare augments the actual `Request` instance. For queue, scheduled, email, tail, and Durable Object WebSocket surfaces, it augments the native carrier object instead of replacing it with a fantasy wrapper. That is why the event-first API still feels like Cloudflare instead of a new platform.',
-					'This is why the runtime feels consistent across local dev, tests, route middleware, and Durable Object wrappers once you learn the model once.'
+					'For fetch and Durable Object fetch, Devflare augments the actual `Request` instance. For queue, scheduled, email, tail, and Durable Object WebSocket surfaces, it augments the native carrier object instead of replacing it with a fantasy wrapper.',
+					'Three general-purpose utilities round out the API: `hasContext()` checks whether a context is active, `getEventContext()` returns the current event regardless of surface type, and `getEventContextOrNull()` does the same but returns `null` outside a context.'
 				]
 			},
 			{
@@ -1771,7 +1772,7 @@ export const handle = sequence(requestId)`
 		sections: [
 			{
 				id: 'two-layers',
-				title: 'There are two HTTP layers on purpose',
+				title: 'Two HTTP layers by design',
 				cards: [
 					{
 						title: '`src/fetch.ts`',

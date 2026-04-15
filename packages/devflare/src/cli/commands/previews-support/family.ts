@@ -2,7 +2,7 @@ import {
 	account,
 	listTrackedRegistryState,
 	type DevflareDeploymentRecord,
-	type DevflarePreviewAliasRecord,
+	type DevflarePreviewScopeRecord,
 	type DevflarePreviewRecord,
 	type WorkerInfo
 } from '../../../cloudflare'
@@ -28,7 +28,7 @@ function getPreviewDisplayTimestamp(record: DevflarePreviewRecord): number {
 	return (record.updatedAt ?? record.createdAt).getTime()
 }
 
-function getAliasDisplayTimestamp(record: DevflarePreviewAliasRecord): number {
+function getScopeDisplayTimestamp(record: DevflarePreviewScopeRecord): number {
 	return (record.updatedAt ?? record.createdAt).getTime()
 }
 
@@ -58,7 +58,7 @@ function ensureWorkerGroup(
 	const created: WorkerDisplayGroup = {
 		workerName,
 		previews: [],
-		aliases: [],
+		scopes: [],
 		deployments: [],
 		latestTimestamp: 0
 	}
@@ -92,8 +92,8 @@ function isVisibleTrackedRecord(
 }
 
 export function getPreviewDisplayLabel(record: DevflarePreviewRecord): string {
-	if (record.alias) {
-		return record.alias
+	if (record.scope) {
+		return record.scope
 	}
 
 	if (record.branchName?.trim()) {
@@ -105,7 +105,7 @@ export function getPreviewDisplayLabel(record: DevflarePreviewRecord): string {
 
 export function buildWorkerGroups(
 	previews: DevflarePreviewRecord[],
-	aliases: DevflarePreviewAliasRecord[],
+	scopes: DevflarePreviewScopeRecord[],
 	deployments: DevflareDeploymentRecord[]
 ): WorkerDisplayGroup[] {
 	const groups = new Map<string, WorkerDisplayGroup>()
@@ -116,11 +116,11 @@ export function buildWorkerGroups(
 		},
 		getTimestamp: getPreviewDisplayTimestamp
 	})
-	appendWorkerGroupRecords(groups, aliases, {
+	appendWorkerGroupRecords(groups, scopes, {
 		append: (group, record) => {
-			group.aliases.push(record)
+			group.scopes.push(record)
 		},
-		getTimestamp: getAliasDisplayTimestamp
+		getTimestamp: getScopeDisplayTimestamp
 	})
 	appendWorkerGroupRecords(groups, deployments, {
 		append: (group, record) => {
@@ -199,7 +199,7 @@ function getGroupDisplayUrl(group: WorkerDisplayGroup): string | undefined {
 		?? getLatestDeployment(group, (record) => Boolean(record.url))?.url
 		?? [...group.previews]
 			.sort((left, right) => getPreviewDisplayTimestamp(right) - getPreviewDisplayTimestamp(left))[0]
-			?.aliasPreviewUrl
+			?.scopeUrl
 		?? [...group.previews]
 			.sort((left, right) => getPreviewDisplayTimestamp(right) - getPreviewDisplayTimestamp(left))[0]
 			?.previewUrl
@@ -485,7 +485,7 @@ export function isVisiblePreviewRecord(record: DevflarePreviewRecord, includeAll
 	return isVisibleTrackedRecord(record, includeAll)
 }
 
-export function isVisibleAliasRecord(record: DevflarePreviewAliasRecord, includeAll: boolean): boolean {
+export function isVisibleScopeRecord(record: DevflarePreviewScopeRecord, includeAll: boolean): boolean {
 	return isVisibleTrackedRecord(record, includeAll)
 }
 
@@ -510,18 +510,18 @@ export async function loadTrackedPreviewScopeRows(
 		return []
 	}
 
-	const { previews, aliases, deployments } = await listTrackedRegistryState({
+	const { previews, scopes, deployments } = await listTrackedRegistryState({
 		registry,
 		workerName: undefined,
 		apiOptions
 	})
 	const filteredPreviews = filterFamilyRecords(previews, families)
 		.filter((record) => isVisiblePreviewRecord(record, false))
-	const filteredAliases = filterFamilyRecords(aliases, families)
-		.filter((record) => isVisibleAliasRecord(record, false))
+	const filteredScopes = filterFamilyRecords(scopes, families)
+		.filter((record) => isVisibleScopeRecord(record, false))
 	const filteredDeployments = filterFamilyRecords(deployments, families)
 		.filter((record) => isVisibleDeploymentRecord(record, false))
-	const workerGroups = buildWorkerGroups(filteredPreviews, filteredAliases, filteredDeployments)
+	const workerGroups = buildWorkerGroups(filteredPreviews, filteredScopes, filteredDeployments)
 
 	return buildPreviewScopeRows(families, buildWorkerGroupMap(workerGroups))
 }

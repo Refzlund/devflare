@@ -637,7 +637,7 @@ export async function runDeployCommand(
 				if (!resolvedVersionId) {
 					if (isBranchScopedPreviewDeployment && resolvedPreviewUrl) {
 						logger.warn(
-							`Deployment verification note: Wrangler completed the named preview-scope deploy for Worker "${prepared.config.name}" and exposed ${resolvedPreviewUrl}, but Cloudflare did not return a Worker version id. Devflare is treating this branch-scoped preview deploy as successful because named preview workers can lag in control-plane version metadata.`
+							`Deployment verification note: Wrangler completed the named preview-scope deploy for Worker "${prepared.config.name}" and exposed ${resolvedPreviewUrl}, but Cloudflare did not return a Worker version id. Devflare is treating this preview-scope deploy as successful because named preview workers can lag in control-plane version metadata.`
 						)
 					} else {
 						const recoveryDetails = versionRecoveryDiagnostics.length > 0
@@ -676,7 +676,7 @@ export async function runDeployCommand(
 			}
 
 			if (resolvedAccountId) {
-				const previewRegistryAlias = isBranchScopedPreviewDeployment
+				const previewRegistryScope = isBranchScopedPreviewDeployment
 					? deployTarget.previewScope
 					: undefined
 				const previewRegistryUrl = preview || isBranchScopedPreviewDeployment
@@ -688,7 +688,7 @@ export async function runDeployCommand(
 						accountId: resolvedAccountId,
 						workerName: prepared.config.name,
 						versionId: resolvedVersionId,
-						previewAlias: previewRegistryAlias,
+						previewScope: previewRegistryScope,
 						previewUrl: previewRegistryUrl,
 						branchName: resolvedPreviewScopeName,
 						commitSha: process.env.GITHUB_SHA,

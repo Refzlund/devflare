@@ -69,7 +69,7 @@ import {
 	getPreviewRegistryContext,
 	listTrackedRegistryState,
 	listTrackedPreviewRecords,
-	listTrackedPreviewAliasRecords,
+	listTrackedPreviewScopeRecords,
 	listTrackedDeploymentRecords,
 	reconcilePreviewRegistry,
 	cleanupPreviewRegistry,
@@ -82,11 +82,11 @@ export {
 	createDevflareAccountRecordSchema,
 	devflareRecordSourceSchema,
 	devflarePreviewStatusSchema,
-	devflarePreviewAliasStatusSchema,
+	devflarePreviewScopeStatusSchema,
 	devflareDeploymentChannelSchema,
 	devflareDeploymentStatusSchema,
 	devflarePreviewRecordSchema,
-	devflarePreviewAliasRecordSchema,
+	devflarePreviewScopeRecordSchema,
 	devflareDeploymentRecordSchema,
 	devflareAccountLayerRecordSchema
 } from './registry-schema'
@@ -313,11 +313,11 @@ export const account = {
 	/** List tracked preview records from the Devflare registry */
 	listTrackedPreviewRecords,
 
-	/** List tracked preview, alias, and deployment records from the Devflare registry */
+	/** List tracked preview, scope, and deployment records from the Devflare registry */
 	listTrackedRegistryState,
 
-	/** List tracked preview-name records from the Devflare registry */
-	listTrackedPreviewAliasRecords,
+	/** List tracked preview-scope records from the Devflare registry */
+	listTrackedPreviewScopeRecords,
 
 	/** List tracked deployment records from the Devflare registry */
 	listTrackedDeploymentRecords,
@@ -328,7 +328,7 @@ export const account = {
 	/** Clean up stale Devflare preview registry records */
 	cleanupPreviewRegistry,
 
-	/** Retire a tracked preview, alias, and preview deployment immediately */
+	/** Retire a tracked preview, scope, and preview deployment immediately */
 	retirePreviewRegistry
 } as const
 
@@ -370,11 +370,11 @@ export type {
 	DevflareAccountRecord,
 	DevflareRecordSource,
 	DevflarePreviewStatus,
-	DevflarePreviewAliasStatus,
+	DevflarePreviewScopeStatus,
 	DevflareDeploymentChannel,
 	DevflareDeploymentStatus,
 	DevflarePreviewRecord,
-	DevflarePreviewAliasRecord,
+	DevflarePreviewScopeRecord,
 	DevflareDeploymentRecord,
 	DevflareAccountLayerRecord
 } from './registry-schema'
@@ -391,7 +391,7 @@ export {
 	getPreviewRegistryContext,
 	listTrackedRegistryState,
 	listTrackedPreviewRecords,
-	listTrackedPreviewAliasRecords,
+	listTrackedPreviewScopeRecords,
 	listTrackedDeploymentRecords,
 	reconcilePreviewRegistry,
 	cleanupPreviewRegistry,

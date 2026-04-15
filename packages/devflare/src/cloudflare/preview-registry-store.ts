@@ -2,10 +2,10 @@ import { CloudflareAPIError, type APIClientOptions } from './api'
 import { queryD1Database } from './account-resources'
 import {
 	devflareDeploymentRecordSchema,
-	devflarePreviewAliasRecordSchema,
+	devflarePreviewScopeRecordSchema,
 	devflarePreviewRecordSchema,
 	type DevflareDeploymentRecord,
-	type DevflarePreviewAliasRecord,
+	type DevflarePreviewScopeRecord,
 	type DevflarePreviewRecord
 } from './registry-schema'
 import { toIsoString } from './preview-registry-records'
@@ -22,8 +22,8 @@ const REGISTRY_SCHEMA_STATEMENTS = [
 		worker_name TEXT NOT NULL,
 		version_id TEXT NOT NULL UNIQUE,
 		preview_url TEXT NOT NULL,
-		alias TEXT,
-		alias_preview_url TEXT,
+		scope TEXT,
+		scope_url TEXT,
 		branch_name TEXT,
 		commit_sha TEXT,
 		deployment_id TEXT,
@@ -37,13 +37,13 @@ const REGISTRY_SCHEMA_STATEMENTS = [
 	)` ,
 	'CREATE INDEX IF NOT EXISTS idx_devflare_preview_records_account_worker ON devflare_preview_records(account_id, worker_name)',
 	'CREATE INDEX IF NOT EXISTS idx_devflare_preview_records_status ON devflare_preview_records(status)',
-	`CREATE TABLE IF NOT EXISTS devflare_preview_alias_records (
+	`CREATE TABLE IF NOT EXISTS devflare_preview_scope_records (
 		id TEXT PRIMARY KEY,
 		ver INTEGER NOT NULL,
 		account_id TEXT NOT NULL,
 		worker_name TEXT NOT NULL,
-		alias TEXT NOT NULL,
-		alias_preview_url TEXT NOT NULL,
+		scope TEXT NOT NULL,
+		scope_url TEXT NOT NULL,
 		version_id TEXT NOT NULL,
 		preview_id TEXT,
 		branch_name TEXT,
@@ -56,8 +56,8 @@ const REGISTRY_SCHEMA_STATEMENTS = [
 		deleted_at TEXT,
 		payload_json TEXT NOT NULL
 	)` ,
-	'CREATE INDEX IF NOT EXISTS idx_devflare_preview_alias_records_account_worker ON devflare_preview_alias_records(account_id, worker_name)',
-	'CREATE INDEX IF NOT EXISTS idx_devflare_preview_alias_records_alias ON devflare_preview_alias_records(alias)',
+	'CREATE INDEX IF NOT EXISTS idx_devflare_preview_scope_records_account_worker ON devflare_preview_scope_records(account_id, worker_name)',
+	'CREATE INDEX IF NOT EXISTS idx_devflare_preview_scope_records_scope ON devflare_preview_scope_records(scope)',
 	`CREATE TABLE IF NOT EXISTS devflare_deployment_records (
 		id TEXT PRIMARY KEY,
 		ver INTEGER NOT NULL,
@@ -177,8 +177,8 @@ function parseStoredPreviewRecord(row: StoredRecordRow): DevflarePreviewRecord {
 	return devflarePreviewRecordSchema.parse(JSON.parse(row.payload_json))
 }
 
-function parseStoredPreviewAliasRecord(row: StoredRecordRow): DevflarePreviewAliasRecord {
-	return devflarePreviewAliasRecordSchema.parse(JSON.parse(row.payload_json))
+function parseStoredPreviewScopeRecord(row: StoredRecordRow): DevflarePreviewScopeRecord {
+	return devflarePreviewScopeRecordSchema.parse(JSON.parse(row.payload_json))
 }
 
 function parseStoredDeploymentRecord(row: StoredRecordRow): DevflareDeploymentRecord {
@@ -198,17 +198,17 @@ export async function readPreviewRows(
 	return rows.map((row) => parseStoredPreviewRecord(row))
 }
 
-export async function readPreviewAliasRows(
+export async function readPreviewScopeRows(
 	registry: PreviewRegistryContext,
 	workerName: string | undefined,
 	apiOptions?: APIClientOptions
-): Promise<DevflarePreviewAliasRecord[]> {
+): Promise<DevflarePreviewScopeRecord[]> {
 	const sql = workerName
-		? 'SELECT payload_json FROM devflare_preview_alias_records WHERE account_id = ? AND worker_name = ? ORDER BY created_at DESC'
-		: 'SELECT payload_json FROM devflare_preview_alias_records WHERE account_id = ? ORDER BY created_at DESC'
+		? 'SELECT payload_json FROM devflare_preview_scope_records WHERE account_id = ? AND worker_name = ? ORDER BY created_at DESC'
+		: 'SELECT payload_json FROM devflare_preview_scope_records WHERE account_id = ? ORDER BY created_at DESC'
 	const params = workerName ? [registry.accountId, workerName] : [registry.accountId]
 	const rows = await runQuery<StoredRecordRow>(registry, sql, params, apiOptions)
-	return rows.map((row) => parseStoredPreviewAliasRecord(row))
+	return rows.map((row) => parseStoredPreviewScopeRecord(row))
 }
 
 export async function readDeploymentRows(
@@ -239,8 +239,8 @@ export async function upsertPreviewRecord(
 			worker_name,
 			version_id,
 			preview_url,
-			alias,
-			alias_preview_url,
+			scope,
+			scope_url,
 			branch_name,
 			commit_sha,
 			deployment_id,
@@ -258,8 +258,8 @@ export async function upsertPreviewRecord(
 			worker_name = excluded.worker_name,
 			version_id = excluded.version_id,
 			preview_url = excluded.preview_url,
-			alias = excluded.alias,
-			alias_preview_url = excluded.alias_preview_url,
+			scope = excluded.scope,
+			scope_url = excluded.scope_url,
 			branch_name = excluded.branch_name,
 			commit_sha = excluded.commit_sha,
 			deployment_id = excluded.deployment_id,
@@ -277,8 +277,8 @@ export async function upsertPreviewRecord(
 			normalizedRecord.workerName,
 			normalizedRecord.versionId,
 			normalizedRecord.previewUrl,
-			normalizedRecord.alias ?? null,
-			normalizedRecord.aliasPreviewUrl ?? null,
+			normalizedRecord.scope ?? null,
+			normalizedRecord.scopeUrl ?? null,
 			normalizedRecord.branchName ?? null,
 			normalizedRecord.commitSha ?? null,
 			normalizedRecord.deploymentId ?? null,
@@ -294,21 +294,21 @@ export async function upsertPreviewRecord(
 	)
 }
 
-export async function upsertPreviewAliasRecord(
+export async function upsertPreviewScopeRecord(
 	registry: PreviewRegistryContext,
-	record: DevflarePreviewAliasRecord,
+	record: DevflarePreviewScopeRecord,
 	apiOptions?: APIClientOptions
 ): Promise<void> {
-	const normalizedRecord = devflarePreviewAliasRecordSchema.parse(record)
+	const normalizedRecord = devflarePreviewScopeRecordSchema.parse(record)
 	await runStatement(
 		registry,
-		`INSERT INTO devflare_preview_alias_records (
+		`INSERT INTO devflare_preview_scope_records (
 			id,
 			ver,
 			account_id,
 			worker_name,
-			alias,
-			alias_preview_url,
+			scope,
+			scope_url,
 			version_id,
 			preview_id,
 			branch_name,
@@ -325,8 +325,8 @@ export async function upsertPreviewAliasRecord(
 			ver = excluded.ver,
 			account_id = excluded.account_id,
 			worker_name = excluded.worker_name,
-			alias = excluded.alias,
-			alias_preview_url = excluded.alias_preview_url,
+			scope = excluded.scope,
+			scope_url = excluded.scope_url,
 			version_id = excluded.version_id,
 			preview_id = excluded.preview_id,
 			branch_name = excluded.branch_name,
@@ -343,8 +343,8 @@ export async function upsertPreviewAliasRecord(
 			normalizedRecord.ver,
 			normalizedRecord.accountId,
 			normalizedRecord.workerName,
-			normalizedRecord.alias,
-			normalizedRecord.aliasPreviewUrl,
+			normalizedRecord.scope,
+			normalizedRecord.scopeUrl,
 			normalizedRecord.versionId,
 			normalizedRecord.previewId ?? null,
 			normalizedRecord.branchName ?? null,

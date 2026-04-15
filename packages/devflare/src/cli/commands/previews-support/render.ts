@@ -11,7 +11,7 @@ import {
 	filterFamilyRecords,
 	filterRecordsForScope,
 	getPreviewDisplayLabel,
-	isVisibleAliasRecord,
+	isVisibleScopeRecord,
 	isVisibleDeploymentRecord,
 	isVisiblePreviewRecord
 } from './family'
@@ -112,7 +112,7 @@ function buildPreviewColumns(
 	const columns: TableColumn<WorkerDisplayGroup['previews'][number]>[] = []
 
 	columns.push({
-		label: 'Alias / Version',
+		label: 'Scope / Version',
 		width: 24,
 		value: (record) => getPreviewDisplayLabel(record)
 	})
@@ -126,22 +126,22 @@ function buildPreviewColumns(
 	})
 	columns.push({
 		label: 'URL',
-		value: (record) => record.aliasPreviewUrl ?? record.previewUrl
+		value: (record) => record.scopeUrl ?? record.previewUrl
 	})
 
 	return columns
 }
 
-function buildAliasColumns(
-	records: WorkerDisplayGroup['aliases'],
+function buildScopeColumns(
+	records: WorkerDisplayGroup['scopes'],
 	theme: PreviewOutputTheme
-): TableColumn<WorkerDisplayGroup['aliases'][number]>[] {
-	const columns: TableColumn<WorkerDisplayGroup['aliases'][number]>[] = []
+): TableColumn<WorkerDisplayGroup['scopes'][number]>[] {
+	const columns: TableColumn<WorkerDisplayGroup['scopes'][number]>[] = []
 
 	columns.push({
-		label: 'Alias',
+		label: 'Scope',
 		width: 24,
-		value: (record) => record.alias
+		value: (record) => record.scope
 	})
 
 	appendStatusColumn(records, columns, theme)
@@ -153,7 +153,7 @@ function buildAliasColumns(
 	})
 	columns.push({
 		label: 'URL',
-		value: (record) => record.aliasPreviewUrl
+		value: (record) => record.scopeUrl
 	})
 
 	return columns
@@ -279,7 +279,7 @@ function buildSectionLines<Row>(
 	const widths = columns.map((column) => column.width)
 	const coloredTitle = title === 'Previews' || title === 'Preview scopes'
 		? cyanBold(title, theme)
-		: title === 'Aliases' || title === 'Stable workers'
+		: title === 'Scopes' || title === 'Stable workers'
 			? bold(title, theme)
 			: yellowBold(title, theme)
 	return [
@@ -289,12 +289,12 @@ function buildSectionLines<Row>(
 	]
 }
 
-function shouldShowAliasSection(
+function shouldShowScopeSection(
 	previews: WorkerDisplayGroup['previews'],
-	aliases: WorkerDisplayGroup['aliases'],
+	scopes: WorkerDisplayGroup['scopes'],
 	includeAll: boolean
 ): boolean {
-	if (aliases.length === 0) {
+	if (scopes.length === 0) {
 		return false
 	}
 
@@ -302,14 +302,14 @@ function shouldShowAliasSection(
 		return true
 	}
 
-	const previewAliasKeys = new Set(
+	const previewScopeKeys = new Set(
 		previews
-			.filter((record) => record.alias && record.aliasPreviewUrl)
-			.map((record) => `${record.workerName}\u0000${record.alias}\u0000${record.versionId}\u0000${record.aliasPreviewUrl}`)
+			.filter((record) => record.scope && record.scopeUrl)
+			.map((record) => `${record.workerName}\u0000${record.scope}\u0000${record.versionId}\u0000${record.scopeUrl}`)
 	)
 
-	return aliases.some((record) => !previewAliasKeys.has(
-		`${record.workerName}\u0000${record.alias}\u0000${record.versionId}\u0000${record.aliasPreviewUrl}`
+	return scopes.some((record) => !previewScopeKeys.has(
+		`${record.workerName}\u0000${record.scope}\u0000${record.versionId}\u0000${record.scopeUrl}`
 	))
 }
 
@@ -319,11 +319,11 @@ function logWorkerGroup(
 	includeAll: boolean,
 	theme: PreviewOutputTheme
 ): void {
-	const showAliases = shouldShowAliasSection(group.previews, group.aliases, includeAll)
+	const showScopes = shouldShowScopeSection(group.previews, group.scopes, includeAll)
 	const lines: string[] = []
 	const previewLines = buildSectionLines('Previews', group.previews, buildPreviewColumns(group.previews, theme), theme)
-	const aliasLines = showAliases
-		? buildSectionLines('Aliases', group.aliases, buildAliasColumns(group.aliases, theme), theme)
+	const scopeLines = showScopes
+		? buildSectionLines('Scopes', group.scopes, buildScopeColumns(group.scopes, theme), theme)
 		: []
 	const deploymentLines = buildSectionLines(
 		'Deployments',
@@ -332,7 +332,7 @@ function logWorkerGroup(
 		theme
 	)
 
-	for (const sectionLines of [previewLines, aliasLines, deploymentLines]) {
+	for (const sectionLines of [previewLines, scopeLines, deploymentLines]) {
 		if (sectionLines.length === 0) {
 			continue
 		}
@@ -370,27 +370,27 @@ export async function showTrackedState(
 	theme: PreviewOutputTheme,
 	apiOptions?: { timeout?: number }
 ): Promise<void> {
-	const { previews, aliases, deployments } = await listTrackedRegistryState({
+	const { previews, scopes, deployments } = await listTrackedRegistryState({
 		registry,
 		workerName: scope.workerFamilyName ? undefined : scope.workerName,
 		apiOptions
 	})
 	const scopedPreviews = filterRecordsForScope(previews, scope)
-	const scopedAliases = filterRecordsForScope(aliases, scope)
+	const scopedScopes = filterRecordsForScope(scopes, scope)
 	const scopedDeployments = filterRecordsForScope(deployments, scope)
 	const filteredPreviews = scopedPreviews.filter((record) => isVisiblePreviewRecord(record, includeAll))
-	const filteredAliases = scopedAliases.filter((record) => isVisibleAliasRecord(record, includeAll))
+	const filteredScopes = scopedScopes.filter((record) => isVisibleScopeRecord(record, includeAll))
 	const filteredDeployments = scopedDeployments.filter((record) => isVisibleDeploymentRecord(record, includeAll))
-	const workerGroups = buildWorkerGroups(filteredPreviews, filteredAliases, filteredDeployments)
+	const workerGroups = buildWorkerGroups(filteredPreviews, filteredScopes, filteredDeployments)
 	const scopeLabel = scope.workerFamilyName ? `${scope.workerFamilyName}*` : scope.workerName
 	const hasHistoricalRecords = !includeAll
 		&& (
 			filteredPreviews.length < scopedPreviews.length
-			|| filteredAliases.length < scopedAliases.length
+			|| filteredScopes.length < scopedScopes.length
 			|| filteredDeployments.length < scopedDeployments.length
 		)
 
-	if (filteredPreviews.length === 0 && filteredAliases.length === 0 && filteredDeployments.length === 0) {
+	if (filteredPreviews.length === 0 && filteredScopes.length === 0 && filteredDeployments.length === 0) {
 		logLine(logger)
 		if (hasHistoricalRecords) {
 			logLine(
@@ -424,18 +424,18 @@ export async function showWorkerFamilyOverview(
 	theme: PreviewOutputTheme,
 	apiOptions?: { timeout?: number }
 ): Promise<void> {
-	const { previews, aliases, deployments } = await listTrackedRegistryState({
+	const { previews, scopes, deployments } = await listTrackedRegistryState({
 		registry,
 		workerName: undefined,
 		apiOptions
 	})
 	const filteredPreviews = filterFamilyRecords(previews, families)
 		.filter((record) => isVisiblePreviewRecord(record, includeAll))
-	const filteredAliases = filterFamilyRecords(aliases, families)
-		.filter((record) => isVisibleAliasRecord(record, includeAll))
+	const filteredScopes = filterFamilyRecords(scopes, families)
+		.filter((record) => isVisibleScopeRecord(record, includeAll))
 	const filteredDeployments = filterFamilyRecords(deployments, families)
 		.filter((record) => isVisibleDeploymentRecord(record, includeAll))
-	const workerGroups = buildWorkerGroups(filteredPreviews, filteredAliases, filteredDeployments)
+	const workerGroups = buildWorkerGroups(filteredPreviews, filteredScopes, filteredDeployments)
 	const groupsByWorker = buildWorkerGroupMap(workerGroups)
 	const stableRows = buildStableWorkerRows(families, groupsByWorker)
 	const previewScopeRows = buildPreviewScopeRows(families, groupsByWorker)

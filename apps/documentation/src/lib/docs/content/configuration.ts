@@ -1,4 +1,4 @@
-import type { DocPage } from '../types'
+﻿import type { DocPage } from '../types'
 
 const docsLink = (slug: string): string => `/docs/${slug}`
 
@@ -367,7 +367,7 @@ export const configurationDocs: DocPage[] = [
 		highlights: [
 			'Use this page when you want the canonical config shape in one glance before opening the deeper pages for one lane.',
 			'Every property shown in the example is a real current config key and is covered by inline hover help on this page.',
-			'The example keeps binding values readable on purpose, using common shorthand where that says the same thing more clearly than an id-heavy object form.',
+			'The example keeps binding values readable, using common shorthand where that says the same thing more clearly than an id-heavy object form.',
 			'Deeper pages still own the richer variants, caveats, and operational details for each lane.'
 		],
 		facts: [
@@ -540,7 +540,7 @@ export const configurationDocs: DocPage[] = [
 				callouts: [
 					{
 						tone: 'warning',
-						title: 'Conventions are only helpful when they still describe the project honestly',
+						title: 'Conventions are only helpful when they still describe the project accurately',
 						body: [
 							'As soon as a default convention stops being obvious, move back to explicit config. That is usually the more maintainable choice.'
 						]
@@ -615,7 +615,7 @@ export const configurationDocs: DocPage[] = [
 				title: 'Keep one base config and let the overlay change only the deltas',
 				paragraphs: [
 					'The main config should describe the stable project: the worker name, the usual file surfaces, and the bindings or defaults that exist regardless of environment. `config.env` is where you change only the parts that diverge for preview, production, or another named lane.',
-					'That is why the overlay model feels calmer than copying whole config files around. The shared story stays in one place, while the environment-specific differences stay small enough to review honestly.'
+					'The overlay model feels more predictable than copying whole config files around. The shared story stays in one place, while the environment-specific differences stay small enough to review accurately.'
 				],
 				snippets: [
 					{
@@ -744,7 +744,7 @@ export const configurationDocs: DocPage[] = [
 						tone: 'success',
 						title: 'This is safer than repointing previews at production state',
 						body: [
-							'When the preview owns a distinct database or queue name, it can be created quickly, reviewed honestly, and deleted cleanly later. That is much safer than hoping reviewers never touch a production binding in a preview session.'
+							'When the preview owns a distinct database or queue name, it can be created quickly, reviewed in isolation, and deleted cleanly later. That is much safer than hoping reviewers never touch a production binding in a preview session.'
 						]
 					}
 				]
@@ -970,7 +970,7 @@ export const configurationDocs: DocPage[] = [
 					{
 						label: 'Configuration',
 						title: 'Need the generated type contract?',
-						body: 'Open the generated types page when `files.entrypoints`, `ref()`, or discovered Durable Objects need to show up honestly in `env.d.ts`.',
+						body: 'Open the generated types page when `files.entrypoints`, `ref()`, or discovered Durable Objects need to show up correctly in `env.d.ts`.',
 						href: docsLink('generated-types')
 					},
 					{
@@ -993,7 +993,7 @@ export const configurationDocs: DocPage[] = [
 		summary:
 			'`devflare types` turns config, discovered Durable Objects, named entrypoints, and cross-worker references into one generated TypeScript contract instead of a pile of hand-maintained env guesswork.',
 		description:
-			'The generated file is more than editor garnish. It is the typed mirror of your Devflare config and discovery rules: bindings land on global `DevflareEnv`, named entrypoints become an exported `Entrypoints` union, and referenced workers can produce typed service interfaces when Devflare can follow them honestly.',
+			'The generated file is more than editor garnish. It is the typed mirror of your Devflare config and discovery rules: bindings land on global `DevflareEnv`, named entrypoints become an exported `Entrypoints` union, and referenced workers can produce typed service interfaces when Devflare can follow them accurately.',
 		highlights: [
 			'`devflare types` writes `env.d.ts` relative to the current working directory by default, or another path when you pass `--output`.',
 			'Bindings, vars, secrets, Durable Objects, service bindings, and named entrypoints all feed the generated contract.',
@@ -1022,7 +1022,7 @@ export const configurationDocs: DocPage[] = [
 				id: 'generated-contract',
 				title: 'Treat the generated file as the typed contract, not as handwritten glue',
 				paragraphs: [
-					'`devflare types` reads the resolved config, discovers supporting source files, and writes one generated file that says what the package runtime actually exposes. That is calmer than hand-maintained `env` declarations because the source of truth stays in config and file discovery, not in a second hand-maintained type file.',
+					'`devflare types` reads the resolved config, discovers supporting source files, and writes one generated file that says what the package runtime actually exposes. This is more reliable than hand-maintained `env` declarations because the source of truth stays in config and file discovery, not in a second hand-maintained type file.',
 					'The result is usually a global `DevflareEnv` interface plus an exported `Entrypoints` union. That combination is what keeps bindings, cross-worker service calls, and named entrypoints typed without making you manually mirror every config change.'
 				],
 				snippets: [
@@ -1055,14 +1055,14 @@ bunx --bun devflare types --output env.generated.d.ts`
 					headers: ['Input Devflare reads', 'Where it comes from', 'Typed result'],
 					rows: [
 						['`bindings`, `vars`, and `secrets`', 'The resolved top-level `devflare.config.*` from the current working directory or explicit `--config` path.', 'Members on global `DevflareEnv`.'],
-						['Local Durable Object classes', '`files.durableObjects` or the default `**/do.*.{ts,js}` discovery pattern.', '`DurableObjectNamespace<...>` when the class can be located honestly.'],
+						['Local Durable Object classes', '`files.durableObjects` or the default `**/do.*.{ts,js}` discovery pattern.', '`DurableObjectNamespace<...>` when the class can be located accurately.'],
 						['Named worker entrypoints', '`files.entrypoints` or the default `**/ep.*.{ts,js}` discovery pattern plus exported classes extending `WorkerEntrypoint`.', 'An exported `Entrypoints` union for `defineConfig<Entrypoints>()`.'],
 						['`ref()` references', 'Imported Devflare configs in other packages or subfolders.', 'Typed service bindings and cross-worker Durable Object namespaces when Devflare can resolve them.'],
 						['Unknown or unresolvable service surface', 'A target worker or entrypoint that cannot be turned into a stable interface.', '`Fetcher` fallback instead of fake precision.']
 					]
 				},
 				bullets: [
-					'If no named entrypoints are discovered yet, `Entrypoints` stays `string` on purpose.',
+					'If no named entrypoints are discovered yet, `Entrypoints` stays `string` — the fallback is intentional.',
 					'`devflare types` does not take an `--env` flag today, so the generated contract reflects the resolved base config rather than a named environment overlay.',
 					'If you choose a nested `--output` path, create the parent directory first; the command writes the file but does not scaffold missing folders for you.',
 					'Discovery follows the configured file patterns first, then falls back to the default Durable Object and entrypoint globs.',
@@ -1197,7 +1197,7 @@ export default defineConfig({
 		summary:
 			'Use config for account context, compatibility posture, assets, deployment routes, WebSocket proxy rules, migrations, observability, limits, and preview cron behavior instead of rediscovering those settings in scripts later.',
 		description:
-			'Devflare exposes several config lanes that are not about file discovery at all. These keys shape runtime identity, Cloudflare compatibility, deployment routing, assets, release behavior, and operational posture, so they belong in authored config where the team can review them honestly.',
+			'Devflare exposes several config lanes that are not about file discovery at all. These keys shape runtime identity, Cloudflare compatibility, deployment routing, assets, release behavior, and operational posture, so they belong in authored config where the team can review them accurately.',
 		highlights: [
 			'`accountId` matters when remote bindings, name-based resource resolution, or account-aware operations should target one Cloudflare account explicitly.',
 			'`compatibilityDate` defaults to the current date, and Devflare always includes `nodejs_compat` plus `nodejs_als` in compatibility flags.',
@@ -1220,7 +1220,7 @@ export default defineConfig({
 		sections: [
 			{
 				id: 'identity-and-compat',
-				title: 'Set runtime identity and compatibility posture on purpose',
+				title: 'Set runtime identity and compatibility posture explicitly',
 				paragraphs: [
 					'Not every package needs the full advanced runtime section on day one, but once remote bindings, compatibility drift, or account-aware operations matter, these settings should move into config instead of living in loose scripts and remembered defaults.',
 					'The important habit is that runtime posture should be reviewable in source control. If a package relies on a specific compatibility date or a specific Cloudflare account, that fact should be obvious before the deploy step runs.'
@@ -1229,7 +1229,7 @@ export default defineConfig({
 					headers: ['Key', 'Use it when', 'Important behavior'],
 					rows: [
 						['`accountId`', 'Remote bindings, name-based resource lookup, or account-aware commands should target one Cloudflare account explicitly.', 'Remote AI and Vectorize flows need a clear account, and config-level `accountId` becomes one resolution lane for account-aware operations and config-driven resource resolution.'],
-						['`compatibilityDate`', 'The package should pin runtime behavior instead of inheriting date drift.', 'Devflare defaults it to the current date when you omit it, so explicit pinning is the calmer choice once the package is real.'],
+						['`compatibilityDate`', 'The package should pin runtime behavior instead of inheriting date drift.', 'Devflare defaults it to the current date when you omit it, so explicit pinning is the safer choice once the package is real.'],
 						['`compatibilityFlags`', 'You need extra Workers compatibility flags beyond the default posture.', 'Devflare always includes `nodejs_compat` and `nodejs_als`, so custom flags should be deliberate additions instead of copy-by-habit repetition.']
 					]
 				},
@@ -1289,7 +1289,7 @@ export default defineConfig({
 				},
 				paragraphs: [
 					'Once a package has Durable Object history, production traffic expectations, or explicit preview behavior, the runtime contract is no longer just “what files exist?” It also includes how that package should be migrated, sampled, and limited at runtime.',
-					'That is why these settings belong in the same config as the Worker surfaces. They are part of the deployable contract, not just garnish around it.'
+					'These settings belong in the same config as the Worker surfaces. They are part of the deployable contract, not just garnish around it.'
 				],
 				callouts: [
 					{

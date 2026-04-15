@@ -6,10 +6,10 @@ import type {
 } from './types'
 import {
 	devflareDeploymentRecordSchema,
-	devflarePreviewAliasRecordSchema,
+	devflarePreviewScopeRecordSchema,
 	devflarePreviewRecordSchema,
 	type DevflareDeploymentRecord,
-	type DevflarePreviewAliasRecord,
+	type DevflarePreviewScopeRecord,
 	type DevflarePreviewRecord,
 	type DevflareRecordSource
 } from './registry-schema'
@@ -17,7 +17,7 @@ import type {
 	ReconcilePreviewRegistryOptions,
 	RetirePreviewRegistryOptions
 } from './preview-registry-types'
-import { formatPreviewAliasUrl, formatVersionPreviewUrl } from '../cli/preview'
+import { formatVersionPreviewUrl } from '../cli/preview'
 
 export function toIsoString(date: Date | undefined): string | null {
 	return date ? date.toISOString() : null
@@ -50,8 +50,8 @@ export function getPreviewRecordId(workerName: string, versionId: string): strin
 	return `preview:${workerName}:${versionId}`
 }
 
-export function getPreviewAliasRecordId(workerName: string, alias: string): string {
-	return `previewAlias:${workerName}:${alias}`
+export function getPreviewScopeRecordId(workerName: string, scope: string): string {
+	return `previewScope:${workerName}:${scope}`
 }
 
 export function getPreviewDeploymentId(workerName: string, versionId: string): string {
@@ -65,7 +65,7 @@ export function getDeploymentRecordId(workerName: string, deploymentId: string):
 export function hasRetireSelector(options: RetirePreviewRegistryOptions): boolean {
 	return Boolean(
 		options.branchName
-		|| options.previewAlias
+		|| options.previewScope
 		|| options.versionId
 		|| options.commitSha
 	)
@@ -75,31 +75,31 @@ function matchesRetireSelector(
 	options: RetirePreviewRegistryOptions,
 	candidate: {
 		branchName?: string | null
-		previewAlias?: string | null
+		previewScope?: string | null
 		versionId?: string | null
 		commitSha?: string | null
 	}
 ): boolean {
 	return (options.branchName !== undefined && candidate.branchName === options.branchName)
-		|| (options.previewAlias !== undefined && candidate.previewAlias === options.previewAlias)
+		|| (options.previewScope !== undefined && candidate.previewScope === options.previewScope)
 		|| (options.versionId !== undefined && candidate.versionId === options.versionId)
 		|| (options.commitSha !== undefined && candidate.commitSha === options.commitSha)
 }
 
 function getPreviewRetireCandidate(record: {
 	branchName?: string | null
-	alias?: string | null
+	scope?: string | null
 	versionId?: string | null
 	commitSha?: string | null
 }): {
 	branchName?: string | null
-	previewAlias?: string | null
+	previewScope?: string | null
 	versionId?: string | null
 	commitSha?: string | null
 } {
 	return {
 		branchName: record.branchName,
-		previewAlias: record.alias,
+		previewScope: record.scope,
 		versionId: record.versionId,
 		commitSha: record.commitSha
 	}
@@ -112,8 +112,8 @@ export function matchesPreviewRetireTarget(
 	return matchesRetireSelector(options, getPreviewRetireCandidate(record))
 }
 
-export function matchesPreviewAliasRetireTarget(
-	record: DevflarePreviewAliasRecord,
+export function matchesPreviewScopeRetireTarget(
+	record: DevflarePreviewScopeRecord,
 	options: RetirePreviewRegistryOptions
 ): boolean {
 	return matchesRetireSelector(options, getPreviewRetireCandidate(record))
@@ -198,25 +198,24 @@ export function buildPreviewRecord(options: {
 	version: WorkerVersionInfo
 	existing?: DevflarePreviewRecord
 	workersSubdomain?: string | null
-	previewAlias?: string
+	previewScope?: string
 	previewUrl?: string
-	previewAliasUrl?: string
+	previewScopeUrl?: string
 	branchName?: string
 	commitSha?: string
 	source?: DevflareRecordSource
 	now: Date
 }): DevflarePreviewRecord | null {
-	const alias = options.previewAlias ?? options.existing?.alias
+	const scope = options.previewScope ?? options.existing?.scope
 	const previewUrl = options.previewUrl
 		?? options.existing?.previewUrl
 		?? (options.workersSubdomain
 			? formatVersionPreviewUrl(options.version.id, options.workerName, options.workersSubdomain)
 			: undefined)
-	const aliasPreviewUrl = options.previewAliasUrl
-		?? options.existing?.aliasPreviewUrl
-		?? (alias && options.workersSubdomain
-			? formatPreviewAliasUrl(alias, options.workerName, options.workersSubdomain)
-			: undefined)
+	const scopeChanged = options.previewScope !== undefined && options.previewScope !== options.existing?.scope
+	const scopeUrl = options.previewScopeUrl
+		?? (options.previewScope !== undefined ? options.previewUrl : undefined)
+		?? (!scopeChanged ? options.existing?.scopeUrl : undefined)
 
 	if (!previewUrl) {
 		return null
@@ -234,8 +233,8 @@ export function buildPreviewRecord(options: {
 		workerName: options.workerName,
 		versionId: options.version.id,
 		previewUrl,
-		alias,
-		aliasPreviewUrl,
+		scope,
+		scopeUrl,
 		branchName: options.branchName ?? options.existing?.branchName,
 		commitSha: options.commitSha ?? options.existing?.commitSha,
 		deploymentId: options.existing?.deploymentId,
@@ -244,20 +243,20 @@ export function buildPreviewRecord(options: {
 	})
 }
 
-export function buildPreviewAliasRecord(options: {
+export function buildPreviewScopeRecord(options: {
 	accountId: string
 	workerName: string
 	previewRecord: DevflarePreviewRecord
-	existing?: DevflarePreviewAliasRecord
+	existing?: DevflarePreviewScopeRecord
 	now: Date
-}): DevflarePreviewAliasRecord | null {
-	if (!options.previewRecord.alias || !options.previewRecord.aliasPreviewUrl) {
+}): DevflarePreviewScopeRecord | null {
+	if (!options.previewRecord.scope || !options.previewRecord.scopeUrl) {
 		return null
 	}
 
-	return devflarePreviewAliasRecordSchema.parse({
-		id: getPreviewAliasRecordId(options.workerName, options.previewRecord.alias),
-		kind: 'previewAlias',
+	return devflarePreviewScopeRecordSchema.parse({
+		id: getPreviewScopeRecordId(options.workerName, options.previewRecord.scope),
+		kind: 'previewScope',
 		ver: 1,
 		...createPreviewLinkedRecordBase({
 			accountId: options.accountId,
@@ -266,8 +265,8 @@ export function buildPreviewAliasRecord(options: {
 			existingCreatedAt: options.existing?.createdAt,
 			now: options.now
 		}),
-		alias: options.previewRecord.alias,
-		aliasPreviewUrl: options.previewRecord.aliasPreviewUrl,
+		scope: options.previewRecord.scope,
+		scopeUrl: options.previewRecord.scopeUrl,
 		branchName: options.previewRecord.branchName,
 	})
 }
@@ -294,7 +293,7 @@ export function buildPreviewDeploymentRecord(options: {
 		deploymentId,
 		channel: 'preview',
 		environment: 'preview',
-		url: options.previewRecord.aliasPreviewUrl ?? options.previewRecord.previewUrl,
+		url: options.previewRecord.scopeUrl ?? options.previewRecord.previewUrl,
 		message: options.existing?.message,
 	})
 }
@@ -368,8 +367,8 @@ export function markPreviewRecordDeleted(record: DevflarePreviewRecord, now: Dat
 	return markRecordDeleted(record, now, devflarePreviewRecordSchema)
 }
 
-export function markPreviewAliasRecordDeleted(record: DevflarePreviewAliasRecord, now: Date): DevflarePreviewAliasRecord {
-	return markRecordDeleted(record, now, devflarePreviewAliasRecordSchema)
+export function markPreviewScopeRecordDeleted(record: DevflarePreviewScopeRecord, now: Date): DevflarePreviewScopeRecord {
+	return markRecordDeleted(record, now, devflarePreviewScopeRecordSchema)
 }
 
 export function markDeploymentRecordDeleted(record: DevflareDeploymentRecord, now: Date): DevflareDeploymentRecord {
@@ -379,15 +378,15 @@ export function markDeploymentRecordDeleted(record: DevflareDeploymentRecord, no
 export function getExplicitPreviewSyncOverrides(
 	options: ReconcilePreviewRegistryOptions,
 	versionId: string
-): Pick<ReconcilePreviewRegistryOptions, 'previewAlias' | 'previewUrl' | 'previewAliasUrl' | 'branchName' | 'commitSha'> {
+): Pick<ReconcilePreviewRegistryOptions, 'previewScope' | 'previewUrl' | 'previewScopeUrl' | 'branchName' | 'commitSha'> {
 	if (versionId !== options.versionId) {
 		return {}
 	}
 
 	return {
-		previewAlias: options.previewAlias,
+		previewScope: options.previewScope,
 		previewUrl: options.previewUrl,
-		previewAliasUrl: options.previewAliasUrl,
+		previewScopeUrl: options.previewScopeUrl,
 		branchName: options.branchName,
 		commitSha: options.commitSha
 	}

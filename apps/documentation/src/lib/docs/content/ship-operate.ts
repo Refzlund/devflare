@@ -1,8 +1,13 @@
-import type { DocCodeTreeEntry, DocPage } from '../types'
+﻿import type { DocCodeTreeEntry, DocPage } from '../types'
 
 const workflowRepoBase = 'https://github.com/Refzlund/devflare/blob/next/.github/workflows'
+const workflowActionSourceBase = 'https://github.com/Refzlund/devflare/blob/next/.github/actions'
+const workflowActionRepo = 'Refzlund/devflare/.github/actions'
+const workflowActionRef = 'next'
 
 const workflowLink = (file: string): string => `${workflowRepoBase}/${file}`
+const workflowActionSourceLink = (action: string): string => `${workflowActionSourceBase}/${action}/action.yml`
+const workflowActionUse = (action: string): string => `${workflowActionRepo}/${action}@${workflowActionRef}`
 const docsLink = (slug: string): string => `/docs/${slug}`
 
 const workflowDirectoryStructure: DocCodeTreeEntry[] = [
@@ -26,6 +31,136 @@ const testingWorkflowStructure: DocCodeTreeEntry[] = [
 	{ path: '.github/workflows/preview.yml' }
 ]
 
+const documentationPreviewWorkflowCode = String.raw`name: Preview
+
+on:
+	push:
+	pull_request:
+		types: [opened, reopened, ready_for_review, closed]
+	delete:
+	workflow_dispatch:
+
+jobs:
+	documentation-preview:
+		steps:
+			- uses: actions/checkout@v5
+
+			- uses: ${workflowActionUse('devflare-setup-workspace')}
+
+			- name: Resolve documentation preview impact
+			  id: impact
+			  uses: ${workflowActionUse('devflare-deploy-impact')}
+			  with:
+			    target-package: documentation
+
+			- name: Deploy documentation branch preview
+			  id: branch-deploy
+			  if: \${{ needs.resolve-context.outputs.branch-preview-enabled == 'true' && steps.impact.outputs.should-deploy == 'true' }}
+			  uses: ${workflowActionUse('devflare-deploy')}
+			  with:
+			    working-directory: apps/documentation
+			    install-working-directory: .
+			    skip-setup: 'true'
+			    skip-install: 'true'
+			    deploy-command: bun run deploy --
+			    preview-scope: \${{ needs.resolve-context.outputs.branch-preview-scope }}
+
+			- name: Deploy documentation PR preview
+			  id: pr-deploy
+			  if: \${{ needs.resolve-context.outputs.pr-preview-enabled == 'true' && steps.impact.outputs.should-deploy == 'true' }}
+			  uses: ${workflowActionUse('devflare-deploy')}
+			  with:
+			    working-directory: apps/documentation
+			    install-working-directory: .
+			    skip-setup: 'true'
+			    skip-install: 'true'
+			    deploy-command: bun run deploy --
+			    preview-scope: \${{ needs.resolve-context.outputs.pr-preview-scope }}
+
+			- name: Publish documentation PR preview feedback
+			  uses: ${workflowActionUse('devflare-github-feedback')}
+			  with:
+			    mode: comment
+			    comment-key: pr-deployment-status`
+
+const previewCleanupWorkflowCode = String.raw`name: Preview
+
+on:
+	delete:
+	workflow_dispatch:
+
+jobs:
+	documentation-cleanup:
+		steps:
+			- name: Clean up documentation branch preview scope
+			  shell: bash
+			  run: |
+			    cd apps/documentation
+			    bunx --bun devflare previews cleanup --scope "$PREVIEW_SCOPE" --apply
+
+			- name: Mark documentation branch preview deployment inactive
+			  uses: ${workflowActionUse('devflare-github-feedback')}
+
+	testing-cleanup:
+		steps:
+			- name: Clean up testing PR preview scope
+			  shell: bash
+			  run: |
+			    cd apps/testing
+			    bunx --bun devflare previews cleanup --scope "$PREVIEW_SCOPE" --apply
+
+			- name: Publish testing PR preview cleanup feedback
+			  uses: ${workflowActionUse('devflare-github-feedback')}`
+
+const testingPreviewWorkflowCode = String.raw`name: Preview
+
+jobs:
+	testing-preview:
+		steps:
+			- uses: ${workflowActionUse('devflare-setup-workspace')}
+
+			- uses: ${workflowActionUse('devflare-deploy')}
+			  with:
+			    working-directory: apps/testing/workers/auth-service
+			    install-working-directory: .
+			    skip-setup: 'true'
+			    skip-install: 'true'
+			    preview-scope: \${{ needs.resolve-context.outputs.branch-preview-scope }}
+
+			- uses: ${workflowActionUse('devflare-deploy')}
+			  with:
+			    working-directory: apps/testing/workers/search-service
+			    install-working-directory: .
+			    skip-setup: 'true'
+			    skip-install: 'true'
+			    preview-scope: \${{ needs.resolve-context.outputs.branch-preview-scope }}
+
+			- uses: ${workflowActionUse('devflare-deploy')}
+			  with:
+			    working-directory: apps/testing
+			    install-working-directory: .
+			    skip-setup: 'true'
+			    skip-install: 'true'
+			    preview-scope: \${{ needs.resolve-context.outputs.branch-preview-scope }}
+
+			- uses: ${workflowActionUse('devflare-github-feedback')}
+			  with:
+			    mode: deployment
+
+			- uses: ${workflowActionUse('devflare-github-feedback')}
+			  with:
+			    mode: comment
+			    comment-key: pr-deployment-status`
+
+const thinPreviewDeployStepCode = String.raw`- id: deploy
+  uses: ${workflowActionUse('devflare-deploy')}
+  with:
+    working-directory: apps/documentation
+    preview: 'true'
+    branch-name: \${{ github.head_ref || github.ref_name }}
+    cloudflare-api-token: \${{ secrets.CLOUDFLARE_API_TOKEN }}
+    cloudflare-account-id: \${{ secrets.CLOUDFLARE_ACCOUNT_ID }}`
+
 export const shipOperateDocs: DocPage[] = [
 	{
 		slug: 'github-workflows',
@@ -33,62 +168,63 @@ export const shipOperateDocs: DocPage[] = [
 		navTitle: 'GitHub workflows',
 		readTime: '5 min read',
 		eyebrow: 'CI/CD',
-		title: 'Use GitHub workflows as thin orchestration around explicit Devflare deploy and validation actions',
+		title: 'Keep workflows thin — let reusable actions own the deploy mechanics',
 		summary:
-			'This repository keeps GitHub workflows small on purpose: one shared preview workflow owns branch and PR preview lifecycles, while reusable Devflare actions handle impact checks, shared workspace setup, deploy execution, and feedback publishing.',
+			'One validation workflow, one shared preview workflow, explicit production lanes, and four reusable actions for the repeatable parts.',
 		description:
-			'The CI/CD pattern in this repo is intentionally boring in the best way. One workflow validates the workspace, one shared preview workflow handles preview targets and cleanup, production stays explicit, and reusable actions keep the mechanics consistent across packages.',
+			'Workflows own triggers, permissions, and target selection. Reusable actions own setup, impact checks, deploy execution, and feedback.',
 		highlights: [
-			'`workspace-ci.yml` is the cached validation lane for the monorepo, not a hidden deploy path.',
-			'`preview.yml` resolves context once, prepares the workspace once per job, and then updates branch and PR preview targets separately when needed.',
-			'`devflare-deploy-impact` determines whether a target package should deploy before the workflow spends Cloudflare effort.',
-			'`devflare-setup-workspace`, `devflare-deploy`, and `devflare-github-feedback` keep setup, deploy execution, and reporting reusable instead of duplicating shell glue in every workflow.'
+			'`workspace-ci.yml` validates the monorepo — it never deploys.',
+			'`preview.yml` resolves context once, then updates branch and PR targets separately.',
+			'`devflare-deploy-impact` skips no-op deploys before touching Cloudflare.',
+			'`devflare-setup-workspace`, `devflare-deploy`, and `devflare-github-feedback` keep the repeatable parts reusable.'
 		],
 		facts: [
-			{ label: 'Best for', value: 'GitHub Actions workflows that validate packages and run explicit preview or production deploys' },
-			{ label: 'Core split', value: 'Caller workflow owns policy; shared actions own mechanics' },
-			{ label: 'Package selector', value: '`working-directory` chooses which Devflare config actually deploys' }
+			{ label: 'Best for', value: 'GitHub Actions with preview and production deploys' },
+			{ label: 'Core split', value: 'Workflow owns policy, actions own mechanics' },
+			{ label: 'Package selector', value: '`working-directory` picks which Devflare config deploys' }
 		],
 		sourcePages: [
 			'.github/workflows/workspace-ci.yml',
 			'.github/workflows/preview.yml',
 			'.github/workflows/documentation-production.yml',
-			'.github/actions/devflare-deploy-impact/action.yml',
-			'.github/actions/devflare-setup-workspace/action.yml',
-			'.github/actions/devflare-deploy/action.yml',
-			'.github/actions/devflare-github-feedback/action.yml',
+			workflowActionSourceLink('devflare-deploy-impact'),
+			workflowActionSourceLink('devflare-setup-workspace'),
+			workflowActionSourceLink('devflare-deploy'),
+			workflowActionSourceLink('devflare-github-feedback'),
 			'.github/scripts/verify-testing-preview-deployment.ts'
 		],
 		sections: [
 			{
 				id: 'workflow-shape',
-				title: 'Keep GitHub workflows thin and let the actions do the repeatable work',
+				title: 'Workflows own policy, actions own mechanics',
 				paragraphs: [
-					'The repo uses GitHub Actions as orchestration, not as a second deploy framework. The workflow file decides when the job runs, which permissions it gets, and which package it is targeting. The reusable actions then handle impact calculation, dependency installation, deploy execution, and GitHub feedback in a consistent way.',
-					'That split matters because it keeps policy visible in the workflow while the mechanics stay reusable. A docs preview, a testing preview family, and a production deploy can share the same action vocabulary without pretending they are the same deployment shape.'
+					'Workflow files decide when jobs run, which permissions they get, and which package they target. Reusable actions handle impact checks, installs, deploys, and feedback.',
+					'Docs previews, testing preview families, and production deploys share the same actions without pretending they are the same deployment shape.'
 				],
 				bullets: [
-					'Use workflow triggers and path filters to decide whether a lane should even run.',
-					'Use `working-directory` to make the target package visible in the workflow itself.',
-					'Keep preview versus production intent explicit instead of hiding it inside a generic shell script.',
-					'Use workflow summaries and feedback actions so the result is observable without re-reading raw logs every time.'
+					'Use triggers and path filters to gate whether a lane runs.',
+					'Use `working-directory` to make the target package visible.',
+					'Keep preview vs. production intent explicit.',
+					'Outside this repo, reference `Refzlund/devflare/.github/actions/<action>@next`.',
+					'Use feedback actions and summaries so the result is readable without raw logs.'
 				],
 				callouts: [
 					{
 						tone: 'info',
-						title: 'A good workflow review question',
+						title: 'Good review question',
 						body: [
-							'Ask three things separately: what triggered this workflow, which package is it acting on, and which explicit deploy target will the action use?'
+							'What triggered this workflow, which package is it acting on, and which deploy target will the action use?'
 						]
 					}
 				]
 			},
 			{
 				id: 'workspace-validation',
-				title: 'Use one workspace CI lane for cached validation, not for hidden deploy logic',
+				title: 'Workspace CI validates — nothing else',
 				paragraphs: [
-					'`workspace-ci.yml` is the repo-wide validation lane. It reacts to workspace-level changes, restores Bun and Turborepo caches, installs dependencies once, and runs the cached `devflare:ci` lane from the repo root.',
-					'That workflow proves the workspace still builds, checks, and tests coherently. It does not choose a Cloudflare target or quietly deploy anything on your behalf.'
+					'`workspace-ci.yml` reacts to workspace-level changes, restores caches, installs once, and runs the `devflare:ci` lane.',
+					'It proves the workspace builds and tests. It never picks a Cloudflare target or deploys anything.'
 				],
 				cards: [
 					{
@@ -99,15 +235,16 @@ export const shipOperateDocs: DocPage[] = [
 				],
 				snippets: [
 					{
-						title: 'Workspace CI stays in the validation lane',
+						title: 'Workspace CI keeps the validation lane in view',
 						description:
-							'The active file is the real repo workflow under `.github/workflows/workspace-ci.yml`, and the surrounding tree shows the workflow family this page references.',
+							'The active file is the real repo workflow under `.github/workflows/workspace-ci.yml`, and the highlighted lines keep the validation job in focus so it reads like cached verification rather than a hidden deploy path.',
 						activeFile: '.github/workflows/workspace-ci.yml',
 						structure: workflowDirectoryStructure,
 						files: [
 							{
 								path: '.github/workflows/workspace-ci.yml',
 								language: 'yaml',
+								focusLines: [[15, 21]],
 								code: String.raw`name: Workspace CI
 
 on:
@@ -136,12 +273,11 @@ jobs:
 			},
 			{
 				id: 'impact-and-deploy',
-				title: 'Preview and production workflows should resolve impact before they deploy',
+				title: 'Check impact before deploying',
 				paragraphs: [
-					'The repository preview and production workflows still call `devflare-deploy-impact` before they deploy. That action compares the target package against the relevant git range so the workflow can skip Cloudflare work when the package or its important dependencies did not change, and it also accepts `extra-paths` when shared files outside the package root should still invalidate the deploy.',
-					'The main preview lane now lives in `preview.yml`. It resolves branch and PR context first, prepares the workspace once per job through `devflare-setup-workspace`, and then runs separate target-aware `devflare-deploy` calls for the branch scope, the PR scope, or both.',
-					'When a later deploy step is reusing that prepared checkout, the caller sets `skip-setup` and `skip-install` so `devflare-deploy` can focus on the target-specific deploy work instead of repeating Bun setup and dependency installation.',
-					'The documentation preview job is the clearest repo-local example to study because the same shared workflow can refresh both the branch preview and the stable PR preview from one prepared job while production stays in its own explicit workflow.'
+					'`devflare-deploy-impact` compares the target package against the git range so the workflow can skip Cloudflare work when nothing relevant changed. It accepts `extra-paths` for shared files outside the package root.',
+					'`preview.yml` resolves branch and PR context first, sets up the workspace once with `devflare-setup-workspace`, then makes target-specific `devflare-deploy` calls. Later deploy steps set `skip-setup` and `skip-install` to avoid repeating Bun setup.',
+					'The documentation preview job is the clearest example — one prepared job refreshes both the branch preview and the PR preview.'
 				],
 				cards: [
 					{
@@ -157,180 +293,163 @@ jobs:
 				],
 				snippets: [
 					{
-						title: 'The shared preview workflow prepares once, then updates the documentation targets it needs',
+						title: 'Prepare the documentation preview job',
 						description:
-							'This abridged excerpt shows the shared documentation preview job inside `.github/workflows/preview.yml`. It omits repeated feedback details so the shared setup, impact check, and target-specific deploy steps stay visible.',
+							'Action references use the public `Refzlund/devflare/...@next` form.',
 						activeFile: '.github/workflows/preview.yml',
 						structure: documentationWorkflowStructure,
 						files: [
 							{
 								path: '.github/workflows/preview.yml',
 								language: 'yaml',
-								code: String.raw`name: Preview
-
-on:
-	push:
-	pull_request:
-		types: [opened, reopened, ready_for_review, closed]
-	delete:
-	workflow_dispatch:
-
-jobs:
-	documentation-preview:
-		steps:
-			- uses: actions/checkout@v5
-
-			- uses: ./.github/actions/devflare-setup-workspace
-
-			- name: Resolve documentation preview impact
-			  id: impact
-			  uses: ./.github/actions/devflare-deploy-impact
-			  with:
-			    target-package: documentation
-
-			- name: Deploy documentation branch preview
-			  id: branch-deploy
-			  if: \${{ needs.resolve-context.outputs.branch-preview-enabled == 'true' && steps.impact.outputs.should-deploy == 'true' }}
-			  uses: ./.github/actions/devflare-deploy
-			  with:
-			    working-directory: apps/documentation
-			    install-working-directory: .
-			    skip-setup: 'true'
-			    skip-install: 'true'
-			    deploy-command: bun run deploy --
-			    preview-scope: \${{ needs.resolve-context.outputs.branch-preview-scope }}
-
-			- name: Deploy documentation PR preview
-			  id: pr-deploy
-			  if: \${{ needs.resolve-context.outputs.pr-preview-enabled == 'true' && steps.impact.outputs.should-deploy == 'true' }}
-			  uses: ./.github/actions/devflare-deploy
-			  with:
-			    working-directory: apps/documentation
-			    install-working-directory: .
-			    skip-setup: 'true'
-			    skip-install: 'true'
-			    deploy-command: bun run deploy --
-			    preview-scope: \${{ needs.resolve-context.outputs.pr-preview-scope }}
-
-			- name: Publish documentation PR preview feedback
-			  uses: ./.github/actions/devflare-github-feedback
-			  with:
-			    mode: comment
-			    comment-key: pr-deployment-status`
+								focusLines: [[13, 15]],
+								code: documentationPreviewWorkflowCode
+							}
+						]
+					},
+					{
+						title: 'Impact check before Cloudflare work',
+						description:
+							'Skips the deploy when the package did not change.',
+						activeFile: '.github/workflows/preview.yml',
+						structure: documentationWorkflowStructure,
+						files: [
+							{
+								path: '.github/workflows/preview.yml',
+								language: 'yaml',
+								focusLines: [[17, 21]],
+								code: documentationPreviewWorkflowCode
+							}
+						]
+					},
+					{
+						title: 'Branch and PR deploy targets',
+						description:
+							'Two separate `devflare-deploy` calls keep branch and PR scopes reviewable.',
+						activeFile: '.github/workflows/preview.yml',
+						structure: documentationWorkflowStructure,
+						files: [
+							{
+								path: '.github/workflows/preview.yml',
+								language: 'yaml',
+								focusLines: [[23, 33], [35, 45]],
+								code: documentationPreviewWorkflowCode
+							}
+						]
+					},
+					{
+						title: 'PR feedback',
+						description:
+							'Feedback runs after the deploy decisions are made.',
+						activeFile: '.github/workflows/preview.yml',
+						structure: documentationWorkflowStructure,
+						files: [
+							{
+								path: '.github/workflows/preview.yml',
+								language: 'yaml',
+								focusLines: [[47, 51]],
+								code: documentationPreviewWorkflowCode
 							}
 						]
 					}
 				],
 				bullets: [
-					'Use `production: true`, `preview: true`, or `preview-scope: <name>` exactly once per deploy action call.',
-					'Use `devflare-setup-workspace` when one job needs to deploy multiple targets or packages from the same checkout.',
-					'Use `skip-setup` and `skip-install` on later deploy calls when a shared job has already prepared Bun and dependencies.',
-					'Keep branch and PR deploy calls separate even when one push updates both targets, because the deploy target is still part of the explicit workflow policy.',
-					'Use `extra-paths` on the impact action when shared workspace files outside the package root should still trigger a redeploy.',
-					'Use `install-working-directory` when a package-local deploy should reuse one shared root install in a monorepo.',
-					'Let the workflow pass branch names, preview scopes, and messages explicitly so deploy intent is visible in logs.'
+					'Set `production: true`, `preview: true`, or `preview-scope: <name>` exactly once per deploy call.',
+					'Use `devflare-setup-workspace` when one job deploys multiple targets from the same checkout.',
+					'Set `skip-setup` and `skip-install` on later deploy calls after a shared setup.',
+					'Keep branch and PR deploys separate — the target is part of the policy.',
+					'Use `extra-paths` on the impact action for shared files outside the package root.',
+					'Use `install-working-directory` to reuse a shared root install in a monorepo.',
+					'Pass branch names, preview scopes, and messages explicitly so intent is visible in logs.'
 				],
 				callouts: [
 					{
 						tone: 'info',
-						title: 'Build once, deploy twice still means two deploy calls',
+						title: 'Build once, deploy twice',
 						body: [
-							'The optimization in this repo is the shared checkout and install work. Cloudflare target selection still lives in each explicit deploy step, so branch and PR targets stay reviewable instead of being hidden inside one shell command.'
+							'The shared work is the checkout and install. Target selection stays in each deploy step so branch and PR targets remain reviewable.'
 						]
 					}
 				]
 			},
 			{
 				id: 'feedback-and-verification',
-				title: 'Publish feedback and verify the live result instead of treating the deploy log as the whole story',
+				title: 'Feedback and verification',
 				paragraphs: [
-					'After deploy, the workflows in this repo publish GitHub feedback on purpose. The shared preview workflow updates branch deployment feedback and grouped PR comment sections from the same run, while production stays in its own deploy-and-verify lane.',
-					'This is where thin workflows pay off: reporting stays separate from deploy mechanics, and a failed live verification or preview verification can be surfaced cleanly without hiding inside one giant shell step.',
-					'Keep the reusable action outputs in mind too: `devflare-deploy-impact` returns `should-deploy`, `reason`, `comparison-base`, `comparison-head`, `changed-workspaces`, and `changed-files`; `devflare-deploy` returns `preview-url`, `version-id`, `verification-note`, `status`, `failure-stage`, `exit-code`, and `log-excerpt`; and `devflare-github-feedback` returns `comment-id`, `deployment-id`, and `pr-number` for later jobs that need to update, close, or cross-link that feedback.'
+					'Preview workflows publish branch deployment feedback and grouped PR comments. Production stays in its own deploy-and-verify lane.',
+					'Reporting stays separate from deploy mechanics, so a failed verification surfaces cleanly.'
 				],
 				table: {
 					headers: ['Workflow file', 'When it runs', 'GitHub feedback'],
 					rows: [
-						['`preview.yml`', 'Non-default branch pushes, selected PR lifecycle events, branch deletion, or manual cleanup dispatch', 'Branch deployment feedback, grouped PR comment sections, and inactive cleanup updates for cleaned-up previews.'],
-						['`documentation-production.yml`', 'Default branch pushes or manual dispatch for docs production', 'Production deployment record plus live URL verification.'],
-						['`workspace-ci.yml`', 'Workspace PRs, selected branch pushes, or manual dispatch', 'No deployment feedback; validation stays separate from deploy policy.']
+						['`preview.yml`', 'Non-default branch pushes, PR lifecycle events, branch deletion, manual dispatch', 'Branch deployments, grouped PR comments, inactive cleanup updates.'],
+						['`documentation-production.yml`', 'Default branch pushes or manual dispatch', 'Production deployment record, live URL verification.'],
+						['`workspace-ci.yml`', 'Workspace PRs, selected branch pushes, manual dispatch', 'None — validation only.']
 					]
 				},
 				bullets: [
 					'Use `devflare-github-feedback` for PR comments, GitHub deployments, or both.',
-					'Keep preview URLs or production URLs visible in workflow output so reviewers do not need to scrape logs.',
-					'Fail the workflow explicitly when deploy verification or live verification says the result is not trustworthy.',
-					'Use `GITHUB_STEP_SUMMARY` to leave a small readable outcome instead of forcing readers to decode every raw step.'
+					'Keep preview and production URLs visible in workflow output.',
+					'Fail the workflow when deploy or live verification says the result is bad.',
+					'Use `GITHUB_STEP_SUMMARY` for a readable outcome.'
 				],
 				callouts: [
 					{
 						tone: 'success',
-						title: 'What the repo pattern optimizes for',
+						title: 'What this optimizes for',
 						body: [
-							'Clear triggers, explicit targets, reusable actions, and observable feedback make CI/CD easier to trust when a deploy matters.'
+							'Clear triggers, explicit targets, reusable actions, and observable feedback.'
 						]
 					}
 				]
 			},
 			{
 				id: 'cleanup-workflows',
-				title: 'Cleanup workflows should be visible too, not hidden in one-off scripts',
+				title: 'Cleanup is first-class',
 				paragraphs: [
-					'This repo keeps cleanup as first-class automation inside `preview.yml`. Deleted branches and manual branch cleanup dispatches reuse the same cleanup jobs, while PR-scoped previews clean themselves up through the same shared workflow when the pull request closes.',
-					'Each cleanup job checks out the default branch, reuses the shared workspace setup action, runs `devflare previews cleanup --scope <name> --apply` for the relevant package, and then marks the matching GitHub deployment or grouped PR comment section inactive.',
-					'That keeps teardown reviewable: you can still see which workflow removes preview-owned resources and which feedback surfaces get marked inactive, but without splitting the lifecycle across six nearly-identical workflow files.'
+					'Cleanup lives inside `preview.yml`. Deleted branches and manual dispatches reuse the same cleanup jobs; PR-scoped previews clean up when the pull request closes.',
+					'Each cleanup job checks out the default branch, runs `devflare previews cleanup --scope <name> --apply`, and marks matching GitHub feedback inactive.'
 				],
 				cards: [
 					{
 						title: 'preview.yml',
-						body: 'Shared preview lifecycle workflow that also owns branch cleanup, PR-close cleanup, and manual branch cleanup dispatches.',
+						body: 'Preview lifecycle workflow — also owns branch cleanup, PR-close cleanup, and manual dispatches.',
 						href: workflowLink('preview.yml')
 					}
 				],
 				bullets: [
-					'Branch deletion cleanup and manual branch cleanup dispatches now live in the same shared workflow file.',
-					'PR closure cleanup lives beside the preview deploy jobs so the open-update-close lifecycle stays reviewable in one place.',
-					'Cleanup updates preview records, then removes preview-owned infrastructure, then marks GitHub feedback inactive.'
+					'Branch deletion and manual cleanup dispatches share the same workflow file.',
+					'PR closure cleanup sits beside the deploy jobs so the full lifecycle is reviewable in one place.',
+					'Cleanup updates records, removes infrastructure, then marks feedback inactive.'
 				],
 				snippets: [
 					{
-						title: 'The shared preview workflow keeps cleanup visible beside deploy logic',
+						title: 'Documentation branch cleanup',
 						description:
-							'This abridged excerpt shows the cleanup portion of `.github/workflows/preview.yml`. It omits repeated auth details so the branch and PR cleanup shape stays visible.',
+							'Uses the public feedback action reference.',
 						activeFile: '.github/workflows/preview.yml',
 						structure: testingWorkflowStructure,
 						files: [
 							{
 								path: '.github/workflows/preview.yml',
 								language: 'yaml',
-								code: String.raw`name: Preview
-
-on:
-	delete:
-	workflow_dispatch:
-
-jobs:
-	documentation-cleanup:
-		steps:
-			- name: Clean up documentation branch preview scope
-			  shell: bash
-			  run: |
-			    cd apps/documentation
-			    bunx --bun devflare previews cleanup --scope "$PREVIEW_SCOPE" --apply
-
-			- name: Mark documentation branch preview deployment inactive
-			  uses: ./.github/actions/devflare-github-feedback
-
-	testing-cleanup:
-		steps:
-			- name: Clean up testing PR preview scope
-			  shell: bash
-			  run: |
-			    cd apps/testing
-			    bunx --bun devflare previews cleanup --scope "$PREVIEW_SCOPE" --apply
-
-			- name: Publish testing PR preview cleanup feedback
-			  uses: ./.github/actions/devflare-github-feedback`
+								focusLines: [[10, 17]],
+								code: previewCleanupWorkflowCode
+							}
+						]
+					},
+					{
+						title: 'Testing PR cleanup',
+						description:
+							'Same pattern, PR-scoped.',
+						activeFile: '.github/workflows/preview.yml',
+						structure: testingWorkflowStructure,
+						files: [
+							{
+								path: '.github/workflows/preview.yml',
+								language: 'yaml',
+								focusLines: [[21, 28]],
+								code: previewCleanupWorkflowCode
 							}
 						]
 					}
@@ -338,69 +457,61 @@ jobs:
 			},
 			{
 				id: 'multi-package-preview-families',
-				title: 'Multi-worker preview families still deploy package by package',
+				title: 'Multi-worker previews deploy per-package',
 				paragraphs: [
-					'The testing preview job inside `preview.yml` shows the multi-worker version of the same rule. One shared job prepares the workspace once, then still deploys each worker package separately with its own `working-directory` and explicit preview scope.',
-					'That is the important CI/CD habit for multi-worker systems: one workflow can coordinate the family, but each package still owns its own resolved Devflare config and deploy step.',
-					'The shared job is also the repo example of branch pushes updating both a GitHub deployment and, when the branch already belongs to an open pull request, the grouped PR comment through the same workflow run.'
+					'The testing preview job shows the multi-worker version: one shared job prepares the workspace, then deploys each worker separately with its own `working-directory` and preview scope.',
+					'One workflow can coordinate the family, but each package still owns its own Devflare config and deploy step.'
 				],
 				cards: [
 					{
 						title: 'preview.yml',
-						body: 'Shared testing preview job that coordinates auth-service, search-service, and the main app across branch and PR targets.',
+						body: 'Testing preview job — coordinates auth-service, search-service, and the main app.',
 						href: workflowLink('preview.yml')
 					}
 				],
 				snippets: [
 					{
-						title: 'Shared multi-worker previews still keep each package deploy explicit',
+						title: 'Shared workspace setup',
 						description:
-							'This excerpt comes from `.github/workflows/preview.yml`, which fans one prepared job across the testing worker family while keeping each deploy package-local.',
+							'One setup action, then per-package deploys.',
 						activeFile: '.github/workflows/preview.yml',
 						structure: testingWorkflowStructure,
 						files: [
 							{
 								path: '.github/workflows/preview.yml',
 								language: 'yaml',
-								code: String.raw`name: Preview
-
-jobs:
-	testing-preview:
-		steps:
-			- uses: ./.github/actions/devflare-setup-workspace
-
-			- uses: ./.github/actions/devflare-deploy
-			  with:
-			    working-directory: apps/testing/workers/auth-service
-			    install-working-directory: .
-			    skip-setup: 'true'
-			    skip-install: 'true'
-			    preview-scope: \${{ needs.resolve-context.outputs.branch-preview-scope }}
-
-			- uses: ./.github/actions/devflare-deploy
-			  with:
-			    working-directory: apps/testing/workers/search-service
-			    install-working-directory: .
-			    skip-setup: 'true'
-			    skip-install: 'true'
-			    preview-scope: \${{ needs.resolve-context.outputs.branch-preview-scope }}
-
-			- uses: ./.github/actions/devflare-deploy
-			  with:
-			    working-directory: apps/testing
-			    install-working-directory: .
-			    skip-setup: 'true'
-			    skip-install: 'true'
-			    preview-scope: \${{ needs.resolve-context.outputs.branch-preview-scope }}
-
-			- uses: ./.github/actions/devflare-github-feedback
-			  with:
-			    mode: deployment
-
-			- uses: ./.github/actions/devflare-github-feedback
-			  with:
-			    mode: comment
-			    comment-key: pr-deployment-status`
+								focusLines: [6],
+								code: testingPreviewWorkflowCode
+							}
+						]
+					},
+					{
+						title: 'Per-package deploys with shared scope',
+						description:
+							'Each package gets its own `devflare-deploy` call and visible `working-directory`.',
+						activeFile: '.github/workflows/preview.yml',
+						structure: testingWorkflowStructure,
+						files: [
+							{
+								path: '.github/workflows/preview.yml',
+								language: 'yaml',
+								focusLines: [[8, 14], [16, 22], [24, 30]],
+								code: testingPreviewWorkflowCode
+							}
+						]
+					},
+					{
+						title: 'Separate deployment and PR feedback',
+						description:
+							'Deployment records and PR comments stay independent.',
+						activeFile: '.github/workflows/preview.yml',
+						structure: testingWorkflowStructure,
+						files: [
+							{
+								path: '.github/workflows/preview.yml',
+								language: 'yaml',
+								focusLines: [[32, 39]],
+								code: testingPreviewWorkflowCode
 							}
 						]
 					}
@@ -414,36 +525,36 @@ jobs:
 		navTitle: 'Production deploys',
 		readTime: '4 min read',
 		eyebrow: 'Production',
-		title: 'Build and deploy production on purpose, with explicit targets and inspectable output',
+		title: 'Explicit production deploys with inspectable output',
 		summary:
-			'Devflare keeps build and deploy flows inspectable, but deploys are intentionally explicit: production uses `--prod` or `--production`, while preview is either a same-worker upload with plain `--preview` or a named preview scope with `--preview <name>`.',
+			'Production uses `--prod` or `--production`, preview uses `--preview` or `--preview <name>`. No target means no deploy.',
 		description:
-			'The deploy story is simpler when the target is unmistakable. Devflare resolves config, generates Wrangler-facing artifacts, and then deploys against an explicit destination instead of guessing whether you meant production or preview.',
+			'Devflare resolves config, generates Wrangler artifacts, and deploys against an explicit destination.',
 		highlights: [
-			'`devflare build` prepares artifacts without deploying anything.',
-			'`devflare deploy` now requires an explicit target: `--prod` / `--production`, plain `--preview`, or named `--preview <name>`.',
-			'Production deploys clear preview-oriented naming overrides so stable worker names stay stable.',
-			'`config print` and `doctor` are the easiest preflight tools when something feels off.'
+			'`devflare build` prepares artifacts without deploying.',
+			'`devflare deploy` requires an explicit target: `--prod`, `--production`, `--preview`, or `--preview <name>`.',
+			'Production deploys clear preview naming overrides so stable worker names stay stable.',
+			'`config print` and `doctor` are the easiest preflight tools.'
 		],
 		facts: [
 			{ label: 'Best for', value: 'Production deploys and preflight checks' },
-			{ label: 'Required target', value: '`--prod`, `--production`, plain `--preview`, or named `--preview <name>`' },
-			{ label: 'Best debug habit', value: 'Inspect compiled output before you deploy when the setup changed' }
+			{ label: 'Required target', value: '`--prod`, `--production`, `--preview`, or `--preview <name>`' },
+			{ label: 'Best debug habit', value: 'Inspect compiled output before deploying' }
 		],
 		sourcePages: ['deploy-preview-cli.md', 'README.md'],
 		sections: [
 			{
 				id: 'command-shape',
-				title: 'Keep the production lane small and reviewable',
+				title: 'The production lane',
 				paragraphs: [
-					'The CLI page already owns the broad command map. The production-specific habit is simpler: refresh generated types when the contract changed, build once, inspect when the setup changed, and only then deploy with an explicit production target.',
-					'That keeps this page focused on release posture instead of re-explaining command families that already have a better home on the CLI page.'
+					'Refresh generated types when bindings or entrypoints changed, build once, inspect when the setup changed, then deploy with an explicit production target.',
+					'The CLI page owns the broad command map. This page covers how those commands fit the release lane.'
 				],
 				steps: [
 					'Run `devflare types` when bindings or entrypoints changed and `env.d.ts` needs to catch up.',
-					'Run `devflare build --env production` to materialize the production shape you actually mean to ship.',
+					'Run `devflare build --env production` to generate production artifacts.',
 					'Use `devflare config print --format wrangler` or `devflare doctor` when the compiled result needs inspection before release.',
-					'Run `devflare deploy --prod` or `--production` only when the target is unmistakably production.'
+					'Run `devflare deploy --prod` or `--production` only when the target is unmistakably production. Add `--dry-run` first if you want to verify the pipeline without pushing.'
 				],
 				callouts: [
 					{
@@ -457,10 +568,10 @@ jobs:
 			},
 			{
 				id: 'explicit-production',
-				title: 'Production deploys should be explicit',
+				title: 'Production deploys are explicit',
 				paragraphs: [
-					'Deploy requires an explicit target so production and preview destinations stay unmistakable. That means production is `--prod` or `--production`, while preview is either plain `--preview` for a same-worker upload or `--preview <name>` for a named preview scope.',
-					'Production deploys also clear preview-scope environment overrides such as `DEVFLARE_PREVIEW_BRANCH`, which helps keep stable production worker names pointed at the stable infrastructure you actually expect.'
+					'Deploy requires an explicit target so production and preview stay unmistakable. Production is `--prod` or `--production`; preview is `--preview` or `--preview <name>`.',
+					'Production deploys also clear preview-scope overrides like `DEVFLARE_PREVIEW_BRANCH` so stable worker names point at stable infrastructure.'
 				],
 				snippets: [
 					{
@@ -476,25 +587,26 @@ bunx --bun devflare deploy --production --message "Release 1" --tag release-1`
 						tone: 'warning',
 						title: 'No target means no deploy',
 						body: [
-							'That rejection is intentional. It keeps production and preview intent visible in CI logs, scripts, and local command history.'
+							'Intentional. Keeps production vs. preview intent visible in CI logs and command history.'
 						]
 					},
 					{
 						tone: 'info',
-						title: 'Automation can make verification stricter than local deploys',
+						title: 'Stricter verification in automation',
 						body: [
-							'The reusable deploy action exposes `verify-deployment` and `require-fresh-production-deployment` so CI can fail when Cloudflare cannot confirm the expected version or keeps serving the existing active production deployment.'
+							'The reusable deploy action exposes `verify-deployment` and `require-fresh-production-deployment` so CI can fail when Cloudflare cannot confirm the expected version.'
 						]
 					}
 				]
 			},
 			{
 				id: 'preflight',
-				title: 'Use the inspectable tools before a risky change',
+				title: 'Preflight tools',
 				bullets: [
-					'Run `devflare config print --format wrangler` when you want to see the compiled deployment shape.',
-					'Run `devflare doctor` when config resolution, Vite opt-in, or generated files feel suspect.',
-					'Run `devflare build` before deploys when the package just gained new bindings, routes, or framework wiring.'
+					'`devflare deploy --prod --dry-run` — run the full deploy pipeline without pushing anything to Cloudflare.',
+					'`devflare config print --format wrangler` — see the compiled deployment shape.',
+					'`devflare doctor` — check config resolution, Vite opt-in, and generated files.',
+					'`devflare build` before deploy — when the package just gained new bindings, routes, or framework wiring.'
 				]
 			}
 		]
@@ -505,20 +617,20 @@ bunx --bun devflare deploy --production --message "Release 1" --tag release-1`
 		navTitle: 'Monorepos & Turborepo',
 		readTime: '6 min read',
 		eyebrow: 'Monorepo',
-		title: 'Use Turborepo to validate the workspace, then deploy the target package with Devflare',
+		title: 'Turborepo validates the workspace, Devflare deploys the target package',
 		summary:
-			'In a Bun monorepo, Turborepo should own task orchestration, caching, and impact-aware validation, while `devflare` still runs from the package that owns the Worker or app you are deploying.',
+			'Turbo owns task orchestration and caching. `devflare` still runs from the package that owns the Worker or app.',
 		description:
-			'This repository uses Turbo at the root and keeps `devflare.config.ts` local to each deployable package. That split is the important pattern: Turbo decides which packages to build, typecheck, test, or check, but actual deploy commands still run in the package that owns the resolved Devflare config.',
+			'Turbo at the root, `devflare.config.ts` local to each deployable package. Turbo decides what to build; deploy commands run in the package that owns the config.',
 		highlights: [
-			'Each deployable package should keep its own `devflare.config.ts` and package-level scripts.',
-			'Use Turbo at the repo root for cached validation and targeted package work.',
-			'Deploy from the target package directory, or set that package as the GitHub Actions working directory.',
-			'The same monorepo can mix same-worker preview uploads and multi-worker preview families.'
+			'Each deployable package keeps its own `devflare.config.ts` and package-level scripts.',
+			'Turbo handles cached validation and targeted package work from the repo root.',
+			'Deploy from the target package directory or set it as the Actions working directory.',
+			'Same monorepo can mix same-worker previews and multi-worker preview families.'
 		],
 		facts: [
-			{ label: 'Best for', value: 'Bun + Turborepo monorepos with more than one Devflare package' },
-			{ label: 'Turbo role', value: 'Validation, caching, filters, and impacted-package orchestration' },
+			{ label: 'Best for', value: 'Bun + Turborepo monorepos with multiple Devflare packages' },
+			{ label: 'Turbo role', value: 'Validation, caching, filters, orchestration' },
 			{ label: 'Deploy rule', value: 'Run `devflare` from the package that owns the config' }
 		],
 		sourcePages: ['README.md', 'deploy-preview-cli.md', 'verification-testing-and-caveats.md'],
@@ -560,10 +672,10 @@ bunx --bun devflare deploy --production --message "Release 1" --tag release-1`
 			},
 			{
 				id: 'root-lanes',
-				title: 'Use repo-root Turbo scripts for contributor and CI lanes',
+				title: 'Repo-root Turbo scripts for contributors and CI',
 				paragraphs: [
-					'The repository now exposes explicit root scripts for the core Devflare workflow so contributors and CI can validate the workspace without guessing at filters every time.',
-					'Those scripts are validation and orchestration tools; they are not a replacement for the actual package-local deploy commands.'
+					'The repo exposes root scripts for the core Devflare workflow so contributors and CI can validate without guessing at filters.',
+					'These are validation and orchestration tools, not a replacement for package-local deploy commands.'
 				],
 				snippets: [
 					{
@@ -586,7 +698,7 @@ bun run turbo check --filter=documentation`
 			},
 			{
 				id: 'deploy-one-package',
-				title: 'Deploy one package at a time, from the package that owns the config',
+				title: 'Deploy from the package that owns the config',
 				steps: [
 					'Use Turbo or path-aware workflow logic to decide whether a package is affected.',
 					'Optionally run Turbo build/check work for that package from the repo root.',
@@ -619,10 +731,10 @@ bun run deploy -- --prod`
 			},
 			{
 				id: 'worker-families',
-				title: 'Multi-worker preview families still deploy package by package',
+				title: 'Multi-worker previews deploy per-package',
 				paragraphs: [
-					'`apps/testing` is the repository example for the other half of the rule: Turbo can orchestrate the workspace, but a branch-scoped preview family still deploys each worker package separately with the same preview scope and naming inputs.',
-					'That is why the workflows keep `DEVFLARE_PREVIEW_BRANCH` consistent and run separate deploys for `auth-service`, `search-service`, and the main app instead of pretending one root deploy magically owns the whole family.'
+					'`apps/testing` shows the other half: Turbo orchestrates the workspace, but a branch-scoped preview family still deploys each worker separately with the same preview scope.',
+					'The workflows keep `DEVFLARE_PREVIEW_BRANCH` consistent and run separate deploys for `auth-service`, `search-service`, and the main app.'
 				],
 				snippets: [
 					{
@@ -651,20 +763,20 @@ bunx --bun devflare previews cleanup --scope pr-123 --apply`
 		navTitle: 'Preview strategies',
 		readTime: '5 min read',
 		eyebrow: 'Previews',
-		title: 'Pick the preview model that matches the app instead of forcing one preview story on every worker',
+		title: 'Pick the preview model that matches the app',
 		summary:
-			'Devflare supports both same-worker preview uploads and named preview scopes, but Durable Object-heavy apps often need a branch-scoped worker-family strategy instead of relying on preview URLs alone.',
+			'Same-worker uploads, named preview scopes, and branch-scoped worker families serve different needs.',
 		description:
-			'Preview complexity usually comes from choosing the wrong model, not from the commands themselves. This page helps you pick the right one before you start writing CI around assumptions that the platform will not actually honor.',
+			'Pick the right preview model before writing CI around assumptions the platform will not honor.',
 		highlights: [
-			'Plain `--preview` keeps the same-worker preview upload flow.',
-			'Both preview targets resolve `config.env.preview`; bare `--preview` uses the synthetic `preview` identifier, while named `--preview next` swaps in an explicit scope and can pair with branch-scoped preview workers when the config is wired for them.',
-			'Use plain `--preview` for same-worker uploads, or `--preview <scope>` when the scope should stay visible in logs, cleanup commands, and preview-owned resource names.',
-			'Preview URLs are public unless protected and have important Cloudflare caveats.',
-			'Durable Object-heavy apps often need branch-scoped worker families instead of same-worker preview URLs.'
+			'Plain `--preview` keeps the same-worker upload flow.',
+			'`--preview <name>` uses an explicit scope for resource naming and cleanup.',
+			'Use plain `--preview` for same-worker uploads, `--preview <scope>` when the scope should be visible in logs and cleanup.',
+			'Preview URLs are public unless protected, and have Cloudflare caveats.',
+			'DO-heavy apps often need branch-scoped worker families.'
 		],
 		facts: [
-			{ label: 'Best for', value: 'Choosing preview strategy before building CI around it' },
+			{ label: 'Best for', value: 'Choosing preview strategy before building CI' },
 			{ label: 'Same-worker mode', value: 'Plain `--preview`' },
 			{ label: 'Named scope mode', value: '`--preview <name>`' }
 		],
@@ -672,7 +784,7 @@ bunx --bun devflare previews cleanup --scope pr-123 --apply`
 		sections: [
 			{
 				id: 'choose-model',
-				title: 'There is more than one preview model',
+				title: 'More than one preview model',
 				table: {
 					headers: ['Preview style', 'Use it when'],
 					rows: [
@@ -682,9 +794,9 @@ bunx --bun devflare previews cleanup --scope pr-123 --apply`
 					]
 				},
 				paragraphs: [
-					'Both preview targets resolve `config.env.preview` and can materialize `preview.scope()` names. Bare `--preview` keeps the same-worker preview upload flow and uses the synthetic `preview` identifier, while named `--preview <name>` swaps that identifier for an explicit scope and can pair naturally with branch-scoped preview workers when your config is wired for that pattern.',
-					'Plain `--preview` can still receive `--branch-name`, CI metadata, or the current git branch when your workflow wants branch context in logs or deploy messages, but preview-scoped resource names still use the synthetic `preview` identifier unless you pick an explicit scope.',
-					'When the preview needs stronger isolation or cleaner cleanup ergonomics, prefer named preview scopes directly instead of layering extra naming conventions onto same-worker uploads.'
+					'Both targets resolve `config.env.preview` and can materialize `preview.scope()` names. Bare `--preview` uses the synthetic `preview` identifier; `--preview <name>` swaps it for an explicit scope that pairs with branch-scoped preview workers.',
+					'Plain `--preview` can still receive `--branch-name` or CI metadata for logs, but preview-scoped resource names use the synthetic identifier unless you pick an explicit scope.',
+					'When you need stronger isolation or cleaner cleanup, prefer named scopes directly.'
 				]
 			},
 			{
@@ -701,20 +813,19 @@ bunx --bun devflare previews cleanup --scope pr-123 --apply`
 				callouts: [
 					{
 						tone: 'warning',
-						title: 'This is why DO-heavy apps need a different preview instinct',
+						title: 'DO-heavy apps need a different preview instinct',
 						body: [
-							'If previews must exercise real Durable Object behavior, reach for branch-scoped worker families and preview-scoped resources instead of hoping same-worker preview URLs will be enough.'
+							'If previews must exercise real Durable Object behavior, use branch-scoped worker families and preview-scoped resources.'
 						]
 					}
 				]
 			},
 			{
 				id: 'preview-resources',
-				title: 'Use preview-scoped resources only when the preview really owns infrastructure',
+				title: 'Preview-scoped resources',
 				paragraphs: [
-					'Branch-scoped previews sometimes need their own KV, D1, R2, Queue, or Vectorize resources. That is where `preview.scope()` is useful: authored config stays stable while preview environments resolve preview-specific names.',
-					'Outside preview environments, those same authored markers resolve back to the base names so your config stays readable.',
-					'Inside preview deploys, bare `--preview` usually materializes names like `my-cache-kv-preview`, while `--preview next` materializes names like `my-cache-kv-next`.'
+					'Branch-scoped previews sometimes need their own KV, D1, R2, Queue, or Vectorize resources. `preview.scope()` keeps authored config stable while preview environments resolve preview-specific names.',
+					'Outside preview, those markers resolve back to the base names. Inside preview, bare `--preview` materializes names like `my-cache-kv-preview`; `--preview next` materializes `my-cache-kv-next`.'
 				],
 				snippets: [
 					{
@@ -745,75 +856,74 @@ export default defineConfig({
 		navTitle: 'Preview operations',
 		readTime: '5 min read',
 		eyebrow: 'Preview lifecycle',
-		title: 'Use preview commands to inspect and clean up previews',
+		title: 'Inspect and clean up previews',
 		summary:
-			'The preview registry is D1-backed and gives Devflare a durable record of preview scope and deployment state so cleanup does not have to depend on fragile one-off scripts.',
+			'The preview registry is D1-backed, giving Devflare durable records of scope and deployment state for reliable cleanup.',
 		description:
-			'Once previews exist, lifecycle management matters as much as deployment. The preview commands are the public surface for understanding what exists and tearing down preview-only resources deliberately.',
+			'Preview commands are the public surface for understanding what exists and tearing down preview-only resources.',
 		highlights: [
-			'`previews` gives you the family or registry view, and `bindings --scope <name>` inspects one resolved preview scope.',
-			'Deploy flows keep preview metadata synchronized automatically so cleanup can target the right scope later.',
-			'`cleanup` is the lifecycle command for removing preview-owned resources and dedicated preview workers when they are no longer needed.',
-			'Cleanup of branch-scoped preview workers can also remove preview-only service, Durable Object, and route ownership that belongs only to those workers.'
+			'`previews` gives the family or registry view; `bindings --scope <name>` inspects one resolved scope.',
+			'Deploy flows keep preview metadata synchronized automatically.',
+			'`cleanup` removes preview-owned resources and dedicated preview workers.',
+			'Cleanup of branch-scoped workers can also remove preview-only service, DO, and route ownership.'
 		],
 		facts: [
-			{ label: 'Best for', value: 'Preview lifecycle management after deploys already exist' },
+			{ label: 'Best for', value: 'Preview lifecycle management' },
 			{ label: 'Registry backing', value: 'D1 (`devflare-registry` by default)' },
-			{ label: 'Cleanup warning', value: 'Dedicated preview workers may own more than just the worker script' }
+			{ label: 'Cleanup warning', value: 'Dedicated preview workers may own more than just the script' }
 		],
 		sourcePages: ['deploy-preview-cli.md', 'README.md'],
 		sections: [
 			{
 				id: 'registry-role',
-				title: 'Why the preview registry exists',
+				title: 'Why the registry exists',
 				paragraphs: [
-					'Cloudflare discovery alone is not enough for a clean preview lifecycle story. The D1-backed registry lets Devflare track preview scope and deployment records in a way that supports reliable inspection and cleanup later.',
-					'Devflare creates and updates that registry as preview deploys happen, so the `previews` and `cleanup` commands can stay focused on real preview state instead of guesswork.',
-					'That is what lets preview operations stay a documented CLI surface instead of becoming a pile of CI-only command glue.'
+					'Cloudflare discovery alone is not enough for clean preview lifecycle management. The D1-backed registry tracks scope and deployment records for reliable inspection and cleanup.',
+					'Devflare creates and updates the registry as preview deploys happen, so `previews` and `cleanup` work from real state.'
 				]
 			},
 			{
 				id: 'useful-commands',
-				title: 'The core commands to remember',
+				title: 'Core commands',
 				snippets: [
 					{
 						title: 'Preview lifecycle commands',
 						language: 'bash',
 						code: String.raw`bunx --bun devflare previews
 bunx --bun devflare previews bindings --scope next
-bunx --bun devflare previews cleanup --days 7 --apply
-bunx --bun devflare previews cleanup --scope next --apply`
+bunx --bun devflare previews cleanup --scope next --apply
+bunx --bun devflare previews cleanup --all --apply`
 					}
 				],
 				bullets: [
-					'Use `previews` for a summary view of preview scopes.',
-					'Use `bindings --scope <name>` when you want to understand which workers currently reference one named preview scope; otherwise the identifier comes from the same preview env vars your automation already set.',
-					'Prefer explicit scope selectors when you know the target, and reserve broad cleanup runs for the moments when the whole preview fleet genuinely needs attention.',
-					'Without `--scope`, `cleanup` first respects `DEVFLARE_PREVIEW_IDENTIFIER`, `DEVFLARE_PREVIEW_PR`, or `DEVFLARE_PREVIEW_BRANCH`, and only then falls back to the synthetic `preview` scope. Use `--all` when you mean every discovered scope for the worker family, not just that resolved default.'
+					'`previews` — summary view of preview scopes.',
+					'`bindings --scope <name>` — which workers reference one named scope.',
+					'Prefer explicit scope selectors when you know the target; reserve broad cleanup for when the whole fleet needs attention.',
+					'Without `--scope`, `cleanup` respects `DEVFLARE_PREVIEW_IDENTIFIER`, `DEVFLARE_PREVIEW_PR`, or `DEVFLARE_PREVIEW_BRANCH`, then falls back to the synthetic `preview` scope. Use `--all` for every discovered scope.'
 				]
 			},
 			{
 				id: 'cleanup-shape',
 				title: 'Cleanup should be specific',
 				bullets: [
-					'`cleanup` soft-deletes stale registry records after an age threshold instead of immediately pretending the historical metadata never existed.',
-					'`cleanup` deletes preview-only resources and can also delete dedicated preview worker scripts for the targeted scope.',
-					'Stable shared workers are not deleted by `cleanup`; same-worker preview uploads only lose matching preview-scoped account resources.',
-					'Analytics Engine datasets and Browser Rendering bindings are reported as warnings instead of deleted resources, and preview-scoped Hyperdrive cleanup only removes preview configs that already exist.'
+					'Without `--apply`, cleanup runs as a dry run — showing what would be removed without touching anything.',
+					'With `--apply`, it deletes preview-only resources and can delete dedicated preview worker scripts.',
+					'Stable shared workers are not deleted; same-worker uploads only lose matching preview-scoped resources.',
+					'Analytics Engine datasets and Browser Rendering bindings are reported as warnings. Hyperdrive cleanup only removes configs that already exist.'
 				],
 				callouts: [
 					{
 						tone: 'accent',
 						title: 'Good cleanup hygiene',
 						body: [
-							'Use the most specific selector you can. Cleanup is easier to trust when the target is obvious in the command itself.'
+							'Use the most specific selector you can. Cleanup is easier to trust when the target is obvious.'
 						]
 					},
 					{
 						tone: 'warning',
-						title: 'Not every preview-looking thing is a deletable resource',
+						title: 'Not every preview-looking thing is deletable',
 						body: [
-							'Browser Rendering does not own an account-scoped resource, Analytics Engine datasets are created on first write, and Hyperdrive preview cleanup can only remove preview configs that already exist. The command tells you about those cases instead of pretending it deleted them.'
+							'Browser Rendering has no account-scoped resource, Analytics Engine datasets are created on first write, and Hyperdrive cleanup can only remove existing preview configs. The command tells you.'
 						]
 					}
 				]
@@ -826,20 +936,20 @@ bunx --bun devflare previews cleanup --scope next --apply`
 		navTitle: 'Testing & automation',
 		readTime: '5 min read',
 		eyebrow: 'Validation',
-		title: 'Test the runtime shape you actually ship, then keep automation thin and observable',
+		title: 'Test the runtime shape you ship, keep automation thin',
 		summary:
-			'Keep local harness detail on the dedicated testing pages, then promote only the right runtime-shaped checks into thin, observable automation.',
+			'Local harness detail stays on the testing pages. This page covers what gets promoted into CI and how automation stays observable.',
 		description:
-			'Devflare’s testing story is intentionally layered. The local harness pages own `createTestContext()` and binding-specific nuance; this page owns the CI-facing question of which checks should move into preview validation, release automation, and workflow feedback.',
+			'The local harness pages own `createTestContext()` and binding nuance. This page owns which checks move into preview validation and release automation.',
 		highlights: [
-			'Use `testing-overview`, `create-test-context`, and binding testing guides as the canonical local-testing references.',
-			'Carry only the automation-facing timing rules into CI: `cf.worker.fetch()` does not drain all `waitUntil()` work, while queue, scheduled, and tail helpers do wait for their background work.',
-			'Promote a small number of runtime-shaped smoke checks into CI instead of recreating the whole local suite in workflows.',
-			'Keep deploy execution and GitHub feedback separate so automation stays reviewable.'
+			'Use `testing-overview`, `create-test-context`, and binding guides as the local-testing references.',
+			'Carry only the timing rules that matter in CI: `cf.worker.fetch()` does not drain all `waitUntil()` work; queue, scheduled, and tail helpers do.',
+			'Promote a small number of runtime-shaped smoke checks into CI.',
+			'Keep deploy execution and feedback separate.'
 		],
 		facts: [
-			{ label: 'Best for', value: 'CI-facing testing policy, preview validation, and thin release automation' },
-			{ label: 'Local harness owner', value: '`/docs/create-test-context` plus binding testing guides' },
+			{ label: 'Best for', value: 'CI testing policy and preview validation' },
+			{ label: 'Local harness owner', value: '`/docs/create-test-context` plus binding guides' },
 			{ label: 'Important nuance', value: '`cf.worker.fetch()` is not a full `waitUntil()` drain' },
 			{ label: 'Workflow companion', value: '`/docs/github-workflows`' }
 		],
@@ -878,19 +988,19 @@ bunx --bun devflare previews cleanup --scope next --apply`
 				callouts: [
 					{
 						tone: 'info',
-						title: 'A cleaner split keeps both pages better',
+						title: 'Cleaner split keeps both pages better',
 						body: [
-							'The harness pages should own local helper behavior. This page should own what gets promoted into automation and how that automation stays understandable.'
+							'Harness pages own local helper behavior. This page owns what gets promoted and how automation stays readable.'
 						]
 					}
 				]
 			},
 			{
 				id: 'automation-timing',
-				title: 'Carry only the automation-facing timing rules into CI',
+				title: 'Timing rules that matter in CI',
 				paragraphs: [
-					'Automation does not need the whole local harness manual, but it does need the timing rules that commonly produce flaky checks or false confidence.',
-					'The main habit is to promote the check that matches the behavior you actually need to trust instead of assuming every helper has the same completion contract.'
+					'Automation does not need the full harness manual, but it needs the timing rules that produce flaky checks or false confidence.',
+					'Promote the check that matches the behavior you need to trust.'
 				],
 				table: {
 					headers: ['When the check depends on...', 'Prefer', 'Why'],
@@ -903,19 +1013,19 @@ bunx --bun devflare previews cleanup --scope next --apply`
 				callouts: [
 					{
 						tone: 'warning',
-						title: 'Do not promote the wrong completion contract into CI',
+						title: 'Wrong completion contract = flaky CI',
 						body: [
-							'If a test depends on `waitUntil()` effects being complete, a plain `cf.worker.fetch()` assertion may be too early. Keep that nuance visible in automation instead of discovering it from flaky builds later.'
+							'If a test depends on `waitUntil()` effects being complete, a plain `cf.worker.fetch()` assertion may be too early.'
 						]
 					}
 				]
 			},
 			{
 				id: 'promotion-path',
-				title: 'Promote the smallest useful checks into automation',
+				title: 'Promote the smallest useful checks',
 				steps: [
 					'Prove the behavior locally with `createTestContext()` or the binding-specific guide first.',
-					'Choose one or two runtime-shaped smoke checks that are worth rerunning in CI because they protect the deploy boundary, not because they are merely easy to copy.',
+					'Choose one or two runtime-shaped smoke checks worth rerunning in CI because they protect the deploy boundary.',
 					'Use preview validation when routing, preview-owned resources, or branch-scoped behavior is the real risk instead of trying to force every concern through one unit-style check.',
 					'Publish one visible summary or feedback artifact so reviewers can tell what passed without spelunking through raw logs.'
 				],
@@ -945,28 +1055,21 @@ bunx --bun devflare previews cleanup --scope next --apply`
 			},
 			{
 				id: 'automation-shape',
-				title: 'Automation should stay thin and observable',
+				title: 'Automation stays thin and observable',
 				paragraphs: [
-					'The repository workflow pieces are intentionally split between deploy logic and GitHub feedback logic. That keeps Cloudflare state changes separate from PR comments, deployment records, or other reporting behavior.',
-					'Caller workflows should own branch naming, permissions, environment selection, and post-deploy feedback decisions, while reusable actions should stay focused on one deploy or one reporting job at a time.'
+					'Deploy logic and GitHub feedback are separate. Cloudflare state changes stay independent from PR comments, deployment records, or other reporting.',
+					'Caller workflows own branch naming, permissions, and feedback decisions. Reusable actions focus on one deploy or one reporting job.'
 				],
 				bullets: [
-					'Keep one package, one explicit target, and one visible verification result in the same workflow lane whenever possible.',
-					'Split deploy execution from GitHub feedback so reporting can fail or retry without becoming a second deploy path.',
-					'Prefer workflow summaries, PR comments, or deployment records that show the result directly instead of forcing reviewers into raw logs.'
+					'One package, one target, one visible result per workflow lane.',
+					'Split deploy from feedback so reporting can fail or retry independently.',
+					'Prefer summaries, PR comments, or deployment records over raw logs.'
 				],
 				snippets: [
 					{
 						title: 'Thin preview deploy step',
 						language: 'yaml',
-						code: `- id: deploy
-  uses: ./.github/actions/devflare-deploy
-  with:
-    working-directory: apps/documentation
-    preview: 'true'
-    branch-name: \${{ github.head_ref || github.ref_name }}
-    cloudflare-api-token: \${{ secrets.CLOUDFLARE_API_TOKEN }}
-    cloudflare-account-id: \${{ secrets.CLOUDFLARE_ACCOUNT_ID }}`
+						code: thinPreviewDeployStepCode
 					}
 				],
 				callouts: [
@@ -974,7 +1077,7 @@ bunx --bun devflare previews cleanup --scope next --apply`
 						tone: 'info',
 						title: 'Thin workflows age better',
 						body: [
-							'When a release is stressful, a small workflow that clearly says what it deploys and what it reports is much easier to trust than a giant do-everything pipeline.'
+							'When a release is stressful, a small workflow that says what it deploys and what it reports is easier to trust.'
 						]
 					}
 				],

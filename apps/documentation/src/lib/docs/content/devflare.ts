@@ -1,4 +1,4 @@
-import { bindingTestingGuides } from './bindings'
+﻿import { bindingTestingGuides } from './bindings'
 import type { DocCodeTreeEntry, DocPage } from '../types'
 
 const docsLink = (slug: string): string => `/docs/${slug}`
@@ -8,7 +8,7 @@ const bindingTestingGuideCards = bindingTestingGuides.map((guide) => ({
 	label: 'Binding guide',
 	meta: guide.defaultHarness,
 	title: `Testing ${guide.label}`,
-	body: `${guide.summary} Open the ${guide.label} overview first when you need the full binding story, or jump straight here when the only open question is how to test it honestly.`
+	body: `${guide.summary} Open the ${guide.label} overview first when you need the full binding story, or jump straight here when the only open question is how to test it.`
 }))
 
 const bindingTestingGuideRows = bindingTestingGuides.map((guide) => [
@@ -392,7 +392,7 @@ export const devflareDocs: DocPage[] = [
 		summary:
 			'This is the practical answer to “what does a real Devflare project look like on disk?” — from a small worker package, to a multi-surface app, to a hosted SvelteKit package, to a Bun monorepo with several deployable workers.',
 		description:
-			'Devflare projects stay readable when the package boundary is obvious, the authored files stay separate from generated output, and each runtime surface owns its own file. This page maps the common file types, then shows a few real project shapes from this repository so you can set up your package on purpose instead of accumulating conventions by accident.',
+			'Devflare projects stay readable when the package boundary is obvious, the authored files stay separate from generated output, and each runtime surface owns its own file. This page maps the common file types, then shows a few real project shapes from this repository so you can set up your package deliberately instead of accumulating conventions by accident.',
 		highlights: [
 			'Every deployable package still starts with one authored `devflare.config.ts` file.',
 			'Worker surfaces like `fetch`, routes, queue, scheduled, email, Durable Objects, entrypoints, workflows, and transport should each live in explicit files when the package actually owns them.',
@@ -505,8 +505,8 @@ export const devflareDocs: DocPage[] = [
 				id: 'multi-surface-package',
 				title: 'One package can own many runtime files without becoming a monolith',
 				paragraphs: [
-					'This is where Devflare architecture becomes more interesting than “one fetch file.” A single package can still own HTTP, route modules, queue work, scheduled jobs, email handlers, Durable Objects, named entrypoints, workflows, and transport rules — as long as each surface keeps its own file and the config names those surfaces honestly.',
-					'That is also why the `files.*` lane matters so much. It is not busywork. It is the map of which runtime surfaces the package actually owns.'
+					'This is where Devflare architecture becomes more interesting than “one fetch file.” A single package can still own HTTP, route modules, queue work, scheduled jobs, email handlers, Durable Objects, named entrypoints, workflows, and transport rules — as long as each surface keeps its own file and the config names those surfaces explicitly.',
+					'The `files.*` lane matters for this reason. It is the map of which runtime surfaces the package actually owns.'
 				],
 				snippets: [
 					{
@@ -683,7 +683,7 @@ export default defineConfig({
 					{
 						label: 'Configuration',
 						title: 'Need generated types and entrypoints?',
-						body: 'Open generated types when the architecture includes bindings, named entrypoints, service refs, or Durable Objects that should land in `env.d.ts` honestly.',
+						body: 'Open generated types when the architecture includes bindings, named entrypoints, service refs, or Durable Objects that should land in `env.d.ts` accurately.',
 						href: docsLink('generated-types')
 					},
 					{
@@ -1030,6 +1030,32 @@ export async function GET({ params }: FetchEvent): Promise<Response> {
 				]
 			},
 			{
+				id: 'method-handlers',
+				title: 'Route files can export per-method handlers',
+				paragraphs: [
+					'Route modules can export named functions for specific HTTP methods: `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, and `ALL`. The runtime resolves the matching export based on the request method.',
+					'`HEAD` requests fall back to `GET` when no `HEAD` export exists, and the response body is stripped automatically. `ALL` is the catch-all when no method-specific export matches.'
+				],
+				table: {
+					headers: ['Export', 'Matches', 'Fallback behavior'],
+					rows: [
+						['`GET`', '`GET` requests', '—'],
+						['`POST`', '`POST` requests', '—'],
+						['`PUT`', '`PUT` requests', '—'],
+						['`PATCH`', '`PATCH` requests', '—'],
+						['`DELETE`', '`DELETE` requests', '—'],
+						['`HEAD`', '`HEAD` requests', 'Falls back to `GET` with body stripped'],
+						['`ALL`', 'Any method not matched by a specific export', '—']
+					]
+				},
+				bullets: [
+					'A handler with two parameters receives `(event, params)` as a convenience shorthand.',
+					'A handler with an `(event, resolve)` signature is called in resolve-style, consistent with `sequence(...)` middleware.',
+					'Method handlers resolve after the `sequence(...)` middleware chain.',
+					'`default` exports are also supported: `export default { GET, POST }` or `export default function handle(event) { ... }`.'
+				]
+			},
+			{
 				id: 'resolve-contract',
 				title: 'Understand what `resolve(event)` actually means',
 				paragraphs: [
@@ -1072,7 +1098,7 @@ export async function GET({ params }: FetchEvent): Promise<Response> {
 			'When a bridge-backed call returns a custom class, `src/transport.ts` can rebuild that class on the caller side instead of flattening it into plain JSON.'
 		],
 		facts: [
-			{ label: 'Big selling point', value: 'Tests can stay worker-shaped instead of mock-shaped' },
+			{ label: 'Key advantage', value: 'Tests can stay worker-shaped instead of mock-shaped' },
 			{ label: 'Core trick', value: '`createTestContext()` plus a unified `env` proxy and bridge-backed bindings' },
 			{ label: 'Durable Object experience', value: 'Direct `env.COUNTER.getByName(...).increment()` calls in tests' },
 			{ label: 'Optional extra', value: '`src/transport.ts` when bridge-backed calls must round-trip custom classes' }
@@ -1095,7 +1121,7 @@ export async function GET({ params }: FetchEvent): Promise<Response> {
 				id: 'why-it-feels-better',
 				title: 'The experience feels better because Devflare removes a whole fake layer',
 				paragraphs: [
-					'A lot of Worker testing feels split-brain. One layer of code is written against real bindings and Worker surfaces, then the tests either fake those APIs by hand or retreat to heavier integration paths for everything.',
+					'A lot of Worker testing feels disconnected. One layer of code is written against real bindings and Worker surfaces, then the tests either fake those APIs by hand or retreat to heavier integration paths for everything.',
 					'Devflare tries to keep one authored story instead. The same config that boots the app can boot the test harness, the same `env` import can keep working, and bridge-backed bindings can cross from Bun back into the worker world without forcing every test to speak raw HTTP or a custom mock vocabulary.'
 				],
 				cards: [
@@ -1119,7 +1145,7 @@ export async function GET({ params }: FetchEvent): Promise<Response> {
 				callouts: [
 					{
 						tone: 'accent',
-						title: 'This is a real selling point',
+						title: 'This is the key advantage',
 						body: [
 							'Devflare is at its best when a test can read like app code instead of a ceremony for building a fake Cloudflare universe first.'
 						]
@@ -1250,7 +1276,7 @@ export async function GET({ params }: FetchEvent): Promise<Response> {
 			},
 			{
 				id: 'keep-it-honest',
-				title: 'The pitch gets stronger when the caveats stay visible too',
+				title: 'Caveats worth knowing',
 				bullets: [
 					'`cf.worker.fetch()` returns when the handler resolves, so some `waitUntil()` side effects may still be running afterward.',
 					'`transport.ts` is for bridge-backed RPC-style calls, not a replacement for normal HTTP request or response serialization.',
@@ -1277,7 +1303,7 @@ export async function GET({ params }: FetchEvent): Promise<Response> {
 		eyebrow: 'Testing map',
 		title: 'Use one testing map so you know which Devflare page answers which testing question',
 		summary:
-			'Devflare’s testing story is layered on purpose: start with one real unit test, use `createTestContext()` and `cf.*` for the runtime-shaped harness, then jump to binding-specific guides or CI-focused pages only when the question changes.',
+			'Devflare’s testing story is layered: start with one real unit test, use `createTestContext()` and `cf.*` for the runtime-shaped harness, then jump to binding-specific guides or CI-focused pages only when the question changes.',
 		description:
 			'The docs already explain starter tests, harness behavior, runtime-context caveats, transport round-trips, binding-specific testing, and automation. This page gathers those lanes into one map so you can open the right testing page first instead of re-deriving the docs structure from memory.',
 		highlights: [
@@ -1300,7 +1326,7 @@ export async function GET({ params }: FetchEvent): Promise<Response> {
 				title: 'Start with one honest proof before you optimize the testing story',
 				paragraphs: [
 					'The safest Devflare testing habit is boring: prove one worker path with one real request first, then only add more harness machinery when a binding, background surface, or preview concern genuinely needs it.',
-					'That is why the docs split testing into layers. A starter request test, a runtime-shaped harness page, binding-specific testing guides, and a CI/automation page each answer different questions. Trying to make one page carry all of that usually makes the guidance worse.'
+					'The docs split testing into layers for this reason. A starter request test, a runtime-shaped harness page, binding-specific testing guides, and a CI/automation page each answer different questions. Trying to make one page carry all of that usually makes the guidance worse.'
 				],
 				snippets: [
 					{
@@ -1355,7 +1381,7 @@ test('GET /health proves the worker boots', async () => {
 						label: 'Testing',
 						meta: 'Binding index',
 						title: 'Binding testing guides',
-						body: 'Use this when the binding already exists and the open question is how to test KV, D1, R2, Queues, Durable Objects, AI, Vectorize, or another binding honestly.'
+						body: 'Use this when the binding already exists and the open question is how to test KV, D1, R2, Queues, Durable Objects, AI, Vectorize, or another binding accurately.'
 					},
 					{
 						href: docsLink('runtime-context'),
@@ -1463,7 +1489,7 @@ test('GET /health proves the worker boots', async () => {
 				],
 				bullets: [
 					'Open the binding overview page first when you need authoring, runtime, or preview context before the tests make sense.',
-					'Open the testing guide first when the binding already exists and the only remaining question is how to test it honestly.',
+					'Open the testing guide first when the binding already exists and the only remaining question is how to test it.',
 					'Use `Testing overview` when you need the bigger map across starter tests, harness behavior, binding guides, runtime helpers, and automation.'
 				],
 				cards: [
@@ -1553,7 +1579,7 @@ test('GET /health proves the worker boots', async () => {
 					]
 				},
 				paragraphs: [
-					'These helpers are runtime-shaped and context-accurate for handler logic, but they do not try to recreate every internal Cloudflare dispatch step byte for byte. That is why their timing rules are documented explicitly instead of being left to guesswork.'
+					'These helpers are runtime-shaped and context-accurate for handler logic, but they do not try to recreate every internal Cloudflare dispatch step byte for byte. Their timing rules are documented explicitly instead of being left to guesswork.'
 				],
 				callouts: [
 					{

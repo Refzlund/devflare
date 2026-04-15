@@ -1,4 +1,4 @@
-import type { DocPage } from '../types'
+﻿import type { DocPage } from '../types'
 
 const docsLink = (slug: string): string => `/docs/${slug}`
 
@@ -201,7 +201,7 @@ export async function GET({ env, params }: FetchEvent<DevflareEnv>): Promise<Res
 		navTitle: 'R2 uploads & delivery',
 		readTime: '7 min read',
 		eyebrow: 'Guide',
-		title: 'Handle R2 uploads and file delivery on purpose instead of treating bucket URLs as the product',
+		title: 'Handle R2 uploads and file delivery explicitly instead of treating bucket URLs as the product',
 		summary:
 			'Use presigned `PUT` URLs for direct uploads, public buckets on custom domains for truly public assets, and private buckets plus Worker auth for protected files. Keep `r2.dev` out of production, and when a preview or environment needs its own bucket, scope it intentionally instead of borrowing production storage.',
 		description:
@@ -310,7 +310,7 @@ export async function GET({ env, params }: FetchEvent<DevflareEnv>): Promise<Res
 					headers: ['Pattern', 'Use it when', 'Main caveat'],
 					rows: [
 						['Public bucket on a custom domain', 'Images, assets, or media should be public and cacheable for anyone.', 'Use a custom domain for real delivery; `r2.dev` is not the production path.'],
-						['Private bucket plus Worker-gated reads', 'Access depends on the current user, tenant, payment state, or other app authorization.', 'Your Worker becomes the delivery boundary, so own the auth, cache headers, and response metadata on purpose.'],
+						['Private bucket plus Worker-gated reads', 'Access depends on the current user, tenant, payment state, or other app authorization.', 'Your Worker becomes the delivery boundary, so own the auth, cache headers, and response metadata deliberately.'],
 						['Presigned `GET` URL on the S3 endpoint', 'A download should be directly accessible for a short time without a custom delivery layer.', 'Presigned URLs are bearer tokens and do not work with custom domains.'],
 						['Custom domain plus Cloudflare Access', 'Only teammates or organization users should reach the bucket.', 'Disable `r2.dev` so the bucket is not still reachable through the public development URL.'],
 						['Custom domain plus Worker token auth or WAF HMAC validation', 'You want expiring direct links on `cdn.example.com` without exposing the whole bucket.', 'This is not the same feature as presigned R2 URLs; you are building or validating the access layer at the custom domain boundary.']
@@ -349,7 +349,7 @@ export async function GET({ env, params }: FetchEvent<DevflareEnv>): Promise<Res
 				title: 'Keep development and production boundaries honest',
 				paragraphs: [
 					'Cloudflare\'s development guidance says local Worker development uses local simulated bindings by default, and Devflare follows the same practical posture: local R2 bindings are available to your worker code, tests, and bridge helpers without requiring a real remote bucket just to iterate.',
-					'That is why browser-visible local file flows should usually go through your Worker routes or app routes. Devflare does not promise a stable browser-facing local bucket origin, and depending on one would make local behavior more brittle than the product boundary probably needs to be.'
+					'Browser-visible local file flows should go through your Worker routes or app routes. Devflare does not promise a stable browser-facing local bucket origin, and depending on one would make local behavior more brittle than the product boundary probably needs to be.'
 				],
 				snippets: [
 					{
@@ -638,7 +638,7 @@ export default defineConfig({
 				title: 'Model the relationship with `ref()` so the worker family stays explicit',
 				paragraphs: [
 					'If another worker is real, the relationship belongs in config instead of in copied worker names or half-remembered script references. `ref()` gives Devflare enough structure to follow the dependency into local runtime, generated env types, and compiled output.',
-					'Keep the architecture example boring on purpose: one referenced worker and one explicit service binding are enough to show the boundary. Named entrypoints are real too, but the service-binding and generated-types pages own that deeper contract once the worker boundary itself is already justified.'
+					'Keep the architecture example simple: one referenced worker and one explicit service binding are enough to show the boundary. Named entrypoints are real too, but the service-binding and generated-types pages own that deeper contract once the worker boundary itself is already justified.'
 				],
 				snippets: [
 					{
@@ -705,7 +705,7 @@ test('service binding calls the default worker export', async () => {
 						label: 'Testing',
 						meta: 'Services',
 						title: 'Testing Services',
-						body: 'Open the service testing guide when the next question is the right default harness or how to test named entrypoints honestly.'
+						body: 'Open the service testing guide when the next question is the right default harness or how to test named entrypoints accurately.'
 					},
 					{
 						href: docsLink('generated-types'),

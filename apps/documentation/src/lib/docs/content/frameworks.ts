@@ -215,6 +215,21 @@ export default defineConfig(async () => {
 				]
 			},
 			{
+				id: 'plugin-options',
+				title: '`devflarePlugin()` options',
+				table: {
+					headers: ['Option', 'Type', 'Default', 'Description'],
+					rows: [
+						['`configPath`', '`string`', '`devflare.config.ts`', 'Path to the Devflare config file.'],
+						['`environment`', '`string`', '—', 'Named environment from config to resolve.'],
+						['`doTransforms`', '`boolean`', '`true`', 'Enable Durable Object code transforms.'],
+						['`watchConfig`', '`boolean`', '`true`', 'Watch the config file for changes in dev mode.'],
+						['`bridgePort`', '`number`', '`DEVFLARE_BRIDGE_PORT`', 'Miniflare bridge port for WebSocket proxying.'],
+						['`wsProxyPatterns`', '`string[]`', '`[]`', 'Additional patterns to proxy WebSocket requests to Miniflare. Patterns from `wsRoutes` in config are included automatically.']
+					]
+				}
+			},
+			{
 				id: 'what-changes-when-vite-is-active',
 				title: 'Know what changes once Vite is actually active',
 				paragraphs: [

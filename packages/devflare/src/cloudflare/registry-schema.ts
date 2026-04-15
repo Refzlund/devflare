@@ -3,7 +3,7 @@
 // =============================================================================
 // Zod 4 schemas for Devflare-managed metadata stored inside a user's Cloudflare
 // account. These records are intended for a D1-first control-plane layer that
-// tracks previews, aliases, deployments, and future reconciliation state.
+// tracks previews, scopes, deployments, and future reconciliation state.
 // =============================================================================
 
 import { z } from 'zod/v4'
@@ -18,7 +18,7 @@ const branchNameSchema = z.string().min(1)
 const commitShaSchema = z.string().regex(/^[a-f0-9]{7,40}$/i, {
 	message: 'Commit SHA must be 7 to 40 hexadecimal characters'
 })
-const previewAliasSchema = z.string().regex(/^[a-z][a-z0-9-]*$/, {
+const previewScopeSchema = z.string().regex(/^[a-z][a-z0-9-]*$/, {
 	message: 'Preview names must start with a lowercase letter and contain only lowercase letters, numbers, and dashes'
 })
 
@@ -58,7 +58,7 @@ export const devflarePreviewStatusSchema = z.enum([
 	'deleted'
 ])
 
-export const devflarePreviewAliasStatusSchema = z.enum([
+export const devflarePreviewScopeStatusSchema = z.enum([
 	'active',
 	'reassigned',
 	'deleted'
@@ -82,35 +82,35 @@ export const devflarePreviewRecordSchema = createDevflareAccountRecordSchema({
 	workerName: workerNameSchema,
 	versionId: cloudflareVersionIdSchema,
 	previewUrl: urlSchema,
-	alias: previewAliasSchema.optional(),
-	aliasPreviewUrl: urlSchema.optional(),
+	scope: previewScopeSchema.optional(),
+	scopeUrl: urlSchema.optional(),
 	branchName: branchNameSchema.optional(),
 	commitSha: commitShaSchema.optional(),
 	deploymentId: recordIdSchema.optional(),
 	source: devflareRecordSourceSchema.default('unknown'),
 	status: devflarePreviewStatusSchema.default('active')
 }).superRefine((record, ctx) => {
-	if (record.aliasPreviewUrl && !record.alias) {
+	if (record.scopeUrl && !record.scope) {
 		ctx.addIssue({
 			code: 'custom',
-			path: ['aliasPreviewUrl'],
-			message: 'aliasPreviewUrl requires alias to be set'
+			path: ['scopeUrl'],
+			message: 'scopeUrl requires scope to be set'
 		})
 	}
 })
 
-export const devflarePreviewAliasRecordSchema = createDevflareAccountRecordSchema({
-	kind: z.literal('previewAlias'),
+export const devflarePreviewScopeRecordSchema = createDevflareAccountRecordSchema({
+	kind: z.literal('previewScope'),
 	accountId: cloudflareAccountIdSchema,
 	workerName: workerNameSchema,
-	alias: previewAliasSchema,
-	aliasPreviewUrl: urlSchema,
+	scope: previewScopeSchema,
+	scopeUrl: urlSchema,
 	versionId: cloudflareVersionIdSchema,
 	previewId: recordIdSchema.optional(),
 	branchName: branchNameSchema.optional(),
 	commitSha: commitShaSchema.optional(),
 	source: devflareRecordSourceSchema.default('unknown'),
-	status: devflarePreviewAliasStatusSchema.default('active')
+	status: devflarePreviewScopeStatusSchema.default('active')
 })
 
 export const devflareDeploymentRecordSchema = createDevflareAccountRecordSchema({
@@ -147,7 +147,7 @@ export const devflareDeploymentRecordSchema = createDevflareAccountRecordSchema(
 
 export const devflareAccountLayerRecordSchema = z.discriminatedUnion('kind', [
 	devflarePreviewRecordSchema,
-	devflarePreviewAliasRecordSchema,
+	devflarePreviewScopeRecordSchema,
 	devflareDeploymentRecordSchema
 ])
 
@@ -155,10 +155,10 @@ export type CloudflareUserId = z.output<typeof cloudflareUserIdSchema>
 export type DevflareAccountRecord = z.output<typeof devflareAccountRecordSchema>
 export type DevflareRecordSource = z.output<typeof devflareRecordSourceSchema>
 export type DevflarePreviewStatus = z.output<typeof devflarePreviewStatusSchema>
-export type DevflarePreviewAliasStatus = z.output<typeof devflarePreviewAliasStatusSchema>
+export type DevflarePreviewScopeStatus = z.output<typeof devflarePreviewScopeStatusSchema>
 export type DevflareDeploymentChannel = z.output<typeof devflareDeploymentChannelSchema>
 export type DevflareDeploymentStatus = z.output<typeof devflareDeploymentStatusSchema>
 export type DevflarePreviewRecord = z.output<typeof devflarePreviewRecordSchema>
-export type DevflarePreviewAliasRecord = z.output<typeof devflarePreviewAliasRecordSchema>
+export type DevflarePreviewScopeRecord = z.output<typeof devflarePreviewScopeRecordSchema>
 export type DevflareDeploymentRecord = z.output<typeof devflareDeploymentRecordSchema>
 export type DevflareAccountLayerRecord = z.output<typeof devflareAccountLayerRecordSchema>

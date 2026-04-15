@@ -239,7 +239,7 @@ jobs:
           version-id: ${{ steps.branch-deploy.outputs.version-id }}
           log-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           log-excerpt: ${{ steps.branch-deploy.outputs.log-excerpt }}
-          summary: This shared preview workflow keeps the branch-scoped documentation preview updated on qualifying pushes.
+          summary: This shared preview workflow keeps the named documentation preview scope updated on qualifying pushes.
 
       - name: Deploy documentation PR preview
         id: pr-deploy
@@ -387,7 +387,7 @@ jobs:
           ref-name: ${{ needs.resolve-context.outputs.branch-preview-scope }}
           environment: documentation branch preview / ${{ needs.resolve-context.outputs.branch-preview-scope }}
           log-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          summary: This branch was deleted, so the shared preview workflow cleaned up the branch-scoped documentation preview and marked the matching GitHub deployment inactive.
+          summary: This branch was deleted, so the shared preview workflow cleaned up the named documentation preview scope and marked the matching GitHub deployment inactive.
 
       - name: Clean up documentation PR preview scope
         if: ${{ needs.resolve-context.outputs.pr-cleanup-enabled == 'true' }}
@@ -576,7 +576,7 @@ jobs:
           version-id: ${{ steps.branch-deploy.outputs.version-id }}
           log-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           log-excerpt: ${{ steps.branch-deploy.outputs.log-excerpt }}
-          summary: This shared preview workflow keeps the branch-scoped testing preview family updated on qualifying pushes.
+          summary: This shared preview workflow keeps the named testing preview scope updated on qualifying pushes.
           details-markdown: |
             - Auth impact: `${{ steps.auth-impact.outputs.should-deploy == 'true' && 'deploy' || 'skip' }}` (`${{ steps.auth-impact.outputs.reason }}`)
             - Search impact: `${{ steps.search-impact.outputs.should-deploy == 'true' && 'deploy' || 'skip' }}` (`${{ steps.search-impact.outputs.reason }}`)
@@ -806,7 +806,7 @@ jobs:
           ref-name: ${{ needs.resolve-context.outputs.branch-preview-scope }}
           environment: testing branch preview / ${{ needs.resolve-context.outputs.branch-preview-scope }}
           log-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          summary: This branch was deleted, so the shared preview workflow cleaned up the branch-scoped testing preview family and marked the matching GitHub deployment inactive.
+          summary: This branch was deleted, so the shared preview workflow cleaned up the named testing preview scope and marked the matching GitHub deployment inactive.
 
       - name: Clean up testing PR preview scope
         if: ${{ needs.resolve-context.outputs.pr-cleanup-enabled == 'true' }}

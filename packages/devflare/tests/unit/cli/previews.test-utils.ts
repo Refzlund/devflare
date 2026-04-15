@@ -152,8 +152,8 @@ interface PreviewRecordFixtureOptions {
 	workerName: string
 	versionId: string
 	previewUrl?: string
-	alias?: string
-	aliasPreviewUrl?: string
+	scope?: string
+	scopeUrl?: string
 	branchName?: string
 	source?: string
 	status?: string
@@ -178,21 +178,21 @@ export function createPreviewRecordFixture(
 		workerName: options.workerName,
 		versionId: options.versionId,
 		...(options.previewUrl ? { previewUrl: options.previewUrl } : {}),
-		...(options.alias ? { alias: options.alias } : {}),
-		...(options.aliasPreviewUrl ? { aliasPreviewUrl: options.aliasPreviewUrl } : {}),
+		...(options.scope ? { scope: options.scope } : {}),
+		...(options.scopeUrl ? { scopeUrl: options.scopeUrl } : {}),
 		...(options.branchName ? { branchName: options.branchName } : {}),
 		source: options.source ?? 'cli',
 		status: options.status ?? 'active'
 	}
 }
 
-interface PreviewAliasFixtureOptions {
+interface PreviewScopeFixtureOptions {
 	accountId?: string
 	workerName: string
-	alias: string
+	scope: string
 	versionId: string
 	previewId?: string
-	aliasPreviewUrl?: string
+	scopeUrl?: string
 	branchName?: string
 	source?: string
 	status?: string
@@ -202,20 +202,20 @@ interface PreviewAliasFixtureOptions {
 	id?: string
 }
 
-export function createPreviewAliasRecordFixture(
-	options: PreviewAliasFixtureOptions
+export function createPreviewScopeRecordFixture(
+	options: PreviewScopeFixtureOptions
 ): Record<string, unknown> {
 	return {
-		id: options.id ?? `previewAlias:${options.workerName}:${options.alias}`,
-		kind: 'previewAlias',
+		id: options.id ?? `previewScope:${options.workerName}:${options.scope}`,
+		kind: 'previewScope',
 		ver: 1,
 		createdAt: options.createdAt ?? '2025-01-01T00:00:00.000Z',
 		updatedAt: options.updatedAt ?? '2025-01-02T00:00:00.000Z',
 		createdBy: options.createdBy ?? 'user_123',
 		accountId: options.accountId ?? 'acc_123',
 		workerName: options.workerName,
-		alias: options.alias,
-		...(options.aliasPreviewUrl ? { aliasPreviewUrl: options.aliasPreviewUrl } : {}),
+		scope: options.scope,
+		...(options.scopeUrl ? { scopeUrl: options.scopeUrl } : {}),
 		versionId: options.versionId,
 		previewId: options.previewId ?? `preview:${options.workerName}:${options.versionId}`,
 		...(options.branchName ? { branchName: options.branchName } : {}),

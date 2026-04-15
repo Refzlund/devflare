@@ -1,6 +1,6 @@
 import type { DevflareConfig } from '../config'
 
-export type DeploymentStrategy = 'default' | 'branch-scoped-preview'
+export type DeploymentStrategy = 'default' | 'preview-scope'
 
 export interface ApplyDeploymentStrategyOptions {
 	environment?: string
@@ -103,14 +103,14 @@ export function applyDeploymentStrategy(
 
 	return {
 		config: nextConfig,
-		strategy: 'branch-scoped-preview',
+		strategy: 'preview-scope',
 		branchScope,
 		omittedResources
 	}
 }
 
 export function describeDeploymentStrategy(result: AppliedDeploymentStrategy): string | undefined {
-	if (result.strategy !== 'branch-scoped-preview' || result.omittedResources.length === 0) {
+	if (result.strategy !== 'preview-scope' || result.omittedResources.length === 0) {
 		return undefined
 	}
 
@@ -122,5 +122,5 @@ export function describeDeploymentStrategy(result: AppliedDeploymentStrategy): s
 		: labels[0]
 	const scopeSuffix = result.branchScope ? ` (${result.branchScope})` : ''
 
-	return `Branch-scoped preview deploy detected${scopeSuffix}; omitting shared ${formattedLabels} from the deployed Wrangler config to avoid singleton Cloudflare resource conflicts.`
+	return `Named preview-scope deploy detected${scopeSuffix}; omitting shared ${formattedLabels} from the deployed Wrangler config to avoid singleton Cloudflare resource conflicts.`
 }

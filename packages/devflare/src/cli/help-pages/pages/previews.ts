@@ -43,7 +43,7 @@ export const PREVIEW_HELP_PAGES: HelpPage[] = [
 		notes: [
 			'The default `list` view can aggregate every configured package from a monorepo root. `bindings` and `cleanup` still need one configured package, so run them inside that package or pass `--config <path>`.',
 			'`bindings` and `cleanup` default to preview-oriented config resolution already, so `--env preview` is usually redundant unless your project stores preview bindings under a different env key.',
-			'`cleanup` removes preview-only Cloudflare resources for the targeted scope and also deletes dedicated preview Worker scripts when that scope is deployed as branch-scoped Workers. Service bindings, Durable Object bindings, and routes attached only to those dedicated preview Workers disappear with them.',
+			'`cleanup` removes preview-only Cloudflare resources for the targeted scope and also deletes dedicated preview-scope Worker scripts when that scope is deployed as its own Worker family. Service bindings, Durable Object bindings, and routes attached only to those dedicated preview Workers disappear with them.',
 			'Stable shared Workers are never deleted by `cleanup`.'
 		]
 	},

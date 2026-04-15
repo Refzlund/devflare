@@ -173,8 +173,7 @@ export async function retireDeletedPreviewWorkers(
 			workerName,
 			databaseName,
 			apiOptions: { timeout: 10000 },
-			branchName: scope,
-			previewAlias: scope,
+			previewScope: scope,
 			apply: true
 		})
 	}

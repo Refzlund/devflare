@@ -1,4 +1,4 @@
-import type { DocCallout, DocCodeSnippet, DocPage, DocSection } from '../types'
+﻿import type { DocCallout, DocCodeSnippet, DocPage, DocSection } from '../types'
 
 const bindingReferenceGroup = 'Bindings'
 
@@ -579,7 +579,7 @@ function createBindingPages(guide: BindingGuideDefinition): DocPage[] {
 				},
 				{
 					id: 'lock-it-in',
-					title: guide.example.testSnippet ? 'Lock in the behavior with one small test or smoke path' : 'Keep the first version boring on purpose',
+					title: guide.example.testSnippet ? 'Lock in the behavior with one small test or smoke path' : 'Keep the first version boring',
 					snippets: guide.example.testSnippet ? [guide.example.testSnippet] : undefined,
 					callouts: guide.example.callout ? [guide.example.callout] : undefined
 				}
@@ -636,7 +636,7 @@ export default defineConfig({
 			],
 			caveatBullets: [
 				'Rerun `devflare types` after adding or renaming a binding so the generated env contract stays honest.',
-				'Preview-scoped names work well for namespace-per-branch flows, but they are still a naming strategy you should review on purpose.',
+				'Preview-scoped names work well for namespace-per-branch flows, but they are still a naming strategy worth reviewing.',
 				'KV is local-friendly, but account-level provisioning behavior still belongs in build, preview, or deploy checks when the lifecycle matters.'
 			],
 			caveatCallout: {
@@ -662,7 +662,7 @@ export default defineConfig({
 			previewNote: 'Preview-scoped KV namespaces can be provisioned and cleaned up automatically',
 			normalizationParagraphs: [
 				'`bindings.kv` accepts a plain string, `{ name }`, or `{ id }`. Devflare normalizes those into one internal shape so later code can reason about them consistently.',
-				'That is why authored config can stay human-readable without making compiler or deploy code guess what each record means at the last second.'
+				'Authored config can stay human-readable without making compiler or deploy code guess what each record means at the last second.'
 			],
 			localRuntimeBullets: [
 				'Local runtime resolution can keep the configured name as the local namespace identifier instead of forcing a Cloudflare API lookup.',
@@ -734,7 +734,7 @@ test('stores and reads a cache value', async () => {
 		},
 		example: {
 			readTime: '3 min read',
-			summary: 'This example keeps KV boring on purpose: one binding, one fetch handler, one assertion.',
+			summary: 'This example keeps KV simple: one binding, one fetch handler, one assertion.',
 			description: 'The fastest way to trust a binding is to wire one small use case end to end before you hide it behind a bigger app.',
 			highlights: [
 				'One binding in config is enough to learn the shape.',
@@ -896,7 +896,7 @@ export default defineConfig({
 				tone: 'success',
 				title: 'Same authoring rule, different runtime shape',
 				body: [
-					'The config story is close to KV, but the runtime story is unapologetically SQL-shaped. That is exactly how it should feel.'
+					'The config story is close to KV, but the runtime story is SQL-shaped — as it should be.'
 				]
 			}
 		},
@@ -1028,7 +1028,7 @@ test('GET / returns a D1-backed health response', async () => {
 		sourcePages: ['schema-bindings.ts', 'compiler.ts', 'simple-context.ts', 'verification-testing-and-caveats.md', 'apps/testing/*'],
 		overview: {
 			readTime: '4 min read',
-			title: 'Use R2 for object storage, but route browser delivery on purpose',
+			title: 'Use R2 for object storage, but route browser delivery deliberately',
 			summary: 'R2 is straightforward in config and well-supported locally, but browser-facing delivery should usually go through a Worker route instead of assuming bucket URLs.',
 			description: 'Devflare treats R2 as a first-class binding in worker code and tests. The main discipline is deciding which files are public, which are private, and which paths should stay app-controlled.',
 			highlights: [
@@ -1060,7 +1060,7 @@ export default defineConfig({
 			fitBullets: [
 				'Use R2 for large objects, uploads, or file delivery that does not belong in D1 or KV.',
 				'Keep private file delivery in a Worker route so auth and response headers stay under your control.',
-				'If the browser needs a direct public asset origin, use a public bucket on a custom domain on purpose rather than by accident.'
+				'If the browser needs a direct public asset origin, use a public bucket on a custom domain rather than by accident.'
 			],
 			caveatBullets: [
 				'Do not assume local bucket URLs are a public contract your app can safely depend on.',
@@ -1330,7 +1330,7 @@ export default defineConfig({
 			],
 			callout: {
 				tone: 'accent',
-				title: 'This is where Devflare earns its keep',
+				title: 'This is where coherent tooling matters most',
 				body: [
 					'If a tool cannot keep DO authoring, local runtime, and test setup coherent, DO-heavy apps get painful fast. Devflare’s value is that these pieces stay part of one story.'
 				]
@@ -1548,7 +1548,7 @@ export default defineConfig({
 			previewNote: 'Preview queue names and DLQs can be provisioned and cleaned up when the preview owns them',
 			normalizationParagraphs: [
 				'Devflare does not treat queue producers and queue consumers as unrelated configuration fragments. It keeps them in one coherent config namespace so later compile and preview code can see the whole story.',
-				'That is why review and runtime stay aligned: the config already names the queue, the producer binding, the consumer, and the dead-letter relationship in one place.'
+				'Review and runtime stay aligned: the config already names the queue, the producer binding, the consumer, and the dead-letter relationship in one place.'
 			],
 			localRuntimeBullets: [
 				'The local harness can stand up queue producers as real env bindings and trigger the queue handler through test helpers.',
@@ -1769,7 +1769,7 @@ export default defineConfig({
 		internals: {
 			readTime: '4 min read',
 			summary: 'Devflare resolves referenced worker configs, bundles the linked worker surfaces, and then exposes those services as local multi-worker bindings.',
-			description: 'That is why service bindings feel more than cosmetic: the tooling actually follows the relationship far enough to keep local tests, type generation, and compiled output aligned.',
+			description: 'Service bindings feel more than cosmetic: the tooling follows the relationship far enough to keep local tests, type generation, and compiled output aligned.',
 			highlights: [
 				'Compiler emits Wrangler `services` entries.',
 				'`ref()` can resolve both default worker exports and named entrypoints.',
@@ -1915,7 +1915,7 @@ test('GET / calls the math service', async () => {
 				tone: 'info',
 				title: 'The example should prove the relationship, not the whole system',
 				body: [
-					'One method call is already enough to teach the service-binding contract honestly.'
+					'One method call is already enough to teach the service-binding contract accurately.'
 				]
 			}
 		}
@@ -1941,8 +1941,8 @@ test('GET / calls the math service', async () => {
 			],
 			bestFor: 'Real inference against Workers AI models',
 			authoringParagraphs: [
-				'AI is one of the clearest examples of Devflare choosing honesty over fantasy. The binding exists in config, the env is typed, and the deploy story is real — but model inference itself still lives on Cloudflare infrastructure.',
-				'That is why the testing story leans on remote mode rather than pretending Miniflare can be a credible stand-in for actual model execution.'
+				'AI is a remote-oriented binding. The binding exists in config, the env is typed, and the deploy story is real — but model inference itself still lives on Cloudflare infrastructure.',
+				'The testing story leans on remote mode rather than pretending Miniflare can be a credible stand-in for actual model execution.'
 			],
 			authoringSnippet: {
 				title: 'Workers AI binding authoring',
@@ -2008,7 +2008,7 @@ export default defineConfig({
 				tone: 'info',
 				title: 'Honest tooling beats fake local magic',
 				body: [
-					'Devflare makes AI explicit and testable on purpose, but it does not pretend local emulation is equivalent to real inference.'
+					'Devflare makes AI explicit and testable, but it does not pretend local emulation is equivalent to real inference.'
 				]
 			}
 		},
@@ -2189,7 +2189,7 @@ export default defineConfig({
 		internals: {
 			readTime: '3 min read',
 			summary: 'Vectorize compiles cleanly into Wrangler output and participates in preview resource lifecycle, but the runtime value of the binding mostly lives in remote infrastructure.',
-			description: 'That is why the codebase treats Vectorize as supported but remote-oriented. Config and preview handling are strong; local emulation is intentionally not oversold.',
+			description: 'The codebase treats Vectorize as supported but remote-oriented. Config and preview handling are strong; local emulation is intentionally not oversold.',
 			highlights: [
 				'Compile emits `vectorize` entries with `index_name`.',
 				'Preview resource logic can provision and later clean up preview-scoped indexes.',
@@ -2339,7 +2339,7 @@ export async function fetch(): Promise<Response> {
 				tone: 'warning',
 				title: 'The remote index still has to exist',
 				body: [
-					'This example is small on purpose, but it is not fictional. The named index has to exist and match the vector shape you send.'
+					'This example is intentionally small, but it is not fictional. The named index has to exist and match the vector shape you send.'
 				]
 			}
 		}
@@ -2356,7 +2356,7 @@ export async function fetch(): Promise<Response> {
 			readTime: '4 min read',
 			title: 'Use Hyperdrive when the worker needs a real PostgreSQL path behind Cloudflare’s pooling layer',
 			summary: 'Hyperdrive is modeled in Devflare config and compile flows like other name-based resources, but its tested local ergonomics are thinner than D1 or KV.',
-			description: 'That is not a reason to avoid it — it is a reason to document it honestly. The binding is supported, yet the strongest evidence in the repo focuses on presence, connection info, and targeted integration rather than a giant local mock universe.',
+			description: 'That is not a reason to avoid it — it is a reason to document it accurately. The binding is supported, yet the strongest evidence in the repo focuses on presence, connection info, and targeted integration rather than a giant local mock universe.',
 			highlights: [
 				'String shorthand means a stable Hyperdrive configuration name.',
 				'Build and deploy can resolve names to Hyperdrive ids.',
@@ -2420,8 +2420,8 @@ export default defineConfig({
 			],
 			localRuntimeBullets: [
 				'The repo shows Hyperdrive bindings exposing connection-oriented information such as `connectionString`, and some smoke paths also allow a `query()`-style helper.',
-				'I did not find the same rich bridge-level local helper story that exists for D1, KV, or R2, which is why the docs should stay cautious here.',
-				'The strongest proven local habit is to assert the binding exists and to use targeted integration for database behavior that really matters.'
+				'The bridge-level local helper surface is thinner than D1, KV, or R2 — expect to lean on targeted integration tests for database behavior that matters.',
+				'The strongest proven local habit is to assert the binding exists and verify the connection string shape.'
 			],
 			compileBullets: [
 				'Build and deploy resolve name-based Hyperdrive bindings to real configuration ids before generating output.',
@@ -2552,8 +2552,8 @@ export async function fetch(): Promise<Response> {
 		overview: {
 			readTime: '5 min read',
 			title: 'Use Browser Rendering when the worker really needs a headless browser path',
-			summary: 'Devflare supports Browser Rendering, but the docs should say the quiet part out loud: there is exactly one browser binding today, and the best-supported local story lives in dev-server and integration flows.',
-			description: 'That is still useful. It means browser work can live in the same docs library as every other binding, just with honest caveats about limits and testing style.',
+			summary: 'Devflare supports Browser Rendering, but there is exactly one browser binding today, and the best-supported local story lives in dev-server and integration flows.',
+			description: 'Browser work can live in the same docs library as every other binding, just with clear caveats about limits and testing style.',
 			highlights: [
 				'Current schema allows exactly one browser binding.',
 				'Compile emits the single Wrangler browser binding shape from the named env key.',
@@ -2565,7 +2565,7 @@ export async function fetch(): Promise<Response> {
 			authoringParagraphs: [
 				'Browser Rendering looks a little unusual in config because the current contract is a named map with exactly one entry. The env key matters more than the configured string value that appears beside it.',
 				'That is also why generated env typing stays conservative today: `devflare types` can model the binding as `Fetcher`, while the richer browser behavior comes from the dev server shim and browser-aware libraries.',
-				'That single-binding constraint is not a Devflare whim. It reflects the current Wrangler and platform support Devflare is choosing to expose honestly.'
+				'That single-binding constraint is not a Devflare whim. It reflects the current Wrangler and platform support Devflare is choosing to expose accurately.'
 			],
 			authoringSnippet: {
 				title: 'Browser binding authoring',
@@ -2614,7 +2614,7 @@ export default defineConfig({
 			previewNote: 'Preview can materialize the binding name, but browser resources are not lifecycle-managed account resources',
 			normalizationParagraphs: [
 				'The browser binding schema accepts a record but then validates that only one key exists. Devflare treats that key as the meaningful env binding name and compiles it into the single `browser.binding` entry Wrangler expects.',
-				'That is why the docs should emphasize the env key and the single-binding limit instead of implying the string value behaves like a normal bucket or namespace resource.'
+				'Emphasize the env key and the single-binding limit rather than implying the string value behaves like a normal bucket or namespace resource.'
 			],
 			localRuntimeBullets: [
 				'The dev server starts a browser shim that can install Chrome Headless Shell and proxy the Browser Rendering protocol over HTTP and WebSocket.',
@@ -2821,8 +2821,8 @@ export default defineConfig({
 				'The more important implementation detail is that datasets are not managed like KV namespaces or buckets. They come to life on write, so preview lifecycle support looks different.'
 			],
 			localRuntimeBullets: [
-				'The repo smoke app and integration tests show `writeDataPoint()` being called through the binding, which is enough to describe the runtime contract honestly.',
-				'I did not find a dedicated analytics helper surface in the test harness, so docs should steer people toward thin worker tests or explicit mocks instead.',
+				'The repo smoke app and integration tests show `writeDataPoint()` being called through the binding, which is enough to describe the runtime contract.',
+				'There is no dedicated analytics helper surface in the test harness — use thin worker tests or explicit mocks instead.',
 				'Type generation still matters here because it keeps the env contract clear even when the test story is lighter.'
 			],
 			compileBullets: [
@@ -2938,7 +2938,7 @@ export async function fetch(): Promise<Response> {
 			},
 			notes: [
 				'Keep the event payload small and explicit so you can reason about what the worker is writing.',
-				'If the real event shape grows richer later, this tiny route still teaches the binding contract honestly.'
+				'If the real event shape grows richer later, this tiny route still teaches the binding contract.'
 			],
 			callout: {
 				tone: 'info',
@@ -3103,7 +3103,7 @@ test('sends an outbound transactional email', async () => {
 		example: {
 			readTime: '3 min read',
 			summary: 'This example keeps outbound email explicit: one binding, one recipient rule, one worker path that sends one message.',
-			description: 'It is enough to teach the binding honestly without dragging inbound processing or full provider workflows into the very first page.',
+			description: 'It is enough to teach the binding accurately without dragging inbound processing or full provider workflows into the very first page.',
 			highlights: [
 				'One outbound binding already teaches the contract.',
 				'The allowed destination is visible in config.',
