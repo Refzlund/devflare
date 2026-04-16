@@ -611,7 +611,6 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           TESTING_DEPLOY_VERSION_ID: ${{ steps.branch-deploy.outputs.version-id }}
-          TESTING_DEPLOY_PREVIEW_URL: ${{ steps.branch-deploy.outputs.preview-url }}
           TESTING_VERIFICATION_ATTEMPTS: '5'
           TESTING_VERIFICATION_DELAY_MS: '3000'
         run: |
