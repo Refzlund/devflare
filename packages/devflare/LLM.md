@@ -24,7 +24,7 @@ See why Devflare exists, build the smallest safe first worker, and keep the docu
   - [Your first worker](/docs/first-worker) — Start with one config file, one fetch handler, and generated types before you branch into routes, bindings, frameworks, or a deeper test setup.
   - [Your first unit test](/docs/first-unit-test) — Take the same starter worker from the previous page and add one request test through `createTestContext()` so the first check uses the same runtime shape the worker will actually run.
   - [Your first bindings](/docs/first-bindings) — Take the same starter worker, split it into routes and helpers, then add one binding-backed route at a time so `src/fetch.ts` can stay small.
-  - [Deploy and Preview](/docs/deploy-and-preview) — Take the same starter worker and ship one named preview on purpose, then remove that same preview scope cleanly when you are done.
+  - [Deploy and Preview](/docs/deploy-and-preview) — Take the same starter worker, ship one named preview, then remove that preview scope cleanly.
 
 ### Devflare
 Keep the day-to-day Devflare surfaces easy to scan: runtime model, HTTP split, authored config rules, CLI workflow, helpers, testing, and framework lanes all live here instead of being scattered across deploy-only docs.
@@ -49,7 +49,7 @@ Keep the day-to-day Devflare surfaces easy to scan: runtime model, HTTP split, a
 
 - **Testing** — Start with why the testing experience feels different, use the testing map and built-in harness for runtime-shaped checks, and jump to binding-specific guides when the test story changes by binding.
   - [Why tests feel native](/docs/why-testing-feels-native) — Devflare’s standout testing trick is that the same config, bindings, env surface, runtime helpers, and even direct Durable Object method calls can stay available in Bun tests without a hand-built fake layer in the middle.
-  - [Testing overview](/docs/testing-overview) — Devflare’s testing story is layered on purpose: start with one real unit test, use `createTestContext()` and `cf.*` for the runtime-shaped harness, then jump to binding-specific guides or CI-focused pages only when the question changes.
+  - [Testing overview](/docs/testing-overview) — Devflare’s testing story is layered: start with one real unit test, use `createTestContext()` and `cf.*` for the runtime-shaped harness, then jump to binding-specific guides or CI-focused pages only when the question changes.
   - [createTestContext()](/docs/create-test-context) — Start tests with `createTestContext()` so the same config, bindings, routes, and handler surfaces the app uses in real runtime flows are available in Bun tests.
   - [Binding testing](/docs/binding-testing-guides) — Every binding overview page already links a hidden testing guide. This page collects those guides in one place so you can jump straight to the right harness, caveats, and escalation path for the binding that changed.
 
@@ -62,22 +62,22 @@ Keep the day-to-day Devflare surfaces easy to scan: runtime model, HTTP split, a
 Deploy explicitly, choose the right preview model, manage preview lifecycle cleanly, and keep CI/CD plus verification honest.
 
 - **CI/CD** — Use small GitHub workflows that keep triggers, permissions, impact checks, deploy intent, and feedback easy to review.
-  - [GitHub workflows](/docs/github-workflows) — This repository keeps GitHub workflows small on purpose: one shared preview workflow owns branch and PR preview lifecycles, while reusable Devflare actions handle impact checks, shared workspace setup, deploy execution, and feedback publishing.
+  - [GitHub workflows](/docs/github-workflows) — Devflare ships reusable GitHub Actions for setup, impact checks, deploy execution, and feedback, plus supported workflow strategies for validation, previews, production, and cleanup.
 
 - **Deploy targets** — Move from local build output to production or preview deploys without guessing which destination you are about to hit.
-  - [Production deploys](/docs/production-deploys) — Devflare keeps build and deploy flows inspectable, but deploys are intentionally explicit: production uses `--prod` or `--production`, while preview is either a same-worker upload with plain `--preview` or a named preview scope with `--preview <name>`.
-  - [Monorepos & Turborepo](/docs/monorepo-turborepo) — In a Bun monorepo, Turborepo should own task orchestration, caching, and impact-aware validation, while `devflare` still runs from the package that owns the Worker or app you are deploying.
-  - [Preview strategies](/docs/preview-strategies) — Devflare supports both same-worker preview uploads and named preview scopes, but Durable Object-heavy apps often need a branch-scoped worker-family strategy instead of relying on preview URLs alone.
+  - [Production deploys](/docs/production-deploys) — Production uses `--prod` or `--production`, preview uses `--preview` or `--preview <name>`. No target means no deploy.
+  - [Monorepos & Turborepo](/docs/monorepo-turborepo) — Turbo owns task orchestration and caching. `devflare` still runs from the package that owns the Worker or app.
+  - [Preview strategies](/docs/preview-strategies) — Same-worker uploads, named preview scopes, and branch-scoped worker families serve different needs.
 
 - **Operations** — Choose account context, inspect live production, manage Worker names and tokens, gate paid remote tests deliberately, and reuse the public Cloudflare helper API when automation needs the same rules.
   - [Control-plane operations](/docs/control-plane-operations) — Devflare’s deeper CLI families exist so account selection, live production inspection, Worker renames, token lifecycle, and remote paid-test gates stay documented instead of dissolving into ad-hoc command snippets.
   - [devflare/cloudflare](/docs/cloudflare-api) — The `devflare/cloudflare` subpath exposes the same account-aware building blocks the CLI uses for auth, resource inventory, usage and limits, preview registry access, preferences, and managed token workflows.
 
 - **Preview lifecycle** — Inspect and clean up preview scopes after they exist so preview infrastructure does not sprawl.
-  - [Preview operations](/docs/preview-operations) — The preview registry is D1-backed and gives Devflare a durable record of preview scope and deployment state so cleanup does not have to depend on fragile one-off scripts.
+  - [Preview operations](/docs/preview-operations) — The preview registry is D1-backed, giving Devflare durable records of scope and deployment state for reliable cleanup.
 
 - **Verification** — Use runtime-shaped tests and keep automation observable enough to trust during releases.
-  - [Testing & automation](/docs/testing-and-automation) — Keep local harness detail on the dedicated testing pages, then promote only the right runtime-shaped checks into thin, observable automation.
+  - [Testing & automation](/docs/testing-and-automation) — Local harness detail stays on the testing pages. This page covers what gets promoted into CI and how automation stays observable.
 
 ### Guides
 Use cross-cutting guides to choose the right storage, state, async, file-delivery, and worker-composition patterns before you dive into one binding reference page.
@@ -95,7 +95,7 @@ Use the per-binding guides for the exact authoring, runtime, testing, preview, a
   - [KV](/docs/kv-binding) — KV bindings are first-class in Devflare: author stable names in config, keep env typed, and run real get or put flows locally.
   - [KV internals](/docs/kv-internals) — KV goes through the full Devflare pipeline: normalize authoring, resolve names when needed, then compile to Wrangler output.
   - [Testing KV](/docs/kv-testing) — Use the default test harness first. KV is one of the bindings Devflare supports best in local tests.
-  - [KV example](/docs/kv-example) — This example keeps KV boring on purpose: one binding, one fetch handler, one assertion.
+  - [KV example](/docs/kv-example) — This example keeps KV simple: one binding, one fetch handler, one assertion.
 
 - **D1** — SQLite-style relational queries with a strong local harness and id or name-based authoring.
   - [D1](/docs/d1-binding) — D1 gets the same stable-name authoring story as KV, but the runtime shape is relational: `prepare`, `batch`, `exec`, and prepared statements.
@@ -140,7 +140,7 @@ Use the per-binding guides for the exact authoring, runtime, testing, preview, a
   - [Hyperdrive example](/docs/hyperdrive-example) — This example keeps Hyperdrive focused on one thing: prove the binding exists and expose the connection information your app will need next.
 
 - **Browser Rendering** — Headless browser support with an explicit single-binding limit and a stronger dev-server story than test-helper story.
-  - [Browser Rendering](/docs/browser-binding) — Devflare supports Browser Rendering, but the docs should say the quiet part out loud: there is exactly one browser binding today, and the best-supported local story lives in dev-server and integration flows.
+  - [Browser Rendering](/docs/browser-binding) — Devflare supports Browser Rendering, but there is exactly one browser binding today, and the best-supported local story lives in dev-server and integration flows.
   - [Browser Rendering internals](/docs/browser-internals) — Browser Rendering support in Devflare is more than a config pass-through: the dev server starts a browser shim and a binding worker that line up with Cloudflare and puppeteer expectations.
   - [Testing Browser Rendering](/docs/browser-testing) — Browser tests should usually be integration-flavored: either drive the worker in dev or exercise a thin smoke path that proves the binding can launch and fetch.
   - [Browser Rendering example](/docs/browser-example) — This example shows the real browser shape most people care about: launch a browser, read one page title, close the browser cleanly.
@@ -252,7 +252,7 @@ The goal is not to hide Cloudflare. The goal is to keep authored code split by r
 | Fact | Value |
 | --- | --- |
 | Best for | Teams that want Cloudflare power without accumulating setup glue |
-| Architecture shape | Config, runtime, tests, framework integration, and Cloudflare ops stay split on purpose |
+| Architecture shape | Config, runtime, tests, framework integration, and Cloudflare ops are separate by design |
 | Build lane | Rolldown composes worker and Durable Object artifacts; Vite stays optional |
 | Still true | Cloudflare limits and Wrangler-compatible output still matter |
 
@@ -274,7 +274,7 @@ Devflare gives those pieces one authored story: readable config, worker-shaped r
 
 #### Why the codebase stays coherent as the app grows
 
-The implementation is split by environment and lifecycle on purpose so the worker story can grow without collapsing into one giant tool blob.
+The implementation splits by environment and lifecycle so the worker story can grow without collapsing into one giant tool blob.
 
 `devflare/config` is for authored config, `devflare/runtime` is for worker code, `devflare/test` is for harnesses, and `devflare/vite` or `devflare/sveltekit` only join the picture when the package grows into a real app host. That split is one of the package's quiet strengths.
 
@@ -500,9 +500,9 @@ The easiest continuation from the first worker page is not a refactor. It is one
 
 `createTestContext()` gives that test the same runtime shape Devflare manages locally. Keep the first assertion narrow: one request, one status check, one response body. That already proves the worker, the harness, and your local setup are all talking to each other correctly.
 
-> **Tip — Keep the first test boring on purpose**
+> **Tip — Keep the first test boring**
 >
-> If the first test is obvious, failures are obvious too. That is exactly what you want while the worker is still tiny.
+> If the first test is obvious, failures are obvious too. That is what you want while the worker is still tiny.
 
 ##### Example — Keep the first worker, add one test file
 
@@ -949,9 +949,9 @@ Once one tiny example works locally, jump to the dedicated binding guides for th
 
 ---
 
-### Deploy one preview on purpose, then delete it cleanly when you are done
+### Deploy one preview, then delete it cleanly
 
-> Take the same starter worker and ship one named preview on purpose, then remove that same preview scope cleanly when you are done.
+> Take the same starter worker, ship one named preview, then remove that preview scope cleanly.
 
 | Field | Value |
 | --- | --- |
@@ -1014,7 +1014,7 @@ If you later need richer lifecycle management, the dedicated preview operations 
 - Keep cleanup commands explicit so logs clearly show what is being removed.
 - If the preview becomes a real recurring workflow, move that command into CI instead of relying on team memory.
 
-> **Warning — Delete previews on purpose too**
+> **Warning — Delete previews explicitly too**
 >
 > Preview environments get messy when deploys are automated but cleanup rules live only in people’s heads. Use the same explicit naming discipline for teardown that you used for deploy.
 
@@ -1218,7 +1218,7 @@ bunx --bun devflare productions versions
 | Navigation title | Project Architecture |
 | Eyebrow | Project setup |
 
-Devflare projects stay readable when the package boundary is obvious, the authored files stay separate from generated output, and each runtime surface owns its own file. This page maps the common file types, then shows a few real project shapes from this repository so you can set up your package on purpose instead of accumulating conventions by accident.
+Devflare projects stay readable when the package boundary is obvious, the authored files stay separate from generated output, and each runtime surface owns its own file. This page maps the common file types, then shows a few real project shapes from this repository so you can set up your package deliberately instead of accumulating conventions by accident.
 
 #### At a glance
 
@@ -1329,9 +1329,9 @@ export async function GET(): Promise<Response> {
 
 #### One package can own many runtime files without becoming a monolith
 
-This is where Devflare architecture becomes more interesting than “one fetch file.” A single package can still own HTTP, route modules, queue work, scheduled jobs, email handlers, Durable Objects, named entrypoints, workflows, and transport rules — as long as each surface keeps its own file and the config names those surfaces honestly.
+This is where Devflare architecture becomes more interesting than “one fetch file.” A single package can still own HTTP, route modules, queue work, scheduled jobs, email handlers, Durable Objects, named entrypoints, workflows, and transport rules — as long as each surface keeps its own file and the config names those surfaces explicitly.
 
-That is also why the `files.*` lane matters so much. It is not busywork. It is the map of which runtime surfaces the package actually owns.
+The `files.*` lane matters for this reason. It is the map of which runtime surfaces the package actually owns.
 
 ##### Reference table
 
@@ -1619,7 +1619,7 @@ bunx --bun devflare deploy --preview pr-123
 - **Need the file-surface rules?** — Open project shape when the next question is how many surfaces the package should actually own and which conventions should stay explicit. ([link](/docs/project-shape))
 - **Need the event-surface map?** — Open worker surfaces when the real question is fetch versus queue versus scheduled versus email, or when the package has started owning more than one event family. ([link](/docs/worker-surfaces))
 - **Need route layout next?** — Open the routing page when the package boundary is clear and the next decision is how `src/fetch.ts` and `src/routes/**` should split responsibility. ([link](/docs/http-routing))
-- **Need generated types and entrypoints?** — Open generated types when the architecture includes bindings, named entrypoints, service refs, or Durable Objects that should land in `env.d.ts` honestly. ([link](/docs/generated-types))
+- **Need generated types and entrypoints?** — Open generated types when the architecture includes bindings, named entrypoints, service refs, or Durable Objects that should land in `env.d.ts` accurately. ([link](/docs/generated-types))
 - **Need the fuller monorepo workflow?** — Open the monorepo page when the next question is Turbo filters, CI workflow boundaries, or package-local deploy discipline across the workspace. ([link](/docs/monorepo-turborepo))
 
 ---
@@ -1645,7 +1645,7 @@ Devflare gives you a request-wide fetch entry and a built-in file router. The sa
 | Primary order | `src/fetch.ts` → same-module methods → matched route file |
 | Route config | `files.routes` |
 
-#### There are two HTTP layers on purpose
+#### Two HTTP layers by design
 
 If `src/fetch.ts` exports `fetch` or `handle`, that module becomes the primary HTTP entry. Inside `resolve(event)`, Devflare checks same-module method handlers first and then dispatches to the matched route file when needed.
 
@@ -2190,7 +2190,7 @@ export default defineConfig({
 - Set `files.transport: null` when you want transport autodiscovery disabled instead of guessed.
 - Use explicit file or glob paths when the project layout is non-standard enough that the default convention would hide intent.
 
-> **Warning — Conventions are only helpful when they still describe the project honestly**
+> **Warning — Conventions are only helpful when they still describe the project accurately**
 >
 > As soon as a default convention stops being obvious, move back to explicit config. That is usually the more maintainable choice.
 
@@ -2308,7 +2308,7 @@ That distinction matters because it keeps code review honest. Event surfaces ans
 ##### Highlights
 
 - **Need transport behavior?** — Open the transport page when a discovered transport file becomes part of the package contract. ([link](/docs/transport-file))
-- **Need the generated type contract?** — Open the generated types page when `files.entrypoints`, `ref()`, or discovered Durable Objects need to show up honestly in `env.d.ts`. ([link](/docs/generated-types))
+- **Need the generated type contract?** — Open the generated types page when `files.entrypoints`, `ref()`, or discovered Durable Objects need to show up correctly in `env.d.ts`. ([link](/docs/generated-types))
 - **Need the broader config map?** — The runtime and deploy settings page covers the non-surface knobs such as account context, compatibility posture, routes, assets, limits, and migrations. ([link](/docs/runtime-deploy-settings))
 
 ##### Reference table
@@ -2333,7 +2333,7 @@ That distinction matters because it keeps code review honest. Event surfaces ans
 | Navigation title | Generated types |
 | Eyebrow | Configuration |
 
-The generated file is more than editor garnish. It is the typed mirror of your Devflare config and discovery rules: bindings land on global `DevflareEnv`, named entrypoints become an exported `Entrypoints` union, and referenced workers can produce typed service interfaces when Devflare can follow them honestly.
+The generated file is more than editor garnish. It is the typed mirror of your Devflare config and discovery rules: bindings land on global `DevflareEnv`, named entrypoints become an exported `Entrypoints` union, and referenced workers can produce typed service interfaces when Devflare can follow them accurately.
 
 #### At a glance
 
@@ -2346,7 +2346,7 @@ The generated file is more than editor garnish. It is the typed mirror of your D
 
 #### Treat the generated file as the typed contract, not as handwritten glue
 
-`devflare types` reads the resolved config, discovers supporting source files, and writes one generated file that says what the package runtime actually exposes. That is calmer than hand-maintained `env` declarations because the source of truth stays in config and file discovery, not in a second hand-maintained type file.
+`devflare types` reads the resolved config, discovers supporting source files, and writes one generated file that says what the package runtime actually exposes. This is more reliable than hand-maintained `env` declarations because the source of truth stays in config and file discovery, not in a second hand-maintained type file.
 
 The result is usually a global `DevflareEnv` interface plus an exported `Entrypoints` union. That combination is what keeps bindings, cross-worker service calls, and named entrypoints typed without making you manually mirror every config change.
 
@@ -2388,7 +2388,7 @@ bunx --bun devflare types --output env.generated.d.ts
 
 ##### Key points
 
-- If no named entrypoints are discovered yet, `Entrypoints` stays `string` on purpose.
+- If no named entrypoints are discovered yet, `Entrypoints` stays `string` — the fallback is intentional.
 - `devflare types` does not take an `--env` flag today, so the generated contract reflects the resolved base config rather than a named environment overlay.
 - If you choose a nested `--output` path, create the parent directory first; the command writes the file but does not scaffold missing folders for you.
 - Discovery follows the configured file patterns first, then falls back to the default Durable Object and entrypoint globs.
@@ -2399,7 +2399,7 @@ bunx --bun devflare types --output env.generated.d.ts
 | Input Devflare reads | Where it comes from | Typed result |
 | --- | --- | --- |
 | `bindings`, `vars`, and `secrets` | The resolved top-level `devflare.config.*` from the current working directory or explicit `--config` path. | Members on global `DevflareEnv`. |
-| Local Durable Object classes | `files.durableObjects` or the default `**/do.*.{ts,js}` discovery pattern. | `DurableObjectNamespace<...>` when the class can be located honestly. |
+| Local Durable Object classes | `files.durableObjects` or the default `**/do.*.{ts,js}` discovery pattern. | `DurableObjectNamespace<...>` when the class can be located accurately. |
 | Named worker entrypoints | `files.entrypoints` or the default `**/ep.*.{ts,js}` discovery pattern plus exported classes extending `WorkerEntrypoint`. | An exported `Entrypoints` union for `defineConfig<Entrypoints>()`. |
 | `ref()` references | Imported Devflare configs in other packages or subfolders. | Typed service bindings and cross-worker Durable Object namespaces when Devflare can resolve them. |
 | Unknown or unresolvable service surface | A target worker or entrypoint that cannot be turned into a stable interface. | `Fetcher` fallback instead of fake precision. |
@@ -2512,7 +2512,7 @@ Devflare environments are an overlay system, not a second copy of the whole conf
 
 The main config should describe the stable project: the worker name, the usual file surfaces, and the bindings or defaults that exist regardless of environment. `config.env` is where you change only the parts that diverge for preview, production, or another named lane.
 
-That is why the overlay model feels calmer than copying whole config files around. The shared story stays in one place, while the environment-specific differences stay small enough to review honestly.
+The overlay model feels more predictable than copying whole config files around. The shared story stays in one place, while the environment-specific differences stay small enough to review accurately.
 
 > **Tip — A smaller overlay is usually a better overlay**
 >
@@ -2635,7 +2635,7 @@ The point of preview-scoped bindings is not to make names look fancy. It is to k
 
 > **Tip — This is safer than repointing previews at production state**
 >
-> When the preview owns a distinct database or queue name, it can be created quickly, reviewed honestly, and deleted cleanly later. That is much safer than hoping reviewers never touch a production binding in a preview session.
+> When the preview owns a distinct database or queue name, it can be created quickly, reviewed in isolation, and deleted cleanly later. That is much safer than hoping reviewers never touch a production binding in a preview session.
 
 ##### Example — Author preview-owned bindings once, then let the scope decide the real names
 
@@ -2770,7 +2770,7 @@ bunx --bun devflare previews cleanup --scope next --apply
 | Navigation title | Runtime & deploy settings |
 | Eyebrow | Configuration |
 
-Devflare exposes several config lanes that are not about file discovery at all. These keys shape runtime identity, Cloudflare compatibility, deployment routing, assets, release behavior, and operational posture, so they belong in authored config where the team can review them honestly.
+Devflare exposes several config lanes that are not about file discovery at all. These keys shape runtime identity, Cloudflare compatibility, deployment routing, assets, release behavior, and operational posture, so they belong in authored config where the team can review them accurately.
 
 #### At a glance
 
@@ -2781,7 +2781,7 @@ Devflare exposes several config lanes that are not about file discovery at all. 
 | Routing split | `files.routes` is app routing, while top-level `routes` is Cloudflare deployment routing |
 | Preview cron default | `previews.includeCrons` defaults to `false` |
 
-#### Set runtime identity and compatibility posture on purpose
+#### Set runtime identity and compatibility posture explicitly
 
 Not every package needs the full advanced runtime section on day one, but once remote bindings, compatibility drift, or account-aware operations matter, these settings should move into config instead of living in loose scripts and remembered defaults.
 
@@ -2792,7 +2792,7 @@ The important habit is that runtime posture should be reviewable in source contr
 | Key | Use it when | Important behavior |
 | --- | --- | --- |
 | `accountId` | Remote bindings, name-based resource lookup, or account-aware commands should target one Cloudflare account explicitly. | Remote AI and Vectorize flows need a clear account, and config-level `accountId` becomes one resolution lane for account-aware operations and config-driven resource resolution. |
-| `compatibilityDate` | The package should pin runtime behavior instead of inheriting date drift. | Devflare defaults it to the current date when you omit it, so explicit pinning is the calmer choice once the package is real. |
+| `compatibilityDate` | The package should pin runtime behavior instead of inheriting date drift. | Devflare defaults it to the current date when you omit it, so explicit pinning is the safer choice once the package is real. |
 | `compatibilityFlags` | You need extra Workers compatibility flags beyond the default posture. | Devflare always includes `nodejs_compat` and `nodejs_als`, so custom flags should be deliberate additions instead of copy-by-habit repetition. |
 
 > **Note — Do not restate the forced flags unless you are making a point**
@@ -2862,7 +2862,7 @@ export default defineConfig({
 
 Once a package has Durable Object history, production traffic expectations, or explicit preview behavior, the runtime contract is no longer just “what files exist?” It also includes how that package should be migrated, sampled, and limited at runtime.
 
-That is why these settings belong in the same config as the Worker surfaces. They are part of the deployable contract, not just garnish around it.
+These settings belong in the same config as the Worker surfaces. They are part of the deployable contract, not just garnish around it.
 
 ##### Reference table
 
@@ -3009,7 +3009,7 @@ The same mechanism is reused by generated worker entrypoints, request-wide middl
 >
 > If a helper works in the dev server but not in tests, or vice versa, that is a bug. Devflare intentionally drives both through the same AsyncLocalStorage-backed context model.
 
-##### Example — The important part of `runWithEventContext()` is small on purpose
+##### Example — The important part of `runWithEventContext()` is intentionally small
 
 ```ts
 const context = {
@@ -3048,9 +3048,9 @@ This is also why strict runtime helpers throwing outside context is healthy: it 
 
 Worker surfaces expose `event.ctx` as the current `ExecutionContext`. Durable Object surfaces expose `event.ctx` as the current `DurableObjectState`, and Devflare also aliases that same value as `event.state` for clarity.
 
-For fetch and Durable Object fetch, Devflare augments the actual `Request` instance. For queue, scheduled, email, tail, and Durable Object WebSocket surfaces, it augments the native carrier object instead of replacing it with a fantasy wrapper. That is why the event-first API still feels like Cloudflare instead of a new platform.
+For fetch and Durable Object fetch, Devflare augments the actual `Request` instance. For queue, scheduled, email, tail, and Durable Object WebSocket surfaces, it augments the native carrier object instead of replacing it with a fantasy wrapper.
 
-This is why the runtime feels consistent across local dev, tests, route middleware, and Durable Object wrappers once you learn the model once.
+Three general-purpose utilities round out the API: `hasContext()` checks whether a context is active, `getEventContext()` returns the current event regardless of surface type, and `getEventContextOrNull()` does the same but returns `null` outside a context.
 
 ##### Reference table
 
@@ -3064,6 +3064,7 @@ This is why the runtime feels consistent across local dev, tests, route middlewa
 | Durable Object fetch | `DurableObjectFetchEvent` | `getDurableObjectFetchEvent()` |
 | Durable Object alarm | `DurableObjectAlarmEvent` | `getDurableObjectAlarmEvent()` |
 | Durable Object WebSocket message / close / error | Dedicated WebSocket event types | `getDurableObjectWebSocketMessageEvent()`, `getDurableObjectWebSocketCloseEvent()`, `getDurableObjectWebSocketErrorEvent()` |
+| Any Durable Object surface | `DurableObjectEvent` | `getDurableObjectEvent()` |
 
 #### `locals` is the mutable storage lane, and it is isolated per context
 
@@ -3194,6 +3195,31 @@ export async function GET({ params }: FetchEvent): Promise<Response> {
 > **Important — The split should stay boring**
 >
 > Global middleware should read like app policy. Route files should read like one URL at a time. If those blur together, the HTTP layer gets harder to review than it needs to be.
+
+#### Route files can export per-method handlers
+
+Route modules can export named functions for specific HTTP methods: `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, and `ALL`. The runtime resolves the matching export based on the request method.
+
+`HEAD` requests fall back to `GET` when no `HEAD` export exists, and the response body is stripped automatically. `ALL` is the catch-all when no method-specific export matches.
+
+##### Key points
+
+- A handler with two parameters receives `(event, params)` as a convenience shorthand.
+- A handler with an `(event, resolve)` signature is called in resolve-style, consistent with `sequence(...)` middleware.
+- Method handlers resolve after the `sequence(...)` middleware chain.
+- `default` exports are also supported: `export default { GET, POST }` or `export default function handle(event) { ... }`.
+
+##### Reference table
+
+| Export | Matches | Fallback behavior |
+| --- | --- | --- |
+| `GET` | `GET` requests | — |
+| `POST` | `POST` requests | — |
+| `PUT` | `PUT` requests | — |
+| `PATCH` | `PATCH` requests | — |
+| `DELETE` | `DELETE` requests | — |
+| `HEAD` | `HEAD` requests | Falls back to `GET` with body stripped |
+| `ALL` | Any method not matched by a specific export | — |
 
 #### Understand what `resolve(event)` actually means
 
@@ -3390,14 +3416,14 @@ The experience feels better because Devflare does more than boot Miniflare. `cre
 
 | Fact | Value |
 | --- | --- |
-| Big selling point | Tests can stay worker-shaped instead of mock-shaped |
+| Key advantage | Tests can stay worker-shaped instead of mock-shaped |
 | Core trick | `createTestContext()` plus a unified `env` proxy and bridge-backed bindings |
 | Durable Object experience | Direct `env.COUNTER.getByName(...).increment()` calls in tests |
 | Optional extra | `src/transport.ts` when bridge-backed calls must round-trip custom classes |
 
 #### The experience feels better because Devflare removes a whole fake layer
 
-A lot of Worker testing feels split-brain. One layer of code is written against real bindings and Worker surfaces, then the tests either fake those APIs by hand or retreat to heavier integration paths for everything.
+A lot of Worker testing feels disconnected. One layer of code is written against real bindings and Worker surfaces, then the tests either fake those APIs by hand or retreat to heavier integration paths for everything.
 
 Devflare tries to keep one authored story instead. The same config that boots the app can boot the test harness, the same `env` import can keep working, and bridge-backed bindings can cross from Bun back into the worker world without forcing every test to speak raw HTTP or a custom mock vocabulary.
 
@@ -3408,7 +3434,7 @@ Devflare tries to keep one authored story instead. The same config that boots th
 - **One set of helper surfaces** — `cf.worker`, `cf.queue`, `cf.scheduled`, `cf.email`, and `cf.tail` trigger the same handler families your package actually owns.
 - **One honest Durable Object story** — Direct `env.MY_DO.getByName(...).method()` calls work in tests, so stateful code does not need a fake facade just to become testable.
 
-> **Important — This is a real selling point**
+> **Important — This is the key advantage**
 >
 > Devflare is at its best when a test can read like app code instead of a ceremony for building a fake Cloudflare universe first.
 
@@ -3554,7 +3580,7 @@ When the package grows queues, schedules, email handlers, or Tail processing, th
 | Email and tail handlers | `cf.email.send()` and `cf.tail.trigger()` | Handler-style invocation with the right local helper semantics instead of custom throwaway scaffolding. |
 | Bindings and Durable Object methods | `env.DB`, `env.CACHE`, `env.FILES`, or `env.COUNTER.getByName(...).increment()` | The same binding contract app code uses, optionally with transport-backed custom value round-trips. |
 
-#### The pitch gets stronger when the caveats stay visible too
+#### Caveats worth knowing
 
 ##### Key points
 
@@ -3571,7 +3597,7 @@ When the package grows queues, schedules, email handlers, or Tail processing, th
 
 ### Use one testing map so you know which Devflare page answers which testing question
 
-> Devflare’s testing story is layered on purpose: start with one real unit test, use `createTestContext()` and `cf.*` for the runtime-shaped harness, then jump to binding-specific guides or CI-focused pages only when the question changes.
+> Devflare’s testing story is layered: start with one real unit test, use `createTestContext()` and `cf.*` for the runtime-shaped harness, then jump to binding-specific guides or CI-focused pages only when the question changes.
 
 | Field | Value |
 | --- | --- |
@@ -3595,7 +3621,7 @@ The docs already explain starter tests, harness behavior, runtime-context caveat
 
 The safest Devflare testing habit is boring: prove one worker path with one real request first, then only add more harness machinery when a binding, background surface, or preview concern genuinely needs it.
 
-That is why the docs split testing into layers. A starter request test, a runtime-shaped harness page, binding-specific testing guides, and a CI/automation page each answer different questions. Trying to make one page carry all of that usually makes the guidance worse.
+The docs split testing into layers for this reason. A starter request test, a runtime-shaped harness page, binding-specific testing guides, and a CI/automation page each answer different questions. Trying to make one page carry all of that usually makes the guidance worse.
 
 ##### Key points
 
@@ -3626,7 +3652,7 @@ test('GET /health proves the worker boots', async () => {
 - **Why tests feel native** — Open this when the question is less “how do I use the harness?” and more “why does Devflare testing feel so much smoother than the usual Worker setup?” ([link](/docs/why-testing-feels-native))
 - **Your first unit test** — Use this when the goal is simply to prove a worker boots, answers one request, and can be exercised through the real Devflare test harness. ([link](/docs/first-unit-test))
 - **createTestContext()** — Use this when you need the real worker-shaped harness, autodiscovered surfaces, helper timing rules, and the `cf.*` testing helpers. ([link](/docs/create-test-context))
-- **Binding testing guides** — Use this when the binding already exists and the open question is how to test KV, D1, R2, Queues, Durable Objects, AI, Vectorize, or another binding honestly. ([link](/docs/binding-testing-guides))
+- **Binding testing guides** — Use this when the binding already exists and the open question is how to test KV, D1, R2, Queues, Durable Objects, AI, Vectorize, or another binding accurately. ([link](/docs/binding-testing-guides))
 - **Runtime context** — Open this when missing-context errors, getters, or runtime proxies are making tests feel harder to trace than they should. It explains the AsyncLocalStorage-backed context model the helpers depend on. ([link](/docs/runtime-context))
 - **transport.ts** — Open this when a test needs a bridge-backed RPC call to return a real class instance instead of collapsing into plain JSON. ([link](/docs/transport-file))
 - **Testing & automation** — Use this page when the question changes from local test harness behavior to CI workflows, preview checks, and observable automation. ([link](/docs/testing-and-automation))
@@ -3703,7 +3729,7 @@ That is the main reason the built-in harness scales: the same config and file co
 
 #### Know which helpers wait for background work and which do not
 
-These helpers are runtime-shaped and context-accurate for handler logic, but they do not try to recreate every internal Cloudflare dispatch step byte for byte. That is why their timing rules are documented explicitly instead of being left to guesswork.
+These helpers are runtime-shaped and context-accurate for handler logic, but they do not try to recreate every internal Cloudflare dispatch step byte for byte. Their timing rules are documented explicitly instead of being left to guesswork.
 
 ##### Reference table
 
@@ -3870,24 +3896,24 @@ That is great once you already opened the right binding page. This index is for 
 ##### Key points
 
 - Open the binding overview page first when you need authoring, runtime, or preview context before the tests make sense.
-- Open the testing guide first when the binding already exists and the only remaining question is how to test it honestly.
+- Open the testing guide first when the binding already exists and the only remaining question is how to test it.
 - Use `Testing overview` when you need the bigger map across starter tests, harness behavior, binding guides, runtime helpers, and automation.
 
 #### Open the testing guide for the binding that actually changed
 
 ##### Highlights
 
-- **Testing KV** — Use the default test harness first. KV is one of the bindings Devflare supports best in local tests. Open the KV overview first when you need the full binding story, or jump straight here when the only open question is how to test it honestly. ([link](/docs/kv-testing))
-- **Testing D1** — D1 is one of the easiest bindings to test meaningfully with Devflare because the local runtime already speaks the same database API your worker uses. Open the D1 overview first when you need the full binding story, or jump straight here when the only open question is how to test it honestly. ([link](/docs/d1-testing))
-- **Testing R2** — R2 is local-friendly, which means you can test real object operations without inventing a storage adapter just to get off the ground. Open the R2 overview first when you need the full binding story, or jump straight here when the only open question is how to test it honestly. ([link](/docs/r2-testing))
-- **Testing Durable Objects** — Durable Objects are well-supported in the default Devflare harness, which means you can test real object behavior without hand-building a fake namespace first. Open the Durable Objects overview first when you need the full binding story, or jump straight here when the only open question is how to test it honestly. ([link](/docs/durable-object-testing))
-- **Testing Queues** — Queue testing is one of the places where Devflare’s helper surface feels especially good because the queue trigger already knows how to drive the real handler shape. Open the Queues overview first when you need the full binding story, or jump straight here when the only open question is how to test it honestly. ([link](/docs/queue-testing))
-- **Testing AI** — The right AI test strategy is selective: use remote mode when you mean to test inference, and skip cleanly when the environment is not allowed to do that. Open the AI overview first when you need the full binding story, or jump straight here when the only open question is how to test it honestly. ([link](/docs/ai-testing))
-- **Testing Vectorize** — The right Vectorize tests are targeted remote checks: a small insert or query, a clear skip condition, and a real index behind the binding. Open the Vectorize overview first when you need the full binding story, or jump straight here when the only open question is how to test it honestly. ([link](/docs/vectorize-testing))
-- **Testing Hyperdrive** — Hyperdrive testing should start smaller and more cautiously than D1 testing: prove the binding exists, then add targeted integration where the real database path matters. Open the Hyperdrive overview first when you need the full binding story, or jump straight here when the only open question is how to test it honestly. ([link](/docs/hyperdrive-testing))
-- **Testing Browser Rendering** — Browser tests should usually be integration-flavored: either drive the worker in dev or exercise a thin smoke path that proves the binding can launch and fetch. Open the Browser Rendering overview first when you need the full binding story, or jump straight here when the only open question is how to test it honestly. ([link](/docs/browser-testing))
-- **Testing Analytics Engine** — Analytics Engine tests should stay thin: verify that the worker writes a data point, not that you can recreate Cloudflare analytics locally. Open the Analytics Engine overview first when you need the full binding story, or jump straight here when the only open question is how to test it honestly. ([link](/docs/analytics-engine-testing))
-- **Testing Send Email** — Send Email is stronger locally than many platform-service bindings because outbound email can be exercised in the default harness, while inbound email has its own related helper surface. Open the Send Email overview first when you need the full binding story, or jump straight here when the only open question is how to test it honestly. ([link](/docs/send-email-testing))
+- **Testing KV** — Use the default test harness first. KV is one of the bindings Devflare supports best in local tests. Open the KV overview first when you need the full binding story, or jump straight here when the only open question is how to test it. ([link](/docs/kv-testing))
+- **Testing D1** — D1 is one of the easiest bindings to test meaningfully with Devflare because the local runtime already speaks the same database API your worker uses. Open the D1 overview first when you need the full binding story, or jump straight here when the only open question is how to test it. ([link](/docs/d1-testing))
+- **Testing R2** — R2 is local-friendly, which means you can test real object operations without inventing a storage adapter just to get off the ground. Open the R2 overview first when you need the full binding story, or jump straight here when the only open question is how to test it. ([link](/docs/r2-testing))
+- **Testing Durable Objects** — Durable Objects are well-supported in the default Devflare harness, which means you can test real object behavior without hand-building a fake namespace first. Open the Durable Objects overview first when you need the full binding story, or jump straight here when the only open question is how to test it. ([link](/docs/durable-object-testing))
+- **Testing Queues** — Queue testing is one of the places where Devflare’s helper surface feels especially good because the queue trigger already knows how to drive the real handler shape. Open the Queues overview first when you need the full binding story, or jump straight here when the only open question is how to test it. ([link](/docs/queue-testing))
+- **Testing AI** — The right AI test strategy is selective: use remote mode when you mean to test inference, and skip cleanly when the environment is not allowed to do that. Open the AI overview first when you need the full binding story, or jump straight here when the only open question is how to test it. ([link](/docs/ai-testing))
+- **Testing Vectorize** — The right Vectorize tests are targeted remote checks: a small insert or query, a clear skip condition, and a real index behind the binding. Open the Vectorize overview first when you need the full binding story, or jump straight here when the only open question is how to test it. ([link](/docs/vectorize-testing))
+- **Testing Hyperdrive** — Hyperdrive testing should start smaller and more cautiously than D1 testing: prove the binding exists, then add targeted integration where the real database path matters. Open the Hyperdrive overview first when you need the full binding story, or jump straight here when the only open question is how to test it. ([link](/docs/hyperdrive-testing))
+- **Testing Browser Rendering** — Browser tests should usually be integration-flavored: either drive the worker in dev or exercise a thin smoke path that proves the binding can launch and fetch. Open the Browser Rendering overview first when you need the full binding story, or jump straight here when the only open question is how to test it. ([link](/docs/browser-testing))
+- **Testing Analytics Engine** — Analytics Engine tests should stay thin: verify that the worker writes a data point, not that you can recreate Cloudflare analytics locally. Open the Analytics Engine overview first when you need the full binding story, or jump straight here when the only open question is how to test it. ([link](/docs/analytics-engine-testing))
+- **Testing Send Email** — Send Email is stronger locally than many platform-service bindings because outbound email can be exercised in the default harness, while inbound email has its own related helper surface. Open the Send Email overview first when you need the full binding story, or jump straight here when the only open question is how to test it. ([link](/docs/send-email-testing))
 
 #### The testing posture is not identical for every binding
 
@@ -4095,6 +4121,19 @@ export default defineConfig(async () => {
 })
 ```
 
+#### `devflarePlugin()` options
+
+##### Reference table
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `configPath` | `string` | `devflare.config.ts` | Path to the Devflare config file. |
+| `environment` | `string` | — | Named environment from config to resolve. |
+| `doTransforms` | `boolean` | `true` | Enable Durable Object code transforms. |
+| `watchConfig` | `boolean` | `true` | Watch the config file for changes in dev mode. |
+| `bridgePort` | `number` | `DEVFLARE_BRIDGE_PORT` | Miniflare bridge port for WebSocket proxying. |
+| `wsProxyPatterns` | `string[]` | `[]` | Additional patterns to proxy WebSocket requests to Miniflare. Patterns from `wsRoutes` in config are included automatically. |
+
 #### Know what changes once Vite is actually active
 
 The package still uses the same Devflare command loop. What changes is the outer host: Vite takes over the app shell while Devflare keeps resolving worker config, generated Wrangler output, Durable Object discovery, and composed worker entrypoints underneath it.
@@ -4225,9 +4264,9 @@ export const handle = sequence(devflareHandle)
 
 ---
 
-### Use GitHub workflows as thin orchestration around explicit Devflare deploy and validation actions
+### Official GitHub Actions patterns for Devflare
 
-> This repository keeps GitHub workflows small on purpose: one shared preview workflow owns branch and PR preview lifecycles, while reusable Devflare actions handle impact checks, shared workspace setup, deploy execution, and feedback publishing.
+> Devflare ships reusable GitHub Actions for setup, impact checks, deploy execution, and feedback, plus supported workflow strategies for validation, previews, production, and cleanup.
 
 | Field | Value |
 | --- | --- |
@@ -4236,309 +4275,372 @@ export const handle = sequence(devflareHandle)
 | Navigation title | GitHub workflows |
 | Eyebrow | CI/CD |
 
-The CI/CD pattern in this repo is intentionally boring in the best way. One workflow validates the workspace, one shared preview workflow handles preview targets and cleanup, production stays explicit, and reusable actions keep the mechanics consistent across packages.
+Treat GitHub workflows as policy and target selection. Treat the reusable Devflare actions as the supported mechanics for workspace setup, impact checks, explicit deploys, and GitHub feedback.
 
 #### At a glance
 
 | Fact | Value |
 | --- | --- |
-| Best for | GitHub Actions workflows that validate packages and run explicit preview or production deploys |
-| Core split | Caller workflow owns policy; shared actions own mechanics |
-| Package selector | `working-directory` chooses which Devflare config actually deploys |
+| Best for | GitHub Actions with validation, preview, production, and cleanup lanes |
+| Supported actions | 4 reusable actions |
+| Package selector | `working-directory` picks which Devflare config deploys |
 
-#### Keep GitHub workflows thin and let the actions do the repeatable work
+#### GitHub Actions are a supported deployment surface
 
-The repo uses GitHub Actions as orchestration, not as a second deploy framework. The workflow file decides when the job runs, which permissions it gets, and which package it is targeting. The reusable actions then handle impact calculation, dependency installation, deploy execution, and GitHub feedback in a consistent way.
+This page is the reference for running Devflare from GitHub Actions. The reusable actions and workflow shapes in this repository are the supported CI/CD patterns, not incidental excerpts copied out of one lucky workflow.
 
-That split matters because it keeps policy visible in the workflow while the mechanics stay reusable. A docs preview, a testing preview family, and a production deploy can share the same action vocabulary without pretending they are the same deployment shape.
-
-##### Key points
-
-- Use workflow triggers and path filters to decide whether a lane should even run.
-- Use `working-directory` to make the target package visible in the workflow itself.
-- Keep preview versus production intent explicit instead of hiding it inside a generic shell script.
-- Use workflow summaries and feedback actions so the result is observable without re-reading raw logs every time.
-
-> **Note — A good workflow review question**
->
-> Ask three things separately: what triggered this workflow, which package is it acting on, and which explicit deploy target will the action use?
-
-#### Use one workspace CI lane for cached validation, not for hidden deploy logic
-
-`workspace-ci.yml` is the repo-wide validation lane. It reacts to workspace-level changes, restores Bun and Turborepo caches, installs dependencies once, and runs the cached `devflare:ci` lane from the repo root.
-
-That workflow proves the workspace still builds, checks, and tests coherently. It does not choose a Cloudflare target or quietly deploy anything on your behalf.
-
-##### Highlights
-
-- **workspace-ci.yml** — Repo-wide cached validation for apps, cases, and packages before any package-specific deploy lane runs. ([link](https://github.com/Refzlund/devflare/blob/next/.github/workflows/workspace-ci.yml))
-
-##### Example — Workspace CI stays in the validation lane
-
-The active file is the real repo workflow under `.github/workflows/workspace-ci.yml`, and the surrounding tree shows the workflow family this page references.
-
-###### File — .github/workflows/workspace-ci.yml
-
-```yaml
-name: Workspace CI
-
-on:
-	pull_request:
-		paths:
-			- 'apps/documentation/**'
-			- 'cases/**'
-			- 'packages/**'
-	push:
-		branches:
-			- main
-			- next
-	workflow_dispatch:
-
-jobs:
-	validate:
-		steps:
-			- uses: actions/checkout@v5
-			- uses: oven-sh/setup-bun@v2
-			- shell: bash
-			  run: bun run devflare:ci
-```
-
-#### Preview and production workflows should resolve impact before they deploy
-
-The repository preview and production workflows still call `devflare-deploy-impact` before they deploy. That action compares the target package against the relevant git range so the workflow can skip Cloudflare work when the package or its important dependencies did not change, and it also accepts `extra-paths` when shared files outside the package root should still invalidate the deploy.
-
-The main preview lane now lives in `preview.yml`. It resolves branch and PR context first, prepares the workspace once per job through `devflare-setup-workspace`, and then runs separate target-aware `devflare-deploy` calls for the branch scope, the PR scope, or both.
-
-When a later deploy step is reusing that prepared checkout, the caller sets `skip-setup` and `skip-install` so `devflare-deploy` can focus on the target-specific deploy work instead of repeating Bun setup and dependency installation.
-
-The documentation preview job is the clearest repo-local example to study because the same shared workflow can refresh both the branch preview and the stable PR preview from one prepared job while production stays in its own explicit workflow.
-
-##### Highlights
-
-- **preview.yml** — Shared preview workflow for documentation and testing branch previews, PR previews, and cleanup flows. ([link](https://github.com/Refzlund/devflare/blob/next/.github/workflows/preview.yml))
-- **documentation-production.yml** — Explicit docs production deploy lane with live verification after deploy. ([link](https://github.com/Refzlund/devflare/blob/next/.github/workflows/documentation-production.yml))
+Keep the ownership split sharp: workflows decide when a lane runs, which permissions it gets, which package it targets, and what verification happens afterwards. The reusable Devflare actions own the mechanics that should stay consistent across repositories.
 
 ##### Key points
 
-- Use `production: true`, `preview: true`, or `preview-scope: <name>` exactly once per deploy action call.
-- Use `devflare-setup-workspace` when one job needs to deploy multiple targets or packages from the same checkout.
-- Use `skip-setup` and `skip-install` on later deploy calls when a shared job has already prepared Bun and dependencies.
-- Keep branch and PR deploy calls separate even when one push updates both targets, because the deploy target is still part of the explicit workflow policy.
-- Use `extra-paths` on the impact action when shared workspace files outside the package root should still trigger a redeploy.
-- Use `install-working-directory` when a package-local deploy should reuse one shared root install in a monorepo.
-- Let the workflow pass branch names, preview scopes, and messages explicitly so deploy intent is visible in logs.
-
-> **Note — Build once, deploy twice still means two deploy calls**
->
-> The optimization in this repo is the shared checkout and install work. Cloudflare target selection still lives in each explicit deploy step, so branch and PR targets stay reviewable instead of being hidden inside one shell command.
-
-##### Example — The shared preview workflow prepares once, then updates the documentation targets it needs
-
-This abridged excerpt shows the shared documentation preview job inside `.github/workflows/preview.yml`. It omits repeated feedback details so the shared setup, impact check, and target-specific deploy steps stay visible.
-
-###### File — .github/workflows/preview.yml
-
-```yaml
-name: Preview
-
-on:
-	push:
-	pull_request:
-		types: [opened, reopened, ready_for_review, closed]
-	delete:
-	workflow_dispatch:
-
-jobs:
-	documentation-preview:
-		steps:
-			- uses: actions/checkout@v5
-
-			- uses: ./.github/actions/devflare-setup-workspace
-
-			- name: Resolve documentation preview impact
-			  id: impact
-			  uses: ./.github/actions/devflare-deploy-impact
-			  with:
-			    target-package: documentation
-
-			- name: Deploy documentation branch preview
-			  id: branch-deploy
-			  if: \${{ needs.resolve-context.outputs.branch-preview-enabled == 'true' && steps.impact.outputs.should-deploy == 'true' }}
-			  uses: ./.github/actions/devflare-deploy
-			  with:
-			    working-directory: apps/documentation
-			    install-working-directory: .
-			    skip-setup: 'true'
-			    skip-install: 'true'
-			    deploy-command: bun run deploy --
-			    preview-scope: \${{ needs.resolve-context.outputs.branch-preview-scope }}
-
-			- name: Deploy documentation PR preview
-			  id: pr-deploy
-			  if: \${{ needs.resolve-context.outputs.pr-preview-enabled == 'true' && steps.impact.outputs.should-deploy == 'true' }}
-			  uses: ./.github/actions/devflare-deploy
-			  with:
-			    working-directory: apps/documentation
-			    install-working-directory: .
-			    skip-setup: 'true'
-			    skip-install: 'true'
-			    deploy-command: bun run deploy --
-			    preview-scope: \${{ needs.resolve-context.outputs.pr-preview-scope }}
-
-			- name: Publish documentation PR preview feedback
-			  uses: ./.github/actions/devflare-github-feedback
-			  with:
-			    mode: comment
-			    comment-key: pr-deployment-status
-```
-
-#### Publish feedback and verify the live result instead of treating the deploy log as the whole story
-
-After deploy, the workflows in this repo publish GitHub feedback on purpose. The shared preview workflow updates branch deployment feedback and grouped PR comment sections from the same run, while production stays in its own deploy-and-verify lane.
-
-This is where thin workflows pay off: reporting stays separate from deploy mechanics, and a failed live verification or preview verification can be surfaced cleanly without hiding inside one giant shell step.
-
-Keep the reusable action outputs in mind too: `devflare-deploy-impact` returns `should-deploy`, `reason`, `comparison-base`, `comparison-head`, `changed-workspaces`, and `changed-files`; `devflare-deploy` returns `preview-url`, `version-id`, `verification-note`, `status`, `failure-stage`, `exit-code`, and `log-excerpt`; and `devflare-github-feedback` returns `comment-id`, `deployment-id`, and `pr-number` for later jobs that need to update, close, or cross-link that feedback.
-
-##### Key points
-
-- Use `devflare-github-feedback` for PR comments, GitHub deployments, or both.
-- Keep preview URLs or production URLs visible in workflow output so reviewers do not need to scrape logs.
-- Fail the workflow explicitly when deploy verification or live verification says the result is not trustworthy.
-- Use `GITHUB_STEP_SUMMARY` to leave a small readable outcome instead of forcing readers to decode every raw step.
+- Inside this repository, use local action paths like `./.github/actions/devflare-deploy`.
+- From another repository, use `Refzlund/devflare/.github/actions/<action>@next`.
+- Make the target package visible through `working-directory` instead of hiding package selection in a shell wrapper.
+- Keep validation, preview, production, and cleanup lanes explicit. They have different verification rules for good reasons.
 
 ##### Reference table
 
-| Workflow file | When it runs | GitHub feedback |
+| Layer | Owns | Should not own |
 | --- | --- | --- |
-| `preview.yml` | Non-default branch pushes, selected PR lifecycle events, branch deletion, or manual cleanup dispatch | Branch deployment feedback, grouped PR comment sections, and inactive cleanup updates for cleaned-up previews. |
-| `documentation-production.yml` | Default branch pushes or manual dispatch for docs production | Production deployment record plus live URL verification. |
-| `workspace-ci.yml` | Workspace PRs, selected branch pushes, or manual dispatch | No deployment feedback; validation stays separate from deploy policy. |
+| Workflow file | Triggers, permissions, concurrency, package selection, and verification order. | Deploy argument construction, Bun setup, or PR comment formatting. |
+| `devflare-setup-workspace` | Bun installation, cache restore, and one shared workspace install. | Target selection or any deploy step. |
+| `devflare-deploy-impact` | Change detection for one deployment target. | Cloudflare deploys or GitHub reporting. |
+| `devflare-deploy` | One explicit production or named preview-scope deploy. | PR comment policy or multi-package orchestration. |
+| `devflare-github-feedback` | PR comments, deployment records, and inactive cleanup updates. | Cloudflare deploy execution. |
 
-> **Tip — What the repo pattern optimizes for**
+> **Note — The goal**
 >
-> Clear triggers, explicit targets, reusable actions, and observable feedback make CI/CD easier to trust when a deploy matters.
+> Reusable mechanics, explicit policy, and CI logs a human can still trust before coffee.
 
-#### Cleanup workflows should be visible too, not hidden in one-off scripts
+#### Supported reusable actions
 
-This repo keeps cleanup as first-class automation inside `preview.yml`. Deleted branches and manual branch cleanup dispatches reuse the same cleanup jobs, while PR-scoped previews clean themselves up through the same shared workflow when the pull request closes.
+Devflare ships four reusable GitHub Actions for the repeatable parts. Use them directly rather than cloning shell logic into every workflow file.
 
-Each cleanup job checks out the default branch, reuses the shared workspace setup action, runs `devflare previews cleanup --scope <name> --apply` for the relevant package, and then marks the matching GitHub deployment or grouped PR comment section inactive.
-
-That keeps teardown reviewable: you can still see which workflow removes preview-owned resources and which feedback surfaces get marked inactive, but without splitting the lifecycle across six nearly-identical workflow files.
+The action source lives in this repository, but the contract is meant to be reused: workspace setup, impact detection, deploy execution, and GitHub feedback are separate on purpose.
 
 ##### Highlights
 
-- **preview.yml** — Shared preview lifecycle workflow that also owns branch cleanup, PR-close cleanup, and manual branch cleanup dispatches. ([link](https://github.com/Refzlund/devflare/blob/next/.github/workflows/preview.yml))
+- **devflare-setup-workspace** — Install Bun, restore the Bun cache, and run one shared workspace install for the job. ([link](https://github.com/Refzlund/devflare/blob/next/.github/actions/devflare-setup-workspace/action.yml))
+- **devflare-deploy-impact** — Decide whether one target package actually needs a deploy before Cloudflare work starts. ([link](https://github.com/Refzlund/devflare/blob/next/.github/actions/devflare-deploy-impact/action.yml))
+- **devflare-deploy** — Run one explicit production or named preview-scope deploy and expose outputs for later verification. ([link](https://github.com/Refzlund/devflare/blob/next/.github/actions/devflare-deploy/action.yml))
+- **devflare-github-feedback** — Publish PR comments, GitHub deployments, or both without mixing reporting into deploy execution. ([link](https://github.com/Refzlund/devflare/blob/next/.github/actions/devflare-github-feedback/action.yml))
+
+#### `devflare-setup-workspace`
+
+Use `devflare-setup-workspace` once near the start of a job when later steps share the same checkout and dependency install. It installs Bun, restores the Bun cache, and runs the workspace install command from the chosen directory.
+
+This action is intentionally target-agnostic. It prepares the workspace; it never decides what to deploy.
 
 ##### Key points
 
-- Branch deletion cleanup and manual branch cleanup dispatches now live in the same shared workflow file.
-- PR closure cleanup lives beside the preview deploy jobs so the open-update-close lifecycle stays reviewable in one place.
-- Cleanup updates preview records, then removes preview-owned infrastructure, then marks GitHub feedback inactive.
+- Best fit: one job that deploys more than one package or deploys and then runs follow-up verification.
+- In a monorepo, keep `working-directory: .` so package deploy steps can reuse the root install.
+- Later `devflare-deploy` steps should set `skip-setup: 'true'` and `skip-install: 'true'` after shared setup already ran.
+- If you only have one simple deploy step, you can let `devflare-deploy` handle setup itself instead.
 
-##### Example — The shared preview workflow keeps cleanup visible beside deploy logic
+> **Note — Use it when the job has shared setup work**
+>
+> This action exists so Bun setup and dependency installation stay boring. That is a compliment.
 
-This abridged excerpt shows the cleanup portion of `.github/workflows/preview.yml`. It omits repeated auth details so the branch and PR cleanup shape stays visible.
-
-###### File — .github/workflows/preview.yml
+##### Example — Prepare the workspace once
 
 ```yaml
-name: Preview
-
-on:
-	delete:
-	workflow_dispatch:
-
-jobs:
-	documentation-cleanup:
-		steps:
-			- name: Clean up documentation branch preview scope
-			  shell: bash
-			  run: |
-			    cd apps/documentation
-			    bunx --bun devflare previews cleanup --scope "$PREVIEW_SCOPE" --apply
-
-			- name: Mark documentation branch preview deployment inactive
-			  uses: ./.github/actions/devflare-github-feedback
-
-	testing-cleanup:
-		steps:
-			- name: Clean up testing PR preview scope
-			  shell: bash
-			  run: |
-			    cd apps/testing
-			    bunx --bun devflare previews cleanup --scope "$PREVIEW_SCOPE" --apply
-
-			- name: Publish testing PR preview cleanup feedback
-			  uses: ./.github/actions/devflare-github-feedback
+- uses: Refzlund/devflare/.github/actions/devflare-setup-workspace@next
+  with:
+    working-directory: .
 ```
 
-#### Multi-worker preview families still deploy package by package
+#### `devflare-deploy-impact`
 
-The testing preview job inside `preview.yml` shows the multi-worker version of the same rule. One shared job prepares the workspace once, then still deploys each worker package separately with its own `working-directory` and explicit preview scope.
+Use `devflare-deploy-impact` before any Cloudflare work. It compares the target package against the relevant git range and tells the workflow whether a deploy is actually needed.
 
-That is the important CI/CD habit for multi-worker systems: one workflow can coordinate the family, but each package still owns its own resolved Devflare config and deploy step.
+Call it once per deployment target. In multi-package preview families, that means one impact decision per worker or app, not one giant yes-or-no for the whole job.
 
-The shared job is also the repo example of branch pushes updating both a GitHub deployment and, when the branch already belongs to an open pull request, the grouped PR comment through the same workflow run.
+##### Key points
+
+- Run it before deploys, not after — skipping a no-op deploy is the whole point.
+- Pass event metadata from GitHub instead of guessing at comparison refs in shell.
+- Keep one impact decision per target so the workflow can skip or deploy packages independently.
+- Promote the `reason` output into human-readable feedback. It makes skipped runs much easier to trust.
+
+##### Reference table
+
+| Key field | Why it matters |
+| --- | --- |
+| `target-package` | Selects the workspace package whose changes should trigger a deploy. |
+| `extra-paths` | Lets shared files outside the package root invalidate that target too. |
+| `should-deploy` | The boolean gate your workflow should use before any deploy step runs. |
+| `reason` | Short explanation you can surface in summaries, PR comments, and logs. |
+| `changed-files` | Audit trail for what the comparison actually saw. |
+
+> **Note — Use this to skip the boring non-events**
+>
+> No-op deploys still cost time, secrets exposure, and reviewer attention. This action exists to spend less of all three.
+
+##### Example — Gate the deploy before Cloudflare work starts
+
+```yaml
+- name: Resolve documentation preview impact
+  id: impact
+  uses: Refzlund/devflare/.github/actions/devflare-deploy-impact@next
+  with:
+    target-package: documentation
+    default-branch: \${{ github.event.repository.default_branch }}
+    event-name: \${{ github.event_name }}
+    event-action: \${{ github.event.action || '' }}
+    push-before: \${{ github.event.before || '' }}
+    pull-request-base-sha: \${{ github.event.pull_request.base.sha || '' }}
+    pull-request-head-sha: \${{ github.event.pull_request.head.sha || '' }}
+```
+
+#### `devflare-deploy`
+
+Use `devflare-deploy` for the actual Devflare deploy step. It can prepare Bun and dependencies for a standalone job, or it can reuse shared setup from an earlier `devflare-setup-workspace` step.
+
+The action requires one explicit target. Use `production: 'true'` for `--prod`, or `preview-scope: <name>` for `--preview <name>`. `working-directory` selects which package-local `devflare.config.ts` and scripts are in play.
+
+Its outputs are the hand-off point for the rest of the workflow: `preview-url`, `version-id`, `verification-note`, `status`, `failure-stage`, `exit-code`, and `log-excerpt` are all meant for later verification and GitHub feedback.
+
+##### Key points
+
+- Production is the supported lane for strict control-plane verification. Leave `verify-deployment` at its default `true`, and enable `require-fresh-production-deployment: 'true'` when you need a hard failure if Cloudflare keeps the old live deployment.
+- Preview workflows in this repository use named preview scopes and then perform app-level verification after the deploy step. That is the supported preview posture here.
+- Use `deploy-command` when the package already wraps Devflare behind `bun run deploy --` or another package-local script.
+- Use `install-working-directory` to reuse a workspace-root install while still deploying from a package subdirectory.
+- Pass `deploy-message` and `deploy-tag` when you want workflow runs to map cleanly onto Cloudflare version history.
+
+##### Reference table
+
+| Input or output | Role |
+| --- | --- |
+| `working-directory` | Selects the package-local Devflare config and scripts. |
+| `production` | Requests an explicit `--prod` deployment. |
+| `preview-scope` | Requests an explicit named preview deployment via `--preview <name>`. |
+| `verify-deployment` | Controls whether the action enforces Cloudflare control-plane verification. |
+| `require-fresh-production-deployment` | Tightens production verification when a new live deployment must be visible. |
+| `preview-url`, `version-id`, `verification-note`, `status` | Outputs the rest of the workflow should consume for verification and feedback. |
+
+> **Warning — Choose exactly one target**
+>
+> The action intentionally rejects ambiguous callers. If a workflow cannot tell whether it is preview or production, the logs will not be much comfort later either.
+
+> **Note — Preview verification is different from production verification**
+>
+> Preview jobs still need real post-deploy checks for the application they expose. In this repository that means URL and content verification for documentation previews plus deployed-binding verification for the testing preview family.
+
+##### Example — Named preview deploy
+
+```yaml
+- id: pr-deploy
+  uses: Refzlund/devflare/.github/actions/devflare-deploy@next
+  with:
+    working-directory: apps/documentation
+    install-working-directory: .
+    skip-setup: 'true'
+    skip-install: 'true'
+    deploy-command: bun run deploy --
+    preview-scope: \${{ needs.resolve-context.outputs.pr-preview-scope }}
+    verify-deployment: 'false'
+    deploy-message: Documentation PR preview \${{ github.sha }} (run \${{ github.run_id }})
+    deploy-tag: documentation-pr-preview-\${{ github.run_id }}
+    cloudflare-api-token: \${{ secrets.CLOUDFLARE_API_TOKEN }}
+    cloudflare-account-id: \${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+```
+
+##### Example — Explicit production deploy
+
+```yaml
+- id: deploy
+  uses: Refzlund/devflare/.github/actions/devflare-deploy@next
+  with:
+    working-directory: apps/documentation
+    install-working-directory: .
+    deploy-command: bun run deploy --
+    production: 'true'
+    deploy-message: Documentation production \${{ github.sha }} (run \${{ github.run_id }})
+    deploy-tag: documentation-production-\${{ github.run_id }}
+    cloudflare-api-token: \${{ secrets.CLOUDFLARE_API_TOKEN }}
+    cloudflare-account-id: \${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+```
+
+#### `devflare-github-feedback`
+
+Use `devflare-github-feedback` to publish the result after deploy and verification have already been decided. It can update a PR comment, a GitHub deployment record, or both.
+
+Keeping feedback separate from deploy execution matters. You can retry reporting, mark cleanup inactive, or change comment grouping without touching the Cloudflare deploy mechanics.
+
+##### Key points
+
+- Use `mode: deployment` for branch previews and production lanes that should show up in the GitHub Deployments UI.
+- Use `mode: comment` for PR previews and group multiple sections into one stable comment with `comment-key` plus `comment-section-key`.
+- Use `operation: cleanup` and `status: inactive` after preview cleanup so GitHub stops pretending old previews are still alive.
+- Surface `summary`, `details-markdown`, and log links so reviewers do not have to spelunk raw job output.
+
+##### Reference table
+
+| Field | Use it for |
+| --- | --- |
+| `mode` | Choose PR comments, GitHub deployments, or both. |
+| `operation` | Differentiate normal reporting from cleanup or inactive updates. |
+| `status` | Publish `success`, `failure`, `skipped`, `in_progress`, or `inactive`. |
+| `comment-key` and `comment-section-key` | Keep one durable PR comment and merge multiple preview sections into it. |
+| `environment` and `environment-url` | Populate the GitHub Deployments UI with the right environment identity. |
+| `log-url` and `log-excerpt` | Make failure context readable without digging through raw workflow output. |
+
+##### Example — Publish grouped PR feedback
+
+```yaml
+- uses: Refzlund/devflare/.github/actions/devflare-github-feedback@next
+  with:
+    github-token: \${{ github.token }}
+    mode: comment
+    operation: report
+    status: success
+    title: Documentation PR preview
+    comment-key: pr-deployment-status
+    comment-section-key: documentation-preview
+    pr-number: \${{ needs.resolve-context.outputs.pr-number }}
+    preview-url: \${{ steps.pr-deploy.outputs.preview-url }}
+    version-id: \${{ steps.pr-deploy.outputs.version-id }}
+    log-url: \${{ github.server_url }}/\${{ github.repository }}/actions/runs/\${{ github.run_id }}
+```
+
+#### Supported workflow files and deployment strategies
+
+The repository currently demonstrates three workflow files and six supported lane types. You do not need to collapse them into one mega-workflow to be “official”; the official part is the clear contract between the workflow lane and the reusable actions.
 
 ##### Highlights
 
-- **preview.yml** — Shared testing preview job that coordinates auth-service, search-service, and the main app across branch and PR targets. ([link](https://github.com/Refzlund/devflare/blob/next/.github/workflows/preview.yml))
+- **workspace-ci.yml** — Validation-only lane for the monorepo. No Cloudflare target, no deploy side door. ([link](https://github.com/Refzlund/devflare/blob/next/.github/workflows/workspace-ci.yml))
+- **preview.yml** — Shared preview lifecycle workflow for branch previews, PR previews, multi-package preview families, and cleanup. ([link](https://github.com/Refzlund/devflare/blob/next/.github/workflows/preview.yml))
+- **documentation-production.yml** — Explicit production lane for the documentation app with live verification after deploy. ([link](https://github.com/Refzlund/devflare/blob/next/.github/workflows/documentation-production.yml))
 
-##### Example — Shared multi-worker previews still keep each package deploy explicit
+##### Reference table
 
-This excerpt comes from `.github/workflows/preview.yml`, which fans one prepared job across the testing worker family while keeping each deploy package-local.
+| Strategy | Workflow file | Verification style | GitHub surface |
+| --- | --- | --- | --- |
+| Validation only | `workspace-ci.yml` | Workspace build, typecheck, and test validation. | None — this lane does not deploy. |
+| Branch preview | `preview.yml` | Target checks plus app-level verification after deploy. | GitHub deployment record. |
+| Pull request preview | `preview.yml` | Target checks plus app-level verification after deploy. | Grouped PR comment. |
+| Multi-package preview family | `preview.yml` | Per-package deploys plus family-level verification. | GitHub deployment record and grouped PR comment. |
+| Production | `documentation-production.yml` | Deploy action control-plane checks plus live URL verification. | GitHub deployment record. |
+| Cleanup | `preview.yml` | Successful cleanup command plus inactive feedback update. | Inactive deployment or PR comment section. |
 
-###### File — .github/workflows/preview.yml
+#### Validation strategy: `workspace-ci.yml`
 
-```yaml
-name: Preview
+`workspace-ci.yml` is the validation lane. It restores Bun and Turborepo caches, installs once, and runs `bun run devflare:ci`.
 
-jobs:
-	testing-preview:
-		steps:
-			- uses: ./.github/actions/devflare-setup-workspace
+It intentionally does not choose a Cloudflare target or request Cloudflare secrets. That keeps repo-wide confidence separate from deploy intent.
 
-			- uses: ./.github/actions/devflare-deploy
-			  with:
-			    working-directory: apps/testing/workers/auth-service
-			    install-working-directory: .
-			    skip-setup: 'true'
-			    skip-install: 'true'
-			    preview-scope: \${{ needs.resolve-context.outputs.branch-preview-scope }}
+##### Key points
 
-			- uses: ./.github/actions/devflare-deploy
-			  with:
-			    working-directory: apps/testing/workers/search-service
-			    install-working-directory: .
-			    skip-setup: 'true'
-			    skip-install: 'true'
-			    preview-scope: \${{ needs.resolve-context.outputs.branch-preview-scope }}
+- Trigger it on repo-wide changes that affect apps, cases, packages, or shared tooling.
+- Use it to prove the monorepo still builds, types, and tests before package-specific deploy lanes matter.
+- Treat it as a prerequisite lane, not a back door into deployment.
 
-			- uses: ./.github/actions/devflare-deploy
-			  with:
-			    working-directory: apps/testing
-			    install-working-directory: .
-			    skip-setup: 'true'
-			    skip-install: 'true'
-			    preview-scope: \${{ needs.resolve-context.outputs.branch-preview-scope }}
+> **Tip — Validation stays validation**
+>
+> If a workflow validates the workspace, let it do that well. Sneaking deploy behavior into it is how release lanes get mysterious.
 
-			- uses: ./.github/actions/devflare-github-feedback
-			  with:
-			    mode: deployment
+#### Branch preview strategy
 
-			- uses: ./.github/actions/devflare-github-feedback
-			  with:
-			    mode: comment
-			    comment-key: pr-deployment-status
-```
+Non-default branch pushes get a stable branch-named preview scope in `preview.yml`. The workflow resolves context once, sets up the workspace once, and then updates only the affected targets for that branch scope.
+
+This is the supported pattern when you want a shareable branch preview that survives multiple pushes and can also coexist with a PR-scoped preview.
+
+##### Highlights
+
+- **preview.yml** — The shared preview workflow resolves context once and then updates branch-scoped targets separately from PR-scoped targets. ([link](https://github.com/Refzlund/devflare/blob/next/.github/workflows/preview.yml))
+
+##### Key points
+
+- The preview scope is the source branch name.
+- Run `devflare-deploy-impact` before each deploy target so unchanged packages skip Cloudflare work.
+- Publish a GitHub deployment record for branch previews so the branch has a first-class environment trail.
+- Follow the deploy with app-specific verification, not just “the command exited”.
+
+#### Pull request preview strategy
+
+Pull requests targeting the default branch get a stable `pr-<number>` preview scope in the same `preview.yml` workflow. The workflow can update the branch preview, the PR preview, or both from the same checkout when that branch already belongs to an open PR.
+
+PR preview reporting is grouped into one comment so documentation and testing results update in place instead of spraying the thread with duplicate status noise.
+
+##### Key points
+
+- Use `opened`, `reopened`, and `ready_for_review` to create or refresh the PR preview.
+- Use `comment-key: pr-deployment-status` plus section keys to merge multiple preview lanes into one durable comment.
+- If impact says `skip`, report `skipped` and leave the existing preview in place rather than tearing it down.
+- Keep branch and PR deploy steps separate even when they share preparation work. They are different targets with different review questions.
+
+> **Note — Stable PR scopes reduce churn**
+>
+> Updating `pr-<number>` in place is much easier to review than minting a brand-new preview identity on every commit.
+
+#### Multi-package preview family strategy
+
+Some applications are really a family of workers. `apps/testing` is the reference pattern: auth service, search service, and main app deploy separately, but they share one preview scope and one workflow lane.
+
+This is the supported strategy when previews need stronger isolation than same-worker uploads can provide, or when bindings across multiple workers must resolve together.
+
+##### Highlights
+
+- **verify-testing-preview-deployment.ts** — The testing preview family finishes with a purpose-built verification script that checks the deployed binding shape, not just deploy command exit codes. ([link](https://github.com/Refzlund/devflare/blob/next/.github/scripts/verify-testing-preview-deployment.ts))
+
+##### Key points
+
+- Evaluate impact per worker or app package.
+- Deploy each package with its own `working-directory` and the same `preview-scope`.
+- Add one family-level verification step after the main deploy to confirm the deployed bindings and URLs line up.
+- Publish both deployment records and grouped PR feedback from the same verified result.
+
+> **Warning — This is the right instinct for DO-heavy or service-bound apps**
+>
+> When one preview really means several workers plus shared bindings, model that explicitly instead of pretending one same-worker upload tells the full truth.
+
+#### Production strategy
+
+`documentation-production.yml` is the reference production lane: resolve impact, perform one explicit production deploy, verify the live site, and then publish a GitHub deployment.
+
+This is the supported split for production automation: let the deploy action handle Cloudflare control-plane verification, then add one live check that proves the currently served app really matches the commit you just shipped.
+
+##### Highlights
+
+- **documentation-production.yml** — The reference production workflow for a Devflare app: impact check, explicit production deploy, live verification, then GitHub deployment feedback. ([link](https://github.com/Refzlund/devflare/blob/next/.github/workflows/documentation-production.yml))
+
+##### Key points
+
+- Run on default-branch pushes or manual dispatch.
+- Use `production: 'true'` instead of inferring production from branch names inside shell logic.
+- Keep `verify-deployment` enabled for production.
+- Use the deploy output URL or the stable production URL for a live content check like `/build.json`.
+- Publish the final environment URL and version ID back to GitHub.
+
+> **Tip — Production gets the strictest verification**
+>
+> Production should fail when the control plane or the live URL cannot prove what is serving. Better a loud release lane than a confident fiction.
+
+#### Cleanup strategy
+
+Cleanup is a supported lifecycle lane, not an afterthought. `preview.yml` handles branch deletion, PR closure, and manual cleanup dispatches from the same policy surface as preview creation.
+
+Each cleanup job checks out the default branch, reinstalls the shared workspace, runs `devflare previews cleanup --scope <name> --apply`, and then marks the matching GitHub deployment or PR comment section inactive.
+
+##### Key points
+
+- Use branch deletion or manual dispatch for branch-scoped cleanup.
+- Use PR closure for PR-scoped cleanup.
+- Keep the scope name identical to the deploy lane so cleanup is obvious and deterministic.
+- Mark feedback inactive after infrastructure cleanup so GitHub reflects reality instead of wishful thinking.
+
+> **Important — Cleanup is part of the contract**
+>
+> A preview strategy that never documents cleanup is just deferred archaeology.
 
 ---
 
-### Build and deploy production on purpose, with explicit targets and inspectable output
+### Explicit production deploys with inspectable output
 
-> Devflare keeps build and deploy flows inspectable, but deploys are intentionally explicit: production uses `--prod` or `--production`, while preview is either a same-worker upload with plain `--preview` or a named preview scope with `--preview <name>`.
+> Production uses `--prod` or `--production`, preview uses `--preview` or `--preview <name>`. No target means no deploy.
 
 | Field | Value |
 | --- | --- |
@@ -4547,46 +4649,46 @@ jobs:
 | Navigation title | Production deploys |
 | Eyebrow | Production |
 
-The deploy story is simpler when the target is unmistakable. Devflare resolves config, generates Wrangler-facing artifacts, and then deploys against an explicit destination instead of guessing whether you meant production or preview.
+Devflare resolves config, generates Wrangler artifacts, and deploys against an explicit destination.
 
 #### At a glance
 
 | Fact | Value |
 | --- | --- |
 | Best for | Production deploys and preflight checks |
-| Required target | `--prod`, `--production`, plain `--preview`, or named `--preview <name>` |
-| Best debug habit | Inspect compiled output before you deploy when the setup changed |
+| Required target | `--prod`, `--production`, `--preview`, or `--preview <name>` |
+| Best debug habit | Inspect compiled output before deploying |
 
-#### Keep the production lane small and reviewable
+#### The production lane
 
-The CLI page already owns the broad command map. The production-specific habit is simpler: refresh generated types when the contract changed, build once, inspect when the setup changed, and only then deploy with an explicit production target.
+Refresh generated types when bindings or entrypoints changed, build once, inspect when the setup changed, then deploy with an explicit production target.
 
-That keeps this page focused on release posture instead of re-explaining command families that already have a better home on the CLI page.
+The CLI page owns the broad command map. This page covers how those commands fit the release lane.
 
 ##### Steps
 
 1. Run `devflare types` when bindings or entrypoints changed and `env.d.ts` needs to catch up.
-2. Run `devflare build --env production` to materialize the production shape you actually mean to ship.
+2. Run `devflare build --env production` to generate production artifacts.
 3. Use `devflare config print --format wrangler` or `devflare doctor` when the compiled result needs inspection before release.
-4. Run `devflare deploy --prod` or `--production` only when the target is unmistakably production.
+4. Run `devflare deploy --prod` or `--production` only when the target is unmistakably production. Add `--dry-run` first if you want to verify the pipeline without pushing.
 
 > **Note — Need the full command map?**
 >
 > Open the CLI page when the question is what `types`, `build`, `config`, or `doctor` generally do. This page only covers how those commands fit the production release lane.
 
-#### Production deploys should be explicit
+#### Production deploys are explicit
 
-Deploy requires an explicit target so production and preview destinations stay unmistakable. That means production is `--prod` or `--production`, while preview is either plain `--preview` for a same-worker upload or `--preview <name>` for a named preview scope.
+Deploy requires an explicit target so production and preview stay unmistakable. Production is `--prod` or `--production`; preview is `--preview` or `--preview <name>`.
 
-Production deploys also clear preview-scope environment overrides such as `DEVFLARE_PREVIEW_BRANCH`, which helps keep stable production worker names pointed at the stable infrastructure you actually expect.
+Production deploys also clear preview-scope overrides like `DEVFLARE_PREVIEW_BRANCH` so stable worker names point at stable infrastructure.
 
 > **Warning — No target means no deploy**
 >
-> That rejection is intentional. It keeps production and preview intent visible in CI logs, scripts, and local command history.
+> Intentional. Keeps production vs. preview intent visible in CI logs and command history.
 
-> **Note — Automation can make verification stricter than local deploys**
+> **Note — Stricter verification in automation**
 >
-> The reusable deploy action exposes `verify-deployment` and `require-fresh-production-deployment` so CI can fail when Cloudflare cannot confirm the expected version or keeps serving the existing active production deployment.
+> The reusable deploy action exposes `verify-deployment` and `require-fresh-production-deployment` so CI can fail when Cloudflare cannot confirm the expected version.
 
 ##### Example — Production deploy commands
 
@@ -4596,19 +4698,20 @@ bunx --bun devflare deploy --prod
 bunx --bun devflare deploy --production --message "Release 1" --tag release-1
 ```
 
-#### Use the inspectable tools before a risky change
+#### Preflight tools
 
 ##### Key points
 
-- Run `devflare config print --format wrangler` when you want to see the compiled deployment shape.
-- Run `devflare doctor` when config resolution, Vite opt-in, or generated files feel suspect.
-- Run `devflare build` before deploys when the package just gained new bindings, routes, or framework wiring.
+- `devflare deploy --prod --dry-run` — run the full deploy pipeline without pushing anything to Cloudflare.
+- `devflare config print --format wrangler` — see the compiled deployment shape.
+- `devflare doctor` — check config resolution, Vite opt-in, and generated files.
+- `devflare build` before deploy — when the package just gained new bindings, routes, or framework wiring.
 
 ---
 
-### Use Turborepo to validate the workspace, then deploy the target package with Devflare
+### Turborepo validates the workspace, Devflare deploys the target package
 
-> In a Bun monorepo, Turborepo should own task orchestration, caching, and impact-aware validation, while `devflare` still runs from the package that owns the Worker or app you are deploying.
+> Turbo owns task orchestration and caching. `devflare` still runs from the package that owns the Worker or app.
 
 | Field | Value |
 | --- | --- |
@@ -4617,14 +4720,14 @@ bunx --bun devflare deploy --production --message "Release 1" --tag release-1
 | Navigation title | Monorepos & Turborepo |
 | Eyebrow | Monorepo |
 
-This repository uses Turbo at the root and keeps `devflare.config.ts` local to each deployable package. That split is the important pattern: Turbo decides which packages to build, typecheck, test, or check, but actual deploy commands still run in the package that owns the resolved Devflare config.
+Turbo at the root, `devflare.config.ts` local to each deployable package. Turbo decides what to build; deploy commands run in the package that owns the config.
 
 #### At a glance
 
 | Fact | Value |
 | --- | --- |
-| Best for | Bun + Turborepo monorepos with more than one Devflare package |
-| Turbo role | Validation, caching, filters, and impacted-package orchestration |
+| Best for | Bun + Turborepo monorepos with multiple Devflare packages |
+| Turbo role | Validation, caching, filters, orchestration |
 | Deploy rule | Run `devflare` from the package that owns the config |
 
 #### Keep the workspace boundary clear
@@ -4654,11 +4757,11 @@ That means every deployable package should still keep its own `devflare.config.t
 >
 > Ask two separate questions: “Which packages should Turbo run?” and “Which package is actually deploying?” Conflating those is how monorepo deploy flows get muddy.
 
-#### Use repo-root Turbo scripts for contributor and CI lanes
+#### Repo-root Turbo scripts for contributors and CI
 
-The repository now exposes explicit root scripts for the core Devflare workflow so contributors and CI can validate the workspace without guessing at filters every time.
+The repo exposes root scripts for the core Devflare workflow so contributors and CI can validate without guessing at filters.
 
-Those scripts are validation and orchestration tools; they are not a replacement for the actual package-local deploy commands.
+These are validation and orchestration tools, not a replacement for package-local deploy commands.
 
 ##### Example — Repo-root validation lane
 
@@ -4678,7 +4781,7 @@ bun run turbo build --filter=documentation
 bun run turbo check --filter=documentation
 ```
 
-#### Deploy one package at a time, from the package that owns the config
+#### Deploy from the package that owns the config
 
 ##### Steps
 
@@ -4704,11 +4807,11 @@ bun run deploy -- --preview feature-search
 bun run deploy -- --prod
 ```
 
-#### Multi-worker preview families still deploy package by package
+#### Multi-worker previews deploy per-package
 
-`apps/testing` is the repository example for the other half of the rule: Turbo can orchestrate the workspace, but a branch-scoped preview family still deploys each worker package separately with the same preview scope and naming inputs.
+`apps/testing` shows the other half: Turbo orchestrates the workspace, but a branch-scoped preview family still deploys each worker separately with the same preview scope.
 
-That is why the workflows keep `DEVFLARE_PREVIEW_BRANCH` consistent and run separate deploys for `auth-service`, `search-service`, and the main app instead of pretending one root deploy magically owns the whole family.
+The workflows keep `DEVFLARE_PREVIEW_BRANCH` consistent and run separate deploys for `auth-service`, `search-service`, and the main app.
 
 ##### Example — Branch-scoped worker family deployment
 
@@ -4729,9 +4832,9 @@ bunx --bun devflare previews cleanup --scope pr-123 --apply
 
 ---
 
-### Pick the preview model that matches the app instead of forcing one preview story on every worker
+### Pick the preview model that matches the app
 
-> Devflare supports both same-worker preview uploads and named preview scopes, but Durable Object-heavy apps often need a branch-scoped worker-family strategy instead of relying on preview URLs alone.
+> Same-worker uploads, named preview scopes, and branch-scoped worker families serve different needs.
 
 | Field | Value |
 | --- | --- |
@@ -4740,23 +4843,23 @@ bunx --bun devflare previews cleanup --scope pr-123 --apply
 | Navigation title | Preview strategies |
 | Eyebrow | Previews |
 
-Preview complexity usually comes from choosing the wrong model, not from the commands themselves. This page helps you pick the right one before you start writing CI around assumptions that the platform will not actually honor.
+Pick the right preview model before writing CI around assumptions the platform will not honor.
 
 #### At a glance
 
 | Fact | Value |
 | --- | --- |
-| Best for | Choosing preview strategy before building CI around it |
+| Best for | Choosing preview strategy before building CI |
 | Same-worker mode | Plain `--preview` |
 | Named scope mode | `--preview <name>` |
 
-#### There is more than one preview model
+#### More than one preview model
 
-Both preview targets resolve `config.env.preview` and can materialize `preview.scope()` names. Bare `--preview` keeps the same-worker preview upload flow and uses the synthetic `preview` identifier, while named `--preview <name>` swaps that identifier for an explicit scope and can pair naturally with branch-scoped preview workers when your config is wired for that pattern.
+Both targets resolve `config.env.preview` and can materialize `preview.scope()` names. Bare `--preview` uses the synthetic `preview` identifier; `--preview <name>` swaps it for an explicit scope that pairs with branch-scoped preview workers.
 
-Plain `--preview` can still receive `--branch-name`, CI metadata, or the current git branch when your workflow wants branch context in logs or deploy messages, but preview-scoped resource names still use the synthetic `preview` identifier unless you pick an explicit scope.
+Plain `--preview` can still receive `--branch-name` or CI metadata for logs, but preview-scoped resource names use the synthetic identifier unless you pick an explicit scope.
 
-When the preview needs stronger isolation or cleaner cleanup ergonomics, prefer named preview scopes directly instead of layering extra naming conventions onto same-worker uploads.
+When you need stronger isolation or cleaner cleanup, prefer named scopes directly.
 
 ##### Reference table
 
@@ -4777,17 +4880,15 @@ When the preview needs stronger isolation or cleaner cleanup ergonomics, prefer 
 - `wrangler versions upload` does not currently apply Durable Object migrations.
 - Same-worker preview uploads are also the wrong fit when branch isolation must cover cron or queue topology, not just the request path.
 
-> **Warning — This is why DO-heavy apps need a different preview instinct**
+> **Warning — DO-heavy apps need a different preview instinct**
 >
-> If previews must exercise real Durable Object behavior, reach for branch-scoped worker families and preview-scoped resources instead of hoping same-worker preview URLs will be enough.
+> If previews must exercise real Durable Object behavior, use branch-scoped worker families and preview-scoped resources.
 
-#### Use preview-scoped resources only when the preview really owns infrastructure
+#### Preview-scoped resources
 
-Branch-scoped previews sometimes need their own KV, D1, R2, Queue, or Vectorize resources. That is where `preview.scope()` is useful: authored config stays stable while preview environments resolve preview-specific names.
+Branch-scoped previews sometimes need their own KV, D1, R2, Queue, or Vectorize resources. `preview.scope()` keeps authored config stable while preview environments resolve preview-specific names.
 
-Outside preview environments, those same authored markers resolve back to the base names so your config stays readable.
-
-Inside preview deploys, bare `--preview` usually materializes names like `my-cache-kv-preview`, while `--preview next` materializes names like `my-cache-kv-next`.
+Outside preview, those markers resolve back to the base names. Inside preview, bare `--preview` materializes names like `my-cache-kv-preview`; `--preview next` materializes `my-cache-kv-next`.
 
 ##### Example — Preview-scoped resource naming
 
@@ -4838,7 +4939,7 @@ The safest operational habit in Devflare is to resolve account context first. Th
 
 Not every command family resolves those lanes in the same order. Inventory-oriented commands, `productions` discovery, other config-backed operator commands, and token management each consult a slightly different subset of explicit flags, workspace settings, environment, config, and authenticated-account fallbacks.
 
-That is why `login`, `account`, and the global or workspace account selectors exist. They make the account story explicit before the deeper command families start reading or mutating Cloudflare state.
+`login`, `account`, and the global or workspace account selectors exist for this reason. They make the account story explicit before the deeper command families start reading or mutating Cloudflare state.
 
 ##### Reference table
 
@@ -4930,7 +5031,7 @@ bunx --bun devflare tokens $BOOTSTRAP --new preview
 bunx --bun devflare ai
 ```
 
-#### Gate paid remote test flows on purpose
+#### Gate paid remote test flows explicitly
 
 Remote mode exists so paid Cloudflare features like AI or Vectorize do not get exercised casually by every local or CI run. The command family is deliberately small: inspect current status, enable it for a bounded window, or disable it again.
 
@@ -5045,7 +5146,7 @@ for (const worker of workers) {
 }
 ```
 
-#### Preview registry helpers and schemas are public on purpose
+#### Preview registry helpers and schemas are public by design
 
 Devflare exports preview-registry helpers plus the shared registry schemas and errors so custom tooling can inspect or update preview metadata without guessing the record shape.
 
@@ -5067,9 +5168,9 @@ That is especially useful for automation that wants to inspect preview URLs, sco
 
 ---
 
-### Use preview commands to inspect and clean up previews
+### Inspect and clean up previews
 
-> The preview registry is D1-backed and gives Devflare a durable record of preview scope and deployment state so cleanup does not have to depend on fragile one-off scripts.
+> The preview registry is D1-backed, giving Devflare durable records of scope and deployment state for reliable cleanup.
 
 | Field | Value |
 | --- | --- |
@@ -5078,64 +5179,62 @@ That is especially useful for automation that wants to inspect preview URLs, sco
 | Navigation title | Preview operations |
 | Eyebrow | Preview lifecycle |
 
-Once previews exist, lifecycle management matters as much as deployment. The preview commands are the public surface for understanding what exists and tearing down preview-only resources deliberately.
+Preview commands are the public surface for understanding what exists and tearing down preview-only resources.
 
 #### At a glance
 
 | Fact | Value |
 | --- | --- |
-| Best for | Preview lifecycle management after deploys already exist |
+| Best for | Preview lifecycle management |
 | Registry backing | D1 (`devflare-registry` by default) |
-| Cleanup warning | Dedicated preview workers may own more than just the worker script |
+| Cleanup warning | Dedicated preview workers may own more than just the script |
 
-#### Why the preview registry exists
+#### Why the registry exists
 
-Cloudflare discovery alone is not enough for a clean preview lifecycle story. The D1-backed registry lets Devflare track preview scope and deployment records in a way that supports reliable inspection and cleanup later.
+Cloudflare discovery alone is not enough for clean preview lifecycle management. The D1-backed registry tracks scope and deployment records for reliable inspection and cleanup.
 
-Devflare creates and updates that registry as preview deploys happen, so the `previews` and `cleanup` commands can stay focused on real preview state instead of guesswork.
+Devflare creates and updates the registry as preview deploys happen, so `previews` and `cleanup` work from real state.
 
-That is what lets preview operations stay a documented CLI surface instead of becoming a pile of CI-only command glue.
-
-#### The core commands to remember
+#### Core commands
 
 ##### Key points
 
-- Use `previews` for a summary view of preview scopes.
-- Use `bindings --scope <name>` when you want to understand which workers currently reference one named preview scope; otherwise the identifier comes from the same preview env vars your automation already set.
-- Prefer explicit scope selectors when you know the target, and reserve broad cleanup runs for the moments when the whole preview fleet genuinely needs attention.
-- Without `--scope`, `cleanup` first respects `DEVFLARE_PREVIEW_IDENTIFIER`, `DEVFLARE_PREVIEW_PR`, or `DEVFLARE_PREVIEW_BRANCH`, and only then falls back to the synthetic `preview` scope. Use `--all` when you mean every discovered scope for the worker family, not just that resolved default.
+- `previews` — summary view of preview scopes.
+- `bindings --scope <name>` — which workers reference one named scope.
+- Prefer explicit scope selectors when you know the target; reserve broad cleanup for when the whole fleet needs attention.
+- Without `--scope`, `cleanup` respects `DEVFLARE_PREVIEW_IDENTIFIER`, `DEVFLARE_PREVIEW_PR`, or `DEVFLARE_PREVIEW_BRANCH`, then falls back to the synthetic `preview` scope. Use `--all` for every discovered scope.
 
 ##### Example — Preview lifecycle commands
 
 ```bash
 bunx --bun devflare previews
 bunx --bun devflare previews bindings --scope next
-bunx --bun devflare previews cleanup --days 7 --apply
 bunx --bun devflare previews cleanup --scope next --apply
+bunx --bun devflare previews cleanup --all --apply
 ```
 
 #### Cleanup should be specific
 
 ##### Key points
 
-- `cleanup` soft-deletes stale registry records after an age threshold instead of immediately pretending the historical metadata never existed.
-- `cleanup` deletes preview-only resources and can also delete dedicated preview worker scripts for the targeted scope.
-- Stable shared workers are not deleted by `cleanup`; same-worker preview uploads only lose matching preview-scoped account resources.
-- Analytics Engine datasets and Browser Rendering bindings are reported as warnings instead of deleted resources, and preview-scoped Hyperdrive cleanup only removes preview configs that already exist.
+- Without `--apply`, cleanup runs as a dry run — showing what would be removed without touching anything.
+- With `--apply`, it deletes preview-only resources and can delete dedicated preview worker scripts.
+- Stable shared workers are not deleted; same-worker uploads only lose matching preview-scoped resources.
+- Analytics Engine datasets and Browser Rendering bindings are reported as warnings. Hyperdrive cleanup only removes configs that already exist.
 
 > **Important — Good cleanup hygiene**
 >
-> Use the most specific selector you can. Cleanup is easier to trust when the target is obvious in the command itself.
+> Use the most specific selector you can. Cleanup is easier to trust when the target is obvious.
 
-> **Warning — Not every preview-looking thing is a deletable resource**
+> **Warning — Not every preview-looking thing is deletable**
 >
-> Browser Rendering does not own an account-scoped resource, Analytics Engine datasets are created on first write, and Hyperdrive preview cleanup can only remove preview configs that already exist. The command tells you about those cases instead of pretending it deleted them.
+> Browser Rendering has no account-scoped resource, Analytics Engine datasets are created on first write, and Hyperdrive cleanup can only remove existing preview configs. The command tells you.
 
 ---
 
-### Test the runtime shape you actually ship, then keep automation thin and observable
+### Test the runtime shape you ship, keep automation thin
 
-> Keep local harness detail on the dedicated testing pages, then promote only the right runtime-shaped checks into thin, observable automation.
+> Local harness detail stays on the testing pages. This page covers what gets promoted into CI and how automation stays observable.
 
 | Field | Value |
 | --- | --- |
@@ -5144,14 +5243,14 @@ bunx --bun devflare previews cleanup --scope next --apply
 | Navigation title | Testing & automation |
 | Eyebrow | Validation |
 
-Devflare’s testing story is intentionally layered. The local harness pages own `createTestContext()` and binding-specific nuance; this page owns the CI-facing question of which checks should move into preview validation, release automation, and workflow feedback.
+The local harness pages own `createTestContext()` and binding nuance. This page owns which checks move into preview validation and release automation.
 
 #### At a glance
 
 | Fact | Value |
 | --- | --- |
-| Best for | CI-facing testing policy, preview validation, and thin release automation |
-| Local harness owner | `/docs/create-test-context` plus binding testing guides |
+| Best for | CI testing policy and preview validation |
+| Local harness owner | `/docs/create-test-context` plus binding guides |
 | Important nuance | `cf.worker.fetch()` is not a full `waitUntil()` drain |
 | Workflow companion | `/docs/github-workflows` |
 
@@ -5167,15 +5266,15 @@ That keeps local test design and CI policy from drifting into two slightly diffe
 - **createTestContext()** — This is the canonical page for autodiscovery, helper timing, transport-aware round-trips, and the real `cf.*` helper behavior. ([link](/docs/create-test-context))
 - **Binding testing guides** — Open these when the binding changes the honest testing posture and the local harness rules are no longer one-size-fits-all. ([link](/docs/binding-testing-guides))
 
-> **Note — A cleaner split keeps both pages better**
+> **Note — Cleaner split keeps both pages better**
 >
-> The harness pages should own local helper behavior. This page should own what gets promoted into automation and how that automation stays understandable.
+> Harness pages own local helper behavior. This page owns what gets promoted and how automation stays readable.
 
-#### Carry only the automation-facing timing rules into CI
+#### Timing rules that matter in CI
 
-Automation does not need the whole local harness manual, but it does need the timing rules that commonly produce flaky checks or false confidence.
+Automation does not need the full harness manual, but it needs the timing rules that produce flaky checks or false confidence.
 
-The main habit is to promote the check that matches the behavior you actually need to trust instead of assuming every helper has the same completion contract.
+Promote the check that matches the behavior you need to trust.
 
 ##### Reference table
 
@@ -5185,11 +5284,11 @@ The main habit is to promote the check that matches the behavior you actually ne
 | Queue, scheduled, or tail background work | `cf.queue.trigger()`, `cf.scheduled.trigger()`, or `cf.tail.trigger()` | Those helpers wait for their background work before they return, so they are a better fit for async side-effect assertions. |
 | Binding-specific or transport-specific behavior | The binding guide or `create-test-context` page first | Different bindings and bridge-backed values have different honest harness rules, and the local testing pages already own those details. |
 
-> **Warning — Do not promote the wrong completion contract into CI**
+> **Warning — Wrong completion contract = flaky CI**
 >
-> If a test depends on `waitUntil()` effects being complete, a plain `cf.worker.fetch()` assertion may be too early. Keep that nuance visible in automation instead of discovering it from flaky builds later.
+> If a test depends on `waitUntil()` effects being complete, a plain `cf.worker.fetch()` assertion may be too early.
 
-#### Promote the smallest useful checks into automation
+#### Promote the smallest useful checks
 
 ##### Highlights
 
@@ -5200,41 +5299,42 @@ The main habit is to promote the check that matches the behavior you actually ne
 ##### Steps
 
 1. Prove the behavior locally with `createTestContext()` or the binding-specific guide first.
-2. Choose one or two runtime-shaped smoke checks that are worth rerunning in CI because they protect the deploy boundary, not because they are merely easy to copy.
+2. Choose one or two runtime-shaped smoke checks worth rerunning in CI because they protect the deploy boundary.
 3. Use preview validation when routing, preview-owned resources, or branch-scoped behavior is the real risk instead of trying to force every concern through one unit-style check.
 4. Publish one visible summary or feedback artifact so reviewers can tell what passed without spelunking through raw logs.
 
-#### Automation should stay thin and observable
+#### Automation stays thin and observable
 
-The repository workflow pieces are intentionally split between deploy logic and GitHub feedback logic. That keeps Cloudflare state changes separate from PR comments, deployment records, or other reporting behavior.
+Deploy logic and GitHub feedback are separate. Cloudflare state changes stay independent from PR comments, deployment records, or other reporting.
 
-Caller workflows should own branch naming, permissions, environment selection, and post-deploy feedback decisions, while reusable actions should stay focused on one deploy or one reporting job at a time.
+Caller workflows own branch naming, permissions, and feedback decisions. Reusable actions focus on one deploy or one reporting job.
 
 ##### Highlights
 
-- **GitHub workflows** — The workflow page owns the deeper repo examples for impact checks, reusable actions, PR feedback, and cleanup jobs. ([link](/docs/github-workflows))
+- **GitHub workflows** — The workflow page owns the supported GitHub Actions patterns for impact checks, reusable actions, preview lanes, production lanes, PR feedback, and cleanup. ([link](/docs/github-workflows))
 
 ##### Key points
 
-- Keep one package, one explicit target, and one visible verification result in the same workflow lane whenever possible.
-- Split deploy execution from GitHub feedback so reporting can fail or retry without becoming a second deploy path.
-- Prefer workflow summaries, PR comments, or deployment records that show the result directly instead of forcing reviewers into raw logs.
+- One package, one target, one visible result per workflow lane.
+- Split deploy from feedback so reporting can fail or retry independently.
+- Prefer summaries, PR comments, or deployment records over raw logs.
 
 > **Note — Thin workflows age better**
 >
-> When a release is stressful, a small workflow that clearly says what it deploys and what it reports is much easier to trust than a giant do-everything pipeline.
+> When a release is stressful, a small workflow that says what it deploys and what it reports is easier to trust.
 
 ##### Example — Thin preview deploy step
 
 ```yaml
 - id: deploy
-  uses: ./.github/actions/devflare-deploy
+  uses: Refzlund/devflare/.github/actions/devflare-deploy@next
   with:
     working-directory: apps/documentation
-    preview: 'true'
-    branch-name: ${{ github.head_ref || github.ref_name }}
-    cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-    cloudflare-account-id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    deploy-command: bun run deploy --
+    preview-scope: \${{ github.head_ref || github.ref_name }}
+    verify-deployment: 'false'
+    cloudflare-api-token: \${{ secrets.CLOUDFLARE_API_TOKEN }}
+    cloudflare-account-id: \${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 ```
 
 ---
@@ -5353,7 +5453,7 @@ export async function GET({ env, params }: FetchEvent<DevflareEnv>): Promise<Res
 
 ---
 
-### Handle R2 uploads and file delivery on purpose instead of treating bucket URLs as the product
+### Handle R2 uploads and file delivery explicitly instead of treating bucket URLs as the product
 
 > Use presigned `PUT` URLs for direct uploads, public buckets on custom domains for truly public assets, and private buckets plus Worker auth for protected files. Keep `r2.dev` out of production, and when a preview or environment needs its own bucket, scope it intentionally instead of borrowing production storage.
 
@@ -5439,7 +5539,7 @@ When the content is private or app-controlled, the safest default is still a pri
 | Pattern | Use it when | Main caveat |
 | --- | --- | --- |
 | Public bucket on a custom domain | Images, assets, or media should be public and cacheable for anyone. | Use a custom domain for real delivery; `r2.dev` is not the production path. |
-| Private bucket plus Worker-gated reads | Access depends on the current user, tenant, payment state, or other app authorization. | Your Worker becomes the delivery boundary, so own the auth, cache headers, and response metadata on purpose. |
+| Private bucket plus Worker-gated reads | Access depends on the current user, tenant, payment state, or other app authorization. | Your Worker becomes the delivery boundary, so own the auth, cache headers, and response metadata deliberately. |
 | Presigned `GET` URL on the S3 endpoint | A download should be directly accessible for a short time without a custom delivery layer. | Presigned URLs are bearer tokens and do not work with custom domains. |
 | Custom domain plus Cloudflare Access | Only teammates or organization users should reach the bucket. | Disable `r2.dev` so the bucket is not still reachable through the public development URL. |
 | Custom domain plus Worker token auth or WAF HMAC validation | You want expiring direct links on `cdn.example.com` without exposing the whole bucket. | This is not the same feature as presigned R2 URLs; you are building or validating the access layer at the custom domain boundary. |
@@ -5448,7 +5548,7 @@ When the content is private or app-controlled, the safest default is still a pri
 
 Cloudflare's development guidance says local Worker development uses local simulated bindings by default, and Devflare follows the same practical posture: local R2 bindings are available to your worker code, tests, and bridge helpers without requiring a real remote bucket just to iterate.
 
-That is why browser-visible local file flows should usually go through your Worker routes or app routes. Devflare does not promise a stable browser-facing local bucket origin, and depending on one would make local behavior more brittle than the product boundary probably needs to be.
+Browser-visible local file flows should go through your Worker routes or app routes. Devflare does not promise a stable browser-facing local bucket origin, and depending on one would make local behavior more brittle than the product boundary probably needs to be.
 
 ##### Key points
 
@@ -5658,7 +5758,7 @@ That means this page should answer the architecture choice first. The service-bi
 
 If another worker is real, the relationship belongs in config instead of in copied worker names or half-remembered script references. `ref()` gives Devflare enough structure to follow the dependency into local runtime, generated env types, and compiled output.
 
-Keep the architecture example boring on purpose: one referenced worker and one explicit service binding are enough to show the boundary. Named entrypoints are real too, but the service-binding and generated-types pages own that deeper contract once the worker boundary itself is already justified.
+Keep the architecture example simple: one referenced worker and one explicit service binding are enough to show the boundary. Named entrypoints are real too, but the service-binding and generated-types pages own that deeper contract once the worker boundary itself is already justified.
 
 ##### Example — Model the worker family with `ref()` and one explicit service binding
 
@@ -5710,7 +5810,7 @@ test('service binding calls the default worker export', async () => {
 ##### Highlights
 
 - **Service binding guide** — Open the service guide for the exact binding shape, env typing, and compiler behavior once another worker is definitely the right boundary. ([link](/docs/service-binding))
-- **Testing Services** — Open the service testing guide when the next question is the right default harness or how to test named entrypoints honestly. ([link](/docs/service-testing))
+- **Testing Services** — Open the service testing guide when the next question is the right default harness or how to test named entrypoints accurately. ([link](/docs/service-testing))
 - **Generated types** — Open this page when `ref()` relationships, named entrypoints, or `defineConfig<Entrypoints>()` typing becomes the real question. ([link](/docs/generated-types))
 - **Preview strategies** — Open the preview page when the worker family needs real isolation and the naming model is the release question now. ([link](/docs/preview-strategies))
 - **Testing overview** — Use the testing map when the next question is broader than service bindings alone. ([link](/docs/testing-overview))
@@ -5774,7 +5874,7 @@ export default defineConfig({
 ##### Key points
 
 - Rerun `devflare types` after adding or renaming a binding so the generated env contract stays honest.
-- Preview-scoped names work well for namespace-per-branch flows, but they are still a naming strategy you should review on purpose.
+- Preview-scoped names work well for namespace-per-branch flows, but they are still a naming strategy worth reviewing.
 - KV is local-friendly, but account-level provisioning behavior still belongs in build, preview, or deploy checks when the lifecycle matters.
 
 > **Note — The safest authoring instinct**
@@ -5832,7 +5932,7 @@ The important detail is that Devflare does not force ids too early. It keeps sta
 
 `bindings.kv` accepts a plain string, `{ name }`, or `{ id }`. Devflare normalizes those into one internal shape so later code can reason about them consistently.
 
-That is why authored config can stay human-readable without making compiler or deploy code guess what each record means at the last second.
+Authored config can stay human-readable without making compiler or deploy code guess what each record means at the last second.
 
 ##### Example — KV from authored config to generated output
 
@@ -5954,7 +6054,7 @@ test('stores and reads a cache value', async () => {
 
 ### A small KV example you can adapt quickly
 
-> This example keeps KV boring on purpose: one binding, one fetch handler, one assertion.
+> This example keeps KV simple: one binding, one fetch handler, one assertion.
 
 | Field | Value |
 | --- | --- |
@@ -6208,7 +6308,7 @@ export default defineConfig({
 
 > **Tip — Same authoring rule, different runtime shape**
 >
-> The config story is close to KV, but the runtime story is unapologetically SQL-shaped. That is exactly how it should feel.
+> The config story is close to KV, but the runtime story is SQL-shaped — as it should be.
 
 ---
 
@@ -6360,7 +6460,7 @@ test('GET / returns a D1-backed health response', async () => {
 
 ---
 
-### Use R2 for object storage, but route browser delivery on purpose
+### Use R2 for object storage, but route browser delivery deliberately
 
 > R2 is straightforward in config and well-supported locally, but browser-facing delivery should usually go through a Worker route instead of assuming bucket URLs.
 
@@ -6409,7 +6509,7 @@ export default defineConfig({
 
 - Use R2 for large objects, uploads, or file delivery that does not belong in D1 or KV.
 - Keep private file delivery in a Worker route so auth and response headers stay under your control.
-- If the browser needs a direct public asset origin, use a public bucket on a custom domain on purpose rather than by accident.
+- If the browser needs a direct public asset origin, use a public bucket on a custom domain rather than by accident.
 
 #### Notes worth keeping visible
 
@@ -6859,7 +6959,7 @@ export default defineConfig({
 - Cross-worker DO references are resolved before compile output is treated as final.
 - Preview and deploy workflows need to respect real DO migration and preview caveats instead of pretending the platform limitations disappeared.
 
-> **Important — This is where Devflare earns its keep**
+> **Important — This is where coherent tooling matters most**
 >
 > If a tool cannot keep DO authoring, local runtime, and test setup coherent, DO-heavy apps get painful fast. Devflare’s value is that these pieces stay part of one story.
 
@@ -7149,7 +7249,7 @@ This is one of the clearer compiler paths in Devflare: producers become env bind
 
 Devflare does not treat queue producers and queue consumers as unrelated configuration fragments. It keeps them in one coherent config namespace so later compile and preview code can see the whole story.
 
-That is why review and runtime stay aligned: the config already names the queue, the producer binding, the consumer, and the dead-letter relationship in one place.
+Review and runtime stay aligned: the config already names the queue, the producer binding, the consumer, and the dead-letter relationship in one place.
 
 ##### Example — Queues from authored config to generated output
 
@@ -7408,9 +7508,9 @@ That means the docs should be honest: Devflare can compile and type the binding 
 
 #### Author it in the simplest shape that still says what you mean
 
-AI is one of the clearest examples of Devflare choosing honesty over fantasy. The binding exists in config, the env is typed, and the deploy story is real — but model inference itself still lives on Cloudflare infrastructure.
+AI is a remote-oriented binding. The binding exists in config, the env is typed, and the deploy story is real — but model inference itself still lives on Cloudflare infrastructure.
 
-That is why the testing story leans on remote mode rather than pretending Miniflare can be a credible stand-in for actual model execution.
+The testing story leans on remote mode rather than pretending Miniflare can be a credible stand-in for actual model execution.
 
 ##### Example — Workers AI binding authoring
 
@@ -7548,7 +7648,7 @@ export default defineConfig({
 
 > **Note — Honest tooling beats fake local magic**
 >
-> Devflare makes AI explicit and testable on purpose, but it does not pretend local emulation is equivalent to real inference.
+> Devflare makes AI explicit and testable, but it does not pretend local emulation is equivalent to real inference.
 
 ---
 
@@ -7689,7 +7789,7 @@ export async function fetch(): Promise<Response> {
 }
 ```
 
-#### Keep the first version boring on purpose
+#### Keep the first version boring
 
 > **Warning — This example still needs remote access**
 >
@@ -7798,7 +7898,7 @@ Cloudflare Vectorize docs is the platform reference. This page is the Devflare t
 | Navigation title | Vectorize internals |
 | Eyebrow | Under the hood |
 
-That is why the codebase treats Vectorize as supported but remote-oriented. Config and preview handling are strong; local emulation is intentionally not oversold.
+The codebase treats Vectorize as supported but remote-oriented. Config and preview handling are strong; local emulation is intentionally not oversold.
 
 #### At a glance
 
@@ -8011,11 +8111,11 @@ export async function fetch(): Promise<Response> {
 }
 ```
 
-#### Keep the first version boring on purpose
+#### Keep the first version boring
 
 > **Warning — The remote index still has to exist**
 >
-> This example is small on purpose, but it is not fictional. The named index has to exist and match the vector shape you send.
+> This example is intentionally small, but it is not fictional. The named index has to exist and match the vector shape you send.
 
 ---
 
@@ -8030,7 +8130,7 @@ export async function fetch(): Promise<Response> {
 | Navigation title | Hyperdrive |
 | Eyebrow | Binding reference |
 
-That is not a reason to avoid it — it is a reason to document it honestly. The binding is supported, yet the strongest evidence in the repo focuses on presence, connection info, and targeted integration rather than a giant local mock universe.
+That is not a reason to avoid it — it is a reason to document it accurately. The binding is supported, yet the strongest evidence in the repo focuses on presence, connection info, and targeted integration rather than a giant local mock universe.
 
 #### At a glance
 
@@ -8170,8 +8270,8 @@ export default defineConfig({
 ##### Key points
 
 - The repo shows Hyperdrive bindings exposing connection-oriented information such as `connectionString`, and some smoke paths also allow a `query()`-style helper.
-- I did not find the same rich bridge-level local helper story that exists for D1, KV, or R2, which is why the docs should stay cautious here.
-- The strongest proven local habit is to assert the binding exists and to use targeted integration for database behavior that really matters.
+- The bridge-level local helper surface is thinner than D1, KV, or R2 — expect to lean on targeted integration tests for database behavior that matters.
+- The strongest proven local habit is to assert the binding exists and verify the connection string shape.
 
 #### Compile, preview, and cleanup behavior
 
@@ -8313,7 +8413,7 @@ export async function fetch(): Promise<Response> {
 }
 ```
 
-#### Keep the first version boring on purpose
+#### Keep the first version boring
 
 > **Note — A smaller example is a more truthful example**
 >
@@ -8323,7 +8423,7 @@ export async function fetch(): Promise<Response> {
 
 ### Use Browser Rendering when the worker really needs a headless browser path
 
-> Devflare supports Browser Rendering, but the docs should say the quiet part out loud: there is exactly one browser binding today, and the best-supported local story lives in dev-server and integration flows.
+> Devflare supports Browser Rendering, but there is exactly one browser binding today, and the best-supported local story lives in dev-server and integration flows.
 
 | Field | Value |
 | --- | --- |
@@ -8332,7 +8432,7 @@ export async function fetch(): Promise<Response> {
 | Navigation title | Browser Rendering |
 | Eyebrow | Binding reference |
 
-That is still useful. It means browser work can live in the same docs library as every other binding, just with honest caveats about limits and testing style.
+Browser work can live in the same docs library as every other binding, just with clear caveats about limits and testing style.
 
 #### At a glance
 
@@ -8348,7 +8448,7 @@ Browser Rendering looks a little unusual in config because the current contract 
 
 That is also why generated env typing stays conservative today: `devflare types` can model the binding as `Fetcher`, while the richer browser behavior comes from the dev server shim and browser-aware libraries.
 
-That single-binding constraint is not a Devflare whim. It reflects the current Wrangler and platform support Devflare is choosing to expose honestly.
+That single-binding constraint is not a Devflare whim. It reflects the current Wrangler and platform support Devflare is choosing to expose accurately.
 
 ##### Example — Browser binding authoring
 
@@ -8436,7 +8536,7 @@ That implementation detail is why the binding belongs in the docs library even t
 
 The browser binding schema accepts a record but then validates that only one key exists. Devflare treats that key as the meaningful env binding name and compiles it into the single `browser.binding` entry Wrangler expects.
 
-That is why the docs should emphasize the env key and the single-binding limit instead of implying the string value behaves like a normal bucket or namespace resource.
+Emphasize the env key and the single-binding limit rather than implying the string value behaves like a normal bucket or namespace resource.
 
 ##### Example — Browser Rendering from authored config to generated output
 
@@ -8621,7 +8721,7 @@ export async function fetch(): Promise<Response> {
 }
 ```
 
-#### Keep the first version boring on purpose
+#### Keep the first version boring
 
 > **Warning — The example is small, not cheap**
 >
@@ -8781,8 +8881,8 @@ export default defineConfig({
 
 ##### Key points
 
-- The repo smoke app and integration tests show `writeDataPoint()` being called through the binding, which is enough to describe the runtime contract honestly.
-- I did not find a dedicated analytics helper surface in the test harness, so docs should steer people toward thin worker tests or explicit mocks instead.
+- The repo smoke app and integration tests show `writeDataPoint()` being called through the binding, which is enough to describe the runtime contract.
+- There is no dedicated analytics helper surface in the test harness — use thin worker tests or explicit mocks instead.
 - Type generation still matters here because it keeps the env contract clear even when the test story is lighter.
 
 #### Compile, preview, and cleanup behavior
@@ -8914,7 +9014,7 @@ export default defineConfig({
 ##### Key points
 
 - Keep the event payload small and explicit so you can reason about what the worker is writing.
-- If the real event shape grows richer later, this tiny route still teaches the binding contract honestly.
+- If the real event shape grows richer later, this tiny route still teaches the binding contract.
 
 ##### Example — Write one analytics point in the worker
 
@@ -8931,7 +9031,7 @@ export async function fetch(): Promise<Response> {
 }
 ```
 
-#### Keep the first version boring on purpose
+#### Keep the first version boring
 
 > **Note — A route can teach the whole binding**
 >
@@ -9197,7 +9297,7 @@ test('sends an outbound transactional email', async () => {
 | Navigation title | Send Email example |
 | Eyebrow | Starter example |
 
-It is enough to teach the binding honestly without dragging inbound processing or full provider workflows into the very first page.
+It is enough to teach the binding accurately without dragging inbound processing or full provider workflows into the very first page.
 
 #### At a glance
 
@@ -9253,7 +9353,7 @@ export async function fetch(): Promise<Response> {
 }
 ```
 
-#### Keep the first version boring on purpose
+#### Keep the first version boring
 
 > **Note — One message is enough to teach the binding**
 >
