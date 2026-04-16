@@ -70,22 +70,22 @@ jobs:
           set -euo pipefail
 
           for attempt in 1 2 3 4 5 6 7 8 9 10; do
-            html="$(curl --fail --silent --show-error --location "${DOCUMENTATION_LIVE_URL}?verify-build-sha=${EXPECTED_BUILD_SHA}&attempt=${attempt}")"
+            payload="$(curl --fail --silent --show-error --location "${DOCUMENTATION_LIVE_URL}/build.json?attempt=${attempt}")"
 
-            if printf '%s' "$html" | grep -Fq "$EXPECTED_BUILD_SHA"; then
+            if printf '%s' "$payload" | grep -Fq "$EXPECTED_BUILD_SHA"; then
               echo 'verified=true' >> "$GITHUB_OUTPUT"
-              echo "Verified live production page contains build SHA ${EXPECTED_BUILD_SHA}."
+              echo "Verified live production build metadata exposes build SHA ${EXPECTED_BUILD_SHA}."
               exit 0
             fi
 
             if [ "$attempt" -lt 10 ]; then
-              echo "Live production page does not show build SHA ${EXPECTED_BUILD_SHA} yet (attempt ${attempt}/10). Retrying..."
+              echo "Live production build metadata does not show build SHA ${EXPECTED_BUILD_SHA} yet (attempt ${attempt}/10). Retrying..."
               sleep 6
             fi
           done
 
           echo 'verified=false' >> "$GITHUB_OUTPUT"
-          echo "Live production page did not contain build SHA ${EXPECTED_BUILD_SHA} after 10 attempts." >&2
+          echo "Live production build metadata did not contain build SHA ${EXPECTED_BUILD_SHA} after 10 attempts." >&2
           exit 1
 
       - name: Publish production deployment feedback
@@ -164,7 +164,7 @@ jobs:
             echo "Last version ID: $DEVFLARE_DEPLOY_VERSION_ID" >&2
           fi
           if [ "$DOCUMENTATION_LIVE_VERIFY_OUTCOME" = 'failure' ]; then
-            echo "Live production page at $DOCUMENTATION_LIVE_URL did not expose build SHA $DOCUMENTATION_EXPECTED_BUILD_SHA after deploy verification retries." >&2
+            echo "Live production build metadata at $DOCUMENTATION_LIVE_URL/build.json did not expose build SHA $DOCUMENTATION_EXPECTED_BUILD_SHA after deploy verification retries." >&2
           fi
           if [ -n "$DEVFLARE_DEPLOY_LOG_EXCERPT" ]; then
             echo '' >&2

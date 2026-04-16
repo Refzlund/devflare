@@ -195,6 +195,7 @@ jobs:
           skip-install: 'true'
           deploy-command: bun run deploy --
           preview-scope: ${{ needs.resolve-context.outputs.branch-preview-scope }}
+          verify-deployment: 'false'
           deploy-message: Documentation branch preview ${{ github.sha }} (run ${{ github.run_id }})
           deploy-tag: documentation-branch-preview-${{ github.run_id }}
           cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -221,6 +222,36 @@ jobs:
             exit 1
           fi
 
+      - name: Verify documentation branch preview content
+        id: branch-content
+        if: ${{ needs.resolve-context.outputs.branch-preview-enabled == 'true' && steps.impact.outputs.should-deploy == 'true' && steps.branch-deploy.outputs.status == 'success' && always() }}
+        continue-on-error: true
+        shell: bash
+        env:
+          DOCUMENTATION_PREVIEW_URL: ${{ steps.branch-deploy.outputs.preview-url }}
+          EXPECTED_BUILD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            payload="$(curl --fail --silent --show-error --location "${DOCUMENTATION_PREVIEW_URL}/build.json?attempt=${attempt}")"
+
+            if printf '%s' "$payload" | grep -Fq "$EXPECTED_BUILD_SHA"; then
+              echo 'verified=true' >> "$GITHUB_OUTPUT"
+              echo "Verified documentation branch preview exposes build SHA ${EXPECTED_BUILD_SHA}."
+              exit 0
+            fi
+
+            if [ "$attempt" -lt 10 ]; then
+              echo "Documentation branch preview does not expose build SHA ${EXPECTED_BUILD_SHA} yet (attempt ${attempt}/10). Retrying..."
+              sleep 6
+            fi
+          done
+
+          echo 'verified=false' >> "$GITHUB_OUTPUT"
+          echo "Documentation branch preview did not expose build SHA ${EXPECTED_BUILD_SHA} after 10 attempts." >&2
+          exit 1
+
       - name: Publish documentation branch preview feedback
         if: ${{ needs.resolve-context.outputs.branch-preview-enabled == 'true' && steps.impact.outputs.should-deploy == 'true' && always() }}
         uses: ./.github/actions/devflare-github-feedback
@@ -228,7 +259,7 @@ jobs:
           github-token: ${{ github.token }}
           mode: deployment
           operation: report
-          status: ${{ steps.branch-deploy.outputs.status == 'success' && steps.branch-validate.outcome != 'failure' && 'success' || 'failure' }}
+          status: ${{ steps.branch-deploy.outputs.status == 'success' && steps.branch-validate.outcome != 'failure' && steps.branch-content.outcome != 'failure' && 'success' || 'failure' }}
           title: Documentation branch preview
           deployment-kind: preview
           ref-name: ${{ needs.resolve-context.outputs.branch-preview-scope }}
@@ -253,6 +284,7 @@ jobs:
           skip-install: 'true'
           deploy-command: bun run deploy --
           preview-scope: ${{ needs.resolve-context.outputs.pr-preview-scope }}
+          verify-deployment: 'false'
           deploy-message: Documentation PR preview ${{ needs.resolve-context.outputs.checkout-ref }} (run ${{ github.run_id }})
           deploy-tag: documentation-pr-preview-${{ github.run_id }}
           cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -285,6 +317,36 @@ jobs:
             exit 1
           fi
 
+      - name: Verify documentation PR preview content
+        id: pr-content
+        if: ${{ needs.resolve-context.outputs.pr-preview-enabled == 'true' && steps.impact.outputs.should-deploy == 'true' && steps.pr-deploy.outputs.status == 'success' && always() }}
+        continue-on-error: true
+        shell: bash
+        env:
+          DOCUMENTATION_PREVIEW_URL: ${{ steps.pr-deploy.outputs.preview-url }}
+          EXPECTED_BUILD_SHA: ${{ needs.resolve-context.outputs.checkout-ref }}
+        run: |
+          set -euo pipefail
+
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            payload="$(curl --fail --silent --show-error --location "${DOCUMENTATION_PREVIEW_URL}/build.json?attempt=${attempt}")"
+
+            if printf '%s' "$payload" | grep -Fq "$EXPECTED_BUILD_SHA"; then
+              echo 'verified=true' >> "$GITHUB_OUTPUT"
+              echo "Verified documentation PR preview exposes build SHA ${EXPECTED_BUILD_SHA}."
+              exit 0
+            fi
+
+            if [ "$attempt" -lt 10 ]; then
+              echo "Documentation PR preview does not expose build SHA ${EXPECTED_BUILD_SHA} yet (attempt ${attempt}/10). Retrying..."
+              sleep 6
+            fi
+          done
+
+          echo 'verified=false' >> "$GITHUB_OUTPUT"
+          echo "Documentation PR preview did not expose build SHA ${EXPECTED_BUILD_SHA} after 10 attempts." >&2
+          exit 1
+
       - name: Publish documentation PR preview feedback
         if: ${{ needs.resolve-context.outputs.pr-preview-enabled == 'true' && always() }}
         uses: ./.github/actions/devflare-github-feedback
@@ -292,7 +354,7 @@ jobs:
           github-token: ${{ github.token }}
           mode: comment
           operation: report
-          status: ${{ steps.impact.outputs.should-deploy != 'true' && 'skipped' || (steps.pr-deploy.outputs.status == 'success' && steps.pr-validate.outcome != 'failure' && 'success' || 'failure') }}
+          status: ${{ steps.impact.outputs.should-deploy != 'true' && 'skipped' || (steps.pr-deploy.outputs.status == 'success' && steps.pr-validate.outcome != 'failure' && steps.pr-content.outcome != 'failure' && 'success' || 'failure') }}
           title: Documentation PR preview
           comment-key: pr-deployment-status
           comment-section-key: documentation-preview
@@ -311,7 +373,8 @@ jobs:
             - Impact decision: `${{ steps.impact.outputs.should-deploy == 'true' && 'deploy' || 'skip' }}`
             - Impact reason: `${{ steps.impact.outputs.reason }}`
             - Preview target verification: `${{ steps.impact.outputs.should-deploy != 'true' && 'skipped' || (steps.pr-validate.outcome == 'success' && 'passed' || 'failed') }}`
-            - Final status: `${{ steps.impact.outputs.should-deploy != 'true' && 'skipped' || (steps.pr-deploy.outputs.status == 'success' && steps.pr-validate.outcome != 'failure' && 'success' || 'failure') }}`
+            - Preview content verification: `${{ steps.impact.outputs.should-deploy != 'true' && 'skipped' || (steps.pr-content.outcome == 'success' && 'passed' || 'failed') }}`
+            - Final status: `${{ steps.impact.outputs.should-deploy != 'true' && 'skipped' || (steps.pr-deploy.outputs.status == 'success' && steps.pr-validate.outcome != 'failure' && steps.pr-content.outcome != 'failure' && 'success' || 'failure') }}`
             - Preview strategy: branch pushes build the workspace once per job, then update both branch and PR targets when the branch already belongs to an open pull request.
 
       - name: Summarize documentation preview
@@ -326,15 +389,15 @@ jobs:
             echo "- Branch target: \`${{ needs.resolve-context.outputs.branch-preview-enabled == 'true' && needs.resolve-context.outputs.branch-preview-scope || 'disabled' }}\`"
             echo "- PR target: \`${{ needs.resolve-context.outputs.pr-preview-enabled == 'true' && needs.resolve-context.outputs.pr-preview-scope || 'disabled' }}\`"
             if [ "${{ needs.resolve-context.outputs.branch-preview-enabled }}" = 'true' ]; then
-              echo "- Branch preview status: \`${{ steps.impact.outputs.should-deploy != 'true' && 'skipped' || (steps.branch-deploy.outputs.status == 'success' && steps.branch-validate.outcome != 'failure' && 'success' || 'failure') }}\`"
+              echo "- Branch preview status: \`${{ steps.impact.outputs.should-deploy != 'true' && 'skipped' || (steps.branch-deploy.outputs.status == 'success' && steps.branch-validate.outcome != 'failure' && steps.branch-content.outcome != 'failure' && 'success' || 'failure') }}\`"
             fi
             if [ "${{ needs.resolve-context.outputs.pr-preview-enabled }}" = 'true' ]; then
-              echo "- PR preview status: \`${{ steps.impact.outputs.should-deploy != 'true' && 'skipped' || (steps.pr-deploy.outputs.status == 'success' && steps.pr-validate.outcome != 'failure' && 'success' || 'failure') }}\`"
+              echo "- PR preview status: \`${{ steps.impact.outputs.should-deploy != 'true' && 'skipped' || (steps.pr-deploy.outputs.status == 'success' && steps.pr-validate.outcome != 'failure' && steps.pr-content.outcome != 'failure' && 'success' || 'failure') }}\`"
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Fail when documentation preview deploy did not succeed
-        if: ${{ always() && steps.impact.outputs.should-deploy == 'true' && ((needs.resolve-context.outputs.branch-preview-enabled == 'true' && (steps.branch-deploy.outputs.status != 'success' || steps.branch-deploy.outcome == 'failure' || steps.branch-validate.outcome == 'failure')) || (needs.resolve-context.outputs.pr-preview-enabled == 'true' && (steps.pr-deploy.outputs.status != 'success' || steps.pr-deploy.outcome == 'failure' || steps.pr-validate.outcome == 'failure'))) }}
+        if: ${{ always() && steps.impact.outputs.should-deploy == 'true' && ((needs.resolve-context.outputs.branch-preview-enabled == 'true' && (steps.branch-deploy.outputs.status != 'success' || steps.branch-deploy.outcome == 'failure' || steps.branch-validate.outcome == 'failure' || steps.branch-content.outcome == 'failure')) || (needs.resolve-context.outputs.pr-preview-enabled == 'true' && (steps.pr-deploy.outputs.status != 'success' || steps.pr-deploy.outcome == 'failure' || steps.pr-validate.outcome == 'failure' || steps.pr-content.outcome == 'failure'))) }}
         shell: bash
         run: |
           echo 'Documentation preview deployment failed.' >&2
@@ -504,6 +567,7 @@ jobs:
           skip-setup: 'true'
           skip-install: 'true'
           preview-scope: ${{ needs.resolve-context.outputs.branch-preview-scope }}
+          verify-deployment: 'false'
           cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           cloudflare-account-id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
@@ -518,6 +582,7 @@ jobs:
           skip-setup: 'true'
           skip-install: 'true'
           preview-scope: ${{ needs.resolve-context.outputs.branch-preview-scope }}
+          verify-deployment: 'false'
           cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           cloudflare-account-id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
@@ -532,6 +597,7 @@ jobs:
           skip-setup: 'true'
           skip-install: 'true'
           preview-scope: ${{ needs.resolve-context.outputs.branch-preview-scope }}
+          verify-deployment: 'false'
           cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           cloudflare-account-id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
@@ -595,6 +661,7 @@ jobs:
           skip-setup: 'true'
           skip-install: 'true'
           preview-scope: ${{ needs.resolve-context.outputs.pr-preview-scope }}
+          verify-deployment: 'false'
           cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           cloudflare-account-id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
@@ -609,6 +676,7 @@ jobs:
           skip-setup: 'true'
           skip-install: 'true'
           preview-scope: ${{ needs.resolve-context.outputs.pr-preview-scope }}
+          verify-deployment: 'false'
           cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           cloudflare-account-id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
@@ -623,6 +691,7 @@ jobs:
           skip-setup: 'true'
           skip-install: 'true'
           preview-scope: ${{ needs.resolve-context.outputs.pr-preview-scope }}
+          verify-deployment: 'false'
           cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           cloudflare-account-id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 

@@ -41,14 +41,29 @@ export interface TestingPreviewVerificationSnapshot {
 	expectedAppName: string
 	expectedDeploymentChannel: string
 	expectedWorkerName: string
+	expectedAuthWorkerName: string
+	expectedSearchWorkerName: string
 	resolvedWorkerName: string
 	resolvedAppName?: string
 	resolvedDeploymentChannel?: string
 	previewUrl?: string
+	previewStatus?: TestingPreviewStatus
+	previewStatusError?: string
 	availableWorkers: string[]
 	versionId?: string
 	bindingsInspected: boolean
 	bindingNames: string[]
+}
+
+export interface TestingPreviewStatus {
+	appName?: string
+	deploymentChannel?: string
+	hasDurableObjectBindings?: boolean
+	hasServiceBindings?: boolean
+	hasVectorizeBindings?: boolean
+	hasAnalyticsBindings?: boolean
+	hasSendEmailBindings?: boolean
+	hasHyperdriveBinding?: boolean
 }
 
 function restoreOptionalEnvironmentVariable(name: string, value: string | undefined): void {
@@ -95,6 +110,39 @@ function uniqueSorted(values: string[]): string[] {
 
 function readOptionalString(value: unknown): string | undefined {
 	return typeof value === 'string' && value.trim().length > 0 ? value : undefined
+}
+
+function readOptionalBoolean(value: unknown): boolean | undefined {
+	return typeof value === 'boolean' ? value : undefined
+}
+
+function appendPreviewPath(previewUrl: string, pathSuffix: string): string {
+	return `${previewUrl.replace(/\/+$/g, '')}${pathSuffix}`
+}
+
+async function loadPreviewStatus(previewUrl: string): Promise<TestingPreviewStatus> {
+	const response = await fetch(appendPreviewPath(previewUrl, '/status'), {
+		headers: {
+			'cache-control': 'no-store'
+		}
+	})
+
+	if (!response.ok) {
+		throw new Error(`Preview status endpoint returned ${response.status} ${response.statusText}.`)
+	}
+
+	const payload = await response.json() as Record<string, unknown>
+
+	return {
+		appName: readOptionalString(payload.appName),
+		deploymentChannel: readOptionalString(payload.deploymentChannel),
+		hasDurableObjectBindings: readOptionalBoolean(payload.hasDurableObjectBindings),
+		hasServiceBindings: readOptionalBoolean(payload.hasServiceBindings),
+		hasVectorizeBindings: readOptionalBoolean(payload.hasVectorizeBindings),
+		hasAnalyticsBindings: readOptionalBoolean(payload.hasAnalyticsBindings),
+		hasSendEmailBindings: readOptionalBoolean(payload.hasSendEmailBindings),
+		hasHyperdriveBinding: readOptionalBoolean(payload.hasHyperdriveBinding)
+	}
 }
 
 function resolveActiveVersionId(deployments: WorkerDeploymentInfo[]): string | undefined {
@@ -149,6 +197,7 @@ export function collectTestingPreviewVerificationErrors(
 	const availableWorkers = new Set(snapshot.availableWorkers)
 	const bindingNames = new Set(snapshot.bindingNames)
 	const hasVerifiedPreviewUrl = typeof snapshot.previewUrl === 'string' && snapshot.previewUrl.trim().length > 0
+	const hasVerifiedPreviewStatus = Boolean(snapshot.previewStatus)
 
 	if (snapshot.resolvedWorkerName !== snapshot.expectedWorkerName) {
 		errors.push(
@@ -169,13 +218,67 @@ export function collectTestingPreviewVerificationErrors(
 	}
 
 	if (!availableWorkers.has(snapshot.expectedWorkerName)) {
-		if (!snapshot.bindingsInspected && !hasVerifiedPreviewUrl) {
+		if (!snapshot.bindingsInspected && !hasVerifiedPreviewStatus) {
 			errors.push(`Expected deployed preview worker ${JSON.stringify(snapshot.expectedWorkerName)} was not found in the Cloudflare account.`)
+		}
+	}
+
+	if (!snapshot.bindingsInspected) {
+		for (const sidecarWorkerName of [snapshot.expectedAuthWorkerName, snapshot.expectedSearchWorkerName]) {
+			if (!availableWorkers.has(sidecarWorkerName)) {
+				errors.push(`Expected preview sidecar worker ${JSON.stringify(sidecarWorkerName)} was not found in the Cloudflare account.`)
+			}
 		}
 	}
 
 	if (!snapshot.versionId && !hasVerifiedPreviewUrl) {
 		errors.push(`Could not resolve an active deployment version for ${JSON.stringify(snapshot.expectedWorkerName)}.`)
+	}
+
+	if (hasVerifiedPreviewUrl && !snapshot.previewStatus) {
+		errors.push(
+			snapshot.previewStatusError
+				? `Could not load the preview status endpoint from ${JSON.stringify(snapshot.previewUrl)}: ${snapshot.previewStatusError}`
+				: `Could not load the preview status endpoint from ${JSON.stringify(snapshot.previewUrl)}.`
+		)
+	}
+
+	if (snapshot.previewStatus) {
+		if (snapshot.previewStatus.appName !== snapshot.expectedAppName) {
+			errors.push(
+				`Preview status APP_NAME was ${JSON.stringify(snapshot.previewStatus.appName)} instead of ${JSON.stringify(snapshot.expectedAppName)}.`
+			)
+		}
+
+		if (snapshot.previewStatus.deploymentChannel !== snapshot.expectedDeploymentChannel) {
+			errors.push(
+				`Preview status DEPLOYMENT_CHANNEL was ${JSON.stringify(snapshot.previewStatus.deploymentChannel)} instead of ${JSON.stringify(snapshot.expectedDeploymentChannel)}.`
+			)
+		}
+
+		if (snapshot.previewStatus.hasDurableObjectBindings !== true) {
+			errors.push('Preview status did not confirm durable object bindings.')
+		}
+
+		if (snapshot.previewStatus.hasServiceBindings !== true) {
+			errors.push('Preview status did not confirm service bindings.')
+		}
+
+		if (snapshot.previewStatus.hasVectorizeBindings !== true) {
+			errors.push('Preview status did not confirm vectorize bindings.')
+		}
+
+		if (snapshot.previewStatus.hasAnalyticsBindings !== true) {
+			errors.push('Preview status did not confirm analytics bindings.')
+		}
+
+		if (snapshot.previewStatus.hasSendEmailBindings !== true) {
+			errors.push('Preview status did not confirm send-email bindings.')
+		}
+
+		if (snapshot.previewStatus.hasHyperdriveBinding !== true) {
+			errors.push('Preview status did not confirm the Hyperdrive binding.')
+		}
 	}
 
 	if (snapshot.bindingsInspected) {
@@ -201,11 +304,22 @@ async function loadVerificationSnapshot(
 	const workerNames = resolveTestingWorkerNames(previewScope)
 	const config = await loadTestingPreviewConfig(previewScope)
 	const vars = (config.vars ?? {}) as Record<string, unknown>
+	const previewUrl = process.env.TESTING_DEPLOY_PREVIEW_URL?.trim() || undefined
 	const liveWorkers = await account.workers(accountId, CLOUDFLARE_API_OPTIONS)
 	const availableWorkers = uniqueSorted(liveWorkers.map((worker) => worker.name))
 	const availableWorkerSet = new Set(availableWorkers)
 	let versionId = requestedVersionId?.trim() || undefined
 	let bindingRows: ParsedWranglerBindingRow[] = []
+	let previewStatus: TestingPreviewStatus | undefined
+	let previewStatusError: string | undefined
+
+	if (previewUrl) {
+		try {
+			previewStatus = await loadPreviewStatus(previewUrl)
+		} catch (error) {
+			previewStatusError = error instanceof Error ? error.message : String(error)
+		}
+	}
 
 	if (!versionId && availableWorkerSet.has(config.name)) {
 		const deployments = await account.workerDeployments(
@@ -230,10 +344,14 @@ async function loadVerificationSnapshot(
 			expectedAppName: process.env.TESTING_EXPECTED_APP_NAME?.trim() || DEFAULT_EXPECTED_APP_NAME,
 			expectedDeploymentChannel: process.env.TESTING_EXPECTED_DEPLOYMENT_CHANNEL?.trim() || DEFAULT_EXPECTED_DEPLOYMENT_CHANNEL,
 			expectedWorkerName: workerNames.mainWorkerName,
+			expectedAuthWorkerName: workerNames.authServiceName,
+			expectedSearchWorkerName: workerNames.searchServiceName,
 			resolvedWorkerName: config.name,
 			resolvedAppName: readOptionalString(vars.APP_NAME),
 			resolvedDeploymentChannel: readOptionalString(vars.DEPLOYMENT_CHANNEL),
-			previewUrl: process.env.TESTING_DEPLOY_PREVIEW_URL?.trim() || undefined,
+			previewUrl,
+			previewStatus,
+			previewStatusError,
 			availableWorkers,
 			versionId,
 			bindingsInspected: versionId !== undefined,
@@ -265,10 +383,21 @@ function createDiagnosticsMessage(input: {
 		...input.errors.map((error) => `- ${error}`),
 		'',
 		`Expected preview worker: ${input.snapshot.expectedWorkerName}`,
+		`Expected auth worker: ${input.snapshot.expectedAuthWorkerName}`,
+		`Expected search worker: ${input.snapshot.expectedSearchWorkerName}`,
 		`Resolved preview worker: ${input.snapshot.resolvedWorkerName}`,
 		`Resolved APP_NAME: ${JSON.stringify(input.snapshot.resolvedAppName)}`,
 		`Resolved DEPLOYMENT_CHANNEL: ${JSON.stringify(input.snapshot.resolvedDeploymentChannel)}`,
 		`Deploy preview URL: ${input.snapshot.previewUrl ?? 'not provided'}`,
+		`Preview status APP_NAME: ${JSON.stringify(input.snapshot.previewStatus?.appName)}`,
+		`Preview status error: ${input.snapshot.previewStatusError ?? 'none'}`,
+		`Preview status DEPLOYMENT_CHANNEL: ${JSON.stringify(input.snapshot.previewStatus?.deploymentChannel)}`,
+		`Preview status service bindings: ${String(input.snapshot.previewStatus?.hasServiceBindings)}`,
+		`Preview status durable objects: ${String(input.snapshot.previewStatus?.hasDurableObjectBindings)}`,
+		`Preview status vectorize: ${String(input.snapshot.previewStatus?.hasVectorizeBindings)}`,
+		`Preview status analytics: ${String(input.snapshot.previewStatus?.hasAnalyticsBindings)}`,
+		`Preview status send email: ${String(input.snapshot.previewStatus?.hasSendEmailBindings)}`,
+		`Preview status hyperdrive: ${String(input.snapshot.previewStatus?.hasHyperdriveBinding)}`,
 		`Active preview version: ${input.snapshot.versionId ?? 'not found'}`,
 		`Binding inspection: ${input.snapshot.bindingsInspected ? 'completed via wrangler versions view' : (input.snapshot.previewUrl ? 'skipped because Cloudflare did not expose preview version metadata after a successful named preview deploy' : 'not available')}`,
 		`Testing workers in account: ${input.availableTestingWorkers.join(', ') || '(none)'}`,
@@ -315,12 +444,12 @@ async function runVerification(): Promise<void> {
 
 			if (!snapshot.bindingsInspected && snapshot.previewUrl) {
 				console.warn(
-					`Cloudflare did not expose preview version metadata for ${JSON.stringify(snapshot.expectedWorkerName)}; treating the named preview deploy as verified from the successful preview URL output plus resolved preview config.`
+					`Cloudflare did not expose preview version metadata for ${JSON.stringify(snapshot.expectedWorkerName)}; verified the live preview status endpoint plus expected preview workers instead.`
 				)
 			}
 
 			console.log(`Verified testing preview scope ${JSON.stringify(previewScope)}.`)
-			console.log(`Verified main worker ${snapshot.expectedWorkerName} version ${snapshot.versionId}.`)
+			console.log(`Verified main worker ${snapshot.expectedWorkerName} version ${snapshot.versionId ?? 'not exposed by Cloudflare'}.`)
 			console.log(`Verified bindings: ${REQUIRED_MAIN_BINDINGS.join(', ')}.`)
 			return
 		} catch (error) {
