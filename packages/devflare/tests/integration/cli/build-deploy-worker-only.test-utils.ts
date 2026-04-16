@@ -125,7 +125,7 @@ export function createWranglerDeployProcessRunner(options: {
 	structuredOutput?: Record<string, unknown>
 } = {}): Parameters<typeof createProcessRunner>[0] {
 	return async (command, args, executionOptions) => {
-		if (command === 'bunx' && args.join(' ') === 'wrangler deploy') {
+		if (command === 'bunx' && args[0] === 'wrangler' && args[1] === 'deploy') {
 			if (options.structuredOutput) {
 				const outputFilePath = String((executionOptions?.env as Record<string, unknown> | undefined)?.WRANGLER_OUTPUT_FILE_PATH ?? '')
 				await writeFile(outputFilePath, JSON.stringify(options.structuredOutput))

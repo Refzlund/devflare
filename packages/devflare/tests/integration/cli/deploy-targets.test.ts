@@ -59,7 +59,7 @@ describe('deploy target integration', () => {
 		const logger = createLogger()
 		setDependencies(createCliDependencies(
 			createProcessRunner((command, args) => {
-				if (command === 'bunx' && args.join(' ') === 'wrangler deploy') {
+				if (command === 'bunx' && args[0] === 'wrangler' && args[1] === 'deploy') {
 					return successResult('Version ID: version-123')
 				}
 
@@ -81,7 +81,7 @@ describe('deploy target integration', () => {
 		const renderedMessages = renderMessages(logger)
 
 		expect(result.exitCode).toBe(0)
-		expect(executions.some((execution) => execution.command === 'bunx' && execution.args.join(' ') === 'wrangler deploy')).toBe(true)
+		expect(executions.some((execution) => execution.command === 'bunx' && execution.args[0] === 'wrangler' && execution.args[1] === 'deploy')).toBe(true)
 		expect(renderedMessages.some((message) => message.includes('demo-worker'))).toBe(true)
 		expect(renderedMessages.some((message) => message.includes('demo-worker-next'))).toBe(false)
 		expect(process.env.DEVFLARE_PREVIEW_BRANCH).toBe('next')
@@ -113,7 +113,7 @@ describe('deploy target integration', () => {
 		const logger = createLogger()
 		setDependencies(createCliDependencies(
 			createProcessRunner((command, args) => {
-				if (command === 'bunx' && args.join(' ') === 'wrangler deploy') {
+				if (command === 'bunx' && args[0] === 'wrangler' && args[1] === 'deploy') {
 					return successResult('Version ID: version-456')
 				}
 
@@ -135,8 +135,8 @@ describe('deploy target integration', () => {
 		const renderedMessages = renderMessages(logger)
 
 		expect(result.exitCode).toBe(0)
-		expect(executions.some((execution) => execution.command === 'bunx' && execution.args.join(' ') === 'wrangler deploy')).toBe(true)
-		expect(executions.some((execution) => execution.command === 'bunx' && execution.args.join(' ') === 'wrangler versions upload')).toBe(false)
+		expect(executions.some((execution) => execution.command === 'bunx' && execution.args[0] === 'wrangler' && execution.args[1] === 'deploy')).toBe(true)
+		expect(executions.some((execution) => execution.command === 'bunx' && execution.args[0] === 'wrangler' && execution.args[1] === 'versions' && execution.args[2] === 'upload')).toBe(false)
 		expect(renderedMessages.some((message) => message.includes('demo-worker-next'))).toBe(true)
 		expect(process.env.DEVFLARE_PREVIEW_BRANCH).toBe(originalPreviewBranch)
 	})
@@ -147,7 +147,7 @@ describe('deploy target integration', () => {
 		const logger = createLogger()
 		setDependencies(createCliDependencies(
 			createProcessRunner((command, args) => {
-				if (command === 'bunx' && args.join(' ') === 'wrangler versions upload') {
+				if (command === 'bunx' && args[0] === 'wrangler' && args[1] === 'versions' && args[2] === 'upload') {
 					return successResult('Version ID: version-789')
 				}
 

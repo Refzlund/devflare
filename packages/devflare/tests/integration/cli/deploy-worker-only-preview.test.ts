@@ -65,7 +65,7 @@ describe('build/deploy worker-only behavior', () => {
 
 		expect(result.exitCode).toBe(0)
 		expect(executions.some(({ command, args }) => isViteBuildExecution(command, args))).toBe(false)
-		expect(executions.some(({ command, args }) => command === 'bunx' && args.join(' ') === 'wrangler deploy')).toBe(true)
+		expect(executions.some(({ command, args }) => command === 'bunx' && args[0] === 'wrangler' && args[1] === 'deploy')).toBe(true)
 		expect(logger.messages.some((message) => message.args.join(' ').includes('Skipping Vite build'))).toBe(true)
 		await access(join(projectDir, '.wrangler', 'deploy', 'config.json'))
 	})
@@ -105,10 +105,11 @@ console.log('stub wrangler binary')
 		)
 
 		expect(result.exitCode).toBe(0)
-		const deployExecution = executions.find(({ args }) => args.at(-1) === 'deploy')
+		const deployExecution = executions.find(({ args }) => args.includes('deploy'))
 		expect(deployExecution?.command).toBe('node')
 		expect(deployExecution?.args[0]?.replace(/\\/g, '/')).toBe(`${projectDir.replace(/\\/g, '/')}/node_modules/wrangler/bin/wrangler.js`)
-		expect(deployExecution?.args.slice(1)).toEqual(['deploy'])
+		expect(deployExecution?.args).toContain('deploy')
+		expect(deployExecution?.args).toContain('--config')
 	})
 
 	test('deploy runs a local wrangler package from an ancestor workspace directory with node', async () => {
@@ -149,10 +150,11 @@ console.log('stub wrangler binary')
 		)
 
 		expect(result.exitCode).toBe(0)
-		const deployExecution = executions.find(({ args }) => args.at(-1) === 'deploy')
+		const deployExecution = executions.find(({ args }) => args.includes('deploy'))
 		expect(deployExecution?.command).toBe('node')
 		expect(deployExecution?.args[0]?.replace(/\\/g, '/')).toBe(`${workspaceDir.replace(/\\/g, '/')}/node_modules/wrangler/bin/wrangler.js`)
-		expect(deployExecution?.args.slice(1)).toEqual(['deploy'])
+		expect(deployExecution?.args).toContain('deploy')
+		expect(deployExecution?.args).toContain('--config')
 	})
 
 	test('deploy forwards Wrangler version metadata flags when message and tag are provided', async () => {
@@ -213,7 +215,9 @@ console.log('stub wrangler binary')
 
 		expect(result.exitCode).toBe(0)
 		const previewExecution = executions.find(({ command, args }) => command === 'bunx' && args[0] === 'wrangler' && args[1] === 'versions' && args[2] === 'upload')
-		expect(previewExecution?.args).toEqual(['wrangler', 'versions', 'upload'])
+		expect(previewExecution?.args).toContain('versions')
+		expect(previewExecution?.args).toContain('upload')
+		expect(previewExecution?.args).toContain('--config')
 		expect(logger.messages.some((message) => message.args.join(' ').includes('Version ID: version-123'))).toBe(true)
 		expect(logger.messages.some((message) => message.args.join(' ').includes('Preview URL: https://preview.example.workers.dev'))).toBe(true)
 	})

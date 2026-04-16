@@ -486,6 +486,8 @@ export async function runDeployCommand(
 					? [localWranglerExecutable, 'deploy']
 					: ['wrangler', 'deploy']
 
+			wranglerArgs.push('--config', prepared.deployConfigPath)
+
 			if (deployMessage?.trim()) {
 				wranglerArgs.push('--message', deployMessage.trim())
 			}
