@@ -21,13 +21,11 @@ import {
 	getPreviewCleanupResourceCandidateCount,
 	logPreviewCleanupScopeBreakdown,
 	logResolvedPreviewScopes,
-	retireDeletedPreviewWorkers,
 	showNoPreviewCleanupCandidatesHint
 } from './previews-support/cleanup'
 import {
 	buildPreviewWorkerCandidatesByScope,
 	collectConfiguredWorkerFamilies,
-	loadTrackedPreviewScopeRows,
 	orderPreviewWorkerNamesForDeletion
 } from './previews-support/family'
 import {
@@ -430,7 +428,6 @@ async function runCleanupSubcommand(
 	context: PreviewCommandContext,
 	logger: ConsolaInstance,
 	options: CliOptions,
-	databaseName: string | undefined,
 	environment: string | undefined,
 	configFile: string | undefined,
 	includeAll: boolean,
@@ -451,23 +448,22 @@ async function runCleanupSubcommand(
 	const configuredFamilies = collectConfiguredWorkerFamilies(config, resolvedEnvironment)
 	const liveWorkers = await account.workers(context.accountId, CLI_API_OPTIONS)
 	const workerCandidatesByScope = buildPreviewWorkerCandidatesByScope(configuredFamilies, liveWorkers)
-	const trackedScopeRows = includeAll || previewScope.identifier
-		? await loadTrackedPreviewScopeRows(context.accountId, databaseName, configuredFamilies, CLI_API_OPTIONS)
-		: []
 	const cleanupTargets = includeAll
-		? buildPreviewCleanupTargets(trackedScopeRows, workerCandidatesByScope, resolvedEnvironment)
+		? buildPreviewCleanupTargets(workerCandidatesByScope, resolvedEnvironment)
 		: previewScope.identifier
-			? [buildPreviewCleanupTarget(previewScope.identifier, trackedScopeRows, workerCandidatesByScope, resolvedEnvironment)]
+			? [buildPreviewCleanupTarget(previewScope.identifier, workerCandidatesByScope, resolvedEnvironment)]
 			: []
-	const cleanupRuns = cleanupTargets.length > 0
+	const cleanupRuns = includeAll
 		? cleanupTargets.map((target) => ({
 			scope: target.scope,
 			target
 		}))
-		: [{
-			scope: previewScope.identifier,
-			target: undefined
-		}]
+		: previewScope.identifier
+			? [{
+				scope: previewScope.identifier,
+				target: cleanupTargets[0]
+			}]
+			: []
 	const applyCleanup = parsed.options.apply === true
 	const executions: PreviewCleanupExecution[] = []
 
@@ -485,15 +481,6 @@ async function runCleanupSubcommand(
 
 			for (const workerName of orderedWorkerNames) {
 				await account.deleteWorker(context.accountId, workerName, CLI_API_OPTIONS)
-			}
-
-			if (cleanupRun.target && orderedWorkerNames.length > 0) {
-				await retireDeletedPreviewWorkers(
-					context.accountId,
-					databaseName,
-					cleanupRun.target.scope,
-					orderedWorkerNames
-				)
 			}
 		}
 
@@ -523,7 +510,7 @@ async function runCleanupSubcommand(
 		return sum + getPreviewCleanupResourceCandidateCount(execution.result)
 	}, 0)
 	const totalCandidates = totalWorkerCandidates + totalResourceCandidates
-	const scopeCountSuffix = includeAll || previewScope.identifier
+	const scopeCountSuffix = cleanupRuns.length > 0
 		? ` across ${cleanupRuns.length} preview scope${cleanupRuns.length === 1 ? '' : 's'}`
 		: ''
 
@@ -645,7 +632,6 @@ export async function runPreviewsCommand(
 
 	try {
 		const context = await resolveContext(parsed, options, subcommand)
-		const databaseName = asOptionalString(parsed.options.database)
 		const environment = asOptionalString(parsed.options.env)
 		const configFile = asOptionalString(parsed.options.config)
 
@@ -659,7 +645,6 @@ export async function runPreviewsCommand(
 					context,
 					logger,
 					options,
-					databaseName,
 					environment,
 					configFile,
 					includeAll,

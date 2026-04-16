@@ -106,7 +106,7 @@ describe('previews command', () => {
 		expect(renderedMessages.some((message) => message.includes('2/3'))).toBe(true)
 		expect(renderedMessages.some((message) => message.includes('missing primary'))).toBe(true)
 		expect(renderedMessages.some((message) => message.includes('demo-worker-next.example-subdomain.workers.dev'))).toBe(true)
-		expect(renderedMessages.some((message) => message.includes('Preview scopes are derived from live worker names'))).toBe(true)
+		expect(renderedMessages.some((message) => message.includes('Preview scopes are derived from live dedicated preview Worker names'))).toBe(true)
 		expect(renderedMessages.some((message) => message.includes('┌ worker demo-worker-next'))).toBe(false)
 	})
 

@@ -1,11 +1,5 @@
 import type { PreviewIdentifierSource } from '../../../config'
 import { cleanupPreviewScopedResources } from '../../../config/preview-resources'
-import type {
-	DevflareDeploymentRecord,
-	DevflarePreviewScopeRecord,
-	DevflarePreviewRecord,
-	PreviewRegistryContext
-} from '../../../cloudflare'
 
 export const PREVIEW_SUBCOMMANDS = ['list', 'bindings', 'cleanup'] as const
 
@@ -41,14 +35,6 @@ export interface TableColumn<Row> {
 	value: (row: Row) => string
 }
 
-export interface WorkerDisplayGroup {
-	workerName: string
-	previews: DevflarePreviewRecord[]
-	scopes: DevflarePreviewScopeRecord[]
-	deployments: DevflareDeploymentRecord[]
-	latestTimestamp: number
-}
-
 export interface ConfiguredWorkerFamilyMember {
 	baseName: string
 	roleLabel: string
@@ -78,7 +64,7 @@ export interface PreviewScopeRow {
 	scope: string
 	strategy: 'dedicated workers'
 	workersLabel: string
-	status: 'ready' | 'partial' | 'active' | 'deleted' | 'superseded' | 'reassigned' | 'orphaned' | 'rolled_back'
+	status: 'ready' | 'partial'
 	updatedAt?: Date
 	notes?: string
 	entryUrl?: string
@@ -95,21 +81,4 @@ export interface PreviewCleanupTarget {
 export interface PreviewCleanupExecution {
 	target?: PreviewCleanupTarget
 	result: Awaited<ReturnType<typeof cleanupPreviewScopedResources>>
-}
-
-export interface PreviewStateScope {
-	workerFamilyName?: string
-	workerName?: string
-}
-
-export interface PreviewRegistryRows {
-	previews: DevflarePreviewRecord[]
-	scopes: DevflarePreviewScopeRecord[]
-	deployments: DevflareDeploymentRecord[]
-}
-
-export interface PreviewRegistryDisplayOptions {
-	registry: PreviewRegistryContext
-	includeAll: boolean
-	theme: PreviewOutputTheme
 }

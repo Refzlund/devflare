@@ -201,7 +201,7 @@ describe('runCli', () => {
 
 		expect(result.exitCode).toBe(0)
 		expect(result.output).toContain('devflare previews cleanup [--config <path>] [--env <name>] [--scope <name> | --all] [--account <id>] [--apply]')
-		expect(result.output).toContain('--scope <name> — Clean one preview scope instead of the default synthetic `preview` scope')
+		expect(result.output).toContain('--scope <name> — Clean one preview scope instead of the default `preview` scope')
 		expect(result.output).not.toContain('preview registry')
 	})
 
@@ -223,8 +223,8 @@ describe('runCli', () => {
 
 		expect(result.exitCode).toBe(0)
 		expect(result.output).toContain('devflare previews cleanup Delete preview-only Worker scripts and preview-scoped Cloudflare resources')
-		expect(result.output).toContain('--scope <name> — Clean one preview scope instead of the default synthetic `preview` scope')
-		expect(result.output).toContain('--all — Clean every discovered preview scope for the current worker family')
+		expect(result.output).toContain('--scope <name> — Clean one preview scope instead of the default `preview` scope')
+		expect(result.output).toContain('--all — Clean every live preview scope Devflare can discover for the current worker family')
 		expect(result.output).toContain('--apply — Apply the cleanup instead of doing a dry run')
 		expect(result.output).toContain('Dedicated preview Worker scripts are candidates only when their names resolve to the targeted preview scope')
 	})

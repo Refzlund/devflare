@@ -17,7 +17,7 @@ export const PREVIEW_HELP_PAGES: HelpPage[] = [
 		],
 		description: [
 			'The default view resolves the current worker family from local config, or scans child `devflare.config.*` files when you run it from a monorepo root, then inspects live Cloudflare Workers and groups dedicated preview Worker names into preview scopes such as `next` or `pr-42`.',
-			'Use `bindings` to inspect preview-scoped resource associations for one scope, or `cleanup` to delete dedicated preview Workers plus preview-only Cloudflare resources for one scope or every discovered scope.'
+			'Use `bindings` to inspect preview-scoped resource associations for one scope, or `cleanup` to delete dedicated preview Workers plus preview-only Cloudflare resources for one scope or every live scope Devflare can discover from Worker names.'
 		],
 		subcommands: [
 			entry('list', 'List stable workers plus dedicated preview scopes for the current worker family (default)'),
@@ -29,7 +29,7 @@ export const PREVIEW_HELP_PAGES: HelpPage[] = [
 			entry('--config <path>', 'Use a specific devflare config file for config-aware preview commands'),
 			entry('--env <name>', 'Resolve a non-default `config.env[name]` before config-aware preview commands when your preview bindings live outside `env.preview`'),
 			entry('--scope <name>', 'Resolve preview-scoped names for a specific identifier on config-aware preview commands'),
-			entry('--all', 'Clean every discovered preview scope for the current worker family when used with `cleanup`'),
+			entry('--all', 'Clean every live preview scope Devflare can discover for the current worker family when used with `cleanup`'),
 			entry('--apply', 'Execute cleanup instead of doing a dry run'),
 			entry('--worker <name>', 'Override the primary worker name shown in the `bindings` report header')
 		],
@@ -38,12 +38,13 @@ export const PREVIEW_HELP_PAGES: HelpPage[] = [
 			entry('devflare previews --account <id>', 'List preview scopes for every configured package when run from a monorepo root'),
 			entry('devflare previews bindings --scope next', 'Inspect the `next` preview scope and its live worker associations'),
 			entry('devflare previews cleanup --scope next --apply', 'Delete preview-only resources and dedicated Workers for the `next` scope'),
-			entry('devflare previews cleanup --all --apply', 'Delete preview-only resources and dedicated Workers for every discovered preview scope')
+			entry('devflare previews cleanup --all --apply', 'Delete preview-only resources and dedicated Workers for every live discovered preview scope')
 		],
 		notes: [
 			'The default `list` view can aggregate every configured package from a monorepo root. `bindings` and `cleanup` still need one configured package, so run them inside that package or pass `--config <path>`.',
 			'`bindings` and `cleanup` default to preview-oriented config resolution already, so `--env preview` is usually redundant unless your project stores preview bindings under a different env key.',
 			'`cleanup` removes preview-only Cloudflare resources for the targeted scope and also deletes dedicated preview-scope Worker scripts when that scope is deployed as its own Worker family. Service bindings, Durable Object bindings, and routes attached only to those dedicated preview Workers disappear with them.',
+			'`cleanup --all` only targets live preview scopes Devflare can discover from Worker names. Use `--scope <name>` when you need to clean one scope explicitly, even if its dedicated preview Workers are already gone.',
 			'Stable shared Workers are never deleted by `cleanup`.'
 		]
 	},
@@ -60,7 +61,7 @@ export const PREVIEW_HELP_PAGES: HelpPage[] = [
 		[
 			entry('--config <path>', 'Use a specific devflare config file'),
 			entry('--env <name>', 'Resolve `config.env[name]` before discovering the worker family'),
-			entry('--account <id>', 'Use a specific Cloudflare account'),
+			entry('--account <id>', 'Use a specific Cloudflare account')
 		],
 		[
 			entry('devflare previews', 'List stable workers and active preview scopes for the current package'),
@@ -105,24 +106,24 @@ export const PREVIEW_HELP_PAGES: HelpPage[] = [
 		],
 		[
 			'Resolves preview-scoped resource names from the current config, deletes dedicated preview Worker scripts for the targeted scope when they exist, and removes matching preview-only Cloudflare resources from the selected account. Preview-only service bindings, Durable Object bindings, and routes attached exclusively to those dedicated Workers disappear with them.',
-			'Use `--scope <name>` for one preview scope or `--all` to iterate every discovered preview scope for the current worker family.'
+			'Use `--scope <name>` for one preview scope or `--all` to iterate every live preview scope Devflare can discover for the current worker family.'
 		],
 		[
 			entry('--config <path>', 'Use a specific devflare config file'),
 			entry('--env <name>', 'Resolve a non-default `config.env[name]` before cleanup when your preview bindings live outside `env.preview`'),
-			entry('--scope <name>', 'Clean one preview scope instead of the default synthetic `preview` scope'),
-			entry('--all', 'Clean every discovered preview scope for the current worker family'),
+			entry('--scope <name>', 'Clean one preview scope instead of the default `preview` scope'),
+			entry('--all', 'Clean every live preview scope Devflare can discover for the current worker family'),
 			entry('--account <id>', 'Use a specific Cloudflare account'),
 			entry('--apply', 'Apply the cleanup instead of doing a dry run')
 		],
 		[
 			entry('devflare previews cleanup --scope next', 'Show which dedicated Workers and preview-only resources belong to the `next` scope'),
-			entry('devflare previews cleanup --all', 'Show the cleanup plan for every discovered preview scope'),
-			entry('devflare previews cleanup --all --apply', 'Delete dedicated preview Workers and preview-only resources for every discovered preview scope')
+			entry('devflare previews cleanup --all', 'Show the cleanup plan for every live discovered preview scope'),
+			entry('devflare previews cleanup --all --apply', 'Delete dedicated preview Workers and preview-only resources for every live discovered preview scope')
 		],
 		[
 			'Dedicated preview Worker scripts are candidates only when their names resolve to the targeted preview scope. Stable shared Workers are never deleted.',
-			'Without `--scope`, the command defaults to the synthetic `preview` scope. Use `--all` when you want every discovered preview scope instead of just that default.',
+			'Without `--scope`, the command defaults to the `preview` scope. Use `--all` when you want every live preview scope Devflare can discover instead of just that default.',
 			'Deleting dedicated preview Worker scripts removes preview-only service bindings, Durable Object bindings, and routes owned solely by those Workers.',
 			'Omit `--env preview` unless your config stores preview bindings under a different env key.',
 			'Analytics Engine datasets and Browser Rendering bindings are intentionally reported as warnings instead of deleted resources.'

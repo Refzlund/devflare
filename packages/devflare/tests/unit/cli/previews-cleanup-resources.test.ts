@@ -74,13 +74,7 @@ describe('previews command', () => {
 			const url = String(input)
 
 			if (url.includes('/accounts/acc_123/d1/database?page=1&per_page=50')) {
-				return jsonResponse([], {
-					page: 1,
-					per_page: 50,
-					total_pages: 1,
-					count: 0,
-					total_count: 0
-				})
+				throw new Error('previews cleanup should not query preview-registry D1 state')
 			}
 
 			if (url.includes('/accounts/acc_123/workers/scripts?page=1&per_page=50')) {
@@ -134,13 +128,7 @@ describe('previews command', () => {
 			const url = String(input)
 
 			if (url.includes('/accounts/acc_123/d1/database?page=1&per_page=50')) {
-				return jsonResponse([], {
-					page: 1,
-					per_page: 50,
-					total_pages: 1,
-					count: 0,
-					total_count: 0
-				})
+				throw new Error('previews cleanup should not query preview-registry D1 state')
 			}
 
 			if (url.includes('/accounts/acc_123/workers/scripts?page=1&per_page=50')) {
@@ -200,7 +188,7 @@ describe('previews command', () => {
 		expect(renderedMessages.some((message) => message.includes('next') && message.includes('dedicated workers') && message.includes('Workers 1'))).toBe(true)
 	})
 
-	test('cleanup uses --all to clean every discovered preview scope', async () => {
+	test('cleanup uses --all to clean every live discovered preview scope', async () => {
 		process.env.CLOUDFLARE_API_TOKEN = 'cf_test_token'
 		const projectDir = temporaryCacheDirectories.create('devflare-previews-cleanup-all-')
 		writeKvCleanupProject(projectDir, 'demo-preview-cleanup-all')
@@ -209,13 +197,7 @@ describe('previews command', () => {
 			const url = String(input)
 
 			if (url.includes('/accounts/acc_123/d1/database?page=1&per_page=50')) {
-				return jsonResponse([], {
-					page: 1,
-					per_page: 50,
-					total_pages: 1,
-					count: 0,
-					total_count: 0
-				})
+				throw new Error('previews cleanup should not query preview-registry D1 state')
 			}
 
 			if (url.includes('/accounts/acc_123/workers/scripts?page=1&per_page=50')) {
@@ -273,13 +255,13 @@ describe('previews command', () => {
 		const renderedMessages = renderMessages(logger)
 
 		expect(result.exitCode).toBe(0)
-		expect(renderedMessages.some((message) => message.includes('preview scopes next, pr-1, preview (--all)'))).toBe(true)
-		expect(renderedMessages.some((message) => message.includes('Preview cleanup dry run complete with 3 candidates across 3 preview scopes'))).toBe(true)
+		expect(renderedMessages.some((message) => message.includes('preview scopes next, pr-1 (--all)'))).toBe(true)
+		expect(renderedMessages.some((message) => message.includes('Preview cleanup dry run complete with 3 candidates across 2 preview scopes'))).toBe(true)
 		expect(renderedMessages.some((message) => message.includes('Candidates: Workers 2 · KV 1'))).toBe(true)
 		expect(renderedMessages.some((message) => message.includes('scope breakdown'))).toBe(true)
 		expect(renderedMessages.some((message) => message.includes('next') && message.includes('dedicated workers') && message.includes('Workers 1'))).toBe(true)
 		expect(renderedMessages.some((message) => message.includes('pr-1') && message.includes('dedicated workers') && message.includes('Workers 1'))).toBe(true)
-		expect(renderedMessages.some((message) => message.includes('preview') && message.includes('default preview scope'))).toBe(true)
+		expect(renderedMessages.some((message) => message.includes('preview') && message.includes('default preview scope'))).toBe(false)
 	})
 
 	test('cleanup deletes preview worker consumers before preview service providers', async () => {
@@ -294,13 +276,7 @@ describe('previews command', () => {
 			const url = String(input)
 
 			if (url.includes('/accounts/acc_123/d1/database?page=1&per_page=50')) {
-				return jsonResponse([], {
-					page: 1,
-					per_page: 50,
-					total_pages: 1,
-					count: 0,
-					total_count: 0
-				})
+				throw new Error('previews cleanup should not query preview-registry D1 state')
 			}
 
 			if (url.includes('/accounts/acc_123/workers/scripts?page=1&per_page=50')) {

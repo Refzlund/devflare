@@ -1,15 +1,9 @@
 import type { ConsolaInstance } from 'consola'
-import {
-	account,
-	retirePreviewRegistry
-} from '../../../cloudflare'
 import { dim, green, logLine } from './theme'
 import type {
-	ConfiguredWorkerFamilyMember,
 	PreviewCleanupExecution,
 	PreviewCleanupTarget,
 	PreviewOutputTheme,
-	PreviewScopeRow,
 	PreviewScopeSelection
 } from './types'
 
@@ -27,18 +21,11 @@ function comparePreviewCleanupScopeNames(left: string, right: string): number {
 
 export function buildPreviewCleanupTarget(
 	scope: string,
-	scopeRows: PreviewScopeRow[],
 	workerCandidatesByScope: Map<string, string[]>,
 	environment: string | undefined
 ): PreviewCleanupTarget {
 	const strategies = new Set<PreviewCleanupTarget['strategies'][number]>()
 	const workerNames = [...(workerCandidatesByScope.get(scope) ?? [])]
-
-	for (const row of scopeRows) {
-		if (row.scope === scope) {
-			strategies.add(row.strategy)
-		}
-	}
 
 	if (workerNames.length > 0) {
 		strategies.add('dedicated workers')
@@ -56,27 +43,18 @@ export function buildPreviewCleanupTarget(
 }
 
 export function buildPreviewCleanupTargets(
-	scopeRows: PreviewScopeRow[],
 	workerCandidatesByScope: Map<string, string[]>,
 	environment: string | undefined
 ): PreviewCleanupTarget[] {
 	const scopeNames = new Set<string>()
 
-	for (const row of scopeRows) {
-		scopeNames.add(row.scope)
-	}
-
 	for (const scope of workerCandidatesByScope.keys()) {
 		scopeNames.add(scope)
 	}
 
-	if (environment === 'preview') {
-		scopeNames.add('preview')
-	}
-
 	return Array.from(scopeNames)
 		.sort(comparePreviewCleanupScopeNames)
-		.map((scope) => buildPreviewCleanupTarget(scope, scopeRows, workerCandidatesByScope, environment))
+		.map((scope) => buildPreviewCleanupTarget(scope, workerCandidatesByScope, environment))
 }
 
 export function getPreviewCleanupResourceCandidateCount(
@@ -150,35 +128,6 @@ export function logPreviewCleanupScopeBreakdown(
 	logLine(logger)
 }
 
-export async function retireDeletedPreviewWorkers(
-	accountId: string,
-	databaseName: string | undefined,
-	scope: string,
-	workerNames: string[]
-): Promise<void> {
-	const registry = await account.getPreviewRegistryContext({
-		accountId,
-		databaseName,
-		apiOptions: { timeout: 10000 },
-		skipContextCache: true
-	})
-
-	if (!registry) {
-		return
-	}
-
-	for (const workerName of workerNames) {
-		await retirePreviewRegistry({
-			accountId,
-			workerName,
-			databaseName,
-			apiOptions: { timeout: 10000 },
-			previewScope: scope,
-			apply: true
-		})
-	}
-}
-
 export function showNoPreviewCleanupCandidatesHint(
 	logger: ConsolaInstance,
 	selection: PreviewScopeSelection | undefined,
@@ -187,7 +136,7 @@ export function showNoPreviewCleanupCandidatesHint(
 ): void {
 	if (includeAll) {
 		logger.warn(
-			'No preview-only resources or dedicated preview Worker scripts were discovered across the resolved preview scopes. This usually means those previews were already cleaned up or the remaining previews only share stable Workers and shared account resources.'
+			'No preview-only resources or dedicated preview Worker scripts were discovered across the live preview scopes Devflare could resolve. This usually means those previews were already cleaned up or the remaining previews only share stable Workers and shared account resources.'
 		)
 		return
 	}
@@ -206,23 +155,4 @@ export function showNoPreviewCleanupCandidatesHint(
 	logger.warn(
 		`No preview-only resources or dedicated preview Worker scripts matched the resolved "${selection.identifier}" scope. This usually means that scope was already cleaned up or the preview shares stable Workers without preview.scope() resources of its own.`
 	)
-}
-
-export function describeCleanupTargetStrategies(
-	target: PreviewCleanupTarget,
-	families: ConfiguredWorkerFamilyMember[]
-): string | undefined {
-	if (target.workerNames.length === 0) {
-		return undefined
-	}
-
-	const familyLabels = families
-		.filter((family) => target.workerNames.some((workerName) => workerName === `${family.baseName}-${target.scope}`))
-		.map((family) => family.role === 'primary' ? 'primary' : family.roleLabel)
-
-	if (familyLabels.length === 0) {
-		return undefined
-	}
-
-	return `${target.workerNames.length} worker(s): ${familyLabels.join(', ')}`
 }
