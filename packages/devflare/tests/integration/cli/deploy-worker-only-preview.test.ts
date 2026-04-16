@@ -70,7 +70,7 @@ describe('build/deploy worker-only behavior', () => {
 		await access(join(projectDir, '.wrangler', 'deploy', 'config.json'))
 	})
 
-	test('deploy prefers the local wrangler package over bunx when it is installed in the project', async () => {
+	test('deploy runs the local wrangler package with node when it is installed in the project', async () => {
 		await writeProjectFiles(projectDir, { withViteConfig: false, withViteDeps: false })
 		await mkdir(join(projectDir, 'node_modules', 'wrangler', 'bin'), { recursive: true })
 		await writeFile(join(projectDir, 'node_modules', 'wrangler', 'package.json'), JSON.stringify({
@@ -106,12 +106,12 @@ console.log('stub wrangler binary')
 
 		expect(result.exitCode).toBe(0)
 		const deployExecution = executions.find(({ args }) => args.at(-1) === 'deploy')
-		expect(deployExecution?.command).toBe('bun')
+		expect(deployExecution?.command).toBe('node')
 		expect(deployExecution?.args[0]?.replace(/\\/g, '/')).toBe(`${projectDir.replace(/\\/g, '/')}/node_modules/wrangler/bin/wrangler.js`)
 		expect(deployExecution?.args.slice(1)).toEqual(['deploy'])
 	})
 
-	test('deploy prefers a local wrangler package installed in an ancestor workspace directory', async () => {
+	test('deploy runs a local wrangler package from an ancestor workspace directory with node', async () => {
 		const workspaceDir = join(projectDir, 'workspace')
 		const workerDir = join(workspaceDir, 'workers', 'auth-service')
 		await mkdir(workerDir, { recursive: true })
@@ -150,7 +150,7 @@ console.log('stub wrangler binary')
 
 		expect(result.exitCode).toBe(0)
 		const deployExecution = executions.find(({ args }) => args.at(-1) === 'deploy')
-		expect(deployExecution?.command).toBe('bun')
+		expect(deployExecution?.command).toBe('node')
 		expect(deployExecution?.args[0]?.replace(/\\/g, '/')).toBe(`${workspaceDir.replace(/\\/g, '/')}/node_modules/wrangler/bin/wrangler.js`)
 		expect(deployExecution?.args.slice(1)).toEqual(['deploy'])
 	})

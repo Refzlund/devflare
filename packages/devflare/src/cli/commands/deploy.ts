@@ -448,7 +448,7 @@ export async function runDeployCommand(
 			)
 			await deps.fs.mkdir(wranglerOutputDirectory, { recursive: true })
 
-			const wranglerCommand = localWranglerExecutable ? 'bun' : 'bunx'
+			const wranglerCommand = localWranglerExecutable ? 'node' : 'bunx'
 			const wranglerArgs = preview
 				? localWranglerExecutable
 					? [localWranglerExecutable, 'versions', 'upload']

@@ -70,12 +70,12 @@ jobs:
           set -euo pipefail
 
           for attempt in 1 2 3 4 5 6 7 8 9 10; do
-            payload="$(curl --fail --silent --show-error --location "${DOCUMENTATION_LIVE_URL}/build.json?attempt=${attempt}")"
-
-            if printf '%s' "$payload" | grep -Fq "$EXPECTED_BUILD_SHA"; then
-              echo 'verified=true' >> "$GITHUB_OUTPUT"
-              echo "Verified live production build metadata exposes build SHA ${EXPECTED_BUILD_SHA}."
-              exit 0
+            if payload="$(curl --fail --silent --show-error --location "${DOCUMENTATION_LIVE_URL}/build.json?attempt=${attempt}")"; then
+              if printf '%s' "$payload" | grep -Fq "$EXPECTED_BUILD_SHA"; then
+                echo 'verified=true' >> "$GITHUB_OUTPUT"
+                echo "Verified live production build metadata exposes build SHA ${EXPECTED_BUILD_SHA}."
+                exit 0
+              fi
             fi
 
             if [ "$attempt" -lt 10 ]; then
