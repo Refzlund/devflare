@@ -11,6 +11,12 @@ on:
       - "package.json"
       - "bun.lock"
       - "turbo.json"
+      - ".github/actions/devflare-deploy/**"
+      - ".github/actions/devflare-deploy-impact/**"
+      - ".github/actions/devflare-github-feedback/**"
+      - ".github/actions/devflare-setup-workspace/**"
+      - ".github/scripts/resolve-deploy-impact.mjs"
+      - ".github/workflows/documentation-production.yml"
   workflow_dispatch:
 
 permissions:
@@ -112,34 +118,48 @@ jobs:
         if: ${{ always() }}
         shell: bash
         run: |
-          {
-            echo '### Documentation production workflow'
-            echo ''
-            echo '- Deploy target: explicit production via `--prod`'
-            echo "- Impact decision: \`${{ steps.impact.outputs.should-deploy == 'true' && 'deploy' || 'skip' }}\`"
-            echo "- Impact reason: ${{ steps.impact.outputs.reason }}"
-            if [ "${{ steps.impact.outputs.should-deploy }}" != 'true' ]; then
-              echo '- Deployment verification: skipped because the documentation workspace and its dependencies were unaffected'
-              echo '- GitHub feedback: skipped because no new deployment was needed'
-              echo "- Final status: \`skipped\`"
-              echo "- Production URL: $DOCUMENTATION_PRODUCTION_URL"
-            else
-              echo '- Deployment verification: handled by the deploy action via Cloudflare control-plane checks'
-              echo "- Live URL verification: ${{ steps.verify-live.outcome == 'success' && 'current build SHA observed on production' || (steps.verify-live.outcome == 'failure' && 'expected build SHA not visible on production' || 'skipped') }}"
-              echo '- GitHub feedback: production deployment status published'
-              echo "- Final status: \`${{ steps.deploy.outputs.status == 'success' && steps.verify-live.outcome != 'failure' && 'success' || 'failure' }}\`"
-              echo "- Production URL: ${{ steps.deploy.outputs.preview-url || env.DOCUMENTATION_PRODUCTION_URL }}"
-              if [ -n "${{ steps.deploy.outputs.failure-stage }}" ]; then
-                echo "- Failure stage: \`${{ steps.deploy.outputs.failure-stage }}\`"
-              fi
-              if [ -n "${{ steps.deploy.outputs.exit-code }}" ]; then
-                echo "- Exit code: \`${{ steps.deploy.outputs.exit-code }}\`"
-              fi
-              if [ -n "${{ steps.deploy.outputs.version-id }}" ]; then
-                echo "- Version ID: \`${{ steps.deploy.outputs.version-id }}\`"
-              fi
+          cat <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          ### Documentation production workflow
+
+          - Deploy target: explicit production via `--prod`
+          - Impact decision: `${{ steps.impact.outputs.should-deploy == 'true' && 'deploy' || 'skip' }}`
+          - Impact reason: ${{ steps.impact.outputs.reason }}
+          EOF
+
+          if [ "${{ steps.impact.outputs.should-deploy }}" != 'true' ]; then
+            cat <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          - Deployment verification: skipped because the documentation workspace and its dependencies were unaffected
+          - GitHub feedback: skipped because no new deployment was needed
+          - Final status: `skipped`
+          - Production URL: ${{ env.DOCUMENTATION_PRODUCTION_URL }}
+          EOF
+          else
+            cat <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          - Deployment verification: handled by the deploy action via Cloudflare control-plane checks
+          - Live URL verification: ${{ steps.verify-live.outcome == 'success' && 'current build SHA observed on production' || (steps.verify-live.outcome == 'failure' && 'expected build SHA not visible on production' || 'skipped') }}
+          - GitHub feedback: production deployment status published
+          - Final status: `${{ steps.deploy.outputs.status == 'success' && steps.verify-live.outcome != 'failure' && 'success' || 'failure' }}`
+          - Production URL: ${{ steps.deploy.outputs.preview-url || env.DOCUMENTATION_PRODUCTION_URL }}
+          EOF
+
+            if [ -n "${{ steps.deploy.outputs.failure-stage }}" ]; then
+              cat <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          - Failure stage: `${{ steps.deploy.outputs.failure-stage }}`
+          EOF
             fi
-          } >> "$GITHUB_STEP_SUMMARY"
+
+            if [ -n "${{ steps.deploy.outputs.exit-code }}" ]; then
+              cat <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          - Exit code: `${{ steps.deploy.outputs.exit-code }}`
+          EOF
+            fi
+
+            if [ -n "${{ steps.deploy.outputs.version-id }}" ]; then
+              cat <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          - Version ID: `${{ steps.deploy.outputs.version-id }}`
+          EOF
+            fi
+          fi
 
       - name: Fail when documentation production deploy did not succeed
         if: ${{ steps.impact.outputs.should-deploy == 'true' && (steps.deploy.outputs.status != 'success' || steps.deploy.outcome == 'failure' || steps.verify-live.outcome == 'failure') }}

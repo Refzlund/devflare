@@ -381,20 +381,26 @@ jobs:
         if: ${{ always() }}
         shell: bash
         run: |
-          {
-            echo '### Documentation preview'
-            echo ''
-            echo "- Impact decision: \`${{ steps.impact.outputs.should-deploy == 'true' && 'deploy' || 'skip' }}\`"
-            echo "- Impact reason: ${{ steps.impact.outputs.reason }}"
-            echo "- Branch target: \`${{ needs.resolve-context.outputs.branch-preview-enabled == 'true' && needs.resolve-context.outputs.branch-preview-scope || 'disabled' }}\`"
-            echo "- PR target: \`${{ needs.resolve-context.outputs.pr-preview-enabled == 'true' && needs.resolve-context.outputs.pr-preview-scope || 'disabled' }}\`"
-            if [ "${{ needs.resolve-context.outputs.branch-preview-enabled }}" = 'true' ]; then
-              echo "- Branch preview status: \`${{ steps.impact.outputs.should-deploy != 'true' && 'skipped' || (steps.branch-deploy.outputs.status == 'success' && steps.branch-validate.outcome != 'failure' && steps.branch-content.outcome != 'failure' && 'success' || 'failure') }}\`"
-            fi
-            if [ "${{ needs.resolve-context.outputs.pr-preview-enabled }}" = 'true' ]; then
-              echo "- PR preview status: \`${{ steps.impact.outputs.should-deploy != 'true' && 'skipped' || (steps.pr-deploy.outputs.status == 'success' && steps.pr-validate.outcome != 'failure' && steps.pr-content.outcome != 'failure' && 'success' || 'failure') }}\`"
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
+          cat <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          ### Documentation preview
+
+          - Impact decision: `${{ steps.impact.outputs.should-deploy == 'true' && 'deploy' || 'skip' }}`
+          - Impact reason: ${{ steps.impact.outputs.reason }}
+          - Branch target: `${{ needs.resolve-context.outputs.branch-preview-enabled == 'true' && needs.resolve-context.outputs.branch-preview-scope || 'disabled' }}`
+          - PR target: `${{ needs.resolve-context.outputs.pr-preview-enabled == 'true' && needs.resolve-context.outputs.pr-preview-scope || 'disabled' }}`
+          EOF
+
+          if [ "${{ needs.resolve-context.outputs.branch-preview-enabled }}" = 'true' ]; then
+            cat <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          - Branch preview status: `${{ steps.impact.outputs.should-deploy != 'true' && 'skipped' || (steps.branch-deploy.outputs.status == 'success' && steps.branch-validate.outcome != 'failure' && steps.branch-content.outcome != 'failure' && 'success' || 'failure') }}`
+          EOF
+          fi
+
+          if [ "${{ needs.resolve-context.outputs.pr-preview-enabled }}" = 'true' ]; then
+            cat <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          - PR preview status: `${{ steps.impact.outputs.should-deploy != 'true' && 'skipped' || (steps.pr-deploy.outputs.status == 'success' && steps.pr-validate.outcome != 'failure' && steps.pr-content.outcome != 'failure' && 'success' || 'failure') }}`
+          EOF
+          fi
 
       - name: Fail when documentation preview deploy did not succeed
         if: ${{ always() && steps.impact.outputs.should-deploy == 'true' && ((needs.resolve-context.outputs.branch-preview-enabled == 'true' && (steps.branch-deploy.outputs.status != 'success' || steps.branch-deploy.outcome == 'failure' || steps.branch-validate.outcome == 'failure' || steps.branch-content.outcome == 'failure')) || (needs.resolve-context.outputs.pr-preview-enabled == 'true' && (steps.pr-deploy.outputs.status != 'success' || steps.pr-deploy.outcome == 'failure' || steps.pr-validate.outcome == 'failure' || steps.pr-content.outcome == 'failure'))) }}
@@ -491,12 +497,12 @@ jobs:
         if: ${{ always() }}
         shell: bash
         run: |
-          {
-            echo '### Documentation cleanup'
-            echo ''
-            echo "- Branch cleanup: \`${{ needs.resolve-context.outputs.branch-cleanup-enabled == 'true' && needs.resolve-context.outputs.branch-preview-scope || 'not requested' }}\`"
-            echo "- PR cleanup: \`${{ needs.resolve-context.outputs.pr-cleanup-enabled == 'true' && needs.resolve-context.outputs.pr-preview-scope || 'not requested' }}\`"
-          } >> "$GITHUB_STEP_SUMMARY"
+          cat <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          ### Documentation cleanup
+
+          - Branch cleanup: `${{ needs.resolve-context.outputs.branch-cleanup-enabled == 'true' && needs.resolve-context.outputs.branch-preview-scope || 'not requested' }}`
+          - PR cleanup: `${{ needs.resolve-context.outputs.pr-cleanup-enabled == 'true' && needs.resolve-context.outputs.pr-preview-scope || 'not requested' }}`
+          EOF
 
   testing-preview:
     name: Testing preview
@@ -751,21 +757,27 @@ jobs:
         if: ${{ always() }}
         shell: bash
         run: |
-          {
-            echo '### Testing preview'
-            echo ''
-            echo "- Auth impact: \`${{ steps.auth-impact.outputs.should-deploy == 'true' && 'deploy' || 'skip' }}\` (`${{ steps.auth-impact.outputs.reason }}`)"
-            echo "- Search impact: \`${{ steps.search-impact.outputs.should-deploy == 'true' && 'deploy' || 'skip' }}\` (`${{ steps.search-impact.outputs.reason }}`)"
-            echo "- Main preview impact: \`${{ steps.main-impact.outputs.should-deploy == 'true' && 'deploy' || 'skip' }}\` (`${{ steps.main-impact.outputs.reason }}`)"
-            echo "- Branch target: \`${{ needs.resolve-context.outputs.branch-preview-enabled == 'true' && needs.resolve-context.outputs.branch-preview-scope || 'disabled' }}\`"
-            echo "- PR target: \`${{ needs.resolve-context.outputs.pr-preview-enabled == 'true' && needs.resolve-context.outputs.pr-preview-scope || 'disabled' }}\`"
-            if [ "${{ needs.resolve-context.outputs.branch-preview-enabled }}" = 'true' ]; then
-              echo "- Branch preview status: \`${{ (steps.auth-impact.outputs.should-deploy != 'true' || steps.branch-auth.outputs.status == 'success') && (steps.search-impact.outputs.should-deploy != 'true' || steps.branch-search.outputs.status == 'success') && (steps.main-impact.outputs.should-deploy != 'true' || (steps.branch-deploy.outputs.status == 'success' && steps.branch-verify.outcome == 'success')) && 'success' || 'failure' }}\`"
-            fi
-            if [ "${{ needs.resolve-context.outputs.pr-preview-enabled }}" = 'true' ]; then
-              echo "- PR preview status: \`${{ (steps.auth-impact.outputs.should-deploy != 'true' && steps.search-impact.outputs.should-deploy != 'true' && steps.main-impact.outputs.should-deploy != 'true') && 'skipped' || (((steps.auth-impact.outputs.should-deploy != 'true' || steps.pr-auth.outputs.status == 'success') && (steps.search-impact.outputs.should-deploy != 'true' || steps.pr-search.outputs.status == 'success') && (steps.main-impact.outputs.should-deploy != 'true' || (steps.pr-deploy.outputs.status == 'success' && steps.pr-verify.outcome == 'success'))) && 'success' || 'failure') }}\`"
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
+          cat <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          ### Testing preview
+
+          - Auth impact: `${{ steps.auth-impact.outputs.should-deploy == 'true' && 'deploy' || 'skip' }}` (`${{ steps.auth-impact.outputs.reason }}`)
+          - Search impact: `${{ steps.search-impact.outputs.should-deploy == 'true' && 'deploy' || 'skip' }}` (`${{ steps.search-impact.outputs.reason }}`)
+          - Main preview impact: `${{ steps.main-impact.outputs.should-deploy == 'true' && 'deploy' || 'skip' }}` (`${{ steps.main-impact.outputs.reason }}`)
+          - Branch target: `${{ needs.resolve-context.outputs.branch-preview-enabled == 'true' && needs.resolve-context.outputs.branch-preview-scope || 'disabled' }}`
+          - PR target: `${{ needs.resolve-context.outputs.pr-preview-enabled == 'true' && needs.resolve-context.outputs.pr-preview-scope || 'disabled' }}`
+          EOF
+
+          if [ "${{ needs.resolve-context.outputs.branch-preview-enabled }}" = 'true' ]; then
+            cat <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          - Branch preview status: `${{ (steps.auth-impact.outputs.should-deploy != 'true' || steps.branch-auth.outputs.status == 'success') && (steps.search-impact.outputs.should-deploy != 'true' || steps.branch-search.outputs.status == 'success') && (steps.main-impact.outputs.should-deploy != 'true' || (steps.branch-deploy.outputs.status == 'success' && steps.branch-verify.outcome == 'success')) && 'success' || 'failure' }}`
+          EOF
+          fi
+
+          if [ "${{ needs.resolve-context.outputs.pr-preview-enabled }}" = 'true' ]; then
+            cat <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          - PR preview status: `${{ (steps.auth-impact.outputs.should-deploy != 'true' && steps.search-impact.outputs.should-deploy != 'true' && steps.main-impact.outputs.should-deploy != 'true') && 'skipped' || (((steps.auth-impact.outputs.should-deploy != 'true' || steps.pr-auth.outputs.status == 'success') && (steps.search-impact.outputs.should-deploy != 'true' || steps.pr-search.outputs.status == 'success') && (steps.main-impact.outputs.should-deploy != 'true' || (steps.pr-deploy.outputs.status == 'success' && steps.pr-verify.outcome == 'success'))) && 'success' || 'failure') }}`
+          EOF
+          fi
 
       - name: Fail when any testing preview deploy or verification step did not succeed
         if: ${{ always() }}
@@ -915,9 +927,9 @@ jobs:
         if: ${{ always() }}
         shell: bash
         run: |
-          {
-            echo '### Testing cleanup'
-            echo ''
-            echo "- Branch cleanup: \`${{ needs.resolve-context.outputs.branch-cleanup-enabled == 'true' && needs.resolve-context.outputs.branch-preview-scope || 'not requested' }}\`"
-            echo "- PR cleanup: \`${{ needs.resolve-context.outputs.pr-cleanup-enabled == 'true' && needs.resolve-context.outputs.pr-preview-scope || 'not requested' }}\`"
-          } >> "$GITHUB_STEP_SUMMARY"
+          cat <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          ### Testing cleanup
+
+          - Branch cleanup: `${{ needs.resolve-context.outputs.branch-cleanup-enabled == 'true' && needs.resolve-context.outputs.branch-preview-scope || 'not requested' }}`
+          - PR cleanup: `${{ needs.resolve-context.outputs.pr-cleanup-enabled == 'true' && needs.resolve-context.outputs.pr-preview-scope || 'not requested' }}`
+          EOF

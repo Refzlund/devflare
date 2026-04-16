@@ -1,6 +1,7 @@
 import { appendFileSync, readdirSync, readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
-import { join, relative } from "node:path";
+import { fileURLToPath } from "node:url";
+import { join, relative, resolve as resolvePath } from "node:path";
 
 const ignoredDirectories = new Set([
 	".devflare",
@@ -14,6 +15,17 @@ const ignoredDirectories = new Set([
 ]);
 
 const rootDir = process.cwd();
+
+export const SHARED_DEPLOY_INFRASTRUCTURE_PATTERNS = [
+	".github/actions/devflare-deploy/**",
+	".github/actions/devflare-deploy-impact/**",
+	".github/actions/devflare-github-feedback/**",
+	".github/actions/devflare-setup-workspace/**",
+	".github/scripts/resolve-deploy-impact.mjs",
+	".github/scripts/verify-testing-preview-deployment.ts",
+	".github/workflows/documentation-production.yml",
+	".github/workflows/preview.yml",
+];
 
 function normalizePath(path) {
 	return path.replace(/\\+/g, "/").replace(/^\.\//, "").replace(/^\//, "");
@@ -163,8 +175,21 @@ function globToRegExp(glob) {
 	return new RegExp(`^${pattern}$`);
 }
 
-function matchesAnyPattern(filePath, patterns) {
+export function matchesAnyPattern(filePath, patterns) {
 	return patterns.some((pattern) => globToRegExp(pattern).test(filePath));
+}
+
+export function createGlobalDependencyPatterns(turboConfig) {
+	return [
+		...new Set(
+			[
+				"package.json",
+				"turbo.json",
+				...(turboConfig.globalDependencies ?? []),
+				...SHARED_DEPLOY_INFRASTRUCTURE_PATTERNS,
+			].map(normalizePath),
+		),
+	];
 }
 
 function readJson(relativePath) {
@@ -335,15 +360,7 @@ function main() {
 
 	const comparison = resolveComparisonRefs(cliArgs);
 	const changedFiles = resolveChangedFiles(cliArgs, comparison);
-	const globalPatterns = [
-		...new Set(
-			[
-				"package.json",
-				"turbo.json",
-				...(turboConfig.globalDependencies ?? []),
-			].map(normalizePath),
-		),
-	];
+	const globalPatterns = createGlobalDependencyPatterns(turboConfig);
 	const globalChangedFiles = changedFiles.filter((filePath) =>
 		matchesAnyPattern(filePath, globalPatterns)
 	);
@@ -463,4 +480,9 @@ function main() {
 	console.log(JSON.stringify(result, null, 2));
 }
 
-main();
+if (
+	process.argv[1] &&
+	fileURLToPath(import.meta.url) === resolvePath(process.argv[1])
+) {
+	main();
+}
