@@ -38,7 +38,7 @@ inputs:
     required: false
     default: "false"
   deploy-command:
-    description: "Optional command prefix used to invoke deploy from the target package, for example 'bun run deploy --'. When omitted, the action falls back to 'bunx --bun devflare deploy'."
+    description: "Optional command prefix used to invoke deploy from the target package, for example 'bun run deploy --'. When omitted, the action falls back to 'bunx devflare deploy'."
     required: false
     default: ""
   deploy-message:
@@ -215,7 +215,7 @@ runs:
 
         deploy_command="$INPUT_DEPLOY_COMMAND"
         if [ -z "$deploy_command" ]; then
-          deploy_command='bunx --bun devflare deploy'
+          deploy_command='bunx devflare deploy'
         fi
 
         deploy_log="$(mktemp)"

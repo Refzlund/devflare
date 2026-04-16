@@ -34,6 +34,22 @@ Analytics Engine        ANALYTICS               analytics-dataset
 		])
 	})
 
+	test('parses Wrangler version binding tables in the current compact binding/type format', () => {
+		const parsed = parseWranglerVersionBindings(`
+Binding                      Resource
+env.AUTH_SERVICE (demo-auth-service)             Worker
+env.SEARCH_INDEX (demo-search-index)             Vectorize Index
+env.APP_NAME ("demo-preview")                   Environment Variable
+Handlers:             fetch
+`.trim())
+
+		expect(parsed).toEqual([
+			{ type: 'Worker', bindingName: 'AUTH_SERVICE', resource: 'demo-auth-service' },
+			{ type: 'Vectorize Index', bindingName: 'SEARCH_INDEX', resource: 'demo-search-index' },
+			{ type: 'Environment Variable', bindingName: 'APP_NAME', resource: '"demo-preview"' }
+		])
+	})
+
 	test('parses Wrangler queue info output with inline and multiline worker lists', () => {
 		const parsed = parseWranglerQueueInfo(`
 Queue Name: jobs-queue

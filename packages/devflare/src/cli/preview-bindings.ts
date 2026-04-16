@@ -5,6 +5,8 @@ import type { ProcessRunner } from './dependencies'
 
 const WRANGLER_TEXT_COLUMNS_REGEX = /\s{2,}/
 
+type WranglerVersionBindingTableMode = 'legacy' | 'compact'
+
 export interface ParsedWranglerBindingRow {
 	type: string
 	bindingName: string
@@ -56,6 +58,31 @@ export interface InspectBindingAssociationsOptions {
 
 function normalizeCell(value: string | undefined): string {
 	return (value ?? '').trim().replace(/\s+/g, ' ')
+}
+
+function normalizeBindingName(value: string | undefined): string {
+	const normalized = normalizeCell(value)
+	return normalized.startsWith('env.') ? normalized.slice(4) : normalized
+}
+
+function parseCompactBindingLabel(value: string): {
+	bindingName: string
+	resource: string
+} {
+	const normalized = normalizeBindingName(value)
+	const match = normalized.match(/^(.*?)\s*\((.*)\)$/)
+
+	if (!match) {
+		return {
+			bindingName: normalized,
+			resource: ''
+		}
+	}
+
+	return {
+		bindingName: normalizeCell(match[1]),
+		resource: normalizeCell(match[2])
+	}
 }
 
 function buildAssociationKey(type: string, resource: string): string {
@@ -330,7 +357,7 @@ export function parseWranglerQueueInfo(output: string): ParsedQueueAssociation |
 export function parseWranglerVersionBindings(output: string): ParsedWranglerBindingRow[] {
 	const lines = output.split(/\r?\n/)
 	const bindings: ParsedWranglerBindingRow[] = []
-	let inBindingTable = false
+	let tableMode: WranglerVersionBindingTableMode | null = null
 
 	for (const rawLine of lines) {
 		const trimmed = rawLine.trim()
@@ -338,16 +365,39 @@ export function parseWranglerVersionBindings(output: string): ParsedWranglerBind
 			continue
 		}
 
-		if (/^(binding\s+type|type)\s{2,}/i.test(rawLine) || /^(binding\s+type|type)$/i.test(trimmed)) {
-			inBindingTable = true
+		if (/^binding\s{2,}resource$/i.test(trimmed)) {
+			tableMode = 'compact'
 			continue
 		}
 
-		if (!inBindingTable) {
+		if (/^(binding\s+type|type)(\s{2,}name)?\s{2,}resource$/i.test(trimmed) || /^(binding\s+type|type)$/i.test(trimmed)) {
+			tableMode = 'legacy'
+			continue
+		}
+
+		if (!tableMode) {
 			continue
 		}
 
 		if (/^-+$/.test(trimmed)) {
+			continue
+		}
+
+		if (tableMode === 'compact') {
+			const segments = trimmed.split(WRANGLER_TEXT_COLUMNS_REGEX).filter(Boolean)
+			if (segments[0]?.endsWith(':')) {
+				break
+			}
+
+			if (segments.length >= 2 && /^env\./i.test(segments[0])) {
+				const parsed = parseCompactBindingLabel(segments[0])
+				bindings.push({
+					type: normalizeCell(segments.slice(1).join('  ')),
+					bindingName: parsed.bindingName,
+					resource: parsed.resource
+				})
+			}
+
 			continue
 		}
 
@@ -367,7 +417,7 @@ export function parseWranglerVersionBindings(output: string): ParsedWranglerBind
 
 		bindings.push({
 			type: normalizeCell(type),
-			bindingName: normalizeCell(bindingName),
+			bindingName: normalizeBindingName(bindingName),
 			resource: normalizeCell(resourceParts.join('  '))
 		})
 	}

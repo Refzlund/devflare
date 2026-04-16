@@ -29,6 +29,11 @@ interface StoredSmokeResult {
 	results: Record<string, SmokeCheckResult>
 }
 
+interface StatusStateRead<T> {
+	value: T | null
+	error?: string
+}
+
 interface QueueBinding {
 	send(message: unknown, options?: unknown): Promise<void>
 }
@@ -220,13 +225,47 @@ function createBindingsSummary(env: TestingEnv): Record<string, unknown> {
 	}
 }
 
+async function readStatusState<T>(
+	getNamespace: () => KVNamespace | undefined,
+	key: string,
+	bindingName = 'SESSIONS'
+): Promise<StatusStateRead<T>> {
+	try {
+		const namespace = getNamespace()
+		if (!namespace) {
+			return {
+				value: null,
+				error: `${bindingName} binding is unavailable`
+			}
+		}
+
+		return {
+			value: await readJson<T>(namespace, key)
+		}
+	} catch (error) {
+		return {
+			value: null,
+			error: formatError(error)
+		}
+	}
+}
+
 async function buildStatusResponse(env: TestingEnv): Promise<Record<string, unknown>> {
 	const [lastSmokeResult, lastQueueJobs, lastQueueEmails, lastScheduledRun] = await Promise.all([
-		readJson<StoredSmokeResult>(env.SESSIONS, stateKeys.smokeResult),
-		readJson<StoredQueueResult>(env.SESSIONS, stateKeys.queueJobs),
-		readJson<StoredQueueResult>(env.SESSIONS, stateKeys.queueEmails),
-		readJson<StoredScheduledResult>(env.SESSIONS, stateKeys.scheduled)
+		readStatusState<StoredSmokeResult>(() => env.SESSIONS, stateKeys.smokeResult),
+		readStatusState<StoredQueueResult>(() => env.SESSIONS, stateKeys.queueJobs),
+		readStatusState<StoredQueueResult>(() => env.SESSIONS, stateKeys.queueEmails),
+		readStatusState<StoredScheduledResult>(() => env.SESSIONS, stateKeys.scheduled)
 	])
+
+	const stateReadErrors = Object.fromEntries(
+		Object.entries({
+			lastSmokeResult: lastSmokeResult.error,
+			lastQueueJobs: lastQueueJobs.error,
+			lastQueueEmails: lastQueueEmails.error,
+			lastScheduledRun: lastScheduledRun.error
+		}).filter(([, error]) => Boolean(error))
+	)
 
 	return {
 		appName: env.APP_NAME,
@@ -244,10 +283,15 @@ async function buildStatusResponse(env: TestingEnv): Promise<Record<string, unkn
 		hasSendEmailBindings: Boolean(env.TRANSACTIONAL_EMAIL && env.SUPPORT_EMAIL),
 		hasHyperdriveBinding: Boolean(env.POSTGRES),
 		bindings: createBindingsSummary(env),
-		lastSmokeResult,
-		lastQueueJobs,
-		lastQueueEmails,
-		lastScheduledRun
+		lastSmokeResult: lastSmokeResult.value,
+		lastQueueJobs: lastQueueJobs.value,
+		lastQueueEmails: lastQueueEmails.value,
+		lastScheduledRun: lastScheduledRun.value,
+		...(Object.keys(stateReadErrors).length > 0
+			? {
+				stateReadErrors
+			}
+			: {})
 	}
 }
 

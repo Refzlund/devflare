@@ -187,6 +187,22 @@ describe('invokeFetchHandler()', () => {
 
 		expect(await response.text()).toBe('123')
 	})
+
+	test('invokes worker-style request/env/ctx handlers', async () => {
+		const fetchEvent = createFetchEvent(
+			new Request('https://example.com/worker-style', { method: 'POST' }),
+			{ message: 'ok' },
+			createMockCtx()
+		)
+
+		const response = await runWithEventContext(fetchEvent, async () => {
+			return invokeFetchHandler(async (request, env, ctx) => {
+				return new Response(`${request.method}:${env.message}:${typeof ctx.waitUntil}`)
+			}, fetchEvent)
+		})
+
+		expect(await response.text()).toBe('POST:ok:function')
+	})
 })
 
 describe('createResolveFetch()', () => {
@@ -250,6 +266,26 @@ describe('createResolveFetch()', () => {
 		})
 
 		expect(await response.text()).toBe('42')
+	})
+
+	test('supports worker-style method handlers with request/env/ctx', async () => {
+		const fetchEvent = createFetchEvent(
+			new Request('https://example.com/api/worker-style', { method: 'GET' }),
+			{ message: 'ok' },
+			createMockCtx()
+		)
+
+		const response = await runWithEventContext(fetchEvent, async () => {
+			const resolve = createResolveFetch({
+				async GET(request, env, ctx) {
+					return new Response(`${request.method}:${env.message}:${typeof ctx.waitUntil}`)
+				}
+			}, null, fetchEvent)
+
+			return resolve(fetchEvent)
+		})
+
+		expect(await response.text()).toBe('GET:ok:function')
 	})
 })
 
@@ -360,6 +396,24 @@ describe('invokeFetchModule()', () => {
 
 		expect(order).toEqual(['before', 'fetch', 'after'])
 		expect(await response.text()).toBe('ok')
+	})
+
+	test('supports a worker-style named fetch(request, env) export as the primary module entry', async () => {
+		const fetchEvent = createFetchEvent(
+			new Request('https://example.com/worker-style-module', { method: 'PATCH' }),
+			{ message: 'ok' },
+			createMockCtx()
+		)
+
+		const response = await runWithEventContext(fetchEvent, async () => {
+			return invokeFetchModule({
+				async fetch(request, env) {
+					return new Response(`${request.method}:${env.message}`)
+				}
+			}, fetchEvent)
+		})
+
+		expect(await response.text()).toBe('PATCH:ok')
 	})
 
 	test('supports a default fetch(event) export', async () => {

@@ -124,6 +124,59 @@ function isResolveStyleFunction(handler: AnyFunction): boolean {
 	return secondParameter === 'resolve' || secondParameter.endsWith('resolve')
 }
 
+function normalizeParameterName(parameterName: string | undefined): string {
+	return parameterName?.trim().toLowerCase() ?? ''
+}
+
+function isParamsStyleFunction(handler: AnyFunction): boolean {
+	if (handler.length !== 2) {
+		return false
+	}
+
+	const parameterNames = getFunctionParameterNames(handler)
+	const secondParameter = normalizeParameterName(parameterNames[1])
+	return secondParameter === 'params' || secondParameter.endsWith('params')
+}
+
+function isRequestStyleParameterName(parameterName: string): boolean {
+	if (!parameterName || parameterName.startsWith('{') || parameterName.startsWith('[')) {
+		return false
+	}
+
+	return parameterName === 'request'
+		|| parameterName === 'req'
+		|| parameterName.endsWith('request')
+		|| parameterName.endsWith('req')
+}
+
+function isWorkerStyleFetchFunction(handler: AnyFunction): boolean {
+	if (isResolveStyleFunction(handler)) {
+		return false
+	}
+
+	if (handler.length >= 3) {
+		return true
+	}
+
+	if (handler.length === 2) {
+		return !isParamsStyleFunction(handler)
+	}
+
+	if (handler.length === 1) {
+		const parameterNames = getFunctionParameterNames(handler)
+		return isRequestStyleParameterName(normalizeParameterName(parameterNames[0]))
+	}
+
+	return false
+}
+
+function invokeWorkerStyleFetchFunction<TEvent extends FetchEvent>(
+	handler: AnyFunction,
+	event: TEvent
+): Promise<Response | null> | Response | null {
+	return handler(event.request, event.env, event.ctx)
+}
+
 function bindMethod(target: unknown, key: string): AnyFunction | null {
 	if (!target || typeof target !== 'object') {
 		return null
@@ -303,8 +356,12 @@ async function invokeResolvedFetchHandler<TEvent extends FetchEvent>(
 		return handler(event, async () => createNotFoundResponse())
 	}
 
-	if (handler.length === 2) {
+	if (isParamsStyleFunction(handler)) {
 		return handler(event, event.params)
+	}
+
+	if (isWorkerStyleFetchFunction(handler)) {
+		return invokeWorkerStyleFetchFunction(handler, event)
 	}
 
 	return handler(event)
@@ -327,6 +384,9 @@ export function resolveFetchHandler(module: FetchModule): AnyFunction | null {
  * Invoke a fetch entry handler with the supported calling conventions.
  *
  * This supports:
+ * - `fetch(request)`
+ * - `fetch(request, env)`
+ * - `fetch(request, env, ctx)`
  * - `fetch(event)`
  * - `fetch(event, resolve)` / `handle(event, resolve)`
  */
@@ -344,7 +404,9 @@ export async function invokeFetchHandler<TEvent extends FetchEvent>(
 		return response ?? createNotFoundResponse()
 	}
 
-	const response = await handler(event)
+	const response = await (isWorkerStyleFetchFunction(handler)
+		? invokeWorkerStyleFetchFunction(handler, event)
+		: handler(event))
 	return response ?? createNotFoundResponse()
 }
 
