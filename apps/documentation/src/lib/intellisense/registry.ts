@@ -360,7 +360,7 @@ const definitions: IntellisenseDefinition[] = [
 		requirement: 'optional',
 		availableIn: 'Top-level devflare config',
 		references: [
-			docsReference('Durable Object binding guide', 'durable-object-binding'),
+			docsReference('Durable Object binding guide', 'bindings/durable-objects'),
 			cloudflareReference('Durable Object migrations', 'https://developers.cloudflare.com/durable-objects/reference/durable-objects-migrations/')
 		]
 	},
@@ -543,7 +543,7 @@ const definitions: IntellisenseDefinition[] = [
 		requirement: 'optional',
 		availableIn: 'files section of devflare config',
 		references: [
-			docsReference('Queue binding guide', 'queue-binding'),
+			docsReference('Queue binding guide', 'bindings/queues'),
 			cloudflareReference('Queues docs', 'https://developers.cloudflare.com/queues/')
 		]
 	},
@@ -603,7 +603,7 @@ const definitions: IntellisenseDefinition[] = [
 		requirement: 'optional',
 		availableIn: 'files section of devflare config',
 		references: [
-			docsReference('Durable Object binding guide', 'durable-object-binding'),
+			docsReference('Durable Object binding guide', 'bindings/durable-objects'),
 			docsReference('State & async patterns', 'durable-objects-and-queues')
 		]
 	},
@@ -861,7 +861,7 @@ const definitions: IntellisenseDefinition[] = [
 		availableIn: 'wsRoutes config',
 		references: [
 			docsReference('Runtime & deploy settings', 'runtime-deploy-settings'),
-			docsReference('Durable Object binding guide', 'durable-object-binding')
+			docsReference('Durable Object binding guide', 'bindings/durable-objects')
 		]
 	},
 	{
@@ -1106,7 +1106,7 @@ const definitions: IntellisenseDefinition[] = [
 		requirement: 'optional',
 		availableIn: 'bindings section of devflare config',
 		references: [
-			docsReference('KV binding guide', 'kv-binding'),
+			docsReference('KV binding guide', 'bindings/kv'),
 			cloudflareReference('Workers KV docs', 'https://developers.cloudflare.com/kv/')
 		]
 	},
@@ -1125,7 +1125,7 @@ const definitions: IntellisenseDefinition[] = [
 		requirement: 'optional',
 		availableIn: 'bindings section of devflare config',
 		references: [
-			docsReference('D1 binding guide', 'd1-binding'),
+			docsReference('D1 binding guide', 'bindings/d1'),
 			cloudflareReference('D1 docs', 'https://developers.cloudflare.com/d1/')
 		]
 	},
@@ -1144,7 +1144,7 @@ const definitions: IntellisenseDefinition[] = [
 		requirement: 'optional',
 		availableIn: 'bindings section of devflare config',
 		references: [
-			docsReference('R2 binding guide', 'r2-binding'),
+			docsReference('R2 binding guide', 'bindings/r2'),
 			cloudflareReference('R2 docs', 'https://developers.cloudflare.com/r2/')
 		]
 	},
@@ -1165,7 +1165,7 @@ const definitions: IntellisenseDefinition[] = [
 		requirement: 'optional',
 		availableIn: 'bindings section of devflare config',
 		references: [
-			docsReference('Durable Object binding guide', 'durable-object-binding'),
+			docsReference('Durable Object binding guide', 'bindings/durable-objects'),
 			cloudflareReference('Durable Objects docs', 'https://developers.cloudflare.com/durable-objects/')
 		]
 	},
@@ -1184,7 +1184,7 @@ const definitions: IntellisenseDefinition[] = [
 		requirement: 'optional',
 		availableIn: 'bindings section of devflare config',
 		references: [
-			docsReference('Queue binding guide', 'queue-binding'),
+			docsReference('Queue binding guide', 'bindings/queues'),
 			cloudflareReference('Queues docs', 'https://developers.cloudflare.com/queues/')
 		]
 	},
@@ -1203,7 +1203,7 @@ const definitions: IntellisenseDefinition[] = [
 		requirement: 'optional',
 		availableIn: 'bindings.queues',
 		references: [
-			docsReference('Queue binding guide', 'queue-binding'),
+			docsReference('Queue binding guide', 'bindings/queues'),
 			cloudflareReference('Queues producers', 'https://developers.cloudflare.com/queues/get-started/')
 		]
 	},
@@ -1222,7 +1222,7 @@ const definitions: IntellisenseDefinition[] = [
 		requirement: 'optional',
 		availableIn: 'bindings.queues',
 		references: [
-			docsReference('Queue binding guide', 'queue-binding'),
+			docsReference('Queue binding guide', 'bindings/queues'),
 			cloudflareReference('Queues consumers', 'https://developers.cloudflare.com/queues/configuration/javascript-apis/')
 		]
 	},
@@ -1241,7 +1241,7 @@ const definitions: IntellisenseDefinition[] = [
 		requirement: 'optional',
 		availableIn: 'bindings section of devflare config',
 		references: [
-			docsReference('Service binding guide', 'service-binding'),
+			docsReference('Service binding guide', 'bindings/services'),
 			cloudflareReference('Service bindings docs', 'https://developers.cloudflare.com/workers/runtime-apis/bindings/service-bindings/')
 		]
 	},
@@ -1260,7 +1260,7 @@ const definitions: IntellisenseDefinition[] = [
 		requirement: 'optional',
 		availableIn: 'bindings section of devflare config',
 		references: [
-			docsReference('AI binding guide', 'ai-binding'),
+			docsReference('AI binding guide', 'bindings/ai'),
 			cloudflareReference('Workers AI docs', 'https://developers.cloudflare.com/workers-ai/')
 		]
 	},
@@ -1279,7 +1279,7 @@ const definitions: IntellisenseDefinition[] = [
 		requirement: 'optional',
 		availableIn: 'bindings section of devflare config',
 		references: [
-			docsReference('Vectorize binding guide', 'vectorize-binding'),
+			docsReference('Vectorize binding guide', 'bindings/vectorize'),
 			cloudflareReference('Vectorize docs', 'https://developers.cloudflare.com/vectorize/')
 		]
 	},
@@ -1298,7 +1298,7 @@ const definitions: IntellisenseDefinition[] = [
 		requirement: 'optional',
 		availableIn: 'bindings section of devflare config',
 		references: [
-			docsReference('Hyperdrive binding guide', 'hyperdrive-binding'),
+			docsReference('Hyperdrive binding guide', 'bindings/hyperdrive'),
 			cloudflareReference('Hyperdrive docs', 'https://developers.cloudflare.com/hyperdrive/')
 		]
 	},
@@ -1317,7 +1317,7 @@ const definitions: IntellisenseDefinition[] = [
 		requirement: 'optional',
 		availableIn: 'bindings section of devflare config',
 		references: [
-			docsReference('Browser binding guide', 'browser-binding'),
+			docsReference('Browser binding guide', 'bindings/browser-rendering'),
 			cloudflareReference('Browser Rendering docs', 'https://developers.cloudflare.com/browser-rendering/')
 		]
 	},
@@ -1336,7 +1336,7 @@ const definitions: IntellisenseDefinition[] = [
 		requirement: 'optional',
 		availableIn: 'bindings section of devflare config',
 		references: [
-			docsReference('Analytics Engine binding guide', 'analytics-engine-binding'),
+			docsReference('Analytics Engine binding guide', 'bindings/analytics-engine'),
 			cloudflareReference('Analytics Engine docs', 'https://developers.cloudflare.com/analytics/analytics-engine/')
 		]
 	},
@@ -1355,7 +1355,7 @@ const definitions: IntellisenseDefinition[] = [
 		requirement: 'optional',
 		availableIn: 'bindings section of devflare config',
 		references: [
-			docsReference('sendEmail binding guide', 'send-email-binding'),
+			docsReference('sendEmail binding guide', 'bindings/send-email'),
 			cloudflareReference('send_email docs', 'https://developers.cloudflare.com/email-routing/email-workers/send-email-workers/')
 		]
 	},
@@ -1373,7 +1373,7 @@ const definitions: IntellisenseDefinition[] = [
 		requirement: 'optional',
 		availableIn: 'bindings.queues.consumers',
 		references: [
-			docsReference('Queue binding guide', 'queue-binding')
+			docsReference('Queue binding guide', 'bindings/queues')
 		]
 	},
 	{
@@ -1390,7 +1390,7 @@ const definitions: IntellisenseDefinition[] = [
 		requirement: 'optional',
 		availableIn: 'bindings.queues.consumers',
 		references: [
-			docsReference('Queue binding guide', 'queue-binding')
+			docsReference('Queue binding guide', 'bindings/queues')
 		]
 	},
 	{
@@ -1407,7 +1407,7 @@ const definitions: IntellisenseDefinition[] = [
 		requirement: 'optional',
 		availableIn: 'bindings.queues.consumers',
 		references: [
-			docsReference('Queue binding guide', 'queue-binding')
+			docsReference('Queue binding guide', 'bindings/queues')
 		]
 	},
 	{
@@ -1424,7 +1424,7 @@ const definitions: IntellisenseDefinition[] = [
 		requirement: 'optional',
 		availableIn: 'bindings.queues.consumers',
 		references: [
-			docsReference('Queue binding guide', 'queue-binding')
+			docsReference('Queue binding guide', 'bindings/queues')
 		]
 	},
 	{
@@ -1441,7 +1441,7 @@ const definitions: IntellisenseDefinition[] = [
 		requirement: 'optional',
 		availableIn: 'bindings.queues.consumers',
 		references: [
-			docsReference('Queue binding guide', 'queue-binding')
+			docsReference('Queue binding guide', 'bindings/queues')
 		]
 	},
 	{
@@ -1458,7 +1458,7 @@ const definitions: IntellisenseDefinition[] = [
 		requirement: 'optional',
 		availableIn: 'bindings.queues.consumers',
 		references: [
-			docsReference('Queue binding guide', 'queue-binding')
+			docsReference('Queue binding guide', 'bindings/queues')
 		]
 	},
 	{
@@ -1475,7 +1475,7 @@ const definitions: IntellisenseDefinition[] = [
 		requirement: 'optional',
 		availableIn: 'bindings.queues.consumers',
 		references: [
-			docsReference('Queue binding guide', 'queue-binding')
+			docsReference('Queue binding guide', 'bindings/queues')
 		]
 	},
 	{
@@ -1492,7 +1492,7 @@ const definitions: IntellisenseDefinition[] = [
 		requirement: 'optional',
 		availableIn: 'bindings.services',
 		references: [
-			docsReference('Service binding guide', 'service-binding')
+			docsReference('Service binding guide', 'bindings/services')
 		]
 	},
 	{
@@ -1509,7 +1509,7 @@ const definitions: IntellisenseDefinition[] = [
 		requirement: 'optional',
 		availableIn: 'bindings.ai',
 		references: [
-			docsReference('AI binding guide', 'ai-binding')
+			docsReference('AI binding guide', 'bindings/ai')
 		]
 	},
 	{
@@ -1526,7 +1526,7 @@ const definitions: IntellisenseDefinition[] = [
 		requirement: 'optional',
 		availableIn: 'bindings.vectorize',
 		references: [
-			docsReference('Vectorize binding guide', 'vectorize-binding')
+			docsReference('Vectorize binding guide', 'bindings/vectorize')
 		]
 	},
 	{
@@ -1543,7 +1543,7 @@ const definitions: IntellisenseDefinition[] = [
 		requirement: 'optional',
 		availableIn: 'bindings.analyticsEngine',
 		references: [
-			docsReference('Analytics Engine binding guide', 'analytics-engine-binding')
+			docsReference('Analytics Engine binding guide', 'bindings/analytics-engine')
 		]
 	},
 	{
@@ -1560,7 +1560,7 @@ const definitions: IntellisenseDefinition[] = [
 		requirement: 'optional',
 		availableIn: 'bindings.sendEmail',
 		references: [
-			docsReference('sendEmail binding guide', 'send-email-binding')
+			docsReference('sendEmail binding guide', 'bindings/send-email')
 		]
 	},
 	{
@@ -1612,7 +1612,7 @@ const definitions: IntellisenseDefinition[] = [
 		requirement: 'contextual',
 		availableIn: 'Queue consumer handlers',
 		references: [
-			docsReference('Queue binding guide', 'queue-binding'),
+			docsReference('Queue binding guide', 'bindings/queues'),
 			cloudflareReference('Queues docs', 'https://developers.cloudflare.com/queues/')
 		]
 	},
@@ -2104,7 +2104,7 @@ const definitions: IntellisenseDefinition[] = [
 		requirement: 'contextual',
 		availableIn: 'Browser Rendering examples',
 		references: [
-			docsReference('Browser binding guide', 'browser-binding'),
+			docsReference('Browser binding guide', 'bindings/browser-rendering'),
 			cloudflareReference('Browser Rendering docs', 'https://developers.cloudflare.com/browser-rendering/')
 		]
 	}

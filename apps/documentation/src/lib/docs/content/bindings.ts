@@ -91,6 +91,9 @@ function getBindingPathBase(guide: Pick<BindingGuideDefinition, 'slugBase' | 'pa
 		case 'queue':
 			return 'bindings/queues'
 
+		case 'service':
+			return 'bindings/services'
+
 		case 'browser':
 			return 'bindings/browser-rendering'
 
@@ -326,6 +329,14 @@ function getCloudflareBindingReference(guide: BindingGuideDefinition): {
 				title: 'Cloudflare Queues docs',
 				href: 'https://developers.cloudflare.com/queues/',
 				description: 'Platform reference for queue producers, consumers, delivery guarantees, retries, batching, and DLQs.',
+				citation: 'Cloudflare Docs'
+			}
+
+		case 'service':
+			return {
+				title: 'Cloudflare Service bindings docs',
+				href: 'https://developers.cloudflare.com/workers/runtime-apis/bindings/service-bindings/',
+				description: 'Platform reference for worker-to-worker bindings, service entrypoints, and the underlying runtime contract.',
 				citation: 'Cloudflare Docs'
 			}
 
@@ -1815,18 +1826,18 @@ test('queue work writes a result record', async () => {
 		overview: {
 			readTime: '4 min read',
 			title: 'Use service bindings to keep multi-worker apps explicit instead of magical',
-			summary: 'Service bindings and `ref()` let you describe worker-to-worker relationships in config, then test them locally without turning names into lore.',
-			description: 'This is the clean lane for apps that grew into more than one worker. The biggest win is not fancy RPC — it is naming and entrypoint relationships that stay visible enough to review.',
+			summary: 'The fast Devflare payoff is simple: wire one worker to another with `ref()`, call it through `env.MATH_SERVICE`, and prove the same relationship locally in one test.',
+			description: 'This is the clean lane for apps that genuinely need more than one worker. Devflare keeps the worker family explicit in config, resolves the referenced surface, and lets local tests use the same service binding contract instead of copied worker names or hand-built internal URLs.',
 			highlights: [
-				'`ref()` keeps service relationships explicit instead of relying on loose string conventions.',
-				'Devflare can model default worker exports and named entrypoints.',
-				'Local multi-worker tests work through the same env surface the app uses.',
+				'`ref()` keeps worker relationships explicit instead of hiding them in env vars or copied script names.',
+				'Gateway code calls the service through the same `env.MATH_SERVICE` contract the tests use.',
+				'Local multi-worker tests work through the default harness instead of custom setup glue.',
 				'`devflare types` can generate typed service bindings and fall back to `Fetcher` when a service cannot be typed.'
 			],
 			bestFor: 'Multi-worker systems, internal RPC boundaries, and explicit service composition',
 			authoringParagraphs: [
-				'Service bindings are easiest to trust when the relationship lives in config, not in a mix of environment variables and copied worker names.',
-				'`ref()` is especially useful because it keeps the dependency explicit while still allowing Devflare to resolve and type the linked worker later.'
+				'The easiest honest starting point is one gateway worker, one referenced worker, and one service binding in config.',
+				'`ref()` is especially useful because it keeps the dependency explicit while still giving Devflare enough structure to resolve, type, and boot the linked worker locally later.'
 			],
 			authoringSnippet: {
 				title: 'Service binding authoring with `ref()`',
@@ -1900,10 +1911,11 @@ export default defineConfig({
 		},
 		testing: {
 			readTime: '4 min read',
-			summary: 'Service binding tests can stay in the default harness, even for multi-worker setups, which is a big part of why the pattern is usable instead of theatrical.',
-			description: 'Start with `createTestContext()`, then call the bound service through the generated env shape. That proves the service wiring in the same language the app itself uses.',
+			summary: 'Service bindings are one of the clearest Devflare wins in multi-worker apps: you can keep the real worker boundary and still prove it through the default local harness.',
+			description: 'Start with `createTestContext()`, then call the bound service through the generated env shape. That proves the config relationship, the local worker family, and the callable contract in the same language the app itself uses.',
 			highlights: [
 				'`createTestContext()` can auto-detect service bindings from config.',
+				'One direct env call is usually enough to prove the wiring honestly.',
 				'The default and named entrypoint stories are both testable through the env.',
 				'Generated env types make service calls much easier to trust.',
 				'You only need higher-level deploy checks when naming or preview topology is the real risk.'
@@ -1949,8 +1961,8 @@ test('service binding calls the default worker export', async () => {
 		},
 		example: {
 			readTime: '3 min read',
-			summary: 'This example keeps the service story tiny: one gateway worker, one math worker, and one method call through the generated env binding.',
-			description: 'That is enough to prove the multi-worker wiring without turning the example into a distributed-systems thesis.',
+			summary: 'This example shows the smallest useful service-binding loop: one `ref()`, one gateway route, and one local multi-worker test.',
+			description: 'That is enough to show why Devflare helps here: the relationship stays explicit in config, typed in env, and testable without hand-assembling your own mini service mesh in the test file.',
 			highlights: [
 				'One worker calling another is enough to learn the pattern.',
 				'`ref()` keeps the dependency visible.',
@@ -2009,10 +2021,10 @@ test('GET / calls the math service', async () => {
 				'Keep one simple service example like this around if you want a smoke check for multi-worker wiring.'
 			],
 			callout: {
-				tone: 'info',
-				title: 'The example should prove the relationship, not the whole system',
+				tone: 'accent',
+				title: 'This is the valuable bit',
 				body: [
-					'One method call is already enough to teach the service-binding contract accurately.'
+					'You do not need a whole microservice fleet to feel the Devflare value. One gateway call already proves that config refs, env bindings, and local multi-worker tests stay part of one coherent loop.'
 				]
 			}
 		}
@@ -3319,7 +3331,7 @@ export async function fetch(): Promise<Response> {
 	}
 ]
 
-const activeBindingGuides = bindingGuides.filter((guide) => guide.slugBase !== 'service')
+const activeBindingGuides = bindingGuides
 
 export interface BindingTestingGuideLink {
 	label: string

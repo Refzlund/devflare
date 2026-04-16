@@ -585,7 +585,7 @@ export default defineConfig({
 		summary:
 			'Use this page for the architecture question: when a separate worker boundary is justified, how `ref()` and service bindings keep it explicit, and where local tests and release checks should prove the wiring.',
 		description:
-			'The service-binding reference pages can explain the mechanics. This page exists for the composition question: when should another worker exist at all, how do you keep the boundary explicit, and which docs own the deeper service details once you commit to it?',
+			'The Services guide can explain the mechanics. This page exists for the composition question: when should another worker exist at all, how do you keep the boundary explicit, and which docs own the deeper service details once you commit to it?',
 		highlights: [
 			'Reach for another worker when the runtime boundary is real, not just because one file feels crowded.',
 			'Use `ref()` and service bindings so worker relationships stay explicit in config, tests, and generated output.',
@@ -613,7 +613,7 @@ export default defineConfig({
 				title: 'Choose another worker only when the boundary is real',
 				paragraphs: [
 					'The goal is not to split one worker just because the file count went up. The goal is to give a real runtime boundary a real worker boundary, then let service bindings make that relationship explicit enough for tooling and review.',
-					'That means this page should answer the architecture choice first. The service-binding guide can take over once the answer is already “yes, another worker should exist.”'
+					'That means this page should answer the architecture choice first. The Services guide can take over once the answer is already “yes, another worker should exist.”'
 				],
 				table: {
 					headers: ['If the real thing is...', 'Prefer...', 'Why'],
@@ -638,7 +638,7 @@ export default defineConfig({
 				title: 'Model the relationship with `ref()` so the worker family stays explicit',
 				paragraphs: [
 					'If another worker is real, the relationship belongs in config instead of in copied worker names or half-remembered script references. `ref()` gives Devflare enough structure to follow the dependency into local runtime, generated env types, and compiled output.',
-					'Keep the architecture example simple: one referenced worker and one explicit service binding are enough to show the boundary. Named entrypoints are real too, but the service-binding and generated-types pages own that deeper contract once the worker boundary itself is already justified.'
+					'Keep the architecture example simple: one referenced worker and one explicit service binding are enough to show the boundary. Named entrypoints are real too, but the Services and generated-types pages own that deeper contract once the worker boundary itself is already justified.'
 				],
 				snippets: [
 					{
@@ -646,13 +646,13 @@ export default defineConfig({
 						language: 'ts',
 						code: String.raw`import { defineConfig, ref } from 'devflare/config'
 
-	const mathWorker = ref(() => import('../math-service/devflare.config'))
+const mathWorker = ref(() => import('../math-service/devflare.config'))
 
 export default defineConfig({
 	name: 'gateway',
 	bindings: {
 		services: {
-				MATH_SERVICE: mathWorker.worker
+			MATH_SERVICE: mathWorker.worker
 		}
 	}
 })`
@@ -694,14 +694,14 @@ test('service binding calls the default worker export', async () => {
 				title: 'Open the service-specific pages once the architecture choice is done',
 				cards: [
 					{
-						href: docsLink('service-binding'),
+						href: docsLink('bindings/services'),
 						label: 'Binding guide',
 						meta: 'Services',
-						title: 'Service binding guide',
+						title: 'Services guide',
 						body: 'Open the service guide for the exact binding shape, env typing, and compiler behavior once another worker is definitely the right boundary.'
 					},
 					{
-						href: docsLink('service-testing'),
+						href: docsLink('bindings/services/testing'),
 						label: 'Testing',
 						meta: 'Services',
 						title: 'Testing Services',
