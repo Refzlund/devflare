@@ -164,28 +164,28 @@ export async function GET({ env, params }: FetchEvent<DevflareEnv>): Promise<Res
 				title: 'Open the binding guide that owns the mechanics',
 				cards: [
 					{
-						href: docsLink('kv-binding'),
+						href: docsLink('bindings/kv'),
 						label: 'Binding guide',
 						meta: 'KV',
 						title: 'KV',
 						body: 'Open the KV guide when the storage shape is keyed lookup, cache-like state, or namespace lifecycle.'
 					},
 					{
-						href: docsLink('d1-binding'),
+						href: docsLink('bindings/d1'),
 						label: 'Binding guide',
 						meta: 'D1',
 						title: 'D1',
 						body: 'Open the D1 guide when the storage shape is query-driven and you need the actual SQL-shaped runtime contract.'
 					},
 					{
-						href: docsLink('r2-binding'),
+						href: docsLink('bindings/r2'),
 						label: 'Binding guide',
 						meta: 'R2',
 						title: 'R2',
 						body: 'Open the R2 guide when the real question is bucket usage, testing, preview naming, or file delivery details.'
 					},
 					{
-						href: docsLink('hyperdrive-binding'),
+						href: docsLink('bindings/hyperdrive'),
 						label: 'Binding guide',
 						meta: 'Hyperdrive',
 						title: 'Hyperdrive',
@@ -387,7 +387,7 @@ export async function GET({ env, params }: FetchEvent<DevflareEnv>): Promise<Res
 				],
 				cards: [
 					{
-						href: docsLink('r2-binding'),
+						href: docsLink('bindings/r2'),
 						label: 'Binding guide',
 						meta: 'R2 mechanics',
 						title: 'R2 binding guide',
@@ -558,14 +558,14 @@ export default defineConfig({
 				title: 'Open the binding guide once the pattern is obvious',
 				cards: [
 					{
-						href: docsLink('durable-object-binding'),
+						href: docsLink('bindings/durable-objects'),
 						label: 'Binding guide',
 						meta: 'Durable Objects',
 						title: 'Durable Objects',
 						body: 'Open the Durable Objects guide for the real binding shape, local tests, migrations, and preview caveats.'
 					},
 					{
-						href: docsLink('queue-binding'),
+						href: docsLink('bindings/queues'),
 						label: 'Binding guide',
 						meta: 'Queues',
 						title: 'Queues',

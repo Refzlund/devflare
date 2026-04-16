@@ -25,8 +25,16 @@ const allDocs: DocPage[] = [
 
 export const docsBySlug = new Map(allDocs.map((doc) => [doc.slug, doc]))
 
+const docsByAlias = new Map(
+	allDocs.flatMap((doc) => (doc.aliases ?? []).map((alias) => [alias, doc] as const))
+)
+
 export function getDoc(slug: string): DocPage | undefined {
-	return docsBySlug.get(slug)
+	return docsBySlug.get(slug) ?? docsByAlias.get(slug)
+}
+
+export function getCanonicalDocSlug(slug: string): string | undefined {
+	return getDoc(slug)?.slug
 }
 
 export function getAdjacentDocs(slug: string): { previous?: DocPage; next?: DocPage } {

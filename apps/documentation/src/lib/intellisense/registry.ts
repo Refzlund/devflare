@@ -1,4 +1,4 @@
-import { docPath } from '$lib/docs/content'
+import { docPath, getCanonicalDocSlug } from '$lib/docs/content'
 import type {
 	IntellisenseContextTag,
 	IntellisenseDefinition,
@@ -12,7 +12,7 @@ const configFilePattern = /(^|[/\\])devflare\.config\.(ts|mts|js|mjs)$/i
 function docsReference(label: string, slug: string): IntellisenseLink {
 	return {
 		label,
-		href: docPath(slug)
+		href: docPath(getCanonicalDocSlug(slug) ?? slug)
 	}
 }
 

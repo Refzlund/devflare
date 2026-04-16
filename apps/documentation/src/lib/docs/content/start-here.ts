@@ -504,7 +504,7 @@ export const startHereDocs: DocPage[] = [
 						meta: 'Remote database path',
 						title: 'Hyperdrive',
 						body: 'Hyperdrive is modeled cleanly in config and generated output, but the local and preview ergonomics are more constrained than KV, D1, or R2 because the real database and credentials stay remote.',
-						href: docsLink('hyperdrive-binding')
+						href: docsLink('bindings/hyperdrive')
 					},
 					{
 						label: 'Partial',
@@ -512,7 +512,7 @@ export const startHereDocs: DocPage[] = [
 						meta: 'Remote platform service',
 						title: 'Workers AI',
 						body: 'The AI binding is supported in config, types, and deployment flows, but meaningful tests are remote-oriented because real inference still lives on Cloudflare infrastructure.',
-						href: docsLink('ai-binding')
+						href: docsLink('bindings/ai')
 					},
 					{
 						label: 'Partial',
@@ -520,7 +520,7 @@ export const startHereDocs: DocPage[] = [
 						meta: 'Remote platform service',
 						title: 'Vectorize',
 						body: 'Vectorize is fully modeled in config and preview-aware naming, but real inserts and similarity queries still need remote infrastructure and honest remote-mode tests.',
-						href: docsLink('vectorize-binding')
+						href: docsLink('bindings/vectorize')
 					},
 					{
 						label: 'Full',
@@ -528,7 +528,7 @@ export const startHereDocs: DocPage[] = [
 						meta: 'Bridge-backed browser lane',
 						title: 'Browser Rendering',
 						body: 'Browser Rendering is fully supported through Devflare\'s bridge-backed local dev story, config model, generated typing, and runtime integration. The main platform caveat is still the Cloudflare one: exactly one browser binding.',
-						href: docsLink('browser-binding')
+						href: docsLink('bindings/browser-rendering')
 					}
 				]
 			},
@@ -1277,19 +1277,19 @@ bunx --bun devflare dev`
 						label: 'Bindings',
 						title: 'Durable Objects guide',
 						body: 'Read the fuller guidance on stateful objects, migrations, previews, and local testing.',
-						href: docsLink('durable-object-binding')
+						href: docsLink('bindings/durable-objects')
 					},
 					{
 						label: 'Bindings',
 						title: 'R2 guide',
 						body: 'Open the deeper R2 page for delivery boundaries, testing patterns, and storage architecture choices.',
-						href: docsLink('r2-binding')
+						href: docsLink('bindings/r2')
 					},
 					{
 						label: 'Bindings',
 						title: 'Browser Rendering guide',
 						body: 'Open the browser guide when you need the single-binding caveat, dev-server details, or heavier browser workflows.',
-						href: docsLink('browser-binding')
+						href: docsLink('bindings/browser-rendering')
 					}
 				]
 			}

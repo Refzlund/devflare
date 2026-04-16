@@ -66,6 +66,7 @@ interface BindingExampleDefinition {
 
 interface BindingGuideDefinition {
 	slugBase: string
+	pathBase?: string
 	label: string
 	categoryDescription: string
 	configKey: string
@@ -78,7 +79,43 @@ interface BindingGuideDefinition {
 	example: BindingExampleDefinition
 }
 
-function getBindingSlugs(slugBase: string): {
+function getBindingPathBase(guide: Pick<BindingGuideDefinition, 'slugBase' | 'pathBase'>): string {
+	if (guide.pathBase) {
+		return guide.pathBase
+	}
+
+	switch (guide.slugBase) {
+		case 'durable-object':
+			return 'bindings/durable-objects'
+
+		case 'queue':
+			return 'bindings/queues'
+
+		case 'browser':
+			return 'bindings/browser-rendering'
+
+		default:
+			return `bindings/${guide.slugBase}`
+	}
+}
+
+function getBindingSlugs(guide: Pick<BindingGuideDefinition, 'slugBase' | 'pathBase'>): {
+	overview: string
+	internals: string
+	testing: string
+	example: string
+} {
+	const pathBase = getBindingPathBase(guide)
+
+	return {
+		overview: pathBase,
+		internals: `${pathBase}/internals`,
+		testing: `${pathBase}/testing`,
+		example: `${pathBase}/example`
+	}
+}
+
+function getLegacyBindingSlugs(slugBase: string): {
 	overview: string
 	internals: string
 	testing: string
@@ -400,7 +437,7 @@ function createBindingReferenceSection(guide: BindingGuideDefinition): DocSectio
 }
 
 function createBindingDeepDiveSection(guide: BindingGuideDefinition): DocSection {
-	const slugs = getBindingSlugs(guide.slugBase)
+	const slugs = getBindingSlugs(guide)
 
 	return {
 		id: 'go-deeper',
@@ -432,11 +469,13 @@ function createBindingDeepDiveSection(guide: BindingGuideDefinition): DocSection
 }
 
 function createBindingPages(guide: BindingGuideDefinition): DocPage[] {
-	const slugs = getBindingSlugs(guide.slugBase)
+	const slugs = getBindingSlugs(guide)
+	const legacySlugs = getLegacyBindingSlugs(guide.slugBase)
 
 	return [
 		{
 			slug: slugs.overview,
+			aliases: [legacySlugs.overview],
 			group: bindingReferenceGroup,
 			navTitle: guide.label,
 			articleNavigationHidden: true,
@@ -476,6 +515,7 @@ function createBindingPages(guide: BindingGuideDefinition): DocPage[] {
 		},
 		{
 			slug: slugs.internals,
+			aliases: [legacySlugs.internals],
 			group: bindingReferenceGroup,
 			sidebarHidden: true,
 			navTitle: `${guide.label} internals`,
@@ -513,6 +553,7 @@ function createBindingPages(guide: BindingGuideDefinition): DocPage[] {
 		},
 		{
 			slug: slugs.testing,
+			aliases: [legacySlugs.testing],
 			group: bindingReferenceGroup,
 			sidebarHidden: true,
 			navTitle: `Testing ${guide.label}`,
@@ -550,6 +591,7 @@ function createBindingPages(guide: BindingGuideDefinition): DocPage[] {
 		},
 		{
 			slug: slugs.example,
+			aliases: [legacySlugs.example],
 			group: bindingReferenceGroup,
 			sidebarHidden: true,
 			navTitle: `${guide.label} example`,
@@ -1252,40 +1294,45 @@ test('GET /files/hello.txt serves the stored object', async () => {
 		overview: {
 			readTime: '5 min read',
 			title: 'Use Durable Objects when coordination or state really belongs with a single object identity',
-			summary: 'Devflare treats Durable Objects as a real first-class surface in config, local runtime, and tests, not as an awkward plugin hanging off the side of the worker.',
-			description: 'That makes DO-heavy apps easier to reason about locally, but it also means you should be honest about the preview and migration caveats that come with them.',
+			summary: 'The fast Devflare payoff is simple: put one counter object in a `do.*` file, call it from the worker, and call the same object directly in tests.',
+			description: 'Devflare auto-discovers `**/do.*.{ts,js}` by default, wires the Durable Object binding into the worker env, and lets tests use the same namespace without making you invent a fake DO harness first.',
 			highlights: [
-				'Durable Object bindings can be local, explicit, or cross-worker through `ref()`.',
-				'The local test story is strong enough to exercise real object behavior through the default harness.',
-				'Devflare bundles discovered DO code and compiles the correct Wrangler binding shape.',
-				'Preview URLs and DO migrations still follow real Cloudflare caveats.'
+				'You can start with one `src/do.counter.ts` file and skip custom DO file-glob config entirely.',
+				'Worker code can call `env.COUNTER.getByName(\'main\').increment()` directly.',
+				'Tests can call that same DO method through the default Devflare harness.',
+				'Devflare still handles the bundling, generated types, and Wrangler binding shape underneath.'
 			],
 			bestFor: 'Stateful sessions, locks, room state, and coordination that should not be faked as random stateless requests',
 			authoringParagraphs: [
-				'A DO binding can be as simple as a class name string when the object lives in the same worker package.',
-				'When the object lives in another worker, `ref()` keeps that relationship explicit instead of scattering script names and class names across the repo.'
+				'The easiest honest starting point is one local Durable Object class and one binding that points at it by class name.',
+				'If the class lives in a `do.*` file, Devflare discovers it with the default `**/do.*.{ts,js}` pattern, so the first example does not need extra DO file config.'
 			],
 			authoringSnippet: {
-				title: 'Durable Object authoring in one worker',
+				title: 'Start with one discovered Durable Object and one binding',
 				language: 'ts',
 				code: String.raw`import { defineConfig } from 'devflare/config'
 
 export default defineConfig({
-	name: 'chat-worker',
+	name: 'counter-worker',
 	files: {
-		durableObjects: 'src/do/**/*.ts'
+		fetch: 'src/fetch.ts'
 	},
 	bindings: {
 		durableObjects: {
-			ROOM: 'ChatRoom',
-			LOCK: { className: 'WriteLock' }
+			COUNTER: 'Counter'
 		}
-	}
+	},
+	migrations: [
+		{
+			tag: 'v1',
+			new_classes: ['Counter']
+		}
+	]
 })`
 			},
 			fitBullets: [
 				'Use Durable Objects when state or coordination should live behind one object identity, not when you merely want a fancy singleton.',
-				'They are a good fit for rooms, counters, distributed locks, and request serialization.',
+				'They are a good fit for counters, rooms, distributed locks, and request serialization.',
 				'If the state is really just data you query, D1 or KV may stay simpler and easier to preview.'
 			],
 			caveatBullets: [
@@ -1343,7 +1390,7 @@ export default defineConfig({
 			highlights: [
 				'Use the default harness before inventing a custom DO mock layer.',
 				'Cross-worker DO bindings can still work in the test context when `ref()` wiring is explicit.',
-				'Object-level behavior can be tested locally with real namespace and stub semantics.',
+				'Object-level behavior can be tested locally with real namespace and direct method calls.',
 				'Preview caveats still need higher-level validation.'
 			],
 			bestFor: 'Local stateful behavior, object methods, and cross-worker DO wiring checks',
@@ -1364,10 +1411,10 @@ beforeAll(() => createTestContext())
 afterAll(() => env.dispose())
 
 test('the counter object increments', async () => {
-	const id = env.COUNTER.idFromName('global')
-	const stub = env.COUNTER.get(id)
-	const response = await stub.fetch('https://counter/increment')
-	expect(await response.text()).toBe('1')
+	const counter = env.COUNTER.getByName('main')
+	expect(await counter.increment()).toBe(1)
+	expect(await counter.increment()).toBe(2)
+	expect(await counter.getValue()).toBe(2)
 })`
 			},
 			helperBullets: [
@@ -1390,27 +1437,26 @@ test('the counter object increments', async () => {
 		},
 		example: {
 			readTime: '4 min read',
-			summary: 'This example uses a tiny counter object because the shape is easy to understand and still proves the important DO wiring.',
-			description: 'A counter is not glamorous, but it teaches the real ingredients: one binding, one class, one namespace lookup, and one request path that exercises state.',
+			summary: 'This example shows the whole Durable Object story in the smallest useful shape: one auto-discovered object, one worker route, and one direct test.',
+			description: 'A counter is enough to show why Devflare is valuable here: you do not need custom DO glue just to get a real local loop. The same `env.COUNTER` namespace works in the worker and in tests.',
 			highlights: [
-				'One class plus one binding is enough to learn the surface.',
-				'The example keeps object identity explicit.',
-				'You can use the same pattern for locks, rooms, or actor-like objects later.',
-				'The first example should prove the state model, not your entire app architecture.'
+				'One `do.*` file plus one binding is enough to learn the surface.',
+				'The example uses Devflare’s default DO discovery pattern instead of extra file-glob ceremony.',
+				'The worker can increment the object and the test can call the same object directly.',
+				'The first example proves the state model without dragging in a chat app or a fake RPC layer.'
 			],
-			configFocus: 'Explicit class discovery and DO binding',
-			runtimeShape: 'Namespace lookup plus `stub.fetch()`',
+			configFocus: 'Auto-discovered `do.*` file plus one DO binding',
+			runtimeShape: 'Direct namespace method calls from the worker and the test harness',
 			bestUse: 'Counters, room state, and small single-identity coordination examples',
 			configSnippet: {
-				title: 'Minimal Durable Object config',
+				title: 'Minimal Durable Object config using the default discovery pattern',
 				language: 'ts',
 				code: String.raw`import { defineConfig } from 'devflare/config'
 
 export default defineConfig({
 	name: 'do-example',
 	files: {
-		fetch: 'src/fetch.ts',
-		durableObjects: 'src/do/**/*.ts'
+		fetch: 'src/fetch.ts'
 	},
 	bindings: {
 		durableObjects: {
@@ -1423,23 +1469,72 @@ export default defineConfig({
 			new_classes: ['Counter']
 		}
 	]
-})`
+})
+
+// Devflare auto-discovers src/do.counter.ts via the default:
+// durableObjects: '**/do.*.{ts,js}'`
 			},
 			usageSnippet: {
-				title: 'A tiny object and fetch path',
+				title: 'A tiny object and one worker path',
 				language: 'ts',
+				activeFile: 'src/fetch.ts',
+				structure: [
+					{ path: 'devflare.config.ts' },
+					{ path: 'src', kind: 'folder' },
+					{ path: 'src/do.counter.ts' },
+					{ path: 'src/fetch.ts' }
+				],
+				files: [
+					{
+						path: 'src/do.counter.ts',
+						language: 'ts',
+						code: String.raw`import { DurableObject } from 'cloudflare:workers'
+
+${'export'} ${'class'} ${'Counter'} extends DurableObject<DevflareEnv> {
+	async increment(amount = 1): Promise<number> {
+		const current = (await this.ctx.storage.get<number>('value')) ?? 0
+		const next = current + amount
+		await this.ctx.storage.put('value', next)
+		return next
+	}
+
+	async getValue(): Promise<number> {
+		return (await this.ctx.storage.get<number>('value')) ?? 0
+	}
+}`
+					},
+					{
+						path: 'src/fetch.ts',
+						language: 'ts',
+						code: String.raw`import { env } from 'devflare'
+
+export async function fetch(request: Request): Promise<Response> {
+	const url = new URL(request.url)
+	const counter = env.COUNTER.getByName('main')
+
+	if (url.pathname === '/value') {
+		return Response.json({ value: await counter.getValue() })
+	}
+
+	return Response.json({ value: await counter.increment() })
+}`
+					}
+				],
 				code: String.raw`import { env } from 'devflare'
 
-// src/do/counter.ts should increment a stored value and return the new count.
+export async function fetch(request: Request): Promise<Response> {
+	const url = new URL(request.url)
+	const counter = env.COUNTER.getByName('main')
 
-export async function fetch(): Promise<Response> {
-	const id = env.COUNTER.idFromName('global')
-	const stub = env.COUNTER.get(id)
-	return stub.fetch('https://counter/increment')
+	if (url.pathname === '/value') {
+		return Response.json({ value: await counter.getValue() })
+	}
+
+	return Response.json({ value: await counter.increment() })
 }`
 			},
 			testSnippet: {
-				title: 'A matching local test',
+				title: 'A direct test that shows the Devflare payoff immediately',
 				language: 'ts',
 				code: String.raw`import { afterAll, beforeAll, expect, test } from 'bun:test'
 import { createTestContext, cf } from 'devflare/test'
@@ -1448,22 +1543,24 @@ import { env } from 'devflare'
 beforeAll(() => createTestContext())
 afterAll(() => env.dispose())
 
-test('GET / increments the counter object', async () => {
-	const first = await cf.worker.get('/')
-	const second = await cf.worker.get('/')
-	expect(await first.text()).toBe('1')
-	expect(await second.text()).toBe('2')
+test('the same counter works directly in tests and through the worker', async () => {
+	const counter = env.COUNTER.getByName('main')
+	expect(await counter.increment()).toBe(1)
+	expect(await counter.increment()).toBe(2)
+
+	const response = await cf.worker.get('/value')
+	expect(await response.json()).toEqual({ value: 2 })
 })`
 			},
 			notes: [
-				'This tiny shape already proves that the object class, namespace, and fetch path are wired correctly.',
-				'Once this works, richer room or lock logic becomes a normal extension instead of a blind leap.'
+				'This tiny shape already proves that the object class, namespace, storage, and worker path are wired correctly.',
+				'Once this works, richer room, session, or lock logic becomes a normal extension instead of a blind leap.'
 			],
 			callout: {
 				tone: 'info',
-				title: 'The tiny state machine is enough',
+				title: 'This is the valuable bit',
 				body: [
-					'You do not need a chat app to learn Durable Objects. One counter proves the important mechanics without burying them.'
+					'You do not need a chat app to feel the Devflare advantage. One counter already proves that DO files, env bindings, and tests stay part of one simple loop.'
 				]
 			}
 		}
@@ -1931,18 +2028,18 @@ test('GET / calls the math service', async () => {
 		overview: {
 			readTime: '4 min read',
 			title: 'Use the AI binding when the worker needs real Workers AI inference, not just a local mock',
-			summary: 'AI is a supported binding in Devflare, but it is intentionally treated as remote-oriented because real model inference lives on Cloudflare infrastructure.',
-			description: 'That means the docs should be honest: Devflare can compile and type the binding cleanly, but meaningful tests usually need remote mode and real account access.',
+			summary: 'Devflare makes Workers AI usable by keeping the binding tiny in config, the worker call obvious, and the remote smoke test explicit instead of fake.',
+			description: 'AI is still remote-oriented, but the first useful path is simple: one worker route, one `env.AI.run(...)` call, and one skip-aware remote test that says clearly when the real platform was involved.',
 			highlights: [
-				'Config is intentionally small: declare the binding name and keep the rest of the flow explicit.',
+				'Config is intentionally tiny: declare the binding name and keep the interesting part in worker code.',
 				'Compiler emits the Wrangler AI binding shape directly.',
-				'Remote-mode checks guard the testing path so local runs can skip expensive or unavailable calls cleanly.',
-				'This is a remote-oriented binding, not a first-class local emulation story.'
+				'`shouldSkip.ai` and remote mode let tests say exactly when they exercised real inference.',
+				'Local-only app work can still stub above the worker boundary without lying about the binding path.'
 			],
 			bestFor: 'Real inference against Workers AI models',
 			authoringParagraphs: [
-				'AI is a remote-oriented binding. The binding exists in config, the env is typed, and the deploy story is real — but model inference itself still lives on Cloudflare infrastructure.',
-				'The testing story leans on remote mode rather than pretending Miniflare can be a credible stand-in for actual model execution.'
+				'AI is a remote-oriented binding, but the first worker path should still be tiny and concrete: receive one request, call one model, return one JSON response.',
+				'The Devflare-specific win is not fake local inference. It is that config, worker code, and remote test gating stay explicit enough that you know when the real platform was actually exercised.'
 			],
 			authoringSnippet: {
 				title: 'Workers AI binding authoring',
@@ -2073,13 +2170,13 @@ describe.skipIf(skipAI)('AI binding', () => {
 		},
 		example: {
 			readTime: '3 min read',
-			summary: 'This example keeps the AI path tiny: one binding, one inference call, one JSON response.',
-			description: 'That is enough to prove the worker can talk to Workers AI without burying the example inside a whole chat product.',
+			summary: 'This example keeps the AI story honest and useful: one binding, one tiny inference route, and one skip-aware remote smoke test.',
+			description: 'That is enough to show the Devflare value: config stays tiny, the worker code stays normal, and the test tells you clearly when remote AI was really available.',
 			highlights: [
 				'One model call is enough to show the shape.',
-				'The example stays focused on the binding path, not app-level UX.',
-				'Remote prerequisites are part of the example, not a hidden afterthought.',
-				'You can wrap the call behind your own helpers later without changing the binding contract.'
+				'The example stays focused on the worker boundary, not app-level chat UX.',
+				'The smoke test uses Devflare’s remote gate instead of pretending inference is local.',
+				'You can stub above this route in local UI work without changing the worker contract.'
 			],
 			configFocus: 'Minimal binding declaration',
 			runtimeShape: 'Call `env.AI.run(...)` from the worker',
@@ -2115,15 +2212,36 @@ export async function fetch(): Promise<Response> {
 	return Response.json({ result })
 }`
 			},
+			testSnippet: {
+				title: 'A skip-aware remote smoke test',
+				language: 'ts',
+				code: String.raw`import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
+import { createTestContext, cf, env, shouldSkip } from 'devflare/test'
+
+beforeAll(() => createTestContext())
+afterAll(() => env.dispose())
+
+const skipAI = await shouldSkip.ai
+
+describe.skipIf(skipAI)('AI route', () => {
+	test('calls Workers AI through the worker boundary', async () => {
+		const response = await cf.worker.get('/')
+		expect(response.ok).toBe(true)
+
+		const body = await response.json()
+		expect(body.result).toBeDefined()
+	})
+})`
+			},
 			notes: [
 				'Use a cheap, small model in smoke paths unless the point is to verify a specific expensive production model.',
 				'Keep local app mocks above this worker route if you need offline UI development.'
 			],
 			callout: {
-				tone: 'warning',
-				title: 'This example still needs remote access',
+				tone: 'accent',
+				title: 'The Devflare win is the explicit remote gate',
 				body: [
-					'It is a minimal worker example, not a promise of local AI emulation. Treat account access and cost control as part of the example setup.'
+					'A clear skip condition is more trustworthy than a fake local AI emulator that never touched the real platform. That honesty is part of what makes the Devflare AI story usable.'
 				]
 			}
 		}
@@ -2139,13 +2257,13 @@ export async function fetch(): Promise<Response> {
 		overview: {
 			readTime: '4 min read',
 			title: 'Use Vectorize when the worker really owns similarity search, not just string matching',
-			summary: 'Vectorize is fully modeled in Devflare config and preview naming, but meaningful tests are still remote-oriented because the index lives on Cloudflare infrastructure.',
-			description: 'That makes the docs pattern similar to AI: compile support is strong, preview lifecycle is explicit, and tests should be honest about when they are using the real index versus a fake.',
+			summary: 'Devflare makes Vectorize usable by keeping the index name explicit in config, preview naming honest, and the real smoke test explicit instead of buried under mocks.',
+			description: 'The right first path is small: one binding, one tiny upsert-and-query route, and one skip-aware remote smoke test that tells the truth about whether the real index was involved.',
 			highlights: [
 				'Each binding declares an explicit `indexName`.',
 				'Compile emits Wrangler `vectorize` entries.',
 				'Preview-scoped Vectorize indexes are part of Devflare’s resource lifecycle story.',
-				'Remote-mode testing is the truthful default for real similarity search.'
+				'`shouldSkip.vectorize` makes the remote test contract obvious instead of noisy.'
 			],
 			bestFor: 'Similarity search, embedding-backed lookup, and retrieval paths that belong in the worker',
 			authoringParagraphs: [
@@ -2281,12 +2399,12 @@ describe.skipIf(skipVectorize)('Vectorize binding', () => {
 		},
 		example: {
 			readTime: '3 min read',
-			summary: 'This example keeps Vectorize honest: one index binding, one upsert, and one query against the same worker path.',
-			description: 'That is enough to show the binding shape without requiring a whole retrieval stack in the very first example.',
+			summary: 'This example keeps Vectorize honest and usable: one index binding, one upsert-and-query route, and one skip-aware remote smoke test.',
+			description: 'That is enough to show the binding shape, the worker contract, and the Devflare remote gate without dragging in a whole retrieval stack on page one.',
 			highlights: [
 				'The index name stays explicit in config.',
 				'The runtime path shows both write and read shape.',
-				'The example is small enough to turn into a remote smoke test later.',
+				'The remote smoke test uses Devflare’s skip gate instead of pretending similarity search is local.',
 				'The worker contract remains visible even if the app wraps it elsewhere.'
 			],
 			configFocus: 'Explicit index naming',
@@ -2331,15 +2449,36 @@ export async function fetch(): Promise<Response> {
 	return Response.json({ result })
 }`
 			},
+			testSnippet: {
+				title: 'A skip-aware remote Vectorize smoke test',
+				language: 'ts',
+				code: String.raw`import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
+import { createTestContext, cf, env, shouldSkip } from 'devflare/test'
+
+beforeAll(() => createTestContext())
+afterAll(() => env.dispose())
+
+const skipVectorize = await shouldSkip.vectorize
+
+describe.skipIf(skipVectorize)('Vectorize route', () => {
+	test('hits the configured index through the worker boundary', async () => {
+		const response = await cf.worker.get('/')
+		expect(response.ok).toBe(true)
+
+		const body = await response.json()
+		expect(body.result).toBeDefined()
+	})
+})`
+			},
 			notes: [
 				'Keep the embedding dimension explicit and consistent with the actual index you created.',
 				'If you later split write and read into separate routes, this same example still teaches the core binding path.'
 			],
 			callout: {
-				tone: 'warning',
-				title: 'The remote index still has to exist',
+				tone: 'accent',
+				title: 'The Devflare win is honest lifecycle plus honest gating',
 				body: [
-					'This example is intentionally small, but it is not fictional. The named index has to exist and match the vector shape you send.'
+					'The named index still has to exist, but Devflare keeps that reality visible in config, preview naming, and skip-aware tests instead of hiding it behind fake local success.'
 				]
 			}
 		}
@@ -2378,7 +2517,7 @@ export default defineConfig({
 	bindings: {
 		hyperdrive: {
 			DB: 'app-postgres',
-				ANALYTICS_DB: { id: 'hyperdrive-id' }
+			ANALYTICS_DB: { id: 'hyperdrive-id' }
 		}
 	}
 })`
@@ -2552,13 +2691,14 @@ export async function fetch(): Promise<Response> {
 		overview: {
 			readTime: '5 min read',
 			title: 'Use Browser Rendering when the worker really needs a headless browser path',
-			summary: 'Devflare supports Browser Rendering, but there is exactly one browser binding today, and the best-supported local story lives in dev-server and integration flows.',
-			description: 'Browser work can live in the same docs library as every other binding, just with clear caveats about limits and testing style.',
+			summary: 'Browser Rendering shines in Devflare’s bridge-backed dev story: keep one browser binding, one narrow worker route, and one smoke path that proves launch works.',
+			description: 'The platform limit is still real — exactly one browser binding — but Devflare adds the missing local ergonomics through the browser shim, binding worker, and integration-friendly route model.',
 			highlights: [
 				'Current schema allows exactly one browser binding.',
 				'Compile emits the single Wrangler browser binding shape from the named env key.',
-				'`devflare types` currently models the binding as `Fetcher`, so the worker boundary is the thing to test and document.',
 				'Devflare ships a browser shim and binding worker to support the local/dev story.',
+				'`devflare types` currently models the binding as `Fetcher`, so the worker boundary is the thing to test and document.',
+				'The best first proof is one narrow route that launches Puppeteer, reads one title, and closes cleanly.',
 				'Preview naming exists, but browser bindings are not lifecycle-managed account resources like KV or D1.'
 			],
 			bestFor: 'PDF generation, screenshots, and other worker-side headless browser tasks',
@@ -2686,11 +2826,12 @@ test('browser-backed route responds', async () => {
 		},
 		example: {
 			readTime: '4 min read',
-			summary: 'This example shows the real browser shape most people care about: launch a browser, read one page title, close the browser cleanly.',
-			description: 'It is intentionally smaller than a full PDF pipeline, but it uses the same worker-side idea: the browser binding is real infrastructure, not a pretend local object.',
+			summary: 'This example shows the real browser path people actually need: one binding, one title-read route, and one smoke check through the dev server.',
+			description: 'It is intentionally smaller than a full PDF pipeline, but it uses the same Devflare idea: a narrow worker route on top of a bridge-backed local browser lane.',
 			highlights: [
 				'The env binding name is what matters in config.',
 				'The runtime example uses `@cloudflare/puppeteer` directly.',
+				'The smoke check proves the browser route through the same dev/integration boundary users will rely on.',
 				'Browser cleanup is part of the example, not an optional footnote.',
 				'This is enough to turn into a PDF or screenshot path later.'
 			],
@@ -2732,15 +2873,30 @@ export async function fetch(): Promise<Response> {
 	}
 }`
 			},
+			testSnippet: {
+				title: 'A dev-server smoke check for the browser route',
+				language: 'ts',
+				code: String.raw`import { expect, test } from 'bun:test'
+
+const baseUrl = process.env.DEVFLARE_TEST_URL ?? 'http://127.0.0.1:8787'
+
+test('browser route returns a title', async () => {
+	const response = await fetch(new URL('/', baseUrl))
+	expect(response.ok).toBe(true)
+
+	const body = await response.json()
+	expect(body.title).toBeTruthy()
+})`
+			},
 			notes: [
 				'Keep the first route tiny so launch, navigation, and cleanup are the only moving parts you have to trust.',
 				'If the real feature is PDF generation, this same pattern is the foundation for that worker path.'
 			],
 			callout: {
-				tone: 'warning',
-				title: 'The example is small, not cheap',
+				tone: 'accent',
+				title: 'The Devflare value is the bridge-backed local lane',
 				body: [
-					'Browser work is still heavier than most bindings. Keep your first path focused enough that failures are easy to diagnose.'
+					'Browser work is still heavier than most bindings, but Devflare gives it a real local/dev story instead of forcing you to document only the production path. Keep the first route narrow enough that launch failures are easy to diagnose.'
 				]
 			}
 		}
@@ -3176,7 +3332,7 @@ export interface BindingTestingGuideLink {
 }
 
 export const bindingTestingGuides: BindingTestingGuideLink[] = activeBindingGuides.map((guide) => {
-	const slugs = getBindingSlugs(guide.slugBase)
+	const slugs = getBindingSlugs(guide)
 
 	return {
 		label: guide.label,
@@ -3190,7 +3346,7 @@ export const bindingTestingGuides: BindingTestingGuideLink[] = activeBindingGuid
 })
 
 export const bindingDocCategories = activeBindingGuides.map((guide) => {
-	const slugs = getBindingSlugs(guide.slugBase)
+	const slugs = getBindingSlugs(guide)
 
 	return {
 		id: `${guide.slugBase}-binding-library`,

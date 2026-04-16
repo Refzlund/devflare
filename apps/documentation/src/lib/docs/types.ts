@@ -77,6 +77,7 @@ export interface DocSection {
 
 export interface DocPage {
 	slug: string
+	aliases?: string[]
 	group: string
 	navTitle: string
 	sidebarHidden?: boolean
