@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test'
-import { access, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { access, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'pathe'
 import { clearDependencies, setDependencies } from '../../../src/cli/dependencies'
@@ -216,6 +216,55 @@ console.log('stub wrangler binary')
 		expect(previewExecution?.args).toEqual(['wrangler', 'versions', 'upload'])
 		expect(logger.messages.some((message) => message.args.join(' ').includes('Version ID: version-123'))).toBe(true)
 		expect(logger.messages.some((message) => message.args.join(' ').includes('Preview URL: https://preview.example.workers.dev'))).toBe(true)
+	})
+
+	test('deploy writes canonical metadata when DEVFLARE_DEPLOY_METADATA_PATH is configured', async () => {
+		await writeProjectFiles(projectDir, { withViteConfig: false, withViteDeps: false })
+		process.env.DEVFLARE_DEPLOY_METADATA_PATH = join(projectDir, 'deploy-result.json')
+
+		const executions: ExecInvocation[] = []
+		const logger = createLogger()
+		setDependencies(createCliDependencies(
+			createProcessRunner((command, args) => {
+				if (command === 'bunx' && args[0] === 'wrangler' && args[1] === 'versions' && args[2] === 'upload') {
+					return successResult('Version ID: version-123\nPreview URL: https://preview.example.workers.dev')
+				}
+
+				return successResult()
+			}, executions)
+		))
+
+		const result = await runDeployCommand(
+			{
+				command: 'deploy',
+				args: [],
+				options: {
+					preview: true,
+					'branch-name': 'feature/branch'
+				}
+			},
+			logger as any,
+			{ cwd: projectDir }
+		)
+
+		expect(result.exitCode).toBe(0)
+		const metadata = JSON.parse(await readFile(join(projectDir, 'deploy-result.json'), 'utf8')) as {
+			status: string
+			exitCode: number
+			workerName: string
+			preview: boolean
+			versionId?: string
+			previewUrl?: string
+			outputUrls: string[]
+		}
+
+		expect(metadata.status).toBe('success')
+		expect(metadata.exitCode).toBe(0)
+		expect(metadata.workerName).toBe('worker-build-test')
+		expect(metadata.preview).toBe(true)
+		expect(metadata.versionId).toBe('version-123')
+		expect(metadata.previewUrl).toBe('https://preview.example.workers.dev')
+		expect(metadata.outputUrls).toContain('https://preview.example.workers.dev')
 	})
 
 	test('deploy verifies preview uploads in Cloudflare control plane when strict verification is enabled', async () => {

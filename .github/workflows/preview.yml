@@ -195,7 +195,7 @@ jobs:
           skip-install: 'true'
           deploy-command: bun run deploy --
           preview-scope: ${{ needs.resolve-context.outputs.branch-preview-scope }}
-          verify-deployment: 'false'
+          verify-deployment: 'true'
           deploy-message: Documentation branch preview ${{ github.sha }} (run ${{ github.run_id }})
           deploy-tag: documentation-branch-preview-${{ github.run_id }}
           cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -284,7 +284,7 @@ jobs:
           skip-install: 'true'
           deploy-command: bun run deploy --
           preview-scope: ${{ needs.resolve-context.outputs.pr-preview-scope }}
-          verify-deployment: 'false'
+          verify-deployment: 'true'
           deploy-message: Documentation PR preview ${{ needs.resolve-context.outputs.checkout-ref }} (run ${{ github.run_id }})
           deploy-tag: documentation-pr-preview-${{ github.run_id }}
           cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -567,7 +567,7 @@ jobs:
           skip-setup: 'true'
           skip-install: 'true'
           preview-scope: ${{ needs.resolve-context.outputs.branch-preview-scope }}
-          verify-deployment: 'false'
+          verify-deployment: 'true'
           cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           cloudflare-account-id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
@@ -582,7 +582,7 @@ jobs:
           skip-setup: 'true'
           skip-install: 'true'
           preview-scope: ${{ needs.resolve-context.outputs.branch-preview-scope }}
-          verify-deployment: 'false'
+          verify-deployment: 'true'
           cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           cloudflare-account-id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
@@ -597,7 +597,7 @@ jobs:
           skip-setup: 'true'
           skip-install: 'true'
           preview-scope: ${{ needs.resolve-context.outputs.branch-preview-scope }}
-          verify-deployment: 'false'
+          verify-deployment: 'true'
           cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           cloudflare-account-id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
@@ -660,7 +660,7 @@ jobs:
           skip-setup: 'true'
           skip-install: 'true'
           preview-scope: ${{ needs.resolve-context.outputs.pr-preview-scope }}
-          verify-deployment: 'false'
+          verify-deployment: 'true'
           cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           cloudflare-account-id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
@@ -675,7 +675,7 @@ jobs:
           skip-setup: 'true'
           skip-install: 'true'
           preview-scope: ${{ needs.resolve-context.outputs.pr-preview-scope }}
-          verify-deployment: 'false'
+          verify-deployment: 'true'
           cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           cloudflare-account-id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
@@ -690,7 +690,7 @@ jobs:
           skip-setup: 'true'
           skip-install: 'true'
           preview-scope: ${{ needs.resolve-context.outputs.pr-preview-scope }}
-          verify-deployment: 'false'
+          verify-deployment: 'true'
           cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           cloudflare-account-id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 

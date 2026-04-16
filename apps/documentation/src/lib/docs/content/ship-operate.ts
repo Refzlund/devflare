@@ -674,7 +674,7 @@ bun run turbo check --filter=documentation
 
 # actual deploy from the app package
 cd apps/documentation
-bun run deploy -- --preview --branch-name feature-search
+bun run deploy -- --preview feature-search
 bun run deploy -- --prod`
 					}
 				],

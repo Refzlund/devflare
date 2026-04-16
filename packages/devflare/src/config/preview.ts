@@ -44,12 +44,32 @@ function encodePreviewScopedName(value: EncodedPreviewScopedName): PreviewScoped
 	return `${PREVIEW_SCOPED_NAME_PREFIX}${JSON.stringify(value)}` as PreviewScopedName
 }
 
+function invalidPreviewScopedName(reason: string): never {
+	throw new Error(
+		`Invalid Devflare preview-scoped value: ${reason}. Recreate it with preview.scope(...) instead of constructing preview markers manually.`
+	)
+}
+
 function decodePreviewScopedName(value: PreviewScopedName): EncodedPreviewScopedName {
 	const payload = value.slice(PREVIEW_SCOPED_NAME_PREFIX.length)
-	const parsed = JSON.parse(payload) as Partial<EncodedPreviewScopedName>
+	let parsed: Partial<EncodedPreviewScopedName>
+
+	try {
+		parsed = JSON.parse(payload) as Partial<EncodedPreviewScopedName>
+	} catch {
+		invalidPreviewScopedName('the encoded payload is not valid JSON')
+	}
+
+	const baseName = typeof parsed.baseName === 'string'
+		? parsed.baseName
+		: ''
+
+	if (!baseName.trim()) {
+		invalidPreviewScopedName('the encoded payload is missing a non-empty baseName')
+	}
 
 	return {
-		baseName: typeof parsed.baseName === 'string' ? parsed.baseName : '',
+		baseName,
 		separator: typeof parsed.separator === 'string' && parsed.separator.length > 0
 			? parsed.separator
 			: '-'
@@ -142,6 +162,10 @@ function mapRecordValues<TValue>(
 export const preview = {
 	scope(defaults: PreviewScopeOptions = {}): PreviewScopeFn {
 		return (baseName: string, options: PreviewScopedNameOptions = {}) => {
+			if (!baseName.trim()) {
+				throw new Error('preview.scope(...) requires a non-empty baseName.')
+			}
+
 			return encodePreviewScopedName({
 				baseName,
 				separator: getPreviewScopedSeparator({

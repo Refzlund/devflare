@@ -14,74 +14,158 @@ import type {
 	StoredRecordRow
 } from './preview-registry-types'
 
-const REGISTRY_SCHEMA_STATEMENTS = [
-	`CREATE TABLE IF NOT EXISTS devflare_preview_records (
-		id TEXT PRIMARY KEY,
-		ver INTEGER NOT NULL,
-		account_id TEXT NOT NULL,
-		worker_name TEXT NOT NULL,
-		version_id TEXT NOT NULL UNIQUE,
-		preview_url TEXT NOT NULL,
-		scope TEXT,
-		scope_url TEXT,
-		branch_name TEXT,
-		commit_sha TEXT,
-		deployment_id TEXT,
-		source TEXT NOT NULL,
-		status TEXT NOT NULL,
-		created_by TEXT NOT NULL,
-		created_at TEXT NOT NULL,
-		updated_at TEXT,
-		deleted_at TEXT,
-		payload_json TEXT NOT NULL
-	)` ,
-	'CREATE INDEX IF NOT EXISTS idx_devflare_preview_records_account_worker ON devflare_preview_records(account_id, worker_name)',
-	'CREATE INDEX IF NOT EXISTS idx_devflare_preview_records_status ON devflare_preview_records(status)',
-	`CREATE TABLE IF NOT EXISTS devflare_preview_scope_records (
-		id TEXT PRIMARY KEY,
-		ver INTEGER NOT NULL,
-		account_id TEXT NOT NULL,
-		worker_name TEXT NOT NULL,
-		scope TEXT NOT NULL,
-		scope_url TEXT NOT NULL,
-		version_id TEXT NOT NULL,
-		preview_id TEXT,
-		branch_name TEXT,
-		commit_sha TEXT,
-		source TEXT NOT NULL,
-		status TEXT NOT NULL,
-		created_by TEXT NOT NULL,
-		created_at TEXT NOT NULL,
-		updated_at TEXT,
-		deleted_at TEXT,
-		payload_json TEXT NOT NULL
-	)` ,
-	'CREATE INDEX IF NOT EXISTS idx_devflare_preview_scope_records_account_worker ON devflare_preview_scope_records(account_id, worker_name)',
-	'CREATE INDEX IF NOT EXISTS idx_devflare_preview_scope_records_scope ON devflare_preview_scope_records(scope)',
-	`CREATE TABLE IF NOT EXISTS devflare_deployment_records (
-		id TEXT PRIMARY KEY,
-		ver INTEGER NOT NULL,
-		account_id TEXT NOT NULL,
-		worker_name TEXT NOT NULL,
-		deployment_id TEXT NOT NULL UNIQUE,
-		channel TEXT NOT NULL,
-		status TEXT NOT NULL,
-		version_id TEXT NOT NULL,
-		preview_id TEXT,
-		environment TEXT,
-		url TEXT,
-		message TEXT,
-		commit_sha TEXT,
-		source TEXT NOT NULL,
-		created_by TEXT NOT NULL,
-		created_at TEXT NOT NULL,
-		updated_at TEXT,
-		deleted_at TEXT,
-		payload_json TEXT NOT NULL
-	)` ,
-	'CREATE INDEX IF NOT EXISTS idx_devflare_deployment_records_account_worker ON devflare_deployment_records(account_id, worker_name)',
-	'CREATE INDEX IF NOT EXISTS idx_devflare_deployment_records_channel_status ON devflare_deployment_records(channel, status)'
-] as const
+interface RegistryTableSchema {
+	name: string
+	createStatement: string
+	migrationColumns: Record<string, string>
+	indexStatements: string[]
+}
+
+const REGISTRY_TABLES: RegistryTableSchema[] = [
+	{
+		name: 'devflare_preview_records',
+		createStatement: `CREATE TABLE IF NOT EXISTS devflare_preview_records (
+			id TEXT PRIMARY KEY,
+			ver INTEGER NOT NULL,
+			account_id TEXT NOT NULL,
+			worker_name TEXT NOT NULL,
+			version_id TEXT NOT NULL UNIQUE,
+			preview_url TEXT NOT NULL,
+			scope TEXT,
+			scope_url TEXT,
+			branch_name TEXT,
+			commit_sha TEXT,
+			deployment_id TEXT,
+			source TEXT NOT NULL,
+			status TEXT NOT NULL,
+			created_by TEXT NOT NULL,
+			created_at TEXT NOT NULL,
+			updated_at TEXT,
+			deleted_at TEXT,
+			payload_json TEXT NOT NULL
+		)`,
+		migrationColumns: {
+			id: 'id TEXT',
+			ver: 'ver INTEGER NOT NULL DEFAULT 1',
+			account_id: `account_id TEXT NOT NULL DEFAULT ''`,
+			worker_name: `worker_name TEXT NOT NULL DEFAULT ''`,
+			version_id: `version_id TEXT NOT NULL DEFAULT ''`,
+			preview_url: `preview_url TEXT NOT NULL DEFAULT ''`,
+			scope: 'scope TEXT',
+			scope_url: 'scope_url TEXT',
+			branch_name: 'branch_name TEXT',
+			commit_sha: 'commit_sha TEXT',
+			deployment_id: 'deployment_id TEXT',
+			source: `source TEXT NOT NULL DEFAULT ''`,
+			status: `status TEXT NOT NULL DEFAULT ''`,
+			created_by: `created_by TEXT NOT NULL DEFAULT ''`,
+			created_at: `created_at TEXT NOT NULL DEFAULT ''`,
+			updated_at: 'updated_at TEXT',
+			deleted_at: 'deleted_at TEXT',
+			payload_json: `payload_json TEXT NOT NULL DEFAULT '{}'`
+		},
+		indexStatements: [
+			'CREATE INDEX IF NOT EXISTS idx_devflare_preview_records_account_worker ON devflare_preview_records(account_id, worker_name)',
+			'CREATE INDEX IF NOT EXISTS idx_devflare_preview_records_status ON devflare_preview_records(status)',
+			'CREATE UNIQUE INDEX IF NOT EXISTS idx_devflare_preview_records_version_id ON devflare_preview_records(version_id)'
+		]
+	},
+	{
+		name: 'devflare_preview_scope_records',
+		createStatement: `CREATE TABLE IF NOT EXISTS devflare_preview_scope_records (
+			id TEXT PRIMARY KEY,
+			ver INTEGER NOT NULL,
+			account_id TEXT NOT NULL,
+			worker_name TEXT NOT NULL,
+			scope TEXT NOT NULL,
+			scope_url TEXT NOT NULL,
+			version_id TEXT NOT NULL,
+			preview_id TEXT,
+			branch_name TEXT,
+			commit_sha TEXT,
+			source TEXT NOT NULL,
+			status TEXT NOT NULL,
+			created_by TEXT NOT NULL,
+			created_at TEXT NOT NULL,
+			updated_at TEXT,
+			deleted_at TEXT,
+			payload_json TEXT NOT NULL
+		)`,
+		migrationColumns: {
+			id: 'id TEXT',
+			ver: 'ver INTEGER NOT NULL DEFAULT 1',
+			account_id: `account_id TEXT NOT NULL DEFAULT ''`,
+			worker_name: `worker_name TEXT NOT NULL DEFAULT ''`,
+			scope: `scope TEXT NOT NULL DEFAULT ''`,
+			scope_url: `scope_url TEXT NOT NULL DEFAULT ''`,
+			version_id: `version_id TEXT NOT NULL DEFAULT ''`,
+			preview_id: 'preview_id TEXT',
+			branch_name: 'branch_name TEXT',
+			commit_sha: 'commit_sha TEXT',
+			source: `source TEXT NOT NULL DEFAULT ''`,
+			status: `status TEXT NOT NULL DEFAULT ''`,
+			created_by: `created_by TEXT NOT NULL DEFAULT ''`,
+			created_at: `created_at TEXT NOT NULL DEFAULT ''`,
+			updated_at: 'updated_at TEXT',
+			deleted_at: 'deleted_at TEXT',
+			payload_json: `payload_json TEXT NOT NULL DEFAULT '{}'`
+		},
+		indexStatements: [
+			'CREATE INDEX IF NOT EXISTS idx_devflare_preview_scope_records_account_worker ON devflare_preview_scope_records(account_id, worker_name)',
+			'CREATE INDEX IF NOT EXISTS idx_devflare_preview_scope_records_scope ON devflare_preview_scope_records(scope)'
+		]
+	},
+	{
+		name: 'devflare_deployment_records',
+		createStatement: `CREATE TABLE IF NOT EXISTS devflare_deployment_records (
+			id TEXT PRIMARY KEY,
+			ver INTEGER NOT NULL,
+			account_id TEXT NOT NULL,
+			worker_name TEXT NOT NULL,
+			deployment_id TEXT NOT NULL UNIQUE,
+			channel TEXT NOT NULL,
+			status TEXT NOT NULL,
+			version_id TEXT NOT NULL,
+			preview_id TEXT,
+			environment TEXT,
+			url TEXT,
+			message TEXT,
+			commit_sha TEXT,
+			source TEXT NOT NULL,
+			created_by TEXT NOT NULL,
+			created_at TEXT NOT NULL,
+			updated_at TEXT,
+			deleted_at TEXT,
+			payload_json TEXT NOT NULL
+		)`,
+		migrationColumns: {
+			id: 'id TEXT',
+			ver: 'ver INTEGER NOT NULL DEFAULT 1',
+			account_id: `account_id TEXT NOT NULL DEFAULT ''`,
+			worker_name: `worker_name TEXT NOT NULL DEFAULT ''`,
+			deployment_id: `deployment_id TEXT NOT NULL DEFAULT ''`,
+			channel: `channel TEXT NOT NULL DEFAULT ''`,
+			status: `status TEXT NOT NULL DEFAULT ''`,
+			version_id: `version_id TEXT NOT NULL DEFAULT ''`,
+			preview_id: 'preview_id TEXT',
+			environment: 'environment TEXT',
+			url: 'url TEXT',
+			message: 'message TEXT',
+			commit_sha: 'commit_sha TEXT',
+			source: `source TEXT NOT NULL DEFAULT ''`,
+			created_by: `created_by TEXT NOT NULL DEFAULT ''`,
+			created_at: `created_at TEXT NOT NULL DEFAULT ''`,
+			updated_at: 'updated_at TEXT',
+			deleted_at: 'deleted_at TEXT',
+			payload_json: `payload_json TEXT NOT NULL DEFAULT '{}'`
+		},
+		indexStatements: [
+			'CREATE INDEX IF NOT EXISTS idx_devflare_deployment_records_account_worker ON devflare_deployment_records(account_id, worker_name)',
+			'CREATE INDEX IF NOT EXISTS idx_devflare_deployment_records_channel_status ON devflare_deployment_records(channel, status)',
+			'CREATE UNIQUE INDEX IF NOT EXISTS idx_devflare_deployment_records_deployment_id ON devflare_deployment_records(deployment_id)'
+		]
+	}
+]
 
 const schemaEnsuredRegistryIds = new Set<string>()
 
@@ -121,6 +205,50 @@ async function runStatement(
 	)
 }
 
+function quoteSqlIdentifier(value: string): string {
+	return `"${value.replaceAll('"', '""')}"`
+}
+
+async function readTableColumnNames(
+	registry: PreviewRegistryContext,
+	tableName: string,
+	apiOptions?: APIClientOptions
+): Promise<Set<string>> {
+	const rows = await runQuery<{ name?: unknown }>(
+		registry,
+		`PRAGMA table_info(${quoteSqlIdentifier(tableName)})`,
+		[],
+		apiOptions
+	)
+
+	return new Set(
+		rows
+			.map((row) => typeof row.name === 'string' ? row.name : undefined)
+			.filter((value): value is string => Boolean(value))
+	)
+}
+
+async function ensureTableColumns(
+	registry: PreviewRegistryContext,
+	table: RegistryTableSchema,
+	apiOptions?: APIClientOptions
+): Promise<void> {
+	const existingColumnNames = await readTableColumnNames(registry, table.name, apiOptions)
+
+	for (const [columnName, definition] of Object.entries(table.migrationColumns)) {
+		if (existingColumnNames.has(columnName)) {
+			continue
+		}
+
+		await runStatement(
+			registry,
+			`ALTER TABLE ${quoteSqlIdentifier(table.name)} ADD COLUMN ${definition}`,
+			[],
+			apiOptions
+		)
+	}
+}
+
 export async function ensurePreviewRegistrySchema(
 	registry: PreviewRegistryContext,
 	apiOptions?: APIClientOptions
@@ -129,8 +257,13 @@ export async function ensurePreviewRegistrySchema(
 		return
 	}
 
-	for (const statement of REGISTRY_SCHEMA_STATEMENTS) {
-		await runStatement(registry, statement, [], apiOptions)
+	for (const table of REGISTRY_TABLES) {
+		await runStatement(registry, table.createStatement, [], apiOptions)
+		await ensureTableColumns(registry, table, apiOptions)
+
+		for (const statement of table.indexStatements) {
+			await runStatement(registry, statement, [], apiOptions)
+		}
 	}
 
 	schemaEnsuredRegistryIds.add(registry.databaseId)

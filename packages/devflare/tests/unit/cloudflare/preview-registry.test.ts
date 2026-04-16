@@ -4,6 +4,7 @@ import {
 	reconcilePreviewRegistry,
 	retirePreviewRegistry
 } from '../../../src/cloudflare/preview-registry'
+import { clearPreviewRegistrySchemaCache } from '../../../src/cloudflare/preview-registry-store'
 import { createTrackedTempDirectories } from '../../helpers/tracked-temp-directories'
 import {
 	capturePreviewTestEnvironmentSnapshot,
@@ -41,6 +42,7 @@ function createPreviewRegistryFetch(options: {
 	previewScopeRecords?: Array<Record<string, unknown>>
 	deploymentRecords?: Array<Record<string, unknown>>
 	recordedStatements?: Array<{ sql: string; params: unknown[] }>
+	tableColumnsByTable?: Record<string, string[]>
 } = {}): typeof fetch {
 	return mock(async (input: RequestInfo | URL, init?: RequestInit) => {
 		const url = String(input)
@@ -86,6 +88,15 @@ function createPreviewRegistryFetch(options: {
 				})
 			}
 
+			const pragmaMatch = sql.match(/^PRAGMA table_info\("([^"]+)"\)$/)
+			if (pragmaMatch) {
+				const tableName = pragmaMatch[1]
+				const columns = options.tableColumnsByTable?.[tableName]
+				if (columns) {
+					return createD1ResultsResponse(columns.map((name) => ({ name })))
+				}
+			}
+
 			if (sql.startsWith('SELECT payload_json FROM devflare_preview_records')) {
 				return createD1ResultsResponse((options.previewRecords ?? []).map(createSerializedRegistryRecord))
 			}
@@ -112,6 +123,7 @@ function expectRegistryInsertStatements(recordedSql: string[]): void {
 }
 
 afterEach(() => {
+	clearPreviewRegistrySchemaCache('db_123')
 	restorePreviewTestEnvironmentSnapshot(originalEnvironment)
 	temporaryCacheDirectories.cleanup()
 })
@@ -277,6 +289,112 @@ describe('preview registry', () => {
 		expect(recordedSql.some((sql) => sql.startsWith('INSERT INTO devflare_preview_records'))).toBe(false)
 		expect(recordedSql.some((sql) => sql.startsWith('INSERT INTO devflare_preview_scope_records'))).toBe(false)
 		expect(recordedSql.some((sql) => sql.startsWith('INSERT INTO devflare_deployment_records'))).toBe(false)
+	})
+
+	test('migrates missing preview registry columns before writing new records', async () => {
+		process.env.CLOUDFLARE_API_TOKEN = 'cf_test_token'
+		const recordedSql: string[] = []
+		globalThis.fetch = createPreviewRegistryFetch({
+			recordedSql,
+			tableColumnsByTable: {
+				devflare_preview_records: [
+					'id',
+					'ver',
+					'account_id',
+					'worker_name',
+					'version_id',
+					'preview_url',
+					'scope',
+					'branch_name',
+					'commit_sha',
+					'source',
+					'status',
+					'created_by',
+					'created_at',
+					'updated_at',
+					'deleted_at',
+					'payload_json'
+				],
+				devflare_preview_scope_records: [
+					'id',
+					'ver',
+					'account_id',
+					'worker_name',
+					'scope',
+					'scope_url',
+					'version_id',
+					'branch_name',
+					'commit_sha',
+					'source',
+					'status',
+					'created_by',
+					'created_at',
+					'updated_at',
+					'deleted_at',
+					'payload_json'
+				],
+				devflare_deployment_records: [
+					'id',
+					'ver',
+					'account_id',
+					'worker_name',
+					'deployment_id',
+					'channel',
+					'status',
+					'version_id',
+					'environment',
+					'url',
+					'commit_sha',
+					'source',
+					'created_by',
+					'created_at',
+					'updated_at',
+					'deleted_at',
+					'payload_json'
+				]
+			},
+			versionsItems: [
+				{
+					id: defaultReconcileRequest.versionId,
+					number: 7,
+					metadata: {
+						author_id: 'user_123',
+						created_on: '2025-01-01T00:00:00.000Z',
+						modified_on: '2025-01-01T00:00:00.000Z',
+						hasPreview: true,
+						source: 'wrangler'
+					}
+				}
+			],
+			deployments: [
+				{
+					id: 'deployment_123',
+					created_on: '2025-01-02T00:00:00.000Z',
+					source: 'wrangler',
+					strategy: 'percentage',
+					versions: [
+						{
+							percentage: 100,
+							version_id: defaultReconcileRequest.versionId
+						}
+					],
+					annotations: {
+						'workers/message': 'Deploy preview branch',
+						'workers/triggered_by': 'upload'
+					},
+					author_email: 'dev@example.com'
+				}
+			]
+		})
+
+		const result = await reconcilePreviewRegistry(defaultReconcileRequest)
+
+		expect(result.previews).toHaveLength(1)
+		expect(recordedSql).toContain('ALTER TABLE "devflare_preview_records" ADD COLUMN scope_url TEXT')
+		expect(recordedSql).toContain('ALTER TABLE "devflare_preview_records" ADD COLUMN deployment_id TEXT')
+		expect(recordedSql).toContain('ALTER TABLE "devflare_preview_scope_records" ADD COLUMN preview_id TEXT')
+		expect(recordedSql).toContain('ALTER TABLE "devflare_deployment_records" ADD COLUMN preview_id TEXT')
+		expect(recordedSql).toContain('ALTER TABLE "devflare_deployment_records" ADD COLUMN message TEXT')
 	})
 
 	test('retires a targeted preview, scope, and preview deployment without touching production records', async () => {

@@ -247,7 +247,7 @@ const projectArchitectureHostedAppPackageCode = String.raw`{
 	"scripts": {
 		"dev": "bun run llm:generate && bunx --bun devflare dev",
 		"build": "bun run llm:generate && bunx --bun devflare build",
-		"deploy": "bun run llm:generate && bunx devflare deploy",
+		"deploy": "bun run llm:generate && bunx --bun devflare deploy",
 		"types": "bunx --bun devflare types"
 	},
 	"devDependencies": {

@@ -46,7 +46,7 @@ bun run turbo build --filter=documentation
 bun run turbo check --filter=documentation
 
 # from apps/documentation
-bun run deploy -- --preview --branch-name feature-search
+bun run deploy -- --preview feature-search
 bun run deploy -- --prod
 ```
 

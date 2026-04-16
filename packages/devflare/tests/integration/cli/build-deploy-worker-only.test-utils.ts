@@ -27,6 +27,7 @@ export interface DeployEnvironmentSnapshot {
 	verifyDeployment?: string
 	verifyDeploymentDelayMs?: string
 	requireFreshProductionDeployment?: string
+	deployMetadataPath?: string
 }
 
 export function cloudflareApiResponse(result: unknown): Response {
@@ -40,7 +41,8 @@ export function captureDeployEnvironmentSnapshot(): DeployEnvironmentSnapshot {
 		accountId: process.env.CLOUDFLARE_ACCOUNT_ID,
 		verifyDeployment: process.env.DEVFLARE_VERIFY_DEPLOYMENT,
 		verifyDeploymentDelayMs: process.env.DEVFLARE_VERIFY_DEPLOYMENT_DELAY_MS,
-		requireFreshProductionDeployment: process.env.DEVFLARE_REQUIRE_FRESH_PRODUCTION_DEPLOYMENT
+		requireFreshProductionDeployment: process.env.DEVFLARE_REQUIRE_FRESH_PRODUCTION_DEPLOYMENT,
+		deployMetadataPath: process.env.DEVFLARE_DEPLOY_METADATA_PATH
 	}
 }
 
@@ -60,6 +62,7 @@ export function restoreDeployEnvironmentSnapshot(snapshot: DeployEnvironmentSnap
 	restoreOptionalEnvironmentVariable('DEVFLARE_VERIFY_DEPLOYMENT', snapshot.verifyDeployment)
 	restoreOptionalEnvironmentVariable('DEVFLARE_VERIFY_DEPLOYMENT_DELAY_MS', snapshot.verifyDeploymentDelayMs)
 	restoreOptionalEnvironmentVariable('DEVFLARE_REQUIRE_FRESH_PRODUCTION_DEPLOYMENT', snapshot.requireFreshProductionDeployment)
+	restoreOptionalEnvironmentVariable('DEVFLARE_DEPLOY_METADATA_PATH', snapshot.deployMetadataPath)
 }
 
 export function enableStrictDeployVerification(options: {

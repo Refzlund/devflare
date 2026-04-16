@@ -5,6 +5,7 @@
 import { createConsola, type ConsolaInstance } from 'consola'
 import { getPackageVersion } from './package-metadata'
 import { COMMANDS, renderHelp, type Command } from './help'
+import { getLocalWorkspaceBuildGuardMessage } from './workspace-build-guard'
 import { createCliTheme, cyanBold, dim, logLine } from './ui'
 
 // =============================================================================
@@ -152,6 +153,12 @@ export async function runCli(
 
 		logLine(logger, renderedHelp.styled)
 		return { exitCode: 0, output: renderedHelp.plain }
+	}
+
+	const workspaceBuildGuardMessage = await getLocalWorkspaceBuildGuardMessage(parsed.command)
+	if (workspaceBuildGuardMessage) {
+		logger.error(workspaceBuildGuardMessage)
+		return { exitCode: 1 }
 	}
 
 	// Route to command handler

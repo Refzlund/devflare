@@ -38,7 +38,7 @@ inputs:
     required: false
     default: "false"
   deploy-command:
-    description: "Optional command prefix used to invoke deploy from the target package, for example 'bun run deploy --'. When omitted, the action falls back to 'bunx devflare deploy'."
+    description: "Optional command prefix used to invoke deploy from the target package, for example 'bun run deploy --'. When omitted, the action falls back to 'bunx --bun devflare deploy'."
     required: false
     default: ""
   deploy-message:
@@ -215,10 +215,12 @@ runs:
 
         deploy_command="$INPUT_DEPLOY_COMMAND"
         if [ -z "$deploy_command" ]; then
-          deploy_command='bunx devflare deploy'
+          deploy_command='bunx --bun devflare deploy'
         fi
 
         deploy_log="$(mktemp)"
+        deploy_metadata_file="$(mktemp)"
+        export DEVFLARE_DEPLOY_METADATA_PATH="$deploy_metadata_file"
         printf 'Using deploy command: %s\n' "$deploy_command" | tee "$deploy_log"
         printf 'Deploy target: %s\n' "$resolved_target" | tee -a "$deploy_log"
         printf 'Bun version: %s\n' "$(bun --version)" | tee -a "$deploy_log"
@@ -231,13 +233,27 @@ runs:
         deploy_exit_code="${PIPESTATUS[0]}"
         set -e
 
-        version_id="$(sed -nE 's/^.*(Worker )?[Vv]ersion ID:?[[:space:]]+([A-Za-z0-9_-]+).*$/\2/p' "$deploy_log" | tail -n 1)"
-        preview_url="$(sed -nE 's/^.*(Preview URL|Version Preview URL|URL):[[:space:]]+(https?:\/\/[^[:space:]]+).*$/\2/p' "$deploy_log" | tail -n 1)"
-        verification_note="$(sed -nE 's/^.*Deployment verification note:[[:space:]]+(.*)$/\1/p' "$deploy_log" | tail -n 1)"
+        metadata_field_reader='const fs = require("node:fs"); const [filePath, fieldName] = process.argv.slice(1); try { const payload = JSON.parse(fs.readFileSync(filePath, "utf8")); const value = payload?.[fieldName]; if (typeof value === "string") { process.stdout.write(value); } else if (typeof value === "number") { process.stdout.write(String(value)); } } catch {}'
+
+        version_id="$(node -e "$metadata_field_reader" "$deploy_metadata_file" versionId)"
+        preview_url="$(node -e "$metadata_field_reader" "$deploy_metadata_file" previewUrl)"
+        verification_note="$(node -e "$metadata_field_reader" "$deploy_metadata_file" verificationNote)"
         workers_dev_url="$(grep -oE 'https?:\/\/[^[:space:]]+' "$deploy_log" | grep 'workers.dev' | tail -n 1 || true)"
         deploy_status='success'
         if [ "$deploy_exit_code" -ne 0 ]; then
           deploy_status='failure'
+        fi
+
+        if [ -z "$version_id" ]; then
+          version_id="$(sed -nE 's/^.*(Worker )?[Vv]ersion ID:?[[:space:]]+([A-Za-z0-9_-]+).*$/\2/p' "$deploy_log" | tail -n 1)"
+        fi
+
+        if [ -z "$preview_url" ]; then
+          preview_url="$(sed -nE 's/^.*(Preview URL|Version Preview URL|URL):[[:space:]]+(https?:\/\/[^[:space:]]+).*$/\2/p' "$deploy_log" | tail -n 1)"
+        fi
+
+        if [ -z "$verification_note" ]; then
+          verification_note="$(sed -nE 's/^.*Deployment verification note:[[:space:]]+(.*)$/\1/p' "$deploy_log" | tail -n 1)"
         fi
 
         preferred_preview_url="$preview_url"
@@ -265,6 +281,7 @@ runs:
         } >> "$GITHUB_OUTPUT"
 
         rm -f "$deploy_log"
+        rm -f "$deploy_metadata_file"
 
         exit "$deploy_exit_code"
 

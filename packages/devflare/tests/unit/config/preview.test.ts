@@ -52,6 +52,26 @@ describe('preview.scope', () => {
 			}
 		})).toBe('analytics-dataset--feature-test-branch')
 	})
+
+	test('rejects empty base names early', () => {
+		const pv = preview.scope()
+
+		expect(() => pv('   ')).toThrow('preview.scope(...) requires a non-empty baseName.')
+	})
+
+	test('rejects malformed preview-scoped markers with a clear error', () => {
+		expect(() => materializePreviewScopedString('__DEVFLARE_PREVIEW_SCOPE__:not-json')).toThrow(
+			'Invalid Devflare preview-scoped value: the encoded payload is not valid JSON.'
+		)
+	})
+
+	test('rejects preview-scoped markers that omit the base name', () => {
+		const invalidScopedName = `${'__DEVFLARE_PREVIEW_SCOPE__:'}${JSON.stringify({ separator: '-' })}`
+
+		expect(() => materializePreviewScopedString(invalidScopedName)).toThrow(
+			'Invalid Devflare preview-scoped value: the encoded payload is missing a non-empty baseName.'
+		)
+	})
 })
 
 describe('resolveConfigForEnvironment', () => {

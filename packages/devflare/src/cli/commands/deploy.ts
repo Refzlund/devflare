@@ -2,8 +2,9 @@
 // Deploy Command — Deploy to Cloudflare
 // =============================================================================
 
+import { mkdir, writeFile } from 'node:fs/promises'
 import { type ConsolaInstance } from 'consola'
-import { join } from 'pathe'
+import { dirname, join } from 'pathe'
 import type { ParsedArgs, CliOptions, CliResult } from '../index'
 import { loadResolvedConfig } from '../../config'
 import {
@@ -32,6 +33,22 @@ import { applyDeploymentStrategy, describeDeploymentStrategy } from '../deploy-s
 import { reconcilePreviewRegistry } from '../../cloudflare/preview-registry'
 import { createCliTheme, dim, green, logLine, yellow, yellowBold } from '../ui'
 import { resolvePackageSpecifier } from '../../utils/resolve-package'
+
+interface DeployResultMetadata {
+	status: 'success' | 'failure'
+	exitCode: number
+	workerName?: string
+	preview: boolean
+	branchScopedPreview: boolean
+	previewScope?: string
+	versionId?: string
+	previewUrl?: string
+	workersDevUrl?: string
+	verificationNote?: string
+	outputUrls: string[]
+	structuredOutput?: string
+	error?: string
+}
 
 async function getCurrentGitBranch(cwd: string): Promise<string | null> {
 	const deps = await getDependencies()
@@ -82,6 +99,16 @@ function shouldRequireFreshProductionDeployment(): boolean {
 	}
 
 	return !['0', 'false', 'no', 'off'].includes(configured)
+}
+
+async function writeDeployResultMetadata(metadata: DeployResultMetadata): Promise<void> {
+	const metadataPath = process.env.DEVFLARE_DEPLOY_METADATA_PATH?.trim()
+	if (!metadataPath) {
+		return
+	}
+
+	await mkdir(dirname(metadataPath), { recursive: true })
+	await writeFile(metadataPath, JSON.stringify(metadata, null, '\t'), 'utf8')
 }
 
 function getDeployVerificationSettings(): { attempts: number; delayMs: number } {
@@ -375,6 +402,7 @@ export async function runDeployCommand(
 	let deployTag: string | undefined
 	let previewScopeName: string | undefined
 	let requireFreshProductionDeployment = false
+	let resolvedPreviewScopeName = process.env.DEVFLARE_PREVIEW_BRANCH?.trim() || undefined
 	const theme = createCliTheme(parsed.options)
 
 	logLine(logger)
@@ -393,10 +421,11 @@ export async function runDeployCommand(
 		deployMessage = resolvedParsed.options.message as string | undefined
 		deployTag = resolvedParsed.options.tag as string | undefined
 		previewScopeName = branchName?.trim() || deployTarget.previewScopeRaw || undefined
+		resolvedPreviewScopeName = previewScopeName || process.env.DEVFLARE_PREVIEW_BRANCH?.trim() || undefined
 		requireFreshProductionDeployment = !preview && shouldRequireFreshProductionDeployment()
 
 		return await withTemporaryEnvironment(deployTarget.envOverrides, async () => {
-			const resolvedPreviewScopeName = previewScopeName || process.env.DEVFLARE_PREVIEW_BRANCH?.trim() || undefined
+			resolvedPreviewScopeName = previewScopeName || process.env.DEVFLARE_PREVIEW_BRANCH?.trim() || undefined
 			if (dryRun) {
 				const config = await loadResolvedConfig({ cwd, configFile: configPath, environment })
 				const deploymentStrategy = applyDeploymentStrategy(config, {
@@ -475,11 +504,6 @@ export async function runDeployCommand(
 				}
 			})
 
-			if (deployProc.exitCode !== 0) {
-				logger.error('Deployment failed')
-				return { exitCode: 1 }
-			}
-
 			let structuredOutput = ''
 			try {
 				structuredOutput = await deps.fs.readFile(wranglerOutputFilePath, 'utf8') as string
@@ -500,6 +524,7 @@ export async function runDeployCommand(
 				? parseWranglerStructuredOutput(structuredOutput)
 				: { urls: [], versionId: undefined, previewUrl: undefined }
 			const parsedOutput = mergeParsedWranglerDeployOutputs(parsedConsoleOutput, parsedStructuredOutput)
+			const workersDevUrl = parsedOutput.urls.find((url) => url.includes('workers.dev'))
 			const configuredAccountId = normalizeCloudflareAccountId(prepared.config.accountId)
 				?? normalizeCloudflareAccountId(process.env.CLOUDFLARE_ACCOUNT_ID)
 			let resolvedAccountId = configuredAccountId
@@ -517,6 +542,39 @@ export async function runDeployCommand(
 			let resolvedVersionId = parsedOutput.versionId
 			let resolvedPreviewUrl = parsedOutput.previewUrl
 			let loggedVersionId = false
+			let verificationNote: string | undefined
+
+			const persistDeployMetadata = async (input: {
+				status: 'success' | 'failure'
+				exitCode: number
+				error?: string
+			}): Promise<void> => {
+				await writeDeployResultMetadata({
+					status: input.status,
+					exitCode: input.exitCode,
+					workerName: prepared.config.name,
+					preview,
+					branchScopedPreview: isBranchScopedPreviewDeployment,
+					previewScope: resolvedPreviewScopeName,
+					versionId: resolvedVersionId,
+					previewUrl: resolvedPreviewUrl,
+					workersDevUrl,
+					verificationNote,
+					outputUrls: parsedOutput.urls,
+					structuredOutput,
+					...(input.error ? { error: input.error } : {})
+				})
+			}
+
+			if (deployProc.exitCode !== 0) {
+				await persistDeployMetadata({
+					status: 'failure',
+					exitCode: 1,
+					error: deployProc.stderr || deployProc.stdout || 'Wrangler deploy failed'
+				})
+				logger.error('Deployment failed')
+				return { exitCode: 1, output: structuredOutput }
+			}
 
 			if (!preview && !resolvedVersionId && !isBranchScopedPreviewDeployment) {
 				resolvedAccountId = await ensureResolvedAccountId()
@@ -622,8 +680,14 @@ export async function runDeployCommand(
 					logger.success(`Version ID: ${resolvedVersionId}`)
 					loggedVersionId = true
 					const reuseMessage = `Cloudflare did not expose a fresh deployment or version after verification retries, and the current active deployment ${currentDeployment.deploymentId} still points at version ${resolvedVersionId}. This usually means the built Worker code and configuration were unchanged, so Cloudflare kept the existing live version.`
+					verificationNote = reuseMessage
 
 					if (requireFreshProductionDeployment) {
+						await persistDeployMetadata({
+							status: 'failure',
+							exitCode: 1,
+							error: reuseMessage
+						})
 						logger.error(
 							`Deployment verification failed: ${reuseMessage} This run requires a fresh production deployment, so Devflare is treating the reused live version as a failure.`
 						)
@@ -661,6 +725,11 @@ export async function runDeployCommand(
 					const recoveryDetails = versionRecoveryDiagnostics.length > 0
 						? ` Cloudflare fallback checks also failed: ${versionRecoveryDiagnostics.join(' | ')}`
 						: ''
+					await persistDeployMetadata({
+						status: 'failure',
+						exitCode: 1,
+						error: `Wrangler did not return a Worker version id, so Devflare could not prove which version Cloudflare accepted.${recoveryDetails}`
+					})
 					logger.error(
 						`Deployment verification failed: Wrangler did not return a Worker version id, so Devflare could not prove which version Cloudflare accepted.${recoveryDetails}`
 					)
@@ -669,6 +738,11 @@ export async function runDeployCommand(
 					resolvedAccountId = await ensureResolvedAccountId()
 
 					if (!resolvedAccountId) {
+						await persistDeployMetadata({
+							status: 'failure',
+							exitCode: 1,
+							error: 'Devflare could not resolve a Cloudflare account id.'
+						})
 						logger.error(
 							'Deployment verification failed: Devflare could not resolve a Cloudflare account id. Pass cloudflare-account-id to the action or set accountId in devflare.config.ts.'
 						)
@@ -686,6 +760,11 @@ export async function runDeployCommand(
 						})
 					} catch (error) {
 						const message = error instanceof Error ? error.message : String(error)
+						await persistDeployMetadata({
+							status: 'failure',
+							exitCode: 1,
+							error: message
+						})
 						logger.error(`Deployment verification failed: ${message}`)
 						return { exitCode: 1, output: structuredOutput }
 					}
@@ -719,10 +798,23 @@ export async function runDeployCommand(
 				}
 			}
 
+			await persistDeployMetadata({
+				status: 'success',
+				exitCode: 0
+			})
 			logger.success('Deployed successfully!')
 			return { exitCode: 0, output: structuredOutput }
 		})
 	} catch (error) {
+		await writeDeployResultMetadata({
+			status: 'failure',
+			exitCode: 1,
+			preview,
+			branchScopedPreview: !preview && environment === 'preview' && Boolean(resolvedPreviewScopeName),
+			previewScope: resolvedPreviewScopeName,
+			outputUrls: [],
+			...(error instanceof Error ? { error: error.message } : { error: String(error) })
+		})
 		if (error instanceof Error) {
 			logger.error('Deployment failed:', error.message)
 			if (resolvedParsed.options.debug) {
