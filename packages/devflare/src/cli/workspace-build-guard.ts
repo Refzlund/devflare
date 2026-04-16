@@ -14,6 +14,10 @@ function isTruthyEnvFlag(value: string | undefined): boolean {
 	return normalized !== undefined && ['1', 'true', 'yes', 'on'].includes(normalized)
 }
 
+function isCiEnvironment(env: NodeJS.ProcessEnv): boolean {
+	return isTruthyEnvFlag(env.CI) || isTruthyEnvFlag(env.GITHUB_ACTIONS)
+}
+
 async function pathExists(path: string): Promise<boolean> {
 	try {
 		await stat(path)
@@ -151,6 +155,10 @@ export async function getLocalWorkspaceBuildGuardMessage(
 
 	const env = options.env ?? process.env
 	if (isTruthyEnvFlag(env.DEVFLARE_SKIP_WORKSPACE_BUILD_GUARD)) {
+		return undefined
+	}
+
+	if (isCiEnvironment(env)) {
 		return undefined
 	}
 

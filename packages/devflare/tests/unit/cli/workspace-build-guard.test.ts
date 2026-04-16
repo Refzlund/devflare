@@ -76,4 +76,26 @@ describe('workspace build guard', () => {
 			await rm(packageRoot, { recursive: true, force: true })
 		}
 	})
+
+	test('skips the local workspace guard in CI environments', async () => {
+		const packageRoot = await mkdtemp(join(tmpdir(), 'devflare-build-guard-ci-'))
+
+		try {
+			await writeFile(join(packageRoot, 'package.json'), JSON.stringify({
+				name: 'devflare'
+			}, null, 2))
+			await writeFixture(join(packageRoot, 'src', 'runtime.ts'), 'export const runtime = true', new Date('2026-04-16T12:00:00.000Z'))
+
+			const message = await getLocalWorkspaceBuildGuardMessage('deploy', {
+				packageRoot,
+				env: {
+					CI: 'true'
+				}
+			})
+
+			expect(message).toBeUndefined()
+		} finally {
+			await rm(packageRoot, { recursive: true, force: true })
+		}
+	})
 })
