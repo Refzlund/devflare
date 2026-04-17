@@ -76,13 +76,16 @@ Use `devflare/config` for config files so Bun only loads the lightweight config 
 import type { FetchEvent } from 'devflare/runtime'
 
 export async function fetch({ url }: FetchEvent): Promise<Response> {
-	return new Response(
-			: `Hello from Devflare: ${url.pathname}`
-	)
+	return new Response(`Hello from Devflare: ${url.pathname}`)
 }
 ```
 
 ### 3. Generate types
+
+```bash
+bunx --bun devflare types
+```
+
 ### 4. Start development
 
 ```bash
@@ -807,8 +810,8 @@ Every top-level command supports `--help`, and nested command groups support bot
 |---|---|
 | `devflare init` | scaffold a project using `src/fetch.ts` and explicit `files.fetch` |
 | `devflare dev` | start the worker-only dev server, enabling Vite only when the current package has a local `vite.config.*` |
-| `devflare build` | resolve config, generate Devflare/Wrangler build artifacts, and run `vite build` only for Vite-backed packages |
-| `devflare deploy` | build and deploy with Wrangler, including same-Worker preview uploads via `--preview` |
+| `devflare build` | resolve config locally, preserve named bindings in generated build artifacts, and run `vite build` only for Vite-backed packages |
+| `devflare deploy` | build or reuse a prior artifact via `--build`, provision named deploy resources, and deploy with Wrangler, including same-Worker preview uploads via `--preview` |
 | `devflare types` | generate `env.d.ts` |
 | `devflare doctor` | check project configuration plus generated artifact locations such as `.devflare/wrangler.jsonc`, `.devflare/build/wrangler.jsonc`, and `.wrangler/deploy/config.json` |
 | `devflare config` | print resolved Devflare config or resolved Wrangler JSON |
@@ -844,6 +847,7 @@ Command defaults:
 Useful flags:
 
 - `build --env <name>`
+- `deploy --build <path>`
 - `deploy --env <name>`
 - `deploy --dry-run`
 - `deploy --preview <name>`
@@ -881,6 +885,8 @@ Treat these as generated output, not source of truth:
 - `.devflare/vite.config.mjs`
 - `.wrangler/deploy/config.json`
 - `env.d.ts`
+
+`devflare build` keeps name-based bindings as names in these generated artifacts. `devflare deploy` is the step that resolves or provisions the concrete Cloudflare resources and rewrites the generated Wrangler config with the IDs Wrangler needs.
 
 The source of truth is still:
 

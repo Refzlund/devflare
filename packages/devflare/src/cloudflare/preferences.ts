@@ -11,8 +11,8 @@
 
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
-import { kvGet, kvPut } from './api'
+import { existsSync, readFileSync, writeFileSync, mkdirSync, renameSync, unlinkSync } from 'node:fs'
+import { kvDelete, kvGet, kvPut } from './api'
 import { DEVFLARE_KV_NAMESPACE_TITLE, getOrCreateNamedKVNamespace } from './kv-namespace'
 
 // -----------------------------------------------------------------------------
@@ -22,6 +22,31 @@ import { DEVFLARE_KV_NAMESPACE_TITLE, getOrCreateNamedKVNamespace } from './kv-n
 const GLOBAL_ACCOUNT_KEY = 'settings:defaultAccountId'
 const LOCAL_CACHE_DIR = '.devflare'
 const LOCAL_CACHE_FILE = 'preferences.json'
+
+// -----------------------------------------------------------------------------
+// Atomic file writes
+// -----------------------------------------------------------------------------
+
+/**
+ * Write a file atomically by writing to a temp sibling and renaming into place.
+ * Prevents corruption if the process is killed mid-write.
+ *
+ * @internal exported for tests only
+ */
+export function writeFileAtomic(path: string, contents: string): void {
+	const tmpPath = path + '.tmp-' + process.pid + '-' + Date.now()
+	writeFileSync(tmpPath, contents, 'utf-8')
+	try {
+		renameSync(tmpPath, path)
+	} catch (error) {
+		try {
+			unlinkSync(tmpPath)
+		} catch {
+			// best-effort cleanup; ignore
+		}
+		throw error
+	}
+}
 
 // -----------------------------------------------------------------------------
 // Local Cache
@@ -68,7 +93,7 @@ function writeLocalPreferences(prefs: LocalPreferences): void {
 		mkdirSync(dir, { recursive: true })
 	}
 
-	writeFileSync(path, JSON.stringify(prefs, null, '\t'), 'utf-8')
+	writeFileAtomic(path, JSON.stringify(prefs, null, '\t'))
 }
 
 // -----------------------------------------------------------------------------
@@ -116,7 +141,7 @@ function readPackageJson(path: string): PackageJson | null {
  * Write package.json to a path
  */
 function writePackageJson(path: string, pkg: PackageJson): void {
-	writeFileSync(path, JSON.stringify(pkg, null, '\t') + '\n', 'utf-8')
+	writeFileAtomic(path, JSON.stringify(pkg, null, '\t') + '\n')
 }
 
 /**
@@ -210,8 +235,8 @@ export async function getGlobalDefaultAccountId(
 			})
 			return value
 		}
-	} catch {
-		// If we can't access KV, just return null
+	} catch (error) {
+		console.debug('[devflare preferences] cloud KV sync failed:', error instanceof Error ? error.message : String(error))
 	}
 
 	return null
@@ -242,9 +267,8 @@ export async function setGlobalDefaultAccountId(
 	try {
 		const namespaceId = await getOrCreatePreferencesNamespace(kvAccountId)
 		await kvPut(kvAccountId, namespaceId, GLOBAL_ACCOUNT_KEY, accountId)
-	} catch {
-		// Local save succeeded, cloud save failed - that's okay
-		// User can sync again later
+	} catch (error) {
+		console.debug('[devflare preferences] cloud KV sync failed:', error instanceof Error ? error.message : String(error))
 	}
 }
 
@@ -292,9 +316,8 @@ export async function clearGlobalDefaultAccountId(
 	// Clear from cloud KV
 	try {
 		const namespaceId = await getOrCreatePreferencesNamespace(anyAccountId)
-		// Write empty string to clear (KV doesn't have delete in our simple helper)
-		await kvPut(anyAccountId, namespaceId, GLOBAL_ACCOUNT_KEY, '')
-	} catch {
-		// Ignore errors
+		await kvDelete(anyAccountId, namespaceId, GLOBAL_ACCOUNT_KEY)
+	} catch (error) {
+		console.debug('[devflare preferences] cloud KV sync failed:', error instanceof Error ? error.message : String(error))
 	}
 }

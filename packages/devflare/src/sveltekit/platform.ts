@@ -7,6 +7,7 @@
 
 import { loadConfig, type DevflareConfig } from '../config'
 import { createEnvProxy, getClient, type BindingHints } from '../bridge'
+import { extractBindingHints } from '../test/binding-hints'
 
 // -----------------------------------------------------------------------------
 // Types
@@ -20,6 +21,11 @@ export interface Platform {
 	context: ExecutionContext
 	caches: CacheStorage
 	cf: Record<string, unknown>
+	/**
+	 * Errors captured from `ctx.waitUntil()` rejections in dev mode.
+	 * Drain via `drainWaitUntilErrors(platform)`.
+	 */
+	pendingErrors?: unknown[]
 }
 
 export interface DevflarePlatformOptions {
@@ -40,14 +46,56 @@ export interface DevflarePlatformOptions {
 // Platform Proxy
 // -----------------------------------------------------------------------------
 
-/** Cached platform keyed by bridgeUrl */
+/** Cached platform keyed by bridgeUrl + binding hint fingerprint */
 let platformCache: { key: string; platform: Platform } | null = null
+
+/**
+ * Generate a stable fingerprint for binding hints so cached platforms are not
+ * shared across configs with differing hint sets.
+ */
+function fingerprintHints(hints: BindingHints): string {
+	const entries = Object.keys(hints).sort().map((name) => [name, hints[name]])
+	return JSON.stringify(entries)
+}
 
 /**
  * Generate cache key from options
  */
-function getPlatformCacheKey(bridgeUrl: string): string {
-	return bridgeUrl
+function getPlatformCacheKey(bridgeUrl: string, hints: BindingHints): string {
+	return `${bridgeUrl}\u0000${fingerprintHints(hints)}`
+}
+
+/**
+ * Build a dev-mode ExecutionContext that records `waitUntil()` rejections on
+ * the provided `pendingErrors` array. The original console.error log is kept
+ * for parity with existing behavior.
+ */
+function createDevExecutionContext(pendingErrors: unknown[]): ExecutionContext {
+	return {
+		waitUntil: (promise: Promise<unknown>) => {
+			promise.catch((err) => {
+				console.error('[devflare] waitUntil error:', err)
+				pendingErrors.push(err)
+			})
+		},
+		passThroughOnException: () => {
+			// No-op in dev mode
+		}
+	} as ExecutionContext
+}
+
+/**
+ * Drain errors captured from `ctx.waitUntil()` calls on a dev platform.
+ * Returns a snapshot of the pending errors and clears the buffer.
+ */
+export function drainWaitUntilErrors(platform: Platform): unknown[] {
+	const buffer = platform.pendingErrors
+	if (!buffer || buffer.length === 0) {
+		return []
+	}
+	const drained = buffer.slice()
+	buffer.length = 0
+	return drained
 }
 
 /**
@@ -85,9 +133,9 @@ export async function createDevflarePlatform(
 		hints = {}
 	} = options
 
-	const cacheKey = getPlatformCacheKey(bridgeUrl)
+	const cacheKey = getPlatformCacheKey(bridgeUrl, hints)
 
-	// Return cached platform if exists for this bridgeUrl
+	// Return cached platform if exists for this bridgeUrl + hint fingerprint
 	if (platformCache?.key === cacheKey) {
 		return platformCache.platform
 	}
@@ -101,18 +149,9 @@ export async function createDevflarePlatform(
 	// Create env proxy with hints
 	const env = createEnvProxy({ client, hints })
 
-	// Create mock execution context
-	const context = {
-		waitUntil: (promise: Promise<unknown>) => {
-			// In dev mode, we just await the promise
-			promise.catch((err) => {
-				console.error('[devflare] waitUntil error:', err)
-			})
-		},
-		passThroughOnException: () => {
-			// No-op in dev mode
-		}
-	} as ExecutionContext
+	// Create mock execution context that captures waitUntil rejections
+	const pendingErrors: unknown[] = []
+	const context = createDevExecutionContext(pendingErrors)
 
 	// Create mock caches
 	const caches = {
@@ -135,7 +174,7 @@ export async function createDevflarePlatform(
 		asOrganization: 'Devflare Dev'
 	}
 
-	const platform: Platform = { env, context, caches, cf }
+	const platform: Platform = { env, context, caches, cf, pendingErrors }
 	platformCache = { key: cacheKey, platform }
 	return platform
 }
@@ -199,73 +238,6 @@ export function getBridgePort(): number {
 let configCache: { cwd: string; promise: Promise<DevflareConfig | null> } | null = null
 
 /**
- * Extract binding hints from devflare config
- * Covers: kv, d1, r2, durableObjects, queues (producers), services
- */
-function extractHintsFromConfig(config: DevflareConfig): BindingHints {
-	const hints: BindingHints = {}
-	const bindings = config.bindings
-
-	if (!bindings) return hints
-
-	// KV namespaces
-	if (bindings.kv) {
-		for (const name of Object.keys(bindings.kv)) {
-			hints[name] = 'kv'
-		}
-	}
-
-	// D1 databases
-	if (bindings.d1) {
-		for (const name of Object.keys(bindings.d1)) {
-			hints[name] = 'd1'
-		}
-	}
-
-	// R2 buckets
-	if (bindings.r2) {
-		for (const name of Object.keys(bindings.r2)) {
-			hints[name] = 'r2'
-		}
-	}
-
-	// Durable Objects
-	if (bindings.durableObjects) {
-		for (const name of Object.keys(bindings.durableObjects)) {
-			hints[name] = 'do'
-		}
-	}
-
-	// Queue producers
-	if (bindings.queues?.producers) {
-		for (const name of Object.keys(bindings.queues.producers)) {
-			hints[name] = 'queue'
-		}
-	}
-
-	// Service bindings
-	if (bindings.services) {
-		for (const name of Object.keys(bindings.services)) {
-			hints[name] = 'service'
-		}
-	}
-
-	// AI binding (single binding named in config)
-	if (bindings.ai?.binding) {
-		hints[bindings.ai.binding] = 'ai'
-	}
-
-	// Send Email bindings
-	if (bindings.sendEmail) {
-		for (const name of Object.keys(bindings.sendEmail)) {
-			hints[name] = 'sendEmail'
-		}
-	}
-
-	return hints
-}
-
-/**
  * Load config and extract hints (cached by cwd)
  */
 async function loadHintsFromConfig(): Promise<BindingHints> {
@@ -274,7 +246,7 @@ async function loadHintsFromConfig(): Promise<BindingHints> {
 	// Check if we have a cached promise for this cwd
 	if (configCache?.cwd === cwd) {
 		const config = await configCache.promise
-		return config ? extractHintsFromConfig(config) : {}
+		return config ? extractBindingHints(config) : {}
 	}
 
 	// Create new cache entry with promise (handles concurrent requests)
@@ -289,7 +261,7 @@ async function loadHintsFromConfig(): Promise<BindingHints> {
 	configCache = { cwd, promise }
 
 	const config = await promise
-	return config ? extractHintsFromConfig(config) : {}
+	return config ? extractBindingHints(config) : {}
 }
 
 // -----------------------------------------------------------------------------

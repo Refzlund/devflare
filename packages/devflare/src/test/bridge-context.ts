@@ -7,9 +7,10 @@
 import { loadConfig, type DevflareConfig } from '../config'
 import { startMiniflare, startMiniflareFromConfig, stopMiniflare, type MiniflareInstance, type MiniflareOptions } from '../bridge/miniflare'
 import { BridgeClient, getClient } from '../bridge/client'
-import { setBindingHints, initEnv, type BindingHints } from '../bridge/proxy'
+import { setBindingHints, initEnv } from '../bridge/proxy'
 import { runWithContext } from '../runtime/context'
 import { wrapEnvSendEmailBindings } from '../utils/send-email'
+import { extractBindingHints } from './binding-hints'
 
 // -----------------------------------------------------------------------------
 // Types
@@ -113,27 +114,7 @@ export async function createBridgeTestContext(
 	// Set binding hints based on config
 	// bindings.kv is Record<string, string> where key is binding name
 	if (config?.bindings) {
-		const hints: BindingHints = {}
-		if (config.bindings.kv) {
-			Object.keys(config.bindings.kv).forEach((name) => { hints[name] = 'kv' })
-		}
-		if (config.bindings.r2) {
-			Object.keys(config.bindings.r2).forEach((name) => { hints[name] = 'r2' })
-		}
-		if (config.bindings.d1) {
-			Object.keys(config.bindings.d1).forEach((name) => { hints[name] = 'd1' })
-		}
-		if (config.bindings.durableObjects) {
-			Object.keys(config.bindings.durableObjects).forEach((name) => { hints[name] = 'do' })
-		}
-		if (config.bindings.queues?.consumers) {
-			config.bindings.queues.consumers.forEach((c) => { hints[c.queue] = 'queue' })
-		}
-		if (config.bindings.ai) hints[config.bindings.ai.binding] = 'ai'
-		if (config.bindings.sendEmail) {
-			Object.keys(config.bindings.sendEmail).forEach((name) => { hints[name] = 'sendEmail' })
-		}
-		setBindingHints(hints)
+		setBindingHints(extractBindingHints(config))
 	}
 
 	// Create the context

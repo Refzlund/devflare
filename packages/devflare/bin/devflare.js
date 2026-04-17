@@ -5,7 +5,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const currentDir = dirname(fileURLToPath(import.meta.url))
 const sourceCliEntryPath = resolve(currentDir, '../src/cli/index.ts')
-const distCliEntryPath = resolve(currentDir, '../dist/src/cli/index.js')
+const distCliEntryPath = resolve(currentDir, '../dist/cli/index.js')
 const cliEntryPath = existsSync(sourceCliEntryPath)
 	? sourceCliEntryPath
 	: distCliEntryPath

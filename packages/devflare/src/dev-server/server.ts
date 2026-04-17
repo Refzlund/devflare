@@ -22,8 +22,9 @@ import { runD1Migrations } from './d1-migrations'
 import { getGatewayScript } from './gateway-script'
 import { createCompatibilityAwareMiniflareLog } from './miniflare-log'
 import { createRuntimeStdioForwarder } from './runtime-stdio'
-import { detectViteProject, stopSpawnedProcessTree } from './vite-utils'
+import { resolveViteMode, stopSpawnedProcessTree } from './vite-utils'
 import { startViteProcess } from './vite-process'
+import { createReloadQueue } from './reload-queue'
 import {
 	collectWorkerWatchRoots,
 	hasWorkerSurfacePaths,
@@ -84,13 +85,14 @@ export function createDevServer(options: DevServerOptions): DevServer {
 		configPath,
 		vitePort = 5173,
 		miniflarePort = 8787,
-		enableVite = true,
+		enableVite: enableViteRequested = true,
 		persist = true, // Default to true for dev - migrations need persistence
 		logger,
 		verbose = false,
 		debug = process.env.DEVFLARE_DEBUG === 'true'
 	} = options
 
+	let enableVite = enableViteRequested
 	let miniflare: MiniflareType | null = null
 	let doBundler: DOBundler | null = null
 	let workerSourceWatcher: import('chokidar').FSWatcher | null = null
@@ -111,7 +113,23 @@ export function createDevServer(options: DevServerOptions): DevServer {
 	let currentDoResult: DOBundleResult | null = null
 	let mainWorkerRoutes: RouteDiscoveryResult | null = null
 	let generatedViteConfigPath: string | null = null
-	let reloadChain = Promise.resolve()
+
+	const reloadQueue = createReloadQueue({
+		reload: async () => {
+			if (!miniflare) return
+
+			const { Log, LogLevel } = await import('miniflare')
+			const mfConfig = buildMiniflareConfig(currentDoResult)
+			// Always enable debug logging to see worker load errors
+			mfConfig.log = createCompatibilityAwareMiniflareLog(Log, LogLevel.DEBUG, logger)
+			mfConfig.handleRuntimeStdio = createRuntimeStdioForwarder(logger)
+
+			logger?.info('Reloading Miniflare...')
+			await miniflare.setOptions(mfConfig)
+			logger?.success('Miniflare reloaded')
+		},
+		logger
+	})
 
 	async function bundleMainWorker(): Promise<void> {
 		if (!mainWorkerScriptPath || !config) {
@@ -500,23 +518,7 @@ export function createDevServer(options: DevServerOptions): DevServer {
 	 */
 	async function reloadMiniflare(doResult: DOBundleResult | null): Promise<void> {
 		currentDoResult = doResult
-
-		const queuedReload = reloadChain.then(async () => {
-			if (!miniflare) return
-
-			const { Log, LogLevel } = await import('miniflare')
-			const mfConfig = buildMiniflareConfig(currentDoResult)
-			// Always enable debug logging to see worker load errors
-			mfConfig.log = createCompatibilityAwareMiniflareLog(Log, LogLevel.DEBUG, logger)
-			mfConfig.handleRuntimeStdio = createRuntimeStdioForwarder(logger)
-
-			logger?.info('Reloading Miniflare...')
-			await miniflare.setOptions(mfConfig)
-			logger?.success('Miniflare reloaded')
-		})
-
-		reloadChain = queuedReload.catch(() => { })
-		await queuedReload
+		await reloadQueue.schedule()
 	}
 
 	async function resolveWorkerConfigWatchPath(): Promise<string | null> {
@@ -632,14 +634,19 @@ export function createDevServer(options: DevServerOptions): DevServer {
 		resolvedWorkerConfigPath = await resolveWorkerConfigWatchPath()
 		logger?.debug('Loaded config:', config.name)
 		if (enableVite) {
-			const viteProject = await detectViteProject(cwd)
-			generatedViteConfigPath = await writeGeneratedViteConfig({
-				cwd,
-				configPath,
-				localConfigPath: viteProject.viteConfigPath,
-				bridgePort: miniflarePort
-			})
-			logger?.debug(`Generated Vite config → ${generatedViteConfigPath}`)
+			const viteMode = await resolveViteMode(cwd, { requested: true })
+			if (!viteMode.enableVite) {
+				logger?.info('Vite disabled: no vite config found for this package')
+				enableVite = false
+			} else {
+				generatedViteConfigPath = await writeGeneratedViteConfig({
+					cwd,
+					configPath,
+					localConfigPath: viteMode.viteConfigPath,
+					bridgePort: miniflarePort
+				})
+				logger?.debug(`Generated Vite config → ${generatedViteConfigPath}`)
+			}
 		}
 		await refreshWorkerOnlySurfaceState()
 

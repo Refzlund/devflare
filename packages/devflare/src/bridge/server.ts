@@ -23,6 +23,8 @@ import {
 import {
 	serializeValue,
 	deserializeValue,
+	serializeDOId,
+	deserializeDOId,
 	base64Decode,
 	base64Encode,
 	type StreamRef
@@ -104,8 +106,13 @@ async function handleWebSocket(
 			} else if (event.data instanceof ArrayBuffer) {
 				handleBinaryMessage(new Uint8Array(event.data), server, wsProxies, incomingStreams)
 			}
-		} catch {
-			// Message handling errors are silently ignored
+		} catch (error) {
+			console.error('[devflare bridge] message handler error:', error)
+			try {
+				server.send(JSON.stringify({ type: 'error', message: String(error) }))
+			} catch {
+				// best-effort notification; swallow send failures to keep listener alive
+			}
 		}
 	})
 
@@ -222,7 +229,7 @@ async function handleRpcCall(
 // RPC Method Execution
 // -----------------------------------------------------------------------------
 
-async function executeRpcMethod(
+export async function executeRpcMethod(
 	method: string,
 	params: unknown[],
 	env: GatewayEnv,
@@ -244,9 +251,21 @@ async function executeRpcMethod(
 
 	// Handle different binding types
 	switch (operation) {
-		// KV Namespace
-		case 'get':
+		// KV Namespace or Durable Object (disambiguated by binding shape)
+		case 'get': {
+			const b = binding as any
+			const isDoNamespace =
+				typeof b.idFromName === 'function' &&
+				typeof b.idFromString === 'function' &&
+				typeof b.newUniqueId === 'function'
+			if (isDoNamespace) {
+				const doId = deserializeDOId(params[0] as any, binding as DurableObjectNamespace)
+				// Instantiate stub to validate id; we return a DOStub reference for the client
+				;(binding as DurableObjectNamespace).get(doId)
+				return { __type: 'DOStub', binding: bindingName, id: params[0] }
+			}
 			return (binding as KVNamespace).get(params[0] as string, params[1] as any)
+		}
 		case 'put':
 			return (binding as KVNamespace).put(
 				params[0] as string,
@@ -306,11 +325,6 @@ async function executeRpcMethod(
 			return serializeDOId((binding as DurableObjectNamespace).idFromString(params[0] as string))
 		case 'newUniqueId':
 			return serializeDOId((binding as DurableObjectNamespace).newUniqueId(params[0] as any))
-		case 'get':
-			// DO get returns stub - we need to handle this specially
-			const doId = deserializeDOId(params[0] as any, binding as DurableObjectNamespace)
-			const stub = (binding as DurableObjectNamespace).get(doId)
-			return { __type: 'DOStub', binding: bindingName, id: params[0] }
 		case 'stub.fetch':
 			return executeDoFetch(env, params[0] as string, params[1] as any, params[2] as any)
 		case 'stub.rpc':
@@ -328,10 +342,10 @@ async function executeRpcMethod(
 
 		// AI (if available)
 		case 'run':
-			if (typeof (binding as any).run === 'function') {
-				return (binding as any).run(params[0], params[1])
+			if (typeof (binding as any).run !== 'function') {
+				throw new Error(`Binding ${bindingName} does not support run(): ${method}`)
 			}
-			break
+			return (binding as any).run(params[0], params[1])
 
 		default:
 			throw new Error(`Unknown operation: ${method}`)
@@ -435,17 +449,6 @@ async function executeD1Statement(
 // -----------------------------------------------------------------------------
 // Durable Object Helpers
 // -----------------------------------------------------------------------------
-
-function serializeDOId(id: DurableObjectId): unknown {
-	return { __type: 'DOId', hex: id.toString() }
-}
-
-function deserializeDOId(serialized: any, ns: DurableObjectNamespace): DurableObjectId {
-	if (serialized.__type === 'DOId') {
-		return ns.idFromString(serialized.hex)
-	}
-	throw new Error('Invalid DOId format')
-}
 
 async function executeDoFetch(
 	env: GatewayEnv,
@@ -725,12 +728,12 @@ async function handleHttpTransfer(
 	url: URL
 ): Promise<Response> {
 	// URL format: /_devflare/transfer/{id}
-	const transferId = url.pathname.split('/').pop()
+	const transferId = decodeURIComponent(url.pathname.split('/').pop() ?? '')
 
 	// For uploads, the body is streamed directly
 	if (request.method === 'PUT' || request.method === 'POST') {
 		// Transfer ID contains binding info: {binding}:{key}
-		const [binding, ...keyParts] = (transferId ?? '').split(':')
+		const [binding, ...keyParts] = transferId.split(':')
 		const key = keyParts.join(':')
 
 		const bucket = env[binding] as R2Bucket
@@ -739,14 +742,14 @@ async function handleHttpTransfer(
 		}
 
 		const result = await bucket.put(key, request.body)
-		return new Response(JSON.stringify(result), {
+		return new Response(JSON.stringify(serializeR2Object(result)), {
 			headers: { 'Content-Type': 'application/json' }
 		})
 	}
 
 	// For downloads
 	if (request.method === 'GET') {
-		const [binding, ...keyParts] = (transferId ?? '').split(':')
+		const [binding, ...keyParts] = transferId.split(':')
 		const key = keyParts.join(':')
 
 		const bucket = env[binding] as R2Bucket

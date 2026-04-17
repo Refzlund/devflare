@@ -14,7 +14,6 @@ import {
 	type HyperdriveBinding,
 	type KVBinding
 } from './schema'
-import { materializePreviewScopedConfig } from './preview'
 import { resolveConfigForEnvironment } from './resolve'
 
 /**
@@ -30,8 +29,8 @@ export interface WranglerConfig {
 	workers_dev?: boolean
 
 	// Bindings
-	kv_namespaces?: Array<{ binding: string; id: string }>
-	d1_databases?: Array<{ binding: string; database_id: string }>
+	kv_namespaces?: WranglerKVNamespaceBinding[]
+	d1_databases?: WranglerD1DatabaseBinding[]
 	r2_buckets?: Array<{ binding: string; bucket_name: string }>
 	durable_objects?: {
 		bindings: Array<{
@@ -60,7 +59,7 @@ export interface WranglerConfig {
 	}>
 	ai?: { binding: string }
 	vectorize?: Array<{ binding: string; index_name: string }>
-	hyperdrive?: Array<{ binding: string; id: string }>
+	hyperdrive?: WranglerHyperdriveBinding[]
 	browser?: { binding: string }
 	analytics_engine_datasets?: Array<{ binding: string; dataset: string }>
 	send_email?: Array<{
@@ -116,10 +115,40 @@ export interface WranglerConfig {
 	[key: string]: unknown
 }
 
-function getWranglerD1DatabaseId(bindingName: string, bindingConfig: D1Binding): string {
+export type WranglerKVNamespaceBinding =
+	| { binding: string; id: string }
+	| { binding: string; name: string }
+
+export type WranglerD1DatabaseBinding =
+	| { binding: string; database_id: string }
+	| { binding: string; database_name: string }
+
+export type WranglerHyperdriveBinding =
+	| { binding: string; id: string }
+	| { binding: string; name: string }
+
+interface CompileConfigOptions {
+	preserveNamedBindings?: boolean
+}
+
+function getWranglerD1DatabaseBinding(
+	bindingName: string,
+	bindingConfig: D1Binding,
+	options: CompileConfigOptions = {}
+): WranglerD1DatabaseBinding {
 	const normalized = normalizeD1Binding(bindingConfig)
 	if (normalized.databaseId) {
-		return normalized.databaseId
+		return {
+			binding: bindingName,
+			database_id: normalized.databaseId
+		}
+	}
+
+	if (options.preserveNamedBindings && normalized.name) {
+		return {
+			binding: bindingName,
+			database_name: normalized.name
+		}
 	}
 
 	throw new Error(
@@ -127,10 +156,24 @@ function getWranglerD1DatabaseId(bindingName: string, bindingConfig: D1Binding):
 	)
 }
 
-function getWranglerKVNamespaceId(bindingName: string, bindingConfig: KVBinding): string {
+function getWranglerKVNamespaceBinding(
+	bindingName: string,
+	bindingConfig: KVBinding,
+	options: CompileConfigOptions = {}
+): WranglerKVNamespaceBinding {
 	const normalized = normalizeKVBinding(bindingConfig)
 	if (normalized.namespaceId) {
-		return normalized.namespaceId
+		return {
+			binding: bindingName,
+			id: normalized.namespaceId
+		}
+	}
+
+	if (options.preserveNamedBindings && normalized.name) {
+		return {
+			binding: bindingName,
+			name: normalized.name
+		}
 	}
 
 	throw new Error(
@@ -138,10 +181,24 @@ function getWranglerKVNamespaceId(bindingName: string, bindingConfig: KVBinding)
 	)
 }
 
-function getWranglerHyperdriveId(bindingName: string, bindingConfig: HyperdriveBinding): string {
+function getWranglerHyperdriveBinding(
+	bindingName: string,
+	bindingConfig: HyperdriveBinding,
+	options: CompileConfigOptions = {}
+): WranglerHyperdriveBinding {
 	const normalized = normalizeHyperdriveBinding(bindingConfig)
 	if (normalized.configurationId) {
-		return normalized.configurationId
+		return {
+			binding: bindingName,
+			id: normalized.configurationId
+		}
+	}
+
+	if (options.preserveNamedBindings && normalized.name) {
+		return {
+			binding: bindingName,
+			name: normalized.name
+		}
 	}
 
 	throw new Error(
@@ -184,6 +241,23 @@ export function compileConfig(
 	config: DevflareConfig,
 	environment?: string
 ): WranglerConfig {
+	return compileConfigInternal(config, environment)
+}
+
+export function compileBuildConfig(
+	config: DevflareConfig,
+	environment?: string
+): WranglerConfig {
+	return compileConfigInternal(config, environment, {
+		preserveNamedBindings: true
+	})
+}
+
+function compileConfigInternal(
+	config: DevflareConfig,
+	environment?: string,
+	options: CompileConfigOptions = {}
+): WranglerConfig {
 	const mergedConfig = resolveConfigForEnvironment(config, environment)
 
 	const result: WranglerConfig = {
@@ -212,7 +286,7 @@ export function compileConfig(
 
 	// Compile bindings
 	if (mergedConfig.bindings) {
-		compileBindings(mergedConfig.bindings, result)
+		compileBindings(mergedConfig.bindings, result, options)
 	}
 
 	// Compile triggers
@@ -278,12 +352,7 @@ export function compileToProgrammaticConfig(
 	config: DevflareConfig,
 	environment?: string
 ): Record<string, unknown> {
-	// Get the wrangler config first
-	const wranglerConfig = compileConfig(config, environment)
-
-	// Return as a plain object for programmatic use
-	// The cloudflare vite plugin accepts the same format as wrangler config
-	return { ...wranglerConfig }
+	return compileConfig(config, environment)
 }
 
 /**
@@ -291,29 +360,28 @@ export function compileToProgrammaticConfig(
  */
 function compileBindings(
 	bindings: NonNullable<DevflareConfig['bindings']>,
-	result: WranglerConfig
+	result: WranglerConfig,
+	options: CompileConfigOptions = {}
 ): void {
 	// KV Namespaces
 	if (bindings.kv) {
-		result.kv_namespaces = Object.entries(bindings.kv).map(([binding, namespace]) => ({
-			binding,
-			id: getWranglerKVNamespaceId(binding, namespace)
-		}))
+		result.kv_namespaces = Object.entries(bindings.kv).map(([binding, namespace]) => {
+			return getWranglerKVNamespaceBinding(binding, namespace, options)
+		})
 	}
 
-	// D1 Databases - d1 is Record<string, string>
+	// D1 Databases
 	if (bindings.d1) {
-		result.d1_databases = Object.entries(bindings.d1).map(([binding, database_id]) => ({
-			binding,
-			database_id: getWranglerD1DatabaseId(binding, database_id)
-		}))
+		result.d1_databases = Object.entries(bindings.d1).map(([binding, database_id]) => {
+			return getWranglerD1DatabaseBinding(binding, database_id, options)
+		})
 	}
 
-	// R2 Buckets - r2 is Record<string, string>
+	// R2 Buckets
 	if (bindings.r2) {
 		result.r2_buckets = Object.entries(bindings.r2).map(([binding, bucket_name]) => ({
 			binding,
-			bucket_name: bucket_name as string
+			bucket_name
 		}))
 	}
 
@@ -382,10 +450,9 @@ function compileBindings(
 
 	// Hyperdrive
 	if (bindings.hyperdrive) {
-		result.hyperdrive = Object.entries(bindings.hyperdrive).map(([binding, config]) => ({
-			binding,
-			id: getWranglerHyperdriveId(binding, config)
-		}))
+		result.hyperdrive = Object.entries(bindings.hyperdrive).map(([binding, config]) => {
+			return getWranglerHyperdriveBinding(binding, config, options)
+		})
 	}
 
 	// Browser
@@ -549,95 +616,175 @@ export async function writeWranglerConfig(
 	return wranglerPath
 }
 
+export async function readWranglerConfig(filePath: string): Promise<WranglerConfig> {
+	const fs = await import('node:fs/promises')
+	const { parse } = await import('jsonc-parser')
+	const content = await fs.readFile(filePath, 'utf-8')
+	const parsedConfig = parse(content)
+
+	if (!parsedConfig || typeof parsedConfig !== 'object') {
+		throw new Error(`Could not parse Wrangler config at ${filePath}.`)
+	}
+
+	return parsedConfig as WranglerConfig
+}
+
 /**
- * Compile DO Worker config from DevflareConfig
- * This creates a separate worker config that exports the DO classes
+ * Derive a deterministic worker name from a Durable Object class name.
+ * Converts PascalCase/camelCase to kebab-case so it is safe to use as a
+ * Wrangler worker name.
+ */
+function kebabCaseClassName(className: string): string {
+	return className
+		.replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+		.replace(/[^A-Za-z0-9]+/g, '-')
+		.replace(/^-+|-+$/g, '')
+		.toLowerCase()
+}
+
+/**
+ * Filter a migration entry down to the subset that applies to the given
+ * Durable Object class. Returns null when nothing in the migration references
+ * the class (so that worker does not need that migration tag).
+ */
+function filterMigrationForClass(
+	migration: NonNullable<DevflareConfig['migrations']>[number],
+	className: string
+): NonNullable<DevflareConfig['migrations']>[number] | null {
+	const newClasses = migration.new_classes?.filter((name) => name === className)
+	const newSqliteClasses = migration.new_sqlite_classes?.filter((name) => name === className)
+	const deletedClasses = migration.deleted_classes?.filter((name) => name === className)
+	const renamedClasses = migration.renamed_classes?.filter((entry) => entry.to === className || entry.from === className)
+
+	const hasAny = Boolean(
+		(newClasses && newClasses.length > 0)
+		|| (newSqliteClasses && newSqliteClasses.length > 0)
+		|| (deletedClasses && deletedClasses.length > 0)
+		|| (renamedClasses && renamedClasses.length > 0)
+	)
+
+	if (!hasAny) {
+		return null
+	}
+
+	return {
+		tag: migration.tag,
+		...(newClasses && newClasses.length > 0 && { new_classes: newClasses }),
+		...(newSqliteClasses && newSqliteClasses.length > 0 && { new_sqlite_classes: newSqliteClasses }),
+		...(deletedClasses && deletedClasses.length > 0 && { deleted_classes: deletedClasses }),
+		...(renamedClasses && renamedClasses.length > 0 && { renamed_classes: renamedClasses })
+	}
+}
+
+/**
+ * Compile DO Worker configs from DevflareConfig.
+ *
+ * Each distinct Durable Object class is emitted as its own compiled worker
+ * entry. The worker name is derived from the class being compiled (or from
+ * an explicit `scriptName` on a binding for that class), never from the
+ * first binding encountered.
  *
  * @param config - The devflare configuration
  * @param doWorkerEntry - Path to the DO worker entry file (e.g., 'src/workers/do-worker.ts')
  * @param options - Additional options
  * @param options.absoluteMain - If true, resolve main to absolute path using cwd
  * @param options.cwd - Working directory for resolving absolute paths
- * @returns Wrangler config for the DO worker, or null if no DOs configured
+ * @returns Array of Wrangler configs — one per DO class. Empty when no DOs configured.
  */
 export function compileDOWorkerConfig(
 	config: DevflareConfig,
 	doWorkerEntry: string,
-	options?: { absoluteMain?: boolean; cwd?: string }
-): WranglerConfig | null {
-	const resolvedConfig = materializePreviewScopedConfig(config)
+	options?: { absoluteMain?: boolean; cwd?: string; environment?: string }
+): WranglerConfig[] {
+	const resolvedConfig = resolveConfigForEnvironment(config, options?.environment)
 
-	// Check if there are any DOs configured
-	if (!resolvedConfig.bindings?.durableObjects || Object.keys(resolvedConfig.bindings.durableObjects).length === 0) {
-		return null
+	const doBindings = resolvedConfig.bindings?.durableObjects
+	if (!doBindings || Object.keys(doBindings).length === 0) {
+		return []
 	}
 
-	// Get the script name from the first DO binding (they should all have the same scriptName)
-	const firstDO = normalizeDOBinding(Object.values(resolvedConfig.bindings.durableObjects)[0])
-	const workerName = firstDO.scriptName || `${resolvedConfig.name}-do`
+	// Group bindings by class name. Multiple bindings may point to the same
+	// class; they are hosted by a single worker dedicated to that class.
+	const bindingsByClass = new Map<
+		string,
+		Array<{ bindingName: string; normalized: ReturnType<typeof normalizeDOBinding> }>
+	>()
+	for (const [bindingName, doConfig] of Object.entries(doBindings)) {
+		const normalized = normalizeDOBinding(doConfig)
+		const group = bindingsByClass.get(normalized.className) ?? []
+		group.push({ bindingName, normalized })
+		bindingsByClass.set(normalized.className, group)
+	}
 
 	// Resolve main path (absolute if needed for wrangler pages dev)
 	let mainPath = doWorkerEntry
 	if (options?.absoluteMain && options.cwd) {
-		// Use path.resolve to get absolute path
-		const path = require('pathe')
-		mainPath = path.resolve(options.cwd, doWorkerEntry)
+		mainPath = resolve(options.cwd, doWorkerEntry)
 	}
 
-	const result: WranglerConfig = {
-		name: workerName,
-		main: mainPath,
-		compatibility_date: resolvedConfig.compatibilityDate
-	}
+	const results: WranglerConfig[] = []
 
-	// Add compatibility flags
-	if (resolvedConfig.compatibilityFlags && resolvedConfig.compatibilityFlags.length > 0) {
-		result.compatibility_flags = resolvedConfig.compatibilityFlags
-	}
+	for (const [className, entries] of bindingsByClass) {
+		const explicitScriptName = entries.find((entry) => entry.normalized.scriptName)?.normalized.scriptName
+		const workerName = explicitScriptName ?? `${resolvedConfig.name}-${kebabCaseClassName(className)}`
 
-	// Add DO bindings WITHOUT script_name (since they're defined in this worker)
-	result.durable_objects = {
-		bindings: Object.entries(resolvedConfig.bindings.durableObjects).map(([name, doConfig]) => {
-			const normalized = normalizeDOBinding(doConfig)
-			return {
-				name,
+		const result: WranglerConfig = {
+			name: workerName,
+			main: mainPath,
+			compatibility_date: resolvedConfig.compatibilityDate
+		}
+
+		if (resolvedConfig.compatibilityFlags && resolvedConfig.compatibilityFlags.length > 0) {
+			result.compatibility_flags = resolvedConfig.compatibilityFlags
+		}
+
+		// DO bindings WITHOUT script_name (the class is defined in this worker)
+		result.durable_objects = {
+			bindings: entries.map(({ bindingName, normalized }) => ({
+				name: bindingName,
 				class_name: normalized.className
-				// No script_name - the classes are exported from this worker
+			}))
+		}
+
+		// Scope migrations to this class only so each worker declares only the
+		// classes it actually exports.
+		if (resolvedConfig.migrations && resolvedConfig.migrations.length > 0) {
+			const classMigrations = resolvedConfig.migrations
+				.map((migration) => filterMigrationForClass(migration, className))
+				.filter((migration): migration is NonNullable<typeof migration> => migration !== null)
+
+			if (classMigrations.length > 0) {
+				result.migrations = compileWranglerMigrations(classMigrations)
 			}
-		})
+		}
+
+		// Include bindings that DOs might need (storage, browser, etc.)
+		if (resolvedConfig.bindings?.kv) {
+			result.kv_namespaces = Object.entries(resolvedConfig.bindings.kv).map(([binding, namespace]) => {
+				return getWranglerKVNamespaceBinding(binding, namespace)
+			})
+		}
+
+		if (resolvedConfig.bindings?.d1) {
+			result.d1_databases = Object.entries(resolvedConfig.bindings.d1).map(([binding, database_id]) => {
+				return getWranglerD1DatabaseBinding(binding, database_id)
+			})
+		}
+
+		if (resolvedConfig.bindings?.r2) {
+			result.r2_buckets = Object.entries(resolvedConfig.bindings.r2).map(([binding, bucket_name]) => ({
+				binding,
+				bucket_name
+			}))
+		}
+
+		const browserBinding = getWranglerBrowserBinding(resolvedConfig.bindings?.browser)
+		if (browserBinding) {
+			result.browser = browserBinding
+		}
+
+		results.push(result)
 	}
 
-	// Add migrations if present
-	if (resolvedConfig.migrations && resolvedConfig.migrations.length > 0) {
-		result.migrations = compileWranglerMigrations(resolvedConfig.migrations)
-	}
-
-	// Include bindings that DOs might need (storage, browser, etc.)
-	if (resolvedConfig.bindings.kv) {
-		result.kv_namespaces = Object.entries(resolvedConfig.bindings.kv).map(([binding, namespace]) => ({
-			binding,
-			id: getWranglerKVNamespaceId(binding, namespace)
-		}))
-	}
-
-	if (resolvedConfig.bindings.d1) {
-		result.d1_databases = Object.entries(resolvedConfig.bindings.d1).map(([binding, database_id]) => ({
-			binding,
-			database_id: getWranglerD1DatabaseId(binding, database_id)
-		}))
-	}
-
-	if (resolvedConfig.bindings.r2) {
-		result.r2_buckets = Object.entries(resolvedConfig.bindings.r2).map(([binding, bucket_name]) => ({
-			binding,
-			bucket_name: bucket_name as string
-		}))
-	}
-
-	const browserBinding = getWranglerBrowserBinding(resolvedConfig.bindings.browser)
-	if (browserBinding) {
-		result.browser = browserBinding
-	}
-
-	return result
+	return results
 }

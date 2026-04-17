@@ -78,6 +78,15 @@ async function applyMigrationsToBinding(options: {
 
 /**
  * Run D1 migrations from migrations/ directory.
+ *
+ * Resolution per D1 binding (in order):
+ *   1. `<cwd>/migrations/<BINDING_NAME>/*.sql` — per-binding directory.
+ *      NOTE: if the per-binding directory EXISTS but contains no .sql files,
+ *      the binding is skipped — the shared fallback is NOT used.
+ *   2. `<cwd>/migrations/*.sql` — shared fallback, used ONLY when the
+ *      per-binding directory does not exist.
+ *   3. Otherwise, skip the binding with a debug log.
+ *
  * Uses the gateway worker HTTP endpoint to run migrations inside workerd.
  */
 export async function runD1Migrations(options: RunD1MigrationsOptions): Promise<void> {
@@ -86,7 +95,7 @@ export async function runD1Migrations(options: RunD1MigrationsOptions): Promise<
 		return
 	}
 
-	const { existsSync, readdirSync, readFileSync } = await import('node:fs')
+	const { existsSync, readdirSync, readFileSync, statSync } = await import('node:fs')
 	const migrationsDir = resolve(cwd, 'migrations')
 
 	if (!existsSync(migrationsDir)) {
@@ -94,34 +103,68 @@ export async function runD1Migrations(options: RunD1MigrationsOptions): Promise<
 		return
 	}
 
-	const files = readdirSync(migrationsDir)
+	const sharedFiles = readdirSync(migrationsDir)
 		.filter((file: string) => file.endsWith('.sql'))
 		.sort()
 
-	if (files.length === 0) {
-		logger?.debug('No SQL migration files found')
-		return
-	}
-
-	logger?.info(`Running ${files.length} D1 migration(s)...`)
-
-	const allStatements: string[] = []
-	for (const file of files) {
-		const sql = readFileSync(resolve(migrationsDir, file), 'utf-8')
-		const statements = collectMigrationStatements(sql)
-		allStatements.push(...statements)
-		logger?.debug(`File ${file}: ${statements.length} statement(s)`)
-	}
-
-	if (allStatements.length === 0) {
-		logger?.debug('No executable D1 migration statements found')
-		return
+	let sharedStatements: string[] | null = null
+	if (sharedFiles.length > 0) {
+		sharedStatements = []
+		for (const file of sharedFiles) {
+			const sql = readFileSync(resolve(migrationsDir, file), 'utf-8')
+			const fileStatements = collectMigrationStatements(sql)
+			sharedStatements.push(...fileStatements)
+			logger?.debug(`Shared file ${file}: ${fileStatements.length} statement(s)`)
+		}
 	}
 
 	for (const [bindingName] of Object.entries(config.bindings.d1)) {
+		const perBindingDir = resolve(migrationsDir, bindingName)
+		const hasPerBindingDir = existsSync(perBindingDir) && statSync(perBindingDir).isDirectory()
+
+		let statements: string[] = []
+		let fileCount = 0
+		let sourceLabel = ''
+
+		if (hasPerBindingDir) {
+			const perBindingFiles = readdirSync(perBindingDir)
+				.filter((file: string) => file.endsWith('.sql'))
+				.sort()
+
+			// An empty per-binding directory intentionally skips the binding
+			// — the shared fallback is NOT used when an explicit directory exists.
+			if (perBindingFiles.length === 0) {
+				logger?.debug(`No SQL migration files in migrations/${bindingName}/, skipping ${bindingName}`)
+				continue
+			}
+
+			for (const file of perBindingFiles) {
+				const sql = readFileSync(resolve(perBindingDir, file), 'utf-8')
+				const fileStatements = collectMigrationStatements(sql)
+				statements.push(...fileStatements)
+				logger?.debug(`File ${bindingName}/${file}: ${fileStatements.length} statement(s)`)
+			}
+			fileCount = perBindingFiles.length
+			sourceLabel = `migrations/${bindingName}/`
+		} else if (sharedStatements !== null) {
+			statements = sharedStatements
+			fileCount = sharedFiles.length
+			sourceLabel = 'migrations/ [shared fallback]'
+		} else {
+			logger?.debug(`No migrations found for ${bindingName}, skipping`)
+			continue
+		}
+
+		logger?.info(`Running ${fileCount} D1 migration(s) for ${bindingName} (from ${sourceLabel})`)
+
+		if (statements.length === 0) {
+			logger?.debug(`No executable D1 migration statements for ${bindingName}`)
+			continue
+		}
+
 		await applyMigrationsToBinding({
 			bindingName,
-			statements: allStatements,
+			statements,
 			miniflarePort,
 			logger
 		})

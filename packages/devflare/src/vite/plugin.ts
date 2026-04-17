@@ -19,8 +19,7 @@ import { loadConfig, resolveConfigPath } from '../config/loader'
 import type { DevflareConfig } from '../config/schema'
 import {
 	loadResolvedConfig,
-	resolveConfigForLocalRuntime,
-	resolveConfigResources
+	resolveConfigForLocalRuntime
 } from '../config'
 import {
 	compileConfig,
@@ -127,21 +126,43 @@ interface ResolvedPluginContextState {
 	durableObjects: DODiscoveryResult | null
 }
 
-// Shared context for accessing compiled config
-let pluginContext: DevflarePluginContext = {
-	wranglerConfig: null,
-	cloudflareConfig: null,
-	projectRoot: process.cwd(),
-	auxiliaryWorkerConfig: null,
-	durableObjects: null
+interface PluginInstanceState {
+	context: DevflarePluginContext
+	projectRoot: string
+	devflareConfig: DevflareConfig | null
+	resolvedPluginConfigPath: string | null
 }
+
+function createPluginState(): PluginInstanceState {
+	return {
+		context: {
+			wranglerConfig: null,
+			cloudflareConfig: null,
+			projectRoot: process.cwd(),
+			auxiliaryWorkerConfig: null,
+			durableObjects: null
+		},
+		projectRoot: process.cwd(),
+		devflareConfig: null,
+		resolvedPluginConfigPath: null
+	}
+}
+
+// Module-level pointer to the most recently configured plugin instance.
+// This is intentionally process-wide so that `getPluginContext()` — a
+// convenience API typically called from a single `vite.config.ts` — can
+// return the active plugin's context without requiring callers to hold a
+// reference. Per-instance hooks do NOT read this; they close over their
+// own state, so multiple `devflarePlugin()` calls in one process remain
+// isolated from each other.
+let lastPluginContext: DevflarePluginContext = createPluginState().context
 
 /**
  * Get the compiled config context
  * Can be used by other plugins or CLI commands
  */
 export function getPluginContext(): DevflarePluginContext {
-	return pluginContext
+	return lastPluginContext
 }
 
 /**
@@ -256,9 +277,7 @@ async function buildPluginContextState(
 	environment?: string,
 	mode: 'serve' | 'build' = 'serve'
 ): Promise<ResolvedPluginContextState> {
-	const effectiveConfig = mode === 'build'
-		? await resolveConfigResources(devflareConfig, { environment })
-		: resolveConfigForLocalRuntime(devflareConfig, environment)
+	const effectiveConfig = resolveConfigForLocalRuntime(devflareConfig, environment)
 	const compiledWranglerConfig = compileConfig(effectiveConfig)
 	const wranglerConfig = mode === 'build'
 		? isolateViteBuildOutputPaths(projectRoot, compiledWranglerConfig)
@@ -391,9 +410,7 @@ export function devflarePlugin(options: DevflarePluginOptions = {}): Plugin {
 		wsProxyPatterns = []
 	} = options
 
-	let projectRoot: string
-	let devflareConfig: DevflareConfig
-	let resolvedPluginConfigPath: string | null = null
+	const state = createPluginState()
 
 	return {
 		name: 'devflare',
@@ -484,39 +501,40 @@ export function devflarePlugin(options: DevflarePluginOptions = {}): Plugin {
 		// Load virtual module content
 		async load(id: string) {
 			if (id === RESOLVED_VIRTUAL_DO_ENTRY) {
-				if (!pluginContext.durableObjects) {
+				if (!state.context.durableObjects) {
 					return '// No Durable Objects configured\nexport default { fetch: () => new Response("No DOs") }'
 				}
-				return generateVirtualDOEntry(pluginContext.durableObjects)
+				return generateVirtualDOEntry(state.context.durableObjects)
 			}
 			return null
 		},
 
 		async configResolved(config: ResolvedConfig) {
-			projectRoot = config.root
-			pluginContext.projectRoot = projectRoot
-			resolvedPluginConfigPath = await resolvePluginConfigPath(projectRoot, configPath)
+			state.projectRoot = config.root
+			state.context.projectRoot = state.projectRoot
+			state.resolvedPluginConfigPath = await resolvePluginConfigPath(state.projectRoot, configPath)
 
 			try {
 				// Load and compile config
-				devflareConfig = await loadConfig({
-					cwd: projectRoot,
+				state.devflareConfig = await loadConfig({
+					cwd: state.projectRoot,
 					configFile: configPath
 				})
 
 				const pluginState = await buildPluginContextState(
-					projectRoot,
-					devflareConfig,
+					state.projectRoot,
+					state.devflareConfig,
 					environment,
 					config.command === 'build' ? 'build' : 'serve'
 				)
-				Object.assign(pluginContext, {
-					projectRoot,
+				Object.assign(state.context, {
+					projectRoot: state.projectRoot,
 					...pluginState
 				})
+				lastPluginContext = state.context
 
-				logDiscoveredDurableObjects(projectRoot, pluginState.durableObjects)
-				await writeGeneratedWranglerConfig(projectRoot, pluginState.wranglerConfig)
+				logDiscoveredDurableObjects(state.projectRoot, pluginState.durableObjects)
+				await writeGeneratedWranglerConfig(state.projectRoot, pluginState.wranglerConfig)
 
 				if (config.command === 'serve') {
 					console.log('[devflare] Config generated to .devflare/wrangler.jsonc')
@@ -540,8 +558,8 @@ export function devflarePlugin(options: DevflarePluginOptions = {}): Plugin {
 			if (!watchConfig) return
 
 			// Watch devflare.config.ts for changes
-			const fullConfigPath = resolvedPluginConfigPath
-				?? resolve(projectRoot, configPath || 'devflare.config.ts')
+			const fullConfigPath = state.resolvedPluginConfigPath
+				?? resolve(state.projectRoot, configPath || 'devflare.config.ts')
 
 			server.watcher.add(fullConfigPath)
 
@@ -550,18 +568,19 @@ export function devflarePlugin(options: DevflarePluginOptions = {}): Plugin {
 					console.log('[devflare] Config changed, reloading...')
 
 					try {
-						devflareConfig = await loadConfig({
-							cwd: projectRoot,
+						state.devflareConfig = await loadConfig({
+							cwd: state.projectRoot,
 							configFile: configPath
 						})
 
-						const pluginState = await buildPluginContextState(projectRoot, devflareConfig, environment, 'serve')
-						Object.assign(pluginContext, {
-							projectRoot,
+						const pluginState = await buildPluginContextState(state.projectRoot, state.devflareConfig, environment, 'serve')
+						Object.assign(state.context, {
+							projectRoot: state.projectRoot,
 							...pluginState
 						})
-						logDiscoveredDurableObjects(projectRoot, pluginState.durableObjects)
-						await writeGeneratedWranglerConfig(projectRoot, pluginState.wranglerConfig)
+						lastPluginContext = state.context
+						logDiscoveredDurableObjects(state.projectRoot, pluginState.durableObjects)
+						await writeGeneratedWranglerConfig(state.projectRoot, pluginState.wranglerConfig)
 
 						console.log('[devflare] Config reloaded')
 

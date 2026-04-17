@@ -3,9 +3,9 @@ import { dirname, relative, resolve } from 'pathe'
 import type { CliOptions, ParsedArgs } from '../index'
 import type { FileSystem } from '../dependencies'
 import {
+	compileBuildConfig,
 	loadConfig,
-	resolveConfigResources,
-	resolveMaterializedConfigResources,
+	resolveConfigForEnvironment,
 	type DevflareConfig
 } from '../../config'
 import {
@@ -15,10 +15,6 @@ import {
 	writeWranglerConfig,
 	type WranglerConfig
 } from '../../config/compiler'
-import {
-	preparePreviewScopedResourcesForDeploy,
-	type PreviewScopedResourceNames
-} from '../../config/preview-resources'
 import { getDependencies } from '../dependencies'
 import { ensureGeneratedDirectory, getGeneratedArtifactPaths } from '../generated-artifacts'
 import { applyDeploymentStrategy, describeDeploymentStrategy } from '../deploy-strategy'
@@ -56,21 +52,6 @@ interface CleanupFileSystem {
 			force: boolean
 		}
 	): Promise<void>
-}
-
-function summarizePreviewScopedResourceNames(resources: PreviewScopedResourceNames): string | null {
-	const segments = [
-		resources.kv.length > 0 ? `KV ${resources.kv.length}` : null,
-		resources.d1.length > 0 ? `D1 ${resources.d1.length}` : null,
-		resources.r2.length > 0 ? `R2 ${resources.r2.length}` : null,
-		resources.queues.length > 0 ? `Queues ${resources.queues.length}` : null,
-		resources.vectorize.length > 0 ? `Vectorize ${resources.vectorize.length}` : null,
-		resources.hyperdrive.length > 0 ? `Hyperdrive ${resources.hyperdrive.length}` : null,
-		resources.analyticsEngine.length > 0 ? `Analytics ${resources.analyticsEngine.length}` : null,
-		resources.browser.length > 0 ? `Browser ${resources.browser.length}` : null
-	].filter((segment): segment is string => segment !== null)
-
-	return segments.length > 0 ? segments.join(' · ') : null
 }
 
 function getBuildArtifactPaths(cwd: string): BuildArtifactPaths {
@@ -362,34 +343,7 @@ export async function prepareBuildArtifacts(
 	const environment = parsed.options.env as string | undefined
 
 	const rawConfig = await loadConfig({ cwd, configFile: configPath })
-	const shouldPreparePreviewScopedResources = parsed.command === 'deploy' && environment === 'preview'
-	const previewScopedResources = shouldPreparePreviewScopedResources
-		? await preparePreviewScopedResourcesForDeploy(rawConfig, { environment })
-		: null
-	const config = previewScopedResources
-		? await resolveMaterializedConfigResources(previewScopedResources.config, {
-			accountId: previewScopedResources.accountId,
-			cloudflare: previewScopedResources.resourceResolutionCloudflare
-		})
-		: await resolveConfigResources(rawConfig, { environment })
-
-	const createdPreviewResourcesSummary = previewScopedResources
-		? summarizePreviewScopedResourceNames(previewScopedResources.created)
-		: null
-	if (createdPreviewResourcesSummary) {
-		logLine(logger, `Provisioned preview-scoped resources: ${createdPreviewResourcesSummary}`)
-	}
-
-	const existingPreviewResourcesSummary = previewScopedResources
-		? summarizePreviewScopedResourceNames(previewScopedResources.existing)
-		: null
-	if (existingPreviewResourcesSummary) {
-		logLine(logger, `Reused preview-scoped resources: ${existingPreviewResourcesSummary}`)
-	}
-
-	for (const warning of previewScopedResources?.warnings ?? []) {
-		logger.warn(warning)
-	}
+	const config = resolveConfigForEnvironment(rawConfig, environment)
 
 	logLine(logger, `Building: ${config.name}`)
 
@@ -413,11 +367,11 @@ export async function prepareBuildArtifacts(
 	}
 
 	const devWranglerConfig = viteProject.shouldStartVite
-		? isolateViteBuildOutputPaths(cwd, compileConfig(config))
-		: compileConfig(config)
+		? isolateViteBuildOutputPaths(cwd, compileBuildConfig(config))
+		: compileBuildConfig(config)
 	const deployWranglerConfig = viteProject.shouldStartVite
-		? isolateViteBuildOutputPaths(cwd, compileConfig(deploymentStrategy.config))
-		: compileConfig(deploymentStrategy.config)
+		? isolateViteBuildOutputPaths(cwd, compileBuildConfig(deploymentStrategy.config))
+		: compileBuildConfig(deploymentStrategy.config)
 
 	if (viteProject.shouldStartVite) {
 		if (composedMainEntry) {
@@ -439,9 +393,6 @@ export async function prepareBuildArtifacts(
 		deployWranglerConfig.main = bundledMainPath
 		logLine(logger, `Generated bundled worker entry: ${bundledMainPath}`)
 	}
-
-	const generatedDevConfigPath = await writeGeneratedDevWranglerConfig(cwd, devWranglerConfig)
-	logger.debug(`Generated dev Wrangler config: ${relative(cwd, generatedDevConfigPath).replace(/\\/g, '/')}`)
 
 	let deployConfigPath: string
 
@@ -481,6 +432,9 @@ export async function prepareBuildArtifacts(
 		logLine(logger, 'Skipping Vite build (no effective Vite config found for this package)')
 		deployConfigPath = await buildWorkerOnlyDeployArtifact(cwd, deployWranglerConfig, config, logger)
 	}
+
+	const generatedDevConfigPath = await writeGeneratedDevWranglerConfig(cwd, devWranglerConfig)
+	logger.debug(`Generated dev Wrangler config: ${relative(cwd, generatedDevConfigPath).replace(/\\/g, '/')}`)
 
 	await writeDeployRedirect(cwd, deployConfigPath)
 	logLine(logger, `Generated deploy Wrangler config: ${relative(cwd, deployConfigPath).replace(/\\/g, '/')}`)

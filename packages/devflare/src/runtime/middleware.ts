@@ -50,7 +50,13 @@ function isFunction(value: unknown): value is AnyFunction {
 	return typeof value === 'function'
 }
 
-function markResolveStyle<T extends AnyFunction>(handler: T): T {
+/**
+ * Tag a handler as resolve-style: `(event, resolve) => Response`.
+ *
+ * Attaches `FETCH_RESOLVE_STYLE_SYMBOL` so detection survives minification
+ * (which rewrites parameter names and function source output).
+ */
+export function markResolveStyle<T extends AnyFunction>(handler: T): T {
 	Object.defineProperty(handler, FETCH_RESOLVE_STYLE_SYMBOL, {
 		value: true,
 		enumerable: false,
@@ -59,6 +65,74 @@ function markResolveStyle<T extends AnyFunction>(handler: T): T {
 	})
 
 	return handler
+}
+
+/**
+ * Explicit escape hatch for declaring a handler's calling convention.
+ *
+ * - `options.style === 'resolve'` marks the handler so
+ *   `isResolveStyleFunction` will recognise it regardless of minification.
+ * - `options.style === 'worker'` (or omitted) returns the handler as-is;
+ *   worker-style detection falls back to arity (`>= 2`).
+ */
+export function defineFetchHandler<T extends AnyFunction>(
+	handler: T,
+	options?: { style?: 'resolve' | 'worker' }
+): T {
+	if (options?.style === 'resolve') {
+		return markResolveStyle(handler)
+	}
+
+	return handler
+}
+
+/**
+ * Detect resolve-style `(event, resolve) => Response` handlers.
+ *
+ * Checks the symbol markers attached by `markResolveStyle` / `sequence()`
+ * first (fully minification-safe). Falls back to a best-effort parameter
+ * name inspection for inline handlers that were not wrapped — this
+ * fallback is fragile under aggressive minification, so authors are
+ * encouraged to wrap such handlers with `defineFetchHandler(fn, { style: 'resolve' })`
+ * or `sequence(...)` when shipping minified builds.
+ */
+function isResolveStyleFunction(handler: AnyFunction): boolean {
+	const record = handler as unknown as Record<PropertyKey, unknown>
+	if (record[FETCH_RESOLVE_STYLE_SYMBOL] || record[FETCH_SEQUENCE_SYMBOL]) {
+		return true
+	}
+
+	if (handler.length !== 2) {
+		return false
+	}
+
+	const parameterNames = getFunctionParameterNames(handler)
+	const secondParameter = parameterNames[1]?.trim().toLowerCase() ?? ''
+	return secondParameter === 'resolve' || secondParameter.endsWith('resolve')
+}
+
+function normalizeParameterName(parameterName: string | undefined): string {
+	return parameterName?.trim().toLowerCase() ?? ''
+}
+
+/**
+ * Detect method handlers written as `(event, params) => Response`.
+ *
+ * Best-effort only. Same caveat as `isResolveStyleFunction`: for
+ * minification-safe code, wrap method handlers with
+ * `defineFetchHandler(fn, { style: 'resolve' })` is NOT appropriate here —
+ * `params`-style handlers are positional and currently rely on parameter
+ * name inspection. Authors shipping minified builds should prefer 1-arg
+ * `(event) => event.params` access instead.
+ */
+function isParamsStyleFunction(handler: AnyFunction): boolean {
+	if (handler.length !== 2) {
+		return false
+	}
+
+	const parameterNames = getFunctionParameterNames(handler)
+	const secondParameter = normalizeParameterName(parameterNames[1])
+	return secondParameter === 'params' || secondParameter.endsWith('params')
 }
 
 function splitParameterList(source: string): string[] {
@@ -106,49 +180,17 @@ function getFunctionParameterNames(handler: AnyFunction): string[] {
 	return []
 }
 
-function isResolveStyleFunction(handler: AnyFunction): boolean {
-	if ((handler as unknown as Record<PropertyKey, unknown>)[FETCH_RESOLVE_STYLE_SYMBOL]) {
-		return true
-	}
-
-	if ((handler as unknown as Record<PropertyKey, unknown>)[FETCH_SEQUENCE_SYMBOL]) {
-		return true
-	}
-
-	if (handler.length !== 2) {
-		return false
-	}
-
-	const parameterNames = getFunctionParameterNames(handler)
-	const secondParameter = parameterNames[1]?.trim().toLowerCase() ?? ''
-	return secondParameter === 'resolve' || secondParameter.endsWith('resolve')
-}
-
-function normalizeParameterName(parameterName: string | undefined): string {
-	return parameterName?.trim().toLowerCase() ?? ''
-}
-
-function isParamsStyleFunction(handler: AnyFunction): boolean {
-	if (handler.length !== 2) {
-		return false
-	}
-
-	const parameterNames = getFunctionParameterNames(handler)
-	const secondParameter = normalizeParameterName(parameterNames[1])
-	return secondParameter === 'params' || secondParameter.endsWith('params')
-}
-
-function isRequestStyleParameterName(parameterName: string): boolean {
-	if (!parameterName || parameterName.startsWith('{') || parameterName.startsWith('[')) {
-		return false
-	}
-
-	return parameterName === 'request'
-		|| parameterName === 'req'
-		|| parameterName.endsWith('request')
-		|| parameterName.endsWith('req')
-}
-
+/**
+ * Detect Cloudflare Worker-style `fetch(request, env, ctx)` handlers.
+ *
+ * Returns true when:
+ * - arity is `>= 3` (unambiguous worker signature), or
+ * - arity is `2` AND the handler is not marked resolve-style AND its
+ *   second parameter name does not look like `resolve` or `params`.
+ *
+ * Name inspection is a best-effort fallback; for minified builds prefer
+ * `defineFetchHandler(fn, { style: 'resolve' })` on resolve-style handlers.
+ */
 function isWorkerStyleFetchFunction(handler: AnyFunction): boolean {
 	if (isResolveStyleFunction(handler)) {
 		return false
@@ -160,11 +202,6 @@ function isWorkerStyleFetchFunction(handler: AnyFunction): boolean {
 
 	if (handler.length === 2) {
 		return !isParamsStyleFunction(handler)
-	}
-
-	if (handler.length === 1) {
-		const parameterNames = getFunctionParameterNames(handler)
-		return isRequestStyleParameterName(normalizeParameterName(parameterNames[0]))
 	}
 
 	return false
@@ -357,7 +394,7 @@ async function invokeResolvedFetchHandler<TEvent extends FetchEvent>(
 	}
 
 	if (isParamsStyleFunction(handler)) {
-		return handler(event, event.params)
+		return handler(event, (event as { params?: unknown }).params ?? {})
 	}
 
 	if (isWorkerStyleFetchFunction(handler)) {

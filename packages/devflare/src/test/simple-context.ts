@@ -27,6 +27,7 @@ import { hasCrossWorkerDOs, hasServiceBindings, resolveDOBindings, resolveServic
 import { buildDurableObjectGateway } from './simple-context-durable-objects'
 import { findNearestConfig, getAvailablePort, getCallerDirectory, resolveTransportFile } from './simple-context-paths'
 import { createLocalSendEmailBinding, wrapEnvSendEmailBindings } from '../utils/send-email'
+import { extractBindingHints } from './binding-hints'
 
 // Handler helper configuration
 import { configureEmail, resetEmailState } from './email'
@@ -36,15 +37,28 @@ import { configureTail, resetTailState } from './tail'
 import { configureWorker, resetWorkerState } from './worker'
 
 // -----------------------------------------------------------------------------
-// Global State
+// Per-context state
 // -----------------------------------------------------------------------------
 
-let globalClient: BridgeClient | null = null
-let globalMiniflare: any = null
-let globalEnvProxy: Record<string, unknown> | null = null
-let globalTransportDecode: Map<string, (v: unknown) => unknown> | null = null
-let globalRemoteBindings: Record<string, unknown> | null = null
-let globalMiniflareBindings: Record<string, unknown> | null = null
+interface TestContextState {
+	client: BridgeClient | null
+	miniflare: any
+	envProxy: Record<string, unknown> | null
+	transportDecode: Map<string, (v: unknown) => unknown> | null
+	remoteBindings: Record<string, unknown> | null
+	miniflareBindings: Record<string, unknown> | null
+}
+
+function createTestContextState(): TestContextState {
+	return {
+		client: null,
+		miniflare: null,
+		envProxy: null,
+		transportDecode: null,
+		remoteBindings: null,
+		miniflareBindings: null
+	}
+}
 
 const TEST_CONTEXT_STARTUP_RETRY_ATTEMPTS = 3
 const TEST_CONTEXT_STARTUP_RETRY_DELAY_MS = 75
@@ -170,6 +184,7 @@ async function startBridgeBackedTestContext(mfConfig: any): Promise<StartedBridg
  * upward from the test file for a supported devflare config.
  */
 export async function createTestContext(configPath?: string): Promise<void> {
+	const state = createTestContextState()
 	const callerDir = getCallerDirectory()
 	let absolutePath: string
 
@@ -193,17 +208,17 @@ export async function createTestContext(configPath?: string): Promise<void> {
 		configFile: absolutePath.split(/[/\\]/).pop()
 	})
 
-	globalRemoteBindings = {}
+	state.remoteBindings = {}
 
 	if (isRemoteModeActive()) {
 		if (config.bindings?.ai) {
 			const aiBindingName = config.bindings.ai.binding || 'AI'
-			globalRemoteBindings[aiBindingName] = createRemoteAI(config.accountId)
+			state.remoteBindings[aiBindingName] = createRemoteAI(config.accountId)
 		}
 
 		if (config.bindings?.vectorize) {
 			for (const [name, vectorConfig] of Object.entries(config.bindings.vectorize)) {
-				globalRemoteBindings[name] = createRemoteVectorize(
+				state.remoteBindings[name] = createRemoteVectorize(
 					vectorConfig.indexName,
 					config.accountId
 				)
@@ -213,46 +228,40 @@ export async function createTestContext(configPath?: string): Promise<void> {
 
 	if (config.vars) {
 		for (const [key, value] of Object.entries(config.vars)) {
-			globalRemoteBindings[key] = value
+			state.remoteBindings[key] = value
 		}
 	}
 
 	if (config.bindings?.sendEmail) {
 		for (const [name, binding] of Object.entries(config.bindings.sendEmail)) {
-			globalRemoteBindings[name] = createLocalSendEmailBinding(binding)
+			state.remoteBindings[name] = createLocalSendEmailBinding(binding)
 		}
 	}
 
-	const hints: BindingHints = {}
-	if (config.bindings?.kv) {
-		for (const name of Object.keys(config.bindings.kv)) {
-			hints[name] = 'kv'
+	const hints = extractBindingHints(config)
+
+	const decodeTransport = (value: unknown): unknown => {
+		if (!state.transportDecode || value === null || typeof value !== 'object') {
+			return value
 		}
-	}
-	if (config.bindings?.r2) {
-		for (const name of Object.keys(config.bindings.r2)) {
-			hints[name] = 'r2'
+
+		if ('__transport' in (value as Record<string, unknown>)) {
+			const encoded = value as { __transport: string; value: unknown }
+			const decoder = state.transportDecode.get(encoded.__transport)
+			if (decoder) {
+				return decoder(encoded.value)
+			}
 		}
-	}
-	if (config.bindings?.d1) {
-		for (const name of Object.keys(config.bindings.d1)) {
-			hints[name] = 'd1'
+
+		if (Array.isArray(value)) {
+			return value.map(decodeTransport)
 		}
-	}
-	if (config.bindings?.durableObjects) {
-		for (const name of Object.keys(config.bindings.durableObjects)) {
-			hints[name] = 'do'
+
+		const result: Record<string, unknown> = {}
+		for (const [k, v] of Object.entries(value)) {
+			result[k] = decodeTransport(v)
 		}
-	}
-	if (config.bindings?.services) {
-		for (const name of Object.keys(config.bindings.services)) {
-			hints[name] = 'service'
-		}
-	}
-	if (config.bindings?.sendEmail) {
-		for (const name of Object.keys(config.bindings.sendEmail)) {
-			hints[name] = 'sendEmail'
-		}
+		return result
 	}
 
 	const needsMultiWorkerForServices = hasServiceBindings(config)
@@ -330,10 +339,10 @@ export async function createTestContext(configPath?: string): Promise<void> {
 				+ `Transport encoding/decoding will be disabled.`
 			)
 		} else {
-			globalTransportDecode = new Map()
+			state.transportDecode = new Map()
 			for (const [typeName, transporter] of Object.entries(transportModule.transport)) {
 				const t = transporter as { encode: (v: unknown) => unknown; decode: (v: unknown) => unknown }
-				globalTransportDecode.set(typeName, t.decode)
+				state.transportDecode.set(typeName, t.decode)
 			}
 		}
 	}
@@ -402,33 +411,33 @@ export async function createTestContext(configPath?: string): Promise<void> {
 	if (hasMultiWorkerServices || hasMultiWorkerDOs) {
 		const { Miniflare } = await import('miniflare')
 		activePort = await getAvailablePort()
-		globalMiniflare = new Miniflare({
+		state.miniflare = new Miniflare({
 			...mfConfig,
 			port: activePort
 		})
-		await globalMiniflare.ready
-		globalMiniflareBindings = wrapEnvSendEmailBindings(await globalMiniflare.getBindings())
+		await state.miniflare.ready
+		state.miniflareBindings = wrapEnvSendEmailBindings(await state.miniflare.getBindings())
 	} else {
 		const startedBridgeBackedTestContext = await startBridgeBackedTestContext(mfConfig)
 		activePort = startedBridgeBackedTestContext.port
-		globalMiniflare = startedBridgeBackedTestContext.miniflare
-		globalMiniflareBindings = startedBridgeBackedTestContext.miniflareBindings
-		globalClient = startedBridgeBackedTestContext.client
+		state.miniflare = startedBridgeBackedTestContext.miniflare
+		state.miniflareBindings = startedBridgeBackedTestContext.miniflareBindings
+		state.client = startedBridgeBackedTestContext.client
 	}
 
 	const disposeContext = async () => {
-		if (globalClient) {
-			await globalClient.disconnect()
-			globalClient = null
+		if (state.client) {
+			await state.client.disconnect()
+			state.client = null
 		}
-		if (globalMiniflare) {
-			await globalMiniflare.dispose()
-			globalMiniflare = null
+		if (state.miniflare) {
+			await state.miniflare.dispose()
+			state.miniflare = null
 		}
-		globalEnvProxy = null
-		globalTransportDecode = null
-		globalRemoteBindings = null
-		globalMiniflareBindings = null
+		state.envProxy = null
+		state.transportDecode = null
+		state.remoteBindings = null
+		state.miniflareBindings = null
 
 		resetQueueState()
 		resetScheduledState()
@@ -442,25 +451,25 @@ export async function createTestContext(configPath?: string): Promise<void> {
 	const getTestEnv = (): Record<string, unknown> => {
 		return new Proxy({}, {
 			get(_, prop: string) {
-				if (globalRemoteBindings && prop in globalRemoteBindings) {
-					return globalRemoteBindings[prop]
+				if (state.remoteBindings && prop in state.remoteBindings) {
+					return state.remoteBindings[prop]
 				}
-				if (hints[prop] === 'sendEmail' && globalEnvProxy && prop in globalEnvProxy) {
-					return globalEnvProxy[prop]
+				if (hints[prop] === 'sendEmail' && state.envProxy && prop in state.envProxy) {
+					return state.envProxy[prop]
 				}
-				if (globalMiniflareBindings && prop in globalMiniflareBindings) {
-					return globalMiniflareBindings[prop]
+				if (state.miniflareBindings && prop in state.miniflareBindings) {
+					return state.miniflareBindings[prop]
 				}
-				if (globalEnvProxy && prop in globalEnvProxy) {
-					return globalEnvProxy[prop]
+				if (state.envProxy && prop in state.envProxy) {
+					return state.envProxy[prop]
 				}
 				return undefined
 			},
 			has(_, prop: string) {
 				return Boolean(
-					(globalRemoteBindings && prop in globalRemoteBindings)
-					|| (globalMiniflareBindings && prop in globalMiniflareBindings)
-					|| (globalEnvProxy && prop in globalEnvProxy)
+					(state.remoteBindings && prop in state.remoteBindings)
+					|| (state.miniflareBindings && prop in state.miniflareBindings)
+					|| (state.envProxy && prop in state.envProxy)
 				)
 			}
 		}) as Record<string, unknown>
@@ -541,18 +550,18 @@ export async function createTestContext(configPath?: string): Promise<void> {
 
 		const envAccessor: Record<string, unknown> = new Proxy({}, {
 			get(_, prop: string) {
-				if (globalRemoteBindings && prop in globalRemoteBindings) {
-					return globalRemoteBindings[prop]
+				if (state.remoteBindings && prop in state.remoteBindings) {
+					return state.remoteBindings[prop]
 				}
-				if (globalMiniflareBindings && prop in globalMiniflareBindings) {
-					return globalMiniflareBindings[prop]
+				if (state.miniflareBindings && prop in state.miniflareBindings) {
+					return state.miniflareBindings[prop]
 				}
 				return undefined
 			},
 			has(_, prop: string) {
 				return Boolean(
-					(globalRemoteBindings && prop in globalRemoteBindings)
-					|| (globalMiniflareBindings && prop in globalMiniflareBindings)
+					(state.remoteBindings && prop in state.remoteBindings)
+					|| (state.miniflareBindings && prop in state.miniflareBindings)
 				)
 			}
 		})
@@ -561,13 +570,13 @@ export async function createTestContext(configPath?: string): Promise<void> {
 		return
 	}
 
-	const bridgeClient = globalClient
+	const bridgeClient = state.client
 	if (!bridgeClient) {
 		throw new Error('Bridge-backed test context did not initialize a client.')
 	}
 
 	setBindingHints(hints)
-	globalEnvProxy = createEnvProxy({
+	state.envProxy = createEnvProxy({
 		client: bridgeClient,
 		transformResult: (result: unknown) => decodeTransport(result)
 	})
@@ -577,57 +586,30 @@ export async function createTestContext(configPath?: string): Promise<void> {
 			const hint = hints[prop]
 			const prefersBridgeBinding = shouldPreferBridgeBinding(hint)
 
-			if (globalRemoteBindings && prop in globalRemoteBindings) {
-				return globalRemoteBindings[prop]
+			if (state.remoteBindings && prop in state.remoteBindings) {
+				return state.remoteBindings[prop]
 			}
-			if (!prefersBridgeBinding && globalMiniflareBindings && prop in globalMiniflareBindings) {
-				return globalMiniflareBindings[prop]
+			if (!prefersBridgeBinding && state.miniflareBindings && prop in state.miniflareBindings) {
+				return state.miniflareBindings[prop]
 			}
-			if (globalEnvProxy) {
-				return globalEnvProxy[prop]
+			if (state.envProxy) {
+				return state.envProxy[prop]
 			}
-			if (prefersBridgeBinding && globalMiniflareBindings && prop in globalMiniflareBindings) {
-				return globalMiniflareBindings[prop]
+			if (prefersBridgeBinding && state.miniflareBindings && prop in state.miniflareBindings) {
+				return state.miniflareBindings[prop]
 			}
 			return undefined
 		},
 		has(_, prop: string) {
 			return Boolean(
-				(globalRemoteBindings && prop in globalRemoteBindings)
-				|| (globalMiniflareBindings && prop in globalMiniflareBindings)
-				|| (globalEnvProxy !== null)
+				(state.remoteBindings && prop in state.remoteBindings)
+				|| (state.miniflareBindings && prop in state.miniflareBindings)
+				|| (state.envProxy !== null)
 			)
 		}
 	})
 
 	__setTestContext(envAccessor, disposeContext)
-}
-
-/**
- * Decode transport types on client side.
- */
-function decodeTransport(value: unknown): unknown {
-	if (!globalTransportDecode || value === null || typeof value !== 'object') {
-		return value
-	}
-
-	if ('__transport' in (value as Record<string, unknown>)) {
-		const encoded = value as { __transport: string; value: unknown }
-		const decoder = globalTransportDecode.get(encoded.__transport)
-		if (decoder) {
-			return decoder(encoded.value)
-		}
-	}
-
-	if (Array.isArray(value)) {
-		return value.map(decodeTransport)
-	}
-
-	const result: Record<string, unknown> = {}
-	for (const [k, v] of Object.entries(value)) {
-		result[k] = decodeTransport(v)
-	}
-	return result
 }
 
 /**

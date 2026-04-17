@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'pathe'
 import {
 	loadResolvedConfig,
+	prepareConfigResourcesForDeploy,
 	resolveConfigForLocalRuntime,
 	resolveConfigResources
 } from '../../../src/config'
@@ -285,5 +286,43 @@ export default {
 		expect(result.bindings?.d1).toEqual({ DB: { id: 'resolved-db-id' } })
 		expect(result.bindings?.hyperdrive).toEqual({ POSTGRES: { id: 'resolved-postgres-id' } })
 		expect(result.bindings?.r2).toEqual({ ASSETS: 'assets-bucket' })
+	})
+
+	test('prepares deploy resources by provisioning missing KV and D1 names', async () => {
+		const result = await prepareConfigResourcesForDeploy({
+			...baseConfig,
+			accountId: 'config-account',
+			bindings: {
+				kv: {
+					CACHE: { name: 'cache-kv' }
+				},
+				d1: {
+					DB: { name: 'main-db' }
+				}
+			}
+		}, {
+			cloudflare: {
+				listKVNamespaces: async () => [],
+				createKVNamespace: async (_accountId, resourceName) => ({
+					id: `kv-${resourceName}`,
+					name: resourceName
+				}),
+				listD1Databases: async () => [],
+				createD1Database: async (_accountId, resourceName) => ({
+					id: `d1-${resourceName}`,
+					name: resourceName,
+					version: 'alpha'
+				})
+			}
+		})
+
+		expect(result.config.bindings?.kv).toEqual({
+			CACHE: { id: 'kv-cache-kv' }
+		})
+		expect(result.config.bindings?.d1).toEqual({
+			DB: { id: 'd1-main-db' }
+		})
+		expect(result.created.kv).toEqual(['cache-kv'])
+		expect(result.created.d1).toEqual(['main-db'])
 	})
 })

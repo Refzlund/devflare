@@ -5,25 +5,12 @@
 // so that env, ctx, event, and locals proxies work inside DO methods
 // =============================================================================
 
+import ts from 'typescript'
 import MagicString from 'magic-string'
 
 // =============================================================================
-// Class Detection
+// Class Detection (TypeScript AST-based)
 // =============================================================================
-
-/**
- * Regex to find classes extending DurableObject
- * Matches: export class ClassName extends DurableObject
- * Also handles: DurableObject<Env> generics and implements SomeInterface
- */
-const DO_CLASS_REGEX = /export\s+class\s+(\w+)\s+extends\s+DurableObject(?:<[^>]+>)?(?:\s+implements\s+[\w,\s]+)?\s*\{/g
-
-/**
- * Regex to find classes with @durableObject decorator
- * Matches: @durableObject() or @durableObject({ ... })
- * Followed by: export class ClassName
- */
-const DECORATOR_CLASS_REGEX = /@durableObject\s*\([^)]*\)\s*\n?\s*export\s+class\s+(\w+)/g
 
 /**
  * Information about a detected Durable Object class
@@ -40,81 +27,137 @@ export interface DOClassInfo {
 }
 
 /**
- * Finds all class names that extend DurableObject or have @durableObject decorator
+ * Returns the trailing identifier name of an expression used as a class base.
+ * Handles `DurableObject`, `Cloudflare.DurableObject`, `DurableObject<Env>`.
  */
-export function findDurableObjectClasses(code: string): string[] {
-	const classes = new Set<string>()
-
-	// Reset regex state
-	DO_CLASS_REGEX.lastIndex = 0
-	DECORATOR_CLASS_REGEX.lastIndex = 0
-
-	// Find classes extending DurableObject
-	let match: RegExpExecArray | null
-	while ((match = DO_CLASS_REGEX.exec(code)) !== null) {
-		classes.add(match[1])
+function getBaseIdentifierName(expr: ts.Expression): string | undefined {
+	// Strip generic type arguments — they live on ExpressionWithTypeArguments,
+	// so here we only see the call/identifier/property-access expression.
+	if (ts.isIdentifier(expr)) {
+		return expr.text
 	}
-
-	// Find classes with @durableObject decorator
-	while ((match = DECORATOR_CLASS_REGEX.exec(code)) !== null) {
-		classes.add(match[1])
+	if (ts.isPropertyAccessExpression(expr)) {
+		return expr.name.text
 	}
-
-	return Array.from(classes)
+	return undefined
 }
 
 /**
- * Finds detailed info about all Durable Object classes
+ * Returns true when the given heritage clause expression refers to DurableObject.
  */
-export function findDurableObjectClassesDetailed(code: string): DOClassInfo[] {
+function extendsDurableObject(node: ts.ClassDeclaration): boolean {
+	const clauses = node.heritageClauses
+	if (!clauses) return false
+	for (const clause of clauses) {
+		if (clause.token !== ts.SyntaxKind.ExtendsKeyword) continue
+		for (const type of clause.types) {
+			const name = getBaseIdentifierName(type.expression)
+			if (name === 'DurableObject') return true
+		}
+	}
+	return false
+}
+
+/**
+ * Returns the `@durableObject` decorator (if any) on a class declaration,
+ * preferring `ts.getDecorators` which understands both legacy and modifier-style decorators.
+ */
+function getDurableObjectDecorator(node: ts.ClassDeclaration): ts.Decorator | undefined {
+	const decorators = ts.canHaveDecorators(node) ? ts.getDecorators(node) : undefined
+	if (!decorators) return undefined
+	for (const decorator of decorators) {
+		const expr = decorator.expression
+		if (ts.isCallExpression(expr) && ts.isIdentifier(expr.expression) && expr.expression.text === 'durableObject') {
+			return decorator
+		}
+		if (ts.isIdentifier(expr) && expr.text === 'durableObject') {
+			return decorator
+		}
+	}
+	return undefined
+}
+
+/**
+ * Parse the first argument of the `@durableObject(...)` decorator into a plain options object.
+ * Only supports the shapes the runtime uses: boolean literals and arrays of string literals.
+ */
+function parseDecoratorOptions(decorator: ts.Decorator): Record<string, unknown> | undefined {
+	const expr = decorator.expression
+	if (!ts.isCallExpression(expr)) return undefined
+	const arg = expr.arguments[0]
+	if (!arg || !ts.isObjectLiteralExpression(arg)) return undefined
+
+	const result: Record<string, unknown> = {}
+	for (const prop of arg.properties) {
+		if (!ts.isPropertyAssignment(prop)) continue
+		let key: string | undefined
+		if (ts.isIdentifier(prop.name)) key = prop.name.text
+		else if (ts.isStringLiteral(prop.name)) key = prop.name.text
+		if (!key) continue
+
+		const value = prop.initializer
+		if (value.kind === ts.SyntaxKind.TrueKeyword) {
+			result[key] = true
+		} else if (value.kind === ts.SyntaxKind.FalseKeyword) {
+			result[key] = false
+		} else if (ts.isStringLiteralLike(value)) {
+			result[key] = value.text
+		} else if (ts.isNumericLiteral(value)) {
+			result[key] = Number(value.text)
+		} else if (ts.isArrayLiteralExpression(value)) {
+			const items: string[] = []
+			for (const el of value.elements) {
+				if (ts.isStringLiteralLike(el)) items.push(el.text)
+			}
+			result[key] = items
+		}
+	}
+	return result
+}
+
+/**
+ * Walk top-level statements and collect DO class information.
+ */
+function collectDurableObjectClasses(code: string): DOClassInfo[] {
+	const sourceFile = ts.createSourceFile(
+		'durable-object.tsx',
+		code,
+		ts.ScriptTarget.Latest,
+		true,
+		ts.ScriptKind.TSX
+	)
+
 	const classMap = new Map<string, DOClassInfo>()
 
-	// Reset regex state
-	DO_CLASS_REGEX.lastIndex = 0
-	DECORATOR_CLASS_REGEX.lastIndex = 0
+	const inspect = (node: ts.ClassDeclaration) => {
+		if (!node.name) return
+		// Only consider exported classes to preserve existing behavior
+		// of the regex-based detector and the downstream transform.
+		const modifiers = ts.canHaveModifiers(node) ? ts.getModifiers(node) : undefined
+		const isExported = modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword) ?? false
+		if (!isExported) return
 
-	// Find classes extending DurableObject
-	let match: RegExpExecArray | null
-	while ((match = DO_CLASS_REGEX.exec(code)) !== null) {
-		const name = match[1]
-		classMap.set(name, {
-			name,
-			extendsBase: true,
-			hasDecorator: false
-		})
-	}
+		const name = node.name.text
+		const extendsBase = extendsDurableObject(node)
+		const decorator = getDurableObjectDecorator(node)
+		const hasDecorator = decorator !== undefined
 
-	// Find classes with @durableObject decorator
-	const decoratorWithOptionsRegex = /@durableObject\s*\((\{[^}]*\})?\)\s*\n?\s*export\s+class\s+(\w+)/g
-	while ((match = decoratorWithOptionsRegex.exec(code)) !== null) {
-		const optionsStr = match[1]
-		const name = match[2]
+		if (!extendsBase && !hasDecorator) return
 
 		const existing = classMap.get(name)
-		if (existing) {
-			existing.hasDecorator = true
-			if (optionsStr) {
-				try {
-					// Try to parse simple object literals
-					existing.decoratorOptions = parseSimpleObject(optionsStr)
-				} catch {
-					// Ignore parse errors
-				}
-			}
-		} else {
-			const info: DOClassInfo = {
-				name,
-				extendsBase: false,
-				hasDecorator: true
-			}
-			if (optionsStr) {
-				try {
-					info.decoratorOptions = parseSimpleObject(optionsStr)
-				} catch {
-					// Ignore parse errors
-				}
-			}
-			classMap.set(name, info)
+		const info: DOClassInfo = existing ?? { name, extendsBase: false, hasDecorator: false }
+		if (extendsBase) info.extendsBase = true
+		if (hasDecorator) {
+			info.hasDecorator = true
+			const options = parseDecoratorOptions(decorator)
+			if (options) info.decoratorOptions = options
+		}
+		classMap.set(name, info)
+	}
+
+	for (const statement of sourceFile.statements) {
+		if (ts.isClassDeclaration(statement)) {
+			inspect(statement)
 		}
 	}
 
@@ -122,62 +165,17 @@ export function findDurableObjectClassesDetailed(code: string): DOClassInfo[] {
 }
 
 /**
- * Parse a simple object literal string
- * Handles: { key: value, key2: true, key3: ['a', 'b'] }
+ * Finds all class names that extend DurableObject or have @durableObject decorator
  */
-function parseSimpleObject(str: string): Record<string, unknown> {
-	// Very simple parser - just extracts key: value pairs
-	// This is intentionally limited; complex parsing would need a real parser
-	const result: Record<string, unknown> = {}
+export function findDurableObjectClasses(code: string): string[] {
+	return collectDurableObjectClasses(code).map((info) => info.name)
+}
 
-	// Remove braces
-	const inner = str.trim().slice(1, -1)
-
-	// Split by commas (but not inside arrays)
-	let depth = 0
-	let current = ''
-	const pairs: string[] = []
-
-	for (const char of inner) {
-		if (char === '[') depth++
-		else if (char === ']') depth--
-		else if (char === ',' && depth === 0) {
-			pairs.push(current.trim())
-			current = ''
-			continue
-		}
-		current += char
-	}
-	if (current.trim()) pairs.push(current.trim())
-
-	for (const pair of pairs) {
-		const colonIndex = pair.indexOf(':')
-		if (colonIndex === -1) continue
-
-		const key = pair.slice(0, colonIndex).trim()
-		const valueStr = pair.slice(colonIndex + 1).trim()
-
-		// Parse value
-		if (valueStr === 'true') {
-			result[key] = true
-		} else if (valueStr === 'false') {
-			result[key] = false
-		} else if (valueStr.startsWith('[')) {
-			// Parse simple array of strings
-			const arrayContent = valueStr.slice(1, -1)
-			result[key] = arrayContent
-				.split(',')
-				.map((s) => s.trim().replace(/^['"]|['"]$/g, ''))
-		} else if (valueStr.startsWith("'") || valueStr.startsWith('"')) {
-			result[key] = valueStr.slice(1, -1)
-		} else if (!isNaN(Number(valueStr))) {
-			result[key] = Number(valueStr)
-		} else {
-			result[key] = valueStr
-		}
-	}
-
-	return result
+/**
+ * Finds detailed info about all Durable Object classes
+ */
+export function findDurableObjectClassesDetailed(code: string): DOClassInfo[] {
+	return collectDurableObjectClasses(code)
 }
 
 // =============================================================================

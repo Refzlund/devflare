@@ -14,11 +14,30 @@ import type { CloudflareAPIResponse } from './types'
 const API_BASE = 'https://api.cloudflare.com/client/v4'
 const DEFAULT_TIMEOUT = 10000 // 10 seconds
 
-// Track if we've already retried with a fresh token (avoid infinite loops)
-let hasRetriedWithFreshToken = false
+// -----------------------------------------------------------------------------
+// Error Types
+// -----------------------------------------------------------------------------
+
+export class CloudflareAPIError extends Error {
+	constructor(
+		message: string,
+		public code: number,
+		public errors: Array<{ code: number; message: string }>
+	) {
+		super(message)
+		this.name = 'CloudflareAPIError'
+	}
+}
+
+export class AuthenticationError extends Error {
+	constructor(message = 'Not authenticated. Run: devflare login') {
+		super(message)
+		this.name = 'AuthenticationError'
+	}
+}
 
 // -----------------------------------------------------------------------------
-// Helpers
+// Fetch with timeout
 // -----------------------------------------------------------------------------
 
 /**
@@ -52,25 +71,173 @@ async function fetchWithTimeout(
 }
 
 // -----------------------------------------------------------------------------
-// Error Types
+// Envelope parsing
 // -----------------------------------------------------------------------------
 
-export class CloudflareAPIError extends Error {
-	constructor(
-		message: string,
-		public code: number,
-		public errors: Array<{ code: number; message: string }>
-	) {
-		super(message)
-		this.name = 'CloudflareAPIError'
+interface ParseEnvelopeOptions {
+	endpoint: string
+	allow404?: boolean
+}
+
+function tryParseJson(text: string): { ok: true; value: unknown } | { ok: false } {
+	if (text.length === 0) return { ok: false }
+	try {
+		return { ok: true, value: JSON.parse(text) }
+	} catch {
+		return { ok: false }
 	}
 }
 
-export class AuthenticationError extends Error {
-	constructor(message = 'Not authenticated. Run: devflare login') {
-		super(message)
-		this.name = 'AuthenticationError'
+function isEnvelopeShape(value: unknown): value is CloudflareAPIResponse<unknown> {
+	if (!value || typeof value !== 'object') return false
+	const record = value as Record<string, unknown>
+	return typeof record.success === 'boolean'
+		&& Array.isArray(record.errors)
+		&& Array.isArray(record.messages)
+		&& 'result' in record
+}
+
+function envelopeFailureError(
+	response: Response,
+	envelope: CloudflareAPIResponse<unknown>,
+	endpoint: string
+): CloudflareAPIError {
+	const first = envelope.errors[0]
+	const message = first
+		? `Cloudflare ${endpoint} failed (${first.code}): ${first.message}`
+		: `Cloudflare ${endpoint} failed`
+	return new CloudflareAPIError(message, response.status, envelope.errors)
+}
+
+/**
+ * Read a response body once (as text) and decode the Cloudflare v4 envelope
+ * without throwing on `success: false`. Returns `null` when a 404 is
+ * explicitly allowed via `allow404: true`.
+ *
+ * Throws `CloudflareAPIError` when the body is not valid JSON or does not
+ * match the expected v4 envelope shape.
+ */
+async function decodeCloudflareEnvelope<T>(
+	response: Response,
+	opts: ParseEnvelopeOptions
+): Promise<CloudflareAPIResponse<T> | null> {
+	if (opts.allow404 === true && response.status === 404) {
+		return null
 	}
+
+	const text = await response.text()
+	const parsed = tryParseJson(text)
+
+	if (!parsed.ok) {
+		throw new CloudflareAPIError(
+			'Cloudflare API returned an invalid JSON response.',
+			response.status,
+			[]
+		)
+	}
+
+	if (!isEnvelopeShape(parsed.value)) {
+		throw new CloudflareAPIError(
+			`Cloudflare ${opts.endpoint} returned a non-envelope JSON response.`,
+			response.status,
+			[]
+		)
+	}
+
+	return parsed.value as CloudflareAPIResponse<T>
+}
+
+/**
+ * Canonical Cloudflare v4 envelope parser.
+ *
+ * - Reads the response body exactly once (text -> tryParseJson).
+ * - Enforces the `{ success, errors, messages, result }` shape.
+ * - Throws `CloudflareAPIError` when `success === false`, surfacing
+ *   `errors[0].code` and `errors[0].message`.
+ * - Treats `404` as success when `allow404: true` is passed, returning
+ *   `null as T` without reading the body.
+ */
+export async function parseCloudflareEnvelope<T>(
+	response: Response,
+	opts: ParseEnvelopeOptions
+): Promise<T> {
+	const envelope = await decodeCloudflareEnvelope<T>(response, opts)
+	if (envelope === null) {
+		return null as T
+	}
+
+	if (!envelope.success) {
+		throw envelopeFailureError(response, envelope, opts.endpoint)
+	}
+
+	return envelope.result
+}
+
+/**
+ * Raw JSON parser for Cloudflare endpoints that do not use the v4 envelope.
+ * Reads the body once as text and parses it as JSON.
+ */
+export async function parseRawJson<T>(
+	response: Response,
+	opts: { endpoint: string }
+): Promise<T> {
+	const text = await response.text()
+	const parsed = tryParseJson(text)
+	if (!parsed.ok) {
+		throw new CloudflareAPIError(
+			`Cloudflare ${opts.endpoint} returned an invalid JSON response.`,
+			response.status,
+			[]
+		)
+	}
+	return parsed.value as T
+}
+
+// -----------------------------------------------------------------------------
+// Auth session
+// -----------------------------------------------------------------------------
+
+export interface CloudflareAuthSession {
+	getAuthHeader(forceRefresh?: boolean): Promise<string>
+	invalidate(): void
+}
+
+interface CreateAuthSessionOptions {
+	accountId?: string
+	tokenProvider?: (forceRefresh: boolean) => Promise<string | null>
+	onInvalidate?: () => void
+}
+
+/**
+ * Create a small auth session abstraction that centralises "which token are
+ * we sending" for every request. The session owns token resolution and
+ * invalidation so request code does not call `getApiToken` directly.
+ */
+export function createCloudflareAuthSession(opts: CreateAuthSessionOptions = {}): CloudflareAuthSession {
+	const provider = opts.tokenProvider ?? ((forceRefresh: boolean) => getApiToken(forceRefresh))
+	const onInvalidate = opts.onInvalidate ?? invalidateToken
+
+	return {
+		async getAuthHeader(forceRefresh = false) {
+			const token = await provider(forceRefresh)
+			if (!token) {
+				throw new AuthenticationError()
+			}
+			return `Bearer ${token}`
+		},
+		invalidate() {
+			onInvalidate()
+		}
+	}
+}
+
+const defaultAuthSession = createCloudflareAuthSession({})
+
+async function resolveAuthHeader(options?: APIClientOptions, forceRefresh = false): Promise<string> {
+	if (options?.token) {
+		return `Bearer ${options.token}`
+	}
+	return defaultAuthSession.getAuthHeader(forceRefresh)
 }
 
 // -----------------------------------------------------------------------------
@@ -80,7 +247,7 @@ export class AuthenticationError extends Error {
 export interface APIClientOptions {
 	/** Override the API token (instead of auto-detecting) */
 	token?: string
-	/** Request timeout in ms (default: 30000) */
+	/** Request timeout in ms (default: 10000) */
 	timeout?: number
 }
 
@@ -91,27 +258,11 @@ interface CloudflareJsonRequestOptions {
 }
 
 /**
- * Create headers for Cloudflare API requests
+ * Check if a decoded envelope represents an auth failure worth retrying.
  */
-async function createHeaders(options?: APIClientOptions, forceRefresh = false): Promise<Headers> {
-	const token = options?.token ?? await getApiToken(forceRefresh)
-
-	if (!token) {
-		throw new AuthenticationError()
-	}
-
-	return new Headers({
-		'Authorization': `Bearer ${token}`,
-		'Content-Type': 'application/json'
-	})
-}
-
-/**
- * Check if an error is an authentication error (401 or auth-related message)
- */
-function isAuthError(response: Response, data: CloudflareAPIResponse<unknown>): boolean {
+function isAuthError(response: Response, envelope: CloudflareAPIResponse<unknown>): boolean {
 	if (response.status === 401) return true
-	if (!data.success && data.errors?.some((e) =>
+	if (!envelope.success && envelope.errors?.some((e) =>
 		e.code === 10000 || // Auth error code
 		e.message?.toLowerCase().includes('authentication') ||
 		e.message?.toLowerCase().includes('token')
@@ -121,40 +272,42 @@ function isAuthError(response: Response, data: CloudflareAPIResponse<unknown>): 
 	return false
 }
 
+/**
+ * Execute a Cloudflare JSON request and return the decoded envelope without
+ * throwing on `success: false` so callers can inspect and retry on auth
+ * errors before surfacing failures.
+ */
 async function requestCloudflareJson<T>(
 	path: string,
 	request: CloudflareJsonRequestOptions,
 	options?: APIClientOptions
 ): Promise<{
 	response: Response
-	data: CloudflareAPIResponse<T>
+	envelope: CloudflareAPIResponse<T>
 }> {
+	const endpoint = `${request.method} ${path}`
+
 	const makeRequest = async (forceRefresh: boolean) => {
-		const headers = await createHeaders(options, forceRefresh)
+		const authorization = await resolveAuthHeader(options, forceRefresh)
+		const headers = new Headers({
+			'Authorization': authorization,
+			'Content-Type': 'application/json'
+		})
 		const response = await fetchWithTimeout(`${API_BASE}${path}`, {
 			method: request.method,
 			headers,
 			...(request.body !== undefined ? { body: JSON.stringify(request.body) } : {})
 		}, options?.timeout ?? DEFAULT_TIMEOUT)
-		const data = await response.json() as CloudflareAPIResponse<T>
-
-		return {
-			response,
-			data
-		}
+		const envelope = await decodeCloudflareEnvelope<T>(response, { endpoint })
+		// allow404 is not set, so envelope is non-null.
+		return { response, envelope: envelope as CloudflareAPIResponse<T> }
 	}
 
 	let result = await makeRequest(false)
 
-	if (request.allowAuthRetry === true && isAuthError(result.response, result.data) && !hasRetriedWithFreshToken && !options?.token) {
-		hasRetriedWithFreshToken = true
-		invalidateToken()
-
-		try {
-			result = await makeRequest(true)
-		} finally {
-			hasRetriedWithFreshToken = false
-		}
+	if (request.allowAuthRetry === true && isAuthError(result.response, result.envelope) && !options?.token) {
+		defaultAuthSession.invalidate()
+		result = await makeRequest(true)
 	}
 
 	return result
@@ -165,44 +318,11 @@ async function requestCloudflareResult<T>(
 	request: CloudflareJsonRequestOptions,
 	options?: APIClientOptions
 ): Promise<T> {
-	const { response, data } = await requestCloudflareJson<T>(path, request, options)
-	return unwrapCloudflareResult(response, data)
-}
-
-function unwrapCloudflareResult<T>(
-	response: Response,
-	data: CloudflareAPIResponse<T>,
-	fallbackMessage = 'API request failed'
-): T {
-	if (!data.success) {
-		throw new CloudflareAPIError(
-			data.errors[0]?.message || fallbackMessage,
-			response.status,
-			data.errors
-		)
+	const { response, envelope } = await requestCloudflareJson<T>(path, request, options)
+	if (!envelope.success) {
+		throw envelopeFailureError(response, envelope, `${request.method} ${path}`)
 	}
-
-	return data.result
-}
-
-async function throwCloudflareResponseError(
-	response: Response,
-	fallbackMessage: string
-): Promise<never> {
-	try {
-		const errorData = await response.json() as CloudflareAPIResponse<unknown>
-		throw new CloudflareAPIError(
-			errorData.errors[0]?.message || fallbackMessage,
-			response.status,
-			errorData.errors
-		)
-	} catch (error) {
-		if (error instanceof CloudflareAPIError) {
-			throw error
-		}
-
-		throw new CloudflareAPIError(fallbackMessage, response.status, [])
-	}
+	return envelope.result
 }
 
 /**
@@ -310,13 +430,16 @@ export async function apiGetAll<T>(
 			? `${path}${separator}cursor=${encodeURIComponent(cursor)}&per_page=${perPage}`
 			: `${path}${separator}page=${page}&per_page=${perPage}`
 
-		const { response, data } = await requestCloudflareJson<T[] | Record<string, unknown>>(pagedPath, {
+		const { response, envelope } = await requestCloudflareJson<T[] | Record<string, unknown>>(pagedPath, {
 			method: 'GET',
 			allowAuthRetry: true
 		}, options)
-		unwrapCloudflareResult(response, data)
 
-		const pageResults = extractPaginatedItems(data.result)
+		if (!envelope.success) {
+			throw envelopeFailureError(response, envelope, `GET ${pagedPath}`)
+		}
+
+		const pageResults = extractPaginatedItems(envelope.result)
 		results.push(...pageResults)
 
 		// Stop conditions:
@@ -324,7 +447,7 @@ export async function apiGetAll<T>(
 		// 2. No results returned (empty page)
 		// 3. We've fetched all items based on total_count
 		// 4. total_pages is defined and we've reached it
-		if (!data.result_info) {
+		if (!envelope.result_info) {
 			break
 		}
 
@@ -333,7 +456,7 @@ export async function apiGetAll<T>(
 			break
 		}
 
-		const nextCursor = data.result_info.cursor?.trim()
+		const nextCursor = envelope.result_info.cursor?.trim()
 		if (nextCursor) {
 			if (seenCursors.has(nextCursor)) {
 				break
@@ -349,15 +472,15 @@ export async function apiGetAll<T>(
 		}
 
 		// If we have total_count, check if we've got all items
-		if (data.result_info.total_count !== undefined) {
-			if (results.length >= data.result_info.total_count) {
+		if (envelope.result_info.total_count !== undefined) {
+			if (results.length >= envelope.result_info.total_count) {
 				break
 			}
 		}
 
 		// If we have total_pages, check if we've reached it
-		if (data.result_info.total_pages !== undefined) {
-			if (page >= data.result_info.total_pages) {
+		if (envelope.result_info.total_pages !== undefined) {
+			if (page >= envelope.result_info.total_pages) {
 				break
 			}
 		}
@@ -371,8 +494,9 @@ export async function apiGetAll<T>(
 // -----------------------------------------------------------------------------
 // KV-Specific Helpers
 // -----------------------------------------------------------------------------
-// Cloudflare KV "values" endpoints are NOT JSON envelopes — they return
-// raw text/binary. We need dedicated helpers that don't try to parse JSON.
+// Cloudflare KV "values" endpoints are NOT JSON envelopes on success — they
+// return raw text/binary. Error responses still return a v4 envelope, which
+// we decode through the canonical parser.
 
 async function requestKVValue(
 	accountId: string,
@@ -383,11 +507,12 @@ async function requestKVValue(
 	} | {
 		method: 'PUT'
 		value: string
+	} | {
+		method: 'DELETE'
 	},
 	options?: APIClientOptions
 ): Promise<Response> {
-	const token = options?.token ?? await getApiToken()
-	if (!token) throw new AuthenticationError()
+	const authorization = await resolveAuthHeader(options)
 
 	const encodedKey = encodeURIComponent(key)
 	const url = `${API_BASE}/accounts/${accountId}/storage/kv/namespaces/${namespaceId}/values/${encodedKey}`
@@ -395,11 +520,24 @@ async function requestKVValue(
 	return fetchWithTimeout(url, {
 		method: request.method,
 		headers: {
-			'Authorization': `Bearer ${token}`,
+			'Authorization': authorization,
 			...(request.method === 'PUT' ? { 'Content-Type': 'text/plain' } : {})
 		},
 		...(request.method === 'PUT' ? { body: request.value } : {})
 	}, options?.timeout ?? DEFAULT_TIMEOUT)
+}
+
+/**
+ * Surface a failed KV-value response as a typed CloudflareAPIError by
+ * decoding the envelope the error path emits.
+ */
+async function throwKVValueError(response: Response, endpoint: string): Promise<never> {
+	// parseCloudflareEnvelope throws CloudflareAPIError either on !success or
+	// when the body is not a valid envelope.
+	await parseCloudflareEnvelope<unknown>(response, { endpoint })
+	// If the body somehow parsed as a successful envelope on a non-ok
+	// response, still surface a typed error.
+	throw new CloudflareAPIError(`Cloudflare ${endpoint} failed`, response.status, [])
 }
 
 /**
@@ -421,7 +559,7 @@ export async function kvGet(
 	}
 
 	if (!response.ok) {
-		await throwCloudflareResponseError(response, 'KV read failed')
+		await throwKVValueError(response, 'KV read')
 	}
 
 	return response.text()
@@ -443,6 +581,29 @@ export async function kvPut(
 	}, options)
 
 	if (!response.ok) {
-		await throwCloudflareResponseError(response, 'KV write failed')
+		await throwKVValueError(response, 'KV write')
+	}
+}
+
+/**
+ * Delete a KV key
+ * Treats 404 as success (key already absent).
+ */
+export async function kvDelete(
+	accountId: string,
+	namespaceId: string,
+	key: string,
+	options?: APIClientOptions
+): Promise<void> {
+	const response = await requestKVValue(accountId, namespaceId, key, {
+		method: 'DELETE'
+	}, options)
+
+	if (response.status === 404) {
+		return
+	}
+
+	if (!response.ok) {
+		await throwKVValueError(response, 'KV delete')
 	}
 }

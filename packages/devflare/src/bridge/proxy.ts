@@ -7,6 +7,7 @@
 import { getClient, type BridgeClient } from './client'
 import { HTTP_TRANSFER_THRESHOLD } from './protocol'
 import {
+	deserializeValue,
 	serializeRequest,
 	deserializeResponse,
 	type SerializedResponse
@@ -92,7 +93,8 @@ function createR2Proxy(client: BridgeClient, bindingName: string): R2Bucket {
 					throw new Error(`HTTP transfer failed: ${error}`)
 				}
 
-				return response.json() as Promise<R2Object | null>
+				const serialized = await response.json() as unknown
+				return deserializeValue(serialized) as R2Object | null
 			}
 
 			return client.call(`${bindingName}.r2.put`, [key, value, options]) as Promise<R2Object | null>
@@ -116,7 +118,7 @@ function getValueSize(value: unknown): number {
 	if (value instanceof Blob) return value.size
 	if (value instanceof ArrayBuffer) return value.byteLength
 	if (value instanceof Uint8Array) return value.byteLength
-	if (typeof value === 'string') return value.length
+	if (typeof value === 'string') return new TextEncoder().encode(value).byteLength
 	if (value instanceof ReadableStream) return Infinity  // Assume large
 	return 0
 }
@@ -398,6 +400,10 @@ function createDOStubProxy(
 				return undefined
 			}
 
+			if (prop === 'then' || prop === 'catch' || prop === 'finally') {
+				return undefined
+			}
+
 			// Any other property is treated as an RPC method
 			// Return a function that calls the DO via RPC
 			return async (...args: unknown[]) => {
@@ -597,20 +603,35 @@ function createSimpleBindingProxy(client: BridgeClient, bindingName: string): un
 	// Return a thenable that fetches the value on await
 	let cachedValue: unknown
 	let fetched = false
+	let pendingValue: Promise<unknown> | null = null
 
-	return {
-		then(resolve: (value: unknown) => void, reject: (error: Error) => void) {
-			if (fetched) {
-				resolve(cachedValue)
-				return
-			}
-			client.call(`${bindingName}.value`, [])
+	const loadValue = () => {
+		if (fetched) {
+			return Promise.resolve(cachedValue)
+		}
+
+		if (!pendingValue) {
+			pendingValue = client.call(`${bindingName}.value`, [])
 				.then((value) => {
 					cachedValue = value
 					fetched = true
-					resolve(value)
+					return value
 				})
-				.catch(reject)
+				.catch((error) => {
+					pendingValue = null
+					throw error
+				})
+		}
+
+		return pendingValue
+	}
+
+	return {
+		then(
+			resolve?: ((value: unknown) => unknown) | null,
+			reject?: ((error: unknown) => unknown) | null
+		) {
+			return loadValue().then(resolve ?? undefined, reject ?? undefined)
 		},
 		toString() {
 			if (!fetched) throw new Error(`Binding ${bindingName} not yet fetched. Use await.`)

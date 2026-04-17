@@ -13,6 +13,7 @@ import {
 	readGeneratedDevConfig,
 	successResult,
 	writeMultiSurfaceProjectFiles,
+	writeNamedD1ProjectFiles,
 	writeProjectFiles,
 	writeRequestWideHandleProjectFiles,
 	writeRolldownWorkerProjectFiles,
@@ -20,6 +21,8 @@ import {
 	writeServiceBindingProjectFiles,
 	type ExecInvocation
 } from './build-deploy-worker-only.test-utils'
+
+const originalFetch = globalThis.fetch
 
 function createBuildHarness(
 	processRunner: Parameters<typeof createProcessRunner>[0] = () => successResult()
@@ -65,9 +68,24 @@ describe('build/deploy worker-only behavior', () => {
 
 	afterEach(async () => {
 		clearDependencies()
+		globalThis.fetch = originalFetch
 		if (projectDir) {
 			await rm(projectDir, { recursive: true, force: true })
 		}
+	})
+
+	test('build preserves named D1 bindings without querying Cloudflare', async () => {
+		await writeNamedD1ProjectFiles(projectDir)
+		globalThis.fetch = async () => {
+			throw new Error('build should not query Cloudflare')
+		}
+
+		const { logger } = createBuildHarness()
+		await runSuccessfulBuild(projectDir, logger)
+
+		const deployConfig = await readGeneratedDeployConfig(projectDir)
+		expect(deployConfig).toContain('"database_name": "app-db"')
+		expect(deployConfig).not.toContain('"database_id":')
 	})
 
 	test('build skips vite for worker-only projects with no local vite.config', async () => {

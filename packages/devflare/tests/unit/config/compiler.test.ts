@@ -4,7 +4,12 @@
 
 import { describe, expect, test } from 'bun:test'
 import { preview } from '../../../src/config'
-import { compileConfig, rebaseWranglerConfigPaths } from '../../../src/config/compiler'
+import {
+	compileBuildConfig,
+	compileConfig,
+	compileDOWorkerConfig,
+	rebaseWranglerConfigPaths
+} from '../../../src/config/compiler'
 import type { DevflareConfig } from '../../../src/config/schema'
 
 describe('compileConfig', () => {
@@ -129,6 +134,19 @@ describe('compileConfig', () => {
 			})).toThrow('loadResolvedConfig() or resolveConfigResources()')
 		})
 
+		test('preserves KV names in build artifacts', () => {
+			const result = compileBuildConfig({
+				...baseConfig,
+				bindings: {
+					kv: { CACHE: { name: 'cache-kv' } }
+				}
+			})
+
+			expect(result.kv_namespaces).toEqual([
+				{ binding: 'CACHE', name: 'cache-kv' }
+			])
+		})
+
 		test('treats D1 string shorthand as an unresolved database name', () => {
 			expect(() => compileConfig({
 				...baseConfig,
@@ -158,6 +176,19 @@ describe('compileConfig', () => {
 					d1: { DB: { name: 'main-database' } }
 				}
 			})).toThrow('loadResolvedConfig() or resolveConfigResources()')
+		})
+
+		test('preserves D1 names in build artifacts', () => {
+			const result = compileBuildConfig({
+				...baseConfig,
+				bindings: {
+					d1: { DB: { name: 'main-database' } }
+				}
+			})
+
+			expect(result.d1_databases).toEqual([
+				{ binding: 'DB', database_name: 'main-database' }
+			])
 		})
 
 		test('compiles R2 bindings', () => {
@@ -335,6 +366,21 @@ describe('compileConfig', () => {
 					}
 				}
 			})).toThrow('loadResolvedConfig() or resolveConfigResources()')
+		})
+
+		test('preserves Hyperdrive names in build artifacts', () => {
+			const result = compileBuildConfig({
+				...baseConfig,
+				bindings: {
+					hyperdrive: {
+						POSTGRES: { name: 'devflare-testing' }
+					}
+				}
+			})
+
+			expect(result.hyperdrive).toEqual([
+				{ binding: 'POSTGRES', name: 'devflare-testing' }
+			])
 		})
 
 		test('compiles Browser binding map syntax', () => {
@@ -580,6 +626,42 @@ describe('compileConfig', () => {
 				{ binding: 'CACHE', id: 'dev-kv-id' }
 			])
 		})
+
+		test('replaces array fields for environment overrides instead of concatenating them', () => {
+			const result = compileConfig({
+				...baseConfig,
+				routes: [
+					{ pattern: 'root.example/*', zone_name: 'example.com' }
+				],
+				triggers: {
+					crons: ['0 * * * *']
+				},
+				migrations: [
+					{ tag: 'v1', new_classes: ['RootCounter'] }
+				],
+				env: {
+					preview: {
+						routes: [
+							{ pattern: 'preview.example/*', zone_name: 'example.com' }
+						],
+						triggers: {
+							crons: ['0 0 * * *']
+						},
+						migrations: [
+							{ tag: 'v2', new_classes: ['PreviewCounter'] }
+						]
+					}
+				}
+			}, 'preview')
+
+			expect(result.routes).toEqual([
+				{ pattern: 'preview.example/*', zone_name: 'example.com' }
+			])
+			expect(result.triggers?.crons).toEqual(['0 0 * * *'])
+			expect(result.migrations).toEqual([
+				{ tag: 'v2', new_classes: ['PreviewCounter'] }
+			])
+		})
 	})
 
 	describe('rebaseWranglerConfigPaths', () => {
@@ -616,5 +698,86 @@ describe('compileConfig', () => {
 				directory: '../public'
 			})
 		})
+	})
+})
+
+describe('compileDOWorkerConfig', () => {
+	const baseConfig: DevflareConfig = {
+		name: 'my-worker',
+		compatibilityDate: '2025-01-07',
+		compatibilityFlags: []
+	}
+
+	test('returns an empty array when no Durable Objects are configured', () => {
+		const results = compileDOWorkerConfig(baseConfig, 'src/workers/do.ts')
+		expect(results).toEqual([])
+	})
+
+	test('produces one compiled-worker entry per DO class, named from the class', () => {
+		const results = compileDOWorkerConfig(
+			{
+				...baseConfig,
+				bindings: {
+					durableObjects: {
+						COUNTER: { className: 'CounterObject' },
+						CHAT: { className: 'ChatRoom' }
+					}
+				}
+			},
+			'src/workers/do.ts'
+		)
+
+		expect(results).toHaveLength(2)
+
+		const counterWorker = results.find((r) => r.name === 'my-worker-counter-object')
+		const chatWorker = results.find((r) => r.name === 'my-worker-chat-room')
+
+		expect(counterWorker).toBeDefined()
+		expect(chatWorker).toBeDefined()
+
+		expect(counterWorker?.durable_objects).toEqual({
+			bindings: [{ name: 'COUNTER', class_name: 'CounterObject' }]
+		})
+		expect(chatWorker?.durable_objects).toEqual({
+			bindings: [{ name: 'CHAT', class_name: 'ChatRoom' }]
+		})
+	})
+
+	test('respects an explicit scriptName when provided', () => {
+		const results = compileDOWorkerConfig(
+			{
+				...baseConfig,
+				bindings: {
+					durableObjects: {
+						COUNTER: { className: 'CounterObject', scriptName: 'custom-do-worker' }
+					}
+				}
+			},
+			'src/workers/do.ts'
+		)
+
+		expect(results).toHaveLength(1)
+		expect(results[0]?.name).toBe('custom-do-worker')
+	})
+
+	test('groups multiple bindings that share a class into a single worker', () => {
+		const results = compileDOWorkerConfig(
+			{
+				...baseConfig,
+				bindings: {
+					durableObjects: {
+						PRIMARY: { className: 'CounterObject' },
+						SECONDARY: { className: 'CounterObject' }
+					}
+				}
+			},
+			'src/workers/do.ts'
+		)
+
+		expect(results).toHaveLength(1)
+		expect(results[0]?.durable_objects?.bindings).toEqual([
+			{ name: 'PRIMARY', class_name: 'CounterObject' },
+			{ name: 'SECONDARY', class_name: 'CounterObject' }
+		])
 	})
 })

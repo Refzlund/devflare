@@ -1,63 +1,34 @@
 import { z } from 'zod'
-import {
-	rolldownConfigSchema,
-	viteConfigSchema
-} from './schema-build'
-import { bindingsSchema } from './schema-bindings'
-import {
-	assetsConfigSchema,
-	compatibilityDateSchema,
-	filesSchema,
-	limitsSchema,
-	migrationSchema,
-	observabilitySchema,
-	previewsConfigSchema,
-	routeConfigSchema,
-	secretConfigSchema,
-	triggersSchema,
-	wranglerConfigSchema
-} from './schema-runtime'
+import { rootConfigShape } from './schema'
 
 /**
  * Environment-specific configuration overrides.
- * Allows different settings per deployment environment.
+ *
+ * Derived from the root config shape so that any new root field is
+ * automatically recognized as an environment override without duplicating
+ * the field list here. We simply:
+ *
+ *   - omit fields that are meaningless inside an environment override
+ *     (`accountId`, `wsRoutes`)
+ *   - make everything optional via `.partial()` so consumers can override
+ *     just the bits they need
+ *   - keep `.strict()` so unsupported shorthand (e.g. top-level `plugins`
+ *     or `build`) is rejected at the environment level as well
+ *
+ * The root `compatibilityFlags` field already applies
+ * `normalizeCompatibilityFlags` via its transform, so forced flags are
+ * injected for environment overrides without extra wiring.
+ *
+ * Wrapped in `z.lazy(...)` to break the module-init cycle with `schema.ts`
+ * (schema.ts references `envConfigSchemaInner` in its `env` field, and this
+ * module references `rootConfigShape` from schema.ts).
  */
-export const envConfigSchema = z.object({
-	/** Override worker name for this environment */
-	name: z.string().optional(),
-	/** Override compatibility date */
-	compatibilityDate: compatibilityDateSchema.optional(),
-	/** Override compatibility flags */
-	compatibilityFlags: z.array(z.string()).optional(),
-	/** Override preview behavior */
-	previews: previewsConfigSchema,
-	/** Override file handlers */
-	files: filesSchema,
-	/** Override bindings */
-	bindings: bindingsSchema,
-	/** Override triggers */
-	triggers: triggersSchema,
-	/** Override environment variables */
-	vars: z.record(z.string(), z.string()).optional(),
-	/** Override secrets configuration */
-	secrets: z.record(z.string(), secretConfigSchema).optional(),
-	/** Override routes */
-	routes: z.array(routeConfigSchema).optional(),
-	/** Override assets configuration */
-	assets: assetsConfigSchema,
-	/** Override limits */
-	limits: limitsSchema,
-	/** Override observability settings */
-	observability: observabilitySchema,
-	/** Override migrations */
-	migrations: z.array(migrationSchema).optional(),
-	/** Override Rolldown configuration */
-	rolldown: rolldownConfigSchema,
-	/** Override Vite-related configuration */
-	vite: viteConfigSchema,
-	/** Override wrangler passthrough */
-	wrangler: wranglerConfigSchema
-}).partial().strict()
+export const envConfigSchema = z.lazy(() =>
+	z.object(rootConfigShape)
+		.omit({ accountId: true, wsRoutes: true })
+		.partial()
+		.strict()
+)
 
 export const envConfigSchemaInner = envConfigSchema
 

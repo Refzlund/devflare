@@ -53,7 +53,7 @@ export async function runLoginCommand(
 	logLine(logger)
 	logLine(logger, `${yellow('login', theme)} ${dim('Opening Wrangler login…', theme)}`)
 	const deps = await getDependencies()
-	const result = await deps.exec.exec('bunx', ['--bun', 'wrangler', 'login'], {
+	const result = await deps.exec.exec('bunx', ['wrangler', 'login'], {
 		cwd,
 		stdio: 'inherit' as any
 	})

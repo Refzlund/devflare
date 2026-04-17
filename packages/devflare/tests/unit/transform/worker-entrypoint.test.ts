@@ -310,3 +310,63 @@ export async function fetchValue(): Promise<string> { return 'hello' }
 		expect(iface).toContain('fetchValue(): Promise<string>')
 	})
 })
+
+describe('transformWorkerEntrypoint (JS inputs)', () => {
+	test('omits TS-only syntax when transforming a .js worker', () => {
+		const code = `
+export function fetch(request) {
+	return new Response('hello')
+}
+
+export function add(a, b) {
+	return a + b
+}
+`
+		const result = transformWorkerEntrypoint(code, 'src/worker.js')
+
+		expect(result).not.toBeNull()
+		const out = result?.code ?? ''
+
+		// No TS interface declarations may be injected into a JS file.
+		expect(out).not.toMatch(/\binterface\s+\w+/)
+
+		// No TS type annotations on the generated fetch/RPC signatures.
+		expect(out).not.toContain(': Request')
+		expect(out).not.toContain(': Promise<Response>')
+		expect(out).not.toMatch(/\badd\(a:\s*/)
+
+		// JS-safe signatures are emitted instead.
+		expect(out).toContain('async fetch(request)')
+		expect(out).toContain('add(a, b)')
+		expect(out).toContain('return __original_add(a, b)')
+		expect(result?.rpcMethods).toEqual(['add'])
+	})
+
+	test('shouldTransformWorker accepts the full extension matrix', () => {
+		const code = `export function ping() { return 'pong' }\n`
+		for (const ext of ['ts', 'tsx', 'mts', 'cts', 'js', 'mjs', 'cjs']) {
+			expect(shouldTransformWorker(code, `src/worker.${ext}`)).toBe(true)
+		}
+		expect(shouldTransformWorker(code, 'src/other.js')).toBe(false)
+	})
+
+	test('does not rewrite matching text inside comments or strings', () => {
+		const code = `
+// export function fake(a: number): number { return a }
+const note = 'export function bogus() {}'
+
+export function real(n: number): number {
+	return n
+}
+`
+		const result = transformWorkerEntrypoint(code, 'worker.ts')
+		expect(result).not.toBeNull()
+		const out = result?.code ?? ''
+
+		// The commented-out and stringified export forms must survive untouched.
+		expect(out).toContain('// export function fake(a: number): number { return a }')
+		expect(out).toContain(`const note = 'export function bogus() {}'`)
+		// And the real export is rewritten to its internal name.
+		expect(out).toContain('function __original_real')
+	})
+})

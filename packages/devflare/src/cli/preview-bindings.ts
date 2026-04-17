@@ -1,11 +1,11 @@
 import { account, type APIClientOptions, type WorkerDeploymentInfo } from '../cloudflare'
-import { compileConfig } from '../config/compiler'
+import { compileBuildConfig } from '../config/compiler'
 import type { DevflareConfig } from '../config/schema'
 import type { ProcessRunner } from './dependencies'
 
 const WRANGLER_TEXT_COLUMNS_REGEX = /\s{2,}/
-
-type WranglerVersionBindingTableMode = 'legacy' | 'compact'
+// eslint-disable-next-line no-control-regex
+const ANSI_ESCAPE_REGEX = /\x1B\[[0-9;]*[A-Za-z]/g
 
 export interface ParsedWranglerBindingRow {
 	type: string
@@ -153,14 +153,14 @@ function addAssociationTarget(
 }
 
 function collectBindingAssociationTargets(config: DevflareConfig): BindingAssociationTarget[] {
-	const compiled = compileConfig(config)
+	const compiled = compileBuildConfig(config)
 	const targets = new Map<string, BindingAssociationTarget>()
 
 	for (const binding of compiled.kv_namespaces ?? []) {
 		addAssociationTarget(targets, {
 			reference: binding.binding,
 			type: 'KV Namespace',
-			resource: binding.id
+			resource: 'id' in binding ? binding.id : binding.name
 		})
 	}
 
@@ -168,7 +168,7 @@ function collectBindingAssociationTargets(config: DevflareConfig): BindingAssoci
 		addAssociationTarget(targets, {
 			reference: binding.binding,
 			type: 'D1 Database',
-			resource: binding.database_id
+			resource: 'database_id' in binding ? binding.database_id : binding.database_name
 		})
 	}
 
@@ -248,7 +248,7 @@ function collectBindingAssociationTargets(config: DevflareConfig): BindingAssoci
 		addAssociationTarget(targets, {
 			reference: binding.binding,
 			type: 'Hyperdrive',
-			resource: binding.id
+			resource: 'id' in binding ? binding.id : binding.name
 		})
 	}
 
@@ -357,25 +357,20 @@ export function parseWranglerQueueInfo(output: string): ParsedQueueAssociation |
 export function parseWranglerVersionBindings(output: string): ParsedWranglerBindingRow[] {
 	const lines = output.split(/\r?\n/)
 	const bindings: ParsedWranglerBindingRow[] = []
-	let tableMode: WranglerVersionBindingTableMode | null = null
+	let inBindingTable = false
 
 	for (const rawLine of lines) {
-		const trimmed = rawLine.trim()
+		const trimmed = preprocessWranglerLine(rawLine)
 		if (!trimmed) {
 			continue
 		}
 
-		if (/^binding\s{2,}resource$/i.test(trimmed)) {
-			tableMode = 'compact'
+		if (isBindingTableHeader(trimmed)) {
+			inBindingTable = true
 			continue
 		}
 
-		if (/^(binding\s+type|type)(\s{2,}name)?\s{2,}resource$/i.test(trimmed) || /^(binding\s+type|type)$/i.test(trimmed)) {
-			tableMode = 'legacy'
-			continue
-		}
-
-		if (!tableMode) {
+		if (!inBindingTable) {
 			continue
 		}
 
@@ -383,46 +378,68 @@ export function parseWranglerVersionBindings(output: string): ParsedWranglerBind
 			continue
 		}
 
-		if (tableMode === 'compact') {
-			const segments = trimmed.split(WRANGLER_TEXT_COLUMNS_REGEX).filter(Boolean)
-			if (segments[0]?.endsWith(':')) {
-				break
-			}
-
-			if (segments.length >= 2 && /^env\./i.test(segments[0])) {
-				const parsed = parseCompactBindingLabel(segments[0])
-				bindings.push({
-					type: normalizeCell(segments.slice(1).join('  ')),
-					bindingName: parsed.bindingName,
-					resource: parsed.resource
-				})
-			}
-
-			continue
-		}
-
 		const segments = trimmed.split(WRANGLER_TEXT_COLUMNS_REGEX).filter(Boolean)
-		if (segments.length < 2) {
+		if (segments.length === 0) {
 			continue
 		}
 
+		// Trailing annotations (e.g. `Handlers: fetch`) terminate the binding table.
 		if (segments[0].endsWith(':')) {
 			break
 		}
 
-		const [type, bindingName, ...resourceParts] = segments
-		if (!type || !bindingName) {
-			continue
+		const parsed = parseBindingRow(segments)
+		if (parsed) {
+			bindings.push(parsed)
 		}
-
-		bindings.push({
-			type: normalizeCell(type),
-			bindingName: normalizeBindingName(bindingName),
-			resource: normalizeCell(resourceParts.join('  '))
-		})
 	}
 
 	return bindings
+}
+
+function preprocessWranglerLine(rawLine: string): string {
+	return rawLine.replace(ANSI_ESCAPE_REGEX, '').replace(/\r$/, '').trim()
+}
+
+function isBindingTableHeader(line: string): boolean {
+	if (/^binding\s{2,}resource$/i.test(line)) {
+		return true
+	}
+	if (/^(binding\s+type|type)(\s{2,}name)?\s{2,}resource$/i.test(line)) {
+		return true
+	}
+	if (/^(binding\s+type|type)$/i.test(line)) {
+		return true
+	}
+	return false
+}
+
+function parseBindingRow(segments: string[]): ParsedWranglerBindingRow | null {
+	if (segments.length < 2) {
+		return null
+	}
+
+	// Compact form: `env.NAME (resource)` followed by the type column.
+	if (/^env\./i.test(segments[0])) {
+		const parsed = parseCompactBindingLabel(segments[0])
+		return {
+			type: normalizeCell(segments.slice(1).join('  ')),
+			bindingName: parsed.bindingName,
+			resource: parsed.resource
+		}
+	}
+
+	// Legacy form: type | name | resource...
+	const [type, bindingName, ...resourceParts] = segments
+	if (!type || !bindingName) {
+		return null
+	}
+
+	return {
+		type: normalizeCell(type),
+		bindingName: normalizeBindingName(bindingName),
+		resource: normalizeCell(resourceParts.join('  '))
+	}
 }
 
 async function inspectWorkerBindings(

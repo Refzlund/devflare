@@ -50,6 +50,37 @@ Handlers:             fetch
 		])
 	})
 
+	test('unified parser strips ANSI color codes from compact-format output', () => {
+		const esc = '\u001B'
+		const parsed = parseWranglerVersionBindings([
+			`${esc}[1mBinding                      Resource${esc}[0m`,
+			`  ${esc}[32menv.AUTH_SERVICE (demo-auth-service)${esc}[0m             Worker`,
+			`  env.SEARCH_INDEX (demo-search-index)             Vectorize Index`,
+			`Handlers:             fetch`
+		].join('\n'))
+
+		expect(parsed).toEqual([
+			{ type: 'Worker', bindingName: 'AUTH_SERVICE', resource: 'demo-auth-service' },
+			{ type: 'Vectorize Index', bindingName: 'SEARCH_INDEX', resource: 'demo-search-index' }
+		])
+	})
+
+	test('unified parser tolerates indented rows and trailing annotations in legacy-format output', () => {
+		const parsed = parseWranglerVersionBindings(`
+Type                    Name                    Resource
+----------------------------------------------------------
+  Queue                   JOBS                    jobs-queue
+  Worker                  AUTH_SERVICE            auth-service    (bound)
+Handlers: fetch
+Compatibility date: 2025-01-01
+`.trim())
+
+		expect(parsed).toEqual([
+			{ type: 'Queue', bindingName: 'JOBS', resource: 'jobs-queue' },
+			{ type: 'Worker', bindingName: 'AUTH_SERVICE', resource: 'auth-service (bound)' }
+		])
+	})
+
 	test('parses Wrangler queue info output with inline and multiline worker lists', () => {
 		const parsed = parseWranglerQueueInfo(`
 Queue Name: jobs-queue

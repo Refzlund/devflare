@@ -170,12 +170,15 @@ function stripDecoratorSyntax(code: string): string {
 
 /**
  * Bundle a single DO file using Rolldown
- * 
+ *
  * Strategy:
  * 1. Read the source file
  * 2. Strip @durableObject decorator (not needed at runtime - just a marker)
- * 3. Write the cleaned code to a temp file
- * 4. Bundle the temp file with Rolldown
+ * 3. Feed the cleaned code to Rolldown through a virtual-entry plugin whose id
+ *    sits in the source directory, so relative imports resolve identically to
+ *    the original Durable Object module — without ever writing a temp file
+ *    next to user source.
+ * 4. Bundle with Rolldown.
  */
 async function bundleDOFile(
 	sourcePath: string,
@@ -208,10 +211,9 @@ export default {
 };
 `
 
-	// Write cleaned code to a temp file next to the source file so relative imports
-	// keep resolving exactly like they do in the original Durable Object module.
-	const tempFilePath = resolve(dirname(sourcePath), `.devflare-temp-${className}.ts`)
-	await fs.writeFile(tempFilePath, entryCode, 'utf-8')
+	// Virtual entry id lives inside the source directory so rolldown resolves
+	// relative imports (./Foo, ../bar) from the original DO module's location.
+	const virtualEntryId = resolve(dirname(sourcePath), `.devflare-do-${className}.virtual.ts`)
 
 	// Output directory for this specific class - clean it first to remove old chunks
 	const classOutDir = resolve(outDir, className)
@@ -225,16 +227,43 @@ export default {
 	// Create a shim for the 'debug' module that @cloudflare/puppeteer uses.
 	const debugShimPath = await ensureDebugShim(outDir)
 
+	const virtualEntryPlugin = {
+		name: 'devflare-do-virtual-entry',
+		resolveId(id: string) {
+			if (id === virtualEntryId) {
+				return virtualEntryId
+			}
+			return null
+		},
+		load(id: string) {
+			if (id === virtualEntryId) {
+				return entryCode
+			}
+			return null
+		}
+	}
+
+	const userRolldownOptions = bundleOptions?.rolldownOptions
+	const userPlugins = userRolldownOptions?.plugins
+	const mergedPlugins = userPlugins === undefined
+		? [virtualEntryPlugin]
+		: Array.isArray(userPlugins)
+			? [virtualEntryPlugin, ...userPlugins]
+			: [virtualEntryPlugin, userPlugins]
+
 	const outFile = resolve(classOutDir, 'index.js')
 	const { inputOptions, outputOptions } = resolveWorkerCompatibleRolldownConfig({
 		cwd,
-		inputFile: tempFilePath,
+		inputFile: virtualEntryId,
 		outFile,
 		platform: 'neutral',
 		alias: {
 			debug: debugShimPath
 		},
-		rolldownOptions: bundleOptions?.rolldownOptions,
+		rolldownOptions: {
+			...userRolldownOptions,
+			plugins: mergedPlugins
+		},
 		sourcemap: bundleOptions?.sourcemap,
 		minify: bundleOptions?.minify,
 		inlineDynamicImports: true,
@@ -246,13 +275,6 @@ export default {
 		outputOptions,
 		outFile
 	})
-
-	// Clean up temp file
-	try {
-		await fs.unlink(tempFilePath)
-	} catch {
-		// Ignore cleanup errors
-	}
 
 	// Return path to the bundled entry
 	return resolve(classOutDir, 'index.js')

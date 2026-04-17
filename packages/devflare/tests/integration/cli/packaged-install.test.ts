@@ -26,7 +26,7 @@ describe('packaged CLI install smoke', () => {
 			type: 'module'
 		}, null, 2))
 
-		await access(join(projectDir, 'node_modules', 'devflare', 'dist', 'src', 'cli', 'index.js'))
+		await access(join(projectDir, 'node_modules', 'devflare', 'dist', 'cli', 'index.js'))
 
 		const cli = Bun.spawn([
 			'bun',

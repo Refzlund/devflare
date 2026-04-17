@@ -182,6 +182,55 @@ describe('createMockD1', () => {
 
 		expect(result.success).toBe(true)
 	})
+
+	test('returns per-table fixtures on SELECT FROM <table>', async () => {
+		const d1 = createMockD1({
+			fixtures: {
+				users: [{ id: 1, name: 'Alice' }, { id: 2, name: 'Bob' }],
+				posts: [{ id: 10, title: 'Hello' }]
+			}
+		})
+
+		const users = await d1.prepare('SELECT * FROM users').all()
+		expect(users.results).toHaveLength(2)
+		expect((users.results[0] as { name: string }).name).toBe('Alice')
+
+		const posts = await d1.prepare('SELECT id, title FROM posts WHERE id = ?').bind(10).all()
+		expect(posts.results).toHaveLength(1)
+		expect((posts.results[0] as { title: string }).title).toBe('Hello')
+	})
+
+	test('different queries against different tables return distinct fixtures', async () => {
+		const d1 = createMockD1({
+			fixtures: {
+				users: [{ id: 1, name: 'Alice' }],
+				posts: [{ id: 10, title: 'Hello' }, { id: 11, title: 'World' }]
+			}
+		})
+
+		const firstUser = await d1.prepare('SELECT * FROM users').first<{ name: string }>()
+		const firstPost = await d1.prepare('SELECT * FROM posts').first<{ title: string }>()
+
+		expect(firstUser?.name).toBe('Alice')
+		expect(firstPost?.title).toBe('Hello')
+	})
+
+	test('INSERT INTO <table> appends to fixture table and reflects in SELECT', async () => {
+		const d1 = createMockD1({ fixtures: { users: [{ id: 1, name: 'Alice' }] } })
+
+		const before = await d1.prepare('SELECT * FROM users').all()
+		expect(before.results).toHaveLength(1)
+
+		const insert = await d1
+			.prepare('INSERT INTO users (name) VALUES (?)')
+			.bind('Bob')
+			.run()
+		expect(insert.success).toBe(true)
+		expect(insert.meta.changes).toBe(1)
+
+		const after = await d1.prepare('SELECT * FROM users').all()
+		expect(after.results).toHaveLength(2)
+	})
 })
 
 describe('createMockR2', () => {

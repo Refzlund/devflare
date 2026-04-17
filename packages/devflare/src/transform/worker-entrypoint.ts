@@ -199,12 +199,32 @@ export function findExportedFunctions(code: string): ExportedFunction[] {
 }
 
 /**
+ * Extensions considered valid worker entrypoint sources.
+ */
+const WORKER_EXTENSIONS = ['.ts', '.tsx', '.mts', '.cts', '.js', '.mjs', '.cjs'] as const
+
+/**
+ * Extensions that may host TypeScript-only syntax (type annotations, interfaces).
+ */
+const TS_EXTENSIONS = ['.ts', '.tsx', '.mts', '.cts'] as const
+
+/**
+ * Returns true when the filename has an extension that permits TS-only syntax.
+ * Gates injection of interfaces and type annotations into emitted worker code.
+ */
+export function shouldEmitTsSyntax(filename: string): boolean {
+	const lower = filename.toLowerCase()
+	return TS_EXTENSIONS.some((ext) => lower.endsWith(ext))
+}
+
+/**
  * Check if a file should be transformed as a worker entrypoint
  * Returns true if the file has exported functions that could be RPC methods
  */
 export function shouldTransformWorker(code: string, filePath: string): boolean {
-	// Only transform worker.ts files
-	if (!filePath.endsWith('worker.ts') && !filePath.endsWith('worker.js')) {
+	const lower = filePath.toLowerCase()
+	const isWorkerFile = WORKER_EXTENSIONS.some((ext) => lower.endsWith(`worker${ext}`))
+	if (!isWorkerFile) {
 		return false
 	}
 
@@ -233,6 +253,7 @@ export function transformWorkerEntrypoint(
 ): WorkerTransformResult | null {
 	const className = options.className ?? 'Worker'
 	const injectContext = options.injectContext ?? true
+	const emitTs = shouldEmitTsSyntax(id)
 
 	const functions = findExportedFunctions(code)
 
@@ -258,40 +279,108 @@ export function transformWorkerEntrypoint(
 	}
 	s.prepend(importStatement)
 
-	// Remove export keywords and rename functions to internal names
-	// fetch is ALWAYS renamed to __originalFetch (regardless of export form)
-	// other functions are renamed to __original_{name}
-	for (const fn of functions) {
-		const fnCode = code.substring(fn.start, fn.end)
-		const internalName = fn.name === 'fetch' ? '__originalFetch' : `__original_${fn.name}`
+	// -------------------------------------------------------------------------
+	// AST-based edits to rewrite exports → internal declarations.
+	// No regex/string replace is performed on already-parsed source; every
+	// mutation is keyed on AST node positions so comments and strings that
+	// happen to contain the matched pattern are never touched.
+	// -------------------------------------------------------------------------
+	const sourceFile = ts.createSourceFile(
+		'worker.ts',
+		code,
+		ts.ScriptTarget.Latest,
+		true,
+		ts.ScriptKind.TS
+	)
 
-		if (fn.isDefault) {
-			// Handle default export function: export default function(...) {}
-			const replacement = fnCode
-				.replace(/^export\s+default\s+(async\s+)?function\s*/, (_, asyncKw) =>
-					`const ${internalName} = ${asyncKw || ''}function `)
-			s.overwrite(fn.start, fn.end, replacement)
-		} else if (fnCode.startsWith('export function') || fnCode.startsWith('export async function')) {
-			// Named function export: export function name(...) {} or export async function name(...) {}
-			const replacement = fnCode
-				.replace(/^export\s+(async\s+)?function\s+\w+/, (_, asyncKw) =>
-					`${asyncKw || ''}function ${internalName}`)
-			s.overwrite(fn.start, fn.end, replacement)
-		} else if (fnCode.startsWith('export const')) {
-			// Arrow function or function expression export: export const name = ...
-			const replacement = fnCode
-				.replace(/^export\s+const\s+\w+/, () =>
-					`const ${internalName}`)
-			s.overwrite(fn.start, fn.end, replacement)
+	const internalNameFor = (name: string): string =>
+		name === 'fetch' ? '__originalFetch' : `__original_${name}`
+
+	function visit(node: ts.Node): void {
+		if (ts.isFunctionDeclaration(node)) {
+			const modifiers = ts.getModifiers(node)
+			const exportMod = modifiers?.find((m) => m.kind === ts.SyntaxKind.ExportKeyword)
+			const defaultMod = modifiers?.find((m) => m.kind === ts.SyntaxKind.DefaultKeyword)
+			const asyncMod = modifiers?.find((m) => m.kind === ts.SyntaxKind.AsyncKeyword)
+
+			if (exportMod) {
+				const isDefault = Boolean(defaultMod)
+				const logicalName = isDefault ? 'fetch' : node.name?.text
+				if (logicalName) {
+					const internal = internalNameFor(logicalName)
+
+					if (isDefault && !node.name) {
+						// Anonymous default: `export default (async )?function ...`
+						// Overwrite [node start, function-keyword start) with `const X = (async )?`
+						const funcKeyword = node
+							.getChildren(sourceFile)
+							.find((c) => c.kind === ts.SyntaxKind.FunctionKeyword)
+						if (funcKeyword) {
+							const asyncKw = asyncMod ? 'async ' : ''
+							s.overwrite(
+								node.getStart(sourceFile),
+								funcKeyword.getStart(sourceFile),
+								`const ${internal} = ${asyncKw}`
+							)
+						}
+					} else if (node.name) {
+						// Named export: remove export (and default) modifiers, rename identifier
+						s.remove(exportMod.getStart(sourceFile), exportMod.getEnd())
+						if (defaultMod) {
+							s.remove(defaultMod.getStart(sourceFile), defaultMod.getEnd())
+						}
+						s.overwrite(
+							node.name.getStart(sourceFile),
+							node.name.getEnd(),
+							internal
+						)
+					}
+				}
+			}
+		} else if (ts.isVariableStatement(node)) {
+			const modifiers = ts.getModifiers(node)
+			const exportMod = modifiers?.find((m) => m.kind === ts.SyntaxKind.ExportKeyword)
+			if (exportMod) {
+				let rewroteAny = false
+				for (const decl of node.declarationList.declarations) {
+					if (
+						ts.isIdentifier(decl.name)
+						&& decl.initializer
+						&& (ts.isFunctionExpression(decl.initializer)
+							|| ts.isArrowFunction(decl.initializer))
+					) {
+						const internal = internalNameFor(decl.name.text)
+						s.overwrite(
+							decl.name.getStart(sourceFile),
+							decl.name.getEnd(),
+							internal
+						)
+						rewroteAny = true
+					}
+				}
+				// Only drop the `export` keyword when at least one declarator
+				// was rewritten into an internal name. Non-function exports
+				// (e.g. `export const VERSION = '1.0.0'`) are preserved as-is.
+				if (rewroteAny) {
+					s.remove(exportMod.getStart(sourceFile), exportMod.getEnd())
+				}
+			}
 		}
+
+		ts.forEachChild(node, visit)
 	}
+
+	visit(sourceFile)
 
 	// Build the class body
 	let classBody = `\n\n// ============ Devflare WorkerEntrypoint ============\nclass ${className} extends WorkerEntrypoint {\n`
 
 	// Add fetch method if present
 	if (fetchFn) {
-		classBody += `\tasync fetch(request: Request): Promise<Response> {\n`
+		const fetchSig = emitTs
+			? 'async fetch(request: Request): Promise<Response>'
+			: 'async fetch(request)'
+		classBody += `\t${fetchSig} {\n`
 		classBody += `\t\tconst __devflareEvent = createFetchEvent(request, this.env, this.ctx)\n`
 
 		if (injectContext) {
@@ -306,13 +395,16 @@ export function transformWorkerEntrypoint(
 		}
 	}
 
-	// Add RPC methods
+	// Add RPC methods. For JS outputs, strip TS-only type annotations from
+	// the method signature (the backing __original_* function still receives
+	// whatever the user wrote, which for valid JS is always untyped).
 	for (const fn of rpcMethods) {
 		const asyncPrefix = fn.isAsync ? 'async ' : ''
-		const returnType = fn.returnType ? `: ${fn.returnType}` : ''
 		const paramNames = extractParamNames(fn.params)
+		const signatureParams = emitTs ? fn.params : paramNames
+		const returnType = emitTs && fn.returnType ? `: ${fn.returnType}` : ''
 
-		classBody += `\n\t${asyncPrefix}${fn.name}(${fn.params})${returnType} {\n`
+		classBody += `\n\t${asyncPrefix}${fn.name}(${signatureParams})${returnType} {\n`
 		classBody += `\t\treturn __original_${fn.name}(${paramNames})\n`
 		classBody += `\t}\n`
 	}

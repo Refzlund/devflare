@@ -33,20 +33,20 @@ export interface SerializedResponse {
 export type BodyRef =
 	| { type: 'bytes'; data: string }  // base64 for JSON transport
 	| { type: 'stream'; sid: number }
-	| { type: 'http'; transferId: string }  // Large file via HTTP
 
-/** Serialized DurableObjectId */
+/**
+ * Canonical wire discriminator for a serialized `DurableObjectId`.
+ *
+ * Kept as a shared constant so the TypeScript serializers in `server.ts` and
+ * the stringified gateway runtime (`gateway-runtime.ts`) agree on a single
+ * shape. DO NOT change without coordinating both sides of the bridge.
+ */
+export const DO_ID_TYPE = 'DOId' as const
+
+/** Serialized DurableObjectId — matches the wire shape emitted by every gateway variant. */
 export interface SerializedDOId {
-	type: 'do-id'
-	name?: string
-	hexId?: string
-}
-
-/** Serialized DurableObjectStub */
-export interface SerializedDOStub {
-	type: 'do-stub'
-	binding: string
-	id: SerializedDOId
+	__type: typeof DO_ID_TYPE
+	hex: string
 }
 
 // -----------------------------------------------------------------------------
@@ -74,8 +74,10 @@ export async function serializeRequest(
 		const bytes = await request.arrayBuffer()
 
 		if (bytes.byteLength > threshold) {
-			// Large body → HTTP transfer
-			body = { type: 'http', transferId: crypto.randomUUID() }
+			// The HTTP body-transfer path was never wired up end-to-end on the
+			// deserialize side. Fail loudly so future wiring cannot silently
+			// produce placeholder bodies.
+			throw new Error('http body transfer not implemented; caller should use inline or binary transfer')
 		} else if (bytes.byteLength > 0) {
 			// Body has content → inline bytes (base64)
 			body = { type: 'bytes', data: base64Encode(new Uint8Array(bytes)) }
@@ -113,9 +115,6 @@ export function deserializeRequest(
 					body = getStream(serialized.body.sid) ?? null
 				}
 				break
-			case 'http':
-				// HTTP transfer handled separately
-				throw new Error('HTTP transfer body must be handled externally')
 		}
 	}
 
@@ -152,8 +151,10 @@ export async function serializeResponse(
 		const bytes = await response.arrayBuffer()
 
 		if (bytes.byteLength > threshold) {
-			// Large body → HTTP transfer
-			body = { type: 'http', transferId: crypto.randomUUID() }
+			// The HTTP body-transfer path was never wired up end-to-end on the
+			// deserialize side. Fail loudly so future wiring cannot silently
+			// produce placeholder bodies.
+			throw new Error('http body transfer not implemented; caller should use inline or binary transfer')
 		} else if (bytes.byteLength > 0) {
 			// Body has content → inline bytes (base64)
 			body = { type: 'bytes', data: base64Encode(new Uint8Array(bytes)) }
@@ -190,8 +191,6 @@ export function deserializeResponse(
 					body = getStream(serialized.body.sid) ?? null
 				}
 				break
-			case 'http':
-				throw new Error('HTTP transfer body must be handled externally')
 		}
 	}
 
@@ -216,21 +215,20 @@ export interface StreamRef {
 // Durable Object Serialization
 // -----------------------------------------------------------------------------
 
-/** Serialize a DurableObjectId */
+/** Serialize a DurableObjectId to the canonical wire shape. */
 export function serializeDOId(id: DurableObjectId): SerializedDOId {
-	return {
-		type: 'do-id',
-		hexId: id.toString()
-	}
+	return { __type: DO_ID_TYPE, hex: id.toString() }
 }
 
-/** Serialize a DurableObjectStub reference */
-export function serializeDOStub(binding: string, id: DurableObjectId): SerializedDOStub {
-	return {
-		type: 'do-stub',
-		binding,
-		id: serializeDOId(id)
+/** Deserialize a canonical `SerializedDOId` back into a `DurableObjectId` bound to `ns`. */
+export function deserializeDOId(
+	serialized: SerializedDOId | { __type?: unknown, hex?: unknown },
+	ns: DurableObjectNamespace
+): DurableObjectId {
+	if (serialized && (serialized as SerializedDOId).__type === DO_ID_TYPE) {
+		return ns.idFromString((serialized as SerializedDOId).hex)
 	}
+	throw new Error('Invalid DOId format')
 }
 
 // -----------------------------------------------------------------------------
@@ -245,8 +243,21 @@ export function needsSpecialSerialization(value: unknown): boolean {
 	if (value instanceof ReadableStream) return true
 	if (value instanceof Uint8Array) return true
 	if (value instanceof ArrayBuffer) return true
+	if (value instanceof Date) return true
+	if (value instanceof Map) return true
+	if (value instanceof Set) return true
+	if (value instanceof URL) return true
+	if (value instanceof Error) return true
 	return false
 }
+
+/** Discriminator tag for structurally-encoded special values */
+export type SerializedSpecial =
+	| { __devflare: 'date', iso: string }
+	| { __devflare: 'map', entries: [unknown, unknown][] }
+	| { __devflare: 'set', values: unknown[] }
+	| { __devflare: 'url', href: string }
+	| { __devflare: 'error', name: string, message: string, stack?: string }
 
 /** Serialize a value that may contain special types */
 export async function serializeValue(value: unknown): Promise<{
@@ -294,6 +305,43 @@ async function serializeValueInternal(
 		return { __type: 'ArrayBuffer', data: base64Encode(new Uint8Array(value)) }
 	}
 
+	if (value instanceof Date) {
+		return { __devflare: 'date', iso: value.toISOString() } satisfies SerializedSpecial
+	}
+
+	if (value instanceof URL) {
+		return { __devflare: 'url', href: value.href } satisfies SerializedSpecial
+	}
+
+	if (value instanceof Error) {
+		const encoded: SerializedSpecial = {
+			__devflare: 'error',
+			name: value.name,
+			message: value.message
+		}
+		if (value.stack) encoded.stack = value.stack
+		return encoded
+	}
+
+	if (value instanceof Map) {
+		const entries: [unknown, unknown][] = []
+		for (const [k, v] of value.entries()) {
+			entries.push([
+				await serializeValueInternal(k, streams),
+				await serializeValueInternal(v, streams)
+			])
+		}
+		return { __devflare: 'map', entries } satisfies SerializedSpecial
+	}
+
+	if (value instanceof Set) {
+		const values: unknown[] = []
+		for (const v of value.values()) {
+			values.push(await serializeValueInternal(v, streams))
+		}
+		return { __devflare: 'set', values } satisfies SerializedSpecial
+	}
+
 	if (Array.isArray(value)) {
 		return Promise.all(value.map((v) => serializeValueInternal(v, streams)))
 	}
@@ -320,6 +368,37 @@ export function deserializeValue(
 
 	if (typeof value === 'object' && value !== null) {
 		const obj = value as Record<string, unknown>
+
+		if (typeof obj.__devflare === 'string') {
+			switch (obj.__devflare) {
+				case 'date':
+					return new Date(obj.iso as string)
+				case 'url':
+					return new URL(obj.href as string)
+				case 'error': {
+					const err = new Error(obj.message as string)
+					if (typeof obj.name === 'string') err.name = obj.name
+					if (typeof obj.stack === 'string') err.stack = obj.stack
+					return err
+				}
+				case 'map': {
+					const entries = (obj.entries as [unknown, unknown][]) ?? []
+					const map = new Map<unknown, unknown>()
+					for (const [k, v] of entries) {
+						map.set(deserializeValue(k, getStream), deserializeValue(v, getStream))
+					}
+					return map
+				}
+				case 'set': {
+					const values = (obj.values as unknown[]) ?? []
+					const set = new Set<unknown>()
+					for (const v of values) {
+						set.add(deserializeValue(v, getStream))
+					}
+					return set
+				}
+			}
+		}
 
 		if (obj.__type === 'Request') {
 			return deserializeRequest(obj as unknown as SerializedRequest, getStream)

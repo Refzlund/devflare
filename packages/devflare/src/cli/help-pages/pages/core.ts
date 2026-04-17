@@ -106,8 +106,8 @@ export const CORE_HELP_PAGES: HelpPage[] = [
 			'devflare build [--config <path>] [--env <name>] [--debug]'
 		],
 		description: [
-			'Resolves your Devflare config, applies environment overrides, and generates the Wrangler-facing artifacts used by deploy flows.',
-			'This is the safest way to inspect what Devflare will hand to Wrangler before you actually deploy.'
+			'Resolves your Devflare config locally, applies environment overrides, and generates the build artifacts used by deploy flows.',
+			'Build preserves named bindings instead of provisioning Cloudflare resources, so it is the safest way to inspect what Devflare will hand to deploy before you actually ship.'
 		],
 		options: [
 			entry('--config <path>', 'Use a specific devflare config file'),
@@ -120,24 +120,26 @@ export const CORE_HELP_PAGES: HelpPage[] = [
 		],
 		notes: [
 			'Build currently writes `.devflare/wrangler.jsonc`, `.devflare/build/wrangler.jsonc`, and `.wrangler/deploy/config.json`.',
-			'`devflare deploy` runs the same artifact preparation step automatically before invoking Wrangler.'
+			'Build does not query or provision Cloudflare account resources on its own; name-based bindings stay as names in the generated artifacts until deploy time.',
+			'`devflare deploy` runs the same artifact preparation step automatically before invoking Wrangler, unless you provide `--build <path>` to reuse an existing build artifact.'
 		]
 	},
 	{
 		path: ['deploy'],
 		summary: 'Deploy explicitly to Cloudflare production or preview targets',
 		usage: [
-			'devflare deploy --prod [--config <path>] [--message <text>] [--tag <text>] [--debug]',
-			'devflare deploy --production [--config <path>] [--message <text>] [--tag <text>] [--debug]',
-			'devflare deploy --preview <name> [--config <path>] [--message <text>] [--tag <text>]',
-			'devflare deploy --preview [--config <path>] [--branch-name <branch>] [--message <text>] [--tag <text>]',
+			'devflare deploy --prod [--config <path>] [--build <path>] [--message <text>] [--tag <text>] [--debug]',
+			'devflare deploy --production [--config <path>] [--build <path>] [--message <text>] [--tag <text>] [--debug]',
+			'devflare deploy --preview <name> [--config <path>] [--build <path>] [--message <text>] [--tag <text>]',
+			'devflare deploy --preview [--config <path>] [--build <path>] [--branch-name <branch>] [--message <text>] [--tag <text>]',
 			'devflare deploy --prod --dry-run [--config <path>]',
 			'devflare deploy --preview <name> --dry-run [--config <path>]',
 			'devflare deploy --preview --dry-run [--config <path>]'
 		],
 		description: [
 			'Deploy requires an explicit target: production via `--prod` / `--production`, or preview via `--preview`.',
-			'Named preview deploys such as `--preview next` or `--preview pr-1` target `config.env.preview`, provision preview-scoped resources automatically, and deploy dedicated preview-scope Workers when your config is wired for them. Bare `--preview` keeps the same-worker preview upload flow and can still use `--branch-name` or CI/git metadata for preview-aware naming.'
+			'Named preview deploys such as `--preview next` or `--preview pr-1` target `config.env.preview`, provision preview-scoped resources automatically, and deploy dedicated preview-scope Workers when your config is wired for them. Bare `--preview` keeps the same-worker preview upload flow and can still use `--branch-name` or CI/git metadata for preview-aware naming.',
+			'Production and named preview deploys also provision missing deploy-time resources such as KV namespaces, D1 databases, R2 buckets, and Queues when Devflare has enough information to create them.'
 		],
 		options: [
 			entry('--prod', 'Deploy to the production environment explicitly'),
@@ -145,6 +147,7 @@ export const CORE_HELP_PAGES: HelpPage[] = [
 			entry('--preview', 'Deploy a same-worker preview upload'),
 			entry('--preview <name>', 'Deploy a named preview scope such as `next` or `pr-1`'),
 			entry('--config <path>', 'Use a specific devflare config file'),
+			entry('--build <path>', 'Reuse an existing build artifact such as `.devflare/build` or `.wrangler/deploy/config.json` instead of rebuilding'),
 			entry('--env <name>', 'Usually unnecessary because the explicit target already pins production vs preview. If you pass it, it must match that target'),
 			entry('--dry-run', 'Print the synthesized Wrangler config and skip the actual deployment'),
 			entry('--branch-name <branch>', 'Provide explicit branch metadata for preview-aware naming when your workflow needs it'),
@@ -154,6 +157,7 @@ export const CORE_HELP_PAGES: HelpPage[] = [
 		],
 		examples: [
 			entry('devflare deploy --prod', 'Deploy explicitly to production'),
+			entry('devflare deploy --prod --build .devflare/build', 'Deploy a previously built artifact without rebuilding the package'),
 			entry('devflare deploy --production --message "Release"', 'Deploy to production with an explicit deployment message'),
 			entry('devflare deploy --preview next', 'Deploy the named `next` preview scope and provision preview-scoped resources automatically'),
 			entry('devflare deploy --preview pr-1', 'Deploy the named `pr-1` preview scope directly'),
@@ -164,6 +168,7 @@ export const CORE_HELP_PAGES: HelpPage[] = [
 			'`devflare deploy` without an explicit target is rejected from the CLI so production and preview destinations stay unmistakable.',
 			'`--prod` / `--production` clear preview-scope environment overrides such as `DEVFLARE_PREVIEW_BRANCH` so production deploys stay pointed at stable Worker names.',
 			'Named preview deploys automatically provision preview-scoped resources before building and deploying.',
+			'When a build artifact still contains name-based bindings, deploy resolves or provisions the concrete Cloudflare resources and rewrites the generated Wrangler config with the IDs Wrangler requires.',
 			'Plain `--preview` still uses Cloudflare preview uploads, so it cannot be the first-ever upload for a brand-new Worker, preview URLs remain limited for Workers that implement Durable Objects, and preview uploads do not apply Durable Object migrations.'
 		]
 	},

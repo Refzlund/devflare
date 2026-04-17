@@ -71,10 +71,6 @@ interface ClosedSession {
 	closeReasonText: string
 }
 
-// Track active and closed sessions
-const sessions = new Map<string, BrowserSession>()
-const history: ClosedSession[] = []
-
 // Cached browser executable path
 let cachedExecutablePath: string | null = null
 
@@ -146,10 +142,57 @@ export function createBrowserShim(options: BrowserShimOptions = {}): BrowserShim
 
 	let server: HttpServer | null = null
 	let executablePath: string | null = null
+	const sessions = new Map<string, BrowserSession>()
+	const history: ClosedSession[] = []
 
 	// Dynamic import of ws package (may not be installed)
 	let WebSocketServerClass: any = null
 	let WebSocketClass: any = null
+	const maxRequestBodyBytes = 1024 * 1024
+
+	function getRequestOrigin(req: IncomingMessage): string | null {
+		const origin = req.headers.origin
+		if (typeof origin === 'string') {
+			return origin
+		}
+
+		if (Array.isArray(origin) && origin[0]) {
+			return origin[0]
+		}
+
+		return null
+	}
+
+	function isLoopbackOrigin(origin: string): boolean {
+		try {
+			const url = new URL(origin)
+			return url.hostname === '127.0.0.1'
+				|| url.hostname === 'localhost'
+				|| url.hostname === '::1'
+				|| url.hostname === '[::1]'
+		} catch {
+			return false
+		}
+	}
+
+	function applyCorsHeaders(req: IncomingMessage, res: ServerResponse): boolean {
+		const origin = getRequestOrigin(req)
+		if (!origin) {
+			return true
+		}
+
+		if (!isLoopbackOrigin(origin)) {
+			res.writeHead(403, { 'Content-Type': 'application/json' })
+			res.end(JSON.stringify({ error: 'Forbidden origin' }))
+			return false
+		}
+
+		res.setHeader('Access-Control-Allow-Origin', origin)
+		res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+		res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+		res.setHeader('Vary', 'Origin')
+		return true
+	}
 
 	/**
 	 * Launch a new browser and create a session
@@ -274,10 +317,9 @@ export function createBrowserShim(options: BrowserShimOptions = {}): BrowserShim
 		// Always log incoming requests for debugging
 		logger?.debug(`[BrowserShim] ${method} ${url.pathname}${url.search ? url.search : ''}`)
 
-		// Set CORS headers
-		res.setHeader('Access-Control-Allow-Origin', '*')
-		res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-		res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+		if (!applyCorsHeaders(req, res)) {
+			return
+		}
 
 		if (method === 'OPTIONS') {
 			res.writeHead(204)
@@ -392,7 +434,18 @@ export function createBrowserShim(options: BrowserShimOptions = {}): BrowserShim
 	function readBody(req: IncomingMessage): Promise<string> {
 		return new Promise((resolve, reject) => {
 			const chunks: Buffer[] = []
-			req.on('data', (chunk: Buffer) => chunks.push(chunk))
+			let totalBytes = 0
+
+			req.on('data', (chunk: Buffer) => {
+				totalBytes += chunk.length
+				if (totalBytes > maxRequestBodyBytes) {
+					req.destroy()
+					reject(new Error(`Request body exceeds ${maxRequestBodyBytes} bytes`))
+					return
+				}
+
+				chunks.push(chunk)
+			})
 			req.on('end', () => resolve(Buffer.concat(chunks).toString()))
 			req.on('error', reject)
 		})
@@ -449,6 +502,13 @@ export function createBrowserShim(options: BrowserShimOptions = {}): BrowserShim
 			const wss = new WebSocketServerClass({ noServer: true })
 
 			server.on('upgrade', (request: IncomingMessage, socket: any, head: Buffer) => {
+				const origin = getRequestOrigin(request)
+				if (origin && !isLoopbackOrigin(origin)) {
+					socket.write('HTTP/1.1 403 Forbidden\r\n\r\n')
+					socket.destroy()
+					return
+				}
+
 				const url = new URL(request.url || '/', `http://${host}:${port}`)
 
 				if (url.pathname !== '/v1/connectDevtools') {
@@ -612,7 +672,7 @@ export function createBrowserShim(options: BrowserShimOptions = {}): BrowserShim
 	 */
 	async function stop(): Promise<void> {
 		// Close all browser sessions
-		for (const sessionId of sessions.keys()) {
+		for (const sessionId of Array.from(sessions.keys())) {
 			await closeSession(sessionId, 3, 'ServerShutdown')
 		}
 

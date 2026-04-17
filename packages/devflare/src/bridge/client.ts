@@ -11,6 +11,7 @@ import {
 	type RpcErr,
 	type StreamPull,
 	type WsOpen,
+	type WsOpened,
 	type WsClose,
 	parseJsonMsg,
 	stringifyJsonMsg,
@@ -54,12 +55,26 @@ export interface ActiveStream {
 	controller: ReadableStreamDefaultController<Uint8Array>
 	buffer: Uint8Array[]
 	creditRemaining: number
+	/** Resolver for a pending pull waiting on bytes or end */
+	pendingPull: {
+		resolve: () => void
+		reject: (error: Error) => void
+	} | null
+	/** Stream ended (from server) — signal pull to flush and close */
+	ended: boolean
+	/** Stream was cancelled locally or aborted */
+	closed: boolean
 }
 
 export interface ActiveWsProxy {
 	clientWs: WebSocket
 	onMessage: (data: Uint8Array | string) => void
 	onClose: (code?: number, reason?: string) => void
+}
+
+export interface PendingWsOpen {
+	resolve: () => void
+	reject: (error: Error) => void
 }
 
 // -----------------------------------------------------------------------------
@@ -76,6 +91,7 @@ export class BridgeClient {
 	private pendingCalls = new Map<string, PendingCall>()
 	private activeStreams = new Map<number, ActiveStream>()
 	private wsProxies = new Map<number, ActiveWsProxy>()
+	private pendingWsOpens = new Map<number, PendingWsOpen>()
 	private outgoingStreams = new Map<number, StreamRef>()
 
 	private connectPromise: Promise<void> | null = null
@@ -148,19 +164,18 @@ export class BridgeClient {
 		return this.connectPromise
 	}
 
-	/** Disconnect from the bridge */
+	/** Disconnect from the bridge and tear down all pending state */
 	disconnect(): void {
 		this.autoReconnect = false
 		this.ws?.close()
 		this.ws = null
 		this.isConnected = false
+		this.cleanupPending(new Error('Bridge disconnected'))
+	}
 
-		// Reject all pending calls
-		for (const [id, pending] of this.pendingCalls) {
-			clearTimeout(pending.timeout)
-			pending.reject(new Error('Bridge disconnected'))
-		}
-		this.pendingCalls.clear()
+	/** Alias for disconnect() */
+	close(): void {
+		this.disconnect()
 	}
 
 	/** Check if connected */
@@ -172,18 +187,7 @@ export class BridgeClient {
 		this.isConnected = false
 		this.ws = null
 
-		// Reject pending calls
-		for (const [_id, pending] of this.pendingCalls) {
-			clearTimeout(pending.timeout)
-			pending.reject(new Error('Bridge disconnected'))
-		}
-		this.pendingCalls.clear()
-
-		// Close active streams
-		for (const [_sid, stream] of this.activeStreams) {
-			stream.controller.error(new Error('Bridge disconnected'))
-		}
-		this.activeStreams.clear()
+		this.cleanupPending(new Error('Bridge disconnected'))
 
 		// Auto-reconnect
 		if (this.autoReconnect) {
@@ -191,6 +195,50 @@ export class BridgeClient {
 				this.connect().catch(() => {})
 			}, this.reconnectDelay)
 		}
+	}
+
+	/** Reject/close all pending RPC calls, streams, and ws proxies */
+	private cleanupPending(error: Error): void {
+		// Reject pending RPC calls
+		for (const pending of this.pendingCalls.values()) {
+			clearTimeout(pending.timeout)
+			pending.reject(error)
+		}
+		this.pendingCalls.clear()
+
+		// Reject pending ws.opened waits
+		for (const pending of this.pendingWsOpens.values()) {
+			pending.reject(error)
+		}
+		this.pendingWsOpens.clear()
+
+		// Error out active incoming streams and reject any pending pull
+		for (const stream of this.activeStreams.values()) {
+			stream.closed = true
+			if (stream.pendingPull) {
+				stream.pendingPull.reject(error)
+				stream.pendingPull = null
+			}
+			try {
+				stream.controller.error(error)
+			} catch {
+				// controller may already be closed
+			}
+		}
+		this.activeStreams.clear()
+
+		// Notify active ws proxies of close
+		for (const proxy of this.wsProxies.values()) {
+			try {
+				proxy.onClose(1006, error.message)
+			} catch {
+				// swallow handler errors during cleanup
+			}
+		}
+		this.wsProxies.clear()
+
+		// Drop outgoing stream refs
+		this.outgoingStreams.clear()
 	}
 
 	// ---------------------------------------------------------------------------
@@ -258,6 +306,11 @@ export class BridgeClient {
 		}
 		this.wsProxies.set(wid, proxy)
 
+		// Register the pending open BEFORE sending so we can't miss ws.opened
+		const openedPromise = new Promise<void>((resolve, reject) => {
+			this.pendingWsOpens.set(wid, { resolve, reject })
+		})
+
 		// Send open request
 		const msg: WsOpen = {
 			t: 'ws.open',
@@ -266,8 +319,13 @@ export class BridgeClient {
 		}
 		this.send(msg)
 
-		// Wait for ws.opened response (handled in handleMessage)
-		// For simplicity, assume it succeeds
+		// Await confirmation from the bridge before returning the proxy
+		try {
+			await openedPromise
+		} catch (error) {
+			this.wsProxies.delete(wid)
+			throw error
+		}
 
 		return {
 			wid,
@@ -304,38 +362,66 @@ export class BridgeClient {
 				this.activeStreams.set(sid, {
 					controller,
 					buffer: [],
-					creditRemaining: 0
+					creditRemaining: 0,
+					pendingPull: null,
+					ended: false,
+					closed: false
 				})
 			},
 			pull: async (controller) => {
 				const stream = this.activeStreams.get(sid)
-				if (!stream) return
+				if (!stream || stream.closed) return
 
-				// Request more data
+				// Flush any buffered chunks first
+				if (stream.buffer.length > 0) {
+					const chunk = stream.buffer.shift()!
+					controller.enqueue(chunk)
+					return
+				}
+
+				// If the stream has ended and buffer is empty, close it
+				if (stream.ended) {
+					controller.close()
+					this.activeStreams.delete(sid)
+					return
+				}
+
+				// Request more data from the bridge
 				const pullMsg: StreamPull = {
 					t: 'stream.pull',
 					sid,
-					creditBytes: DEFAULT_CHUNK_SIZE * 4  // Request 1MB at a time
+					creditBytes: DEFAULT_CHUNK_SIZE * 4
 				}
 				this.send(pullMsg)
 
-				// Wait for data (handled in handleMessage)
-				await new Promise<void>((resolve) => {
-					const checkBuffer = () => {
-						const s = this.activeStreams.get(sid)
-						if (!s) return resolve()
-						if (s.buffer.length > 0) {
-							const chunk = s.buffer.shift()!
-							controller.enqueue(chunk)
-							resolve()
-						} else {
-							setTimeout(checkBuffer, 10)
-						}
-					}
-					checkBuffer()
+				// Await a signal that bytes arrived, the stream ended, or it was aborted
+				await new Promise<void>((resolve, reject) => {
+					stream.pendingPull = { resolve, reject }
 				})
+				stream.pendingPull = null
+
+				if (stream.closed) return
+
+				if (stream.buffer.length > 0) {
+					const chunk = stream.buffer.shift()!
+					controller.enqueue(chunk)
+					return
+				}
+
+				if (stream.ended) {
+					controller.close()
+					this.activeStreams.delete(sid)
+				}
 			},
 			cancel: () => {
+				const stream = this.activeStreams.get(sid)
+				if (stream) {
+					stream.closed = true
+					if (stream.pendingPull) {
+						stream.pendingPull.reject(new Error('Stream cancelled'))
+						stream.pendingPull = null
+					}
+				}
 				this.activeStreams.delete(sid)
 			}
 		})
@@ -377,14 +463,14 @@ export class BridgeClient {
 					this.handleStreamAbort(msg)
 					break
 				case 'ws.opened':
-					// WS proxy opened successfully
+					this.handleWsOpened(msg)
 					break
 				case 'ws.close':
 					this.handleWsClose(msg)
 					break
 			}
 		} catch (error) {
-			// Silently ignore malformed messages in production
+			console.error('[devflare bridge client] parse error:', data, error)
 		}
 	}
 
@@ -485,28 +571,44 @@ export class BridgeClient {
 
 	private handleStreamChunk(decoded: ReturnType<typeof decodeBinaryFrame>): void {
 		const stream = this.activeStreams.get(decoded.id)
-		if (!stream) return
+		if (!stream || stream.closed) return
 
 		stream.buffer.push(decoded.payload)
+		if (stream.pendingPull) {
+			const pending = stream.pendingPull
+			stream.pendingPull = null
+			pending.resolve()
+		}
 	}
 
 	private handleStreamEnd(msg: { sid: number }): void {
 		const stream = this.activeStreams.get(msg.sid)
 		if (!stream) return
 
-		// Flush remaining buffer
-		for (const chunk of stream.buffer) {
-			stream.controller.enqueue(chunk)
+		stream.ended = true
+		if (stream.pendingPull) {
+			const pending = stream.pendingPull
+			stream.pendingPull = null
+			pending.resolve()
 		}
-		stream.controller.close()
-		this.activeStreams.delete(msg.sid)
 	}
 
 	private handleStreamAbort(msg: { sid: number; error?: string }): void {
 		const stream = this.activeStreams.get(msg.sid)
 		if (!stream) return
 
-		stream.controller.error(new Error(msg.error ?? 'Stream aborted'))
+		const err = new Error(msg.error ?? 'Stream aborted')
+		stream.closed = true
+		if (stream.pendingPull) {
+			const pending = stream.pendingPull
+			stream.pendingPull = null
+			pending.reject(err)
+		}
+		try {
+			stream.controller.error(err)
+		} catch {
+			// already closed
+		}
 		this.activeStreams.delete(msg.sid)
 	}
 
@@ -528,6 +630,13 @@ export class BridgeClient {
 
 		proxy.onClose(msg.code, msg.reason)
 		this.wsProxies.delete(msg.wid)
+	}
+
+	private handleWsOpened(msg: WsOpened): void {
+		const pending = this.pendingWsOpens.get(msg.wid)
+		if (!pending) return
+		this.pendingWsOpens.delete(msg.wid)
+		pending.resolve()
 	}
 
 	// ---------------------------------------------------------------------------

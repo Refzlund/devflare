@@ -108,4 +108,29 @@ describe('ref', () => {
 		expect(baseBinding.service).toBe('math-worker')
 		expect(result.worker.__ref).toBe(result)
 	})
+
+	test('extracts configPath from an arrow function with implicit import(...)', () => {
+		const result = ref(() => import('./does-not-exist/devflare.config') as never)
+		expect(result.configPath).toBe('./does-not-exist/devflare.config')
+	})
+
+	test('extracts configPath from a block-body function returning import(...)', () => {
+		const result = ref(function load() {
+			return import('./another-path/devflare.config') as never
+		})
+		expect(result.configPath).toBe('./another-path/devflare.config')
+	})
+
+	test('returns pending sentinel when the import function has no import(...) call', () => {
+		const result = ref(async () => ({ default: { name: 'x' } }) as never)
+		expect(result.configPath).toBe('<pending>')
+	})
+
+	test('throws a clear error when the import specifier is a dynamic template literal', () => {
+		// Wrapping the template literal inside a factory prevents TypeScript/Bun
+		// from constant-folding `segment` into a static string literal.
+		const makeFn = (segment: string) => () => import(`./${segment}/devflare.config`) as never
+		expect(() => ref(makeFn('foo')))
+			.toThrow(/template literal with an embedded expression|static string literal/)
+	})
 })

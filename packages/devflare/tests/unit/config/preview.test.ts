@@ -161,4 +161,95 @@ describe('resolveConfigForEnvironment', () => {
 		expect(previewConfig.bindings?.d1?.PRIMARY_DB).toBe('primary-db-feature-queue-cleanup')
 		expect(previewConfig.bindings?.hyperdrive?.POSTGRES).toBe('postgres-hyperdrive-feature-queue-cleanup')
 	})
+
+	test('keeps forced compatibility flags while replacing root custom flags when an environment override provides its own list', () => {
+		const config: DevflareConfig = {
+			name: 'demo-worker',
+			compatibilityDate: '2026-04-08',
+			compatibilityFlags: ['nodejs_compat', 'nodejs_als', 'root-flag'],
+			env: {
+				preview: {
+					compatibilityFlags: ['nodejs_compat', 'nodejs_als', 'preview-flag']
+				}
+			}
+		}
+
+		const previewConfig = resolveConfigForEnvironment(config, 'preview')
+
+		expect(previewConfig.compatibilityFlags).toEqual([
+			'nodejs_compat',
+			'nodejs_als',
+			'preview-flag'
+		])
+	})
+
+	test('replaces array fields while still deep-merging objects for environment overrides', () => {
+		const config: DevflareConfig = {
+			name: 'demo-worker',
+			compatibilityDate: '2026-04-08',
+			compatibilityFlags: ['nodejs_compat', 'nodejs_als'],
+			vars: {
+				KEEP: 'root',
+				SHARED: 'root'
+			},
+			routes: [
+				{ pattern: 'root.example/*', zone_name: 'example.com' }
+			],
+			triggers: {
+				crons: ['0 * * * *']
+			},
+			migrations: [
+				{ tag: 'v1', new_classes: ['RootCounter'] }
+			],
+			bindings: {
+				queues: {
+					consumers: [
+						{ queue: 'root-queue', deadLetterQueue: 'root-dlq' }
+					]
+				}
+			},
+			env: {
+				preview: {
+					vars: {
+						SHARED: 'preview',
+						ONLY: 'preview'
+					},
+					routes: [
+						{ pattern: 'preview.example/*', zone_name: 'example.com' }
+					],
+					triggers: {
+						crons: ['0 0 * * *']
+					},
+					migrations: [
+						{ tag: 'v2', new_classes: ['PreviewCounter'] }
+					],
+					bindings: {
+						queues: {
+							consumers: [
+								{ queue: 'preview-queue' }
+							]
+						}
+					}
+				}
+			}
+		}
+
+		const previewConfig = resolveConfigForEnvironment(config, 'preview')
+
+		expect(previewConfig.vars).toEqual({
+			KEEP: 'root',
+			SHARED: 'preview',
+			ONLY: 'preview'
+		})
+		expect(previewConfig.routes).toEqual([
+			{ pattern: 'preview.example/*', zone_name: 'example.com' }
+		])
+		expect(previewConfig.triggers?.crons).toEqual(['0 0 * * *'])
+		expect(previewConfig.migrations).toEqual([
+			{ tag: 'v2', new_classes: ['PreviewCounter'] }
+		])
+		expect(previewConfig.bindings?.queues?.consumers).toEqual([
+			{ queue: 'preview-queue' }
+		])
+	})
 })

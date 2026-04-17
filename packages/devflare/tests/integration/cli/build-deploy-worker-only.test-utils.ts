@@ -349,6 +349,41 @@ export default {
 	})
 }
 
+export async function writeNamedD1ProjectFiles(
+	projectDir: string,
+	options: {
+		workerName?: string
+		accountId?: string
+		databaseName?: string
+	} = {}
+): Promise<void> {
+	const workerName = options.workerName ?? 'worker-build-test'
+	const accountId = options.accountId ?? 'account-123'
+	const databaseName = options.databaseName ?? 'app-db'
+
+	await writeProjectFixture(projectDir, {
+		packageName: workerName,
+		configSource: `
+export default {
+	name: ${JSON.stringify(workerName)},
+	accountId: ${JSON.stringify(accountId)},
+	compatibilityDate: '2026-03-17',
+	files: {
+		fetch: 'src/fetch.ts'
+	},
+	bindings: {
+		d1: {
+			DB: ${JSON.stringify(databaseName)}
+		}
+	}
+}
+`.trim(),
+		files: {
+			'src/fetch.ts': DEFAULT_FETCH_HANDLER_SOURCE
+		}
+	})
+}
+
 export async function writeRequestWideHandleProjectFiles(projectDir: string): Promise<void> {
 	await writeProjectFixture(projectDir, {
 		packageName: 'worker-build-test',

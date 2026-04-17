@@ -140,7 +140,7 @@ describe('login command', () => {
 		expect(execCalls).toEqual([
 			{
 				command: 'bunx',
-				args: ['--bun', 'wrangler', 'login']
+				args: ['wrangler', 'login']
 			}
 		])
 		expect(renderedMessages.some((message) => message.includes('Authenticated with Cloudflare'))).toBe(true)

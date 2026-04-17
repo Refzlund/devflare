@@ -376,11 +376,19 @@ function transformWorkerDynamicImports(
 			.map(([specifier, identifier]) => `import * as ${identifier} from ${quoteString(specifier)}`)
 			.join('\n')
 
-		const importInsertPosition = code.startsWith('#!')
-			? (code.indexOf('\n') === -1 ? code.length : code.indexOf('\n') + 1)
-			: 0
-
-		s.appendLeft(importInsertPosition, `${importBlock}\n`)
+		if (code.startsWith('#!')) {
+			const newlineIndex = code.indexOf('\n')
+			if (newlineIndex === -1) {
+				// Shebang-only file with no terminating newline: append newline
+				// after the shebang, then the import block. Avoids double-inserts
+				// and never rewrites or removes the existing shebang.
+				s.appendRight(code.length, `\n${importBlock}\n`)
+			} else {
+				s.appendLeft(newlineIndex + 1, `${importBlock}\n`)
+			}
+		} else {
+			s.appendLeft(0, `${importBlock}\n`)
+		}
 	}
 
 	return {

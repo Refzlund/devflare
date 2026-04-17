@@ -191,9 +191,10 @@ describe('runCli', () => {
 		const result = await runCli(['deploy', '--help'], { silent: true })
 
 		expect(result.exitCode).toBe(0)
-		expect(result.output).toContain('devflare deploy --preview <name> [--config <path>] [--message <text>] [--tag <text>]')
-		expect(result.output).toContain('devflare deploy --preview [--config <path>] [--branch-name <branch>] [--message <text>] [--tag <text>]')
+		expect(result.output).toContain('devflare deploy --preview <name> [--config <path>] [--build <path>] [--message <text>] [--tag <text>]')
+		expect(result.output).toContain('devflare deploy --preview [--config <path>] [--build <path>] [--branch-name <branch>] [--message <text>] [--tag <text>]')
 		expect(result.output).toContain('--preview <name> — Deploy a named preview scope such as `next` or `pr-1`')
+		expect(result.output).toContain('--build <path> — Reuse an existing build artifact')
 	})
 
 	test('shows preview cleanup help', async () => {

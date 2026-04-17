@@ -168,6 +168,79 @@ interface ResolvedData<TConfig = DevflareConfigInput> {
 
 const resolvedCache = new WeakMap<RefResult, ResolvedData>()
 const pendingResolutions = new WeakMap<RefResult, Promise<ResolvedData>>()
+const PENDING_REF_VALUE = '<pending>'
+
+// -----------------------------------------------------------------------------
+// Config Path Extraction
+// -----------------------------------------------------------------------------
+
+/**
+ * Extract the import specifier string from an import-thunk function's source.
+ *
+ * Uses a narrow regex over `fn.toString()`. To avoid returning bogus paths for
+ * minified or hand-written functions that do not contain a parseable
+ * `import(...)` call, the result is validated before being returned.
+ *
+ * Throws a clear error instead of returning a silent placeholder when the
+ * function source is not in a recognized shape.
+ */
+function extractConfigPathFromImportFn(
+	fn: (...args: unknown[]) => unknown
+): string {
+	let source: string
+	try {
+		source = Function.prototype.toString.call(fn)
+	} catch {
+		// Exotic function (bound/native/Proxy) — treat as unresolved until
+		// runtime resolution and fail loudly only when the path is actually
+		// needed.
+		return PENDING_REF_VALUE
+	}
+
+	// Functions that do not contain a dynamic `import(...)` at all (e.g. the
+	// mock thunks used in tests and in programmatic test contexts) are treated
+	// as having a pending config path — not an error. The path is only
+	// consulted by consumers that need it and those consumers already handle
+	// the pending sentinel.
+	if (!/import\s*\(/.test(source)) {
+		return PENDING_REF_VALUE
+	}
+
+	const match = source.match(/import\s*\(\s*(['"`])([^'"`]+)\1\s*\)/)
+	const raw = match?.[2]
+
+	if (!raw || raw.length === 0) {
+		throw new Error(
+			'ref() could not extract a config path from the import function source. '
+			+ 'The specifier must be a static string literal — dynamic or computed '
+			+ 'specifiers (e.g. template literals with expressions) are not supported. '
+			+ 'If this input has been minified, pass an unminified config source.'
+		)
+	}
+
+	// Reject template literals with embedded expressions — the resulting
+	// path is dynamic and can only be resolved at runtime.
+	if (match?.[1] === '`' && /\$\{/.test(raw)) {
+		throw new Error(
+			'ref() import specifier is a template literal with an embedded expression. '
+			+ 'The specifier must be a static string literal so the config path can '
+			+ 'be resolved ahead of time.'
+		)
+	}
+
+	// Obvious minification artefact: a 1-char specifier with no separator or
+	// extension is almost certainly the product of a bundler rewriting the
+	// original literal. Refuse to guess.
+	if (raw.length < 2 && !/[./]/.test(raw)) {
+		throw new Error(
+			`ref() extracted a suspiciously short config path (${JSON.stringify(raw)}). `
+			+ 'This usually indicates a minified bundle where the original specifier '
+			+ 'was rewritten. Pass an unminified config source.'
+		)
+	}
+
+	return raw
+}
 
 // -----------------------------------------------------------------------------
 // Implementation
@@ -208,16 +281,32 @@ export function ref<TImport extends () => Promise<{ default: DevflareConfigInput
 ): RefResult<ExtractConfig<TImport>> {
 	type TConfig = ExtractConfig<TImport>
 	const nameOverride = typeof nameOrImport === 'string' ? nameOrImport : undefined
-	const importFn = (typeof nameOrImport === 'function' ? nameOrImport : maybeImport!) as unknown as ConfigImport<TConfig>
+	let importFn: ConfigImport<TConfig> | undefined
+
+	if (typeof nameOrImport === 'function') {
+		importFn = nameOrImport as unknown as ConfigImport<TConfig>
+	} else if (typeof maybeImport === 'function') {
+		importFn = maybeImport as unknown as ConfigImport<TConfig>
+	}
 
 	if (!importFn) {
 		throw new Error('ref() requires an import function')
 	}
 
-	// Extract the import path from the function's source code
-	const fnSource = importFn.toString()
-	const importMatch = fnSource.match(/import\s*\(\s*['"]([^'"]+)['"]\s*\)/)
-	const configPath = importMatch?.[1] ?? '<pending>'
+	const resolvedImportFn = importFn
+
+	// Extract the import path from the function's source code.
+	//
+	// Ideal approach: runtime probe via Proxy (call `fn(rootProxy)` and observe
+	// the property chains the proxy was accessed on). That approach doesn't apply
+	// here because the input is a dynamic `import()` expression — a syntactic
+	// operator that cannot be intercepted by replacing globals or parameters.
+	//
+	// We therefore parse the function source with a narrow regex, then guard the
+	// result against obviously-minified or otherwise-unparseable inputs so we
+	// fail loudly instead of silently returning a bogus path.
+	const configPath = extractConfigPathFromImportFn(resolvedImportFn)
+	const doBindingCache = new Map<string, DOBindingRef>()
 
 	// Helper to resolve the config
 	async function doResolve(): Promise<ResolvedData<TConfig>> {
@@ -231,7 +320,7 @@ export function ref<TImport extends () => Promise<{ default: DevflareConfigInput
 
 		// Start resolution
 		const promise = (async () => {
-			const module = await importFn()
+			const module = await resolvedImportFn()
 			const config = ('default' in module ? module.default : module) as TConfig
 
 			if (!config.name && !nameOverride) {
@@ -248,8 +337,12 @@ export function ref<TImport extends () => Promise<{ default: DevflareConfigInput
 			return resolved
 		})()
 
-		pendingResolutions.set(proxy, promise as Promise<ResolvedData>)
-		return promise
+		const trackedPromise = promise.finally(() => {
+			pendingResolutions.delete(proxy)
+		}) as Promise<ResolvedData<TConfig>>
+
+		pendingResolutions.set(proxy, trackedPromise as Promise<ResolvedData>)
+		return trackedPromise
 	}
 
 	// Helper to get resolved value synchronously (throws if not resolved)
@@ -273,7 +366,7 @@ export function ref<TImport extends () => Promise<{ default: DevflareConfigInput
 				// If name override is provided, use it directly
 				if (nameOverride) return nameOverride
 				// Otherwise, indicate pending (this will be resolved by test context)
-				return '<pending>'
+				return PENDING_REF_VALUE
 			},
 			entrypoint,
 			__ref: proxy
@@ -289,7 +382,7 @@ export function ref<TImport extends () => Promise<{ default: DevflareConfigInput
 					const cached = resolvedCache.get(proxy) as ResolvedData<TConfig> | undefined
 					if (cached) return cached.name
 					if (nameOverride) return nameOverride
-					return '<pending>'
+					return PENDING_REF_VALUE
 				}
 				if (prop === 'entrypoint') return undefined
 				if (prop === '__ref') return proxy
@@ -300,7 +393,12 @@ export function ref<TImport extends () => Promise<{ default: DevflareConfigInput
 
 	// Create DO binding for cross-worker access
 	function createDOBinding(bindingName: string): DOBindingRef {
-		return {
+		const cachedBinding = doBindingCache.get(bindingName)
+		if (cachedBinding) {
+			return cachedBinding
+		}
+
+		const doBinding: DOBindingRef = {
 			// className is a getter that resolves lazily from the config
 			get className() {
 				const cached = resolvedCache.get(proxy) as ResolvedData<TConfig> | undefined
@@ -313,18 +411,20 @@ export function ref<TImport extends () => Promise<{ default: DevflareConfigInput
 						return (doConfig as { className: string }).className
 					}
 				}
-				// Default to binding name if not resolved (will be updated after resolve())
-				return bindingName
+				return PENDING_REF_VALUE
 			},
 			get scriptName() {
 				// Worker name for cross-worker access
 				const cached = resolvedCache.get(proxy) as ResolvedData<TConfig> | undefined
 				if (cached) return cached.name
 				if (nameOverride) return nameOverride
-				return '<pending>'
+				return PENDING_REF_VALUE
 			},
 			__ref: proxy
 		}
+
+		doBindingCache.set(bindingName, doBinding)
+		return doBinding
 	}
 
 	// Known properties on RefResult (not DO bindings)
@@ -336,7 +436,7 @@ export function ref<TImport extends () => Promise<{ default: DevflareConfigInput
 		get config() { return getResolved().config },
 		configPath,
 		worker: workerAccessor,
-		__import: importFn,
+		__import: resolvedImportFn,
 		__nameOverride: nameOverride,
 		resolve: doResolve
 	}

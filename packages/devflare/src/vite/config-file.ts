@@ -144,8 +144,7 @@ async function ensureGeneratedConfigDir(cwd: string): Promise<string> {
 
 async function resolveDevflarePackageRoot(currentFilePath: string): Promise<string> {
 	const fs = await import('node:fs/promises')
-	const { dirname } = await import('node:path')
-	const { resolve } = await import('pathe')
+	const { dirname, resolve } = await import('pathe')
 	let currentDir = dirname(currentFilePath)
 
 	while (true) {
@@ -174,14 +173,13 @@ async function resolveDevflarePackageRoot(currentFilePath: string): Promise<stri
 }
 
 async function resolveGeneratedViteImportPath(configDir: string): Promise<string> {
-	const { extname, sep } = await import('node:path')
 	const { fileURLToPath } = await import('node:url')
-	const { relative, resolve } = await import('pathe')
-	const currentFilePath = fileURLToPath(import.meta.url)
+	const { extname, normalize, relative, resolve } = await import('pathe')
+	const currentFilePath = normalize(fileURLToPath(import.meta.url))
 	const currentExtension = extname(currentFilePath)
 	const packageRoot = await resolveDevflarePackageRoot(currentFilePath)
-	const viteEntryPath = currentFilePath.includes(`${sep}dist${sep}`)
-		? resolve(packageRoot, 'dist/src/vite/index.js')
+	const viteEntryPath = currentFilePath.includes('/dist/')
+		? resolve(packageRoot, 'dist/vite/index.js')
 		: resolve(packageRoot, `src/vite/index${currentExtension}`)
 	const relativeImportPath = relative(configDir, viteEntryPath)
 

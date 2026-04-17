@@ -110,20 +110,43 @@ async function handleHttpRequest(
 	logger?: ConsolaInstance,
 	verbose?: boolean
 ): Promise<Response> {
+	const hopByHopHeaders = new Set([
+		'connection',
+		'host',
+		'keep-alive',
+		'proxy-authenticate',
+		'proxy-authorization',
+		'te',
+		'trailer',
+		'transfer-encoding',
+		'upgrade',
+		'content-length'
+	])
+
 	if (verbose) {
 		logger?.debug(`[BrowserHandler] Proxying HTTP to: ${targetUrl}`)
 	}
 
 	try {
-		// Proxy request to browser shim
-		const response = await fetch(targetUrl, {
-			method: request.method,
-			headers: {
-				'Content-Type': request.headers.get('content-type') || 'application/json',
-				'Accept': request.headers.get('accept') || '*/*'
-			},
-			body: request.body
+		const forwardedHeaders = new Headers()
+		request.headers.forEach((value, key) => {
+			if (!hopByHopHeaders.has(key.toLowerCase())) {
+				forwardedHeaders.set(key, value)
+			}
 		})
+
+		const proxyRequest: RequestInit & { duplex?: 'half' } = {
+			method: request.method,
+			headers: forwardedHeaders
+		}
+
+		if (request.body && request.method !== 'GET' && request.method !== 'HEAD') {
+			proxyRequest.body = request.body
+			proxyRequest.duplex = 'half'
+		}
+
+		// Proxy request to browser shim
+		const response = await fetch(targetUrl, proxyRequest)
 
 		// Return the response directly
 		return new Response(response.body, {
@@ -172,6 +195,8 @@ async function handleWebSocketUpgrade(
 		logger?.debug(`[BrowserHandler] WebSocket upgrade for session: ${sessionId}`)
 	}
 
+	let shimWs: import('ws').WebSocket | null = null
+
 	try {
 		// Import ws library and Miniflare WebSocket utilities
 		const { WebSocket: WsWebSocket } = await import('ws')
@@ -185,29 +210,34 @@ async function handleWebSocketUpgrade(
 		}
 
 		// Connect to browser shim WebSocket
-		const shimWs = new WsWebSocket(targetWsUrl)
+		shimWs = new WsWebSocket(targetWsUrl)
+		const browserShimSocket = shimWs
 
 		// Wait for connection to open
 		await new Promise<void>((resolve, reject) => {
-			shimWs.once('open', () => {
+			const connectTimeout = setTimeout(() => {
+				reject(new Error('WebSocket connection timeout'))
+			}, 10000)
+
+			browserShimSocket.once('open', () => {
+				clearTimeout(connectTimeout)
 				if (verbose) {
 					logger?.debug(`[BrowserHandler] WebSocket connection opened to shim`)
 				}
 				resolve()
 			})
-			shimWs.once('error', (err) => {
+			browserShimSocket.once('error', (err) => {
+				clearTimeout(connectTimeout)
 				logger?.error(`[BrowserHandler] WebSocket connection error: ${err.message}`)
 				reject(err)
 			})
-			setTimeout(() => reject(new Error('WebSocket connection timeout')), 10000)
 		})
 
 		// Create a WebSocketPair - this is Miniflare's implementation
 		// that works in Node.js and can be returned to workerd
 		// IMPORTANT: The order is [worker, client] - worker is returned in response,
 		// client is coupled to the external WebSocket connection
-		const pair = new WebSocketPair()
-		const [worker, client] = Object.values(pair) as [WebSocket, WebSocket]
+		const { 0: worker, 1: client } = new WebSocketPair()
 
 		if (verbose) {
 			logger?.debug(`[BrowserHandler] WebSocketPair created, MfResponse type: ${MfResponse?.name || typeof MfResponse}`)
@@ -217,7 +247,7 @@ async function handleWebSocketUpgrade(
 		// This sets up bidirectional message relaying:
 		// - Messages from shimWs → client → (through pair) → worker → workerd
 		// - Messages from workerd → worker → (through pair) → client → shimWs
-		await coupleWebSocket(shimWs, client)
+		await coupleWebSocket(browserShimSocket, client)
 
 		if (verbose) {
 			logger?.debug(`[BrowserHandler] WebSocket coupled successfully, returning 101 response`)
@@ -233,6 +263,10 @@ async function handleWebSocketUpgrade(
 		logger?.info(`[BrowserHandler] 101 response created, status: ${response.status}`)
 		return response as Response
 	} catch (error) {
+		try {
+			shimWs?.close()
+		} catch {}
+
 		const msg = error instanceof Error ? error.message : 'WebSocket error'
 		logger?.error(`[BrowserHandler] WebSocket upgrade error: ${msg}`)
 		return new Response(`WebSocket upgrade failed: ${msg}`, { status: 500 })

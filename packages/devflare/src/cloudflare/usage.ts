@@ -85,31 +85,114 @@ export async function getUsage(
 }
 
 /**
- * Record usage for a service
+ * Optional injection points for {@link recordUsage}.
+ *
+ * Cloudflare's KV REST API does not expose an atomic compare-and-swap
+ * primitive, so recording usage is implemented as an optimistic read-modify-
+ * write loop with post-write verification. These dependencies are exposed
+ * primarily for testing the retry path.
+ */
+export interface RecordUsageDeps {
+	kvGet?: typeof kvGet
+	kvPut?: typeof kvPut
+	getNamespaceId?: (accountId: string) => Promise<string>
+	sleep?: (ms: number) => Promise<void>
+	now?: () => Date
+	maxAttempts?: number
+	warn?: (message: string) => void
+}
+
+const MAX_RECORD_USAGE_ATTEMPTS = 5
+
+/**
+ * Record usage for a service.
+ *
+ * Usage counts are recorded via an optimistic read-modify-write loop against
+ * a Devflare-managed KV namespace. After each write the value is re-read and
+ * compared against the update we just issued; if another writer clobbered it
+ * we back off and retry, capped at {@link MAX_RECORD_USAGE_ATTEMPTS} attempts.
+ *
+ * Because Cloudflare KV is eventually consistent and lacks conditional writes,
+ * the counters are inherently best-effort — under heavy concurrency some
+ * increments can still be lost. When the retry budget is exhausted we emit a
+ * warning instead of silently dropping the update.
  */
 export async function recordUsage(
 	accountId: string,
 	service: CloudflareService,
-	count: number = 1
+	count: number = 1,
+	deps: RecordUsageDeps = {}
 ): Promise<UsageRecord> {
-	const today = getTodayDate()
-	const namespaceId = await getOrCreateUsageNamespace(accountId)
+	const kvGetFn = deps.kvGet ?? kvGet
+	const kvPutFn = deps.kvPut ?? kvPut
+	const getNamespaceId = deps.getNamespaceId ?? getOrCreateUsageNamespace
+	const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)))
+	const now = deps.now ?? (() => new Date())
+	const maxAttempts = deps.maxAttempts ?? MAX_RECORD_USAGE_ATTEMPTS
+	const warn = deps.warn ?? ((message: string) => console.warn(message))
+
+	const today = now().toISOString().split('T')[0]
+	const namespaceId = await getNamespaceId(accountId)
 	const key = buildUsageKey(service, today)
 
-	// Get existing usage
-	const existing = await getUsage(accountId, service, today)
-	const currentCount = existing?.count ?? 0
+	let lastWritten: UsageRecord | null = null
+	let lastObserved: UsageRecord | null = null
 
-	const record: UsageRecord = {
-		service,
-		date: today,
-		count: currentCount + count,
-		updatedAt: new Date().toISOString()
+	for (let attempt = 0; attempt < maxAttempts; attempt++) {
+		const existingRaw = await kvGetFn(accountId, namespaceId, key)
+		let existing: UsageRecord | null = null
+		if (existingRaw !== null) {
+			try {
+				existing = JSON.parse(existingRaw) as UsageRecord
+			} catch {
+				existing = null
+			}
+		}
+		lastObserved = existing
+
+		const record: UsageRecord = {
+			service,
+			date: today,
+			count: (existing?.count ?? 0) + count,
+			updatedAt: now().toISOString()
+		}
+
+		await kvPutFn(accountId, namespaceId, key, JSON.stringify(record))
+		lastWritten = record
+
+		// Verify: read-after-write. If our update is intact, we're done.
+		// Note: KV is eventually consistent so this verification is best-effort.
+		const verifyRaw = await kvGetFn(accountId, namespaceId, key)
+		if (verifyRaw !== null) {
+			try {
+				const verify = JSON.parse(verifyRaw) as UsageRecord
+				if (verify.updatedAt === record.updatedAt && verify.count === record.count) {
+					return record
+				}
+			} catch {
+				// fall through to retry
+			}
+		}
+
+		// A concurrent writer clobbered our update (or the read is stale).
+		// Back off and retry by re-reading and re-applying our delta on top.
+		if (attempt < maxAttempts - 1) {
+			const backoffMs = Math.min(25 * 2 ** attempt, 400)
+			await sleep(backoffMs)
+		}
 	}
 
-	await kvPut(accountId, namespaceId, key, JSON.stringify(record))
+	warn(
+		`[devflare] recordUsage: could not confirm usage write for ${service} after ${maxAttempts} attempts `
+		+ 'due to concurrent writes; usage counts are best-effort under concurrency.'
+	)
 
-	return record
+	return lastWritten ?? {
+		service,
+		date: today,
+		count: (lastObserved?.count ?? 0) + count,
+		updatedAt: now().toISOString()
+	}
 }
 
 /**

@@ -50,7 +50,17 @@ export {
 	type RolldownConfig,
 	type MigrationConfig
 } from './schema'
-export { compileConfig, stringifyConfig, writeWranglerConfig, type WranglerConfig } from './compiler'
+export {
+	compileBuildConfig,
+	compileConfig,
+	readWranglerConfig,
+	stringifyConfig,
+	writeWranglerConfig,
+	type WranglerConfig,
+	type WranglerD1DatabaseBinding,
+	type WranglerHyperdriveBinding,
+	type WranglerKVNamespaceBinding
+} from './compiler'
 export {
 	loadConfig,
 	loadResolvedConfig,
@@ -69,6 +79,14 @@ export {
 	type ResolveMaterializedConfigResourcesOptions,
 	type ResolveConfigResourcesOptions
 } from './resource-resolution'
+export {
+	prepareConfigResourcesForDeploy,
+	prepareMaterializedConfigResourcesForDeploy,
+	type DeployResourceNames,
+	type PrepareConfigResourcesForDeployOptions,
+	type PrepareConfigResourcesForDeployResult,
+	type PrepareMaterializedConfigResourcesForDeployOptions
+} from './deploy-resources'
 
 // Cross-config referencing
 export {

@@ -4,9 +4,20 @@
 
 import { mkdir, writeFile } from 'node:fs/promises'
 import { type ConsolaInstance } from 'consola'
-import { dirname, join } from 'pathe'
+import { basename, dirname, isAbsolute, join, resolve } from 'pathe'
 import type { ParsedArgs, CliOptions, CliResult } from '../index'
-import { loadResolvedConfig } from '../../config'
+import {
+	compileBuildConfig,
+	compileConfig,
+	loadConfig,
+	prepareConfigResourcesForDeploy,
+	readWranglerConfig,
+	resolveConfigForEnvironment,
+	type DeployResourceNames,
+	type DevflareConfig,
+	type PrepareConfigResourcesForDeployResult,
+	type WranglerConfig
+} from '../../config'
 import {
 	getPrimaryAccount,
 	getWorkerVersionDetail,
@@ -15,9 +26,10 @@ import {
 	listWorkerDeployments
 } from '../../cloudflare/account'
 import { getEffectiveAccountId } from '../../cloudflare/preferences'
-import { compileConfig, stringifyConfig } from '../../config/compiler'
+import { stringifyConfig, writeWranglerConfig } from '../../config/compiler'
 import { getDependencies } from '../dependencies'
 import { prepareBuildArtifacts } from './build-artifacts'
+import { preparePreviewScopedResourcesForDeploy } from '../../config/preview-resources'
 import {
 	formatWorkersDevUrl,
 	mergeParsedWranglerDeployOutputs,
@@ -48,6 +60,165 @@ interface DeployResultMetadata {
 	outputUrls: string[]
 	structuredOutput?: string
 	error?: string
+}
+
+interface PreparedDeployConfigResult {
+	config: DevflareConfig
+	deployConfigPath: string
+	previewScopedResources: Awaited<ReturnType<typeof preparePreviewScopedResourcesForDeploy>> | null
+	deployResources: PrepareConfigResourcesForDeployResult
+	wranglerConfig: WranglerConfig
+}
+
+function summarizeDeployResourceNames(resources: DeployResourceNames): string | null {
+	const segments = [
+		resources.kv.length > 0 ? `KV ${resources.kv.length}` : null,
+		resources.d1.length > 0 ? `D1 ${resources.d1.length}` : null,
+		resources.r2.length > 0 ? `R2 ${resources.r2.length}` : null,
+		resources.queues.length > 0 ? `Queues ${resources.queues.length}` : null,
+		resources.vectorize.length > 0 ? `Vectorize ${resources.vectorize.length}` : null,
+		resources.hyperdrive.length > 0 ? `Hyperdrive ${resources.hyperdrive.length}` : null
+	].filter((segment): segment is string => segment !== null)
+
+	return segments.length > 0 ? segments.join(' · ') : null
+}
+
+async function readDeployRedirectPath(filePath: string): Promise<string | null> {
+	const fs = await import('node:fs/promises')
+
+	try {
+		const rawConfig = await fs.readFile(filePath, 'utf-8')
+		const parsed = JSON.parse(rawConfig) as { configPath?: unknown }
+		if (typeof parsed.configPath !== 'string' || parsed.configPath.length === 0) {
+			return null
+		}
+
+		return resolve(dirname(filePath), parsed.configPath)
+	} catch {
+		return null
+	}
+}
+
+async function resolveBuildArtifactConfigPath(buildPath: string, cwd: string): Promise<string> {
+	const fs = await import('node:fs/promises')
+	const absoluteBuildPath = isAbsolute(buildPath)
+		? buildPath
+		: resolve(cwd, buildPath)
+
+	let stat
+	try {
+		stat = await fs.stat(absoluteBuildPath)
+	} catch {
+		throw new Error(`Could not find build artifact path: ${absoluteBuildPath}`)
+	}
+
+	if (stat.isFile()) {
+		if (basename(absoluteBuildPath) === 'config.json') {
+			const redirectedConfigPath = await readDeployRedirectPath(absoluteBuildPath)
+			if (!redirectedConfigPath) {
+				throw new Error(`Build redirect ${absoluteBuildPath} did not contain a valid configPath.`)
+			}
+
+			return redirectedConfigPath
+		}
+
+		return absoluteBuildPath
+	}
+
+	const candidates = [
+		resolve(absoluteBuildPath, 'wrangler.jsonc'),
+		resolve(absoluteBuildPath, '.wrangler', 'deploy', 'config.json'),
+		resolve(absoluteBuildPath, 'config.json'),
+		resolve(absoluteBuildPath, '.devflare', 'build', 'wrangler.jsonc')
+	]
+
+	for (const candidatePath of candidates) {
+		try {
+			const candidateStat = await fs.stat(candidatePath)
+			if (!candidateStat.isFile()) {
+				continue
+			}
+
+			if (basename(candidatePath) === 'config.json') {
+				const redirectedConfigPath = await readDeployRedirectPath(candidatePath)
+				if (redirectedConfigPath) {
+					return redirectedConfigPath
+				}
+				continue
+			}
+
+			return candidatePath
+		} catch {
+			// Try the next candidate.
+		}
+	}
+
+	throw new Error(
+		`Could not resolve a Wrangler build config from ${absoluteBuildPath}. Pass a .devflare/build directory, a generated wrangler.jsonc, or a .wrangler/deploy/config.json redirect.`
+	)
+}
+
+function withBuildArtifactPaths(
+	compiledConfig: WranglerConfig,
+	buildConfig: WranglerConfig
+): WranglerConfig {
+	return {
+		...compiledConfig,
+		...(buildConfig.main ? { main: buildConfig.main } : {}),
+		...(buildConfig.assets ? { assets: buildConfig.assets } : {})
+	}
+}
+
+async function prepareDeployConfig(options: {
+	cwd: string
+	configPath?: string
+	environment?: string
+	buildConfigPath: string
+	preview: boolean
+	branchName?: string
+}): Promise<PreparedDeployConfigResult> {
+	const rawConfig = await loadConfig({
+		cwd: options.cwd,
+		configFile: options.configPath
+	})
+	const previewScopedResources = options.environment === 'preview'
+		? await preparePreviewScopedResourcesForDeploy(rawConfig, {
+			environment: options.environment
+		})
+		: null
+	const deployResources = await prepareConfigResourcesForDeploy(
+		previewScopedResources?.config ?? rawConfig,
+		{
+			environment: options.environment,
+			accountId: previewScopedResources?.accountId,
+			cloudflare: previewScopedResources?.resourceResolutionCloudflare
+		}
+	)
+	const deploymentStrategy = applyDeploymentStrategy(deployResources.config, {
+		environment: options.environment,
+		preview: options.preview,
+		branchName: options.branchName,
+		previewBranch: process.env.DEVFLARE_PREVIEW_BRANCH
+	})
+	const buildWranglerConfig = await readWranglerConfig(options.buildConfigPath)
+	const wranglerConfig = withBuildArtifactPaths(
+		compileConfig(deploymentStrategy.config),
+		buildWranglerConfig
+	)
+
+	await writeWranglerConfig(
+		dirname(options.buildConfigPath),
+		wranglerConfig,
+		basename(options.buildConfigPath)
+	)
+
+	return {
+		config: deploymentStrategy.config,
+		deployConfigPath: options.buildConfigPath,
+		previewScopedResources,
+		deployResources,
+		wranglerConfig
+	}
 }
 
 async function getCurrentGitBranch(cwd: string): Promise<string | null> {
@@ -427,14 +598,17 @@ export async function runDeployCommand(
 		return await withTemporaryEnvironment(deployTarget.envOverrides, async () => {
 			resolvedPreviewScopeName = previewScopeName || process.env.DEVFLARE_PREVIEW_BRANCH?.trim() || undefined
 			if (dryRun) {
-				const config = await loadResolvedConfig({ cwd, configFile: configPath, environment })
-				const deploymentStrategy = applyDeploymentStrategy(config, {
-					environment,
-					preview,
-					branchName,
-					previewBranch: process.env.DEVFLARE_PREVIEW_BRANCH
-				})
-				const wranglerConfig = compileConfig(deploymentStrategy.config)
+				const config = await loadConfig({ cwd, configFile: configPath })
+				const deploymentStrategy = applyDeploymentStrategy(
+					resolveConfigForEnvironment(config, environment),
+					{
+						environment,
+						preview,
+						branchName,
+						previewBranch: process.env.DEVFLARE_PREVIEW_BRANCH
+					}
+				)
+				const wranglerConfig = compileBuildConfig(deploymentStrategy.config)
 
 				logLine(logger, `${yellow('dry run', theme)} ${dim('Skipping actual deployment', theme)}`)
 				const deploymentStrategyMessage = describeDeploymentStrategy(deploymentStrategy)
@@ -447,7 +621,55 @@ export async function runDeployCommand(
 			}
 
 			const deps = await getDependencies()
-			const prepared = await prepareBuildArtifacts(resolvedParsed, logger, options)
+			const requestedBuildPath = resolvedParsed.options.build as string | undefined
+			const buildConfigPath = requestedBuildPath
+				? await resolveBuildArtifactConfigPath(requestedBuildPath, cwd)
+				: (await prepareBuildArtifacts(resolvedParsed, logger, options)).deployConfigPath
+			const prepared = await prepareDeployConfig({
+				cwd,
+				configPath,
+				environment,
+				buildConfigPath,
+				preview,
+				branchName
+			})
+
+			const createdPreviewResourcesSummary = prepared.previewScopedResources
+				? summarizeDeployResourceNames(prepared.previewScopedResources.created)
+				: null
+			if (createdPreviewResourcesSummary) {
+				logLine(logger, `Provisioned preview-scoped resources: ${createdPreviewResourcesSummary}`)
+			}
+
+			const existingPreviewResourcesSummary = prepared.previewScopedResources
+				? summarizeDeployResourceNames(prepared.previewScopedResources.existing)
+				: null
+			if (existingPreviewResourcesSummary) {
+				logLine(logger, `Reused preview-scoped resources: ${existingPreviewResourcesSummary}`)
+			}
+
+			const createdDeployResourcesSummary = summarizeDeployResourceNames(prepared.deployResources.created)
+			if (createdDeployResourcesSummary) {
+				logLine(logger, `Provisioned deploy resources: ${createdDeployResourcesSummary}`)
+			}
+
+			const existingDeployResourcesSummary = summarizeDeployResourceNames(prepared.deployResources.existing)
+			if (existingDeployResourcesSummary) {
+				logLine(logger, `Reused deploy resources: ${existingDeployResourcesSummary}`)
+			}
+
+			for (const warning of prepared.previewScopedResources?.warnings ?? []) {
+				logger.warn(warning)
+			}
+
+			for (const warning of prepared.deployResources.warnings) {
+				logger.warn(warning)
+			}
+
+			if (requestedBuildPath) {
+				logLine(logger, `${dim('build', theme)} ${green(buildConfigPath, theme)}`)
+			}
+
 			logLine(logger, `${dim('worker', theme)} ${green(prepared.config.name, theme)}`)
 			const localWranglerExecutable = await resolveLocalWranglerExecutable(cwd, deps.fs)
 

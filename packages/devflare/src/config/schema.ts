@@ -13,6 +13,7 @@
 // =============================================================================
 
 import { z } from 'zod'
+import { normalizeCompatibilityFlags } from './compatibility'
 import {
 	rolldownConfigSchema,
 	viteConfigSchema
@@ -40,16 +41,14 @@ function getCurrentDate(): string {
 	return now.toISOString().split('T')[0]
 }
 
-/** Compatibility flags that are always enabled by devflare */
-const FORCED_COMPATIBILITY_FLAGS = ['nodejs_compat', 'nodejs_als']
-
 /**
- * Main devflare configuration schema.
+ * Raw Zod shape of the root devflare configuration (excluding the `env` field,
+ * which references back into this shape via the environment override schema).
  *
- * This is the complete schema for `devflare.config.ts` files.
- * Use `defineConfig()` for type-safe configuration with autocompletion.
+ * Exported so `schema-env.ts` can derive the environment override schema from
+ * the single source of truth without hand-listing every field.
  */
-const canonicalConfigSchema = z.object({
+export const rootConfigShape = {
 	/**
 	 * Worker name (required).
 	 * Used as the deployment target and in URLs.
@@ -74,10 +73,7 @@ const canonicalConfigSchema = z.object({
 	 * Compatibility flags to enable additional features.
 	 * @default ['nodejs_compat', 'nodejs_als'] (always included)
 	 */
-	compatibilityFlags: z.array(z.string()).optional().transform((flags = []) => {
-		const merged = new Set([...FORCED_COMPATIBILITY_FLAGS, ...flags])
-		return [...merged]
-	}),
+	compatibilityFlags: z.array(z.string()).optional().transform((flags = []) => normalizeCompatibilityFlags(flags)),
 
 	/** Preview-specific Devflare behavior. */
 	previews: previewsConfigSchema,
@@ -121,11 +117,20 @@ const canonicalConfigSchema = z.object({
 	/** Vite-related configuration namespace. */
 	vite: viteConfigSchema,
 
-	/** Environment-specific configuration overrides. */
-	env: z.record(z.string(), envConfigSchemaInner).optional(),
-
 	/** Wrangler passthrough for unsupported options. */
 	wrangler: wranglerConfigSchema
+} as const
+
+/**
+ * Main devflare configuration schema.
+ *
+ * This is the complete schema for `devflare.config.ts` files.
+ * Use `defineConfig()` for type-safe configuration with autocompletion.
+ */
+const canonicalConfigSchema = z.object({
+	...rootConfigShape,
+	/** Environment-specific configuration overrides. */
+	env: z.record(z.string(), envConfigSchemaInner).optional()
 })
 
 export const configSchema = canonicalConfigSchema.strict()

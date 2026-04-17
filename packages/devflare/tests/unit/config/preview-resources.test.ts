@@ -43,7 +43,7 @@ function createPreviewScopedResourceConfig(): DevflareConfig {
 				}
 			},
 			hyperdrive: {
-				POSTGRES: pv('testing-hyperdrive')
+				POSTGRES: { name: pv('testing-hyperdrive'), previewFallback: 'base' }
 			},
 			browser: {
 				BROWSER: pv('browser-renderer')
@@ -264,5 +264,30 @@ describe('preview-scoped resource lifecycle', () => {
 		].map((entry) => entry.replaceAll('"', '')))
 		expect(result.warnings.some((warning) => warning.includes('Analytics Engine'))).toBe(true)
 		expect(result.warnings.some((warning) => warning.includes('Browser Rendering'))).toBe(true)
+	})
+
+	test('throws when a preview Hyperdrive binding has no dedicated preview and no previewFallback opt-in', async () => {
+		const config: DevflareConfig = {
+			name: 'preview-hyperdrive-worker',
+			compatibilityDate: '2026-04-08',
+			bindings: {
+				hyperdrive: {
+					POSTGRES: pv('testing-hyperdrive')
+				}
+			}
+		}
+
+		await expect(
+			preparePreviewScopedResourcesForDeploy(config, {
+				environment: 'preview',
+				identifier: 'pr-7',
+				accountId: 'account-123',
+				cloudflare: {
+					listHyperdrives: async () => ([
+						{ id: 'hyperdrive-base', name: 'testing-hyperdrive' }
+					])
+				}
+			})
+		).rejects.toThrow(/previewFallback: 'base'/)
 	})
 })

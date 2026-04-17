@@ -15,10 +15,6 @@ export {
 	event,
 	locals
 } from './exports'
-export {
-	setLocalSendEmailBindings,
-	clearLocalSendEmailBindings
-} from '../utils/send-email'
 
 export type { EventContext } from './context'
 
@@ -84,6 +80,8 @@ export {
 	invokeFetchHandler,
 	createResolveFetch,
 	invokeFetchModule,
+	defineFetchHandler,
+	markResolveStyle,
 	type Awaitable,
 	type ResolveFetch,
 	type FetchMiddleware
@@ -107,3 +105,12 @@ export {
 	getDurableObjectOptions,
 	type DurableObjectOptions
 } from '../decorators'
+
+// Local sendEmail bindings (worker-safe: pure in-worker state; no Node imports)
+// Kept on the runtime barrel because the generated composed worker imports them
+// here and the runtime entry is the reliable resolution path inside bundled workers.
+export {
+	setLocalSendEmailBindings,
+	clearLocalSendEmailBindings,
+	type LocalSendEmailBindingConfig
+} from '../utils/send-email'

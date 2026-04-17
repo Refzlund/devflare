@@ -31,6 +31,25 @@ describe('configSchema', () => {
 			}
 		})
 
+			test('forces compatibility flags inside environment overrides', () => {
+				const result = configSchema.safeParse({
+					name: 'my-worker',
+					compatibilityDate: '2025-01-07',
+					env: {
+						preview: {
+							compatibilityFlags: ['url_standard']
+						}
+					}
+				})
+
+				expect(result.success).toBe(true)
+				if (result.success) {
+					expect(result.data.env?.preview?.compatibilityFlags).toContain('nodejs_compat')
+					expect(result.data.env?.preview?.compatibilityFlags).toContain('nodejs_als')
+					expect(result.data.env?.preview?.compatibilityFlags).toContain('url_standard')
+				}
+			})
+
 		test('accepts environment-specific vite and rolldown overrides', () => {
 			const result = configSchema.safeParse({
 				name: 'my-worker',

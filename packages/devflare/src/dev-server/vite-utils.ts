@@ -108,6 +108,34 @@ export async function detectViteProject(
 	}
 }
 
+export interface ResolvedViteMode {
+	/** Whether the dev server should actually start Vite for this cwd. */
+	enableVite: boolean
+	/** Resolved Vite config path, or null if none was found. */
+	viteConfigPath: string | null
+	/** The raw detection outcome for callers that want details. */
+	detection: ViteProjectDetection
+}
+
+/**
+ * Resolve the effective Vite mode for a project. Combines the caller's
+ * `requested` preference with the filesystem detection so that callers who ask
+ * for Vite but lack a local config are downgraded to worker-only mode rather
+ * than silently having the detection result ignored.
+ */
+export async function resolveViteMode(
+	cwd: string,
+	options: { requested?: boolean; fs?: ViteProjectFileSystem } = {}
+): Promise<ResolvedViteMode> {
+	const detection = await detectViteProject(cwd, options.fs)
+	const requested = options.requested ?? true
+	return {
+		enableVite: requested && detection.shouldStartVite,
+		viteConfigPath: detection.viteConfigPath,
+		detection
+	}
+}
+
 export function stripAnsi(value: string): string {
 	return value.replace(ANSI_REGEX, '')
 }

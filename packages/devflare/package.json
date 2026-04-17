@@ -3,49 +3,54 @@
 	"version": "1.0.0-next.16",
 	"description": "Devflare is a developer-first toolkit for Cloudflare Workers that sits on top of Miniflare and Wrangler-compatible config",
 	"type": "module",
-	"main": "./dist/src/index.js",
+	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
 	"exports": {
 		".": {
 			"types": "./dist/index.d.ts",
-			"browser": "./dist/src/browser.js",
-			"import": "./dist/src/index.js",
-			"default": "./dist/src/index.js"
+			"browser": "./dist/browser.js",
+			"import": "./dist/index.js",
+			"default": "./dist/index.js"
 		},
 		"./config": {
 			"types": "./dist/config-entry.d.ts",
-			"import": "./dist/src/config-entry.js",
-			"default": "./dist/src/config-entry.js"
+			"import": "./dist/config-entry.js",
+			"default": "./dist/config-entry.js"
 		},
 		"./runtime": {
 			"types": "./dist/runtime/index.d.ts",
-			"import": "./dist/src/runtime/index.js",
-			"default": "./dist/src/runtime/index.js"
+			"import": "./dist/runtime/index.js",
+			"default": "./dist/runtime/index.js"
 		},
 		"./test": {
 			"types": "./dist/test/index.d.ts",
-			"import": "./dist/src/test/index.js",
-			"default": "./dist/src/test/index.js"
+			"import": "./dist/test/index.js",
+			"default": "./dist/test/index.js"
 		},
 		"./vite": {
 			"types": "./dist/vite/index.d.ts",
-			"import": "./dist/src/vite/index.js",
-			"default": "./dist/src/vite/index.js"
+			"import": "./dist/vite/index.js",
+			"default": "./dist/vite/index.js"
 		},
 		"./sveltekit": {
 			"types": "./dist/sveltekit/index.d.ts",
-			"import": "./dist/src/sveltekit/index.js",
-			"default": "./dist/src/sveltekit/index.js"
+			"import": "./dist/sveltekit/index.js",
+			"default": "./dist/sveltekit/index.js"
 		},
 		"./cloudflare": {
 			"types": "./dist/cloudflare/index.d.ts",
-			"import": "./dist/src/cloudflare/index.js",
-			"default": "./dist/src/cloudflare/index.js"
+			"import": "./dist/cloudflare/index.js",
+			"default": "./dist/cloudflare/index.js"
 		},
 		"./decorators": {
 			"types": "./dist/decorators/index.d.ts",
-			"import": "./dist/src/decorators/index.js",
-			"default": "./dist/src/decorators/index.js"
+			"import": "./dist/decorators/index.js",
+			"default": "./dist/decorators/index.js"
+		},
+		"./internal/send-email": {
+			"types": "./dist/utils/send-email.d.ts",
+			"import": "./dist/utils/send-email.js",
+			"default": "./dist/utils/send-email.js"
 		}
 	},
 	"bin": {
@@ -58,7 +63,7 @@
 	],
 	"scripts": {
 		"llm:generate": "bun ./scripts/generate-llm.ts",
-		"build": "bun build ./src/index.ts ./src/browser.ts ./src/config-entry.ts ./src/cli/index.ts ./src/runtime/index.ts ./src/test/index.ts ./src/vite/index.ts ./src/sveltekit/index.ts ./src/cloudflare/index.ts ./src/decorators/index.ts --outdir ./dist --splitting --target node --packages=external && tsgo --declaration --emitDeclarationOnly --noEmit false --outDir ./dist",
+		"build": "bun build ./src/index.ts ./src/browser.ts ./src/config-entry.ts ./src/cli/index.ts ./src/runtime/index.ts ./src/test/index.ts ./src/vite/index.ts ./src/sveltekit/index.ts ./src/cloudflare/index.ts ./src/decorators/index.ts ./src/utils/send-email.ts --root ./src --outdir ./dist --splitting --target node --packages=external && tsgo --declaration --emitDeclarationOnly --noEmit false --outDir ./dist",
 		"dev": "bun --watch ./src/cli/index.ts",
 		"prepack": "bun run llm:generate",
 		"test": "bun test",
@@ -68,7 +73,6 @@
 		"check": "bun run typecheck"
 	},
 	"dependencies": {
-		"@cloudflare/workers-types": "^4.20250109.0",
 		"@puppeteer/browsers": "^2.10.3",
 		"c12": "^2.0.1",
 		"chokidar": "^4.0.3",
@@ -81,6 +85,7 @@
 		"globby": "^16.1.0",
 		"jsonc-parser": "^3.3.1",
 		"magic-string": "^0.30.17",
+		"miniflare": "^3.20250109.0",
 		"pathe": "^2.0.2",
 		"picomatch": "^4.0.3",
 		"puppeteer-core": "^24.5.0",
@@ -91,24 +96,32 @@
 	},
 	"devDependencies": {
 		"@cloudflare/vite-plugin": "^1.0.0",
+		"@cloudflare/workers-types": "^4.20250109.0",
 		"@types/bun": "^1.1.14",
 		"@types/picomatch": "^4.0.2",
 		"@types/ws": "^8.18.1",
-		"miniflare": "^3.20250109.0",
 		"typescript": "^5.7.2",
 		"vite": "^6.0.0"
 	},
 	"peerDependencies": {
 		"@cloudflare/vite-plugin": "^1.0.0",
+		"@cloudflare/workers-types": "^4.20250109.0",
 		"vite": "^6.0.0 || ^7.0.0 || ^8.0.0"
 	},
 	"peerDependenciesMeta": {
 		"@cloudflare/vite-plugin": {
 			"optional": true
 		},
+		"@cloudflare/workers-types": {
+			"optional": true
+		},
 		"vite": {
 			"optional": true
 		}
+	},
+	"engines": {
+		"node": ">=20",
+		"bun": ">=1.1"
 	},
 	"keywords": [
 		"cloudflare",

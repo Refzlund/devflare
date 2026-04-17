@@ -26,6 +26,316 @@ interface GeneratedDurableObjectExport {
 
 export interface PrepareComposedWorkerEntrypointOptions {
 	devInternalEmail?: boolean
+	includeDevOnlyHooks?: boolean
+}
+
+/**
+ * Minimal structured codegen helper used to emit the composed worker module.
+ * Each method appends a discrete "section" to the output; sections are joined
+ * by a single newline when rendered, which matches the shape previously
+ * produced by the hand-written template literal.
+ */
+class CodeBuilder {
+	private readonly sections: string[] = []
+
+	importStatement(specifiers: readonly string[], from: string): this {
+		this.sections.push(`import { ${specifiers.join(', ')} } from '${from}'`)
+		return this
+	}
+
+	importNamespace(identifier: string, from: string): this {
+		this.sections.push(`import * as ${identifier} from '${from}'`)
+		return this
+	}
+
+	reExport(names: readonly string[], from: string): this {
+		this.sections.push(`export { ${names.join(', ')} } from '${from}'`)
+		return this
+	}
+
+	constDeclaration(name: string, value: string): this {
+		this.sections.push(`const ${name} = ${value}`)
+		return this
+	}
+
+	classDeclaration(body: string): this {
+		this.sections.push(body)
+		return this
+	}
+
+	exportDefault(body: string): this {
+		this.sections.push(`export default ${body}`)
+		return this
+	}
+
+	raw(text: string): this {
+		this.sections.push(text)
+		return this
+	}
+
+	blank(): this {
+		this.sections.push('')
+		return this
+	}
+
+	toString(): string {
+		return this.sections.join('\n')
+	}
+}
+
+const DEV_ONLY_EMAIL_HOOKS_SOURCE = `
+function __devflareCreateEmailHeaders(rawBody) {
+	const headers = new Headers()
+	const lines = rawBody.split(/\\r?\\n/)
+
+	for (const line of lines) {
+		if (line.trim() === '') {
+			break
+		}
+
+		const colonIndex = line.indexOf(':')
+		if (colonIndex <= 0) {
+			continue
+		}
+
+		headers.append(line.slice(0, colonIndex).trim(), line.slice(colonIndex + 1).trim())
+	}
+
+	return headers
+}
+
+function __devflareCreateEmailRawStream(rawBody) {
+	return new ReadableStream({
+		start(controller) {
+			controller.enqueue(new TextEncoder().encode(rawBody))
+			controller.close()
+		}
+	})
+}
+
+async function __devflareHandleInternalEmail(request, env, ctx) {
+	if (!__devflareEmailHandler) {
+		return new Response('Email handler not configured', { status: 501 })
+	}
+
+	const from = request.headers.get('x-devflare-email-from') || 'unknown@example.com'
+	const to = request.headers.get('x-devflare-email-to') || 'worker@example.com'
+	const rawBody = await request.text()
+	const emailMessage = {
+		from,
+		to,
+		headers: __devflareCreateEmailHeaders(rawBody),
+		raw: __devflareCreateEmailRawStream(rawBody),
+		rawSize: rawBody.length,
+		setReject(reason) {
+			console.warn('[Devflare email rejected]', reason)
+		},
+		async forward(rcptTo) {
+			console.log('[Devflare email forwarded]', rcptTo)
+			return Promise.resolve()
+		},
+		async reply(message) {
+			console.log('[Devflare email reply sent]', message?.from)
+			return Promise.resolve()
+		}
+	}
+
+	const __devflareEvent = createEmailEvent(emailMessage, env, ctx)
+
+	await runWithEventContext(
+		__devflareEvent,
+		() => __devflareEmailHandler(__devflareEvent, env, ctx)
+	)
+
+	return new Response(JSON.stringify({ ok: true, from, to }), {
+		headers: { 'Content-Type': 'application/json' }
+	})
+}
+`
+
+function emitDevOnlyEmailHooks(builder: CodeBuilder, options: { enabled: boolean }): void {
+	if (!options.enabled) {
+		return
+	}
+
+	builder.raw(DEV_ONLY_EMAIL_HOOKS_SOURCE)
+}
+
+const RESOLVE_HANDLER_DECLARATION = `const __devflareResolveHandler = (module, namedExport) => {
+	const defaultExport = module.default
+
+	if (typeof defaultExport === 'function') {
+		return defaultExport
+	}
+
+	if (defaultExport && typeof defaultExport[namedExport] === 'function') {
+		return defaultExport[namedExport].bind(defaultExport)
+	}
+
+	if (typeof module[namedExport] === 'function') {
+		return module[namedExport]
+	}
+
+	return null
+}`
+
+function buildDefaultExportBody(options: {
+	hasFetchDispatch: boolean
+	includeDevOnlyHooks: boolean
+}): string {
+	const devOnlyEmailEntry = options.includeDevOnlyHooks
+		? `const url = new URL(request.url)
+
+				if (
+					request.headers.get('x-devflare-event') === 'email'
+					&& url.pathname === '/_devflare/internal/email'
+				) {
+					return __devflareHandleInternalEmail(request, env, ctx)
+				}
+
+				`
+		: ''
+
+	return `{
+	...(${options.hasFetchDispatch ? 'true' : 'false'}
+		? {
+			async fetch(request, env, ctx) {
+				${devOnlyEmailEntry}const __devflareInitialRouteMatch = __devflareHasRoutes ? matchFetchRoute(__devflareRoutes, request) : null
+				const __devflareEvent = createFetchEvent(request, env, ctx, {
+					params: __devflareInitialRouteMatch?.params ?? {}
+				})
+				return runWithEventContext(
+					__devflareEvent,
+					() => invokeFetchModule(
+						__devflareFetchModule,
+						__devflareEvent,
+						__devflareHasRoutes
+							? createRouteResolve(__devflareRoutes, __devflareEvent)
+							: undefined
+					)
+				)
+			}
+		}
+		: {}),
+	...(__devflareQueueHandler
+		? {
+			async queue(batch, env, ctx) {
+				const __devflareEvent = createQueueEvent(batch, env, ctx)
+				return runWithEventContext(
+					__devflareEvent,
+					() => __devflareQueueHandler(__devflareEvent, env, ctx)
+				)
+			}
+		}
+		: {}),
+	...(__devflareScheduledHandler
+		? {
+			async scheduled(controller, env, ctx) {
+				const __devflareEvent = createScheduledEvent(controller, env, ctx)
+				return runWithEventContext(
+					__devflareEvent,
+					() => __devflareScheduledHandler(__devflareEvent, env, ctx)
+				)
+			}
+		}
+		: {}),
+	...(__devflareEmailHandler
+		? {
+			async email(message, env, ctx) {
+				const __devflareEvent = createEmailEvent(message, env, ctx)
+				return runWithEventContext(
+					__devflareEvent,
+					() => __devflareEmailHandler(__devflareEvent, env, ctx)
+				)
+			}
+		}
+		: {})
+}`
+}
+
+function getComposedWorkerEntrypointSource(
+	surfaceImportPaths: WorkerSurfacePaths,
+	configuredLocalSendEmailBindings: Record<string, {
+		destinationAddress?: string
+		allowedDestinationAddresses?: string[]
+		allowedSenderAddresses?: string[]
+	}> = {},
+	durableObjectExports: readonly GeneratedDurableObjectExport[] = [],
+	routeImports: readonly GeneratedRouteModuleImport[] = [],
+	options: PrepareComposedWorkerEntrypointOptions = {}
+): string {
+	const includeDevOnlyHooks = options.includeDevOnlyHooks ?? options.devInternalEmail === true
+
+	const importsBuilder = new CodeBuilder()
+	importsBuilder.importStatement(
+		[
+			'createEmailEvent',
+			'createFetchEvent',
+			'createQueueEvent',
+			'createRouteResolve',
+			'createScheduledEvent',
+			'invokeFetchModule',
+			'matchFetchRoute',
+			'runWithEventContext',
+			'setLocalSendEmailBindings'
+		],
+		'devflare/runtime'
+	)
+
+	const fallbackModules: Array<{ identifier: string, importPath: string | null }> = [
+		{ identifier: '__devflareFetchModule', importPath: surfaceImportPaths.fetch },
+		{ identifier: '__devflareQueueModule', importPath: surfaceImportPaths.queue },
+		{ identifier: '__devflareScheduledModule', importPath: surfaceImportPaths.scheduled },
+		{ identifier: '__devflareEmailModule', importPath: surfaceImportPaths.email }
+	]
+
+	const fallbacksBuilder = new CodeBuilder()
+	for (const { identifier, importPath } of fallbackModules) {
+		if (importPath) {
+			importsBuilder.importNamespace(identifier, importPath)
+		} else {
+			fallbacksBuilder.constDeclaration(identifier, '{}')
+		}
+	}
+
+	for (const routeImport of routeImports) {
+		importsBuilder.importNamespace(routeImport.identifier, routeImport.importPath)
+	}
+
+	const reExportsBuilder = new CodeBuilder()
+	for (const { classNames, importPath } of durableObjectExports) {
+		reExportsBuilder.reExport(classNames, importPath)
+	}
+
+	const routeManifestEntries = routeImports.map(({ identifier, filePath, routePath, segmentsJson }) => {
+		return `\t{ filePath: ${JSON.stringify(filePath)}, routePath: ${JSON.stringify(routePath)}, segments: ${segmentsJson}, module: ${identifier} }`
+	})
+
+	const builder = new CodeBuilder()
+	builder.raw(importsBuilder.toString())
+	builder.raw(fallbacksBuilder.toString())
+	builder.raw(reExportsBuilder.toString())
+	builder.blank()
+	builder.raw(`setLocalSendEmailBindings(${JSON.stringify(configuredLocalSendEmailBindings)})`)
+	builder.blank()
+	builder.constDeclaration('__devflareHasFetchModule', surfaceImportPaths.fetch ? 'true' : 'false')
+	builder.raw(`const __devflareRoutes = [\n${routeManifestEntries.join(',\n')}\n]`)
+	builder.constDeclaration('__devflareHasRoutes', '__devflareRoutes.length > 0')
+	builder.blank()
+	builder.raw(RESOLVE_HANDLER_DECLARATION)
+	builder.blank()
+	builder.constDeclaration('__devflareQueueHandler', "__devflareResolveHandler(__devflareQueueModule, 'queue')")
+	builder.constDeclaration('__devflareScheduledHandler', "__devflareResolveHandler(__devflareScheduledModule, 'scheduled')")
+	builder.constDeclaration('__devflareEmailHandler', "__devflareResolveHandler(__devflareEmailModule, 'email')")
+	emitDevOnlyEmailHooks(builder, { enabled: includeDevOnlyHooks })
+	builder.blank()
+	builder.exportDefault(buildDefaultExportBody({
+		hasFetchDispatch: Boolean(surfaceImportPaths.fetch) || routeImports.length > 0 || includeDevOnlyHooks,
+		includeDevOnlyHooks
+	}))
+	builder.raw('')
+
+	return builder.toString()
 }
 
 function toImportSpecifier(fromFilePath: string, toFilePath: string): string {
@@ -145,219 +455,6 @@ function needsComposedWorkerEntrypoint(
 	return Boolean(
 		surfacePaths.fetch
 	)
-}
-
-function getComposedWorkerEntrypointSource(
-	surfaceImportPaths: WorkerSurfacePaths,
-	configuredLocalSendEmailBindings: Record<string, {
-		destinationAddress?: string
-		allowedDestinationAddresses?: string[]
-		allowedSenderAddresses?: string[]
-	}> = {},
-	durableObjectExports: readonly GeneratedDurableObjectExport[] = [],
-	routeImports: readonly GeneratedRouteModuleImport[] = [],
-	options: PrepareComposedWorkerEntrypointOptions = {}
-): string {
-	const importLines = [`import { createEmailEvent, createFetchEvent, createQueueEvent, createRouteResolve, createScheduledEvent, invokeFetchModule, matchFetchRoute, runWithEventContext, setLocalSendEmailBindings } from 'devflare/runtime'`]
-	const moduleFallbackLines: string[] = []
-	const durableObjectExportLines = durableObjectExports.map(({ classNames, importPath }) => `export { ${classNames.join(', ')} } from '${importPath}'`)
-	const localSendEmailBindings = JSON.stringify(configuredLocalSendEmailBindings)
-	const routeManifestEntries = routeImports.map(({ identifier, filePath, routePath, segmentsJson }) => {
-		return `\t{ filePath: ${JSON.stringify(filePath)}, routePath: ${JSON.stringify(routePath)}, segments: ${segmentsJson}, module: ${identifier} }`
-	})
-
-	const registerSurfaceModule = (identifier: string, importPath: string | null) => {
-		if (importPath) {
-			importLines.push(`import * as ${identifier} from '${importPath}'`)
-			return
-		}
-
-		moduleFallbackLines.push(`const ${identifier} = {}`)
-	}
-
-	registerSurfaceModule('__devflareFetchModule', surfaceImportPaths.fetch)
-	registerSurfaceModule('__devflareQueueModule', surfaceImportPaths.queue)
-	registerSurfaceModule('__devflareScheduledModule', surfaceImportPaths.scheduled)
-	registerSurfaceModule('__devflareEmailModule', surfaceImportPaths.email)
-
-	for (const routeImport of routeImports) {
-		importLines.push(`import * as ${routeImport.identifier} from '${routeImport.importPath}'`)
-	}
-
-	const includeDevInternalEmail = options.devInternalEmail === true
-	const devInternalEmailHelpers = includeDevInternalEmail
-		? `
-function __devflareCreateEmailHeaders(rawBody) {
-	const headers = new Headers()
-	const lines = rawBody.split(/\\r?\\n/)
-
-	for (const line of lines) {
-		if (line.trim() === '') {
-			break
-		}
-
-		const colonIndex = line.indexOf(':')
-		if (colonIndex <= 0) {
-			continue
-		}
-
-		headers.append(line.slice(0, colonIndex).trim(), line.slice(colonIndex + 1).trim())
-	}
-
-	return headers
-}
-
-function __devflareCreateEmailRawStream(rawBody) {
-	return new ReadableStream({
-		start(controller) {
-			controller.enqueue(new TextEncoder().encode(rawBody))
-			controller.close()
-		}
-	})
-}
-
-async function __devflareHandleInternalEmail(request, env, ctx) {
-	if (!__devflareEmailHandler) {
-		return new Response('Email handler not configured', { status: 501 })
-	}
-
-	const from = request.headers.get('x-devflare-email-from') || 'unknown@example.com'
-	const to = request.headers.get('x-devflare-email-to') || 'worker@example.com'
-	const rawBody = await request.text()
-	const emailMessage = {
-		from,
-		to,
-		headers: __devflareCreateEmailHeaders(rawBody),
-		raw: __devflareCreateEmailRawStream(rawBody),
-		rawSize: rawBody.length,
-		setReject(reason) {
-			console.warn('[Devflare email rejected]', reason)
-		},
-		async forward(rcptTo) {
-			console.log('[Devflare email forwarded]', rcptTo)
-			return Promise.resolve()
-		},
-		async reply(message) {
-			console.log('[Devflare email reply sent]', message?.from)
-			return Promise.resolve()
-		}
-	}
-
-	const __devflareEvent = createEmailEvent(emailMessage, env, ctx)
-
-	await runWithEventContext(
-		__devflareEvent,
-		() => __devflareEmailHandler(__devflareEvent, env, ctx)
-	)
-
-	return new Response(JSON.stringify({ ok: true, from, to }), {
-		headers: { 'Content-Type': 'application/json' }
-	})
-}
-`
-		: ''
-
-	return `
-${importLines.join('\n')}
-${moduleFallbackLines.join('\n')}
-${durableObjectExportLines.join('\n')}
-
-setLocalSendEmailBindings(${localSendEmailBindings})
-
-const __devflareHasFetchModule = ${surfaceImportPaths.fetch ? 'true' : 'false'}
-const __devflareRoutes = [
-${routeManifestEntries.join(',\n')}
-]
-const __devflareHasRoutes = __devflareRoutes.length > 0
-
-const __devflareResolveHandler = (module, namedExport) => {
-	const defaultExport = module.default
-
-	if (typeof defaultExport === 'function') {
-		return defaultExport
-	}
-
-	if (defaultExport && typeof defaultExport[namedExport] === 'function') {
-		return defaultExport[namedExport].bind(defaultExport)
-	}
-
-	if (typeof module[namedExport] === 'function') {
-		return module[namedExport]
-	}
-
-	return null
-}
-
-const __devflareQueueHandler = __devflareResolveHandler(__devflareQueueModule, 'queue')
-const __devflareScheduledHandler = __devflareResolveHandler(__devflareScheduledModule, 'scheduled')
-const __devflareEmailHandler = __devflareResolveHandler(__devflareEmailModule, 'email')
-${devInternalEmailHelpers}
-
-export default {
-	...(${surfaceImportPaths.fetch || routeImports.length > 0 || includeDevInternalEmail ? 'true' : 'false'}
-		? {
-			async fetch(request, env, ctx) {
-				${includeDevInternalEmail ? `const url = new URL(request.url)
-
-				if (
-					request.headers.get('x-devflare-event') === 'email'
-					&& url.pathname === '/_devflare/internal/email'
-				) {
-					return __devflareHandleInternalEmail(request, env, ctx)
-				}
-
-				` : ''}const __devflareInitialRouteMatch = __devflareHasRoutes ? matchFetchRoute(__devflareRoutes, request) : null
-				const __devflareEvent = createFetchEvent(request, env, ctx, {
-					params: __devflareInitialRouteMatch?.params ?? {}
-				})
-				return runWithEventContext(
-					__devflareEvent,
-					() => invokeFetchModule(
-						__devflareFetchModule,
-						__devflareEvent,
-						__devflareHasRoutes
-							? createRouteResolve(__devflareRoutes, __devflareEvent)
-							: undefined
-					)
-				)
-			}
-		}
-		: {}),
-	...(__devflareQueueHandler
-		? {
-			async queue(batch, env, ctx) {
-				const __devflareEvent = createQueueEvent(batch, env, ctx)
-				return runWithEventContext(
-					__devflareEvent,
-					() => __devflareQueueHandler(__devflareEvent, env, ctx)
-				)
-			}
-		}
-		: {}),
-	...(__devflareScheduledHandler
-		? {
-			async scheduled(controller, env, ctx) {
-				const __devflareEvent = createScheduledEvent(controller, env, ctx)
-				return runWithEventContext(
-					__devflareEvent,
-					() => __devflareScheduledHandler(__devflareEvent, env, ctx)
-				)
-			}
-		}
-		: {}),
-	...(__devflareEmailHandler
-		? {
-			async email(message, env, ctx) {
-				const __devflareEvent = createEmailEvent(message, env, ctx)
-				return runWithEventContext(
-					__devflareEvent,
-					() => __devflareEmailHandler(__devflareEvent, env, ctx)
-				)
-			}
-		}
-		: {})
-}
-`.trimStart()
 }
 
 export async function prepareComposedWorkerEntrypoint(

@@ -58,7 +58,7 @@ export interface ProcessRunner {
 	spawn(
 		command: string,
 		args?: string[],
-		options?: { cwd?: string; stdio?: any; env?: NodeJS.ProcessEnv }
+		options?: { cwd?: string; stdio?: any; env?: NodeJS.ProcessEnv; shell?: boolean }
 	): SpawnedProcess
 }
 
@@ -93,11 +93,14 @@ export async function createRealDependencies(): Promise<CliDependencies> {
 				}
 			},
 			spawn: (command, args = [], options = {}) => {
+				// Note: `shell` defaults to false. Callers that legitimately need shell
+				// interpretation (rare) must opt in by passing `shell: true` explicitly.
+				// Passing shell:true with untrusted input is a command-injection risk.
 				const child = spawn(command, args, {
 					cwd: options.cwd,
 					stdio: options.stdio ?? 'pipe',
 					env: options.env,
-					shell: true
+					shell: options.shell ?? false
 				})
 				// Create wrapper with getter for killed property
 				const wrapper: SpawnedProcess = {

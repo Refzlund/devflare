@@ -139,7 +139,18 @@ export const hyperdriveBindingByIdSchema = z.object({
 
 export const hyperdriveBindingByNameSchema = z.object({
 	/** Stable Hyperdrive configuration name to resolve to an ID at config/build/deploy time */
-	name: z.string()
+	name: z.string(),
+	/**
+	 * Opt-in fallback behavior for preview-scoped Hyperdrive bindings.
+	 * When set to `'base'`, Devflare is permitted to reuse the base Hyperdrive
+	 * configuration if no dedicated preview Hyperdrive exists in the account.
+	 * When omitted, missing preview Hyperdrives cause a config-resolution error.
+	 */
+	previewFallback: z.literal('base').optional(),
+	/** Explicit dedicated preview Hyperdrive configuration ID */
+	previewId: z.string().optional(),
+	/** Explicit local connection string used for preview/dev runs */
+	previewLocalConnectionString: z.string().optional()
 }).strict()
 
 export const hyperdriveBindingSchema = z.union([

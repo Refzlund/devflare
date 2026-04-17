@@ -38,6 +38,12 @@ export interface PreviewScopedResourceRef {
 	bindingName?: string
 	baseName: string
 	previewName: string
+	/**
+	 * Hyperdrive-only: the binding explicitly opted in to reusing the base
+	 * Hyperdrive configuration when no preview Hyperdrive exists in the
+	 * account (via `previewFallback: 'base'` on the binding).
+	 */
+	allowBaseFallback?: boolean
 }
 
 export interface PreviewScopedResourcePlan {
@@ -231,10 +237,14 @@ function applyHyperdriveBindingFallbacks(
 			hyperdrive: Object.fromEntries(
 				Object.entries(config.bindings.hyperdrive).map(([bindingName, bindingConfig]) => {
 					const fallbackName = hyperdriveBindingFallbacks[bindingName]
-					if (!fallbackName || typeof bindingConfig !== 'string') {
+					if (!fallbackName) {
 						return [bindingName, bindingConfig]
 					}
 
+					// Collapse any form (string or object) to the base-config
+					// string once the binding has been resolved to the base
+					// Hyperdrive. Object-form bindings carry preview opt-in
+					// metadata that no longer applies post-resolution.
 					return [bindingName, fallbackName]
 				})
 			)
@@ -440,9 +450,22 @@ export function collectPreviewScopedResourcePlan(
 	if (bindings.hyperdrive) {
 		plan.hyperdrive = Object.entries(bindings.hyperdrive)
 			.map(([bindingName, bindingConfig]) => {
-				return typeof bindingConfig === 'string'
-					? createPreviewScopedResourceRef(bindingConfig, bindingName, options)
-					: null
+				if (typeof bindingConfig === 'string') {
+					return createPreviewScopedResourceRef(bindingConfig, bindingName, options)
+				}
+				if (
+					bindingConfig
+					&& typeof bindingConfig === 'object'
+					&& 'name' in bindingConfig
+					&& typeof bindingConfig.name === 'string'
+				) {
+					const ref = createPreviewScopedResourceRef(bindingConfig.name, bindingName, options)
+					if (ref && (bindingConfig as { previewFallback?: unknown }).previewFallback === 'base') {
+						ref.allowBaseFallback = true
+					}
+					return ref
+				}
+				return null
 			})
 			.filter((ref): ref is PreviewScopedResourceRef => ref !== null)
 	}
@@ -576,6 +599,15 @@ export async function preparePreviewScopedResourcesForDeploy(
 		if (!findHyperdriveByName(hyperdrives, ref.baseName)) {
 			throw new Error(
 				`Could not resolve preview Hyperdrive "${ref.previewName}" because neither the preview config nor the base config "${ref.baseName}" exists in this account.`
+			)
+		}
+
+		if (!ref.allowBaseFallback) {
+			const bindingLabel = ref.bindingName ? `"${ref.bindingName}"` : `for preview name "${ref.previewName}"`
+			throw new Error(
+				`Preview Hyperdrive binding ${bindingLabel} has no dedicated preview Hyperdrive configuration "${ref.previewName}" in this account. `
+				+ 'Either provision a dedicated preview Hyperdrive (or set `previewId` / `previewLocalConnectionString` on the binding), '
+				+ "or opt in to reusing the base Hyperdrive by setting `previewFallback: 'base'` on the binding."
 			)
 		}
 
