@@ -254,4 +254,119 @@ describe('runD1Migrations', () => {
 			'CREATE TABLE second (id INTEGER)'
 		])
 	})
+
+	test('ledger first-run: sends files with sha256 and marks all as applied', async () => {
+		const projectDir = createProjectWithMigration('CREATE TABLE demo (id INTEGER PRIMARY KEY);')
+
+		const calls: Array<{ bindingName: string; files?: Array<{ filename: string; sha256: string; statements: string[] }> }> = []
+		globalThis.fetch = mock(async (_input: unknown, init?: RequestInit) => {
+			const body = JSON.parse(String(init?.body ?? '{}'))
+			calls.push(body)
+			return new Response(
+				JSON.stringify({
+					success: true,
+					applied: body.files?.map((f: { filename: string }) => f.filename) ?? [],
+					skipped: [],
+					warnings: []
+				}),
+				{ status: 200, headers: { 'Content-Type': 'application/json' } }
+			)
+		}) as unknown as typeof fetch
+
+		await runD1Migrations({
+			cwd: projectDir,
+			config: {
+				name: 'demo-worker',
+				compatibilityDate: '2026-04-12',
+				bindings: { d1: { DB: 'demo-db' } }
+			} as never,
+			miniflarePort: 8787
+		})
+
+		expect(calls).toHaveLength(1)
+		expect(calls[0]?.files).toHaveLength(1)
+		expect(calls[0]?.files?.[0]?.filename).toBe('001_init.sql')
+		expect(typeof calls[0]?.files?.[0]?.sha256).toBe('string')
+		expect((calls[0]?.files?.[0]?.sha256 ?? '').length).toBe(64)
+		expect(calls[0]?.files?.[0]?.statements).toEqual(['CREATE TABLE demo (id INTEGER PRIMARY KEY)'])
+	})
+
+	test('ledger second-run with same content: gateway reports all skipped, no warnings', async () => {
+		const projectDir = createProjectWithMigration('CREATE TABLE demo (id INTEGER PRIMARY KEY);')
+		const warnSpy = mock(() => {})
+		const originalWarn = console.warn
+		console.warn = warnSpy as unknown as typeof console.warn
+
+		try {
+			globalThis.fetch = mock(async (_input: unknown, init?: RequestInit) => {
+				const body = JSON.parse(String(init?.body ?? '{}'))
+				return new Response(
+					JSON.stringify({
+						success: true,
+						applied: [],
+						skipped: body.files?.map((f: { filename: string }) => f.filename) ?? [],
+						warnings: []
+					}),
+					{ status: 200, headers: { 'Content-Type': 'application/json' } }
+				)
+			}) as unknown as typeof fetch
+
+			await runD1Migrations({
+				cwd: projectDir,
+				config: {
+					name: 'demo-worker',
+					compatibilityDate: '2026-04-12',
+					bindings: { d1: { DB: 'demo-db' } }
+				} as never,
+				miniflarePort: 8787
+			})
+
+			expect(warnSpy).toHaveBeenCalledTimes(0)
+		} finally {
+			console.warn = originalWarn
+		}
+	})
+
+	test('ledger second-run with changed content: emits console.warn and does not re-apply', async () => {
+		const projectDir = createProjectWithMigration('CREATE TABLE demo (id INTEGER, added TEXT);')
+		const warnSpy = mock(() => {})
+		const originalWarn = console.warn
+		console.warn = warnSpy as unknown as typeof console.warn
+
+		try {
+			globalThis.fetch = mock(async (_input: unknown, init?: RequestInit) => {
+				const body = JSON.parse(String(init?.body ?? '{}'))
+				const filenames = body.files?.map((f: { filename: string }) => f.filename) ?? []
+				return new Response(
+					JSON.stringify({
+						success: true,
+						applied: [],
+						skipped: filenames,
+						warnings: filenames.map((filename: string) => ({
+							filename,
+							message: 'sha256 drifted since last apply; skipped'
+						}))
+					}),
+					{ status: 200, headers: { 'Content-Type': 'application/json' } }
+				)
+			}) as unknown as typeof fetch
+
+			await runD1Migrations({
+				cwd: projectDir,
+				config: {
+					name: 'demo-worker',
+					compatibilityDate: '2026-04-12',
+					bindings: { d1: { DB: 'demo-db' } }
+				} as never,
+				miniflarePort: 8787
+			})
+
+			expect(warnSpy).toHaveBeenCalledTimes(1)
+			const warnArgs = (warnSpy as unknown as { mock: { calls: unknown[][] } }).mock.calls[0]
+			expect(String(warnArgs?.[0] ?? '')).toContain('001_init.sql')
+			expect(String(warnArgs?.[0] ?? '')).toContain('changed')
+		} finally {
+			console.warn = originalWarn
+		}
+	})
 })

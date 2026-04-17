@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import {
 	filterDevflareManagedTokens,
+	matchesKnownPermissionGroup,
 	normalizeDevflareTokenName,
 	selectAllReusablePermissionGroups,
 	selectDevflarePermissionGroups,
@@ -181,5 +182,96 @@ describe('selectDevflarePermissionGroups', () => {
 		])
 
 		expect(filtered.map((token) => token.id)).toEqual(['token_1'])
+	})
+})
+
+describe('matchesKnownPermissionGroup', () => {
+	test('prefers id match over display name and falls back to exact display-name match with warning', () => {
+		const knownIds = {
+			WORKERS_SCRIPTS_WRITE: 'verified-workers-scripts-write-id',
+			WORKERS_SCRIPTS_READ: undefined,
+			ACCOUNT_SETTINGS_READ: undefined,
+			WORKERS_KV_STORAGE_WRITE: undefined,
+			WORKERS_KV_STORAGE_READ: undefined,
+			ACCOUNT_API_TOKENS_WRITE: undefined,
+			ACCOUNT_API_TOKENS_READ: undefined
+		}
+		const knownDisplayNames = {
+			WORKERS_SCRIPTS_WRITE: 'Workers Scripts Write',
+			WORKERS_SCRIPTS_READ: 'Workers Scripts Read',
+			ACCOUNT_SETTINGS_READ: 'Account Settings Read',
+			WORKERS_KV_STORAGE_WRITE: 'Workers KV Storage Write',
+			WORKERS_KV_STORAGE_READ: 'Workers KV Storage Read',
+			ACCOUNT_API_TOKENS_WRITE: 'Account API Tokens Write',
+			ACCOUNT_API_TOKENS_READ: 'Account API Tokens Read'
+		}
+
+		const permissionsList = [
+			// id-matched — display name deliberately different / renamed
+			{
+				id: 'verified-workers-scripts-write-id',
+				name: 'Workers Scripts: Write (renamed by Cloudflare)',
+				scopes: ['com.cloudflare.api.account']
+			},
+			// display-name-matched — id not in the known map
+			{
+				id: 'some-unrelated-id-for-read',
+				name: 'Workers Scripts Read',
+				scopes: ['com.cloudflare.api.account']
+			},
+			// should NOT match either — substring-only name
+			{
+				id: 'unrelated',
+				name: 'Workers Scripts Write Delegated',
+				scopes: ['com.cloudflare.api.account']
+			},
+			// should NOT match — wrong id and wrong name
+			{
+				id: 'other',
+				name: 'Some Other Group',
+				scopes: ['com.cloudflare.api.account']
+			}
+		]
+
+		const warnCalls: string[] = []
+		const originalWarn = console.warn
+		console.warn = (...args: unknown[]) => {
+			warnCalls.push(args.map(String).join(' '))
+		}
+
+		try {
+			const writeMatches = permissionsList.filter((group) =>
+				matchesKnownPermissionGroup('WORKERS_SCRIPTS_WRITE', group, {
+					knownIds,
+					knownDisplayNames
+				})
+			)
+			const readMatches = permissionsList.filter((group) =>
+				matchesKnownPermissionGroup('WORKERS_SCRIPTS_READ', group, {
+					knownIds,
+					knownDisplayNames
+				})
+			)
+
+			// Id-matched: matches only the exact id, even though the display name drifted
+			expect(writeMatches.map((group) => group.id)).toEqual([
+				'verified-workers-scripts-write-id'
+			])
+			// Display-name fallback: matches ONLY the exact name, not substrings
+			expect(readMatches.map((group) => group.id)).toEqual([
+				'some-unrelated-id-for-read'
+			])
+
+			// No warning for id-matched path
+			expect(
+				warnCalls.some((message) => message.includes('WORKERS_SCRIPTS_WRITE'))
+			).toBe(false)
+			// Warning emitted for display-name fallback path
+			expect(
+				warnCalls.some((message) => message.includes('WORKERS_SCRIPTS_READ'))
+			).toBe(true)
+		} finally {
+			console.warn = originalWarn
+		}
 	})
 })

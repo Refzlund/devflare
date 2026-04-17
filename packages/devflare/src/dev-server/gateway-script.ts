@@ -86,13 +86,95 @@ export default {
 
 async function handleMigration(request, env) {
 	try {
-		const { bindingName, statements } = await request.json()
-		log('Migration request for binding:', bindingName, 'statements count:', statements?.length, 'bindings:', Object.keys(env))
+		const { bindingName, statements, files } = await request.json()
+		log('Migration request for binding:', bindingName, 'statements count:', statements?.length, 'files:', files?.length, 'bindings:', Object.keys(env))
 		const db = env[bindingName]
 		if (!db) {
 			return Response.json({ error: 'Binding not found: ' + bindingName }, { status: 404 })
 		}
 
+		// Ledger-aware path: when the client sends per-file metadata, we track
+		// applied migrations in a \`_devflare_migrations\` table and skip files
+		// whose filename+sha256 is already recorded. Files with a drifting hash
+		// are reported as warnings and skipped — we refuse to re-apply to avoid
+		// stomping on user data.
+		if (Array.isArray(files) && files.length > 0) {
+			try {
+				await db.prepare(
+					'CREATE TABLE IF NOT EXISTS _devflare_migrations (filename TEXT PRIMARY KEY, applied_at TEXT NOT NULL, sha256 TEXT NOT NULL)'
+				).run()
+			} catch (error) {
+				const msg = error?.message || String(error)
+				log('Failed to ensure migration ledger:', msg)
+				return Response.json({ error: 'Failed to ensure migration ledger: ' + msg }, { status: 500 })
+			}
+
+			let ledgerRows = []
+			try {
+				const ledger = await db.prepare('SELECT filename, sha256 FROM _devflare_migrations').all()
+				ledgerRows = ledger?.results || []
+			} catch (error) {
+				log('Failed to read migration ledger:', error?.message || String(error))
+			}
+			const ledgerByFilename = new Map()
+			for (const row of ledgerRows) {
+				ledgerByFilename.set(row.filename, row.sha256)
+			}
+
+			const applied = []
+			const skipped = []
+			const warnings = []
+			const results = []
+
+			for (const file of files) {
+				const existingHash = ledgerByFilename.get(file.filename)
+				if (existingHash === file.sha256) {
+					skipped.push(file.filename)
+					continue
+				}
+				if (existingHash && existingHash !== file.sha256) {
+					warnings.push({
+						filename: file.filename,
+						message: 'sha256 drifted since last apply; skipped'
+					})
+					skipped.push(file.filename)
+					continue
+				}
+
+				let fileFailed = false
+				for (const sql of file.statements || []) {
+					try {
+						log('Running migration SQL:', sql.slice(0, 80))
+						await db.prepare(sql).run()
+						results.push({ sql: sql.slice(0, 50), success: true })
+					} catch (error) {
+						const msg = error?.message || String(error)
+						log('Migration SQL error:', msg)
+						if (msg.includes('already exists')) {
+							results.push({ sql: sql.slice(0, 50), success: true, skipped: true })
+						} else {
+							results.push({ sql: sql.slice(0, 50), success: false, error: msg })
+							fileFailed = true
+						}
+					}
+				}
+
+				if (!fileFailed) {
+					try {
+						await db.prepare(
+							'INSERT OR REPLACE INTO _devflare_migrations (filename, applied_at, sha256) VALUES (?, ?, ?)'
+						).bind(file.filename, new Date().toISOString(), file.sha256).run()
+						applied.push(file.filename)
+					} catch (error) {
+						log('Failed to record migration in ledger:', error?.message || String(error))
+					}
+				}
+			}
+
+			return Response.json({ success: true, results, applied, skipped, warnings })
+		}
+
+		// Legacy path: flat statement list, no ledger tracking.
 		const results = []
 		for (const sql of statements) {
 			try {

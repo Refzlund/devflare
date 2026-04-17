@@ -44,7 +44,7 @@ type ConfigResourceResolutionErrorArgs = ConstructorParameters<ConfigModule['Con
 
 function createUnsupportedApiError(name: string): Error {
 	return new Error(
-		`${name} is not available in worker/browser bundles. Import it from the Node-side devflare package entry instead.`
+		`${name} is not available in browser environments; import from devflare/test or devflare/runtime in a worker/Node context instead.`
 	)
 }
 
@@ -54,20 +54,23 @@ function unsupportedFunction<TFunction>(name: string): TFunction {
 	}) as unknown as TFunction
 }
 
+// Proxy that refuses ALL forms of introspection. Earlier revisions returned an
+// empty object shape (has()=false, ownKeys()=[]) which lied about the absence
+// of features — feature-detection code could conclude the export was simply an
+// empty module rather than unavailable. Every trap now throws explicitly.
 function createUnsupportedObject<T extends object>(name: string): T {
+	const fail = (): never => {
+		throw createUnsupportedApiError(name)
+	}
 	return new Proxy({} as T, {
-		get() {
-			throw createUnsupportedApiError(name)
-		},
-		has() {
-			return false
-		},
-		ownKeys() {
-			return []
-		},
-		getOwnPropertyDescriptor() {
-			return undefined
-		}
+		get: fail,
+		has: fail,
+		ownKeys: fail,
+		getOwnPropertyDescriptor: fail,
+		set: fail,
+		defineProperty: fail,
+		deleteProperty: fail,
+		getPrototypeOf: fail
 	})
 }
 

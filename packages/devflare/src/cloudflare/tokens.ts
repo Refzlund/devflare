@@ -27,6 +27,96 @@ const DEVFLARE_PERMISSION_GROUP_NAME_PATTERNS = [
 	/^Workers /i
 ] as const
 
+/**
+ * Symbolic names for individual Cloudflare permission groups we care about
+ * when reasoning about a Devflare token policy. Stable ids (when known)
+ * should be preferred over display names, which Cloudflare is free to
+ * rename or localize at any time.
+ *
+ * Entries set to `undefined` have not been confidently verified against
+ * Cloudflare's public docs at authoring time and fall back to exact
+ * display-name matching via {@link KNOWN_PERMISSION_GROUP_DISPLAY_NAMES}.
+ * Replace with the real UUID returned by
+ * `GET /accounts/:id/tokens/permission_groups` when verified.
+ */
+export const KNOWN_PERMISSION_GROUP_IDS = {
+	// TODO: id not verified from Cloudflare public docs at authoring time.
+	WORKERS_SCRIPTS_WRITE: undefined,
+	// TODO: id not verified from Cloudflare public docs at authoring time.
+	WORKERS_SCRIPTS_READ: undefined,
+	// TODO: id not verified from Cloudflare public docs at authoring time.
+	ACCOUNT_SETTINGS_READ: undefined,
+	// TODO: id not verified from Cloudflare public docs at authoring time.
+	WORKERS_KV_STORAGE_WRITE: undefined,
+	// TODO: id not verified from Cloudflare public docs at authoring time.
+	WORKERS_KV_STORAGE_READ: undefined,
+	// TODO: id not verified from Cloudflare public docs at authoring time.
+	ACCOUNT_API_TOKENS_WRITE: undefined,
+	// TODO: id not verified from Cloudflare public docs at authoring time.
+	ACCOUNT_API_TOKENS_READ: undefined
+} satisfies Record<string, string | undefined>
+
+/**
+ * Canonical display names used for exact-match fallback when the
+ * corresponding id in {@link KNOWN_PERMISSION_GROUP_IDS} is not verified.
+ *
+ * Exact matches only — no substring / case-insensitive matching — so
+ * drift (e.g. Cloudflare adding a suffix or renaming) is caught rather
+ * than silently mis-matching.
+ */
+export const KNOWN_PERMISSION_GROUP_DISPLAY_NAMES: Record<
+	keyof typeof KNOWN_PERMISSION_GROUP_IDS,
+	string
+> = {
+	WORKERS_SCRIPTS_WRITE: 'Workers Scripts Write',
+	WORKERS_SCRIPTS_READ: 'Workers Scripts Read',
+	ACCOUNT_SETTINGS_READ: 'Account Settings Read',
+	WORKERS_KV_STORAGE_WRITE: 'Workers KV Storage Write',
+	WORKERS_KV_STORAGE_READ: 'Workers KV Storage Read',
+	ACCOUNT_API_TOKENS_WRITE: 'Account API Tokens Write',
+	ACCOUNT_API_TOKENS_READ: 'Account API Tokens Read'
+}
+
+export type KnownPermissionGroupName = keyof typeof KNOWN_PERMISSION_GROUP_IDS
+
+/**
+ * Match a Cloudflare permission group against a known symbolic name,
+ * preferring the stable id and falling back to an *exact* display-name
+ * match. Logs a `console.warn` on fallback so drift is visible in logs.
+ *
+ * The `options` hook exists so callers (and tests) can supply their own
+ * id / display-name tables without mutating the module-level maps.
+ */
+export function matchesKnownPermissionGroup(
+	symbolicName: KnownPermissionGroupName,
+	permissionGroup: Pick<AccountTokenPermissionGroup, 'id' | 'name'>,
+	options?: {
+		knownIds?: Record<string, string | undefined>
+		knownDisplayNames?: Record<string, string>
+	}
+): boolean {
+	const knownIds = options?.knownIds ?? KNOWN_PERMISSION_GROUP_IDS
+	const knownDisplayNames = options?.knownDisplayNames ?? KNOWN_PERMISSION_GROUP_DISPLAY_NAMES
+
+	const expectedId = knownIds[symbolicName]
+	if (typeof expectedId === 'string' && expectedId.length > 0) {
+		return permissionGroup.id === expectedId
+	}
+
+	const expectedName = knownDisplayNames[symbolicName]
+	if (typeof expectedName === 'string' && permissionGroup.name === expectedName) {
+		console.warn(
+			`[devflare] Matched Cloudflare permission group '${symbolicName}' by display name `
+				+ `('${expectedName}') because no verified id is configured. Cloudflare display `
+				+ 'names are unstable; please file an issue to add the permission-group id to '
+				+ 'KNOWN_PERMISSION_GROUP_IDS.'
+		)
+		return true
+	}
+
+	return false
+}
+
 // Cloudflare lets a bootstrap token manage API tokens, but it does not allow the
 // created sub-token to inherit token-management permissions. Devflare therefore
 // uses the bootstrap token for minting and excludes Account API Tokens permissions

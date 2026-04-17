@@ -42,6 +42,15 @@ export interface BrowserShimOptions {
 	keepAlive?: number
 	/** Custom cache directory for Chrome (default: ~/.devflare/chrome) */
 	cacheDir?: string
+	/**
+	 * Opt-in to launching Chrome with `--no-sandbox` / `--disable-setuid-sandbox`.
+	 *
+	 * Disabling the Chromium sandbox is a significant security regression: a
+	 * compromised page can access the host with the privileges of the process
+	 * running the browser. Only enable this in trusted CI containers or rootless
+	 * environments where the sandbox cannot start. Defaults to `false`.
+	 */
+	allowNoSandbox?: boolean
 }
 
 export interface BrowserShim {
@@ -75,6 +84,132 @@ interface ClosedSession {
 let cachedExecutablePath: string | null = null
 
 // -----------------------------------------------------------------------------
+// Chrome launch flags
+// -----------------------------------------------------------------------------
+
+/**
+ * Default Chrome flags used when launching headless Chrome for local
+ * browser-rendering emulation. Each flag is included for a deliberate reason;
+ * edit cautiously.
+ *
+ * NOTE: `--no-sandbox` / `--disable-setuid-sandbox` are intentionally NOT part
+ * of the defaults. Disabling the sandbox removes the primary boundary between
+ * untrusted web content and the host and must be opted into explicitly via
+ * `BrowserShimOptions.allowNoSandbox`.
+ */
+export const DEFAULT_CHROME_FLAGS: readonly string[] = [
+	// Avoid /dev/shm exhaustion in small containers (common on CI).
+	'--disable-dev-shm-usage',
+	// Headless shell has no GPU; skip GL init to avoid startup errors.
+	'--disable-gpu',
+	'--disable-software-rasterizer',
+	// Trim background/extension surface that complex test pages don't need.
+	'--disable-extensions',
+	'--disable-background-networking',
+	'--disable-background-timer-throttling',
+	'--disable-backgrounding-occluded-windows',
+	'--disable-renderer-backgrounding',
+	'--disable-features=TranslateUI',
+	'--disable-ipc-flooding-protection',
+	// Reduce resource usage during automated runs.
+	'--disable-default-apps',
+	'--mute-audio',
+	// Prevent OOM on memory-heavy pages inside constrained runners.
+	'--js-flags=--max-old-space-size=4096'
+]
+
+/**
+ * Flags appended only when `allowNoSandbox` is explicitly enabled. Kept in a
+ * separate constant so callers and tests can assert they are opt-in.
+ */
+export const NO_SANDBOX_FLAGS: readonly string[] = [
+	'--no-sandbox',
+	'--disable-setuid-sandbox'
+]
+
+/**
+ * Resolve the Chrome argv for a shim launch. Exported for testability.
+ */
+export function resolveChromeFlags(options: { allowNoSandbox?: boolean } = {}): string[] {
+	const flags = [...DEFAULT_CHROME_FLAGS]
+	if (options.allowNoSandbox) {
+		flags.unshift(...NO_SANDBOX_FLAGS)
+	}
+	return flags
+}
+
+// -----------------------------------------------------------------------------
+// Download progress tracker
+// -----------------------------------------------------------------------------
+
+export interface DownloadProgress {
+	bytesReceived: number
+	totalBytes: number
+}
+
+/**
+ * Create a download progress logger that emits at most one "start" line and
+ * exactly one "complete" line per download. Avoids the previous heuristic
+ * percent-spam which could log the same bucket multiple times.
+ *
+ * The returned callback matches `@puppeteer/browsers` `downloadProgressCallback`.
+ */
+export function createDownloadProgressLogger(
+	logger?: ConsolaInstance,
+	label: string = 'Chrome'
+): {
+	onProgress: (downloadedBytes: number, totalBytes: number) => void
+	finalize: () => void
+	readonly progress: DownloadProgress
+	readonly started: boolean
+	readonly completed: boolean
+} {
+	const state: { started: boolean; completed: boolean; progress: DownloadProgress } = {
+		started: false,
+		completed: false,
+		progress: { bytesReceived: 0, totalBytes: 0 }
+	}
+
+	return {
+		onProgress(downloadedBytes: number, totalBytes: number) {
+			if (state.completed) return
+
+			state.progress.bytesReceived = downloadedBytes
+			state.progress.totalBytes = totalBytes
+
+			if (!state.started) {
+				state.started = true
+				logger?.info(`[BrowserShim] Downloading ${label}...`)
+			}
+
+			if (totalBytes > 0 && downloadedBytes >= totalBytes) {
+				state.completed = true
+				logger?.info(`[BrowserShim] ${label} download complete`)
+			}
+		},
+		/**
+		 * Emit the single "complete" line if a download was started but the
+		 * progress stream never reported final totals. No-op if the download
+		 * never started (e.g. fully-cached build) or already completed.
+		 */
+		finalize() {
+			if (!state.started || state.completed) return
+			state.completed = true
+			logger?.info(`[BrowserShim] ${label} download complete`)
+		},
+		get progress() {
+			return state.progress
+		},
+		get started() {
+			return state.started
+		},
+		get completed() {
+			return state.completed
+		}
+	}
+}
+
+// -----------------------------------------------------------------------------
 // Browser Installation
 // -----------------------------------------------------------------------------
 
@@ -105,20 +240,22 @@ async function ensureChrome(
 
 	logger?.debug(`[BrowserShim] Resolved Chrome Headless Shell build: ${buildId}`)
 
+	const progressLogger = createDownloadProgressLogger(logger, 'Chrome')
+
 	// Install Chrome Headless Shell if not present
 	const installedBrowser = await install({
 		browser: BrowserType.CHROMEHEADLESSSHELL,
 		buildId,
 		cacheDir,
 		downloadProgressCallback: (downloadedBytes, totalBytes) => {
-			if (totalBytes > 0) {
-				const percent = Math.round((downloadedBytes / totalBytes) * 100)
-				if (percent % 20 === 0) {
-					logger?.info(`[BrowserShim] Downloading Chrome... ${percent}%`)
-				}
-			}
+			progressLogger.onProgress(downloadedBytes, totalBytes)
 		}
 	})
+
+	// Fallback: if a download started but progress events never reported final
+	// totals, emit the single "complete" line so logs are not dangling. No-op
+	// when the build was already cached (nothing was downloaded).
+	progressLogger.finalize()
 
 	cachedExecutablePath = installedBrowser.executablePath
 	logger?.success(`[BrowserShim] Chrome ready: ${installedBrowser.executablePath}`)
@@ -137,8 +274,17 @@ export function createBrowserShim(options: BrowserShimOptions = {}): BrowserShim
 		logger,
 		verbose = false,
 		keepAlive = 60000,
-		cacheDir = join(homedir(), '.devflare', 'chrome')
+		cacheDir = join(homedir(), '.devflare', 'chrome'),
+		allowNoSandbox = false
 	} = options
+
+	const chromeLaunchArgs = resolveChromeFlags({ allowNoSandbox })
+	if (allowNoSandbox) {
+		logger?.warn(
+			'[BrowserShim] Launching Chrome with --no-sandbox (allowNoSandbox=true). '
+				+ 'Only use this in trusted CI/rootless environments.'
+		)
+	}
 
 	let server: HttpServer | null = null
 	let executablePath: string | null = null
@@ -211,26 +357,7 @@ export function createBrowserShim(options: BrowserShimOptions = {}): BrowserShim
 			headless: true,
 			// Increase protocol timeout for complex pages
 			protocolTimeout: 120000,
-			args: [
-				'--no-sandbox',
-				'--disable-setuid-sandbox',
-				'--disable-dev-shm-usage',
-				'--disable-gpu',
-				'--disable-software-rasterizer',
-				// Additional stability flags
-				'--disable-extensions',
-				'--disable-background-networking',
-				'--disable-background-timer-throttling',
-				'--disable-backgrounding-occluded-windows',
-				'--disable-renderer-backgrounding',
-				'--disable-features=TranslateUI',
-				'--disable-ipc-flooding-protection',
-				// Reduce resource usage
-				'--disable-default-apps',
-				'--mute-audio',
-				// Memory limits to prevent crashes
-				'--js-flags=--max-old-space-size=4096'
-			]
+			args: chromeLaunchArgs
 		})
 
 		const wsEndpoint = browser.wsEndpoint()

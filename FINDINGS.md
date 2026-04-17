@@ -266,14 +266,16 @@ These broader failures are real findings, but they are not regressions introduce
 	- Follow-up still open: further decomposition of `createDevServer` (Miniflare config build, DO bundling orchestration, watcher setup, start/stop lifecycle) remains in a single closure; deferred as behavior-risk
 
 - `packages/devflare/src/dev-server/d1-migrations.ts`
-	- Per-binding precedence has landed; current follow-up is deeper migration state tracking (applied ledger) rather than re-applying SQL on every dev-server start
+	- Fixed: applied-migration ledger landed. Client sends per-file metadata `files: [{ filename, sha256, statements }]` alongside legacy flat `statements`. Gateway creates `_devflare_migrations (filename TEXT PRIMARY KEY, applied_at TEXT NOT NULL, sha256 TEXT NOT NULL)` on first run, reads the ledger, and per file: skip when `sha256` matches, `console.warn` + skip when `sha256` drifted, apply + `INSERT OR REPLACE` when absent. Single round-trip per binding preserved; legacy branch retained. `runD1Migrations` signature unchanged
+	- 3 new tests (first-run applies all; second-run same content skips all; second-run changed content warns + skips)
 
 - `packages/devflare/src/dev-server/gateway-script.ts`
 	- Fixed: extracted the in-sandbox WebSocket bridge (`handleBridgeWebSocket`, `handleBridgeJsonMessage`, `handleBridgeRpcCall`, `handleBridgeWsOpen`, `handleBridgeWsClose`) and `handleHttpTransfer` into `src/bridge/gateway-runtime.ts`'s shared `GATEWAY_RUNTIME_JS` template. `gateway-script.ts` shrank from ~310 to ~200 lines — only dev-server-only overlay remains (`WS_ROUTES` matching, DO WebSocket forwarding, D1 migration endpoint, email ingest endpoint, app-worker fallthrough, dev `/health`). Process-global `wsProxies` map replaced with per-connection Map created inside `handleBridgeWebSocket` so reloads no longer leak state across clients
 	- Follow-up still open: `src/bridge/server.ts` remains a TypeScript sibling (richer streaming transport, typed, user-facing export). Message vocabulary + error envelope are kept aligned by shape; full TS↔JS dedup would require build-time codegen and is deferred
 
 - `packages/devflare/src/runtime/middleware.ts`
-	- Handler calling conventions still have a `Function.prototype.toString()` fallback for unmarked 2-arg handlers; the new `defineFetchHandler` / `markResolveStyle` markers are now the recommended minification-safe path but the fallback is still present so legacy user code keeps working
+	- Fixed: `getFunctionParameterNames()` now wraps `handler.toString()` in try/catch. On throw it emits `console.debug` and returns `[]`, so detection defaults to worker-style (safer under bound/native handlers). Added a module-level `toStringWarnedOnce` `Set<string>` keyed by handler source; the first time each unique source hits the `toString()` detection path, a single `console.warn` is emitted instructing users to adopt `defineFetchHandler(fn, { style: 'resolve' })` / `sequence(...)`. Test-only `__resetToStringFallbackWarnings()` exported
+	- 1 new test asserts the warn is emitted exactly once per unique source
 
 - `packages/devflare/src/runtime/context-events.ts`
 	- Fixed: added `prepareEventShell(env, { locals })` helper centralizing the shared `wrapEnvSendEmailBindings(env)` + `createLocals(options.locals)` pair. Every event builder (`createBaseEvent`, `createFetchEvent`, `createQueueEvent`, `createScheduledEvent`, `createEmailEvent`, `createTailEvent`, `createDurableObjectFetchEvent`, `createDurableObjectAlarmEvent`, and the three DO websocket variants) now spreads the shell and layers its specific fields. Public signatures unchanged
@@ -300,18 +302,20 @@ These broader failures are real findings, but they are not regressions introduce
 ### Medium severity
 
 - `packages/devflare/src/browser.ts`
-	- Browser-safe fallback proxies still fake too much behavior and can lie about feature presence
+	- Fixed: the `createUnsupportedObject` proxy no longer lies about feature presence. Every trap (`get`, `has`, `ownKeys`, `getOwnPropertyDescriptor`, `set`, `defineProperty`, `deleteProperty`, `getPrototypeOf`) now throws with the exact guidance `'<symbol> is not available in browser environments; import from devflare/test or devflare/runtime in a worker/Node context instead.'`. Introspection (`Object.keys`, `in`, `JSON.stringify`, `for...in`) can no longer see an innocuous empty object. Properties that legitimately work in browsers (`defineConfig`, `ref`, `workerName`, `env`, bridge proxy utilities, decorators) untouched. Public exports unchanged
 
 - `packages/devflare/src/browser-shim/server.ts`
-	- Still hardcodes heavy Chrome flags and uses `--no-sandbox`
-	- Download progress logging is still noisy and heuristic-based
+	- Fixed: extracted `DEFAULT_CHROME_FLAGS` + `NO_SANDBOX_FLAGS` with per-flag rationale. Removed `--no-sandbox` + `--disable-setuid-sandbox` from defaults; opt-in only via `allowNoSandbox?: boolean` option (JSDoc warns about the security regression); `logger.warn` emitted at runtime when opt-in is used. Exposed `resolveChromeFlags({ allowNoSandbox })` for testability
+	- Fixed: replaced heuristic `percent % 20 === 0` progress spam with `createDownloadProgressLogger` maintaining explicit `{ bytesReceived, totalBytes }`; emits exactly one start line and exactly one complete line; `finalize()` closes dangling streams. Fully-cached builds emit nothing
+	- 9 new tests covering default flag set, sandbox opt-in, and progress-logger behavior
 
 - `packages/devflare/src/bundler/do-bundler.ts`
 	- Fixed: the `.devflare-temp-<className>.ts` write next to user source eliminated entirely. Replaced with a Rolldown virtual-entry plugin (`resolveId` / `load`) whose synthetic id sits at `<sourceDir>/.devflare-do-<className>.virtual.ts` — rolldown still resolves relative imports from the original DO module's directory, but no file is written to disk. No cleanup needed, no watcher race, no `os.tmpdir()` or `.devflare/.cache/` cruft
-	- Rebuild strategy (full-rebuild vs HMR) still unchanged and deferred
+	- Fixed: stale HMR-promising banner in `src/bundler/index.ts` rewritten to accurately describe full rebuild + debounce + single-flight; incremental rebuilds explicitly noted as deferred architectural work
 
 - `packages/devflare/src/bundler/rolldown-shared.ts`
-	- Alias precedence still needs deeper review to ensure user overrides beat framework defaults everywhere
+	- Fixed: extracted explicit `mergeAliases(userAliases, frameworkDefaults)` helper. Added `AliasEntry`/`AliasInput` types, `normalizeAliasEntries`, `aliasEntriesToRolldownRecord`. Normalizes both inputs to entries, drops framework entries whose normalized key (`str:…` or `re:source:flags`) collides with a user entry, then emits `[...frameworkFiltered, ...dedupedUser]`. User wins on duplicate `find` keys; user ordering preserved for regex specificity. Exported via `src/bundler/index.ts` for cross-module sharing. `resolveWorkerCompatibleRolldownConfig` now routes through it
+	- 2 new tests cover override-on-duplicate and user-ordering preservation
 
 - `packages/devflare/src/bundler/worker-compat.ts`
 	- Fixed: shebang handling no longer concatenates imports onto the shebang line when the source lacks a trailing newline. `appendRight`-s imports after the shebang with an explicit leading newline; never double-inserts, never regex-rewrites the shebang
@@ -325,7 +329,9 @@ These broader failures are real findings, but they are not regressions introduce
 	- 2 new tests covering retry-recovery and warn-on-exhaustion
 
 - `packages/devflare/src/cloudflare/tokens.ts`
-	- Token permission-group filtering still relies heavily on Cloudflare display-name strings
+	- Fixed: added `KNOWN_PERMISSION_GROUP_IDS`, `KNOWN_PERMISSION_GROUP_DISPLAY_NAMES`, `KnownPermissionGroupName`, and `matchesKnownPermissionGroup(symbolicName, group, options?)`. Id match checked first; falls back to *exact* display-name comparison (no substring/regex/case-insensitive) and emits `console.warn` so drift is visible. `options` hook allows id/name table injection for tests and callers
+	- Disclosure: permission-group UUIDs could not be confidently verified against Cloudflare's public docs at authoring time. Every entry in `KNOWN_PERMISSION_GROUP_IDS` is `undefined` with a `TODO:` comment; in production every symbolic lookup currently degrades to the exact-display-name fallback path with a warning. Replacing an `undefined` with the UUID from `GET /accounts/:id/tokens/permission_groups` flips that group onto the id-matched path with no other code changes
+	- Existing broad-category regex filters left intact to avoid changing production selection behavior; 1 new test covers id vs display-name precedence
 
 - `packages/devflare/src/config/ref.ts`
 	- Config-path extraction: `fn.toString()` path is now wrapped behind `extractConfigPathFromImportFn` with a pre-check. No `import(` → existing `<pending>` sentinel. `import(` present but empty specifier or `${…}` template literal → throws a clear error. Short/no-separator specifier → throws as a minification heuristic. A true runtime probe via Proxy is not applicable to the `import()` syntactic operator (documented in-code)
@@ -353,11 +359,11 @@ These broader failures are real findings, but they are not regressions introduce
 	- Fixed: introduced an internal `CodeBuilder` with typed methods (`importStatement`, `importNamespace`, `reExport`, `constDeclaration`, `classDeclaration`, `exportDefault`, `raw`, `blank`). `getComposedWorkerEntrypointSource` now assembles imports, fallbacks, DO re-exports, manifests, handler declarations, and default export through the builder — output is byte-identical
 	- Fixed: dev-only email helpers (`__devflareCreateEmailHeaders`, `__devflareCreateEmailRawStream`, `__devflareHandleInternalEmail`) + the `/_devflare/internal/email` gate extracted into `emitDevOnlyEmailHooks(builder, { enabled })`. New `includeDevOnlyHooks?: boolean` option defaults to current behavior (`options.devInternalEmail === true`)
 
-### Lower-severity but worth cleaning
+### Lower-severity cleanup status
 
-- Stale comments and placeholder responses remain in several bundler and compiler paths
-- There are still multiple broad `catch {}` sites across the bridge, browser shim, bundler, and config loaders
-- The repo still carries several duplicated helper patterns that differ only slightly in naming or logging behavior
+- Empty `catch {}` audit: 6 sites found across `src/`. Only `src/bridge/gateway-runtime.ts#L375` was reachable/undocumented — added best-effort cleanup comment. The 5 browser-shim sites (handler.ts, binding-worker.ts lines 306/316/322/327) were already classified as intentional WS-cleanup in the Wave 8 quality review and left alone. No empty `catch (err) {}` variants found. No control-flow changes
+- Stale comments sweep in `src/bundler/*.ts` + `src/config/*.ts`: grep for `TODO|XXX|FIXME|HACK|temporarily|for now|kludge|workaround` returned 0 hits — no drift to clean up
+- Duplicated helper patterns: Wave 4–7 consolidation (binding-hints, gateway-runtime, envelope decoding, CodeBuilder, mergeAliases) covered the substantive duplicates; smaller cosmetic duplication is out of scope for this pass
 - `README.md`, `LLM.md`, and code surfaces still drift in several places even after the quick-start fix
 
 ## Suggested next fix wave

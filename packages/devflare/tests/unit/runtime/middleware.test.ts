@@ -2,8 +2,9 @@
 // Middleware System Tests — sequence() and fetch module dispatch
 // =============================================================================
 
-import { describe, expect, test } from 'bun:test'
+import { describe, expect, spyOn, test } from 'bun:test'
 import {
+	__resetToStringFallbackWarnings,
 	createResolveFetch,
 	invokeFetchHandler,
 	invokeFetchModule,
@@ -449,5 +450,40 @@ describe('invokeFetchModule()', () => {
 
 		expect(response.status).toBe(404)
 		expect(await response.text()).toBe('Not Found')
+	})
+})
+
+describe('toString() fallback warning', () => {
+	test('warns only once per unique handler source even when detection runs multiple times', async () => {
+		__resetToStringFallbackWarnings()
+		const warnSpy = spyOn(console, 'warn').mockImplementation(() => { })
+
+		try {
+			// Unmarked 2-arg handler — triggers the toString() fallback path.
+			const handler = async (event: unknown, resolve: (event: unknown) => Promise<Response>) => {
+				return resolve(event)
+			}
+
+			const fetchEvent = createFetchEvent(
+				new Request('https://example.com/toString-warn'),
+				{},
+				createMockCtx()
+			)
+
+			// Invoke detection multiple times on the same handler body.
+			await runWithEventContext(fetchEvent, async () => {
+				await invokeFetchHandler(handler, fetchEvent, async () => new Response('ok'))
+				await invokeFetchHandler(handler, fetchEvent, async () => new Response('ok'))
+				await invokeFetchHandler(handler, fetchEvent, async () => new Response('ok'))
+			})
+
+			const fallbackWarnings = warnSpy.mock.calls.filter((args) =>
+				typeof args[0] === 'string' && args[0].includes('Function.prototype.toString()')
+			)
+			expect(fallbackWarnings.length).toBe(1)
+		} finally {
+			warnSpy.mockRestore()
+			__resetToStringFallbackWarnings()
+		}
 	})
 })

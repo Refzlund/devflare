@@ -165,8 +165,35 @@ function splitParameterList(source: string): string[] {
 	return parameters
 }
 
+const toStringWarnedOnce = new Set<string>()
+
+/**
+ * Reset the once-per-process warning tracker. Test-only hook.
+ */
+export function __resetToStringFallbackWarnings(): void {
+	toStringWarnedOnce.clear()
+}
+
 function getFunctionParameterNames(handler: AnyFunction): string[] {
-	const source = handler.toString().trim()
+	let source: string
+	try {
+		source = handler.toString().trim()
+	} catch (err) {
+		// Minifiers, bound functions, or Proxy wrappers can throw on toString().
+		// Default to worker-style detection (safer for minified handlers).
+		console.debug('[devflare middleware] Function.prototype.toString() threw; defaulting to worker-style:', err)
+		return []
+	}
+
+	if (!toStringWarnedOnce.has(source)) {
+		toStringWarnedOnce.add(source)
+		console.warn(
+			'[devflare] Detected a 2-argument fetch handler via Function.prototype.toString() inspection. '
+			+ 'This fallback is fragile under minification. Wrap resolve-style handlers with '
+			+ "`defineFetchHandler(fn, { style: 'resolve' })` or `sequence(...)` to make detection minification-safe."
+		)
+	}
+
 	const parenthesizedMatch = source.match(/^[^(]*\(([^)]*)\)/)
 	if (parenthesizedMatch) {
 		return splitParameterList(parenthesizedMatch[1])

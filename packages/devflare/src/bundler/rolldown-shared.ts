@@ -98,25 +98,117 @@ function mergePluginOptions(
 	return [base, user]
 }
 
+/**
+ * Single alias entry. `find` may be a string or RegExp; `replacement` is the
+ * module id / absolute path the matched specifier resolves to.
+ */
+export interface AliasEntry {
+	find: string | RegExp
+	replacement: string
+}
+
+type RolldownAliasRecord = Record<string, string>
+
+/**
+ * Rolldown's `resolve.alias` option accepts only `Record<string, string[] | string | false>`.
+ * We accept the richer `AliasEntry[]` form internally so framework defaults, user
+ * overrides and future regex-based aliases can flow through a single pipeline.
+ */
+export type AliasInput = RolldownAliasRecord | AliasEntry[] | undefined
+
+function aliasKey(find: string | RegExp): string {
+	return find instanceof RegExp
+		? `re:${find.source}:${find.flags}`
+		: `str:${find}`
+}
+
+export function normalizeAliasEntries(input: AliasInput): AliasEntry[] {
+	if (!input) {
+		return []
+	}
+
+	if (Array.isArray(input)) {
+		return input.filter((entry): entry is AliasEntry => {
+			return Boolean(entry) && typeof entry.replacement === 'string'
+		})
+	}
+
+	return Object.entries(input)
+		.filter(([, replacement]) => typeof replacement === 'string')
+		.map(([find, replacement]) => ({ find, replacement: replacement as string }))
+}
+
+/**
+ * Merge framework-default aliases with user-provided aliases.
+ *
+ * Contract:
+ * - Framework defaults are emitted first, then user entries, so on duplicate
+ *   `find` keys the user entry wins (object-spread / last-wins semantics).
+ * - Entries are deduplicated by the normalized `find` key (string value or
+ *   `RegExp.source` + flags).
+ * - Ordering of user entries is preserved so regex specificity remains
+ *   predictable.
+ */
+export function mergeAliases(
+	userAliases: AliasEntry[],
+	frameworkDefaults: AliasEntry[]
+): AliasEntry[] {
+	const userKeys = new Set(userAliases.map((entry) => aliasKey(entry.find)))
+
+	const frameworkFiltered = frameworkDefaults.filter((entry) => {
+		return !userKeys.has(aliasKey(entry.find))
+	})
+
+	// Dedupe user entries too, keeping the LAST occurrence of each key to match
+	// object-spread semantics while preserving the relative ordering of that
+	// last occurrence (important for regex specificity).
+	const seenUserKeys = new Set<string>()
+	const dedupedUser: AliasEntry[] = []
+	for (let index = userAliases.length - 1; index >= 0; index--) {
+		const entry = userAliases[index]!
+		const key = aliasKey(entry.find)
+		if (seenUserKeys.has(key)) {
+			continue
+		}
+		seenUserKeys.add(key)
+		dedupedUser.unshift(entry)
+	}
+
+	return [...frameworkFiltered, ...dedupedUser]
+}
+
+function aliasEntriesToRolldownRecord(entries: AliasEntry[]): RolldownAliasRecord {
+	const record: RolldownAliasRecord = {}
+	for (const entry of entries) {
+		if (entry.find instanceof RegExp) {
+			// Rolldown's resolve.alias is Record<string, string> only. RegExp keys
+			// are carried by `mergeAliases` for future use but cannot be handed to
+			// rolldown directly; skip them here so we never emit an invalid shape.
+			continue
+		}
+		record[entry.find] = entry.replacement
+	}
+	return record
+}
+
 function mergeResolveOptions(
 	base: InputOptions['resolve'] | undefined,
 	user: InputOptions['resolve'] | undefined
 ): InputOptions['resolve'] | undefined {
-	if (!base) {
-		return user
+	if (!base && !user) {
+		return undefined
 	}
 
-	if (!user) {
-		return base
-	}
+	const frameworkEntries = normalizeAliasEntries(base?.alias as AliasInput)
+	const userEntries = normalizeAliasEntries(user?.alias as AliasInput)
+	const mergedEntries = mergeAliases(userEntries, frameworkEntries)
+
+	const mergedAlias = aliasEntriesToRolldownRecord(mergedEntries)
 
 	return {
-		...user,
-		...base,
-		alias: {
-			...(user.alias ?? {}),
-			...(base.alias ?? {})
-		}
+		...(user ?? {}),
+		...(base ?? {}),
+		...(mergedEntries.length > 0 ? { alias: mergedAlias } : {})
 	}
 }
 

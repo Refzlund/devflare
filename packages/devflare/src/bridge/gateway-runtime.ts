@@ -372,6 +372,8 @@ function handleBridgeWebSocket(request, env, ctx) {
 
 	server.addEventListener('close', () => {
 		for (const proxy of wsProxies.values()) {
+			// Best-effort cleanup: the DO-side WS may already be closed or in an
+			// invalid state; any throw here would abort sibling closes.
 			try { proxy.doWs.close() } catch {}
 		}
 		wsProxies.clear()
