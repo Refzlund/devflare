@@ -33,6 +33,7 @@ import {
 	type WorkerSurfacePaths
 } from './worker-surface-paths'
 import { startWorkerSourceWatcher as createWorkerSourceWatcher } from './worker-source-watcher'
+import { formatErrorMessage, logRemoteBindingRequirements, logWorkerHandlerDetection } from './server-startup-helpers'
 
 // -----------------------------------------------------------------------------
 // Types
@@ -71,10 +72,6 @@ export interface DevServer {
 const INTERNAL_APP_SERVICE_BINDING = '__DEVFLARE_APP'
 
 type MiniflareServiceBinding = { name: string; entrypoint?: string }
-
-function formatErrorMessage(error: unknown): string {
-	return error instanceof Error ? error.message : String(error)
-}
 
 // -----------------------------------------------------------------------------
 // Dev Server Implementation
@@ -611,44 +608,20 @@ export function createDevServer(options: DevServerOptions): DevServer {
 			!enableVite
 			&& (hasWorkerSurfacePaths(mainWorkerSurfacePaths) || Boolean(mainWorkerRoutes?.routes.length))
 		) {
-			const detectedWorkerHandlers = Object.entries(mainWorkerSurfacePaths)
-				.filter(([, surfacePath]) => !!surfacePath)
-				.map(([surfaceName, surfacePath]) => `${surfaceName}=${surfacePath}`)
-			const detectedRouteHandlers = mainWorkerRoutes?.routes.map((route) => `route=${route.filePath}`) ?? []
-			logger?.info(`Worker handlers detected: ${[...detectedWorkerHandlers, ...detectedRouteHandlers].join(', ')}`)
+			logWorkerHandlerDetection(
+				logger,
+				enableVite,
+				true,
+				mainWorkerSurfacePaths,
+				mainWorkerRoutes
+			)
 		} else if (!enableVite) {
-			logger?.warn('No local worker handler entry was found for worker-only mode')
+			logWorkerHandlerDetection(logger, enableVite, false, mainWorkerSurfacePaths, mainWorkerRoutes)
 		}
 
 		// Check for remote bindings and warn if requirements not met
 		const remoteCheck = await checkRemoteBindingRequirements(config)
-		if (remoteCheck.hasRemoteBindings) {
-			logger?.info('')
-			logger?.warn('⚠️  Remote-only bindings detected:')
-			for (const binding of remoteCheck.remoteBindings) {
-				logger?.warn(`   • ${binding}`)
-			}
-			logger?.info('')
-
-			if (remoteCheck.missingAccountId) {
-				logger?.warn('⚠️  WARN: accountId is not set in devflare.config.ts')
-				logger?.warn('   Remote bindings (AI, Vectorize) require accountId to charge the correct account.')
-				logger?.warn('   Add: accountId: \'your-cloudflare-account-id\'')
-				logger?.info('')
-			}
-
-			if (remoteCheck.notLoggedIn) {
-				logger?.warn('⚠️  WARN: Not logged in to Wrangler')
-				logger?.warn('   Remote bindings require authentication.')
-				logger?.warn('   Run: bunx wrangler login')
-				logger?.info('')
-			}
-
-			if (!remoteCheck.missingAccountId && !remoteCheck.notLoggedIn) {
-				logger?.success('✓ Remote binding requirements met')
-				logger?.info('')
-			}
-		}
+		logRemoteBindingRequirements(logger, remoteCheck)
 
 		// Start browser shim if browser rendering is configured
 		const browserBinding = getSingleBrowserBindingName(config.bindings?.browser)

@@ -13,23 +13,17 @@
 // - auxiliaryWorkers config passed to @cloudflare/vite-plugin
 // =============================================================================
 
-import { isAbsolute, relative, resolve } from 'pathe'
+import { resolve } from 'pathe'
 import type { Plugin, ResolvedConfig, ViteDevServer } from 'vite'
-import { loadConfig, resolveConfigPath } from '../config/loader'
+import { loadConfig } from '../config/loader'
 import type { DevflareConfig } from '../config/schema'
-import type { ResolvedConfig as ResolvedDevflareConfig } from '../config/resolve-phased'
 import {
 	loadResolvedConfig,
-	resolveConfigForEnvironment,
 	resolveConfigForLocalRuntime
 } from '../config'
 import {
-	compileBuildConfig,
 	compileConfig,
 	compileToProgrammaticConfig,
-	isolateViteBuildOutputPaths,
-	rebaseWranglerConfigPaths,
-	writeWranglerConfig,
 	type WranglerConfig
 } from '../config/compiler'
 import { DEFAULT_DO_PATTERN } from '../utils/glob'
@@ -44,6 +38,11 @@ import {
 	type AuxiliaryWorkerConfig,
 	type DODiscoveryResult
 } from './plugin-durable-objects'
+import {
+	buildPluginContextState,
+	resolvePluginConfigPath,
+	writeGeneratedWranglerConfig
+} from './plugin-context'
 
 export type { AuxiliaryWorkerConfig, DODiscoveryResult }
 
@@ -118,13 +117,6 @@ export interface DevflarePluginContext {
 	durableObjects: DODiscoveryResult | null
 }
 
-interface ResolvedPluginContextState {
-	wranglerConfig: WranglerConfig
-	cloudflareConfig: Record<string, unknown>
-	auxiliaryWorkerConfig: AuxiliaryWorkerConfig | null
-	durableObjects: DODiscoveryResult | null
-}
-
 interface PluginInstanceState {
 	context: DevflarePluginContext
 	projectRoot: string
@@ -162,117 +154,6 @@ let lastPluginContext: DevflarePluginContext = createPluginState().context
  */
 export function getPluginContext(): DevflarePluginContext {
 	return lastPluginContext
-}
-
-async function buildPluginContextState(
-	projectRoot: string,
-	devflareConfig: DevflareConfig,
-	environment?: string,
-	mode: 'serve' | 'build' = 'serve'
-): Promise<ResolvedPluginContextState> {
-	// Dev/serve: materialize names -> stable local identifiers (miniflare friendly).
-	// Build: preserve names in the emitted Wrangler artefact so deploy can
-	// later resolve them against the real Cloudflare account. Previously the
-	// build path also used the local-runtime identifiers, producing a
-	// distributable that silently contained fake IDs in place of name-only
-	// bindings (C1).
-	const effectiveConfig = mode === 'build'
-		? resolveConfigForEnvironment(devflareConfig, environment)
-		: resolveConfigForLocalRuntime(devflareConfig, environment)
-	const compiledWranglerConfig = mode === 'build'
-		? compileBuildConfig(effectiveConfig)
-		: compileConfig(effectiveConfig as ResolvedDevflareConfig)
-	const wranglerConfig = mode === 'build'
-		? isolateViteBuildOutputPaths(projectRoot, compiledWranglerConfig)
-		: compiledWranglerConfig
-	const cloudflareConfig = {
-		...(mode === 'build'
-			? isolateViteBuildOutputPaths(
-				projectRoot,
-				compileToProgrammaticConfig(effectiveConfig, environment, { preserveNamedBindings: true }) as WranglerConfig
-			)
-			: compileToProgrammaticConfig(effectiveConfig, environment))
-	}
-	const composedMainEntry = mode === 'build'
-		? null
-		: await prepareComposedWorkerEntrypoint(projectRoot, effectiveConfig, environment)
-	if (composedMainEntry) {
-		wranglerConfig.main = composedMainEntry
-		cloudflareConfig.main = composedMainEntry
-	}
-
-	let durableObjects: DODiscoveryResult | null = null
-	let auxiliaryWorkerConfig: AuxiliaryWorkerConfig | null = null
-
-	const doPatternConfig = effectiveConfig.files?.durableObjects
-	const doPattern = typeof doPatternConfig === 'string' ? doPatternConfig : DEFAULT_DO_PATTERN
-	if (doPatternConfig !== false) {
-		const doWorkerName = `${wranglerConfig.name}-do`
-		const discovery = await discoverDurableObjects(projectRoot, doPattern, doWorkerName)
-
-		if (discovery.files.size > 0) {
-			durableObjects = discovery
-
-			if (wranglerConfig.durable_objects?.bindings) {
-				for (const binding of wranglerConfig.durable_objects.bindings) {
-					binding.script_name = doWorkerName
-				}
-			}
-			if (cloudflareConfig.durable_objects) {
-				const doConfig = cloudflareConfig.durable_objects as { bindings: Array<{ script_name?: string }> }
-				for (const binding of doConfig.bindings) {
-					binding.script_name = doWorkerName
-				}
-			}
-
-			auxiliaryWorkerConfig = createAuxiliaryWorkerConfig(wranglerConfig, discovery)
-		}
-	}
-
-	return {
-		wranglerConfig,
-		cloudflareConfig,
-		durableObjects,
-		auxiliaryWorkerConfig
-	}
-}
-
-async function ensureGeneratedConfigDir(projectRoot: string): Promise<string> {
-	const configDir = resolve(projectRoot, CONFIG_DIR)
-	const fs = await import('node:fs/promises')
-	await fs.mkdir(configDir, { recursive: true })
-
-	const gitignorePath = resolve(configDir, '.gitignore')
-	try {
-		await fs.access(gitignorePath)
-	} catch {
-		await fs.writeFile(gitignorePath, '*\n', 'utf-8')
-	}
-
-	return configDir
-}
-
-async function writeGeneratedWranglerConfig(
-	projectRoot: string,
-	wranglerConfig: WranglerConfig
-): Promise<void> {
-	const configDir = await ensureGeneratedConfigDir(projectRoot)
-	const wranglerFileConfig = rebaseWranglerConfigPaths(projectRoot, configDir, wranglerConfig)
-
-	await writeWranglerConfig(configDir, wranglerFileConfig, 'wrangler.jsonc')
-}
-
-async function resolvePluginConfigPath(
-	projectRoot: string,
-	configPath?: string
-): Promise<string | null> {
-	if (configPath) {
-		return isAbsolute(configPath)
-			? configPath
-			: resolve(projectRoot, configPath)
-	}
-
-	return await resolveConfigPath(projectRoot) ?? null
 }
 
 /**
