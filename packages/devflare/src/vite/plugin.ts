@@ -31,6 +31,11 @@ import {
 	resolvePluginConfigPath,
 	writeGeneratedWranglerConfig
 } from './plugin-context'
+import {
+	buildWebSocketProxyConfig,
+	buildWorkerNameDefine,
+	tryLoadDevflareConfig
+} from './plugin-config-hook'
 
 export type { AuxiliaryWorkerConfig, DODiscoveryResult }
 
@@ -199,66 +204,18 @@ export function devflarePlugin(options: DevflarePluginOptions = {}): Plugin {
 			const cwd = config.root ?? process.cwd()
 			const returnConfig: Record<string, unknown> = {}
 
-			// Load devflare config for worker name and routes
-			let lfConfig: DevflareConfig | null = null
-			try {
-				lfConfig = await loadConfig({
-					cwd,
-					configFile: configPath
-				})
-			} catch (error) {
-				// Config may not exist yet, continue without it
-				if (command === 'build') {
-					console.warn('[devflare] Could not load config:', error)
-				}
-			}
+			const lfConfig = await tryLoadDevflareConfig(cwd, configPath, command as 'serve' | 'build')
 
-			// Inject __DEVFLARE_WORKER_NAME__ as build-time constant
 			if (lfConfig) {
-				const workerNameValue = lfConfig.name ?? 'unknown'
-				returnConfig.define = {
-					...((config.define ?? {}) as Record<string, unknown>),
-					'__DEVFLARE_WORKER_NAME__': JSON.stringify(workerNameValue)
-				}
+				returnConfig.define = buildWorkerNameDefine(lfConfig, (config.define ?? {}) as Record<string, unknown>)
 			}
 
 			// Only add proxy in dev mode when running under devflare dev
 			if (command === 'serve' && process.env.DEVFLARE_DEV && lfConfig) {
 				const port = bridgePort ?? 8787
-				const patterns: string[] = [...wsProxyPatterns]
-
-				// Extract patterns from wsRoutes
-				if (lfConfig.wsRoutes && lfConfig.wsRoutes.length > 0) {
-					for (const route of lfConfig.wsRoutes) {
-						if (!patterns.includes(route.pattern)) {
-							patterns.push(route.pattern)
-						}
-					}
-				}
-
-				// Build proxy config for WebSocket patterns
-				const proxyConfig: Record<string, unknown> = {}
-
-				for (const pattern of patterns) {
-					proxyConfig[pattern] = {
-						target: `http://127.0.0.1:${port}`,
-						changeOrigin: true,
-						ws: true,
-						// Forward WebSocket upgrade requests
-						configure: (proxy: unknown) => {
-							; (proxy as { on: (event: string, handler: (err: Error) => void) => void })
-								.on('error', (err: Error) => {
-									console.error(`[devflare] Proxy error: ${err.message}`)
-								})
-						}
-					}
-				}
-
-				if (Object.keys(proxyConfig).length > 0) {
-					console.log(`[devflare] WebSocket proxy configured for: ${patterns.join(', ')}`)
-					returnConfig.server = {
-						proxy: proxyConfig
-					}
+				const proxyConfig = buildWebSocketProxyConfig(lfConfig, port, wsProxyPatterns)
+				if (proxyConfig) {
+					returnConfig.server = { proxy: proxyConfig }
 				}
 			}
 
