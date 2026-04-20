@@ -9,9 +9,8 @@ import type { Miniflare as MiniflareType } from 'miniflare'
 import { resolve } from 'pathe'
 import type { DevflareConfig } from '../config'
 import { loadConfig } from '../config/loader'
-import { getSingleBrowserBindingName } from '../config/schema'
+import { type BrowserShim } from '../browser-shim'
 import { bundleWorkerEntry, createDOBundler, type DOBundler, type DOBundleResult } from '../bundler'
-import { createBrowserShim, type BrowserShim } from '../browser-shim'
 import { checkRemoteBindingRequirements } from '../cli/wrangler-auth'
 import { clearLocalSendEmailBindings, setLocalSendEmailBindings } from '../utils/send-email'
 import { writeGeneratedViteConfig } from '../vite'
@@ -31,7 +30,7 @@ import {
 	type WorkerSurfacePaths
 } from './worker-surface-paths'
 import { applyWatcherTargetDiff, startWorkerSourceWatcher as createWorkerSourceWatcher } from './worker-source-watcher'
-import { logMiniflareBindingDiagnostics, logMiniflareConfigDiagnostics, logRemoteBindingRequirements, logWorkerHandlerDetection, resolveWorkerConfigWatchPath } from './server-startup-helpers'
+import { logMiniflareBindingDiagnostics, logMiniflareConfigDiagnostics, logRemoteBindingRequirements, logWorkerHandlerDetection, maybeStartBrowserShim, resolveWorkerConfigWatchPath } from './server-startup-helpers'
 
 // -----------------------------------------------------------------------------
 
@@ -318,17 +317,7 @@ export function createDevServer(options: DevServerOptions): DevServer {
 		logRemoteBindingRequirements(logger, remoteCheck)
 
 		// Start browser shim if browser rendering is configured
-		const browserBinding = getSingleBrowserBindingName(config.bindings?.browser)
-		if (browserBinding) {
-			logger?.info(`Starting Browser Rendering shim (binding: ${browserBinding})...`)
-			browserShim = createBrowserShim({
-				port: browserShimPort,
-				host: '127.0.0.1',
-				logger,
-				verbose
-			})
-			await browserShim.start()
-		}
+		browserShim = await maybeStartBrowserShim(config, { browserShimPort, logger, verbose })
 
 		// Bundle DOs if pattern is set
 		const doPattern = config.files?.durableObjects

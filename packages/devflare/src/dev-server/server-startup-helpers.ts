@@ -9,6 +9,9 @@ import type { ConsolaInstance } from 'consola'
 import type { Miniflare as MiniflareType } from 'miniflare'
 import { resolve } from 'pathe'
 import { resolveConfigPath } from '../config/loader'
+import { createBrowserShim, type BrowserShim } from '../browser-shim'
+import type { DevflareConfig } from '../config/schema'
+import { getSingleBrowserBindingName } from '../config/schema'
 import type { RouteDiscoveryResult } from '../worker-entry/routes'
 import type { WorkerSurfacePaths } from './worker-surface-paths'
 import type { checkRemoteBindingRequirements } from '../cli/wrangler-auth'
@@ -170,4 +173,27 @@ export async function logMiniflareBindingDiagnostics(
 	} catch (error) {
 		logger?.debug(`Skipping Miniflare binding diagnostics: ${formatErrorMessage(error)}`)
 	}
+}
+
+/**
+ * If the config declares a single browser-rendering binding, construct and
+ * start a `BrowserShim` listening on `browserShimPort`. Returns `null` when
+ * no browser binding is configured (no shim needed).
+ */
+export async function maybeStartBrowserShim(
+	config: DevflareConfig,
+	options: { browserShimPort: number; logger?: ConsolaInstance; verbose: boolean }
+): Promise<BrowserShim | null> {
+	const browserBinding = getSingleBrowserBindingName(config.bindings?.browser)
+	if (!browserBinding) return null
+
+	options.logger?.info(`Starting Browser Rendering shim (binding: ${browserBinding})...`)
+	const shim = createBrowserShim({
+		port: options.browserShimPort,
+		host: '127.0.0.1',
+		logger: options.logger,
+		verbose: options.verbose
+	})
+	await shim.start()
+	return shim
 }
