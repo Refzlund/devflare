@@ -11,6 +11,8 @@ import { resolve } from 'pathe'
 import { resolveConfigPath } from '../config/loader'
 import { createBrowserShim, type BrowserShim } from '../browser-shim'
 import { createDOBundler, type DOBundler, type DOBundleResult } from '../bundler'
+import { writeGeneratedViteConfig } from '../vite'
+import { resolveViteMode } from './vite-utils'
 import type { DevflareConfig } from '../config/schema'
 import { getSingleBrowserBindingName } from '../config/schema'
 import type { RouteDiscoveryResult } from '../worker-entry/routes'
@@ -234,4 +236,39 @@ export async function maybeStartDOBundler(
 	const result = await bundler.build()
 	await bundler.watch()
 	return { bundler, result }
+}
+
+/**
+ * Resolve whether Vite should run for this package, and if so, write the
+ * generated Vite config under `.devflare/`. Returns:
+ *   - `{ enableVite: false, generatedViteConfigPath: null }` when Vite is
+ *     not requested or no Vite config exists for this package
+ *   - `{ enableVite: true, generatedViteConfigPath }` after writing the
+ *     generated config
+ */
+export async function resolveViteIntegration(options: {
+	cwd: string
+	configPath: string | undefined
+	miniflarePort: number
+	enableViteRequested: boolean
+	logger?: ConsolaInstance
+}): Promise<{ enableVite: boolean; generatedViteConfigPath: string | null }> {
+	if (!options.enableViteRequested) {
+		return { enableVite: false, generatedViteConfigPath: null }
+	}
+
+	const viteMode = await resolveViteMode(options.cwd, { requested: true })
+	if (!viteMode.enableVite) {
+		options.logger?.info('Vite disabled: no vite config found for this package')
+		return { enableVite: false, generatedViteConfigPath: null }
+	}
+
+	const generatedViteConfigPath = await writeGeneratedViteConfig({
+		cwd: options.cwd,
+		configPath: options.configPath,
+		localConfigPath: viteMode.viteConfigPath,
+		bridgePort: options.miniflarePort
+	})
+	options.logger?.debug(`Generated Vite config → ${generatedViteConfigPath}`)
+	return { enableVite: true, generatedViteConfigPath }
 }

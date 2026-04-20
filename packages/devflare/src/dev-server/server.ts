@@ -13,14 +13,13 @@ import { type BrowserShim } from '../browser-shim'
 import { bundleWorkerEntry, type DOBundler, type DOBundleResult } from '../bundler'
 import { checkRemoteBindingRequirements } from '../cli/wrangler-auth'
 import { clearLocalSendEmailBindings, setLocalSendEmailBindings } from '../utils/send-email'
-import { writeGeneratedViteConfig } from '../vite'
 import { prepareComposedWorkerEntrypoint } from '../worker-entry/composed-worker'
 import { discoverRoutes, type RouteDiscoveryResult } from '../worker-entry/routes'
 import { runD1Migrations } from './d1-migrations'
 import { createCompatibilityAwareMiniflareLog } from './miniflare-log'
 import { buildMiniflareDevConfig } from './miniflare-dev-config'
 import { createRuntimeStdioForwarder } from './runtime-stdio'
-import { resolveViteMode, stopSpawnedProcessTree } from './vite-utils'
+import { stopSpawnedProcessTree } from './vite-utils'
 import { startViteProcess } from './vite-process'
 import { createReloadQueue } from './reload-queue'
 import {
@@ -30,7 +29,7 @@ import {
 	type WorkerSurfacePaths
 } from './worker-surface-paths'
 import { applyWatcherTargetDiff, startWorkerSourceWatcher as createWorkerSourceWatcher } from './worker-source-watcher'
-import { logMiniflareBindingDiagnostics, logMiniflareConfigDiagnostics, logRemoteBindingRequirements, logWorkerHandlerDetection, maybeStartBrowserShim, maybeStartDOBundler, resolveWorkerConfigWatchPath } from './server-startup-helpers'
+import { logMiniflareBindingDiagnostics, logMiniflareConfigDiagnostics, logRemoteBindingRequirements, logWorkerHandlerDetection, maybeStartBrowserShim, maybeStartDOBundler, resolveViteIntegration, resolveWorkerConfigWatchPath } from './server-startup-helpers'
 
 // -----------------------------------------------------------------------------
 
@@ -280,21 +279,15 @@ export function createDevServer(options: DevServerOptions): DevServer {
 		setLocalSendEmailBindings(config.bindings?.sendEmail ?? {})
 		resolvedWorkerConfigPath = await resolveWorkerConfigWatchPath(cwd, configPath)
 		logger?.debug('Loaded config:', config.name)
-		if (enableVite) {
-			const viteMode = await resolveViteMode(cwd, { requested: true })
-			if (!viteMode.enableVite) {
-				logger?.info('Vite disabled: no vite config found for this package')
-				enableVite = false
-			} else {
-				generatedViteConfigPath = await writeGeneratedViteConfig({
-					cwd,
-					configPath,
-					localConfigPath: viteMode.viteConfigPath,
-					bridgePort: miniflarePort
-				})
-				logger?.debug(`Generated Vite config → ${generatedViteConfigPath}`)
-			}
-		}
+		const viteIntegration = await resolveViteIntegration({
+			cwd,
+			configPath,
+			miniflarePort,
+			enableViteRequested: enableVite,
+			logger
+		})
+		enableVite = viteIntegration.enableVite
+		generatedViteConfigPath = viteIntegration.generatedViteConfigPath
 		await refreshWorkerOnlySurfaceState()
 
 		if (
