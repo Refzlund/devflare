@@ -12,17 +12,14 @@ import { loadConfig, resolveConfigPath } from '../config/loader'
 import { getSingleBrowserBindingName } from '../config/schema'
 import { bundleWorkerEntry, createDOBundler, type DOBundler, type DOBundleResult } from '../bundler'
 import { createBrowserShim, type BrowserShim } from '../browser-shim'
-import { getBrowserBindingScript } from '../browser-shim/binding-worker'
 import { checkRemoteBindingRequirements } from '../cli/wrangler-auth'
 import { clearLocalSendEmailBindings, setLocalSendEmailBindings } from '../utils/send-email'
 import { writeGeneratedViteConfig } from '../vite'
 import { prepareComposedWorkerEntrypoint } from '../worker-entry/composed-worker'
 import { discoverRoutes, type RouteDiscoveryResult } from '../worker-entry/routes'
 import { runD1Migrations } from './d1-migrations'
-import { getGatewayScript } from './gateway-script'
 import { createCompatibilityAwareMiniflareLog } from './miniflare-log'
-import { buildQueueConsumers, buildQueueProducers, buildSendEmailConfig } from './miniflare-bindings'
-import { buildServiceBindings, makeMiniflareWorker, type MakeMiniflareWorkerContext, type MiniflareServiceBinding } from './miniflare-worker-config'
+import { buildMiniflareDevConfig } from './miniflare-dev-config'
 import { createRuntimeStdioForwarder } from './runtime-stdio'
 import { resolveViteMode, stopSpawnedProcessTree } from './vite-utils'
 import { startViteProcess } from './vite-process'
@@ -36,8 +33,6 @@ import {
 import { startWorkerSourceWatcher as createWorkerSourceWatcher } from './worker-source-watcher'
 import { formatErrorMessage, logRemoteBindingRequirements, logWorkerHandlerDetection } from './server-startup-helpers'
 
-// -----------------------------------------------------------------------------
-// Types
 // -----------------------------------------------------------------------------
 
 export interface DevServerOptions {
@@ -69,8 +64,6 @@ export interface DevServer {
 	/** Get Miniflare instance for testing */
 	getMiniflare(): MiniflareType | null
 }
-
-const INTERNAL_APP_SERVICE_BINDING = '__DEVFLARE_APP'
 
 // -----------------------------------------------------------------------------
 // Dev Server Implementation
@@ -146,186 +139,24 @@ export function createDevServer(options: DevServerOptions): DevServer {
 		logger?.debug(`Bundled main worker → ${bundledMainWorkerScriptPath}`)
 	}
 
-	/**
-	 * Build Miniflare configuration
-	 *
-	 * IMPORTANT: When using multi-worker setup, ALL workers must go in the
-	 * `workers` array. The FIRST worker is the entrypoint and receives all
-	 * HTTP requests. Top-level script/modules options are NOT used when
-	 * workers array is present.
-	 */
 	function buildMiniflareConfig(doResult: DOBundleResult | null) {
 		if (!config) throw new Error('Config not loaded')
 
-		const loadedConfig = config
-
-		const bindings = loadedConfig.bindings ?? {}
-		const persistPath = resolve(cwd, '.devflare/data')
-		const appWorkerName = loadedConfig.name
-		const shouldRunMainWorker = !enableVite && (
-			hasWorkerSurfacePaths(mainWorkerSurfacePaths)
-			|| Boolean(mainWorkerRoutes?.routes.length)
-		)
-		const queueProducers = buildQueueProducers(bindings)
-		const queueConsumers = buildQueueConsumers(bindings)
-
-		// Shared options (not worker-specific)
-		const sharedOptions: any = {
-			port: miniflarePort,
-			host: '127.0.0.1',
-
-			// Persistence paths
-			kvPersist: persist ? `${persistPath}/kv` : undefined,
-			r2Persist: persist ? `${persistPath}/r2` : undefined,
-			d1Persist: persist ? `${persistPath}/d1` : undefined,
-			durableObjectsPersist: persist ? `${persistPath}/do` : undefined
-		}
-
-		const createServiceBindings = (
-			extraBindings: Record<string, MiniflareServiceBinding> = {}
-		) => buildServiceBindings(bindings, extraBindings)
-
-		const sendEmailConfig = buildSendEmailConfig(bindings)
-
-		const workerContext: MakeMiniflareWorkerContext = {
+		return buildMiniflareDevConfig({
+			config,
 			cwd,
-			loadedConfig,
-			bindings,
-			sendEmailConfig,
-			queueProducers
-		}
-
-		const createWorkerConfig = (options: Parameters<typeof makeMiniflareWorker>[1]) =>
-			makeMiniflareWorker(workerContext, options)
-
-		// Gateway worker configuration (receives all HTTP requests)
-		// The first worker in the array is the entrypoint
-		const gatewayWorker = createWorkerConfig({
-			name: 'gateway',
-			script: getGatewayScript(
-				loadedConfig.wsRoutes,
-				debug,
-				shouldRunMainWorker ? INTERNAL_APP_SERVICE_BINDING : null
-			),
-			serviceBindings: shouldRunMainWorker
-				? createServiceBindings({
-					[INTERNAL_APP_SERVICE_BINDING]: { name: appWorkerName }
-				})
-				: createServiceBindings()
+			miniflarePort,
+			persist,
+			enableVite,
+			debug,
+			mainWorkerSurfacePaths,
+			mainWorkerRoutes,
+			mainWorkerScriptPath,
+			bundledMainWorkerScriptPath,
+			browserShimPort,
+			doResult,
+			logger
 		})
-		gatewayWorker.routes = ['*']
-
-		const hasDurableObjectBundles = !!doResult && doResult.bundles.size > 0
-		const browserBindingName = getSingleBrowserBindingName(bindings.browser)
-		const needsBrowserWorker = Boolean(browserBindingName && (hasDurableObjectBundles || shouldRunMainWorker))
-
-		// If there is no app worker, DO worker, or browser worker, keep the
-		// lightweight gateway-only configuration.
-		if (!shouldRunMainWorker && !hasDurableObjectBundles && !needsBrowserWorker) {
-			return {
-				...sharedOptions,
-				...gatewayWorker
-			}
-		}
-
-		// Multi-worker setup: gateway + DO workers + browser binding worker
-		// CRITICAL: First worker in array is entrypoint (receives HTTP requests)
-		const workers: any[] = []
-		const durableObjects: Record<string, { className: string; scriptName: string }> = {}
-
-		// Browser binding configuration
-		const browserShimUrl = `http://127.0.0.1:${browserShimPort}`
-		const browserWorkerName = 'browser-binding'
-
-		if (shouldRunMainWorker && mainWorkerScriptPath) {
-			const mainWorkerServiceBindings = createServiceBindings(
-				browserBindingName
-					? {
-						[browserBindingName]: { name: browserWorkerName }
-					}
-					: {}
-			)
-
-			const mainWorkerConfig = createWorkerConfig({
-				name: appWorkerName,
-				scriptPath: bundledMainWorkerScriptPath ?? mainWorkerScriptPath,
-				serviceBindings: mainWorkerServiceBindings,
-				queueConsumers,
-				triggers: loadedConfig.triggers?.crons?.length
-					? { crons: loadedConfig.triggers.crons }
-					: undefined
-			})
-
-			workers.push(mainWorkerConfig)
-		}
-
-		// Create a worker for each DO bundle
-		if (doResult) {
-			for (const [bindingName, bundlePath] of doResult.bundles) {
-				const className = doResult.classes.get(bindingName)
-				if (!className) continue
-
-				const workerName = `do-${bindingName.toLowerCase()}`
-
-				const workerConfig = createWorkerConfig({
-					name: workerName,
-					scriptPath: bundlePath,
-					durableObjects: {
-						[bindingName]: className
-					},
-					serviceBindings: createServiceBindings(
-						browserBindingName
-							? {
-								[browserBindingName]: { name: browserWorkerName }
-							}
-							: {}
-					)
-				})
-
-				if (browserBindingName) {
-					logger?.debug(`DO ${workerName} has browser service binding: ${browserBindingName} → ${browserWorkerName}`)
-				}
-
-				logger?.debug(`DO ${workerName} config:`, JSON.stringify(workerConfig, null, 2))
-				workers.push(workerConfig)
-
-				// Reference this worker from the gateway
-				durableObjects[bindingName] = {
-					className,
-					scriptName: workerName
-				}
-			}
-		}
-
-		// Add browser binding worker if configured
-		// This worker runs inside workerd and handles WebSocket upgrades properly
-		if (needsBrowserWorker) {
-			const browserWorker = createWorkerConfig({
-				name: browserWorkerName,
-				script: getBrowserBindingScript(browserShimUrl, debug)
-			})
-			workers.push(browserWorker)
-			logger?.info(`Browser binding worker configured: ${browserBindingName} → ${browserShimUrl}`)
-		}
-
-		// Add DO bindings to gateway worker
-		if (Object.keys(durableObjects).length > 0) {
-			gatewayWorker.durableObjects = durableObjects
-
-			if (shouldRunMainWorker) {
-				const mainWorker = workers.find((worker) => worker.name === appWorkerName)
-				if (mainWorker) {
-					mainWorker.durableObjects = durableObjects
-				}
-			}
-		}
-
-		// Return multi-worker config with gateway FIRST (entrypoint)
-		// Note: Browser binding uses Node.js handler (not a worker)
-		return {
-			...sharedOptions,
-			workers: [gatewayWorker, ...workers]
-		}
 	}
 
 	/**
