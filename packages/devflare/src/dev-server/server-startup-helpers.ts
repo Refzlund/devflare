@@ -10,6 +10,7 @@ import type { Miniflare as MiniflareType } from 'miniflare'
 import { resolve } from 'pathe'
 import { resolveConfigPath } from '../config/loader'
 import { createBrowserShim, type BrowserShim } from '../browser-shim'
+import { createDOBundler, type DOBundler, type DOBundleResult } from '../bundler'
 import type { DevflareConfig } from '../config/schema'
 import { getSingleBrowserBindingName } from '../config/schema'
 import type { RouteDiscoveryResult } from '../worker-entry/routes'
@@ -196,4 +197,41 @@ export async function maybeStartBrowserShim(
 	})
 	await shim.start()
 	return shim
+}
+
+/**
+ * If the config declares a `files.durableObjects` glob, construct a
+ * `DOBundler`, run an initial build, and start watching. Returns
+ * `{ bundler, result }` (`{ null, null }` when no DO pattern is configured).
+ * The `onRebuild` callback fires on each subsequent rebuild — typically used
+ * to schedule a Miniflare reload.
+ */
+export async function maybeStartDOBundler(
+	config: DevflareConfig,
+	options: {
+		cwd: string
+		logger?: ConsolaInstance
+		onRebuild: (result: DOBundleResult) => Promise<void>
+	}
+): Promise<{ bundler: DOBundler | null; result: DOBundleResult | null }> {
+	const doPattern = config.files?.durableObjects
+	if (typeof doPattern !== 'string' || !doPattern) {
+		return { bundler: null, result: null }
+	}
+
+	const outDir = resolve(options.cwd, '.devflare/do-bundles')
+	const bundler = createDOBundler({
+		cwd: options.cwd,
+		pattern: doPattern,
+		outDir,
+		rolldownOptions: config.rolldown?.options,
+		sourcemap: config.rolldown?.sourcemap,
+		minify: config.rolldown?.minify,
+		logger: options.logger,
+		onRebuild: options.onRebuild
+	})
+
+	const result = await bundler.build()
+	await bundler.watch()
+	return { bundler, result }
 }

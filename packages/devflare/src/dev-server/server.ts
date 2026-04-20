@@ -10,7 +10,7 @@ import { resolve } from 'pathe'
 import type { DevflareConfig } from '../config'
 import { loadConfig } from '../config/loader'
 import { type BrowserShim } from '../browser-shim'
-import { bundleWorkerEntry, createDOBundler, type DOBundler, type DOBundleResult } from '../bundler'
+import { bundleWorkerEntry, type DOBundler, type DOBundleResult } from '../bundler'
 import { checkRemoteBindingRequirements } from '../cli/wrangler-auth'
 import { clearLocalSendEmailBindings, setLocalSendEmailBindings } from '../utils/send-email'
 import { writeGeneratedViteConfig } from '../vite'
@@ -30,7 +30,7 @@ import {
 	type WorkerSurfacePaths
 } from './worker-surface-paths'
 import { applyWatcherTargetDiff, startWorkerSourceWatcher as createWorkerSourceWatcher } from './worker-source-watcher'
-import { logMiniflareBindingDiagnostics, logMiniflareConfigDiagnostics, logRemoteBindingRequirements, logWorkerHandlerDetection, maybeStartBrowserShim, resolveWorkerConfigWatchPath } from './server-startup-helpers'
+import { logMiniflareBindingDiagnostics, logMiniflareConfigDiagnostics, logRemoteBindingRequirements, logWorkerHandlerDetection, maybeStartBrowserShim, maybeStartDOBundler, resolveWorkerConfigWatchPath } from './server-startup-helpers'
 
 // -----------------------------------------------------------------------------
 
@@ -320,34 +320,16 @@ export function createDevServer(options: DevServerOptions): DevServer {
 		browserShim = await maybeStartBrowserShim(config, { browserShimPort, logger, verbose })
 
 		// Bundle DOs if pattern is set
-		const doPattern = config.files?.durableObjects
-		let doResult: DOBundleResult | null = null
-
-		if (typeof doPattern === 'string' && doPattern) {
-			const outDir = resolve(cwd, '.devflare/do-bundles')
-
-			doBundler = createDOBundler({
-				cwd,
-				pattern: doPattern,
-				outDir,
-				rolldownOptions: config.rolldown?.options,
-				sourcemap: config.rolldown?.sourcemap,
-				minify: config.rolldown?.minify,
-				logger,
-				onRebuild: async (result) => {
-					// Hot reload Miniflare when DOs change
-					await reloadMiniflare(result)
-				}
-			})
-
-			// Initial build
-			doResult = await doBundler.build()
-			currentDoResult = doResult
-
-			// Start watching
-			await doBundler.watch()
-		}
-
+		const doInit = await maybeStartDOBundler(config, {
+			cwd,
+			logger,
+			onRebuild: async (result) => {
+				// Hot reload Miniflare when DOs change
+				await reloadMiniflare(result)
+			}
+		})
+		doBundler = doInit.bundler
+		const doResult: DOBundleResult | null = doInit.result
 		currentDoResult = doResult
 
 		// Start Miniflare
