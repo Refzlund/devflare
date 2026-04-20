@@ -13,6 +13,8 @@ import {
 	prepareConfigResourcesForDeploy,
 	readWranglerConfig,
 	resolveConfigForEnvironment,
+	ServiceBindingValidationError,
+	validateServiceBindings,
 	type DeployResourceNames,
 	type DevflareConfig,
 	type PrepareConfigResourcesForDeployResult,
@@ -25,6 +27,7 @@ import {
 	getWorkersSubdomain,
 	listWorkerDeployments
 } from '../../cloudflare/account'
+import { listWorkers } from '../../cloudflare/account-workers'
 import { getEffectiveAccountId } from '../../cloudflare/preferences'
 import { stringifyConfig, writeWranglerConfig } from '../../config/compiler'
 import { getDependencies } from '../dependencies'
@@ -200,21 +203,50 @@ async function prepareDeployConfig(options: {
 		branchName: options.branchName,
 		previewBranch: process.env.DEVFLARE_PREVIEW_BRANCH
 	})
+
+	// C16: deploy-time service-binding preflight. Surface typos in
+	// `bindings.services[*].service` before invoking Wrangler so users get
+	// a clear error pointing at the config instead of a runtime dispatch
+	// failure on the deployed worker.
+	const validationAccountId = previewScopedResources?.accountId
+		?? deploymentStrategy.config.accountId
+		?? process.env.CLOUDFLARE_ACCOUNT_ID
+	if (validationAccountId) {
+		try {
+			await validateServiceBindings(deploymentStrategy.config, validationAccountId, {
+				listWorkers: (accountId) => listWorkers(accountId),
+				selfWorkerName: deploymentStrategy.config.name
+			})
+		} catch (error) {
+			if (error instanceof ServiceBindingValidationError) {
+				throw error
+			}
+			// Non-validation failures (network/credentials) are non-fatal
+			// preflight noise - Wrangler's own deploy will surface auth
+			// problems clearly, and we don't want preflight to block when
+			// the validation account lookup itself fails.
+		}
+	}
+
 	const buildWranglerConfig = await readWranglerConfig(options.buildConfigPath)
 	const wranglerConfig = withBuildArtifactPaths(
 		compileConfig(deploymentStrategy.config),
 		buildWranglerConfig
 	)
 
-	await writeWranglerConfig(
-		dirname(options.buildConfigPath),
-		wranglerConfig,
-		basename(options.buildConfigPath)
-	)
+	// C4: write the resolved (ID-substituted) wrangler config to a sibling
+	// `.devflare/deploy/wrangler.jsonc` instead of overwriting the build
+	// artefact in place. Re-running `devflare deploy --build <path>` is
+	// non-destructive to the original build output.
+	const buildDir = dirname(options.buildConfigPath)
+	const deployArtefactDir = resolve(buildDir, '..', 'deploy')
+	await mkdir(deployArtefactDir, { recursive: true })
+	const deployArtefactPath = resolve(deployArtefactDir, 'wrangler.jsonc')
+	await writeWranglerConfig(deployArtefactDir, wranglerConfig, 'wrangler.jsonc')
 
 	return {
 		config: deploymentStrategy.config,
-		deployConfigPath: options.buildConfigPath,
+		deployConfigPath: deployArtefactPath,
 		previewScopedResources,
 		deployResources,
 		wranglerConfig

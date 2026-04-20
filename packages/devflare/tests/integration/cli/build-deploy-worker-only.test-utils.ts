@@ -594,7 +594,16 @@ export async function readGeneratedDevConfig(projectDir: string): Promise<string
 }
 
 export async function readGeneratedDeployConfig(projectDir: string): Promise<string> {
-	return readFile(join(projectDir, '.devflare', 'build', 'wrangler.jsonc'), 'utf8')
+	// R2: deploy now writes the resolved (ID-substituted) wrangler config to
+	// `.devflare/deploy/wrangler.jsonc` instead of overwriting the build
+	// artefact. Fall back to the legacy build path for tests/cases that
+	// only exercise the build artefact (no deploy step run yet).
+	const deployPath = join(projectDir, '.devflare', 'deploy', 'wrangler.jsonc')
+	try {
+		return await readFile(deployPath, 'utf8')
+	} catch {
+		return readFile(join(projectDir, '.devflare', 'build', 'wrangler.jsonc'), 'utf8')
+	}
 }
 
 export function isViteBuildExecution(command: string, args: string[]): boolean {

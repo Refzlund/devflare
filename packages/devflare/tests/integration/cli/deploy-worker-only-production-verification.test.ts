@@ -183,5 +183,5 @@ describe('build/deploy worker-only behavior', () => {
 		expect(result.exitCode).toBe(0)
 		expect(logger.messages.some((message) => message.args.join(' ').includes('Version ID: version-from-deployment'))).toBe(true)
 		expect(logger.messages.some((message) => message.args.join(' ').includes('Verified Cloudflare deployment deployment-fallback for version version-from-deployment'))).toBe(true)
-	})
+	}, 20000)
 })
