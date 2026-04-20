@@ -17,20 +17,8 @@ import { resolve } from 'pathe'
 import type { Plugin, ResolvedConfig, ViteDevServer } from 'vite'
 import { loadConfig } from '../config/loader'
 import type { DevflareConfig } from '../config/schema'
+import type { WranglerConfig } from '../config/compiler'
 import {
-	loadResolvedConfig,
-	resolveConfigForLocalRuntime
-} from '../config'
-import {
-	compileConfig,
-	compileToProgrammaticConfig,
-	type WranglerConfig
-} from '../config/compiler'
-import { DEFAULT_DO_PATTERN } from '../utils/glob'
-import { prepareComposedWorkerEntrypoint } from '../worker-entry/composed-worker'
-import {
-	createAuxiliaryWorkerConfig,
-	discoverDurableObjects,
 	generateVirtualDOEntry,
 	logDiscoveredDurableObjects,
 	RESOLVED_VIRTUAL_DO_ENTRY,
@@ -427,120 +415,9 @@ export function devflarePlugin(options: DevflarePluginOptions = {}): Plugin {
 
 /**
  * Get cloudflare config for programmatic use with @cloudflare/vite-plugin.
- * Call this in vite.config.ts before setting up plugins.
- *
- * By default the config is resolved **offline** using local stable
- * identifiers (no Cloudflare credentials required — matches the Miniflare /
- * workerd behaviour of `vite dev`). Pass `{ resolve: 'remote' }` to restore
- * the legacy behaviour that talks to the Cloudflare API and fails without
- * credentials (e.g. when you want the programmatic config to reflect real
- * production IDs during an automation script).
+ * Re-exported from `./plugin-programmatic`.
  */
-export async function getCloudflareConfig(options: {
-	cwd?: string
-	configPath?: string
-	environment?: string
-	/**
-	 * Resolution strategy for name-based KV/D1/Hyperdrive bindings.
-	 * - `'offline-local'` (default) — no network; use stable local identifiers
-	 * - `'remote'` — resolve against the live Cloudflare account (legacy)
-	 */
-	resolve?: 'offline-local' | 'remote'
-} = {}): Promise<Record<string, unknown>> {
-	const cwd = options.cwd ?? process.cwd()
-	const strategy = options.resolve ?? 'offline-local'
-	const devflareConfig = strategy === 'remote'
-		? await loadResolvedConfig({
-			cwd,
-			configFile: options.configPath,
-			environment: options.environment
-		})
-		: resolveConfigForLocalRuntime(
-			await loadConfig({ cwd, configFile: options.configPath }),
-			options.environment
-		)
-	const composedMainEntry = await prepareComposedWorkerEntrypoint(cwd, devflareConfig)
-	const cloudflareConfig = compileToProgrammaticConfig(devflareConfig)
-	if (composedMainEntry) {
-		cloudflareConfig.main = composedMainEntry
-	}
-
-	return cloudflareConfig
-}
-
-/**
- * Get auxiliary worker configs for Durable Objects
- * Use this when configuring @cloudflare/vite-plugin's auxiliaryWorkers option
- *
- * @example
- * ```ts
- * const { cloudflareConfig, auxiliaryWorkers } = await getDevflareConfigs()
- *
- * cloudflare({
- *   config: cloudflareConfig,
- *   auxiliaryWorkers
- * })
- * ```
- */
-export async function getDevflareConfigs(options: {
-	cwd?: string
-	configPath?: string
-	environment?: string
-	/**
-	 * Resolution strategy for name-based KV/D1/Hyperdrive bindings.
-	 * - `'offline-local'` (default) — no network; use stable local identifiers
-	 * - `'remote'` — resolve against the live Cloudflare account (legacy)
-	 */
-	resolve?: 'offline-local' | 'remote'
-} = {}): Promise<{
-	cloudflareConfig: Record<string, unknown>
-	auxiliaryWorkers: AuxiliaryWorkerConfig[]
-}> {
-	const cwd = options.cwd ?? process.cwd()
-	const strategy = options.resolve ?? 'offline-local'
-	const devflareConfig = strategy === 'remote'
-		? await loadResolvedConfig({
-			cwd,
-			configFile: options.configPath,
-			environment: options.environment
-		})
-		: resolveConfigForLocalRuntime(
-			await loadConfig({ cwd, configFile: options.configPath }),
-			options.environment
-		)
-	const composedMainEntry = await prepareComposedWorkerEntrypoint(cwd, devflareConfig)
-
-	const wranglerConfig = compileConfig(devflareConfig)
-	const cloudflareConfig = { ...wranglerConfig }
-	if (composedMainEntry) {
-		wranglerConfig.main = composedMainEntry
-		cloudflareConfig.main = composedMainEntry
-	}
-
-	const auxiliaryWorkers: AuxiliaryWorkerConfig[] = []
-
-	// Check for DO pattern (use default if not explicitly set to false)
-	const doPatternConfig = devflareConfig.files?.durableObjects
-	const doPattern = typeof doPatternConfig === 'string' ? doPatternConfig : DEFAULT_DO_PATTERN
-	if (doPatternConfig !== false) {
-		const doWorkerName = `${wranglerConfig.name}-do`
-		const discovery = await discoverDurableObjects(cwd, doPattern, doWorkerName)
-
-		if (discovery.files.size > 0) {
-			// Update main worker's DO bindings with script_name
-			if (cloudflareConfig.durable_objects) {
-				const doConfig = cloudflareConfig.durable_objects as { bindings: Array<{ script_name?: string }> }
-				for (const binding of doConfig.bindings) {
-					binding.script_name = doWorkerName
-				}
-			}
-
-			auxiliaryWorkers.push(createAuxiliaryWorkerConfig(wranglerConfig, discovery))
-		}
-	}
-
-	return { cloudflareConfig, auxiliaryWorkers }
-}
+export { getCloudflareConfig, getDevflareConfigs } from './plugin-programmatic'
 
 // Default export for convenience
 export default devflarePlugin
