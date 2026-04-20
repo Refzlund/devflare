@@ -247,6 +247,57 @@ export const kvBindingSchema = z.union([
 ])
 
 /**
+ * C17 — mTLS Certificate binding.
+ * The id is the UUID returned by `wrangler mtls-certificate upload`.
+ */
+export const mtlsCertificateBindingSchema = z.union([
+	z.string(),
+	z.object({
+		certificate_id: z.string()
+	}).strict()
+])
+
+/**
+ * C17 — Workers for Platforms (Dispatch Namespace) binding.
+ */
+export const dispatchNamespaceBindingSchema = z.union([
+	z.string(),
+	z.object({
+		namespace: z.string(),
+		outbound: z.object({
+			service: z.string(),
+			environment: z.string().optional(),
+			parameters: z.array(z.string()).optional()
+		}).optional()
+	}).strict()
+])
+
+/**
+ * C17 — Workflows-as-binding (a workflow class exposed for another worker
+ * to invoke). Distinct from a worker declaring its own workflows.
+ */
+export const workflowBindingSchema = z.object({
+	name: z.string(),
+	className: z.string(),
+	scriptName: z.string().optional()
+}).strict()
+
+/**
+ * C17 — Cloudflare Pipelines binding.
+ */
+export const pipelineBindingSchema = z.union([
+	z.string(),
+	z.object({
+		pipeline: z.string()
+	}).strict()
+])
+
+/**
+ * C17 — Cloudflare Images binding (transformation/upload service).
+ */
+export const imagesBindingSchema = z.object({}).strict().or(z.literal(true))
+
+/**
  * All worker bindings configuration.
  * Defines connections to Cloudflare services and resources.
  */
@@ -314,7 +365,44 @@ export const bindingsSchema = z.object({
 	/**
 	 * Email sending bindings.
 	 */
-	sendEmail: z.record(z.string(), sendEmailBindingSchema).optional()
+	sendEmail: z.record(z.string(), sendEmailBindingSchema).optional(),
+
+	/**
+	 * C17 — mTLS Certificate bindings.
+	 * Maps a binding name to the certificate UUID issued via
+	 * `wrangler mtls-certificate upload`. The runtime exposes the certificate
+	 * to the worker as `env.<binding>` for use with `fetch`'s `mTLS` option.
+	 */
+	mtlsCertificates: z.record(z.string(), mtlsCertificateBindingSchema).optional(),
+
+	/**
+	 * C17 — Workers for Platforms (Dispatch Namespace) bindings.
+	 * Maps a binding name to the dispatch namespace name. Allows a parent
+	 * worker to look up and dispatch to user workers stored in the namespace.
+	 */
+	dispatchNamespaces: z.record(z.string(), dispatchNamespaceBindingSchema).optional(),
+
+	/**
+	 * C17 — Workflows-as-binding.
+	 * Maps a binding name to a workflow class hosted by another worker (or
+	 * the same worker, via `scriptName`). Distinct from `bindings.workflows`
+	 * declarations of workflows defined IN this worker.
+	 */
+	workflows: z.record(z.string(), workflowBindingSchema).optional(),
+
+	/**
+	 * C17 — Pipelines bindings.
+	 * Maps a binding name to a Cloudflare Pipelines pipeline (R2-backed
+	 * streaming ingestion).
+	 */
+	pipelines: z.record(z.string(), pipelineBindingSchema).optional(),
+
+	/**
+	 * C17 — Cloudflare Images binding.
+	 * Maps a binding name to access the Images service from the worker
+	 * (transformation/upload via `env.<binding>`).
+	 */
+	images: z.record(z.string(), imagesBindingSchema).optional()
 }).optional()
 
 export type BrowserBindings = z.infer<typeof browserBindingSchema>
@@ -325,3 +413,8 @@ export type KVBinding = z.infer<typeof kvBindingSchema>
 export type QueueConsumer = z.infer<typeof queueConsumerSchema>
 export type QueuesConfig = z.infer<typeof queuesConfigSchema>
 export type ServiceBinding = z.infer<typeof serviceBindingSchema>
+export type MtlsCertificateBinding = z.infer<typeof mtlsCertificateBindingSchema>
+export type DispatchNamespaceBinding = z.infer<typeof dispatchNamespaceBindingSchema>
+export type WorkflowBinding = z.infer<typeof workflowBindingSchema>
+export type PipelineBinding = z.infer<typeof pipelineBindingSchema>
+export type ImagesBinding = z.infer<typeof imagesBindingSchema>
