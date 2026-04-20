@@ -20,7 +20,6 @@ import { BridgeClient } from '../bridge/client'
 import { createEnvProxy, setBindingHints, type BindingHints } from '../bridge/proxy'
 import { isRemoteModeActive } from '../cloudflare/remote-config'
 import { __clearTestContext, __setTestContext } from '../env'
-import { discoverRoutes } from '../worker-entry/routes'
 import { createRemoteAI } from './remote-ai'
 import { createRemoteVectorize } from './remote-vectorize'
 import { hasCrossWorkerDOs, hasServiceBindings, resolveDOBindings, resolveServiceBindings } from './resolve-service-bindings'
@@ -28,6 +27,7 @@ import { buildDurableObjectGateway } from './simple-context-durable-objects'
 import { findNearestConfig, getAvailablePort, getCallerDirectory, resolveTransportFile } from './simple-context-paths'
 import { createLocalSendEmailBinding, wrapEnvSendEmailBindings } from '../utils/send-email'
 import { extractBindingHints } from './binding-hints'
+import { resolveHandlerPaths } from './simple-context-handlers'
 import { startBridgeBackedTestContext } from './simple-context-startup'
 
 // Handler helper configuration
@@ -368,43 +368,13 @@ export async function createTestContext(configPath?: string): Promise<void> {
 		}) as Record<string, unknown>
 	}
 
-	const queuePath = config.files?.queue
-	const scheduledPath = config.files?.scheduled
-	const fetchPath = config.files?.fetch
-	const emailPath = config.files?.email
-
-	const DEFAULT_FETCH_PATH = 'src/fetch.ts'
-	const DEFAULT_QUEUE_PATH = 'src/queue.ts'
-	const DEFAULT_SCHEDULED_PATH = 'src/scheduled.ts'
-	const DEFAULT_EMAIL_PATH = 'src/email.ts'
-	const DEFAULT_TAIL_PATH = 'src/tail.ts'
-
-	const resolvePath = async (configValue: string | false | undefined, defaultPath: string): Promise<string | null> => {
-		if (typeof configValue === 'string') {
-			return configValue
-		}
-		if (configValue === false) {
-			return null
-		}
-
-		const defaultAbsolute = join(configDir, defaultPath)
-		try {
-			const fs = await import('fs/promises')
-			await fs.access(defaultAbsolute)
-			return defaultPath
-		} catch {
-			return null
-		}
-	}
-
-	const [resolvedFetchPath, resolvedQueuePath, resolvedScheduledPath, resolvedEmailPath, resolvedTailPath, resolvedRoutes] = await Promise.all([
-		resolvePath(fetchPath, DEFAULT_FETCH_PATH),
-		resolvePath(queuePath, DEFAULT_QUEUE_PATH),
-		resolvePath(scheduledPath, DEFAULT_SCHEDULED_PATH),
-		resolvePath(emailPath, DEFAULT_EMAIL_PATH),
-		resolvePath(undefined, DEFAULT_TAIL_PATH),
-		discoverRoutes(configDir, config)
-	])
+	const handlerPaths = await resolveHandlerPaths(configDir, config)
+	const resolvedFetchPath = handlerPaths.fetch
+	const resolvedQueuePath = handlerPaths.queue
+	const resolvedScheduledPath = handlerPaths.scheduled
+	const resolvedEmailPath = handlerPaths.email
+	const resolvedTailPath = handlerPaths.tail
+	const resolvedRoutes = handlerPaths.routes
 
 	configureQueue({
 		handlerPath: resolvedQueuePath,
