@@ -86,3 +86,38 @@ export function buildWebSocketProxyConfig(
 	console.log(`[devflare] WebSocket proxy configured for: ${patterns.join(', ')}`)
 	return proxyConfig
 }
+
+/**
+ * Build the additional Vite config returned by the plugin's `config()` hook.
+ * Loads the devflare config, derives `define` and (in dev under
+ * `DEVFLARE_DEV`) `server.proxy`. Returns `undefined` when there is nothing
+ * to merge.
+ */
+export async function buildPluginConfigHookResult(
+	cwd: string,
+	options: {
+		configPath: string | undefined
+		bridgePort: number | undefined
+		wsProxyPatterns: string[]
+	},
+	command: 'serve' | 'build',
+	existingDefine: Record<string, unknown>
+): Promise<Record<string, unknown> | undefined> {
+	const lfConfig = await tryLoadDevflareConfig(cwd, options.configPath, command)
+
+	const returnConfig: Record<string, unknown> = {}
+
+	if (lfConfig) {
+		returnConfig.define = buildWorkerNameDefine(lfConfig, existingDefine)
+	}
+
+	if (command === 'serve' && process.env.DEVFLARE_DEV && lfConfig) {
+		const port = options.bridgePort ?? 8787
+		const proxyConfig = buildWebSocketProxyConfig(lfConfig, port, options.wsProxyPatterns)
+		if (proxyConfig) {
+			returnConfig.server = { proxy: proxyConfig }
+		}
+	}
+
+	return Object.keys(returnConfig).length > 0 ? returnConfig : undefined
+}

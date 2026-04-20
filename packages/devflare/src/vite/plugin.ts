@@ -32,9 +32,7 @@ import {
 	writeGeneratedWranglerConfig
 } from './plugin-context'
 import {
-	buildWebSocketProxyConfig,
-	buildWorkerNameDefine,
-	tryLoadDevflareConfig
+	buildPluginConfigHookResult
 } from './plugin-config-hook'
 import { runDevflareTransform } from './plugin-transform'
 
@@ -236,24 +234,12 @@ export function devflarePlugin(options: DevflarePluginOptions = {}): Plugin {
 		// Also inject build-time constants (workerName)
 		async config(config, { command }) {
 			const cwd = config.root ?? process.cwd()
-			const returnConfig: Record<string, unknown> = {}
-
-			const lfConfig = await tryLoadDevflareConfig(cwd, configPath, command as 'serve' | 'build')
-
-			if (lfConfig) {
-				returnConfig.define = buildWorkerNameDefine(lfConfig, (config.define ?? {}) as Record<string, unknown>)
-			}
-
-			// Only add proxy in dev mode when running under devflare dev
-			if (command === 'serve' && process.env.DEVFLARE_DEV && lfConfig) {
-				const port = bridgePort ?? 8787
-				const proxyConfig = buildWebSocketProxyConfig(lfConfig, port, wsProxyPatterns)
-				if (proxyConfig) {
-					returnConfig.server = { proxy: proxyConfig }
-				}
-			}
-
-			return Object.keys(returnConfig).length > 0 ? returnConfig : undefined
+			return buildPluginConfigHookResult(
+				cwd,
+				{ configPath, bridgePort, wsProxyPatterns },
+				command as 'serve' | 'build',
+				(config.define ?? {}) as Record<string, unknown>
+			)
 		},
 
 		// Handle virtual module resolution
