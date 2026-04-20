@@ -350,9 +350,12 @@ function compileConfigInternal(
  */
 export function compileToProgrammaticConfig(
 	config: DevflareConfig,
-	environment?: string
+	environment?: string,
+	options: { preserveNamedBindings?: boolean } = {}
 ): Record<string, unknown> {
-	return compileConfig(config, environment)
+	return options.preserveNamedBindings
+		? compileBuildConfig(config, environment)
+		: compileConfig(config, environment)
 }
 
 /**

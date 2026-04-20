@@ -19,9 +19,11 @@ import { loadConfig, resolveConfigPath } from '../config/loader'
 import type { DevflareConfig } from '../config/schema'
 import {
 	loadResolvedConfig,
+	resolveConfigForEnvironment,
 	resolveConfigForLocalRuntime
 } from '../config'
 import {
+	compileBuildConfig,
 	compileConfig,
 	compileToProgrammaticConfig,
 	isolateViteBuildOutputPaths,
@@ -277,15 +279,28 @@ async function buildPluginContextState(
 	environment?: string,
 	mode: 'serve' | 'build' = 'serve'
 ): Promise<ResolvedPluginContextState> {
-	const effectiveConfig = resolveConfigForLocalRuntime(devflareConfig, environment)
-	const compiledWranglerConfig = compileConfig(effectiveConfig)
+	// Dev/serve: materialize names -> stable local identifiers (miniflare friendly).
+	// Build: preserve names in the emitted Wrangler artefact so deploy can
+	// later resolve them against the real Cloudflare account. Previously the
+	// build path also used the local-runtime identifiers, producing a
+	// distributable that silently contained fake IDs in place of name-only
+	// bindings (C1).
+	const effectiveConfig = mode === 'build'
+		? resolveConfigForEnvironment(devflareConfig, environment)
+		: resolveConfigForLocalRuntime(devflareConfig, environment)
+	const compiledWranglerConfig = mode === 'build'
+		? compileBuildConfig(effectiveConfig)
+		: compileConfig(effectiveConfig)
 	const wranglerConfig = mode === 'build'
 		? isolateViteBuildOutputPaths(projectRoot, compiledWranglerConfig)
 		: compiledWranglerConfig
 	const cloudflareConfig = {
 		...(mode === 'build'
-			? isolateViteBuildOutputPaths(projectRoot, compileToProgrammaticConfig(effectiveConfig) as WranglerConfig)
-			: compileToProgrammaticConfig(effectiveConfig))
+			? isolateViteBuildOutputPaths(
+				projectRoot,
+				compileToProgrammaticConfig(effectiveConfig, environment, { preserveNamedBindings: true }) as WranglerConfig
+			)
+			: compileToProgrammaticConfig(effectiveConfig, environment))
 	}
 	const composedMainEntry = mode === 'build'
 		? null
@@ -639,20 +654,39 @@ export function devflarePlugin(options: DevflarePluginOptions = {}): Plugin {
 }
 
 /**
- * Get cloudflare config for programmatic use with @cloudflare/vite-plugin
- * Call this in vite.config.ts before setting up plugins
+ * Get cloudflare config for programmatic use with @cloudflare/vite-plugin.
+ * Call this in vite.config.ts before setting up plugins.
+ *
+ * By default the config is resolved **offline** using local stable
+ * identifiers (no Cloudflare credentials required — matches the Miniflare /
+ * workerd behaviour of `vite dev`). Pass `{ resolve: 'remote' }` to restore
+ * the legacy behaviour that talks to the Cloudflare API and fails without
+ * credentials (e.g. when you want the programmatic config to reflect real
+ * production IDs during an automation script).
  */
 export async function getCloudflareConfig(options: {
 	cwd?: string
 	configPath?: string
 	environment?: string
+	/**
+	 * Resolution strategy for name-based KV/D1/Hyperdrive bindings.
+	 * - `'offline-local'` (default) — no network; use stable local identifiers
+	 * - `'remote'` — resolve against the live Cloudflare account (legacy)
+	 */
+	resolve?: 'offline-local' | 'remote'
 } = {}): Promise<Record<string, unknown>> {
 	const cwd = options.cwd ?? process.cwd()
-	const devflareConfig = await loadResolvedConfig({
-		cwd,
-		configFile: options.configPath,
-		environment: options.environment
-	})
+	const strategy = options.resolve ?? 'offline-local'
+	const devflareConfig = strategy === 'remote'
+		? await loadResolvedConfig({
+			cwd,
+			configFile: options.configPath,
+			environment: options.environment
+		})
+		: resolveConfigForLocalRuntime(
+			await loadConfig({ cwd, configFile: options.configPath }),
+			options.environment
+		)
 	const composedMainEntry = await prepareComposedWorkerEntrypoint(cwd, devflareConfig)
 	const cloudflareConfig = compileToProgrammaticConfig(devflareConfig)
 	if (composedMainEntry) {
@@ -680,16 +714,28 @@ export async function getDevflareConfigs(options: {
 	cwd?: string
 	configPath?: string
 	environment?: string
+	/**
+	 * Resolution strategy for name-based KV/D1/Hyperdrive bindings.
+	 * - `'offline-local'` (default) — no network; use stable local identifiers
+	 * - `'remote'` — resolve against the live Cloudflare account (legacy)
+	 */
+	resolve?: 'offline-local' | 'remote'
 } = {}): Promise<{
 	cloudflareConfig: Record<string, unknown>
 	auxiliaryWorkers: AuxiliaryWorkerConfig[]
 }> {
 	const cwd = options.cwd ?? process.cwd()
-	const devflareConfig = await loadResolvedConfig({
-		cwd,
-		configFile: options.configPath,
-		environment: options.environment
-	})
+	const strategy = options.resolve ?? 'offline-local'
+	const devflareConfig = strategy === 'remote'
+		? await loadResolvedConfig({
+			cwd,
+			configFile: options.configPath,
+			environment: options.environment
+		})
+		: resolveConfigForLocalRuntime(
+			await loadConfig({ cwd, configFile: options.configPath }),
+			options.environment
+		)
 	const composedMainEntry = await prepareComposedWorkerEntrypoint(cwd, devflareConfig)
 
 	const wranglerConfig = compileConfig(devflareConfig)
