@@ -87,11 +87,18 @@ export function hasWranglerConfig(): boolean {
 }
 
 /**
- * Parse TOML-like config file (simple parser for wrangler's format)
+ * Parse TOML-like config file (simple parser for wrangler's format).
+ *
+ * Wrangler's OAuth config is flat root-section key/value pairs. Any keys
+ * inside a `[section]` header are deliberately ignored so that a future
+ * wrangler release that adds a section does not silently leak unrelated
+ * keys into our lookup (e.g. a `[section]\noauth_token = "x"` under a
+ * non-root section would otherwise be picked up as the root token).
  */
 function parseSimpleToml(content: string): Record<string, string> {
 	const result: Record<string, string> = {}
 	const lines = content.split('\n')
+	let inRootSection = true
 
 	for (const line of lines) {
 		const trimmed = line.trim()
@@ -99,8 +106,14 @@ function parseSimpleToml(content: string): Record<string, string> {
 		// Skip comments and empty lines
 		if (trimmed.startsWith('#') || trimmed === '') continue
 
-		// Skip section headers
-		if (trimmed.startsWith('[')) continue
+		// Track section headers: we only accept keys from the implicit root
+		// section (before any `[section]` header).
+		if (trimmed.startsWith('[')) {
+			inRootSection = false
+			continue
+		}
+
+		if (!inRootSection) continue
 
 		// Parse key = "value" or key = 'value'
 		const match = trimmed.match(/^(\w+)\s*=\s*["'](.*)["']$/)

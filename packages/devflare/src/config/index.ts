@@ -87,6 +87,18 @@ export {
 	type PrepareConfigResourcesForDeployResult,
 	type PrepareMaterializedConfigResourcesForDeployOptions
 } from './deploy-resources'
+export {
+	resolveResources,
+	type BuildConfig,
+	type LocalConfig,
+	type DeployConfig,
+	type Phase,
+	type PhaseConfig,
+	type ResolveResourcesOptions,
+	type ResolveResourcesBuildOptions,
+	type ResolveResourcesLocalOptions,
+	type ResolveResourcesDeployOptions
+} from './resolve-phased'
 
 // Cross-config referencing
 export {

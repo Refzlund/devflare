@@ -1,4 +1,4 @@
-import { apiDelete, apiGetAll, apiPost, type APIClientOptions } from './api'
+import { apiDelete, apiGetAll, apiPost, CloudflareAPIError, type APIClientOptions } from './api'
 import type {
 	AIModel,
 	AIModelInfo,
@@ -311,8 +311,15 @@ export async function listVectorizeIndexes(
 			metric: index.config.metric,
 			description: index.description
 		}))
-	} catch {
-		return []
+	} catch (error) {
+		// Swallow only "endpoint not available on this account" style errors
+		// (404). Any other failure — auth (401/403), rate limit (429), 5xx —
+		// must be surfaced so callers don't silently treat the account as
+		// empty and re-create resources or skip a validation step.
+		if (error instanceof CloudflareAPIError && error.code === 404) {
+			return []
+		}
+		throw error
 	}
 }
 

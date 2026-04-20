@@ -1,0 +1,131 @@
+// =============================================================================
+// Phase-discriminated resolver (R1 step 1 - facade + branded phase types)
+// =============================================================================
+// This module exposes a single `resolveResources({ phase })` entry point that
+// unifies the three lifecycle consumers documented in
+// `tests/unit/config/resolver-contract.test.ts`:
+//
+//   * build   - preserves name-based KV/D1/Hyperdrive bindings (no network)
+//   * local   - materializes name-based bindings into stable local identifiers
+//   * deploy  - resolves or provisions concrete Cloudflare IDs
+//
+// Today this is a facade - it delegates to the existing helpers without
+// changing behavior, so the resolver-contract regression gate stays green.
+// Subsequent R1 steps collapse the duplicated internals and brand the return
+// type per phase so that `compileConfig` can refuse an unresolved config at
+// the type level.
+//
+// See `.local/refactors/R1-phase-discriminated-resolver.md` for the plan.
+// =============================================================================
+
+import {
+prepareMaterializedConfigResourcesForDeploy,
+type PrepareMaterializedConfigResourcesForDeployOptions
+} from './deploy-resources'
+import { materializePreviewScopedConfig, type PreviewResolutionOptions } from './preview'
+import { mergeConfigForEnvironment } from './resolve'
+import {
+resolveConfigForLocalRuntime,
+resolveMaterializedConfigResources,
+type ResolveMaterializedConfigResourcesOptions
+} from './resource-resolution'
+import type { DevflareConfig } from './schema'
+
+declare const __phaseBrand: unique symbol
+
+/**
+ * `DevflareConfig` after the build-phase pipeline. KV/D1/Hyperdrive bindings
+ * may still carry `{ name }`-only entries because the build artefact is
+ * reproducible offline and resolves IDs at deploy.
+ */
+export type BuildConfig = DevflareConfig & { readonly [__phaseBrand]: 'build' }
+
+/**
+ * `DevflareConfig` after the local-phase pipeline. KV/D1/Hyperdrive bindings
+ * have been materialized into stable local identifiers via
+ * `getLocalXIdentifier()` helpers.
+ */
+export type LocalConfig = DevflareConfig & { readonly [__phaseBrand]: 'local' }
+
+/**
+ * `DevflareConfig` after the deploy-phase pipeline. KV/D1/Hyperdrive bindings
+ * have been resolved (and optionally provisioned) against a live Cloudflare
+ * account.
+ */
+export type DeployConfig = DevflareConfig & { readonly [__phaseBrand]: 'deploy' }
+
+export type Phase = 'build' | 'local' | 'deploy'
+
+export type PhaseConfig<P extends Phase> =
+P extends 'build' ? BuildConfig
+: P extends 'local' ? LocalConfig
+: P extends 'deploy' ? DeployConfig
+: never
+
+export interface ResolveResourcesCommonOptions {
+environment?: string
+preview?: PreviewResolutionOptions
+}
+
+export interface ResolveResourcesBuildOptions extends ResolveResourcesCommonOptions {
+phase: 'build'
+}
+
+export interface ResolveResourcesLocalOptions extends ResolveResourcesCommonOptions {
+phase: 'local'
+}
+
+export interface ResolveResourcesDeployOptions
+extends ResolveResourcesCommonOptions,
+ResolveMaterializedConfigResourcesOptions {
+phase: 'deploy'
+provision?: boolean
+preparation?: PrepareMaterializedConfigResourcesForDeployOptions
+}
+
+export type ResolveResourcesOptions =
+| ResolveResourcesBuildOptions
+| ResolveResourcesLocalOptions
+| ResolveResourcesDeployOptions
+
+/**
+ * Unified phase-discriminated resource resolver. Facade over the legacy
+ * per-phase helpers; stamps the appropriate phase brand on the returned
+ * config so callers can narrow at the type layer.
+ */
+export async function resolveResources<O extends ResolveResourcesOptions>(
+config: DevflareConfig,
+options: O
+): Promise<PhaseConfig<O['phase']>> {
+const envMerged = mergeConfigForEnvironment(config, options.environment)
+const previewMerged = options.preview
+? materializePreviewScopedConfig(envMerged, options.preview)
+: envMerged
+
+switch (options.phase) {
+case 'build': {
+return previewMerged as PhaseConfig<O['phase']>
+}
+case 'local': {
+const resolved = resolveConfigForLocalRuntime(previewMerged, undefined)
+return resolved as PhaseConfig<O['phase']>
+}
+case 'deploy': {
+if (options.provision) {
+const prepared = await prepareMaterializedConfigResourcesForDeploy(
+previewMerged,
+options.preparation ?? {
+accountId: options.accountId,
+cloudflare: options.cloudflare
+}
+)
+return prepared.config as PhaseConfig<O['phase']>
+}
+const materialized = await resolveMaterializedConfigResources(previewMerged, {
+accountId: options.accountId,
+cloudflare: options.cloudflare
+})
+return materialized as PhaseConfig<O['phase']>
+}
+}
+}

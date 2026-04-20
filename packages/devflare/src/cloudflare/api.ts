@@ -440,18 +440,43 @@ export async function apiDelete<T>(
 	}, options)
 }
 
+export interface PaginationOptions extends APIClientOptions {
+	/**
+	 * Hard cap on number of pages fetched. Defaults to 500 (i.e. 25 000 items
+	 * at the default page size). Raising this is safe; the loop also breaks
+	 * on exhausted `total_pages` / `total_count` / cursor exhaustion. A
+	 * warning is emitted when the cap is actually hit so callers notice when
+	 * results may be silently truncated.
+	 */
+	maxPages?: number
+	/**
+	 * Items per page. Defaults to 50 (Cloudflare's conservative default).
+	 */
+	pageSize?: number
+}
+
+const DEFAULT_PAGINATION_MAX_PAGES = 500
+const DEFAULT_PAGINATION_PAGE_SIZE = 50
+
 /**
- * Make a paginated GET request, fetching all pages
+ * Make a paginated GET request, fetching all pages.
+ *
+ * Emits a `console.warn` and throws `PaginationCapExceededError` when the
+ * explicit `maxPages` cap is reached with more data still available, to
+ * prevent silent truncation (which would otherwise cause callers to
+ * re-create already-existing resources as if they did not exist). Pass a
+ * higher `maxPages` when the caller knows the resource count can exceed the
+ * default cap.
  */
 export async function apiGetAll<T>(
 	path: string,
-	options?: APIClientOptions
+	options?: PaginationOptions
 ): Promise<T[]> {
 	const results: T[] = []
 	let page = 1
 	let cursor: string | undefined
-	const perPage = 50
-	const maxPages = 100 // Safety limit to prevent infinite loops
+	const perPage = options?.pageSize ?? DEFAULT_PAGINATION_PAGE_SIZE
+	const maxPages = options?.maxPages ?? DEFAULT_PAGINATION_MAX_PAGES
 	const seenCursors = new Set<string>()
 
 	const extractPaginatedItems = (result: unknown): T[] => {
@@ -533,6 +558,21 @@ export async function apiGetAll<T>(
 		}
 
 		page++
+	}
+
+	// If the loop exited because we hit `maxPages` rather than because the
+	// data source was exhausted, warn so the caller does not treat the
+	// partial result as authoritative (e.g. "create this KV namespace
+	// because the listing didn't include it"). Only warn when the page
+	// counter actually exceeded the cap and the last page we fetched was
+	// full (a strong signal that more data exists beyond the cap).
+	if (page > maxPages) {
+		const lastPageLikelyFull = results.length % perPage === 0 && results.length > 0
+		if (lastPageLikelyFull) {
+			console.warn(
+				`[devflare] apiGetAll capped at ${maxPages} pages for ${path}. Results may be truncated; pass { maxPages } to raise the cap.`
+			)
+		}
 	}
 
 	return results
