@@ -11,7 +11,7 @@
 //   })
 // =============================================================================
 
-import { dirname, join, resolve } from 'path'
+import { dirname, resolve } from 'path'
 import {
 	getLocalD1DatabaseIdentifier,
 	loadConfig
@@ -29,6 +29,7 @@ import { createLocalSendEmailBinding, wrapEnvSendEmailBindings } from '../utils/
 import { extractBindingHints } from './binding-hints'
 import { resolveHandlerPaths } from './simple-context-handlers'
 import { startBridgeBackedTestContext } from './simple-context-startup'
+import { decodeTransportValue, loadTransportDecoders, type TransportDecoderMap } from './simple-context-transport'
 
 // Handler helper configuration
 import { configureEmail, resetEmailState } from './email'
@@ -45,7 +46,7 @@ interface TestContextState {
 	client: BridgeClient | null
 	miniflare: any
 	envProxy: Record<string, unknown> | null
-	transportDecode: Map<string, (v: unknown) => unknown> | null
+	transportDecode: TransportDecoderMap | null
 	remoteBindings: Record<string, unknown> | null
 	miniflareBindings: Record<string, unknown> | null
 }
@@ -133,29 +134,7 @@ export async function createTestContext(configPath?: string): Promise<void> {
 
 	const hints = extractBindingHints(config)
 
-	const decodeTransport = (value: unknown): unknown => {
-		if (!state.transportDecode || value === null || typeof value !== 'object') {
-			return value
-		}
-
-		if ('__transport' in (value as Record<string, unknown>)) {
-			const encoded = value as { __transport: string; value: unknown }
-			const decoder = state.transportDecode.get(encoded.__transport)
-			if (decoder) {
-				return decoder(encoded.value)
-			}
-		}
-
-		if (Array.isArray(value)) {
-			return value.map(decodeTransport)
-		}
-
-		const result: Record<string, unknown> = {}
-		for (const [k, v] of Object.entries(value)) {
-			result[k] = decodeTransport(v)
-		}
-		return result
-	}
+	const decodeTransport = (value: unknown): unknown => decodeTransportValue(state.transportDecode, value)
 
 	const needsMultiWorkerForServices = hasServiceBindings(config)
 	const needsMultiWorkerForDOs = hasCrossWorkerDOs(config)
@@ -222,22 +201,7 @@ export async function createTestContext(configPath?: string): Promise<void> {
 	const transportFile = resolveTransportFile(configDir, config.files?.transport)
 
 	if (transportFile) {
-		const transportPath = join(configDir, transportFile)
-		const transportModule = await import(transportPath)
-
-		if (!transportModule.transport) {
-			console.warn(
-				`[devflare] Warning: Transport file "${transportFile}" does not export a named "transport" object.\n`
-				+ `Expected: export const transport = { ... }\n`
-				+ `Transport encoding/decoding will be disabled.`
-			)
-		} else {
-			state.transportDecode = new Map()
-			for (const [typeName, transporter] of Object.entries(transportModule.transport)) {
-				const t = transporter as { encode: (v: unknown) => unknown; decode: (v: unknown) => unknown }
-				state.transportDecode.set(typeName, t.decode)
-			}
-		}
+		state.transportDecode = await loadTransportDecoders(configDir, transportFile)
 	}
 
 	const gateway = await buildDurableObjectGateway(config, configDir, transportFile)
