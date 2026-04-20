@@ -32,6 +32,13 @@ import { getEffectiveAccountId } from '../../cloudflare/preferences'
 import { stringifyConfig, writeWranglerConfig } from '../../config/compiler'
 import { getDependencies } from '../dependencies'
 import { prepareBuildArtifacts } from './build-artifacts'
+import {
+	compareManifests,
+	createBuildManifest,
+	formatDriftWarning,
+	readBuildManifest
+} from '../build-manifest'
+import { getPackageVersion } from '../package-metadata'
 import { preparePreviewScopedResourcesForDeploy } from '../../config/preview-resources'
 import {
 	formatWorkersDevUrl,
@@ -179,11 +186,44 @@ async function prepareDeployConfig(options: {
 	buildConfigPath: string
 	preview: boolean
 	branchName?: string
+	logger?: ConsolaInstance
+	force?: boolean
 }): Promise<PreparedDeployConfigResult> {
 	const rawConfig = await loadConfig({
 		cwd: options.cwd,
 		configFile: options.configPath
 	})
+
+	// R2: detect drift between the build artefact manifest and the current
+	// source/target. Fixes C5 (bindings drift), C8 (preview->production
+	// silent flip), C11 (cross-version artefact reuse).
+	const manifestDir = dirname(options.buildConfigPath)
+	const manifest = await readBuildManifest(manifestDir)
+	if (manifest) {
+		const currentManifest = createBuildManifest(rawConfig, {
+			devflareVersion: await getPackageVersion(),
+			intendedTarget: {
+				environment: options.environment,
+				preview: options.preview,
+				branchName: options.branchName
+			}
+		})
+		const drift = compareManifests(manifest, currentManifest)
+		const warning = formatDriftWarning(drift)
+		if (warning && options.logger) {
+			if (options.force) {
+				logLine(options.logger, warning)
+				logLine(options.logger, 'Continuing because --force was passed.')
+			} else {
+				// Drift is a warning, not a hard error - surface it loudly so
+				// CI logs flag it, but don't block the deploy. Hard-blocking
+				// would be a behaviour change for existing pipelines that
+				// build then deploy with slightly different env vars.
+				logLine(options.logger, warning)
+			}
+		}
+	}
+
 	const previewScopedResources = options.environment === 'preview'
 		? await preparePreviewScopedResourcesForDeploy(rawConfig, {
 			environment: options.environment
@@ -663,7 +703,9 @@ export async function runDeployCommand(
 				environment,
 				buildConfigPath,
 				preview,
-				branchName
+				branchName,
+				logger,
+				force: resolvedParsed.options.force === true
 			})
 
 			const createdPreviewResourcesSummary = prepared.previewScopedResources

@@ -28,6 +28,12 @@ import {
 import { prepareComposedWorkerEntrypoint } from '../../worker-entry/composed-worker'
 import { resolvePackageSpecifier } from '../../utils/resolve-package'
 import { logLine } from '../ui'
+import {
+	createBuildManifest,
+	writeBuildManifest,
+	type BuildManifest
+} from '../build-manifest'
+import { getPackageVersion } from '../package-metadata'
 
 type BuildArtifactPaths = ReturnType<typeof getGeneratedArtifactPaths>
 
@@ -439,6 +445,20 @@ export async function prepareBuildArtifacts(
 	await writeDeployRedirect(cwd, deployConfigPath)
 	logLine(logger, `Generated deploy Wrangler config: ${relative(cwd, deployConfigPath).replace(/\\/g, '/')}`)
 	logLine(logger, `Generated deploy redirect: ${relative(cwd, getBuildArtifactPaths(cwd).deployRedirectPath).replace(/\\/g, '/')}`)
+
+	// R2: emit a build manifest alongside the artefact so deploy can detect
+	// drift (config edits, version skew, target mismatch) before shipping.
+	const manifest = createBuildManifest(rawConfig, {
+		devflareVersion: await getPackageVersion(),
+		intendedTarget: {
+			environment,
+			preview: parsed.options.preview === true,
+			previewScope: typeof parsed.options.preview === 'string' ? parsed.options.preview : undefined,
+			branchName: parsed.options['branch-name'] as string | undefined
+		}
+	})
+	const manifestPath = await writeBuildManifest(getBuildArtifactPaths(cwd).buildDir, manifest)
+	logger.debug(`Generated build manifest: ${relative(cwd, manifestPath).replace(/\\/g, '/')}`)
 
 	return {
 		config,
