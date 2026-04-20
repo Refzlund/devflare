@@ -23,12 +23,12 @@ import {
 	nextWsId,
 	DEFAULT_BRIDGE_PORT,
 	DEFAULT_CHUNK_SIZE
-} from './protocol'
+} from './v2/legacy-protocol'
 import {
 	serializeValue,
 	deserializeValue,
 	type StreamRef
-} from './serialization'
+} from './v2/legacy-serialization'
 
 // -----------------------------------------------------------------------------
 // Types

@@ -5,13 +5,13 @@
 // =============================================================================
 
 import { getClient, type BridgeClient } from './client'
-import { HTTP_TRANSFER_THRESHOLD } from './protocol'
+import { HTTP_TRANSFER_THRESHOLD } from './v2/legacy-protocol'
 import {
 	deserializeValue,
 	serializeRequest,
 	deserializeResponse,
 	type SerializedResponse
-} from './serialization'
+} from './v2/legacy-serialization'
 
 // -----------------------------------------------------------------------------
 // Types

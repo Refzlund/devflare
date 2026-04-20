@@ -19,7 +19,7 @@ import {
 	decodeBinaryFrame,
 	BinaryKind,
 	BinaryFlags
-} from './protocol'
+} from './v2/legacy-protocol'
 import {
 	serializeValue,
 	deserializeValue,
@@ -28,7 +28,7 @@ import {
 	base64Decode,
 	base64Encode,
 	type StreamRef
-} from './serialization'
+} from './v2/legacy-serialization'
 import { normalizeSendEmailMessage } from '../utils/send-email'
 
 // -----------------------------------------------------------------------------

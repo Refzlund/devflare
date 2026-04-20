@@ -1,7 +1,16 @@
 // =============================================================================
-// Bridge Protocol — Message Types + Binary Framing
+// Bridge Protocol — Message Types + Binary Framing  (legacy v1 wire format)
 // =============================================================================
-// WebSocket-based RPC protocol for Node.js ↔ Miniflare communication
+// WebSocket-based RPC protocol for Node.js ↔ Miniflare communication.
+//
+// HISTORY: This module is the v1 transport vocabulary that originally lived
+// at `src/bridge/protocol.ts`. It was relocated into `src/bridge/v2/` as part
+// of the v1-removal sweep so that the v2 transport namespace owns all bridge
+// wire definitions. The behavior and exported names are bit-identical to the
+// pre-move v1 module; the deeper TransportV2Codec primitives in this folder
+// (frames.ts, codec.ts, body-streams.ts, value-codec.ts, control-messages.ts,
+// ws-relay.ts) are the forward-looking replacement that consumers will move
+// to incrementally.
 // =============================================================================
 
 // -----------------------------------------------------------------------------

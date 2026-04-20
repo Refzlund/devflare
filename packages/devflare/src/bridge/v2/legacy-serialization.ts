@@ -1,10 +1,15 @@
 // =============================================================================
-// Bridge Serialization — Request/Response/Stream Conversion
+// Bridge Serialization — Request/Response/Stream Conversion  (legacy v1 wire)
 // =============================================================================
-// Converts Web API objects to/from serializable POJOs for RPC transport
+// Converts Web API objects to/from serializable POJOs for RPC transport.
+//
+// HISTORY: Relocated from `src/bridge/serialization.ts` into the v2 namespace
+// during the v1-removal sweep. Behavior is bit-identical to the pre-move v1
+// module; the forward-looking replacement is the value-codec + body-streams
+// primitives that ride on top of TransportV2Codec.
 // =============================================================================
 
-import { nextStreamId } from './protocol'
+import { nextStreamId } from './legacy-protocol'
 
 // -----------------------------------------------------------------------------
 // Serialized Types

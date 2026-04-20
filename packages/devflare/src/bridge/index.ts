@@ -35,7 +35,7 @@ export {
 	HTTP_TRANSFER_THRESHOLD,
 	DEFAULT_BRIDGE_PORT,
 	DEFAULT_HTTP_PORT
-} from './protocol'
+} from './v2/legacy-protocol'
 
 // Serialization
 export {
@@ -49,7 +49,7 @@ export {
 	serializeValue,
 	deserializeValue,
 	serializeDOId
-} from './serialization'
+} from './v2/legacy-serialization'
 
 // Client
 export {

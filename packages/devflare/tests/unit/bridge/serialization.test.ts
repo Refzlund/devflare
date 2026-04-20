@@ -13,7 +13,7 @@ import {
 	serializeDOId,
 	deserializeDOId,
 	DO_ID_TYPE
-} from '../../../src/bridge/serialization'
+} from '../../../src/bridge/v2/legacy-serialization'
 
 async function roundTrip<T>(value: T): Promise<unknown> {
 	const { value: encoded } = await serializeValue(value)
