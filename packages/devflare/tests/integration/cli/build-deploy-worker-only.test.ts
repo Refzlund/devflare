@@ -76,9 +76,9 @@ describe('build/deploy worker-only behavior', () => {
 
 	test('build preserves named D1 bindings without querying Cloudflare', async () => {
 		await writeNamedD1ProjectFiles(projectDir)
-		globalThis.fetch = async () => {
+		globalThis.fetch = (async () => {
 			throw new Error('build should not query Cloudflare')
-		}
+		}) as unknown as typeof fetch
 
 		const { logger } = createBuildHarness()
 		await runSuccessfulBuild(projectDir, logger)

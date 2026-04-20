@@ -3,6 +3,7 @@ import {
 	createGlobalDependencyPatterns,
 	matchesAnyPattern,
 	SHARED_DEPLOY_INFRASTRUCTURE_PATTERNS
+	// @ts-ignore - JS module with no declarations
 } from '../../../../../.github/scripts/resolve-deploy-impact.mjs'
 
 describe('resolve deploy impact script', () => {

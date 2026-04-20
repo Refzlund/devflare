@@ -44,6 +44,8 @@ describe('getExplicitPreviewSyncOverrides', () => {
 	test('returns an empty object when the version does not match', () => {
 		const result = getExplicitPreviewSyncOverrides(
 			{
+				accountId: 'acc_1',
+				workerName: 'worker',
 				versionId: 'v-1',
 				previewScope: 'pr-1',
 				previewUrl: 'https://example.com',
@@ -59,6 +61,8 @@ describe('getExplicitPreviewSyncOverrides', () => {
 	test('propagates explicit overrides when the version matches', () => {
 		const result = getExplicitPreviewSyncOverrides(
 			{
+				accountId: 'acc_1',
+				workerName: 'worker',
 				versionId: 'v-1',
 				previewScope: 'pr-1',
 				previewUrl: 'https://example.com/preview',

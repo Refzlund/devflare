@@ -66,7 +66,7 @@ describe('vite plugin config generation', () => {
 				throw new Error('Expected devflare Vite plugin to expose configResolved()')
 			}
 
-			await plugin.configResolved({
+			await (plugin.configResolved as any)({
 				root: projectDir,
 				command: 'build'
 			} as any)
@@ -425,7 +425,7 @@ export default {
 					throw new Error('Expected devflare Vite plugin to expose configResolved()')
 				}
 
-				await plugin.configResolved({
+				await (plugin.configResolved as any)({
 					root: projectDir,
 					command: 'build'
 				} as any)
@@ -477,7 +477,7 @@ export class Counter extends DurableObject {}
 					throw new Error('Expected devflare Vite plugin to expose configResolved()')
 				}
 
-				await firstPlugin.configResolved({
+				await (firstPlugin.configResolved as any)({
 					root: firstProjectDir,
 					command: 'build'
 				} as any)
@@ -508,7 +508,7 @@ export default {
 					throw new Error('Expected devflare Vite plugin to expose configResolved()')
 				}
 
-				await secondPlugin.configResolved({
+				await (secondPlugin.configResolved as any)({
 					root: secondProjectDir,
 					command: 'build'
 				} as any)
@@ -553,12 +553,12 @@ export default {
 					throw new Error('Expected devflare Vite plugin to expose configResolved() and configureServer()')
 				}
 
-				await plugin.configResolved({
+				await (plugin.configResolved as any)({
 					root: projectDir,
 					command: 'serve'
 				} as any)
 
-				plugin.configureServer({
+				;(plugin.configureServer as any)({
 					watcher: {
 						add(path: string) {
 							addedPaths.push(path)

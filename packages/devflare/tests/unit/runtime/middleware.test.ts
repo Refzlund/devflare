@@ -163,7 +163,7 @@ describe('invokeFetchHandler()', () => {
 		)
 
 		const response = await runWithEventContext(fetchEvent, async () => {
-			return invokeFetchHandler(async (event, resolve) => {
+			return invokeFetchHandler(async (event: any, resolve: any) => {
 				const downstream = await resolve(event)
 				return new Response(`wrapped:${await downstream.text()}`)
 			}, fetchEvent, async () => new Response('ok'))
@@ -181,7 +181,7 @@ describe('invokeFetchHandler()', () => {
 		)
 
 		const response = await runWithEventContext(fetchEvent, async () => {
-			return invokeFetchHandler(async (event) => {
+			return invokeFetchHandler(async (event: any) => {
 				return new Response(event.params.id)
 			}, fetchEvent)
 		})
@@ -197,7 +197,7 @@ describe('invokeFetchHandler()', () => {
 		)
 
 		const response = await runWithEventContext(fetchEvent, async () => {
-			return invokeFetchHandler(async (request, env, ctx) => {
+			return invokeFetchHandler(async (request: any, env: any, ctx: any) => {
 				return new Response(`${request.method}:${env.message}:${typeof ctx.waitUntil}`)
 			}, fetchEvent)
 		})
@@ -258,7 +258,7 @@ describe('createResolveFetch()', () => {
 
 		const response = await runWithEventContext(fetchEvent, async () => {
 			const resolve = createResolveFetch({
-				async GET(_event, params: { id: string }) {
+				async GET(_event: any, params: { id: string }) {
 					return new Response(params.id)
 				}
 			}, null, fetchEvent)
@@ -278,7 +278,7 @@ describe('createResolveFetch()', () => {
 
 		const response = await runWithEventContext(fetchEvent, async () => {
 			const resolve = createResolveFetch({
-				async GET(request, env, ctx) {
+				async GET(request: any, env: any, ctx: any) {
 					return new Response(`${request.method}:${env.message}:${typeof ctx.waitUntil}`)
 				}
 			}, null, fetchEvent)
@@ -408,7 +408,7 @@ describe('invokeFetchModule()', () => {
 
 		const response = await runWithEventContext(fetchEvent, async () => {
 			return invokeFetchModule({
-				async fetch(request, env) {
+				async fetch(request: any, env: any) {
 					return new Response(`${request.method}:${env.message}`)
 				}
 			}, fetchEvent)

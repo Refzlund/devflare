@@ -78,7 +78,7 @@ describe('browser-shim download progress logger', () => {
 		const { logger, lines } = makeLogger()
 		const tracker = createDownloadProgressLogger(logger, 'Chrome')
 
-		for (let i = 0; i <= 100; i += 1) {
+		for (let i = 0;i <= 100;i += 1) {
 			tracker.onProgress(i, 100)
 		}
 

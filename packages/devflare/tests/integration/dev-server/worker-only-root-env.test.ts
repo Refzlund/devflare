@@ -261,7 +261,7 @@ export default {
 
 			const response = await fetch(workerUrl)
 			expect(response.status).toBe(200)
-			expect(await response.json()).toEqual({
+			expect(await response.json() as Record<string, unknown>).toEqual({
 				als: true,
 				crypto: 'crypto-ready'
 			})

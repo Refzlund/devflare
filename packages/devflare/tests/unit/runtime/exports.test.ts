@@ -28,8 +28,8 @@ describe('env proxy', () => {
 		const mockCtx = createMockCtx()
 
 		runWithContext(mockEnv, mockCtx, null, () => {
-			expect(env.DB).toBe('d1-instance')
-			expect(env.KV).toBe('kv-namespace')
+			expect((env as Record<string, unknown>).DB).toBe('d1-instance')
+			expect((env as Record<string, unknown>).KV).toBe('kv-namespace')
 		})
 	})
 
@@ -48,7 +48,7 @@ describe('env proxy', () => {
 
 describe('ctx proxy', () => {
 	test('throws ContextAccessError outside request handler', () => {
-		expect(() => ctx.waitUntil).toThrow(ContextAccessError)
+		expect(() => (ctx as ExecutionContext).waitUntil).toThrow(ContextAccessError)
 	})
 
 	test('provides access to ExecutionContext within context', () => {
@@ -61,7 +61,7 @@ describe('ctx proxy', () => {
 		}
 
 		runWithContext(mockEnv, mockCtx, null, () => {
-			expect(ctx.waitUntil).toBe(waitUntilFn)
+			expect((ctx as ExecutionContext).waitUntil).toBe(waitUntilFn)
 		})
 	})
 })
@@ -154,10 +154,10 @@ describe('combined usage', () => {
 
 		await runWithContext(mockEnv, mockCtx, mockRequest, async () => {
 			// Access env
-			expect(env.API_KEY).toBe('secret')
+			expect((env as Record<string, unknown>).API_KEY).toBe('secret')
 
 			// Use ctx
-			ctx.waitUntil(Promise.resolve('background-task'))
+			;(ctx as ExecutionContext).waitUntil(Promise.resolve('background-task'))
 
 			// Access event
 			expect(event.request!.url).toBe('https://api.example.com/users')

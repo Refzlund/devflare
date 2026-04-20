@@ -7,8 +7,8 @@ import { executeRpcMethod } from '../../../src/bridge/server'
 import type { GatewayEnv } from '../../../src/bridge/server'
 
 const noopCtx = {
-	waitUntil: () => {},
-	passThroughOnException: () => {}
+	waitUntil: () => { },
+	passThroughOnException: () => { }
 } as unknown as ExecutionContext
 
 describe('executeRpcMethod — get dispatch', () => {
@@ -19,9 +19,9 @@ describe('executeRpcMethod — get dispatch', () => {
 				calls.push(args)
 				return 'kv-value'
 			},
-			put: () => {},
-			list: () => {},
-			delete: () => {}
+			put: () => { },
+			list: () => { },
+			delete: () => { }
 		}
 		const env = { MY_KV: kv } as unknown as GatewayEnv
 

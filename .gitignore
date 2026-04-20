@@ -6,6 +6,8 @@
 memories
 .local
 .jscpd-*
+FINDINGS.md
+INCONSISTENCIES.md
 
 # Build outputs
 dist/

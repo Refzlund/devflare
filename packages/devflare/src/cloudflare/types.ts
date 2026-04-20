@@ -129,7 +129,7 @@ export interface D1Database {
 export interface D1DatabaseInfo {
 	id: string
 	name: string
-	version: string
+	version?: string
 	tableCount?: number
 	sizeBytes?: number
 }

@@ -8,8 +8,8 @@ import { ensurePackageBuilt } from '../helpers/built-devflare.helpers'
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '../../../')
 const devflareTestImportPath = pathToFileURL(join(repoRoot, 'src', 'test', 'index.ts')).href
 const devflareImportPath = pathToFileURL(join(repoRoot, 'src', 'index.ts')).href
-const builtDevflareTestImportPath = pathToFileURL(join(repoRoot, 'dist', 'src', 'test', 'index.js')).href
-const builtDevflareImportPath = pathToFileURL(join(repoRoot, 'dist', 'src', 'index.js')).href
+const builtDevflareTestImportPath = pathToFileURL(join(repoRoot, 'dist', 'test', 'index.js')).href
+const builtDevflareImportPath = pathToFileURL(join(repoRoot, 'dist', 'index.js')).href
 const tempDirs: string[] = []
 
 interface TransportResult {

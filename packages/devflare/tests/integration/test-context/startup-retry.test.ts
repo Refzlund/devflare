@@ -2,7 +2,8 @@ import { afterAll, describe, expect, test } from 'bun:test'
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'pathe'
-import { BridgeClient, env } from '../../../src'
+import { env } from '../../../src'
+import { BridgeClient } from '../../../src/bridge'
 import { createTestContext } from '../../../src/test'
 
 const tempDirs: string[] = []
@@ -59,12 +60,13 @@ export default {
 		try {
 			await createTestContext(join(projectDir, 'devflare.config.ts'))
 
-			await env.CACHE.put('retry-check', 'ok')
-			expect(await env.CACHE.get('retry-check')).toBe('ok')
+			const envAny = env as any
+			await envAny.CACHE.put('retry-check', 'ok')
+			expect(await envAny.CACHE.get('retry-check')).toBe('ok')
 			expect(connectAttempts).toBe(2)
 		} finally {
 			BridgeClient.prototype.connect = originalConnect
-			await env.dispose()
+			await (env as any).dispose()
 		}
 	})
 })

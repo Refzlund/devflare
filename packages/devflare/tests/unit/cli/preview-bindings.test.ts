@@ -238,6 +238,7 @@ Consumers:
 				name: 'demo-worker',
 				accountId: 'acc_123',
 				compatibilityDate: '2025-01-01',
+				compatibilityFlags: [],
 				bindings: {
 					queues: {
 						producers: { JOBS: 'jobs-queue' },

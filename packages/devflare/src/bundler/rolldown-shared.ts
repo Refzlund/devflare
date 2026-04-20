@@ -164,7 +164,7 @@ export function mergeAliases(
 	// last occurrence (important for regex specificity).
 	const seenUserKeys = new Set<string>()
 	const dedupedUser: AliasEntry[] = []
-	for (let index = userAliases.length - 1; index >= 0; index--) {
+	for (let index = userAliases.length - 1;index >= 0;index--) {
 		const entry = userAliases[index]!
 		const key = aliasKey(entry.find)
 		if (seenUserKeys.has(key)) {

@@ -2,7 +2,10 @@ import { afterEach, describe, expect, mock, test } from 'bun:test'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { main } from '../../../../.github/actions/devflare-github-feedback/index.js'
+import {
+	main
+	// @ts-ignore - JS module with no declarations
+} from '../../../../.github/actions/devflare-github-feedback/index.js'
 
 const originalFetch = globalThis.fetch
 const originalEnvironment = { ...process.env }

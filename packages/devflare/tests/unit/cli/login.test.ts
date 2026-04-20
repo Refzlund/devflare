@@ -70,7 +70,7 @@ function mockAuthenticatedAccountFetch(): void {
 		}
 
 		throw new Error(`Unexpected fetch URL: ${url}`)
-	}) as typeof fetch
+	}) as unknown as typeof fetch
 }
 
 async function runLoginScenario(
@@ -174,7 +174,7 @@ describe('login command', () => {
 			}
 
 			throw new Error(`Unexpected fetch URL: ${url}`)
-		}) as typeof fetch
+		}) as unknown as typeof fetch
 
 		const deps = createExecDependencies(async () => ({
 			exitCode: 0,

@@ -24,7 +24,7 @@ function createDeps(state: KvState, overrides: Partial<RecordUsageDeps> = {}): R
 			const next = state.concurrentWrites.shift()
 			if (next) next(state)
 		},
-		sleep: async () => {},
+		sleep: async () => { },
 		maxAttempts: 5,
 		...overrides
 	}

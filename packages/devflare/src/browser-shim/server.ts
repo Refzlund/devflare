@@ -282,7 +282,7 @@ export function createBrowserShim(options: BrowserShimOptions = {}): BrowserShim
 	if (allowNoSandbox) {
 		logger?.warn(
 			'[BrowserShim] Launching Chrome with --no-sandbox (allowNoSandbox=true). '
-				+ 'Only use this in trusted CI/rootless environments.'
+			+ 'Only use this in trusted CI/rootless environments.'
 		)
 	}
 
@@ -676,7 +676,7 @@ export function createBrowserShim(options: BrowserShimOptions = {}): BrowserShim
 					// Connect to Chrome's DevTools WebSocket
 					const chromeWs = new WebSocketClass(session.wsEndpoint)
 					let chromeConnected = false
-					
+
 					// Set a connection timeout
 					const connectTimeout = setTimeout(() => {
 						if (!chromeConnected) {
@@ -687,7 +687,7 @@ export function createBrowserShim(options: BrowserShimOptions = {}): BrowserShim
 							} catch {
 								// Ignore errors
 							}
-							closeSession(sessionId, 5, 'ChromeConnectionTimeout').catch(() => {})
+							closeSession(sessionId, 5, 'ChromeConnectionTimeout').catch(() => { })
 						}
 					}, 10000) // 10 second timeout
 
@@ -716,7 +716,7 @@ export function createBrowserShim(options: BrowserShimOptions = {}): BrowserShim
 						} catch {
 							// Ignore errors when closing already closed socket
 						}
-						
+
 						// Chrome connection closed - clean up the session entirely
 						// This handles crashes, timeouts, and normal closures
 						closeSession(sessionId, 2, 'ChromeDisconnected').catch((err) => {
@@ -731,7 +731,7 @@ export function createBrowserShim(options: BrowserShimOptions = {}): BrowserShim
 						} catch {
 							// Ignore errors when closing already closed socket
 						}
-						
+
 						// Chrome error - clean up the session
 						closeSession(sessionId, 4, 'ChromeError').catch((err) => {
 							logger?.error('[BrowserShim] Error closing session after Chrome error:', err)
@@ -762,7 +762,7 @@ export function createBrowserShim(options: BrowserShimOptions = {}): BrowserShim
 						if (s && s.connectionId === connectionId) {
 							s.connectionId = undefined
 							s.connectionStartTime = undefined
-							
+
 							// Close the browser session immediately when client disconnects
 							// Don't wait for idle timeout - clean up now
 							closeSession(sessionId, 1, 'ClientDisconnected').catch((err) => {

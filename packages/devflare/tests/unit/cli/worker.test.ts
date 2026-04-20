@@ -69,7 +69,7 @@ function mockRenameWorkerApi(fromName: string, toName: string): void {
 		}
 
 		throw new Error(`Unexpected fetch request: ${method} ${url}`)
-	}) as typeof fetch
+	}) as unknown as typeof fetch
 }
 
 async function runRenameWorker(rootDir: string, fromName: string, toName: string, logger: ReturnType<typeof createLogger>) {

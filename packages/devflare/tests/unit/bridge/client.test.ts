@@ -60,13 +60,13 @@ let originalWebSocket: typeof globalThis.WebSocket
 
 beforeEach(() => {
 	originalWebSocket = globalThis.WebSocket
-	;(globalThis as unknown as { WebSocket: unknown }).WebSocket =
-		FakeWebSocket as unknown as typeof WebSocket
+		; (globalThis as unknown as { WebSocket: unknown }).WebSocket =
+			FakeWebSocket as unknown as typeof WebSocket
 	FakeWebSocket.instances = []
 })
 
 afterEach(() => {
-	;(globalThis as unknown as { WebSocket: typeof WebSocket }).WebSocket =
+	; (globalThis as unknown as { WebSocket: typeof WebSocket }).WebSocket =
 		originalWebSocket
 })
 
@@ -204,7 +204,7 @@ describe('BridgeClient parse errors', () => {
 		ws.open()
 		await connectPromise
 
-		const spy = mock(() => {})
+		const spy = mock(() => { })
 		const originalError = console.error
 		console.error = spy as unknown as typeof console.error
 

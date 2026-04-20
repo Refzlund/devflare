@@ -40,7 +40,7 @@ function createMockState(): DurableObjectState {
 		storage: {} as DurableObjectStorage,
 		waitUntil: () => { },
 		blockConcurrencyWhile: async <T>(callback: () => Promise<T>) => callback()
-	} as DurableObjectState
+	} as unknown as DurableObjectState
 }
 
 function createMockQueueBatch(): MessageBatch<{ value: string }> {
@@ -75,7 +75,7 @@ function createMockEmailMessage(): ForwardableEmailMessage {
 		setReject() { },
 		forward: async () => { },
 		reply: async () => { }
-	} as ForwardableEmailMessage
+	} as unknown as ForwardableEmailMessage
 }
 
 describe('runWithContext', () => {

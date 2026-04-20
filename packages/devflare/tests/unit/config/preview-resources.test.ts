@@ -12,6 +12,7 @@ function createPreviewScopedResourceConfig(): DevflareConfig {
 	return {
 		name: 'preview-resource-worker',
 		compatibilityDate: '2026-04-08',
+		compatibilityFlags: [],
 		bindings: {
 			kv: {
 				CACHE: pv('cache-kv'),
@@ -270,6 +271,7 @@ describe('preview-scoped resource lifecycle', () => {
 		const config: DevflareConfig = {
 			name: 'preview-hyperdrive-worker',
 			compatibilityDate: '2026-04-08',
+			compatibilityFlags: [],
 			bindings: {
 				hyperdrive: {
 					POSTGRES: pv('testing-hyperdrive')

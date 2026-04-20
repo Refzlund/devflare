@@ -80,6 +80,7 @@ describe('resolveConfigForEnvironment', () => {
 		const config: DevflareConfig = {
 			name: 'demo-worker',
 			compatibilityDate: '2026-04-08',
+			compatibilityFlags: [],
 			bindings: {
 				kv: {
 					CACHE: pv('cache-kv')
@@ -146,6 +147,7 @@ describe('resolveConfigForEnvironment', () => {
 		const config: DevflareConfig = {
 			name: 'demo-worker',
 			compatibilityDate: '2026-04-08',
+			compatibilityFlags: [],
 			bindings: {
 				d1: {
 					PRIMARY_DB: pv('primary-db')

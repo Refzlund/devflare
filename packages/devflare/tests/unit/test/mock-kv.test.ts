@@ -5,7 +5,7 @@ const BINARY = new Uint8Array([0xff, 0xfe, 0xfd, 0x00, 0xaa])
 
 const expectBytesEqual = (actual: Uint8Array, expected: Uint8Array) => {
 	expect(actual.length).toBe(expected.length)
-	for (let i = 0; i < expected.length; i++) {
+	for (let i = 0;i < expected.length;i++) {
 		expect(actual[i]).toBe(expected[i])
 	}
 }

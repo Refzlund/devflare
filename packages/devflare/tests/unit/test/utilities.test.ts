@@ -70,7 +70,7 @@ describe('withTestContext', () => {
 		const mockEnv = { API_KEY: 'secret123' }
 
 		await withTestContext({ env: mockEnv }, async () => {
-			expect(env.API_KEY).toBe('secret123')
+			expect((env as Record<string, unknown>).API_KEY).toBe('secret123')
 		})
 	})
 

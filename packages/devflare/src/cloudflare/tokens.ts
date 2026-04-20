@@ -107,9 +107,9 @@ export function matchesKnownPermissionGroup(
 	if (typeof expectedName === 'string' && permissionGroup.name === expectedName) {
 		console.warn(
 			`[devflare] Matched Cloudflare permission group '${symbolicName}' by display name `
-				+ `('${expectedName}') because no verified id is configured. Cloudflare display `
-				+ 'names are unstable; please file an issue to add the permission-group id to '
-				+ 'KNOWN_PERMISSION_GROUP_IDS.'
+			+ `('${expectedName}') because no verified id is configured. Cloudflare display `
+			+ 'names are unstable; please file an issue to add the permission-group id to '
+			+ 'KNOWN_PERMISSION_GROUP_IDS.'
 		)
 		return true
 	}

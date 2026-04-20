@@ -56,7 +56,7 @@ describe('account command', () => {
 			}
 
 			throw new Error(`Unexpected fetch URL: ${url}`)
-		}) as typeof fetch
+		}) as unknown as typeof fetch
 
 		const logger = createLogger()
 		const result = await runAccountCommand(

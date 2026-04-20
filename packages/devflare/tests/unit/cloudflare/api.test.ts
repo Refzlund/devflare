@@ -245,7 +245,7 @@ describe('apiGetAll', () => {
 			}
 		})) as unknown as typeof fetch
 
-		const failure = await apiGet('/items').catch((error) => error)
+		const failure = await apiGet('/items').catch((error) => error) as CloudflareAPIError
 
 		expect(failure).toBeInstanceOf(CloudflareAPIError)
 		expect(failure.message).toContain('7003')

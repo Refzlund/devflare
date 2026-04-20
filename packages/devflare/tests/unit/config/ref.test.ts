@@ -110,12 +110,14 @@ describe('ref', () => {
 	})
 
 	test('extracts configPath from an arrow function with implicit import(...)', () => {
+		// @ts-expect-error intentionally non-existent module for configPath extraction test
 		const result = ref(() => import('./does-not-exist/devflare.config') as never)
 		expect(result.configPath).toBe('./does-not-exist/devflare.config')
 	})
 
 	test('extracts configPath from a block-body function returning import(...)', () => {
 		const result = ref(function load() {
+			// @ts-expect-error intentionally non-existent module for configPath extraction test
 			return import('./another-path/devflare.config') as never
 		})
 		expect(result.configPath).toBe('./another-path/devflare.config')

@@ -97,7 +97,7 @@ describe('deploy build artifact provisioning', () => {
 				}
 
 				throw new Error(`Unexpected Cloudflare request: ${method} ${url}`)
-			})
+			}) as unknown as typeof fetch
 
 			const { executions, logger } = createDeployHarness(createWranglerDeployProcessRunner({
 				structuredOutput: {

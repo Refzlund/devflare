@@ -9,7 +9,7 @@ function buildTestPlatform(): Platform {
 				pendingErrors.push(err)
 			})
 		},
-		passThroughOnException: () => {}
+		passThroughOnException: () => { }
 	} as ExecutionContext
 
 	return {

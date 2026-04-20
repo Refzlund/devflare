@@ -82,9 +82,9 @@ describe('build artifact cleanup helpers', () => {
 		const busyError = Object.assign(new Error('busy'), {
 			code: 'EBUSY'
 		})
-		const access = mock(async () => { })
-		const rename = mock(async () => { })
-		const rm = mock(async (targetPath: string) => {
+		const access = mock(async (_path: string) => { })
+		const rename = mock(async (_oldPath: string, _newPath: string) => { })
+		const rm = mock(async (targetPath: string, _options: { recursive: boolean; force: boolean }) => {
 			if (targetPath.includes('.devflare-stale-')) {
 				return
 			}

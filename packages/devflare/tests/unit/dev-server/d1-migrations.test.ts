@@ -17,9 +17,9 @@ function createProjectWithMigration(sql: string): string {
 }
 
 function trackTimeouts(delays: number[]): void {
-	globalThis.setTimeout = ((handler: TimerHandler, timeout?: number, ...args: unknown[]) => {
+	globalThis.setTimeout = ((handler: Parameters<typeof setTimeout>[0], timeout?: number, ...args: unknown[]) => {
 		delays.push(Number(timeout ?? 0))
-		return originalSetTimeout(handler, 0, ...(args as []))
+		return originalSetTimeout(handler as never, 0, ...(args as []))
 	}) as typeof setTimeout
 }
 
@@ -293,7 +293,7 @@ describe('runD1Migrations', () => {
 
 	test('ledger second-run with same content: gateway reports all skipped, no warnings', async () => {
 		const projectDir = createProjectWithMigration('CREATE TABLE demo (id INTEGER PRIMARY KEY);')
-		const warnSpy = mock(() => {})
+		const warnSpy = mock(() => { })
 		const originalWarn = console.warn
 		console.warn = warnSpy as unknown as typeof console.warn
 
@@ -329,7 +329,7 @@ describe('runD1Migrations', () => {
 
 	test('ledger second-run with changed content: emits console.warn and does not re-apply', async () => {
 		const projectDir = createProjectWithMigration('CREATE TABLE demo (id INTEGER, added TEXT);')
-		const warnSpy = mock(() => {})
+		const warnSpy = mock(() => { })
 		const originalWarn = console.warn
 		console.warn = warnSpy as unknown as typeof console.warn
 

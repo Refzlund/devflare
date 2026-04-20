@@ -16,6 +16,7 @@
 		"declaration": true,
 		"declarationMap": true,
 		"sourceMap": true,
+		"allowImportingTsExtensions": true,
 		"paths": {
 			"devflare": ["./packages/devflare/src/index.ts"],
 			"devflare/*": ["./packages/devflare/src/*.ts"]
