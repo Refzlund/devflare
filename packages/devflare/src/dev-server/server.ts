@@ -8,7 +8,7 @@ import type { ConsolaInstance } from 'consola'
 import type { Miniflare as MiniflareType } from 'miniflare'
 import { resolve } from 'pathe'
 import type { DevflareConfig } from '../config'
-import { loadConfig, resolveConfigPath } from '../config/loader'
+import { loadConfig } from '../config/loader'
 import { getSingleBrowserBindingName } from '../config/schema'
 import { bundleWorkerEntry, createDOBundler, type DOBundler, type DOBundleResult } from '../bundler'
 import { createBrowserShim, type BrowserShim } from '../browser-shim'
@@ -31,7 +31,7 @@ import {
 	type WorkerSurfacePaths
 } from './worker-surface-paths'
 import { startWorkerSourceWatcher as createWorkerSourceWatcher } from './worker-source-watcher'
-import { formatErrorMessage, logRemoteBindingRequirements, logWorkerHandlerDetection } from './server-startup-helpers'
+import { logMiniflareBindingDiagnostics, logMiniflareConfigDiagnostics, logRemoteBindingRequirements, logWorkerHandlerDetection, resolveWorkerConfigWatchPath } from './server-startup-helpers'
 
 // -----------------------------------------------------------------------------
 
@@ -171,24 +171,7 @@ export function createDevServer(options: DevServerOptions): DevServer {
 		const shouldLogMiniflareDiagnostics = verbose || debug
 
 		if (shouldLogMiniflareDiagnostics) {
-			logger?.info('=== MINIFLARE CONFIG DEBUG ===')
-			logger?.info('Full config:', JSON.stringify(mfConfig, (key, value) => {
-				// Truncate long scripts
-				if (key === 'script' && typeof value === 'string' && value.length > 200) {
-					return value.substring(0, 200) + '...[truncated]'
-				}
-				return value
-			}, 2))
-
-			if (mfConfig.workers) {
-				logger?.info('Workers order:')
-				for (const w of mfConfig.workers) {
-					logger?.info(`  → ${w.name}:`)
-					logger?.info(`      script: ${w.script ? 'inline' : w.scriptPath}`)
-					logger?.info(`      browserRendering: ${JSON.stringify(w.browserRendering)}`)
-					logger?.info(`      durableObjects: ${JSON.stringify(w.durableObjects)}`)
-				}
-			}
+			logMiniflareConfigDiagnostics(logger, mfConfig)
 		}
 
 		miniflare = new Miniflare(mfConfig)
@@ -197,30 +180,7 @@ export function createDevServer(options: DevServerOptions): DevServer {
 		logger?.success(`Miniflare ready on http://localhost:${miniflarePort}`)
 
 		if (shouldLogMiniflareDiagnostics) {
-			try {
-				const gatewayBindings = await miniflare.getBindings('gateway')
-				logger?.info('Gateway worker bindings:', Object.keys(gatewayBindings))
-
-				if (mfConfig.workers) {
-					for (const w of mfConfig.workers) {
-						if (w.name !== 'gateway') {
-							try {
-								const doBindings = await miniflare.getBindings(w.name)
-								logger?.info(`${w.name} worker bindings:`, Object.keys(doBindings))
-								if ('BROWSER' in doBindings) {
-									logger?.success(`${w.name} has BROWSER binding!`)
-								} else {
-									logger?.warn(`${w.name} is MISSING BROWSER binding`)
-								}
-							} catch (error) {
-								logger?.debug(`Skipping binding diagnostics for ${w.name}: ${formatErrorMessage(error)}`)
-							}
-						}
-					}
-				}
-			} catch (error) {
-				logger?.debug(`Skipping Miniflare binding diagnostics: ${formatErrorMessage(error)}`)
-			}
+			await logMiniflareBindingDiagnostics(logger, miniflare, mfConfig)
 		}
 	}
 
@@ -232,20 +192,7 @@ export function createDevServer(options: DevServerOptions): DevServer {
 		await reloadQueue.schedule()
 	}
 
-	async function resolveWorkerConfigWatchPath(): Promise<string | null> {
-		if (configPath) {
-			const explicitPath = resolve(cwd, configPath)
-			const fs = await import('node:fs/promises')
-			try {
-				await fs.access(explicitPath)
-				return explicitPath
-			} catch {
-				// Fall back to config discovery below when the explicit path is not directly watchable.
-			}
-		}
 
-		return await resolveConfigPath(cwd) ?? null
-	}
 
 	async function refreshWorkerOnlySurfaceState(): Promise<void> {
 		if (!config) {
@@ -305,7 +252,7 @@ export function createDevServer(options: DevServerOptions): DevServer {
 	async function reloadWorkerOnlyConfig(): Promise<void> {
 		config = await loadConfig({ cwd, configFile: configPath })
 		setLocalSendEmailBindings(config.bindings?.sendEmail ?? {})
-		resolvedWorkerConfigPath = await resolveWorkerConfigWatchPath()
+		resolvedWorkerConfigPath = await resolveWorkerConfigWatchPath(cwd, configPath)
 		await refreshWorkerOnlySurfaceState()
 		await reloadMiniflare(currentDoResult)
 	}
@@ -342,7 +289,7 @@ export function createDevServer(options: DevServerOptions): DevServer {
 		// Load config
 		config = await loadConfig({ cwd, configFile: configPath })
 		setLocalSendEmailBindings(config.bindings?.sendEmail ?? {})
-		resolvedWorkerConfigPath = await resolveWorkerConfigWatchPath()
+		resolvedWorkerConfigPath = await resolveWorkerConfigWatchPath(cwd, configPath)
 		logger?.debug('Loaded config:', config.name)
 		if (enableVite) {
 			const viteMode = await resolveViteMode(cwd, { requested: true })

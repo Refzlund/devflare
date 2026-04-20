@@ -6,6 +6,9 @@
 // =============================================================================
 
 import type { ConsolaInstance } from 'consola'
+import type { Miniflare as MiniflareType } from 'miniflare'
+import { resolve } from 'pathe'
+import { resolveConfigPath } from '../config/loader'
 import type { RouteDiscoveryResult } from '../worker-entry/routes'
 import type { WorkerSurfacePaths } from './worker-surface-paths'
 import type { checkRemoteBindingRequirements } from '../cli/wrangler-auth'
@@ -79,4 +82,92 @@ export function logRemoteBindingRequirements(
 
 export function formatErrorMessage(error: unknown): string {
 	return error instanceof Error ? error.message : String(error)
+}
+
+/**
+ * Resolve the path to watch for config changes. Prefers an explicit
+ * `configPath` if it's directly accessible on disk, otherwise falls back to
+ * the auto-discovered config path under `cwd`. Returns `null` when neither
+ * is available.
+ */
+export async function resolveWorkerConfigWatchPath(
+	cwd: string,
+	configPath: string | undefined
+): Promise<string | null> {
+	if (configPath) {
+		const explicitPath = resolve(cwd, configPath)
+		const fs = await import('node:fs/promises')
+		try {
+			await fs.access(explicitPath)
+			return explicitPath
+		} catch {
+			// Fall back to config discovery below when the explicit path is not directly watchable.
+		}
+	}
+
+	return await resolveConfigPath(cwd) ?? null
+}
+
+/**
+ * Pretty-print the resolved Miniflare config (truncating long inline scripts)
+ * before `Miniflare` is constructed. Only emits when verbose/debug logging is
+ * requested by the caller.
+ */
+export function logMiniflareConfigDiagnostics(
+	logger: ConsolaInstance | undefined,
+	mfConfig: any
+): void {
+	logger?.info('=== MINIFLARE CONFIG DEBUG ===')
+	logger?.info('Full config:', JSON.stringify(mfConfig, (key, value) => {
+		if (key === 'script' && typeof value === 'string' && value.length > 200) {
+			return value.substring(0, 200) + '...[truncated]'
+		}
+		return value
+	}, 2))
+
+	if (mfConfig.workers) {
+		logger?.info('Workers order:')
+		for (const w of mfConfig.workers) {
+			logger?.info(`  → ${w.name}:`)
+			logger?.info(`      script: ${w.script ? 'inline' : w.scriptPath}`)
+			logger?.info(`      browserRendering: ${JSON.stringify(w.browserRendering)}`)
+			logger?.info(`      durableObjects: ${JSON.stringify(w.durableObjects)}`)
+		}
+	}
+}
+
+/**
+ * After `Miniflare` is `ready`, query each declared worker's bindings and
+ * log them. Best-effort: any per-worker failure is logged at debug and does
+ * not abort the rest of the diagnostics.
+ */
+export async function logMiniflareBindingDiagnostics(
+	logger: ConsolaInstance | undefined,
+	miniflare: MiniflareType,
+	mfConfig: any
+): Promise<void> {
+	try {
+		const gatewayBindings = await miniflare.getBindings('gateway')
+		logger?.info('Gateway worker bindings:', Object.keys(gatewayBindings))
+
+		if (mfConfig.workers) {
+			for (const w of mfConfig.workers) {
+				if (w.name !== 'gateway') {
+					try {
+						const doBindings = await miniflare.getBindings(w.name)
+						logger?.info(`${w.name} worker bindings:`, Object.keys(doBindings))
+						if ('BROWSER' in doBindings) {
+							logger?.success(`${w.name} has BROWSER binding!`)
+						} else {
+							logger?.warn(`${w.name} is MISSING BROWSER binding`)
+						}
+					} catch (error) {
+						logger?.debug(`Skipping binding diagnostics for ${w.name}: ${formatErrorMessage(error)}`)
+					}
+				}
+			}
+		}
+	} catch (error) {
+		logger?.debug(`Skipping Miniflare binding diagnostics: ${formatErrorMessage(error)}`)
+	}
 }
