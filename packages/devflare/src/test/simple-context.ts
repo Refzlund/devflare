@@ -30,6 +30,7 @@ import { extractBindingHints } from './binding-hints'
 import { resolveHandlerPaths } from './simple-context-handlers'
 import { startBridgeBackedTestContext } from './simple-context-startup'
 import { decodeTransportValue, loadTransportDecoders, type TransportDecoderMap } from './simple-context-transport'
+import { applyMultiWorkerConfig } from './simple-context-multi-worker'
 
 // Handler helper configuration
 import { configureEmail, resetEmailState } from './email'
@@ -214,53 +215,7 @@ export async function createTestContext(configPath?: string): Promise<void> {
 	const hasMultiWorkerDOs = doBindingResolution && doBindingResolution.workers.length > 0
 
 	if (hasMultiWorkerServices || hasMultiWorkerDOs) {
-		const primaryDurableObjects = {
-			...(mfConfig.durableObjects || {}),
-			...(doBindingResolution?.crossWorkerDOBindings || {})
-		}
-
-		const primaryWorker: Record<string, unknown> = {
-			name: config.name ?? 'primary',
-			modules: true,
-			script: mfConfig.script,
-			compatibilityDate: config.compatibilityDate ?? '2025-01-01',
-			...(mfConfig.kvNamespaces && { kvNamespaces: mfConfig.kvNamespaces }),
-			...(mfConfig.r2Buckets && { r2Buckets: mfConfig.r2Buckets }),
-			...(mfConfig.d1Databases && { d1Databases: mfConfig.d1Databases }),
-			...(mfConfig.email && { email: mfConfig.email }),
-			...(Object.keys(primaryDurableObjects).length > 0 && { durableObjects: primaryDurableObjects }),
-			...(serviceBindingResolution?.primaryServiceBindings && { serviceBindings: serviceBindingResolution.primaryServiceBindings })
-		}
-
-		const additionalWorkers = [
-			...(serviceBindingResolution?.workers || []),
-			...(doBindingResolution?.workers || [])
-		]
-		const workersByName = new Map<string, typeof additionalWorkers[0]>()
-
-		for (const worker of additionalWorkers) {
-			if (!workersByName.has(worker.name)) {
-				workersByName.set(worker.name, worker)
-				continue
-			}
-
-			const existing = workersByName.get(worker.name)!
-			if (worker.durableObjects) {
-				existing.durableObjects = {
-					...(existing.durableObjects || {}),
-					...worker.durableObjects
-				}
-			}
-		}
-
-		const workers = [primaryWorker, ...workersByName.values()]
-		delete mfConfig.script
-		delete mfConfig.modules
-		delete mfConfig.kvNamespaces
-		delete mfConfig.r2Buckets
-		delete mfConfig.d1Databases
-		delete mfConfig.durableObjects
-		mfConfig.workers = workers
+		applyMultiWorkerConfig(mfConfig, config, serviceBindingResolution, doBindingResolution)
 	}
 
 	let activePort: number
