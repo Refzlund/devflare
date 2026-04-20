@@ -13,7 +13,6 @@
 
 import { dirname, resolve } from 'path'
 import {
-	getLocalD1DatabaseIdentifier,
 	loadConfig
 } from '../config'
 import { BridgeClient } from '../bridge/client'
@@ -31,6 +30,7 @@ import { resolveHandlerPaths } from './simple-context-handlers'
 import { startBridgeBackedTestContext } from './simple-context-startup'
 import { decodeTransportValue, loadTransportDecoders, type TransportDecoderMap } from './simple-context-transport'
 import { applyMultiWorkerConfig } from './simple-context-multi-worker'
+import { buildInlineBridgeMfConfig } from './simple-context-mfconfig'
 
 // Handler helper configuration
 import { configureEmail, resetEmailState } from './email'
@@ -151,53 +151,7 @@ export async function createTestContext(configPath?: string): Promise<void> {
 		doBindingResolution = await resolveDOBindings(config, configDir)
 	}
 
-	const localWorkerBindings: Record<string, unknown> = config.vars ?? {}
-	const mfConfig: any = {
-		modules: true
-	}
-
-	if (config.bindings?.kv) {
-		mfConfig.kvNamespaces = Object.keys(config.bindings.kv)
-	}
-	if (config.bindings?.r2) {
-		mfConfig.r2Buckets = Object.keys(config.bindings.r2)
-	}
-	if (config.bindings?.d1) {
-		mfConfig.d1Databases = Object.fromEntries(
-			Object.entries(config.bindings.d1).map(([bindingName, bindingConfig]) => {
-				return [bindingName, getLocalD1DatabaseIdentifier(bindingConfig)]
-			})
-		)
-	}
-
-	if (config.bindings?.queues?.producers) {
-		const queueProducers: Record<string, { queueName: string }> = {}
-		for (const [bindingName, queueName] of Object.entries(config.bindings.queues.producers)) {
-			queueProducers[bindingName] = { queueName }
-		}
-		mfConfig.queueProducers = queueProducers
-	}
-
-	if (Object.keys(localWorkerBindings).length > 0) {
-		mfConfig.bindings = localWorkerBindings
-	}
-
-	if (config.bindings?.sendEmail) {
-		mfConfig.email = {
-			send_email: Object.entries(config.bindings.sendEmail).map(([name, binding]) => ({
-				name,
-				...(binding.destinationAddress && {
-					destination_address: binding.destinationAddress
-				}),
-				...(binding.allowedDestinationAddresses && {
-					allowed_destination_addresses: binding.allowedDestinationAddresses
-				}),
-				...(binding.allowedSenderAddresses && {
-					allowed_sender_addresses: binding.allowedSenderAddresses
-				})
-			}))
-		}
-	}
+	const mfConfig: any = buildInlineBridgeMfConfig(config)
 
 	const transportFile = resolveTransportFile(configDir, config.files?.transport)
 
