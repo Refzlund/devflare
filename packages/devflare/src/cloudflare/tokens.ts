@@ -1,4 +1,5 @@
 import { apiDelete, apiGetAll, apiPost, apiPut, type APIClientOptions } from './api'
+import { KNOWN_PERMISSION_GROUP_IDS_DATA } from './known-permission-group-ids.generated'
 import type {
 	AccountOwnedAPIToken,
 	AccountOwnedAPITokenDeleteResult,
@@ -34,27 +35,30 @@ const DEVFLARE_PERMISSION_GROUP_NAME_PATTERNS = [
  * rename or localize at any time.
  *
  * Entries set to `undefined` have not been confidently verified against
- * Cloudflare's public docs at authoring time and fall back to exact
- * display-name matching via {@link KNOWN_PERMISSION_GROUP_DISPLAY_NAMES}.
- * Replace with the real UUID returned by
- * `GET /accounts/:id/tokens/permission_groups` when verified.
+ * Cloudflare's `GET /accounts/:id/tokens/permission_groups` endpoint and
+ * fall back to exact display-name matching via
+ * {@link KNOWN_PERMISSION_GROUP_DISPLAY_NAMES}.
+ *
+ * The verified UUIDs (or `null` placeholders) live in
+ * `known-permission-group-ids.generated.ts`, which is rewritten by
+ * `scripts/refresh-permission-groups.ts` against a maintainer's Cloudflare
+ * account so this file does not need hand-edits when Cloudflare publishes
+ * or rotates permission-group ids.
  */
-export const KNOWN_PERMISSION_GROUP_IDS = {
-	// TODO: id not verified from Cloudflare public docs at authoring time.
-	WORKERS_SCRIPTS_WRITE: undefined,
-	// TODO: id not verified from Cloudflare public docs at authoring time.
-	WORKERS_SCRIPTS_READ: undefined,
-	// TODO: id not verified from Cloudflare public docs at authoring time.
-	ACCOUNT_SETTINGS_READ: undefined,
-	// TODO: id not verified from Cloudflare public docs at authoring time.
-	WORKERS_KV_STORAGE_WRITE: undefined,
-	// TODO: id not verified from Cloudflare public docs at authoring time.
-	WORKERS_KV_STORAGE_READ: undefined,
-	// TODO: id not verified from Cloudflare public docs at authoring time.
-	ACCOUNT_API_TOKENS_WRITE: undefined,
-	// TODO: id not verified from Cloudflare public docs at authoring time.
-	ACCOUNT_API_TOKENS_READ: undefined
-} satisfies Record<string, string | undefined>
+function deriveKnownPermissionGroupIds<TKey extends string>(
+	data: Record<TKey, string | null>
+): Record<TKey, string | undefined> {
+	const result = {} as Record<TKey, string | undefined>
+	for (const key of Object.keys(data) as TKey[]) {
+		const value = data[key]
+		result[key] = value === null ? undefined : value
+	}
+	return result
+}
+
+export const KNOWN_PERMISSION_GROUP_IDS = deriveKnownPermissionGroupIds(
+	KNOWN_PERMISSION_GROUP_IDS_DATA
+) satisfies Record<string, string | undefined>
 
 /**
  * Canonical display names used for exact-match fallback when the

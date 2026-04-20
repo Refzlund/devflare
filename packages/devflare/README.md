@@ -929,6 +929,29 @@ The source of truth is still:
 
 ---
 
+## Maintainer scripts
+
+These scripts live in `packages/devflare/scripts/` and are intended for Devflare maintainers, not for end-user applications.
+
+### `refresh-permission-groups`
+
+Fetches the live Cloudflare permission-group catalog and rewrites `src/cloudflare/known-permission-group-ids.generated.ts` so the symbolic Devflare permission-group names (`WORKERS_SCRIPTS_WRITE`, etc.) map to verified Cloudflare UUIDs instead of falling back to display-name matching.
+
+```sh
+# from the repo root
+CLOUDFLARE_API_TOKEN=... CLOUDFLARE_ACCOUNT_ID=... bun run --cwd packages/devflare refresh-permission-groups
+```
+
+Flags:
+
+- `--dry-run` — print the would-be generated file to stdout instead of writing to disk; useful for CI drift checks.
+- `--keep-existing` — keep the previously-known UUID for entries missing from the API response, instead of clearing them to `null`.
+- `--output <path>` — override the destination file; defaults to `packages/devflare/src/cloudflare/known-permission-group-ids.generated.ts`.
+
+The API token must have permission to read `/accounts/:id/tokens/permission_groups`. The script never touches `tokens.ts` directly, so the public matcher API and its display-name fallback continue to work even when the generated file ships with all-`null` entries.
+
+---
+
 ## In one sentence
 
 **Devflare helps you build Cloudflare Workers with clearer structure, better local tooling, and a development workflow that stays coherent as the app grows.**
