@@ -755,6 +755,30 @@ export async function runDeployCommand(
 				}
 				logLine(logger, dim('Would deploy with wrangler config:', theme))
 				logLine(logger, stringifyConfig(wranglerConfig))
+
+				// C6 — also render the resolved view (post-resource-resolution).
+				// Best-effort: if no Cloudflare credentials or the account
+				// cannot be reached, fall back to the build-config view above.
+				try {
+					const describeResult = await prepareConfigResourcesForDeploy(deploymentStrategy.config, {
+						environment,
+						describeOnly: true
+					})
+					const resolvedWranglerConfig = compileConfig(describeResult.config)
+					logLine(logger, dim('Resolved view (would-create placeholders for missing resources):', theme))
+					logLine(logger, stringifyConfig(resolvedWranglerConfig))
+					const wouldCreate = [
+						...describeResult.created.kv.map((n) => `KV: ${n}`),
+						...describeResult.created.d1.map((n) => `D1: ${n}`),
+						...describeResult.created.r2.map((n) => `R2: ${n}`),
+						...describeResult.created.queues.map((n) => `Queue: ${n}`)
+					]
+					if (wouldCreate.length > 0) {
+						logLine(logger, dim(`Would create:\n  - ${wouldCreate.join('\n  - ')}`, theme))
+					}
+				} catch (describeErr) {
+					logLine(logger, dim(`(resolved view unavailable: ${(describeErr as Error).message})`, theme))
+				}
 				return { exitCode: 0 }
 			}
 

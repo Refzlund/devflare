@@ -86,11 +86,21 @@ export interface PrepareConfigResourcesForDeployOptions {
 	identifier?: string
 	accountId?: string
 	cloudflare?: Partial<DeployResourcePreparationApi>
+	/** C6 — see `PrepareMaterializedConfigResourcesForDeployOptions.describeOnly`. */
+	describeOnly?: boolean
 }
 
 export interface PrepareMaterializedConfigResourcesForDeployOptions {
 	accountId?: string
 	cloudflare?: Partial<DeployResourcePreparationApi>
+	/**
+	 * C6 — describe-only mode. When true, no `create*` Cloudflare APIs are
+	 * called. Resources missing in the account are reported via the returned
+	 * `created` field (their IDs are placeholder strings prefixed with
+	 * `<would-create:>`), so dry-run can render the same plan that a real
+	 * deploy would execute without performing any side effects.
+	 */
+	describeOnly?: boolean
 }
 
 export interface PrepareConfigResourcesForDeployResult {
@@ -529,6 +539,22 @@ export async function prepareMaterializedConfigResourcesForDeploy(
 	const cloudflareApi = resolveDeployResourcePreparationApi(options.cloudflare)
 	const accountId = await resolveLookupAccountId(resolvedConfig, options, cloudflareApi)
 
+	// C6 — describe-only mode for dry-run: stub the create-* APIs so they
+	// return `<would-create:NAME>` placeholders rather than calling the live
+	// Cloudflare API. Resolution of existing resources still happens for
+	// real, so the dry-run output reflects the actual mix of "would create"
+	// vs "would reuse" the live deploy would perform.
+	if (options.describeOnly) {
+		cloudflareApi.createKVNamespace = (async (_acc: string, name: string) =>
+			({ id: `<would-create:${name}>`, name })) as DeployResourcePreparationApi['createKVNamespace']
+		cloudflareApi.createD1Database = (async (_acc: string, name: string) =>
+			({ id: `<would-create:${name}>`, name, version: '', tableCount: 0, sizeBytes: 0 })) as DeployResourcePreparationApi['createD1Database']
+		cloudflareApi.createR2Bucket = (async (_acc: string, name: string) =>
+			({ name })) as DeployResourcePreparationApi['createR2Bucket']
+		cloudflareApi.createQueue = (async (_acc: string, name: string) =>
+			({ id: `<would-create:${name}>`, name })) as DeployResourcePreparationApi['createQueue']
+	}
+
 	// C13 — sequential provisioning leaves silent orphans. We do not
 	// auto-delete created resources on a later failure (Cloudflare resource
 	// deletion is asynchronous, partial, and risky against resources a user
@@ -538,6 +564,30 @@ export async function prepareMaterializedConfigResourcesForDeploy(
 	// deploy, so the user can clean them up manually if the deploy is
 	// abandoned.
 	try {
+	// C3 — resolve-only resources (Hyperdrive, Vectorize) FIRST so that a
+	// "create the index first" failure happens BEFORE we provision any
+	// KV/D1/R2/Queue resources. Otherwise a missing Hyperdrive config would
+	// only be detected after side effects (orphans).
+	const hyperdriveIdsByName = await resolveOrCreateResourceIdsByName(pendingHyperdriveNameBindings, {
+		listResources: async () => cloudflareApi.listHyperdrives(accountId),
+		listFailureMessage: `Could not list Hyperdrive configurations for Cloudflare account ${accountId} while preparing deploy resources.`,
+		missingFailureMessage: (missingBindings) => {
+			return `Could not find Hyperdrive configuration(s) for ${formatMissingBindings(missingBindings)} in Cloudflare account ${accountId}. Cloudflare does not expose a create API that Devflare can use from only a binding name, so create the Hyperdrive config first or configure the binding with an explicit id.`
+		}
+	})
+	created.hyperdrive.push(...hyperdriveIdsByName.created)
+	existing.hyperdrive.push(...hyperdriveIdsByName.existing)
+
+	const vectorizeState = await ensureNamedResourcesExist<VectorizeIndexInfo>(vectorizeNames, {
+		listResources: async () => cloudflareApi.listVectorizeIndexes(accountId),
+		listFailureMessage: `Could not list Vectorize indexes for Cloudflare account ${accountId} while preparing deploy resources.`,
+		missingFailureMessage: (missingNames) => {
+			return `Could not find Vectorize index(es) ${missingNames.join(', ')} in Cloudflare account ${accountId}. Devflare can only auto-provision preview-scoped Vectorize indexes by cloning an existing base index; for normal deploys create the index first.`
+		}
+	})
+	created.vectorize.push(...vectorizeState.created)
+	existing.vectorize.push(...vectorizeState.existing)
+
 	const namespaceIdsByName = await resolveOrCreateResourceIdsByName(pendingKVNameBindings, {
 		listResources: async () => cloudflareApi.listKVNamespaces(accountId),
 		createResource: async (resourceName) => cloudflareApi.createKVNamespace(accountId, resourceName),
@@ -566,16 +616,6 @@ export async function prepareMaterializedConfigResourcesForDeploy(
 	created.d1.push(...databaseIdsByName.created)
 	existing.d1.push(...databaseIdsByName.existing)
 
-	const hyperdriveIdsByName = await resolveOrCreateResourceIdsByName(pendingHyperdriveNameBindings, {
-		listResources: async () => cloudflareApi.listHyperdrives(accountId),
-		listFailureMessage: `Could not list Hyperdrive configurations for Cloudflare account ${accountId} while preparing deploy resources.`,
-		missingFailureMessage: (missingBindings) => {
-			return `Could not find Hyperdrive configuration(s) for ${formatMissingBindings(missingBindings)} in Cloudflare account ${accountId}. Cloudflare does not expose a create API that Devflare can use from only a binding name, so create the Hyperdrive config first or configure the binding with an explicit id.`
-		}
-	})
-	created.hyperdrive.push(...hyperdriveIdsByName.created)
-	existing.hyperdrive.push(...hyperdriveIdsByName.existing)
-
 	const r2State = await ensureNamedResourcesExist<R2BucketInfo>(r2Names, {
 		listResources: async () => cloudflareApi.listR2Buckets(accountId),
 		createResource: async (resourceName) => cloudflareApi.createR2Bucket(accountId, resourceName),
@@ -603,16 +643,6 @@ export async function prepareMaterializedConfigResourcesForDeploy(
 	})
 	created.queues.push(...queueState.created)
 	existing.queues.push(...queueState.existing)
-
-	const vectorizeState = await ensureNamedResourcesExist<VectorizeIndexInfo>(vectorizeNames, {
-		listResources: async () => cloudflareApi.listVectorizeIndexes(accountId),
-		listFailureMessage: `Could not list Vectorize indexes for Cloudflare account ${accountId} while preparing deploy resources.`,
-		missingFailureMessage: (missingNames) => {
-			return `Could not find Vectorize index(es) ${missingNames.join(', ')} in Cloudflare account ${accountId}. Devflare can only auto-provision preview-scoped Vectorize indexes by cloning an existing base index; for normal deploys create the index first.`
-		}
-	})
-	created.vectorize.push(...vectorizeState.created)
-	existing.vectorize.push(...vectorizeState.existing)
 
 	const config = withResolvedIdBindings(resolvedConfig, {
 		kv: kvBindings
@@ -658,6 +688,7 @@ export async function prepareConfigResourcesForDeploy(
 
 	return prepareMaterializedConfigResourcesForDeploy(resolvedConfig, {
 		accountId: options.accountId,
-		cloudflare: options.cloudflare
+		cloudflare: options.cloudflare,
+		describeOnly: options.describeOnly
 	})
 }
