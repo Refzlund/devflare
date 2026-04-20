@@ -21,6 +21,7 @@ import { discoverRoutes, type RouteDiscoveryResult } from '../worker-entry/route
 import { runD1Migrations } from './d1-migrations'
 import { getGatewayScript } from './gateway-script'
 import { createCompatibilityAwareMiniflareLog } from './miniflare-log'
+import { buildQueueConsumers, buildQueueProducers, buildSendEmailConfig } from './miniflare-bindings'
 import { createRuntimeStdioForwarder } from './runtime-stdio'
 import { resolveViteMode, stopSpawnedProcessTree } from './vite-utils'
 import { startViteProcess } from './vite-process'
@@ -169,37 +170,8 @@ export function createDevServer(options: DevServerOptions): DevServer {
 			hasWorkerSurfacePaths(mainWorkerSurfacePaths)
 			|| Boolean(mainWorkerRoutes?.routes.length)
 		)
-		const queueProducers = (() => {
-			if (!bindings.queues?.producers) {
-				return undefined
-			}
-
-			const producers: Record<string, { queueName: string }> = {}
-			for (const [bindingName, queueName] of Object.entries(bindings.queues.producers)) {
-				producers[bindingName] = { queueName }
-			}
-
-			return producers
-		})()
-		const queueConsumers = (() => {
-			if (!bindings.queues?.consumers || bindings.queues.consumers.length === 0) {
-				return undefined
-			}
-
-			const consumers: Record<string, Record<string, unknown>> = {}
-			for (const consumer of bindings.queues.consumers) {
-				consumers[consumer.queue] = {
-					...(consumer.maxBatchSize !== undefined && { maxBatchSize: consumer.maxBatchSize }),
-					...(consumer.maxBatchTimeout !== undefined && { maxBatchTimeout: consumer.maxBatchTimeout }),
-					...(consumer.maxRetries !== undefined && { maxRetries: consumer.maxRetries }),
-					...(consumer.deadLetterQueue && { deadLetterQueue: consumer.deadLetterQueue }),
-					...(consumer.maxConcurrency !== undefined && { maxConcurrency: consumer.maxConcurrency }),
-					...(consumer.retryDelay !== undefined && { retryDelay: consumer.retryDelay })
-				}
-			}
-
-			return consumers
-		})()
+		const queueProducers = buildQueueProducers(bindings)
+		const queueConsumers = buildQueueConsumers(bindings)
 
 		// Shared options (not worker-specific)
 		const sharedOptions: any = {
@@ -234,22 +206,7 @@ export function createDevServer(options: DevServerOptions): DevServer {
 			return Object.keys(serviceBindings).length > 0 ? serviceBindings : undefined
 		}
 
-		const sendEmailConfig = bindings.sendEmail
-			? {
-				send_email: Object.entries(bindings.sendEmail).map(([name, binding]) => ({
-					name,
-					...(binding.destinationAddress && {
-						destination_address: binding.destinationAddress
-					}),
-					...(binding.allowedDestinationAddresses && {
-						allowed_destination_addresses: binding.allowedDestinationAddresses
-					}),
-					...(binding.allowedSenderAddresses && {
-						allowed_sender_addresses: binding.allowedSenderAddresses
-					})
-				}))
-			}
-			: undefined
+		const sendEmailConfig = buildSendEmailConfig(bindings)
 
 		const createWorkerConfig = (options: {
 			name: string
