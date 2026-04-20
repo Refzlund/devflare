@@ -28,6 +28,7 @@ import { buildDurableObjectGateway } from './simple-context-durable-objects'
 import { findNearestConfig, getAvailablePort, getCallerDirectory, resolveTransportFile } from './simple-context-paths'
 import { createLocalSendEmailBinding, wrapEnvSendEmailBindings } from '../utils/send-email'
 import { extractBindingHints } from './binding-hints'
+import { startBridgeBackedTestContext } from './simple-context-startup'
 
 // Handler helper configuration
 import { configureEmail, resetEmailState } from './email'
@@ -60,116 +61,8 @@ function createTestContextState(): TestContextState {
 	}
 }
 
-const TEST_CONTEXT_STARTUP_RETRY_ATTEMPTS = 3
-const TEST_CONTEXT_STARTUP_RETRY_DELAY_MS = 75
-const TEST_CONTEXT_BRIDGE_CONNECT_RETRY_ATTEMPTS = 8
-const TEST_CONTEXT_BRIDGE_CONNECT_RETRY_DELAY_MS = 150
-
-interface StartedBridgeBackedTestContext {
-	port: number
-	client: BridgeClient
-	miniflare: any
-	miniflareBindings: Record<string, unknown>
-}
-
-function isRetriableTestContextStartupError(error: unknown): boolean {
-	if (!(error instanceof Error)) {
-		return false
-	}
-
-	const message = error.message.toLowerCase()
-	return message.includes('websocket connection failed')
-		|| message.includes('connection timeout: ws://')
-		|| message.includes('econnrefused')
-		|| message.includes('eaddrinuse')
-		|| message.includes('address already in use')
-}
-
-async function waitForTestContextStartupRetry(): Promise<void> {
-	await new Promise((resolve) => setTimeout(resolve, TEST_CONTEXT_STARTUP_RETRY_DELAY_MS))
-}
-
-async function waitForBridgeClientRetry(): Promise<void> {
-	await new Promise((resolve) => setTimeout(resolve, TEST_CONTEXT_BRIDGE_CONNECT_RETRY_DELAY_MS))
-}
-
 function shouldPreferBridgeBinding(hint: BindingHints[string] | undefined): boolean {
 	return hint === 'do' || hint === 'service'
-}
-
-async function connectBridgeClientWithRetry(url: string): Promise<BridgeClient> {
-	let lastError: unknown
-
-	for (let attempt = 1;attempt <= TEST_CONTEXT_BRIDGE_CONNECT_RETRY_ATTEMPTS;attempt++) {
-		const client = new BridgeClient({ url })
-
-		try {
-			await client.connect()
-			return client
-		} catch (error) {
-			lastError = error
-			client.disconnect()
-
-			if (
-				attempt >= TEST_CONTEXT_BRIDGE_CONNECT_RETRY_ATTEMPTS
-				|| !isRetriableTestContextStartupError(error)
-			) {
-				throw error
-			}
-
-			await waitForBridgeClientRetry()
-		}
-	}
-
-	throw lastError instanceof Error
-		? lastError
-		: new Error('Bridge-backed test context could not connect to the WebSocket gateway.')
-}
-
-async function startBridgeBackedTestContext(mfConfig: any): Promise<StartedBridgeBackedTestContext> {
-	const { Miniflare } = await import('miniflare')
-
-	for (let attempt = 1;attempt <= TEST_CONTEXT_STARTUP_RETRY_ATTEMPTS;attempt++) {
-		const port = await getAvailablePort()
-		let miniflare: any = null
-		let client: BridgeClient | null = null
-
-		try {
-			miniflare = new Miniflare({
-				...mfConfig,
-				port
-			})
-			await miniflare.ready
-
-			const miniflareBindings = wrapEnvSendEmailBindings(await miniflare.getBindings())
-			client = await connectBridgeClientWithRetry(`ws://localhost:${port}`)
-
-			return {
-				port,
-				client,
-				miniflare,
-				miniflareBindings
-			}
-		} catch (error) {
-			client?.disconnect()
-
-			if (miniflare) {
-				try {
-					await miniflare.dispose()
-				} catch {
-					// Ignore cleanup failures while retrying test context startup.
-				}
-			}
-
-			if (attempt >= TEST_CONTEXT_STARTUP_RETRY_ATTEMPTS || !isRetriableTestContextStartupError(error)) {
-				throw error
-			}
-
-			await waitForTestContextStartupRetry()
-		}
-	}
-
-	throw new Error('Bridge-backed test context startup exhausted all retry attempts.')
 }
 
 // -----------------------------------------------------------------------------
