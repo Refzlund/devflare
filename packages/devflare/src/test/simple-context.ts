@@ -24,6 +24,7 @@ import { findNearestConfig, getAvailablePort, getCallerDirectory, resolveTranspo
 import { wrapEnvSendEmailBindings } from '../utils/send-email'
 import { extractBindingHints } from './binding-hints'
 import { buildRemoteAndStaticBindings } from './simple-context-bindings'
+import { configureSurfaceHandlers, createBridgeEnvAccessor, createMultiWorkerEnvAccessor } from './simple-context-env'
 import { resolveHandlerPaths } from './simple-context-handlers'
 import { startBridgeBackedTestContext } from './simple-context-startup'
 import { decodeTransportValue, loadTransportDecoders, type TransportDecoderMap } from './simple-context-transport'
@@ -31,11 +32,11 @@ import { applyMultiWorkerConfig } from './simple-context-multi-worker'
 import { buildInlineBridgeMfConfig } from './simple-context-mfconfig'
 
 // Handler helper configuration
-import { configureEmail, resetEmailState } from './email'
-import { configureQueue, resetQueueState } from './queue'
-import { configureScheduled, resetScheduledState } from './scheduled'
-import { configureTail, resetTailState } from './tail'
-import { configureWorker, resetWorkerState } from './worker'
+import { resetEmailState } from './email'
+import { resetQueueState } from './queue'
+import { resetScheduledState } from './scheduled'
+import { resetTailState } from './tail'
+import { resetWorkerState } from './worker'
 
 // -----------------------------------------------------------------------------
 // Per-context state
@@ -212,67 +213,17 @@ export async function createTestContext(configPath?: string): Promise<void> {
 	}
 
 	const handlerPaths = await resolveHandlerPaths(configDir, config)
-	const resolvedFetchPath = handlerPaths.fetch
-	const resolvedQueuePath = handlerPaths.queue
-	const resolvedScheduledPath = handlerPaths.scheduled
-	const resolvedEmailPath = handlerPaths.email
-	const resolvedTailPath = handlerPaths.tail
-	const resolvedRoutes = handlerPaths.routes
 
-	configureQueue({
-		handlerPath: resolvedQueuePath,
+	configureSurfaceHandlers({
+		handlerPaths,
 		configDir,
-		getEnv: getTestEnv
-	})
-	configureScheduled({
-		handlerPath: resolvedScheduledPath,
-		configDir,
-		getEnv: getTestEnv
-	})
-	configureWorker({
-		handlerPath: resolvedFetchPath,
-		routes: resolvedRoutes?.routes.map((route) => ({
-			filePath: route.filePath,
-			routePath: route.routePath,
-			segments: route.segments
-		})) ?? [],
-		configDir,
-		getEnv: getTestEnv
-	})
-	configureTail({
-		handlerPath: resolvedTailPath,
-		configDir,
-		getEnv: getTestEnv
-	})
-	configureEmail({
-		port: activePort,
-		handlerPath: resolvedEmailPath,
-		configDir,
+		activePort,
 		getEnv: getTestEnv
 	})
 
 	if (hasMultiWorkerServices || hasMultiWorkerDOs) {
 		setBindingHints(hints)
-
-		const envAccessor: Record<string, unknown> = new Proxy({}, {
-			get(_, prop: string) {
-				if (state.remoteBindings && prop in state.remoteBindings) {
-					return state.remoteBindings[prop]
-				}
-				if (state.miniflareBindings && prop in state.miniflareBindings) {
-					return state.miniflareBindings[prop]
-				}
-				return undefined
-			},
-			has(_, prop: string) {
-				return Boolean(
-					(state.remoteBindings && prop in state.remoteBindings)
-					|| (state.miniflareBindings && prop in state.miniflareBindings)
-				)
-			}
-		})
-
-		__setTestContext(envAccessor, disposeContext)
+		__setTestContext(createMultiWorkerEnvAccessor(state), disposeContext)
 		return
 	}
 
@@ -287,35 +238,10 @@ export async function createTestContext(configPath?: string): Promise<void> {
 		transformResult: (result: unknown) => decodeTransport(result)
 	})
 
-	const envAccessor: Record<string, unknown> = new Proxy({}, {
-		get(_, prop: string) {
-			const hint = hints[prop]
-			const prefersBridgeBinding = shouldPreferBridgeBinding(hint)
-
-			if (state.remoteBindings && prop in state.remoteBindings) {
-				return state.remoteBindings[prop]
-			}
-			if (!prefersBridgeBinding && state.miniflareBindings && prop in state.miniflareBindings) {
-				return state.miniflareBindings[prop]
-			}
-			if (state.envProxy) {
-				return state.envProxy[prop]
-			}
-			if (prefersBridgeBinding && state.miniflareBindings && prop in state.miniflareBindings) {
-				return state.miniflareBindings[prop]
-			}
-			return undefined
-		},
-		has(_, prop: string) {
-			return Boolean(
-				(state.remoteBindings && prop in state.remoteBindings)
-				|| (state.miniflareBindings && prop in state.miniflareBindings)
-				|| (state.envProxy !== null)
-			)
-		}
-	})
-
-	__setTestContext(envAccessor, disposeContext)
+	__setTestContext(
+		createBridgeEnvAccessor(state, hints, shouldPreferBridgeBinding),
+		disposeContext
+	)
 }
 
 /**
