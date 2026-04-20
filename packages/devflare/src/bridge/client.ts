@@ -1,14 +1,17 @@
 // =============================================================================
 // Bridge Client — WebSocket Client for Node.js/Bun
 // =============================================================================
-// Connects to the Miniflare gateway worker and provides RPC interface
+// Connects to the Miniflare gateway worker and provides an RPC interface.
+//
+// Wire protocol: TransportV2Codec owns the underlying socket. On connect, the
+// client sends `hello` and the server replies `welcome` (or simply ignores the
+// handshake — connect resolves on socket open either way, and the codec keeps
+// the handshake promise live for capability negotiation). RPC, body, stream
+// and ws-relay messages are dispatched through the codec.
 // =============================================================================
 
 import {
 	type JsonMsg,
-	type RpcCall,
-	type RpcOk,
-	type RpcErr,
 	type StreamPull,
 	type WsOpen,
 	type WsOpened,
@@ -19,16 +22,50 @@ import {
 	decodeBinaryFrame,
 	BinaryKind,
 	BinaryFlags,
-	nextRpcId,
 	nextWsId,
 	DEFAULT_BRIDGE_PORT,
 	DEFAULT_CHUNK_SIZE
-} from './v2/legacy-protocol'
+} from './v2/wire'
 import {
 	serializeValue,
 	deserializeValue,
 	type StreamRef
-} from './v2/legacy-serialization'
+} from './v2/value-serialization'
+import { TransportV2Codec } from './v2/codec'
+import type {
+	WebSocketLike,
+	WebSocketLikeMessageEvent,
+	WebSocketLikeCloseEvent
+} from './v2/transport'
+import type { TransportV2DecodedBinaryFrame } from './v2/frames'
+
+// -----------------------------------------------------------------------------
+// Internal — adapter that exposes a real browser/Node WebSocket as a
+// WebSocketLike target the v2 codec can attach to. We retain control over the
+// real WebSocket's onopen handler so that BridgeClient.connect() can resolve
+// on socket open while the codec runs the handshake in the background.
+// -----------------------------------------------------------------------------
+
+class BridgeWsAdapter implements WebSocketLike {
+	onmessage: ((event: WebSocketLikeMessageEvent) => void) | null = null
+	onclose: ((event: WebSocketLikeCloseEvent) => void) | null = null
+	onerror: ((event: { error?: unknown }) => void) | null = null
+	#ws: WebSocket
+
+	constructor(ws: WebSocket) {
+		this.#ws = ws
+	}
+
+	send(data: string | Uint8Array): void {
+		this.#ws.send(data as never)
+	}
+
+	close(code?: number, reason?: string): void {
+		this.#ws.close(code, reason)
+	}
+}
+
+const BRIDGE_CLIENT_CAPABILITIES = ['streams', 'ws-relay', 'http-transfer'] as const
 
 // -----------------------------------------------------------------------------
 // Types
@@ -83,12 +120,13 @@ export interface PendingWsOpen {
 
 export class BridgeClient {
 	private ws: WebSocket | null = null
+	private codec: TransportV2Codec | null = null
+	private adapter: BridgeWsAdapter | null = null
 	private url: string
 	private autoReconnect: boolean
 	private reconnectDelay: number
 	private connectTimeout: number
 
-	private pendingCalls = new Map<string, PendingCall>()
 	private activeStreams = new Map<number, ActiveStream>()
 	private wsProxies = new Map<number, ActiveWsProxy>()
 	private pendingWsOpens = new Map<number, PendingWsOpen>()
@@ -134,25 +172,46 @@ export class BridgeClient {
 				this.ws = new WebSocket(this.url)
 				this.ws.binaryType = 'arraybuffer'
 
+				const adapter = new BridgeWsAdapter(this.ws)
+				this.adapter = adapter
+
 				this.ws.onopen = () => {
 					clearTimeout(timeout)
+					// Attach the v2 codec only once the socket is open so its
+					// `sendHello()` call writes to a live transport.
+					this.codec = new TransportV2Codec(adapter, {
+						capabilities: [...BRIDGE_CLIENT_CAPABILITIES],
+						onUnknownControl: (data) => this.handleJsonMessage(data),
+						onUnknownBinary: (frame) => this.handleV2BinaryFrame(frame)
+					})
+					// Fire the handshake but do NOT block connect() on it. The
+					// gateway-runtime side acks with `welcome`; servers that do
+					// not implement v2 simply ignore it (the codec dispatches
+					// unknown text to onUnknownControl, which silently drops).
+					this.codec.sendHello()
+					this.codec.handshake.catch(() => { /* surfaced through cleanupPending */ })
 					this.isConnected = true
 					this.connectPromise = null
 					resolve()
 				}
 
-				this.ws.onerror = () => {
+				this.ws.onerror = (event) => {
 					clearTimeout(timeout)
 					this.connectPromise = null
+					adapter.onerror?.({ error: (event as unknown as { error?: unknown }).error })
 					reject(new Error('WebSocket connection failed'))
 				}
 
-				this.ws.onclose = () => {
+				this.ws.onclose = (event) => {
+					adapter.onclose?.({
+						code: event?.code ?? 1006,
+						reason: event?.reason ?? ''
+					})
 					this.handleDisconnect()
 				}
 
 				this.ws.onmessage = (event) => {
-					this.handleMessage(event.data)
+					adapter.onmessage?.({ data: event.data })
 				}
 			} catch (error) {
 				clearTimeout(timeout)
@@ -167,6 +226,12 @@ export class BridgeClient {
 	/** Disconnect from the bridge and tear down all pending state */
 	disconnect(): void {
 		this.autoReconnect = false
+		// Closing the codec rejects any pending RPC calls registered there
+		// with the codec's own "v2 transport closed" error; cleanupPending()
+		// then layers the BridgeClient-level streams/ws teardown.
+		this.codec?.close()
+		this.codec = null
+		this.adapter = null
 		this.ws?.close()
 		this.ws = null
 		this.isConnected = false
@@ -185,6 +250,9 @@ export class BridgeClient {
 
 	private handleDisconnect(): void {
 		this.isConnected = false
+		this.codec?.close()
+		this.codec = null
+		this.adapter = null
 		this.ws = null
 
 		this.cleanupPending(new Error('Bridge disconnected'))
@@ -197,15 +265,8 @@ export class BridgeClient {
 		}
 	}
 
-	/** Reject/close all pending RPC calls, streams, and ws proxies */
+	/** Reject/close all pending streams and ws proxies (codec owns RPC pending). */
 	private cleanupPending(error: Error): void {
-		// Reject pending RPC calls
-		for (const pending of this.pendingCalls.values()) {
-			clearTimeout(pending.timeout)
-			pending.reject(error)
-		}
-		this.pendingCalls.clear()
-
 		// Reject pending ws.opened waits
 		for (const pending of this.pendingWsOpens.values()) {
 			pending.reject(error)
@@ -249,7 +310,10 @@ export class BridgeClient {
 	async call(method: string, params: unknown[], timeoutMs = 30000): Promise<unknown> {
 		await this.ensureConnected()
 
-		const id = nextRpcId()
+		const codec = this.codec
+		if (!codec) {
+			throw new Error('Bridge disconnected')
+		}
 
 		// Serialize params (may produce streams)
 		const { value: serializedParams, streams } = await serializeValue(params)
@@ -259,23 +323,29 @@ export class BridgeClient {
 			this.outgoingStreams.set(streamRef.sid, streamRef)
 		}
 
-		return new Promise((resolve, reject) => {
-			const timeout = setTimeout(() => {
-				this.pendingCalls.delete(id)
+		const callPromise = codec.call(method, serializedParams as unknown[])
+
+		let timeoutHandle: ReturnType<typeof setTimeout> | null = null
+		const timeoutPromise = new Promise<never>((_, reject) => {
+			timeoutHandle = setTimeout(() => {
 				reject(new Error(`RPC timeout: ${method}`))
 			}, timeoutMs)
-
-			this.pendingCalls.set(id, { resolve, reject, timeout })
-
-			const msg: RpcCall = {
-				t: 'rpc.call',
-				id,
-				method,
-				params: serializedParams as unknown[]
-			}
-
-			this.send(msg)
 		})
+
+		try {
+			const rawResult = await Promise.race([callPromise, timeoutPromise])
+			return deserializeValue(rawResult, (sid) => this.createReadableStream(sid))
+		} catch (error) {
+			// Re-wrap codec's "v2 transport closed" error so callers continue
+			// to see the BridgeClient-level disconnect message they expect.
+			if (!this.isConnected && error instanceof Error
+				&& /v2 transport closed|transport/.test(error.message)) {
+				throw new Error('Bridge disconnected')
+			}
+			throw error
+		} finally {
+			if (timeoutHandle !== null) clearTimeout(timeoutHandle)
+		}
 	}
 
 	// ---------------------------------------------------------------------------
@@ -335,7 +405,7 @@ export class BridgeClient {
 					: data
 				const flags = typeof data === 'string' ? BinaryFlags.TEXT : 0
 				const frame = encodeBinaryFrame(BinaryKind.WsData, wid, 0, flags, payload)
-				this.ws?.send(frame)
+				this.sendBinary(frame)
 			},
 			close: (code, reason) => {
 				const closeMsg: WsClose = { t: 'ws.close', wid, code, reason }
@@ -428,28 +498,17 @@ export class BridgeClient {
 	}
 
 	// ---------------------------------------------------------------------------
-	// Message Handling
+	// Message Handling — invoked by TransportV2Codec via onUnknownControl /
+	// onUnknownBinary hooks. The codec handles `hello`/`welcome`, `body.*` and
+	// the `rpc.*` envelope itself; everything below is the legacy stream/ws
+	// vocabulary that v2 keeps bit-compatible for in-flight wire shapes.
 	// ---------------------------------------------------------------------------
-
-	private handleMessage(data: ArrayBuffer | string): void {
-		if (typeof data === 'string') {
-			this.handleJsonMessage(data)
-		} else {
-			this.handleBinaryMessage(new Uint8Array(data))
-		}
-	}
 
 	private handleJsonMessage(data: string): void {
 		try {
 			const msg = parseJsonMsg(data)
 
 			switch (msg.t) {
-				case 'rpc.ok':
-					this.handleRpcOk(msg)
-					break
-				case 'rpc.err':
-					this.handleRpcErr(msg)
-					break
 				case 'event':
 					this.handleEvent(msg)
 					break
@@ -474,46 +533,20 @@ export class BridgeClient {
 		}
 	}
 
-	private handleBinaryMessage(frame: Uint8Array): void {
-		try {
-			const decoded = decodeBinaryFrame(frame)
-
-			switch (decoded.kind) {
-				case BinaryKind.StreamChunk:
-					this.handleStreamChunk(decoded)
-					break
-				case BinaryKind.WsData:
-					this.handleWsData(decoded)
-					break
-			}
-		} catch {
-			// Silently ignore malformed binary frames
+	/**
+	 * Receive a v2 binary frame. Frame format is byte-identical to the legacy
+	 * v1 frames for kinds 1 (StreamChunk) and 2 (WsData); v2 owns kind 3
+	 * (BodyChunk) which the codec handles internally before reaching here.
+	 */
+	private handleV2BinaryFrame(frame: TransportV2DecodedBinaryFrame): void {
+		switch (frame.kind) {
+			case BinaryKind.StreamChunk:
+				this.handleStreamChunk(frame)
+				break
+			case BinaryKind.WsData:
+				this.handleWsData(frame)
+				break
 		}
-	}
-
-	private handleRpcOk(msg: RpcOk): void {
-		const pending = this.pendingCalls.get(msg.id)
-		if (!pending) return
-
-		clearTimeout(pending.timeout)
-		this.pendingCalls.delete(msg.id)
-
-		// Deserialize result (may contain streams)
-		const result = deserializeValue(msg.result, (sid) => this.createReadableStream(sid))
-		pending.resolve(result)
-	}
-
-	private handleRpcErr(msg: RpcErr): void {
-		const pending = this.pendingCalls.get(msg.id)
-		if (!pending) return
-
-		clearTimeout(pending.timeout)
-		this.pendingCalls.delete(msg.id)
-
-		const error = new Error(msg.error.message)
-		;(error as any).code = msg.error.code
-		;(error as any).details = msg.error.details
-		pending.reject(error)
 	}
 
 	private handleEvent(_msg: { topic: string; data: unknown }): void {
@@ -553,7 +586,7 @@ export class BridgeClient {
 						0,
 						value
 					)
-					this.ws?.send(frame)
+					this.sendBinary(frame)
 					sent += value.byteLength
 				}
 			}
@@ -650,10 +683,19 @@ export class BridgeClient {
 	}
 
 	private send(msg: JsonMsg): void {
-		if (!this.ws || !this.isConnected) {
+		const codec = this.codec
+		if (!codec || !this.isConnected) {
 			throw new Error('Not connected to bridge')
 		}
-		this.ws.send(stringifyJsonMsg(msg))
+		codec.sendText(stringifyJsonMsg(msg))
+	}
+
+	private sendBinary(frame: Uint8Array): void {
+		const codec = this.codec
+		if (!codec || !this.isConnected) {
+			throw new Error('Not connected to bridge')
+		}
+		codec.sendBinary(frame)
 	}
 }
 

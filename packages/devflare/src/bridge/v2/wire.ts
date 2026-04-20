@@ -1,16 +1,12 @@
 // =============================================================================
-// Bridge Protocol — Message Types + Binary Framing  (legacy v1 wire format)
+// Bridge Transport v2 — Wire Vocabulary  (RPC envelope, stream/ws control,
+// binary frame format, ID counters)
 // =============================================================================
-// WebSocket-based RPC protocol for Node.js ↔ Miniflare communication.
-//
-// HISTORY: This module is the v1 transport vocabulary that originally lived
-// at `src/bridge/protocol.ts`. It was relocated into `src/bridge/v2/` as part
-// of the v1-removal sweep so that the v2 transport namespace owns all bridge
-// wire definitions. The behavior and exported names are bit-identical to the
-// pre-move v1 module; the deeper TransportV2Codec primitives in this folder
-// (frames.ts, codec.ts, body-streams.ts, value-codec.ts, control-messages.ts,
-// ws-relay.ts) are the forward-looking replacement that consumers will move
-// to incrementally.
+// JSON control messages (rpc.call/rpc.ok/rpc.err, stream.*, ws.*, event,
+// http.transfer) and the 10-byte binary frame header used by every devflare
+// bridge transport. Sits below the codec layer (see codec.ts) which adds the
+// hello/welcome handshake and the body-stream registry on top of these
+// primitives.
 // =============================================================================
 
 // -----------------------------------------------------------------------------

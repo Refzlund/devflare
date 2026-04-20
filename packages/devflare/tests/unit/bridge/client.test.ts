@@ -4,7 +4,7 @@
 
 import { describe, test, expect, beforeEach, afterEach, mock } from 'bun:test'
 import { BridgeClient } from '../../../src/bridge/client'
-import { stringifyJsonMsg } from '../../../src/bridge/v2/legacy-protocol'
+import { stringifyJsonMsg } from '../../../src/bridge/v2/wire'
 
 // -----------------------------------------------------------------------------
 // Fake WebSocket used as a replacement for the global WebSocket constructor.

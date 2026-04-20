@@ -340,6 +340,18 @@ function handleBridgeWsClose(msg, wsProxies) {
 async function handleBridgeJsonMessage(data, ws, env, ctx, wsProxies) {
 	const msg = JSON.parse(data)
 	switch (msg.t) {
+		case 'hello':
+			// v2 handshake — acknowledge with welcome echoing the negotiated
+			// capability intersection. Capabilities advertised by the gateway
+			// are kept in sync with src/bridge/client.ts (BRIDGE_CLIENT_CAPABILITIES).
+			ws.send(JSON.stringify({
+				t: 'welcome',
+				protocolVersion: 2,
+				capabilities: ['streams', 'ws-relay', 'http-transfer']
+					.filter((c) => Array.isArray(msg.capabilities) && msg.capabilities.includes(c))
+					.sort()
+			}))
+			break
 		case 'rpc.call':
 			await handleBridgeRpcCall(msg, ws, env, ctx)
 			break
