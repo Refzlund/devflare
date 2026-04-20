@@ -1,5 +1,16 @@
 import { getPrimaryAccount, listD1Databases, listHyperdrives, listKVNamespaces } from '../cloudflare/account'
 import { getEffectiveAccountId } from '../cloudflare/preferences'
+import {
+	collectPendingNameBindings,
+	formatMissingBindings,
+	materializeIdBindings,
+	materializeResolvedNameBindings,
+	normalizeD1NameBinding,
+	normalizeHyperdriveNameBinding,
+	normalizeKVNameBinding,
+	withResolvedIdBindings,
+	type PendingNameBinding
+} from './binding-resolution-helpers'
 import { loadConfig, type LoadConfigOptions } from './loader'
 import { materializePreviewScopedConfig, type PreviewResolutionOptions } from './preview'
 import { mergeConfigForEnvironment, resolveConfigForEnvironment } from './resolve'
@@ -7,9 +18,6 @@ import {
 	getLocalD1DatabaseIdentifier,
 	getLocalHyperdriveConfigIdentifier,
 	getLocalKVNamespaceIdentifier,
-	normalizeD1Binding,
-	normalizeHyperdriveBinding,
-	normalizeKVBinding,
 	type DevflareConfig
 } from './schema'
 
@@ -27,20 +35,6 @@ const defaultCloudflareApi: CloudflareConfigResolutionApi = {
 	listKVNamespaces,
 	listD1Databases,
 	listHyperdrives
-}
-
-type KVBindings = NonNullable<NonNullable<DevflareConfig['bindings']>['kv']>
-type D1Bindings = NonNullable<NonNullable<DevflareConfig['bindings']>['d1']>
-type HyperdriveBindings = NonNullable<NonNullable<DevflareConfig['bindings']>['hyperdrive']>
-
-interface NormalizedNameBinding {
-	id?: string
-	name?: string
-}
-
-interface PendingNameBinding {
-	bindingName: string
-	resourceName: string
 }
 
 export interface ResolveConfigResourcesOptions {
@@ -84,96 +78,6 @@ function resolveCloudflareApi(
 	}
 }
 
-function materializeIdBindings<TBinding>(
-	bindings: Record<string, TBinding>,
-	resolveId: (binding: TBinding) => string
-): Record<string, { id: string }> {
-	return Object.fromEntries(
-		Object.entries(bindings).map(([bindingName, bindingConfig]) => {
-			return [bindingName, { id: resolveId(bindingConfig) }]
-		})
-	)
-}
-
-function normalizeKVNameBinding(bindingConfig: KVBindings[string]): NormalizedNameBinding {
-	const normalized = normalizeKVBinding(bindingConfig)
-	return {
-		id: normalized.namespaceId,
-		name: normalized.name
-	}
-}
-
-function normalizeD1NameBinding(bindingConfig: D1Bindings[string]): NormalizedNameBinding {
-	const normalized = normalizeD1Binding(bindingConfig)
-	return {
-		id: normalized.databaseId,
-		name: normalized.name
-	}
-}
-
-function normalizeHyperdriveNameBinding(bindingConfig: HyperdriveBindings[string]): NormalizedNameBinding {
-	const normalized = normalizeHyperdriveBinding(bindingConfig)
-	return {
-		id: normalized.configurationId,
-		name: normalized.name
-	}
-}
-
-function collectPendingNameBindings<TBinding>(
-	bindings: Record<string, TBinding> | undefined,
-	normalizeBinding: (binding: TBinding) => NormalizedNameBinding
-): PendingNameBinding[] {
-	if (!bindings) {
-		return []
-	}
-
-	return Object.entries(bindings)
-		.map(([bindingName, bindingConfig]) => {
-			const normalized = normalizeBinding(bindingConfig)
-			return normalized.id
-				? null
-				: {
-					bindingName,
-					resourceName: normalized.name ?? ''
-				}
-		})
-		.filter((binding): binding is PendingNameBinding => binding !== null)
-}
-
-function materializeResolvedNameBindings<TBinding>(
-	bindings: Record<string, TBinding> | undefined,
-	normalizeBinding: (binding: TBinding) => NormalizedNameBinding,
-	idsByName: Map<string, string>
-): Record<string, { id: string }> | undefined {
-	if (!bindings) {
-		return undefined
-	}
-
-	return materializeIdBindings(bindings, (bindingConfig) => {
-		const normalized = normalizeBinding(bindingConfig)
-		return normalized.id ?? idsByName.get(normalized.name ?? '') ?? ''
-	})
-}
-
-function withResolvedIdBindings(
-	resolvedConfig: DevflareConfig,
-	bindings: {
-		kv?: Record<string, { id: string }>
-		d1?: Record<string, { id: string }>
-		hyperdrive?: Record<string, { id: string }>
-	}
-): DevflareConfig {
-	return {
-		...resolvedConfig,
-		bindings: {
-			...resolvedConfig.bindings,
-			...(bindings.kv ? { kv: bindings.kv } : {}),
-			...(bindings.d1 ? { d1: bindings.d1 } : {}),
-			...(bindings.hyperdrive ? { hyperdrive: bindings.hyperdrive } : {})
-		}
-	}
-}
-
 async function resolveLookupAccountId(
 	config: DevflareConfig,
 	options: ResolveConfigResourcesOptions,
@@ -209,12 +113,6 @@ async function resolveLookupAccountId(
 			error
 		)
 	}
-}
-
-function formatMissingBindings(missing: PendingNameBinding[]): string {
-	return missing
-		.map(({ bindingName, resourceName }) => `${bindingName} → ${resourceName}`)
-		.join(', ')
 }
 
 async function resolveResourceIdsByName<TResource extends { id: string; name: string }>(
