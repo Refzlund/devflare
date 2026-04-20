@@ -36,6 +36,7 @@ import {
 	buildWorkerNameDefine,
 	tryLoadDevflareConfig
 } from './plugin-config-hook'
+import { runDevflareTransform } from './plugin-transform'
 
 export type { AuxiliaryWorkerConfig, DODiscoveryResult }
 
@@ -342,42 +343,7 @@ export function devflarePlugin(options: DevflarePluginOptions = {}): Plugin {
 
 		// Transform Durable Object classes and Worker Entrypoints
 		async transform(code: string, id: string) {
-			// Skip node_modules
-			if (id.includes('node_modules')) return null
-
-			// Only transform .ts/.js files
-			if (!id.endsWith('.ts') && !id.endsWith('.tsx') && !id.endsWith('.js')) {
-				return null
-			}
-
-			// 1. Worker Entrypoint Transform (worker.ts files)
-			if (id.endsWith('worker.ts') || id.endsWith('worker.js')) {
-				const {
-					shouldTransformWorker,
-					transformWorkerEntrypoint
-				} = await import('../transform/worker-entrypoint')
-
-				if (shouldTransformWorker(code, id)) {
-					const result = transformWorkerEntrypoint(code, id)
-					if (result) {
-						return {
-							code: result.code,
-							map: result.map
-						}
-					}
-				}
-			}
-
-			// 2. Durable Object transforms (if enabled)
-			if (doTransforms) {
-				// Check if file contains DurableObject import or class
-				if (code.includes('DurableObject') || code.includes('@durableObject')) {
-					const { transformDurableObject } = await import('../transform/durable-object')
-					return transformDurableObject(code, id)
-				}
-			}
-
-			return null
+			return runDevflareTransform(code, id, { doTransforms })
 		}
 	}
 }
