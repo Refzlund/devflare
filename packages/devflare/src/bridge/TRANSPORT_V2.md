@@ -76,9 +76,9 @@ Every v2 endpoint sends `hello { protocolVersion: 2, capabilities: [...] }` imme
 
 ## Migration strategy
 
-1. **Foundation (this commit).** Land the architecture note, frame vocabulary types, and unit tests for the new frame encoders. Nothing is wired into `server.ts` / `client.ts` / `proxy.ts` yet.
-2. **Dual-mode flag.** Introduce an opt-in `transport: 'v1' | 'v2'` flag on `BridgeServer` / `BridgeClient`. Default stays `v1`. New tests run only against `v2`; existing v1 tests remain untouched.
-3. **Body streaming on v2.** Wire `body.open` / body chunk / `body.end` through `serializeRequest` / `deserializeRequest` so v2 can true-stream bodies without buffering into base64.
+1. **Foundation (commit `69e5d89`).** Architecture note + frame vocabulary types + 21 frame encoder/decoder unit tests. Nothing wired into `server.ts` / `client.ts` / `proxy.ts` / `gateway-runtime.ts`.
+2. **Codec + in-memory transport pair (landed).** [`v2/codec.ts`](./v2/codec.ts) attaches to a [`WebSocketLike`](./v2/transport.ts), owns the handshake state machine, demultiplexes incoming control + binary frames, runs the RPC pending-call table, and exposes `setRpcCallHandler()` / `call()` / `respondOk()` / `respondErr()`. [`createTransportV2Pair()`](./v2/transport.ts) yields two linked in-memory transports for tests; nothing networked.
+3. **Body streaming on v2 (landed).** [`v2/body-streams.ts`](./v2/body-streams.ts) provides `writeTransportV2Body()` (turns a `ReadableStream<Uint8Array>` into `body.open` + `BodyChunk` frames + `body.end`, with abort propagation) and a reader-side `TransportV2BodyReaderRegistry`. [`v2/serialization.ts`](./v2/serialization.ts) provides `serializeRequestV2` / `deserializeRequestV2` / `serializeResponseV2` / `deserializeResponseV2` that NEVER buffer bodies — every non-empty body crosses as a stream. End-to-end tests cover handshake, RPC ok/err, RPC rejection on close, and full streaming `Request` + `Response` round-trips through the in-memory pair.
 4. **Gateway codegen.** Pick the codegen mechanism (see "Open questions") and emit `gateway-runtime.ts` from the canonical TS source.
 5. **Flip default.** In a major release, switch the default to `v2` and migrate the remaining tests. Keep v1 importable for one major version, then remove.
 
@@ -86,10 +86,10 @@ Every v2 endpoint sends `hello { protocolVersion: 2, capabilities: [...] }` imme
 
 Each phase has a hard regression gate before it can land:
 
-- Foundation: `bun test packages/devflare/tests/unit/bridge/v2/` is green; the existing `bun test packages/devflare/tests/unit/bridge/` count is unchanged.
-- Dual-mode flag: every existing bridge integration test still passes with `transport: 'v1'`; the new v2 smoke test passes.
-- Body streaming on v2: a new streaming-body integration test passes; v1 integration tests remain unchanged.
+- Foundation: `bun test packages/devflare/tests/unit/bridge/v2/frames.test.ts` is green; the existing `bun test packages/devflare/tests/unit/bridge/` count is unchanged. **Status: passing (21 tests).**
+- Codec + body streaming: `bun test packages/devflare/tests/unit/bridge/v2/` is green; full unit suite count grows by exactly the new tests with zero v1 regressions. **Status: passing (43 v2 tests; 617 total unit tests pass / 0 fail / 2 skip).**
 - Gateway codegen: the generated `gateway-runtime.ts` byte-equals the previous hand-maintained file when run on the canonical source (or the diff is reviewed and accepted).
+- Default flip: every existing bridge integration test still passes after switching to `v2` end-to-end.
 
 ## Open questions
 

@@ -1,9 +1,12 @@
 // =============================================================================
-// Bridge Transport v2 — Public Surface (foundation)
+// Bridge Transport v2 — Public Surface
 // =============================================================================
 //
-// Re-exports the v2 frame vocabulary. Nothing in this barrel wires v2 into
-// the existing transport — see `../TRANSPORT_V2.md` for the migration plan.
+// Phase 2/3 of the F09/F11 program landed the codec, body streams, in-memory
+// transport pair, and streaming request/response serialization. None of this
+// is wired into the existing `BridgeServer` / `BridgeClient` /
+// `gateway-runtime.ts` modules yet — see `../TRANSPORT_V2.md` for the
+// migration plan.
 // =============================================================================
 
 export {
@@ -31,3 +34,43 @@ export type {
 	TransportV2ControlMsg,
 	TransportV2DecodedBinaryFrame
 } from './frames'
+
+export {
+	TRANSPORT_V2_DEFAULT_BODY_CHUNK_SIZE,
+	TransportV2BodyReaderRegistry,
+	writeTransportV2Body
+} from './body-streams'
+export type {
+	TransportV2BodyWriterIo,
+	TransportV2BodyWriterOptions
+} from './body-streams'
+
+export { TransportV2Codec } from './codec'
+export type {
+	TransportV2CodecOptions,
+	TransportV2HandshakeOk,
+	TransportV2RpcCall,
+	TransportV2RpcErr,
+	TransportV2RpcMsg,
+	TransportV2RpcOk
+} from './codec'
+
+export { createTransportV2Pair } from './transport'
+export type {
+	TransportV2InMemoryPair,
+	WebSocketLike,
+	WebSocketLikeCloseEvent,
+	WebSocketLikeMessageEvent
+} from './transport'
+
+export {
+	deserializeRequestV2,
+	deserializeResponseV2,
+	serializeRequestV2,
+	serializeResponseV2
+} from './serialization'
+export type {
+	TransportV2BodyRef,
+	TransportV2SerializedRequest,
+	TransportV2SerializedResponse
+} from './serialization'
