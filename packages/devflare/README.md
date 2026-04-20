@@ -796,6 +796,36 @@ It also auto-detects conventional `src/fetch.ts`, `src/queue.ts`, `src/scheduled
 - `cf.email.send()` invokes the configured email handler in `createTestContext()`-backed tests and otherwise falls back to the local email endpoint; for ingress-fidelity-sensitive flows, validate with a higher-level integration test
 - remote mode is mainly about AI and Vectorize, not “make every binding remote”
 
+### Choosing pure mocks vs Miniflare-backed `createTestContext()`
+
+`devflare/test` ships two complementary lanes. Pick by what you are validating:
+
+- **Pure mocks** (`createMockKV`, `createMockD1`, `createMockR2`, `createMockEnv`, `createMockTestContext`, `withTestContext`):
+	- Fast, in-process, no Miniflare boot
+	- Use when you are unit-testing a function that reads or writes a single binding and you control the inputs
+	- Behavior is approximate: KV is binary-safe, D1 supports `SELECT`/`INSERT` per-table fixtures, R2 stores bytes — anything beyond those primitives will diverge from production
+- **`createTestContext()` (Miniflare-backed)**:
+	- Boots a real Workers runtime locally with your `devflare.config.ts`
+	- Use when you are testing handler dispatch, multi-binding flows, queues/scheduled/email/Durable Objects, route discovery, middleware composition, or anything that needs accurate Workers semantics
+	- Slower per test, so reuse one context per test file when possible
+
+Rule of thumb: if the assertion is "given inputs X, my function returns Y", reach for the mocks. If the assertion is "the worker behaves correctly when this binding/handler/route fires", use `createTestContext()`.
+
+---
+
+## Public API surface and migration notes
+
+Devflare's bare `'devflare'` import is intentionally narrow and only exposes the documented public API. Internal helpers for the bridge, transform, and test runner are reachable from dedicated subpaths instead:
+
+- `devflare` — primary public API (`defineConfig`, `defineWorker`, `sequence`, `defineFetchHandler`, runtime context accessors, etc.)
+- `devflare/test` — `createTestContext`, `cf`, mock factories
+- `devflare/runtime` — runtime accessors (`env`, `ctx`, `event`, `locals`, helpers)
+- `devflare/cloudflare` — Cloudflare API helpers
+- `devflare/sveltekit` — SvelteKit platform glue
+- `devflare/decorators` — `@durableObject` and other decorators
+
+If you previously imported internal helpers (e.g., bridge serialization or transform helpers) from bare `'devflare'`, switch to the matching subpath. The internal modules are not considered stable public API and may change between minor versions.
+
 ---
 
 ## CLI
