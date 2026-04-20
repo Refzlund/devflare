@@ -130,6 +130,14 @@ export type WranglerHyperdriveBinding =
 
 interface CompileConfigOptions {
 	preserveNamedBindings?: boolean
+	/**
+	 * If true, skip the internal `resolveConfigForEnvironment` call. Use when
+	 * the caller has already merged environment overrides and materialized
+	 * preview-scoped bindings (e.g. the deploy path). Idempotent today, but
+	 * `R1` step 4 will make env-merge non-idempotent for some array-additive
+	 * fields, so callers on the deploy path should set this explicitly. (CR1.)
+	 */
+	alreadyResolved?: boolean
 }
 
 function getWranglerD1DatabaseBinding(
@@ -253,10 +261,12 @@ export function compileConfig(
 
 export function compileBuildConfig(
 	config: DevflareConfig,
-	environment?: string
+	environment?: string,
+	options: { alreadyResolved?: boolean } = {}
 ): WranglerConfig {
 	return compileConfigInternal(config, environment, {
-		preserveNamedBindings: true
+		preserveNamedBindings: true,
+		alreadyResolved: options.alreadyResolved
 	})
 }
 
@@ -265,7 +275,9 @@ function compileConfigInternal(
 	environment?: string,
 	options: CompileConfigOptions = {}
 ): WranglerConfig {
-	const mergedConfig = resolveConfigForEnvironment(config, environment)
+	const mergedConfig = options.alreadyResolved
+		? config
+		: resolveConfigForEnvironment(config, environment)
 
 	const result: WranglerConfig = {
 		name: mergedConfig.name,

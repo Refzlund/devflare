@@ -746,7 +746,9 @@ export async function runDeployCommand(
 						previewBranch: process.env.DEVFLARE_PREVIEW_BRANCH
 					}
 				)
-				const wranglerConfig = compileBuildConfig(deploymentStrategy.config)
+				const wranglerConfig = compileBuildConfig(deploymentStrategy.config, undefined, {
+					alreadyResolved: true
+				})
 
 				logLine(logger, `${yellow('dry run', theme)} ${dim('Skipping actual deployment', theme)}`)
 				const deploymentStrategyMessage = describeDeploymentStrategy(deploymentStrategy)
