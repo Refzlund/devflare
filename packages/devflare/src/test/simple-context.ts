@@ -17,15 +17,13 @@ import {
 } from '../config'
 import { BridgeClient } from '../bridge/client'
 import { createEnvProxy, setBindingHints, type BindingHints } from '../bridge/proxy'
-import { isRemoteModeActive } from '../cloudflare/remote-config'
 import { __clearTestContext, __setTestContext } from '../env'
-import { createRemoteAI } from './remote-ai'
-import { createRemoteVectorize } from './remote-vectorize'
 import { hasCrossWorkerDOs, hasServiceBindings, resolveDOBindings, resolveServiceBindings } from './resolve-service-bindings'
 import { buildDurableObjectGateway } from './simple-context-durable-objects'
 import { findNearestConfig, getAvailablePort, getCallerDirectory, resolveTransportFile } from './simple-context-paths'
-import { createLocalSendEmailBinding, wrapEnvSendEmailBindings } from '../utils/send-email'
+import { wrapEnvSendEmailBindings } from '../utils/send-email'
 import { extractBindingHints } from './binding-hints'
+import { buildRemoteAndStaticBindings } from './simple-context-bindings'
 import { resolveHandlerPaths } from './simple-context-handlers'
 import { startBridgeBackedTestContext } from './simple-context-startup'
 import { decodeTransportValue, loadTransportDecoders, type TransportDecoderMap } from './simple-context-transport'
@@ -103,35 +101,7 @@ export async function createTestContext(configPath?: string): Promise<void> {
 		configFile: absolutePath.split(/[/\\]/).pop()
 	})
 
-	state.remoteBindings = {}
-
-	if (isRemoteModeActive()) {
-		if (config.bindings?.ai) {
-			const aiBindingName = config.bindings.ai.binding || 'AI'
-			state.remoteBindings[aiBindingName] = createRemoteAI(config.accountId)
-		}
-
-		if (config.bindings?.vectorize) {
-			for (const [name, vectorConfig] of Object.entries(config.bindings.vectorize)) {
-				state.remoteBindings[name] = createRemoteVectorize(
-					vectorConfig.indexName,
-					config.accountId
-				)
-			}
-		}
-	}
-
-	if (config.vars) {
-		for (const [key, value] of Object.entries(config.vars)) {
-			state.remoteBindings[key] = value
-		}
-	}
-
-	if (config.bindings?.sendEmail) {
-		for (const [name, binding] of Object.entries(config.bindings.sendEmail)) {
-			state.remoteBindings[name] = createLocalSendEmailBinding(binding)
-		}
-	}
+	state.remoteBindings = buildRemoteAndStaticBindings(config)
 
 	const hints = extractBindingHints(config)
 
