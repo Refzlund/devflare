@@ -117,6 +117,42 @@ function createEmptyDeployResourceNames(): DeployResourceNames {
 	}
 }
 
+/**
+ * C13 — surface partial-progress orphans on a failed deploy preparation.
+ *
+ * If any resource was already created before the throw, attach a clear
+ * footer to the error message listing what was created so the user can
+ * decide whether to keep, delete, or rerun. Auto-deletion is intentionally
+ * not performed: deletion is irreversible, has cross-binding side effects
+ * (DBs may have data, queues may be inflight), and the deploy may simply
+ * be retried after fixing the underlying error.
+ */
+function decorateOrphanError(err: unknown, created: DeployResourceNames): Error {
+	const summaryParts: string[] = []
+	if (created.kv.length > 0) summaryParts.push(`KV: ${created.kv.join(', ')}`)
+	if (created.d1.length > 0) summaryParts.push(`D1: ${created.d1.join(', ')}`)
+	if (created.hyperdrive.length > 0) summaryParts.push(`Hyperdrive: ${created.hyperdrive.join(', ')}`)
+	if (created.r2.length > 0) summaryParts.push(`R2: ${created.r2.join(', ')}`)
+	if (created.queues.length > 0) summaryParts.push(`Queues: ${created.queues.join(', ')}`)
+	if (created.vectorize.length > 0) summaryParts.push(`Vectorize: ${created.vectorize.join(', ')}`)
+
+	const base = err instanceof Error ? err : new Error(String(err))
+	if (summaryParts.length === 0) return base
+
+	const orphanFooter =
+		`\n\nDeploy preparation failed AFTER provisioning the following Cloudflare resources, ` +
+		`which were left in your account:\n  - ${summaryParts.join('\n  - ')}\n` +
+		`Re-run \`devflare deploy\` after fixing the error to reuse them, or delete them manually if abandoning the deploy.`
+
+	const decorated = new Error(`${base.message}${orphanFooter}`)
+	if ('cause' in base && base.cause !== undefined) {
+		;(decorated as Error & { cause: unknown }).cause = base.cause
+	} else {
+		;(decorated as Error & { cause: unknown }).cause = base
+	}
+	return decorated
+}
+
 function resolveDeployResourcePreparationApi(
 	overrides: Partial<DeployResourcePreparationApi> | undefined
 ): DeployResourcePreparationApi {
@@ -493,6 +529,15 @@ export async function prepareMaterializedConfigResourcesForDeploy(
 	const cloudflareApi = resolveDeployResourcePreparationApi(options.cloudflare)
 	const accountId = await resolveLookupAccountId(resolvedConfig, options, cloudflareApi)
 
+	// C13 — sequential provisioning leaves silent orphans. We do not
+	// auto-delete created resources on a later failure (Cloudflare resource
+	// deletion is asynchronous, partial, and risky against resources a user
+	// might already be reading). Instead we make the orphans LOUD: any
+	// throw between KV/D1/Hyperdrive/R2/Queues/Vectorize is re-thrown
+	// decorated with the exact set of resources already created during this
+	// deploy, so the user can clean them up manually if the deploy is
+	// abandoned.
+	try {
 	const namespaceIdsByName = await resolveOrCreateResourceIdsByName(pendingKVNameBindings, {
 		listResources: async () => cloudflareApi.listKVNamespaces(accountId),
 		createResource: async (resourceName) => cloudflareApi.createKVNamespace(accountId, resourceName),
@@ -592,6 +637,9 @@ export async function prepareMaterializedConfigResourcesForDeploy(
 		created,
 		existing,
 		warnings
+	}
+	} catch (err) {
+		throw decorateOrphanError(err, created)
 	}
 }
 

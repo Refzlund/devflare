@@ -687,6 +687,16 @@ function filterMigrationForClass(
  * an explicit `scriptName` on a binding for that class), never from the
  * first binding encountered.
  *
+ * **Public-API only.** This helper is exported for downstream tooling that
+ * orchestrates multi-worker DO topologies on top of devflare. The internal
+ * `devflare build` / `devflare deploy` pipeline does **not** call this —
+ * it emits a single Wrangler config and relies on `wrangler` to handle DO
+ * placement. C9 in `REMAINING.md` tracks this caveat: nothing inside the
+ * package exercises this function, so behaviour for current consumers is
+ * defined by the (small) test surface rather than by the build/deploy
+ * happy path. Pass `preserveNamedBindings: true` if you want the same
+ * build-time name preservation that `compileBuildConfig()` uses.
+ *
  * @param config - The devflare configuration
  * @param doWorkerEntry - Path to the DO worker entry file (e.g., 'src/workers/do-worker.ts')
  * @param options - Additional options

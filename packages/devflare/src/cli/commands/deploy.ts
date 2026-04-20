@@ -2,7 +2,7 @@
 // Deploy Command — Deploy to Cloudflare
 // =============================================================================
 
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, open, readFile, rm, writeFile } from 'node:fs/promises'
 import { type ConsolaInstance } from 'consola'
 import { basename, dirname, isAbsolute, join, resolve } from 'pathe'
 import type { ParsedArgs, CliOptions, CliResult } from '../index'
@@ -282,7 +282,17 @@ async function prepareDeployConfig(options: {
 	const deployArtefactDir = resolve(buildDir, '..', 'deploy')
 	await mkdir(deployArtefactDir, { recursive: true })
 	const deployArtefactPath = resolve(deployArtefactDir, 'wrangler.jsonc')
-	await writeWranglerConfig(deployArtefactDir, wranglerConfig, 'wrangler.jsonc')
+
+	// C10: serialize concurrent deploys against the same artefact. Exclusive
+	// `wx` lock file with bounded wait so two `devflare deploy` invocations
+	// targeting the same `.devflare/deploy/` cannot tear each other's writes.
+	const lockPath = resolve(deployArtefactDir, '.lock')
+	const lockHandle = await acquireDeployArtefactLock(lockPath)
+	try {
+		await writeWranglerConfig(deployArtefactDir, wranglerConfig, 'wrangler.jsonc')
+	} finally {
+		await releaseDeployArtefactLock(lockHandle, lockPath)
+	}
 
 	return {
 		config: deploymentStrategy.config,
@@ -291,6 +301,62 @@ async function prepareDeployConfig(options: {
 		deployResources,
 		wranglerConfig
 	}
+}
+
+/**
+ * C10 — bounded-wait exclusive lock around the deploy artefact directory.
+ *
+ * Uses `open(path, 'wx')` (O_EXCL) which atomically fails when the file
+ * already exists, so the only way to acquire the lock is to be the process
+ * that successfully created it. Stale locks (older than 60s) are forcibly
+ * cleared so a crashed deploy cannot wedge subsequent runs.
+ */
+async function acquireDeployArtefactLock(
+	lockPath: string,
+	options: { maxWaitMs?: number; staleAfterMs?: number } = {}
+): Promise<{ close: () => Promise<void> }> {
+	const maxWaitMs = options.maxWaitMs ?? 30_000
+	const staleAfterMs = options.staleAfterMs ?? 60_000
+	const pollMs = 100
+	const start = Date.now()
+	while (true) {
+		try {
+			const handle = await open(lockPath, 'wx')
+			await handle.writeFile(`${process.pid}\n${Date.now()}`)
+			return handle
+		} catch (err) {
+			if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err
+			try {
+				const existing = await readFile(lockPath, 'utf-8')
+				const ts = Number.parseInt(existing.split('\n')[1] ?? '0', 10)
+				if (Number.isFinite(ts) && Date.now() - ts > staleAfterMs) {
+					await rm(lockPath, { force: true })
+					continue
+				}
+			} catch {
+				continue
+			}
+			if (Date.now() - start > maxWaitMs) {
+				throw new Error(
+					`Timed out waiting for deploy artefact lock at ${lockPath}. ` +
+					`Another \`devflare deploy\` may be running against the same artefact directory.`
+				)
+			}
+			await new Promise((r) => setTimeout(r, pollMs))
+		}
+	}
+}
+
+async function releaseDeployArtefactLock(
+	handle: { close: () => Promise<void> },
+	lockPath: string
+): Promise<void> {
+	try {
+		await handle.close()
+	} catch {
+		// Already closed.
+	}
+	await rm(lockPath, { force: true })
 }
 
 async function getCurrentGitBranch(cwd: string): Promise<string | null> {

@@ -13,6 +13,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { readFileSync, existsSync } from 'node:fs'
 import { execSync } from 'node:child_process'
+import { parse as parseToml } from 'smol-toml'
 import type { WranglerAuth } from './types'
 
 // -----------------------------------------------------------------------------
@@ -87,41 +88,33 @@ export function hasWranglerConfig(): boolean {
 }
 
 /**
- * Parse TOML-like config file (simple parser for wrangler's format).
+ * Parse TOML config file (wrangler's stored OAuth state).
  *
- * Wrangler's OAuth config is flat root-section key/value pairs. Any keys
- * inside a `[section]` header are deliberately ignored so that a future
- * wrangler release that adds a section does not silently leak unrelated
- * keys into our lookup (e.g. a `[section]\noauth_token = "x"` under a
- * non-root section would otherwise be picked up as the root token).
+ * Uses a real TOML parser (`smol-toml`) so that nested sections, escapes,
+ * and other TOML 1.0 constructs are handled correctly. We deliberately
+ * read only the implicit root section: any keys nested under a `[section]`
+ * header are ignored to keep this resilient against future wrangler
+ * additions that put new sections in the same file. If the parser throws
+ * (corrupt file, partial write), the caller falls back to the slower
+ * `bunx wrangler auth token` shell-out path.
  */
 function parseSimpleToml(content: string): Record<string, string> {
-	const result: Record<string, string> = {}
-	const lines = content.split('\n')
-	let inRootSection = true
-
-	for (const line of lines) {
-		const trimmed = line.trim()
-
-		// Skip comments and empty lines
-		if (trimmed.startsWith('#') || trimmed === '') continue
-
-		// Track section headers: we only accept keys from the implicit root
-		// section (before any `[section]` header).
-		if (trimmed.startsWith('[')) {
-			inRootSection = false
-			continue
-		}
-
-		if (!inRootSection) continue
-
-		// Parse key = "value" or key = 'value'
-		const match = trimmed.match(/^(\w+)\s*=\s*["'](.*)["']$/)
-		if (match) {
-			result[match[1]] = match[2]
-		}
+	let parsed: Record<string, unknown>
+	try {
+		parsed = parseToml(content) as Record<string, unknown>
+	} catch {
+		return {}
 	}
 
+	const result: Record<string, string> = {}
+	for (const [key, value] of Object.entries(parsed)) {
+		// Only keep root-level scalars; nested tables/arrays are skipped.
+		if (typeof value === 'string') {
+			result[key] = value
+		} else if (typeof value === 'number' || typeof value === 'boolean') {
+			result[key] = String(value)
+		}
+	}
 	return result
 }
 
