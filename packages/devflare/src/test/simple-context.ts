@@ -11,33 +11,24 @@
 //   })
 // =============================================================================
 
-import { dirname, resolve } from 'path'
-import {
-	loadConfig
-} from '../config'
 import { BridgeClient } from '../bridge/client'
 import { createEnvProxy, setBindingHints, type BindingHints } from '../bridge/proxy'
-import { __clearTestContext, __setTestContext } from '../env'
+import { __setTestContext } from '../env'
 import { hasCrossWorkerDOs, hasServiceBindings, resolveDOBindings, resolveServiceBindings } from './resolve-service-bindings'
 import { buildDurableObjectGateway } from './simple-context-durable-objects'
-import { findNearestConfig, getAvailablePort, getCallerDirectory, resolveTransportFile } from './simple-context-paths'
+import { getAvailablePort, resolveTransportFile } from './simple-context-paths'
 import { wrapEnvSendEmailBindings } from '../utils/send-email'
 import { extractBindingHints } from './binding-hints'
 import { buildRemoteAndStaticBindings } from './simple-context-bindings'
 import { configureSurfaceHandlers, createBridgeEnvAccessor, createMultiWorkerEnvAccessor } from './simple-context-env'
 import { resolveHandlerPaths } from './simple-context-handlers'
+import { createDisposeContext, resolveTestContextConfig } from './simple-context-lifecycle'
 import { startBridgeBackedTestContext } from './simple-context-startup'
 import { decodeTransportValue, loadTransportDecoders, type TransportDecoderMap } from './simple-context-transport'
 import { applyMultiWorkerConfig } from './simple-context-multi-worker'
 import { buildInlineBridgeMfConfig } from './simple-context-mfconfig'
 
 // Handler helper configuration
-import { resetEmailState } from './email'
-import { resetQueueState } from './queue'
-import { resetScheduledState } from './scheduled'
-import { resetTailState } from './tail'
-import { resetWorkerState } from './worker'
-
 // -----------------------------------------------------------------------------
 // Per-context state
 // -----------------------------------------------------------------------------
@@ -79,28 +70,7 @@ function shouldPreferBridgeBinding(hint: BindingHints[string] | undefined): bool
  */
 export async function createTestContext(configPath?: string): Promise<void> {
 	const state = createTestContextState()
-	const callerDir = getCallerDirectory()
-	let absolutePath: string
-
-	if (configPath) {
-		absolutePath = resolve(callerDir, configPath)
-	} else {
-		const found = await findNearestConfig(callerDir)
-		if (!found) {
-			throw new Error(
-				`Could not find a devflare config file. Searched upward from: ${callerDir}\n`
-				+ `Expected one of: devflare.config.ts, devflare.config.mts, devflare.config.js, devflare.config.mjs\n`
-				+ `Either create a config file or provide an explicit path: createTestContext('./path/to/config.ts')`
-			)
-		}
-		absolutePath = found
-	}
-
-	const configDir = dirname(absolutePath)
-	const config = await loadConfig({
-		cwd: configDir,
-		configFile: absolutePath.split(/[/\\]/).pop()
-	})
+	const { configDir, config } = await resolveTestContextConfig(configPath)
 
 	state.remoteBindings = buildRemoteAndStaticBindings(config)
 
@@ -162,28 +132,7 @@ export async function createTestContext(configPath?: string): Promise<void> {
 		state.client = startedBridgeBackedTestContext.client
 	}
 
-	const disposeContext = async () => {
-		if (state.client) {
-			await state.client.disconnect()
-			state.client = null
-		}
-		if (state.miniflare) {
-			await state.miniflare.dispose()
-			state.miniflare = null
-		}
-		state.envProxy = null
-		state.transportDecode = null
-		state.remoteBindings = null
-		state.miniflareBindings = null
-
-		resetQueueState()
-		resetScheduledState()
-		resetWorkerState()
-		resetTailState()
-		resetEmailState()
-
-		__clearTestContext()
-	}
+	const disposeContext = createDisposeContext(state)
 
 	const getTestEnv = (): Record<string, unknown> => {
 		return new Proxy({}, {
