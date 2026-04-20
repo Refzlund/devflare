@@ -9,7 +9,7 @@ import type { Miniflare as MiniflareType } from 'miniflare'
 import { resolve } from 'pathe'
 import type { DevflareConfig } from '../config'
 import { loadConfig, resolveConfigPath } from '../config/loader'
-import { getLocalD1DatabaseIdentifier, getLocalKVNamespaceIdentifier, getSingleBrowserBindingName } from '../config/schema'
+import { getSingleBrowserBindingName } from '../config/schema'
 import { bundleWorkerEntry, createDOBundler, type DOBundler, type DOBundleResult } from '../bundler'
 import { createBrowserShim, type BrowserShim } from '../browser-shim'
 import { getBrowserBindingScript } from '../browser-shim/binding-worker'
@@ -22,6 +22,7 @@ import { runD1Migrations } from './d1-migrations'
 import { getGatewayScript } from './gateway-script'
 import { createCompatibilityAwareMiniflareLog } from './miniflare-log'
 import { buildQueueConsumers, buildQueueProducers, buildSendEmailConfig } from './miniflare-bindings'
+import { buildServiceBindings, makeMiniflareWorker, type MakeMiniflareWorkerContext, type MiniflareServiceBinding } from './miniflare-worker-config'
 import { createRuntimeStdioForwarder } from './runtime-stdio'
 import { resolveViteMode, stopSpawnedProcessTree } from './vite-utils'
 import { startViteProcess } from './vite-process'
@@ -70,8 +71,6 @@ export interface DevServer {
 }
 
 const INTERNAL_APP_SERVICE_BINDING = '__DEVFLARE_APP'
-
-type MiniflareServiceBinding = { name: string; entrypoint?: string }
 
 // -----------------------------------------------------------------------------
 // Dev Server Implementation
@@ -184,93 +183,20 @@ export function createDevServer(options: DevServerOptions): DevServer {
 
 		const createServiceBindings = (
 			extraBindings: Record<string, MiniflareServiceBinding> = {}
-		) => {
-			const serviceBindings: Record<string, MiniflareServiceBinding> = {}
-
-			if (bindings.services) {
-				for (const [bindingName, serviceConfig] of Object.entries(bindings.services)) {
-					serviceBindings[bindingName] = {
-						name: serviceConfig.service,
-						...(serviceConfig.entrypoint && { entrypoint: serviceConfig.entrypoint })
-					}
-				}
-			}
-
-			for (const [bindingName, target] of Object.entries(extraBindings)) {
-				serviceBindings[bindingName] = target
-			}
-
-			return Object.keys(serviceBindings).length > 0 ? serviceBindings : undefined
-		}
+		) => buildServiceBindings(bindings, extraBindings)
 
 		const sendEmailConfig = buildSendEmailConfig(bindings)
 
-		const createWorkerConfig = (options: {
-			name: string
-			script?: string
-			scriptPath?: string
-			durableObjects?: Record<string, string | { className: string; scriptName: string }>
-			serviceBindings?: Record<string, MiniflareServiceBinding>
-			queueConsumers?: Record<string, Record<string, unknown>>
-			triggers?: { crons?: string[] }
-		}) => {
-			const baseFlags = loadedConfig.compatibilityFlags ?? []
-			const compatFlags = baseFlags.includes('nodejs_compat')
-				? baseFlags
-				: [...baseFlags, 'nodejs_compat']
-			const workerBindings: Record<string, unknown> = loadedConfig.vars ?? {}
-
-			const workerConfig: any = {
-				name: options.name,
-				modules: true,
-				compatibilityDate: loadedConfig.compatibilityDate,
-				compatibilityFlags: compatFlags,
-				...(bindings.kv && {
-					kvNamespaces: Object.fromEntries(
-						Object.entries(bindings.kv).map(([bindingName, bindingConfig]) => {
-							return [bindingName, getLocalKVNamespaceIdentifier(bindingConfig)]
-						})
-					)
-				}),
-				...(bindings.r2 && { r2Buckets: bindings.r2 }),
-				...(bindings.d1 && {
-					d1Databases: Object.fromEntries(
-						Object.entries(bindings.d1).map(([bindingName, bindingConfig]) => {
-							return [bindingName, getLocalD1DatabaseIdentifier(bindingConfig)]
-						})
-					)
-				}),
-				...(Object.keys(workerBindings).length > 0 && { bindings: workerBindings }),
-				...(sendEmailConfig && { email: sendEmailConfig }),
-				...(queueProducers && { queueProducers }),
-				...(options.queueConsumers && { queueConsumers: options.queueConsumers }),
-				...(options.triggers && { triggers: options.triggers })
-			}
-
-			if (options.scriptPath) {
-				workerConfig.scriptPath = options.scriptPath
-				workerConfig.modulesRoot = cwd
-				workerConfig.modulesRules = [
-					{ type: 'ESModule', include: ['**/*.ts', '**/*.tsx', '**/*.mts', '**/*.mjs'] },
-					{ type: 'CommonJS', include: ['**/*.js', '**/*.cjs'] },
-					{ type: 'ESModule', include: ['**/*.jsx'] }
-				]
-			}
-
-			if (options.script) {
-				workerConfig.script = options.script
-			}
-
-			if (options.durableObjects && Object.keys(options.durableObjects).length > 0) {
-				workerConfig.durableObjects = options.durableObjects
-			}
-
-			if (options.serviceBindings && Object.keys(options.serviceBindings).length > 0) {
-				workerConfig.serviceBindings = options.serviceBindings
-			}
-
-			return workerConfig
+		const workerContext: MakeMiniflareWorkerContext = {
+			cwd,
+			loadedConfig,
+			bindings,
+			sendEmailConfig,
+			queueProducers
 		}
+
+		const createWorkerConfig = (options: Parameters<typeof makeMiniflareWorker>[1]) =>
+			makeMiniflareWorker(workerContext, options)
 
 		// Gateway worker configuration (receives all HTTP requests)
 		// The first worker in the array is the entrypoint
