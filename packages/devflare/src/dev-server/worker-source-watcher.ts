@@ -123,3 +123,26 @@ export async function startWorkerSourceWatcher(
 
 	return watcher
 }
+
+/**
+ * Compute the diff between current and next watch-target lists and apply it
+ * to the given watcher. Returns the deduped next-targets array which the
+ * caller should store as the new "current" state.
+ */
+export async function applyWatcherTargetDiff(
+	watcher: FSWatcher,
+	currentTargets: string[],
+	nextTargets: string[]
+): Promise<string[]> {
+	const nextSet = new Set(nextTargets)
+	const targetsToRemove = currentTargets.filter((t) => !nextSet.has(t))
+	const targetsToAdd = nextTargets.filter((t) => !currentTargets.includes(t))
+
+	if (targetsToRemove.length > 0) {
+		await watcher.unwatch(targetsToRemove)
+	}
+	if (targetsToAdd.length > 0) {
+		watcher.add(targetsToAdd)
+	}
+	return nextTargets
+}

@@ -30,7 +30,7 @@ import {
 	resolveMainWorkerSurfacePaths,
 	type WorkerSurfacePaths
 } from './worker-surface-paths'
-import { startWorkerSourceWatcher as createWorkerSourceWatcher } from './worker-source-watcher'
+import { applyWatcherTargetDiff, startWorkerSourceWatcher as createWorkerSourceWatcher } from './worker-source-watcher'
 import { logMiniflareBindingDiagnostics, logMiniflareConfigDiagnostics, logRemoteBindingRequirements, logWorkerHandlerDetection, resolveWorkerConfigWatchPath } from './server-startup-helpers'
 
 // -----------------------------------------------------------------------------
@@ -232,21 +232,11 @@ export function createDevServer(options: DevServerOptions): DevServer {
 		if (!workerSourceWatcher) {
 			return
 		}
-
-		const nextWatchTargets = getWorkerWatchTargets()
-		const nextWatchTargetSet = new Set(nextWatchTargets)
-		const targetsToRemove = workerWatchTargets.filter((target) => !nextWatchTargetSet.has(target))
-		const targetsToAdd = nextWatchTargets.filter((target) => !workerWatchTargets.includes(target))
-
-		if (targetsToRemove.length > 0) {
-			await workerSourceWatcher.unwatch(targetsToRemove)
-		}
-
-		if (targetsToAdd.length > 0) {
-			workerSourceWatcher.add(targetsToAdd)
-		}
-
-		workerWatchTargets = nextWatchTargets
+		workerWatchTargets = await applyWatcherTargetDiff(
+			workerSourceWatcher,
+			workerWatchTargets,
+			getWorkerWatchTargets()
+		)
 	}
 
 	async function reloadWorkerOnlyConfig(): Promise<void> {
