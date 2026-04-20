@@ -17,6 +17,7 @@ import { isAbsolute, relative, resolve } from 'pathe'
 import type { Plugin, ResolvedConfig, ViteDevServer } from 'vite'
 import { loadConfig, resolveConfigPath } from '../config/loader'
 import type { DevflareConfig } from '../config/schema'
+import type { ResolvedConfig as ResolvedDevflareConfig } from '../config/resolve-phased'
 import {
 	loadResolvedConfig,
 	resolveConfigForEnvironment,
@@ -290,7 +291,7 @@ async function buildPluginContextState(
 		: resolveConfigForLocalRuntime(devflareConfig, environment)
 	const compiledWranglerConfig = mode === 'build'
 		? compileBuildConfig(effectiveConfig)
-		: compileConfig(effectiveConfig)
+		: compileConfig(effectiveConfig as ResolvedDevflareConfig)
 	const wranglerConfig = mode === 'build'
 		? isolateViteBuildOutputPaths(projectRoot, compiledWranglerConfig)
 		: compiledWranglerConfig

@@ -38,6 +38,7 @@ import {
 	type DevflareConfig
 } from './schema'
 import { ConfigResourceResolutionError } from './resource-resolution'
+import { brandAsDeployConfig, type DeployConfig } from './resolve-phased'
 
 interface DeployResourcePreparationApi {
 	getPrimaryAccount: typeof getPrimaryAccount
@@ -102,7 +103,7 @@ export interface PrepareMaterializedConfigResourcesForDeployOptions {
 }
 
 export interface PrepareConfigResourcesForDeployResult {
-	config: DevflareConfig
+	config: DeployConfig
 	created: DeployResourceNames
 	existing: DeployResourceNames
 	warnings: string[]
@@ -401,7 +402,7 @@ export async function prepareMaterializedConfigResourcesForDeploy(
 
 	if (!kvBindings && !d1Bindings && !hyperdriveBindings && r2Names.length === 0 && queueNames.length === 0 && vectorizeNames.length === 0) {
 		return {
-			config: resolvedConfig,
+			config: brandAsDeployConfig(resolvedConfig),
 			created,
 			existing,
 			warnings
@@ -421,11 +422,11 @@ export async function prepareMaterializedConfigResourcesForDeploy(
 		&& vectorizeNames.length === 0
 	) {
 		return {
-			config: withResolvedIdBindings(resolvedConfig, {
+			config: brandAsDeployConfig(withResolvedIdBindings(resolvedConfig, {
 				kv: kvBindings ? materializeIdBindings(kvBindings, getLocalKVNamespaceIdentifier) : undefined,
 				d1: d1Bindings ? materializeIdBindings(d1Bindings, getLocalD1DatabaseIdentifier) : undefined,
 				hyperdrive: hyperdriveBindings ? materializeIdBindings(hyperdriveBindings, getLocalHyperdriveConfigIdentifier) : undefined
-			}),
+			})),
 			created,
 			existing,
 			warnings
@@ -559,7 +560,7 @@ export async function prepareMaterializedConfigResourcesForDeploy(
 	})
 
 	return {
-		config,
+		config: brandAsDeployConfig(config),
 		created,
 		existing,
 		warnings

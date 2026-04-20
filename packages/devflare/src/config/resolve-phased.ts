@@ -56,6 +56,30 @@ export type DeployConfig = DevflareConfig & { readonly [__phaseBrand]: 'deploy' 
 
 export type Phase = 'build' | 'local' | 'deploy'
 
+/**
+ * Configurations whose KV/D1/Hyperdrive bindings are guaranteed to carry an
+ * `id` field (either a real Cloudflare resource ID or a stable local
+ * identifier). `compileConfig()` requires this brand so that passing a raw
+ * `DevflareConfig` is rejected at compile time rather than runtime.
+ */
+export type ResolvedConfig = LocalConfig | DeployConfig
+
+/**
+ * Cast helper used at the resolve-phase boundaries. The brand is a phantom
+ * intersection so this is a zero-cost reinterpretation.
+ */
+export function brandAsLocalConfig(config: DevflareConfig): LocalConfig {
+	return config as LocalConfig
+}
+
+/**
+ * Cast helper used at the resolve-phase boundaries. The brand is a phantom
+ * intersection so this is a zero-cost reinterpretation.
+ */
+export function brandAsDeployConfig(config: DevflareConfig): DeployConfig {
+	return config as DeployConfig
+}
+
 export type PhaseConfig<P extends Phase> =
 P extends 'build' ? BuildConfig
 : P extends 'local' ? LocalConfig

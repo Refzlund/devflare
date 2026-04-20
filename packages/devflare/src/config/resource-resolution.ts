@@ -13,6 +13,7 @@ import {
 } from './binding-resolution-helpers'
 import { loadConfig, type LoadConfigOptions } from './loader'
 import { materializePreviewScopedConfig, type PreviewResolutionOptions } from './preview'
+import { brandAsDeployConfig, brandAsLocalConfig, type DeployConfig, type LocalConfig } from './resolve-phased'
 import { mergeConfigForEnvironment, resolveConfigForEnvironment } from './resolve'
 import {
 	getLocalD1DatabaseIdentifier,
@@ -159,21 +160,21 @@ async function resolveResourceIdsByName<TResource extends { id: string; name: st
 export function resolveConfigForLocalRuntime(
 	config: DevflareConfig,
 	environment?: string
-): DevflareConfig {
+): LocalConfig {
 	const resolvedConfig = resolveConfigForEnvironment(config, environment)
 	const kvBindings = resolvedConfig.bindings?.kv
 	const d1Bindings = resolvedConfig.bindings?.d1
 	const hyperdriveBindings = resolvedConfig.bindings?.hyperdrive
 
 	if (!kvBindings && !d1Bindings && !hyperdriveBindings) {
-		return resolvedConfig
+		return brandAsLocalConfig(resolvedConfig)
 	}
-
-	return withResolvedIdBindings(resolvedConfig, {
+	const pendingKVNameBindings = collectPendingNameBindings(kvBindings, normalizeKVNameBinding)
+	return brandAsLocalConfig(withResolvedIdBindings(resolvedConfig, {
 		kv: kvBindings ? materializeIdBindings(kvBindings, getLocalKVNamespaceIdentifier) : undefined,
 		d1: d1Bindings ? materializeIdBindings(d1Bindings, getLocalD1DatabaseIdentifier) : undefined,
 		hyperdrive: hyperdriveBindings ? materializeIdBindings(hyperdriveBindings, getLocalHyperdriveConfigIdentifier) : undefined
-	})
+	}))
 }
 
 /**
@@ -189,13 +190,13 @@ export function resolveConfigForLocalRuntime(
 export async function resolveMaterializedConfigResources(
 	resolvedConfig: DevflareConfig,
 	options: ResolveMaterializedConfigResourcesOptions = {}
-): Promise<DevflareConfig> {
+): Promise<DeployConfig> {
 	const kvBindings = resolvedConfig.bindings?.kv
 	const d1Bindings = resolvedConfig.bindings?.d1
 	const hyperdriveBindings = resolvedConfig.bindings?.hyperdrive
 
 	if (!kvBindings && !d1Bindings && !hyperdriveBindings) {
-		return resolvedConfig
+		return brandAsDeployConfig(resolvedConfig)
 	}
 
 	const pendingKVNameBindings = collectPendingNameBindings(kvBindings, normalizeKVNameBinding)
@@ -207,11 +208,11 @@ export async function resolveMaterializedConfigResources(
 		&& pendingD1NameBindings.length === 0
 		&& pendingHyperdriveNameBindings.length === 0
 	) {
-		return withResolvedIdBindings(resolvedConfig, {
+		return brandAsDeployConfig(withResolvedIdBindings(resolvedConfig, {
 			kv: kvBindings ? materializeIdBindings(kvBindings, getLocalKVNamespaceIdentifier) : undefined,
 			d1: d1Bindings ? materializeIdBindings(d1Bindings, getLocalD1DatabaseIdentifier) : undefined,
 			hyperdrive: hyperdriveBindings ? materializeIdBindings(hyperdriveBindings, getLocalHyperdriveConfigIdentifier) : undefined
-		})
+		}))
 	}
 
 	const cloudflareApi = resolveCloudflareApi(options.cloudflare)
@@ -241,11 +242,11 @@ export async function resolveMaterializedConfigResources(
 		}
 	})
 
-	return withResolvedIdBindings(resolvedConfig, {
+	return brandAsDeployConfig(withResolvedIdBindings(resolvedConfig, {
 		kv: materializeResolvedNameBindings(kvBindings, normalizeKVNameBinding, namespaceIdsByName),
 		d1: materializeResolvedNameBindings(d1Bindings, normalizeD1NameBinding, databaseIdsByName),
 		hyperdrive: materializeResolvedNameBindings(hyperdriveBindings, normalizeHyperdriveNameBinding, hyperdriveIdsByName)
-	})
+	}))
 }
 
 /**
@@ -255,7 +256,7 @@ export async function resolveMaterializedConfigResources(
 export async function resolveConfigResources(
 	config: DevflareConfig,
 	options: ResolveConfigResourcesOptions = {}
-): Promise<DevflareConfig> {
+): Promise<DeployConfig> {
 	const resolvedConfig = materializePreviewScopedConfig(
 		mergeConfigForEnvironment(config, options.environment),
 		{
@@ -279,7 +280,7 @@ export async function resolveConfigResources(
  */
 export async function loadResolvedConfig(
 	options: LoadResolvedConfigOptions = {}
-): Promise<DevflareConfig> {
+): Promise<DeployConfig> {
 	const config = await loadConfig(options)
 	return resolveConfigResources(config, options)
 }

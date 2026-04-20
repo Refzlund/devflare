@@ -15,6 +15,7 @@ import {
 	type KVBinding
 } from './schema'
 import { resolveConfigForEnvironment } from './resolve'
+import type { ResolvedConfig } from './resolve-phased'
 
 /**
  * Wrangler config type — represents the output format for wrangler.jsonc
@@ -231,14 +232,20 @@ function compileWranglerMigrations(
 }
 
 /**
- * Compile DevflareConfig to WranglerConfig
+ * Compile a phase-resolved DevflareConfig to WranglerConfig.
  *
- * @param config - The devflare configuration
+ * R1 step 3 — input is type-narrowed to `ResolvedConfig` (`LocalConfig |
+ * DeployConfig`) so callers cannot accidentally pass a raw `DevflareConfig`
+ * whose KV/D1/Hyperdrive bindings might still be name-only. The runtime
+ * throw remains as a defence-in-depth guard for callers that bypass the
+ * type system (e.g. via `as any`).
+ *
+ * @param config - A phase-resolved devflare configuration (`LocalConfig` or `DeployConfig`)
  * @param environment - Optional environment name for env-specific overrides
  * @returns Wrangler-compatible configuration object
  */
 export function compileConfig(
-	config: DevflareConfig,
+	config: ResolvedConfig,
 	environment?: string
 ): WranglerConfig {
 	return compileConfigInternal(config, environment)
@@ -355,7 +362,7 @@ export function compileToProgrammaticConfig(
 ): Record<string, unknown> {
 	return options.preserveNamedBindings
 		? compileBuildConfig(config, environment)
-		: compileConfig(config, environment)
+		: compileConfig(config as ResolvedConfig, environment)
 }
 
 /**

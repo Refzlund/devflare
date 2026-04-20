@@ -9,8 +9,8 @@ export interface ApplyDeploymentStrategyOptions {
 	previewBranch?: string
 }
 
-export interface AppliedDeploymentStrategy {
-	config: DevflareConfig
+export interface AppliedDeploymentStrategy<TConfig extends DevflareConfig = DevflareConfig> {
+	config: TConfig
 	strategy: DeploymentStrategy
 	branchScope?: string
 	omittedResources: Array<'queue-consumers' | 'cron-triggers'>
@@ -73,10 +73,10 @@ function omitCronTriggers(config: DevflareConfig): DevflareConfig {
 	}
 }
 
-export function applyDeploymentStrategy(
-	config: DevflareConfig,
+export function applyDeploymentStrategy<TConfig extends DevflareConfig>(
+	config: TConfig,
 	options: ApplyDeploymentStrategyOptions = {}
-): AppliedDeploymentStrategy {
+): AppliedDeploymentStrategy<TConfig> {
 	const branchScope = normalizeBranchScope(options.previewBranch) ?? normalizeBranchScope(options.branchName)
 	const isBranchScopedPreviewDeploy = !options.preview && options.environment === 'preview' && Boolean(branchScope)
 
@@ -89,7 +89,7 @@ export function applyDeploymentStrategy(
 	}
 
 	const omittedResources: AppliedDeploymentStrategy['omittedResources'] = []
-	let nextConfig = config
+	let nextConfig: DevflareConfig = config
 
 	if (nextConfig.bindings?.queues?.consumers?.length) {
 		nextConfig = omitQueueConsumers(nextConfig)
@@ -102,7 +102,7 @@ export function applyDeploymentStrategy(
 	}
 
 	return {
-		config: nextConfig,
+		config: nextConfig as TConfig,
 		strategy: 'preview-scope',
 		branchScope,
 		omittedResources
