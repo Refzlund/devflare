@@ -1,10 +1,26 @@
 # REMAINING
 
-Last updated: 2026-04-20
+Last updated: 2026-04-21
 
 This file captures the implementation strategy for the blocked items that remain in `FINDINGS.md`.
 
 > Note: the current summary line in `FINDINGS.md` says `6` blocked, but the findings register presently contains `9` blocked entries: `F09`, `F11`, `F18`, `F22`, `F35`, `F45`, `F49`, `F57`, and `F58`. This plan follows the register entries themselves.
+
+## Maintenance-loop progress (2026-04-21)
+
+A scoped maintenance pass landed the following items from this plan:
+
+- `F18` — **Done.** Refresh path is now a one-command maintainer operation. `packages/devflare/scripts/refresh-permission-groups.ts` (registered as the `refresh-permission-groups` package script), `packages/devflare/src/cloudflare/known-permission-group-ids.generated.ts` (typed const, all entries `null` until a maintainer runs the script with credentials), `tokens.ts` rewired to derive from the generated data via `null → undefined` mapping while preserving the public `KNOWN_PERMISSION_GROUP_IDS` shape, 9 new unit tests, README "Maintainer scripts" section. Display-name fallback in `matchesKnownPermissionGroup()` remains as the safe path. Commit `1c5dca0`.
+- `F57` — **Done (no longer reproducible).** Empirically retired: `bun run check --force` exits 0 across the workspace; `bun run typecheck` exits 0; svelte-check passes for `@devflare/case18-sveltekit-full` and `documentation` with 0 errors. Likely resolved transitively by the F21/F23/F24 build/deploy/preview fixes that landed earlier in the audit. The offline resource-resolution mode proposed below is no longer needed for `check` to pass; it remains a future-proofing option only.
+- `F58` — **Done (original blocker no longer reproducible).** The original `CONFIG_RESOURCE_RESOLUTION_ERROR` failure mode for `case1`/`case12` is gone; both build cleanly. `bun run build --force` now fails for an unrelated reason in `cases/case17-rolldown-plugin` because case17 declares `vite ^6.0.0` but Bun resolves `vite@8.0.8`, which transitively imports `rolldown` (not declared in case17 devDependencies). That is captured as new finding `F59` (one-line fix: pin `vite@^6.4.0` or add `rolldown` as devDep).
+- `F22` — **Partial (cross-phase contract tests landed; extraction still gated on `F35`/`F45`).** `packages/devflare/tests/unit/config/resolver-contract.test.ts` now pins build / dev-vite / deploy phases against the same fixtures (8 tests, 26 expect calls): build preserves names, dev uses local stable identifiers, deploy resolves through Cloudflare mocks, binding key sets stay identical across phases, environment overrides apply consistently, id-only configs round-trip without remote calls, and `compileConfig()` still rejects name-only bindings. The shared `resolveResources()` extraction proposed below now has a one-shot regression gate to land behind. Code extraction itself is intentionally NOT performed in this pass; per the plan below it is sequenced behind `F35`/`F45`, and prior-pass attempts at premature extraction had to be reverted.
+
+Items that remain blocked (architectural / external work outside the maintenance loop):
+
+- `F09`, `F11` — major-version transport program
+- `F35` — Vite plugin reorg (sequenced after `F22` extraction)
+- `F45` — `createDevServer()` decomposition (sequenced after `F22` and `F35`)
+- `F49` — `createTestContext()` decomposition (lowest urgency)
 
 ## Recommended sequence
 
