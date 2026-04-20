@@ -45,8 +45,9 @@ export interface TransportV2Welcome {
 // Control plane — body streams
 // -----------------------------------------------------------------------------
 
-/** Side that owns a body stream. */
-export type TransportV2BodyKind = 'request' | 'response'
+/** Side that owns a body stream. `'value'` is used for free-standing
+ * ReadableStream parameters/results that are not tied to a Request/Response. */
+export type TransportV2BodyKind = 'request' | 'response' | 'value'
 
 /** Declares a streaming body for an in-flight request or response. */
 export interface TransportV2BodyOpen {

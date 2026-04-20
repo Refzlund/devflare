@@ -602,7 +602,7 @@ export class BridgeClient {
 		}
 	}
 
-	private handleStreamChunk(decoded: ReturnType<typeof decodeBinaryFrame>): void {
+	private handleStreamChunk(decoded: { id: number; payload: Uint8Array }): void {
 		const stream = this.activeStreams.get(decoded.id)
 		if (!stream || stream.closed) return
 
@@ -645,7 +645,7 @@ export class BridgeClient {
 		this.activeStreams.delete(msg.sid)
 	}
 
-	private handleWsData(decoded: ReturnType<typeof decodeBinaryFrame>): void {
+	private handleWsData(decoded: { id: number; flags: number; payload: Uint8Array }): void {
 		const proxy = this.wsProxies.get(decoded.id)
 		if (!proxy) return
 
