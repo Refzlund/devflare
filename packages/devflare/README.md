@@ -120,13 +120,16 @@ Use subpaths intentionally.
 
 | Import | Use for |
 |---|---|
-| `devflare` | main package entrypoint: config helpers, `ref()`, unified `env`, bridge helpers, CLI helpers, decorators |
-| `devflare/runtime` | worker-safe runtime helpers like `env`, `ctx`, `event`, `locals`, event types/getters, middleware helpers |
-| `devflare/test` | `createTestContext`, `cf.*`, mock helpers, bridge test context, skip helpers |
+| `devflare` | main package entrypoint: `defineConfig`, `defineWorker`, `ref()`, the unified `env`/`ctx`/`event`/`locals` proxies, `sequence`, `defineFetchHandler`, decorators |
+| `devflare/config` | lightweight config-only entry for `devflare.config.ts` files (Bun loads only the config helpers, not the full Node-side barrel) |
+| `devflare/runtime` | worker-safe runtime helpers: strict `env`, `ctx`, `event`, `locals`, event types/getters, middleware helpers |
+| `devflare/test` | `createTestContext`, `cf.*`, mock helpers (`createMockKV`/`createMockD1`/`createMockR2`/`createMockEnv`/`createMockTestContext`/`withTestContext`) |
 | `devflare/vite` | Vite integration |
 | `devflare/sveltekit` | SvelteKit integration |
 | `devflare/cloudflare` | Cloudflare account/auth/usage/limits/preferences helpers |
 | `devflare/decorators` | decorators only |
+
+Internal bridge and transform helpers are intentionally not re-exported from bare `'devflare'`. If you previously imported them from the main entry, switch to the matching subpath — see "Public API surface and migration notes" below.
 
 ### Runtime import rule of thumb
 

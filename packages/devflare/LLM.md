@@ -11,7 +11,7 @@ It is meant to read like a proper markdown handbook rather than a second source 
 - Links use the same `/docs/...` routes as the documentation site.
 
 ## Documentation map
-This export covers 83 pages across 5 top-level groups.
+This export covers 87 pages across 5 top-level groups.
 
 ### Quickstart
 See why Devflare exists, build the smallest safe first worker, and keep the documentation contract nearby before you branch into the deeper toolkit.
@@ -92,70 +92,76 @@ Use cross-cutting guides to choose the right storage, state, async, file-deliver
 Use the per-binding guides for the exact authoring, runtime, testing, preview, and example details once the guide pages have already helped you choose the right pattern.
 
 - **KV** — Fast lookup state, cache-like reads, and lightweight shared data with strong local support.
-  - [KV](/docs/kv-binding) — KV bindings are first-class in Devflare: author stable names in config, keep env typed, and run real get or put flows locally.
-  - [KV internals](/docs/kv-internals) — KV goes through the full Devflare pipeline: normalize authoring, resolve names when needed, then compile to Wrangler output.
-  - [Testing KV](/docs/kv-testing) — Use the default test harness first. KV is one of the bindings Devflare supports best in local tests.
-  - [KV example](/docs/kv-example) — This example keeps KV simple: one binding, one fetch handler, one assertion.
+  - [KV](/docs/bindings/kv) — KV bindings are first-class in Devflare: author stable names in config, keep env typed, and run real get or put flows locally.
+  - [KV internals](/docs/bindings/kv/internals) — KV goes through the full Devflare pipeline: normalize authoring, resolve names when needed, then compile to Wrangler output.
+  - [Testing KV](/docs/bindings/kv/testing) — Use the default test harness first. KV is one of the bindings Devflare supports best in local tests.
+  - [KV example](/docs/bindings/kv/example) — This example keeps KV simple: one binding, one fetch handler, one assertion.
 
 - **D1** — SQLite-style relational queries with a strong local harness and id or name-based authoring.
-  - [D1](/docs/d1-binding) — D1 gets the same stable-name authoring story as KV, but the runtime shape is relational: `prepare`, `batch`, `exec`, and prepared statements.
-  - [D1 internals](/docs/d1-internals) — D1 uses the same normalize-then-resolve pattern as KV, but compiles to Wrangler `d1_databases` and exposes a relational local runtime surface.
-  - [Testing D1](/docs/d1-testing) — D1 is one of the easiest bindings to test meaningfully with Devflare because the local runtime already speaks the same database API your worker uses.
-  - [D1 example](/docs/d1-example) — This starter example keeps D1 focused on one job: answer a single query and prove the binding works locally.
+  - [D1](/docs/bindings/d1) — D1 gets the same stable-name authoring story as KV, but the runtime shape is relational: `prepare`, `batch`, `exec`, and prepared statements.
+  - [D1 internals](/docs/bindings/d1/internals) — D1 uses the same normalize-then-resolve pattern as KV, but compiles to Wrangler `d1_databases` and exposes a relational local runtime surface.
+  - [Testing D1](/docs/bindings/d1/testing) — D1 is one of the easiest bindings to test meaningfully with Devflare because the local runtime already speaks the same database API your worker uses.
+  - [D1 example](/docs/bindings/d1/example) — This starter example keeps D1 focused on one job: answer a single query and prove the binding works locally.
 
 - **R2** — Object storage bindings with strong local support and one important rule: do not assume a browser URL contract.
-  - [R2](/docs/r2-binding) — R2 is straightforward in config and well-supported locally, but browser-facing delivery should usually go through a Worker route instead of assuming bucket URLs.
-  - [R2 internals](/docs/r2-internals) — R2 is simpler than KV or D1 because the authored value is already the bucket name, so there is no name-versus-id resolution dance.
-  - [Testing R2](/docs/r2-testing) — R2 is local-friendly, which means you can test real object operations without inventing a storage adapter just to get off the ground.
-  - [R2 example](/docs/r2-example) — This example uses one private bucket and one route, which is still the cleanest default shape for many real apps.
+  - [R2](/docs/bindings/r2) — R2 is straightforward in config and well-supported locally, but browser-facing delivery should usually go through a Worker route instead of assuming bucket URLs.
+  - [R2 internals](/docs/bindings/r2/internals) — R2 is simpler than KV or D1 because the authored value is already the bucket name, so there is no name-versus-id resolution dance.
+  - [Testing R2](/docs/bindings/r2/testing) — R2 is local-friendly, which means you can test real object operations without inventing a storage adapter just to get off the ground.
+  - [R2 example](/docs/bindings/r2/example) — This example uses one private bucket and one route, which is still the cleanest default shape for many real apps.
 
 - **Durable Objects** — Stateful coordination primitives with strong local support, cross-worker wiring, and important preview caveats.
-  - [Durable Objects](/docs/durable-object-binding) — Devflare treats Durable Objects as a real first-class surface in config, local runtime, and tests, not as an awkward plugin hanging off the side of the worker.
-  - [Durable Objects internals](/docs/durable-object-internals) — Durable Object bindings normalize into a stable binding shape, compile into Wrangler `durable_objects.bindings`, and participate in Devflare’s own DO bundling path.
-  - [Testing Durable Objects](/docs/durable-object-testing) — Durable Objects are well-supported in the default Devflare harness, which means you can test real object behavior without hand-building a fake namespace first.
-  - [Durable Objects example](/docs/durable-object-example) — This example uses a tiny counter object because the shape is easy to understand and still proves the important DO wiring.
+  - [Durable Objects](/docs/bindings/durable-objects) — The fast Devflare payoff is simple: put one counter object in a `do.*` file, call it from the worker, and call the same object directly in tests.
+  - [Durable Objects internals](/docs/bindings/durable-objects/internals) — Durable Object bindings normalize into a stable binding shape, compile into Wrangler `durable_objects.bindings`, and participate in Devflare’s own DO bundling path.
+  - [Testing Durable Objects](/docs/bindings/durable-objects/testing) — Durable Objects are well-supported in the default Devflare harness, which means you can test real object behavior without hand-building a fake namespace first.
+  - [Durable Objects example](/docs/bindings/durable-objects/example) — This example shows the whole Durable Object story in the smallest useful shape: one auto-discovered object, one worker route, and one direct test.
 
 - **Queues** — Producer and consumer bindings for background work with a strong local trigger story.
-  - [Queues](/docs/queue-binding) — Devflare models Queue producers and consumers explicitly, which makes local tests and preview naming much easier to reason about.
-  - [Queues internals](/docs/queue-internals) — Queue config is compiled into explicit producer and consumer blocks, with preview resource materialization available for both queue names and DLQs.
-  - [Testing Queues](/docs/queue-testing) — Queue testing is one of the places where Devflare’s helper surface feels especially good because the queue trigger already knows how to drive the real handler shape.
-  - [Queues example](/docs/queue-example) — This starter example wires one producer, one consumer, and one stored result so you can see the whole queue loop without ceremony.
+  - [Queues](/docs/bindings/queues) — Devflare models Queue producers and consumers explicitly, which makes local tests and preview naming much easier to reason about.
+  - [Queues internals](/docs/bindings/queues/internals) — Queue config is compiled into explicit producer and consumer blocks, with preview resource materialization available for both queue names and DLQs.
+  - [Testing Queues](/docs/bindings/queues/testing) — Queue testing is one of the places where Devflare’s helper surface feels especially good because the queue trigger already knows how to drive the real handler shape.
+  - [Queues example](/docs/bindings/queues/example) — This starter example wires one producer, one consumer, and one stored result so you can see the whole queue loop without ceremony.
+
+- **Services** — Worker-to-worker bindings with `ref()` support, typed env generation, and good local multi-worker tests.
+  - [Services](/docs/bindings/services) — The fast Devflare payoff is simple: wire one worker to another with `ref()`, call it through `env.MATH_SERVICE`, and prove the same relationship locally in one test.
+  - [Services internals](/docs/bindings/services/internals) — Devflare resolves referenced worker configs, bundles the linked worker surfaces, and then exposes those services as local multi-worker bindings.
+  - [Testing Services](/docs/bindings/services/testing) — Service bindings are one of the clearest Devflare wins in multi-worker apps: you can keep the real worker boundary and still prove it through the default local harness.
+  - [Services example](/docs/bindings/services/example) — This example shows the smallest useful service-binding loop: one `ref()`, one gateway route, and one local multi-worker test.
 
 - **AI** — Workers AI bindings for remote inference, with a deliberately remote-oriented testing story.
-  - [AI](/docs/ai-binding) — AI is a supported binding in Devflare, but it is intentionally treated as remote-oriented because real model inference lives on Cloudflare infrastructure.
-  - [AI internals](/docs/ai-internals) — AI has a smaller compiler story than storage bindings, but a more explicit auth and remote-runtime story.
-  - [Testing AI](/docs/ai-testing) — The right AI test strategy is selective: use remote mode when you mean to test inference, and skip cleanly when the environment is not allowed to do that.
-  - [AI example](/docs/ai-example) — This example keeps the AI path tiny: one binding, one inference call, one JSON response.
+  - [AI](/docs/bindings/ai) — Devflare makes Workers AI usable by keeping the binding tiny in config, the worker call obvious, and the remote smoke test explicit instead of fake.
+  - [AI internals](/docs/bindings/ai/internals) — AI has a smaller compiler story than storage bindings, but a more explicit auth and remote-runtime story.
+  - [Testing AI](/docs/bindings/ai/testing) — The right AI test strategy is selective: use remote mode when you mean to test inference, and skip cleanly when the environment is not allowed to do that.
+  - [AI example](/docs/bindings/ai/example) — This example keeps the AI story honest and useful: one binding, one tiny inference route, and one skip-aware remote smoke test.
 
 - **Vectorize** — Vector similarity indexes with explicit remote testing and preview-aware index naming.
-  - [Vectorize](/docs/vectorize-binding) — Vectorize is fully modeled in Devflare config and preview naming, but meaningful tests are still remote-oriented because the index lives on Cloudflare infrastructure.
-  - [Vectorize internals](/docs/vectorize-internals) — Vectorize compiles cleanly into Wrangler output and participates in preview resource lifecycle, but the runtime value of the binding mostly lives in remote infrastructure.
-  - [Testing Vectorize](/docs/vectorize-testing) — The right Vectorize tests are targeted remote checks: a small insert or query, a clear skip condition, and a real index behind the binding.
-  - [Vectorize example](/docs/vectorize-example) — This example keeps Vectorize honest: one index binding, one upsert, and one query against the same worker path.
+  - [Vectorize](/docs/bindings/vectorize) — Devflare makes Vectorize usable by keeping the index name explicit in config, preview naming honest, and the real smoke test explicit instead of buried under mocks.
+  - [Vectorize internals](/docs/bindings/vectorize/internals) — Vectorize compiles cleanly into Wrangler output and participates in preview resource lifecycle, but the runtime value of the binding mostly lives in remote infrastructure.
+  - [Testing Vectorize](/docs/bindings/vectorize/testing) — The right Vectorize tests are targeted remote checks: a small insert or query, a clear skip condition, and a real index behind the binding.
+  - [Vectorize example](/docs/bindings/vectorize/example) — This example keeps Vectorize honest and usable: one index binding, one upsert-and-query route, and one skip-aware remote smoke test.
 
 - **Hyperdrive** — PostgreSQL-oriented bindings with schema support, name resolution, and a narrower proven local story than D1 or KV.
-  - [Hyperdrive](/docs/hyperdrive-binding) — Hyperdrive is modeled in Devflare config and compile flows like other name-based resources, but its tested local ergonomics are thinner than D1 or KV.
-  - [Hyperdrive internals](/docs/hyperdrive-internals) — Hyperdrive uses the same normalize-and-resolve pattern as KV and D1, but preview lifecycle includes a fallback path instead of guaranteed preview cloning.
-  - [Testing Hyperdrive](/docs/hyperdrive-testing) — Hyperdrive testing should start smaller and more cautiously than D1 testing: prove the binding exists, then add targeted integration where the real database path matters.
-  - [Hyperdrive example](/docs/hyperdrive-example) — This example keeps Hyperdrive focused on one thing: prove the binding exists and expose the connection information your app will need next.
+  - [Hyperdrive](/docs/bindings/hyperdrive) — Hyperdrive is modeled in Devflare config and compile flows like other name-based resources, but its tested local ergonomics are thinner than D1 or KV.
+  - [Hyperdrive internals](/docs/bindings/hyperdrive/internals) — Hyperdrive uses the same normalize-and-resolve pattern as KV and D1, but preview lifecycle includes a fallback path instead of guaranteed preview cloning.
+  - [Testing Hyperdrive](/docs/bindings/hyperdrive/testing) — Hyperdrive testing should start smaller and more cautiously than D1 testing: prove the binding exists, then add targeted integration where the real database path matters.
+  - [Hyperdrive example](/docs/bindings/hyperdrive/example) — This example keeps Hyperdrive focused on one thing: prove the binding exists and expose the connection information your app will need next.
 
 - **Browser Rendering** — Headless browser support with an explicit single-binding limit and a stronger dev-server story than test-helper story.
-  - [Browser Rendering](/docs/browser-binding) — Devflare supports Browser Rendering, but there is exactly one browser binding today, and the best-supported local story lives in dev-server and integration flows.
-  - [Browser Rendering internals](/docs/browser-internals) — Browser Rendering support in Devflare is more than a config pass-through: the dev server starts a browser shim and a binding worker that line up with Cloudflare and puppeteer expectations.
-  - [Testing Browser Rendering](/docs/browser-testing) — Browser tests should usually be integration-flavored: either drive the worker in dev or exercise a thin smoke path that proves the binding can launch and fetch.
-  - [Browser Rendering example](/docs/browser-example) — This example shows the real browser shape most people care about: launch a browser, read one page title, close the browser cleanly.
+  - [Browser Rendering](/docs/bindings/browser-rendering) — Browser Rendering shines in Devflare’s bridge-backed dev story: keep one browser binding, one narrow worker route, and one smoke path that proves launch works.
+  - [Browser Rendering internals](/docs/bindings/browser-rendering/internals) — Browser Rendering support in Devflare is more than a config pass-through: the dev server starts a browser shim and a binding worker that line up with Cloudflare and puppeteer expectations.
+  - [Testing Browser Rendering](/docs/bindings/browser-rendering/testing) — Browser tests should usually be integration-flavored: either drive the worker in dev or exercise a thin smoke path that proves the binding can launch and fetch.
+  - [Browser Rendering example](/docs/bindings/browser-rendering/example) — This example shows the real browser path people actually need: one binding, one title-read route, and one smoke check through the dev server.
 
 - **Analytics Engine** — Dataset bindings for writeDataPoint-style event recording with schema support and lighter local testing guidance.
-  - [Analytics Engine](/docs/analytics-engine-binding) — Analytics Engine is modeled cleanly in Devflare config and generated types, but the repo evidence points to a lighter local story than the first-class storage bindings.
-  - [Analytics Engine internals](/docs/analytics-engine-internals) — Analytics Engine has a straightforward compiler story, plus a preview note that matters because datasets are auto-created on first write instead of provisioned like buckets or databases.
-  - [Testing Analytics Engine](/docs/analytics-engine-testing) — Analytics Engine tests should stay thin: verify that the worker writes a data point, not that you can recreate Cloudflare analytics locally.
-  - [Analytics Engine example](/docs/analytics-engine-example) — This example writes one analytics event from one route, which is usually all you need to teach the binding shape clearly.
+  - [Analytics Engine](/docs/bindings/analytics-engine) — Analytics Engine is modeled cleanly in Devflare config and generated types, but the repo evidence points to a lighter local story than the first-class storage bindings.
+  - [Analytics Engine internals](/docs/bindings/analytics-engine/internals) — Analytics Engine has a straightforward compiler story, plus a preview note that matters because datasets are auto-created on first write instead of provisioned like buckets or databases.
+  - [Testing Analytics Engine](/docs/bindings/analytics-engine/testing) — Analytics Engine tests should stay thin: verify that the worker writes a data point, not that you can recreate Cloudflare analytics locally.
+  - [Analytics Engine example](/docs/bindings/analytics-engine/example) — This example writes one analytics event from one route, which is usually all you need to teach the binding shape clearly.
 
 - **Send Email** — Outbound email bindings with real local support, plus an important distinction from inbound email event handlers.
-  - [Send Email](/docs/send-email-binding) — Send Email is a real binding surface in Devflare, and it is worth documenting separately from inbound `src/email.ts` handlers so the two flows do not get blurred together.
-  - [Send Email internals](/docs/send-email-internals) — Send Email compiles into Wrangler output, normalizes message input at runtime, and supports local address restrictions instead of treating email as an unbounded free-for-all.
-  - [Testing Send Email](/docs/send-email-testing) — Send Email is stronger locally than many platform-service bindings because outbound email can be exercised in the default harness, while inbound email has its own related helper surface.
-  - [Send Email example](/docs/send-email-example) — This example keeps outbound email explicit: one binding, one recipient rule, one worker path that sends one message.
+  - [Send Email](/docs/bindings/send-email) — Send Email is a real binding surface in Devflare, and it is worth documenting separately from inbound `src/email.ts` handlers so the two flows do not get blurred together.
+  - [Send Email internals](/docs/bindings/send-email/internals) — Send Email compiles into Wrangler output, normalizes message input at runtime, and supports local address restrictions instead of treating email as an unbounded free-for-all.
+  - [Testing Send Email](/docs/bindings/send-email/testing) — Send Email is stronger locally than many platform-service bindings because outbound email can be exercised in the default harness, while inbound email has its own related helper surface.
+  - [Send Email example](/docs/bindings/send-email/example) — This example keeps outbound email explicit: one binding, one recipient rule, one worker path that sends one message.
 
 ## Full documentation
 
@@ -303,10 +309,10 @@ Hover a label to see what it means for config, local runtime, tests, previews, a
 - **KV, D1, and R2** — Devflare gives the main storage bindings a strong local-first story: readable config, generated env typing, local runtime behavior, and realistic tests without losing the Cloudflare shape. ([link](/docs/storage-bindings))
 - **Durable Objects and queues** — Stateful objects and deferred work are treated as real worker surfaces, with config discovery, local runtime wrappers, and test helpers that match the application boundary. ([link](/docs/durable-objects-and-queues))
 - **Service bindings and worker composition** — Service bindings and `ref()` let worker-to-worker dependencies stay explicit enough for local multi-worker runtime, generated types, and real tests through the same env surface the app uses. ([link](/docs/multi-workers))
-- **Hyperdrive** — Hyperdrive is modeled cleanly in config and generated output, but the local and preview ergonomics are more constrained than KV, D1, or R2 because the real database and credentials stay remote. ([link](/docs/hyperdrive-binding))
-- **Workers AI** — The AI binding is supported in config, types, and deployment flows, but meaningful tests are remote-oriented because real inference still lives on Cloudflare infrastructure. ([link](/docs/ai-binding))
-- **Vectorize** — Vectorize is fully modeled in config and preview-aware naming, but real inserts and similarity queries still need remote infrastructure and honest remote-mode tests. ([link](/docs/vectorize-binding))
-- **Browser Rendering** — Browser Rendering is fully supported through Devflare's bridge-backed local dev story, config model, generated typing, and runtime integration. The main platform caveat is still the Cloudflare one: exactly one browser binding. ([link](/docs/browser-binding))
+- **Hyperdrive** — Hyperdrive is modeled cleanly in config and generated output, but the local and preview ergonomics are more constrained than KV, D1, or R2 because the real database and credentials stay remote. ([link](/docs/bindings/hyperdrive))
+- **Workers AI** — The AI binding is supported in config, types, and deployment flows, but meaningful tests are remote-oriented because real inference still lives on Cloudflare infrastructure. ([link](/docs/bindings/ai))
+- **Vectorize** — Vectorize is fully modeled in config and preview-aware naming, but real inserts and similarity queries still need remote infrastructure and honest remote-mode tests. ([link](/docs/bindings/vectorize))
+- **Browser Rendering** — Browser Rendering is fully supported through Devflare's bridge-backed local dev story, config model, generated typing, and runtime integration. The main platform caveat is still the Cloudflare one: exactly one browser binding. ([link](/docs/bindings/browser-rendering))
 
 #### What Devflare adds on top of raw Cloudflare workflows
 
@@ -943,9 +949,9 @@ Once one tiny example works locally, jump to the dedicated binding guides for th
 
 ##### Highlights
 
-- **Durable Objects guide** — Read the fuller guidance on stateful objects, migrations, previews, and local testing. ([link](/docs/durable-object-binding))
-- **R2 guide** — Open the deeper R2 page for delivery boundaries, testing patterns, and storage architecture choices. ([link](/docs/r2-binding))
-- **Browser Rendering guide** — Open the browser guide when you need the single-binding caveat, dev-server details, or heavier browser workflows. ([link](/docs/browser-binding))
+- **Durable Objects guide** — Read the fuller guidance on stateful objects, migrations, previews, and local testing. ([link](/docs/bindings/durable-objects))
+- **R2 guide** — Open the deeper R2 page for delivery boundaries, testing patterns, and storage architecture choices. ([link](/docs/bindings/r2))
+- **Browser Rendering guide** — Open the browser guide when you need the single-binding caveat, dev-server details, or heavier browser workflows. ([link](/docs/bindings/browser-rendering))
 
 ---
 
@@ -3903,17 +3909,18 @@ That is great once you already opened the right binding page. This index is for 
 
 ##### Highlights
 
-- **Testing KV** — Use the default test harness first. KV is one of the bindings Devflare supports best in local tests. Open the KV overview first when you need the full binding story, or jump straight here when the only open question is how to test it. ([link](/docs/kv-testing))
-- **Testing D1** — D1 is one of the easiest bindings to test meaningfully with Devflare because the local runtime already speaks the same database API your worker uses. Open the D1 overview first when you need the full binding story, or jump straight here when the only open question is how to test it. ([link](/docs/d1-testing))
-- **Testing R2** — R2 is local-friendly, which means you can test real object operations without inventing a storage adapter just to get off the ground. Open the R2 overview first when you need the full binding story, or jump straight here when the only open question is how to test it. ([link](/docs/r2-testing))
-- **Testing Durable Objects** — Durable Objects are well-supported in the default Devflare harness, which means you can test real object behavior without hand-building a fake namespace first. Open the Durable Objects overview first when you need the full binding story, or jump straight here when the only open question is how to test it. ([link](/docs/durable-object-testing))
-- **Testing Queues** — Queue testing is one of the places where Devflare’s helper surface feels especially good because the queue trigger already knows how to drive the real handler shape. Open the Queues overview first when you need the full binding story, or jump straight here when the only open question is how to test it. ([link](/docs/queue-testing))
-- **Testing AI** — The right AI test strategy is selective: use remote mode when you mean to test inference, and skip cleanly when the environment is not allowed to do that. Open the AI overview first when you need the full binding story, or jump straight here when the only open question is how to test it. ([link](/docs/ai-testing))
-- **Testing Vectorize** — The right Vectorize tests are targeted remote checks: a small insert or query, a clear skip condition, and a real index behind the binding. Open the Vectorize overview first when you need the full binding story, or jump straight here when the only open question is how to test it. ([link](/docs/vectorize-testing))
-- **Testing Hyperdrive** — Hyperdrive testing should start smaller and more cautiously than D1 testing: prove the binding exists, then add targeted integration where the real database path matters. Open the Hyperdrive overview first when you need the full binding story, or jump straight here when the only open question is how to test it. ([link](/docs/hyperdrive-testing))
-- **Testing Browser Rendering** — Browser tests should usually be integration-flavored: either drive the worker in dev or exercise a thin smoke path that proves the binding can launch and fetch. Open the Browser Rendering overview first when you need the full binding story, or jump straight here when the only open question is how to test it. ([link](/docs/browser-testing))
-- **Testing Analytics Engine** — Analytics Engine tests should stay thin: verify that the worker writes a data point, not that you can recreate Cloudflare analytics locally. Open the Analytics Engine overview first when you need the full binding story, or jump straight here when the only open question is how to test it. ([link](/docs/analytics-engine-testing))
-- **Testing Send Email** — Send Email is stronger locally than many platform-service bindings because outbound email can be exercised in the default harness, while inbound email has its own related helper surface. Open the Send Email overview first when you need the full binding story, or jump straight here when the only open question is how to test it. ([link](/docs/send-email-testing))
+- **Testing KV** — Use the default test harness first. KV is one of the bindings Devflare supports best in local tests. Open the KV overview first when you need the full binding story, or jump straight here when the only open question is how to test it. ([link](/docs/bindings/kv/testing))
+- **Testing D1** — D1 is one of the easiest bindings to test meaningfully with Devflare because the local runtime already speaks the same database API your worker uses. Open the D1 overview first when you need the full binding story, or jump straight here when the only open question is how to test it. ([link](/docs/bindings/d1/testing))
+- **Testing R2** — R2 is local-friendly, which means you can test real object operations without inventing a storage adapter just to get off the ground. Open the R2 overview first when you need the full binding story, or jump straight here when the only open question is how to test it. ([link](/docs/bindings/r2/testing))
+- **Testing Durable Objects** — Durable Objects are well-supported in the default Devflare harness, which means you can test real object behavior without hand-building a fake namespace first. Open the Durable Objects overview first when you need the full binding story, or jump straight here when the only open question is how to test it. ([link](/docs/bindings/durable-objects/testing))
+- **Testing Queues** — Queue testing is one of the places where Devflare’s helper surface feels especially good because the queue trigger already knows how to drive the real handler shape. Open the Queues overview first when you need the full binding story, or jump straight here when the only open question is how to test it. ([link](/docs/bindings/queues/testing))
+- **Testing Services** — Service bindings are one of the clearest Devflare wins in multi-worker apps: you can keep the real worker boundary and still prove it through the default local harness. Open the Services overview first when you need the full binding story, or jump straight here when the only open question is how to test it. ([link](/docs/bindings/services/testing))
+- **Testing AI** — The right AI test strategy is selective: use remote mode when you mean to test inference, and skip cleanly when the environment is not allowed to do that. Open the AI overview first when you need the full binding story, or jump straight here when the only open question is how to test it. ([link](/docs/bindings/ai/testing))
+- **Testing Vectorize** — The right Vectorize tests are targeted remote checks: a small insert or query, a clear skip condition, and a real index behind the binding. Open the Vectorize overview first when you need the full binding story, or jump straight here when the only open question is how to test it. ([link](/docs/bindings/vectorize/testing))
+- **Testing Hyperdrive** — Hyperdrive testing should start smaller and more cautiously than D1 testing: prove the binding exists, then add targeted integration where the real database path matters. Open the Hyperdrive overview first when you need the full binding story, or jump straight here when the only open question is how to test it. ([link](/docs/bindings/hyperdrive/testing))
+- **Testing Browser Rendering** — Browser tests should usually be integration-flavored: either drive the worker in dev or exercise a thin smoke path that proves the binding can launch and fetch. Open the Browser Rendering overview first when you need the full binding story, or jump straight here when the only open question is how to test it. ([link](/docs/bindings/browser-rendering/testing))
+- **Testing Analytics Engine** — Analytics Engine tests should stay thin: verify that the worker writes a data point, not that you can recreate Cloudflare analytics locally. Open the Analytics Engine overview first when you need the full binding story, or jump straight here when the only open question is how to test it. ([link](/docs/bindings/analytics-engine/testing))
+- **Testing Send Email** — Send Email is stronger locally than many platform-service bindings because outbound email can be exercised in the default harness, while inbound email has its own related helper surface. Open the Send Email overview first when you need the full binding story, or jump straight here when the only open question is how to test it. ([link](/docs/bindings/send-email/testing))
 
 #### The testing posture is not identical for every binding
 
@@ -3926,6 +3933,7 @@ That is great once you already opened the right binding page. This index is for 
 | R2 | First-class local runtime and tests | `createTestContext()` with `env.ASSETS` or `cf.worker.fetch()` |
 | Durable Objects | First-class local runtime and tests, including cross-worker references | `createTestContext()` with the real DO namespace in `env` |
 | Queues | First-class local runtime and queue-trigger tests | `createTestContext()` plus `cf.queue.trigger()` |
+| Services | First-class local runtime and multi-worker tests | `createTestContext()` plus `env.MY_SERVICE` |
 | AI | Remote-oriented; local tests require remote mode | `createTestContext()` after remote mode is enabled, plus `shouldSkip.ai` |
 | Vectorize | Remote-oriented; local tests require remote mode or explicit mocks | `createTestContext()` in remote mode plus `shouldSkip.vectorize` |
 | Hyperdrive | Supported, but with a narrower proven local test story | `createTestContext()` plus small binding or smoke checks |
@@ -5446,10 +5454,10 @@ export async function GET({ env, params }: FetchEvent<DevflareEnv>): Promise<Res
 
 ##### Highlights
 
-- **KV** — Open the KV guide when the storage shape is keyed lookup, cache-like state, or namespace lifecycle. ([link](/docs/kv-binding))
-- **D1** — Open the D1 guide when the storage shape is query-driven and you need the actual SQL-shaped runtime contract. ([link](/docs/d1-binding))
-- **R2** — Open the R2 guide when the real question is bucket usage, testing, preview naming, or file delivery details. ([link](/docs/r2-binding))
-- **Hyperdrive** — Open the Hyperdrive guide when the worker is reaching an existing PostgreSQL system and the operational caveats matter more than the storage taxonomy. ([link](/docs/hyperdrive-binding))
+- **KV** — Open the KV guide when the storage shape is keyed lookup, cache-like state, or namespace lifecycle. ([link](/docs/bindings/kv))
+- **D1** — Open the D1 guide when the storage shape is query-driven and you need the actual SQL-shaped runtime contract. ([link](/docs/bindings/d1))
+- **R2** — Open the R2 guide when the real question is bucket usage, testing, preview naming, or file delivery details. ([link](/docs/bindings/r2))
+- **Hyperdrive** — Open the Hyperdrive guide when the worker is reaching an existing PostgreSQL system and the operational caveats matter more than the storage taxonomy. ([link](/docs/bindings/hyperdrive))
 
 ---
 
@@ -5585,7 +5593,7 @@ export async function GET({ env, params }: FetchEvent<DevflareEnv>): Promise<Res
 
 ##### Highlights
 
-- **R2 binding guide** — Open this once the architecture choice is done and the next question is the exact binding shape, local runtime behavior, or testing posture. ([link](/docs/r2-binding))
+- **R2 binding guide** — Open this once the architecture choice is done and the next question is the exact binding shape, local runtime behavior, or testing posture. ([link](/docs/bindings/r2))
 - **Preview-scoped bindings** — Open this when preview deployments should own separate buckets or other disposable infrastructure that can be cleaned up by scope later. ([link](/docs/config-previews))
 - **createTestContext()** — Open this when the next question is how the local worker-shaped test harness exposes real R2 bindings and helper surfaces. ([link](/docs/create-test-context))
 
@@ -5709,8 +5717,8 @@ export default defineConfig({
 
 ##### Highlights
 
-- **Durable Objects** — Open the Durable Objects guide for the real binding shape, local tests, migrations, and preview caveats. ([link](/docs/durable-object-binding))
-- **Queues** — Open the Queues guide for producer and consumer authoring, queue tests, and preview resource lifecycle details. ([link](/docs/queue-binding))
+- **Durable Objects** — Open the Durable Objects guide for the real binding shape, local tests, migrations, and preview caveats. ([link](/docs/bindings/durable-objects))
+- **Queues** — Open the Queues guide for producer and consumer authoring, queue tests, and preview resource lifecycle details. ([link](/docs/bindings/queues))
 
 ---
 
@@ -5725,7 +5733,7 @@ export default defineConfig({
 | Navigation title | Worker composition |
 | Eyebrow | Composition |
 
-The service-binding reference pages can explain the mechanics. This page exists for the composition question: when should another worker exist at all, how do you keep the boundary explicit, and which docs own the deeper service details once you commit to it?
+The Services guide can explain the mechanics. This page exists for the composition question: when should another worker exist at all, how do you keep the boundary explicit, and which docs own the deeper service details once you commit to it?
 
 #### At a glance
 
@@ -5740,7 +5748,7 @@ The service-binding reference pages can explain the mechanics. This page exists 
 
 The goal is not to split one worker just because the file count went up. The goal is to give a real runtime boundary a real worker boundary, then let service bindings make that relationship explicit enough for tooling and review.
 
-That means this page should answer the architecture choice first. The service-binding guide can take over once the answer is already “yes, another worker should exist.”
+That means this page should answer the architecture choice first. The Services guide can take over once the answer is already “yes, another worker should exist.”
 
 ##### Reference table
 
@@ -5758,20 +5766,20 @@ That means this page should answer the architecture choice first. The service-bi
 
 If another worker is real, the relationship belongs in config instead of in copied worker names or half-remembered script references. `ref()` gives Devflare enough structure to follow the dependency into local runtime, generated env types, and compiled output.
 
-Keep the architecture example simple: one referenced worker and one explicit service binding are enough to show the boundary. Named entrypoints are real too, but the service-binding and generated-types pages own that deeper contract once the worker boundary itself is already justified.
+Keep the architecture example simple: one referenced worker and one explicit service binding are enough to show the boundary. Named entrypoints are real too, but the Services and generated-types pages own that deeper contract once the worker boundary itself is already justified.
 
 ##### Example — Model the worker family with `ref()` and one explicit service binding
 
 ```ts
 import { defineConfig, ref } from 'devflare/config'
 
-	const mathWorker = ref(() => import('../math-service/devflare.config'))
+const mathWorker = ref(() => import('../math-service/devflare.config'))
 
 export default defineConfig({
 	name: 'gateway',
 	bindings: {
 		services: {
-				MATH_SERVICE: mathWorker.worker
+			MATH_SERVICE: mathWorker.worker
 		}
 	}
 })
@@ -5809,8 +5817,8 @@ test('service binding calls the default worker export', async () => {
 
 ##### Highlights
 
-- **Service binding guide** — Open the service guide for the exact binding shape, env typing, and compiler behavior once another worker is definitely the right boundary. ([link](/docs/service-binding))
-- **Testing Services** — Open the service testing guide when the next question is the right default harness or how to test named entrypoints accurately. ([link](/docs/service-testing))
+- **Services guide** — Open the service guide for the exact binding shape, env typing, and compiler behavior once another worker is definitely the right boundary. ([link](/docs/bindings/services))
+- **Testing Services** — Open the service testing guide when the next question is the right default harness or how to test named entrypoints accurately. ([link](/docs/bindings/services/testing))
 - **Generated types** — Open this page when `ref()` relationships, named entrypoints, or `defineConfig<Entrypoints>()` typing becomes the real question. ([link](/docs/generated-types))
 - **Preview strategies** — Open the preview page when the worker family needs real isolation and the naming model is the release question now. ([link](/docs/preview-strategies))
 - **Testing overview** — Use the testing map when the next question is broader than service bindings alone. ([link](/docs/testing-overview))
@@ -5823,7 +5831,7 @@ test('service binding calls the default worker export', async () => {
 
 | Field | Value |
 | --- | --- |
-| Route | [`/docs/kv-binding`](/docs/kv-binding) |
+| Route | [`/docs/bindings/kv`](/docs/bindings/kv) |
 | Group | Bindings |
 | Navigation title | KV |
 | Eyebrow | Binding reference |
@@ -5901,9 +5909,9 @@ Cloudflare Workers KV docs is the platform reference. This page is the Devflare 
 
 ##### Highlights
 
-- **KV internals** — See normalization, Wrangler `kv_namespaces`, and the preview or runtime details behind the authored shape. ([link](/docs/kv-internals))
-- **Testing KV** — Start from `createTestContext()` plus `env.CACHE` or `cf.worker.fetch()` and only escalate when the binding or deployment model genuinely needs it. ([link](/docs/kv-testing))
-- **KV example** — Adapt one small end-to-end path before you hide the binding behind a bigger abstraction. ([link](/docs/kv-example))
+- **KV internals** — See normalization, Wrangler `kv_namespaces`, and the preview or runtime details behind the authored shape. ([link](/docs/bindings/kv/internals))
+- **Testing KV** — Start from `createTestContext()` plus `env.CACHE` or `cf.worker.fetch()` and only escalate when the binding or deployment model genuinely needs it. ([link](/docs/bindings/kv/testing))
+- **KV example** — Adapt one small end-to-end path before you hide the binding behind a bigger abstraction. ([link](/docs/bindings/kv/example))
 
 ---
 
@@ -5913,7 +5921,7 @@ Cloudflare Workers KV docs is the platform reference. This page is the Devflare 
 
 | Field | Value |
 | --- | --- |
-| Route | [`/docs/kv-internals`](/docs/kv-internals) |
+| Route | [`/docs/bindings/kv/internals`](/docs/bindings/kv/internals) |
 | Group | Bindings |
 | Navigation title | KV internals |
 | Eyebrow | Under the hood |
@@ -5993,7 +6001,7 @@ export default defineConfig({
 
 | Field | Value |
 | --- | --- |
-| Route | [`/docs/kv-testing`](/docs/kv-testing) |
+| Route | [`/docs/bindings/kv/testing`](/docs/bindings/kv/testing) |
 | Group | Bindings |
 | Navigation title | Testing KV |
 | Eyebrow | Testing |
@@ -6058,7 +6066,7 @@ test('stores and reads a cache value', async () => {
 
 | Field | Value |
 | --- | --- |
-| Route | [`/docs/kv-example`](/docs/kv-example) |
+| Route | [`/docs/bindings/kv/example`](/docs/bindings/kv/example) |
 | Group | Bindings |
 | Navigation title | KV example |
 | Eyebrow | Starter example |
@@ -6148,7 +6156,7 @@ test('writes and reads through the worker', async () => {
 
 | Field | Value |
 | --- | --- |
-| Route | [`/docs/d1-binding`](/docs/d1-binding) |
+| Route | [`/docs/bindings/d1`](/docs/bindings/d1) |
 | Group | Bindings |
 | Navigation title | D1 |
 | Eyebrow | Binding reference |
@@ -6226,9 +6234,9 @@ Cloudflare D1 docs is the platform reference. This page is the Devflare translat
 
 ##### Highlights
 
-- **D1 internals** — See normalization, Wrangler `d1_databases`, and the preview or runtime details behind the authored shape. ([link](/docs/d1-internals))
-- **Testing D1** — Start from `createTestContext()` with `env.DB` or `cf.worker.fetch()` and only escalate when the binding or deployment model genuinely needs it. ([link](/docs/d1-testing))
-- **D1 example** — Adapt one small end-to-end path before you hide the binding behind a bigger abstraction. ([link](/docs/d1-example))
+- **D1 internals** — See normalization, Wrangler `d1_databases`, and the preview or runtime details behind the authored shape. ([link](/docs/bindings/d1/internals))
+- **Testing D1** — Start from `createTestContext()` with `env.DB` or `cf.worker.fetch()` and only escalate when the binding or deployment model genuinely needs it. ([link](/docs/bindings/d1/testing))
+- **D1 example** — Adapt one small end-to-end path before you hide the binding behind a bigger abstraction. ([link](/docs/bindings/d1/example))
 
 ---
 
@@ -6238,7 +6246,7 @@ Cloudflare D1 docs is the platform reference. This page is the Devflare translat
 
 | Field | Value |
 | --- | --- |
-| Route | [`/docs/d1-internals`](/docs/d1-internals) |
+| Route | [`/docs/bindings/d1/internals`](/docs/bindings/d1/internals) |
 | Group | Bindings |
 | Navigation title | D1 internals |
 | Eyebrow | Under the hood |
@@ -6318,7 +6326,7 @@ export default defineConfig({
 
 | Field | Value |
 | --- | --- |
-| Route | [`/docs/d1-testing`](/docs/d1-testing) |
+| Route | [`/docs/bindings/d1/testing`](/docs/bindings/d1/testing) |
 | Group | Bindings |
 | Navigation title | Testing D1 |
 | Eyebrow | Testing |
@@ -6383,7 +6391,7 @@ test('D1 answers a simple health query', async () => {
 
 | Field | Value |
 | --- | --- |
-| Route | [`/docs/d1-example`](/docs/d1-example) |
+| Route | [`/docs/bindings/d1/example`](/docs/bindings/d1/example) |
 | Group | Bindings |
 | Navigation title | D1 example |
 | Eyebrow | Starter example |
@@ -6466,7 +6474,7 @@ test('GET / returns a D1-backed health response', async () => {
 
 | Field | Value |
 | --- | --- |
-| Route | [`/docs/r2-binding`](/docs/r2-binding) |
+| Route | [`/docs/bindings/r2`](/docs/bindings/r2) |
 | Group | Bindings |
 | Navigation title | R2 |
 | Eyebrow | Binding reference |
@@ -6543,9 +6551,9 @@ Cloudflare R2 docs is the platform reference. This page is the Devflare translat
 
 ##### Highlights
 
-- **R2 internals** — See normalization, Wrangler `r2_buckets`, and the preview or runtime details behind the authored shape. ([link](/docs/r2-internals))
-- **Testing R2** — Start from `createTestContext()` with `env.ASSETS` or `cf.worker.fetch()` and only escalate when the binding or deployment model genuinely needs it. ([link](/docs/r2-testing))
-- **R2 example** — Adapt one small end-to-end path before you hide the binding behind a bigger abstraction. ([link](/docs/r2-example))
+- **R2 internals** — See normalization, Wrangler `r2_buckets`, and the preview or runtime details behind the authored shape. ([link](/docs/bindings/r2/internals))
+- **Testing R2** — Start from `createTestContext()` with `env.ASSETS` or `cf.worker.fetch()` and only escalate when the binding or deployment model genuinely needs it. ([link](/docs/bindings/r2/testing))
+- **R2 example** — Adapt one small end-to-end path before you hide the binding behind a bigger abstraction. ([link](/docs/bindings/r2/example))
 
 ---
 
@@ -6555,7 +6563,7 @@ Cloudflare R2 docs is the platform reference. This page is the Devflare translat
 
 | Field | Value |
 | --- | --- |
-| Route | [`/docs/r2-internals`](/docs/r2-internals) |
+| Route | [`/docs/bindings/r2/internals`](/docs/bindings/r2/internals) |
 | Group | Bindings |
 | Navigation title | R2 internals |
 | Eyebrow | Under the hood |
@@ -6634,7 +6642,7 @@ export default defineConfig({
 
 | Field | Value |
 | --- | --- |
-| Route | [`/docs/r2-testing`](/docs/r2-testing) |
+| Route | [`/docs/bindings/r2/testing`](/docs/bindings/r2/testing) |
 | Group | Bindings |
 | Navigation title | Testing R2 |
 | Eyebrow | Testing |
@@ -6700,7 +6708,7 @@ test('stores and reads an object', async () => {
 
 | Field | Value |
 | --- | --- |
-| Route | [`/docs/r2-example`](/docs/r2-example) |
+| Route | [`/docs/bindings/r2/example`](/docs/bindings/r2/example) |
 | Group | Bindings |
 | Navigation title | R2 example |
 | Eyebrow | Starter example |
@@ -6791,16 +6799,16 @@ test('GET /files/hello.txt serves the stored object', async () => {
 
 ### Use Durable Objects when coordination or state really belongs with a single object identity
 
-> Devflare treats Durable Objects as a real first-class surface in config, local runtime, and tests, not as an awkward plugin hanging off the side of the worker.
+> The fast Devflare payoff is simple: put one counter object in a `do.*` file, call it from the worker, and call the same object directly in tests.
 
 | Field | Value |
 | --- | --- |
-| Route | [`/docs/durable-object-binding`](/docs/durable-object-binding) |
+| Route | [`/docs/bindings/durable-objects`](/docs/bindings/durable-objects) |
 | Group | Bindings |
 | Navigation title | Durable Objects |
 | Eyebrow | Binding reference |
 
-That makes DO-heavy apps easier to reason about locally, but it also means you should be honest about the preview and migration caveats that come with them.
+Devflare auto-discovers `**/do.*.{ts,js}` by default, wires the Durable Object binding into the worker env, and lets tests use the same namespace without making you invent a fake DO harness first.
 
 #### At a glance
 
@@ -6812,26 +6820,31 @@ That makes DO-heavy apps easier to reason about locally, but it also means you s
 
 #### Author it in the simplest shape that still says what you mean
 
-A DO binding can be as simple as a class name string when the object lives in the same worker package.
+The easiest honest starting point is one local Durable Object class and one binding that points at it by class name.
 
-When the object lives in another worker, `ref()` keeps that relationship explicit instead of scattering script names and class names across the repo.
+If the class lives in a `do.*` file, Devflare discovers it with the default `**/do.*.{ts,js}` pattern, so the first example does not need extra DO file config.
 
-##### Example — Durable Object authoring in one worker
+##### Example — Start with one discovered Durable Object and one binding
 
 ```ts
 import { defineConfig } from 'devflare/config'
 
 export default defineConfig({
-	name: 'chat-worker',
+	name: 'counter-worker',
 	files: {
-		durableObjects: 'src/do/**/*.ts'
+		fetch: 'src/fetch.ts'
 	},
 	bindings: {
 		durableObjects: {
-			ROOM: 'ChatRoom',
-			LOCK: { className: 'WriteLock' }
+			COUNTER: 'Counter'
 		}
-	}
+	},
+	migrations: [
+		{
+			tag: 'v1',
+			new_classes: ['Counter']
+		}
+	]
 })
 ```
 
@@ -6840,7 +6853,7 @@ export default defineConfig({
 ##### Key points
 
 - Use Durable Objects when state or coordination should live behind one object identity, not when you merely want a fancy singleton.
-- They are a good fit for rooms, counters, distributed locks, and request serialization.
+- They are a good fit for counters, rooms, distributed locks, and request serialization.
 - If the state is really just data you query, D1 or KV may stay simpler and easier to preview.
 
 #### Notes worth keeping visible
@@ -6875,9 +6888,9 @@ Cloudflare Durable Objects docs is the platform reference. This page is the Devf
 
 ##### Highlights
 
-- **Durable Objects internals** — See normalization, Wrangler `durable_objects.bindings`, and the preview or runtime details behind the authored shape. ([link](/docs/durable-object-internals))
-- **Testing Durable Objects** — Start from `createTestContext()` with the real DO namespace in `env` and only escalate when the binding or deployment model genuinely needs it. ([link](/docs/durable-object-testing))
-- **Durable Objects example** — Adapt one small end-to-end path before you hide the binding behind a bigger abstraction. ([link](/docs/durable-object-example))
+- **Durable Objects internals** — See normalization, Wrangler `durable_objects.bindings`, and the preview or runtime details behind the authored shape. ([link](/docs/bindings/durable-objects/internals))
+- **Testing Durable Objects** — Start from `createTestContext()` with the real DO namespace in `env` and only escalate when the binding or deployment model genuinely needs it. ([link](/docs/bindings/durable-objects/testing))
+- **Durable Objects example** — Adapt one small end-to-end path before you hide the binding behind a bigger abstraction. ([link](/docs/bindings/durable-objects/example))
 
 ---
 
@@ -6887,7 +6900,7 @@ Cloudflare Durable Objects docs is the platform reference. This page is the Devf
 
 | Field | Value |
 | --- | --- |
-| Route | [`/docs/durable-object-internals`](/docs/durable-object-internals) |
+| Route | [`/docs/bindings/durable-objects/internals`](/docs/bindings/durable-objects/internals) |
 | Group | Bindings |
 | Navigation title | Durable Objects internals |
 | Eyebrow | Under the hood |
@@ -6918,16 +6931,21 @@ Keep the binding readable in source, then inspect only the Wrangler-facing slice
 import { defineConfig } from 'devflare/config'
 
 export default defineConfig({
-	name: 'chat-worker',
+	name: 'counter-worker',
 	files: {
-		durableObjects: 'src/do/**/*.ts'
+		fetch: 'src/fetch.ts'
 	},
 	bindings: {
 		durableObjects: {
-			ROOM: 'ChatRoom',
-			LOCK: { className: 'WriteLock' }
+			COUNTER: 'Counter'
 		}
-	}
+	},
+	migrations: [
+		{
+			tag: 'v1',
+			new_classes: ['Counter']
+		}
+	]
 })
 ```
 
@@ -6971,7 +6989,7 @@ export default defineConfig({
 
 | Field | Value |
 | --- | --- |
-| Route | [`/docs/durable-object-testing`](/docs/durable-object-testing) |
+| Route | [`/docs/bindings/durable-objects/testing`](/docs/bindings/durable-objects/testing) |
 | Group | Bindings |
 | Navigation title | Testing Durable Objects |
 | Eyebrow | Testing |
@@ -7003,10 +7021,10 @@ beforeAll(() => createTestContext())
 afterAll(() => env.dispose())
 
 test('the counter object increments', async () => {
-	const id = env.COUNTER.idFromName('global')
-	const stub = env.COUNTER.get(id)
-	const response = await stub.fetch('https://counter/increment')
-	expect(await response.text()).toBe('1')
+	const counter = env.COUNTER.getByName('main')
+	expect(await counter.increment()).toBe(1)
+	expect(await counter.increment()).toBe(2)
+	expect(await counter.getValue()).toBe(2)
 })
 ```
 
@@ -7034,28 +7052,28 @@ test('the counter object increments', async () => {
 
 ### A small Durable Objects example you can adapt quickly
 
-> This example uses a tiny counter object because the shape is easy to understand and still proves the important DO wiring.
+> This example shows the whole Durable Object story in the smallest useful shape: one auto-discovered object, one worker route, and one direct test.
 
 | Field | Value |
 | --- | --- |
-| Route | [`/docs/durable-object-example`](/docs/durable-object-example) |
+| Route | [`/docs/bindings/durable-objects/example`](/docs/bindings/durable-objects/example) |
 | Group | Bindings |
 | Navigation title | Durable Objects example |
 | Eyebrow | Starter example |
 
-A counter is not glamorous, but it teaches the real ingredients: one binding, one class, one namespace lookup, and one request path that exercises state.
+A counter is enough to show why Devflare is valuable here: you do not need custom DO glue just to get a real local loop. The same `env.COUNTER` namespace works in the worker and in tests.
 
 #### At a glance
 
 | Fact | Value |
 | --- | --- |
-| Config focus | Explicit class discovery and DO binding |
-| Runtime shape | Namespace lookup plus `stub.fetch()` |
+| Config focus | Auto-discovered `do.*` file plus one DO binding |
+| Runtime shape | Direct namespace method calls from the worker and the test harness |
 | Best use | Counters, room state, and small single-identity coordination examples |
 
 #### Start by wiring the binding clearly in config
 
-##### Example — Minimal Durable Object config
+##### Example — Minimal Durable Object config using the default discovery pattern
 
 ```ts
 import { defineConfig } from 'devflare/config'
@@ -7063,8 +7081,7 @@ import { defineConfig } from 'devflare/config'
 export default defineConfig({
 	name: 'do-example',
 	files: {
-		fetch: 'src/fetch.ts',
-		durableObjects: 'src/do/**/*.ts'
+		fetch: 'src/fetch.ts'
 	},
 	bindings: {
 		durableObjects: {
@@ -7078,36 +7095,63 @@ export default defineConfig({
 		}
 	]
 })
+
+// Devflare auto-discovers src/do.counter.ts via the default:
+// durableObjects: '**/do.*.{ts,js}'
 ```
 
 #### Then use it in one honest runtime path
 
 ##### Key points
 
-- This tiny shape already proves that the object class, namespace, and fetch path are wired correctly.
-- Once this works, richer room or lock logic becomes a normal extension instead of a blind leap.
+- This tiny shape already proves that the object class, namespace, storage, and worker path are wired correctly.
+- Once this works, richer room, session, or lock logic becomes a normal extension instead of a blind leap.
 
-##### Example — A tiny object and fetch path
+##### Example — A tiny object and one worker path
+
+###### File — src/do.counter.ts
+
+```ts
+import { DurableObject } from 'cloudflare:workers'
+
+export class Counter extends DurableObject<DevflareEnv> {
+	async increment(amount = 1): Promise<number> {
+		const current = (await this.ctx.storage.get<number>('value')) ?? 0
+		const next = current + amount
+		await this.ctx.storage.put('value', next)
+		return next
+	}
+
+	async getValue(): Promise<number> {
+		return (await this.ctx.storage.get<number>('value')) ?? 0
+	}
+}
+```
+
+###### File — src/fetch.ts
 
 ```ts
 import { env } from 'devflare'
 
-// src/do/counter.ts should increment a stored value and return the new count.
+export async function fetch(request: Request): Promise<Response> {
+	const url = new URL(request.url)
+	const counter = env.COUNTER.getByName('main')
 
-export async function fetch(): Promise<Response> {
-	const id = env.COUNTER.idFromName('global')
-	const stub = env.COUNTER.get(id)
-	return stub.fetch('https://counter/increment')
+	if (url.pathname === '/value') {
+		return Response.json({ value: await counter.getValue() })
+	}
+
+	return Response.json({ value: await counter.increment() })
 }
 ```
 
 #### Lock in the behavior with one small test or smoke path
 
-> **Note — The tiny state machine is enough**
+> **Note — This is the valuable bit**
 >
-> You do not need a chat app to learn Durable Objects. One counter proves the important mechanics without burying them.
+> You do not need a chat app to feel the Devflare advantage. One counter already proves that DO files, env bindings, and tests stay part of one simple loop.
 
-##### Example — A matching local test
+##### Example — A direct test that shows the Devflare payoff immediately
 
 ```ts
 import { afterAll, beforeAll, expect, test } from 'bun:test'
@@ -7117,11 +7161,13 @@ import { env } from 'devflare'
 beforeAll(() => createTestContext())
 afterAll(() => env.dispose())
 
-test('GET / increments the counter object', async () => {
-	const first = await cf.worker.get('/')
-	const second = await cf.worker.get('/')
-	expect(await first.text()).toBe('1')
-	expect(await second.text()).toBe('2')
+test('the same counter works directly in tests and through the worker', async () => {
+	const counter = env.COUNTER.getByName('main')
+	expect(await counter.increment()).toBe(1)
+	expect(await counter.increment()).toBe(2)
+
+	const response = await cf.worker.get('/value')
+	expect(await response.json()).toEqual({ value: 2 })
 })
 ```
 
@@ -7133,7 +7179,7 @@ test('GET / increments the counter object', async () => {
 
 | Field | Value |
 | --- | --- |
-| Route | [`/docs/queue-binding`](/docs/queue-binding) |
+| Route | [`/docs/bindings/queues`](/docs/bindings/queues) |
 | Group | Bindings |
 | Navigation title | Queues |
 | Eyebrow | Binding reference |
@@ -7218,9 +7264,9 @@ Cloudflare Queues docs is the platform reference. This page is the Devflare tran
 
 ##### Highlights
 
-- **Queues internals** — See normalization, Wrangler `queues.producers` and `queues.consumers`, and the preview or runtime details behind the authored shape. ([link](/docs/queue-internals))
-- **Testing Queues** — Start from `createTestContext()` plus `cf.queue.trigger()` and only escalate when the binding or deployment model genuinely needs it. ([link](/docs/queue-testing))
-- **Queues example** — Adapt one small end-to-end path before you hide the binding behind a bigger abstraction. ([link](/docs/queue-example))
+- **Queues internals** — See normalization, Wrangler `queues.producers` and `queues.consumers`, and the preview or runtime details behind the authored shape. ([link](/docs/bindings/queues/internals))
+- **Testing Queues** — Start from `createTestContext()` plus `cf.queue.trigger()` and only escalate when the binding or deployment model genuinely needs it. ([link](/docs/bindings/queues/testing))
+- **Queues example** — Adapt one small end-to-end path before you hide the binding behind a bigger abstraction. ([link](/docs/bindings/queues/example))
 
 ---
 
@@ -7230,7 +7276,7 @@ Cloudflare Queues docs is the platform reference. This page is the Devflare tran
 
 | Field | Value |
 | --- | --- |
-| Route | [`/docs/queue-internals`](/docs/queue-internals) |
+| Route | [`/docs/bindings/queues/internals`](/docs/bindings/queues/internals) |
 | Group | Bindings |
 | Navigation title | Queues internals |
 | Eyebrow | Under the hood |
@@ -7322,7 +7368,7 @@ export default defineConfig({
 
 | Field | Value |
 | --- | --- |
-| Route | [`/docs/queue-testing`](/docs/queue-testing) |
+| Route | [`/docs/bindings/queues/testing`](/docs/bindings/queues/testing) |
 | Group | Bindings |
 | Navigation title | Testing Queues |
 | Eyebrow | Testing |
@@ -7393,7 +7439,7 @@ test('queue consumer stores a processed result', async () => {
 
 | Field | Value |
 | --- | --- |
-| Route | [`/docs/queue-example`](/docs/queue-example) |
+| Route | [`/docs/bindings/queues/example`](/docs/bindings/queues/example) |
 | Group | Bindings |
 | Navigation title | Queues example |
 | Eyebrow | Starter example |
@@ -7485,18 +7531,339 @@ test('queue work writes a result record', async () => {
 
 ---
 
-### Use the AI binding when the worker needs real Workers AI inference, not just a local mock
+### Use service bindings to keep multi-worker apps explicit instead of magical
 
-> AI is a supported binding in Devflare, but it is intentionally treated as remote-oriented because real model inference lives on Cloudflare infrastructure.
+> The fast Devflare payoff is simple: wire one worker to another with `ref()`, call it through `env.MATH_SERVICE`, and prove the same relationship locally in one test.
 
 | Field | Value |
 | --- | --- |
-| Route | [`/docs/ai-binding`](/docs/ai-binding) |
+| Route | [`/docs/bindings/services`](/docs/bindings/services) |
+| Group | Bindings |
+| Navigation title | Services |
+| Eyebrow | Binding reference |
+
+This is the clean lane for apps that genuinely need more than one worker. Devflare keeps the worker family explicit in config, resolves the referenced surface, and lets local tests use the same service binding contract instead of copied worker names or hand-built internal URLs.
+
+#### At a glance
+
+| Fact | Value |
+| --- | --- |
+| Config key | bindings.services |
+| Authoring shape | Record<string, { service: string; environment?: string; entrypoint?: string }> \| ref().worker(...) |
+| Best for | Multi-worker systems, internal RPC boundaries, and explicit service composition |
+
+#### Author it in the simplest shape that still says what you mean
+
+The easiest honest starting point is one gateway worker, one referenced worker, and one service binding in config.
+
+`ref()` is especially useful because it keeps the dependency explicit while still giving Devflare enough structure to resolve, type, and boot the linked worker locally later.
+
+##### Example — Service binding authoring with `ref()`
+
+```ts
+import { defineConfig, ref } from 'devflare/config'
+
+const mathService = ref(() => import('../math-service/devflare.config'))
+
+export default defineConfig({
+	name: 'gateway',
+	bindings: {
+		services: {
+			MATH_SERVICE: mathService.worker,
+			ADMIN: mathService.worker('AdminEntrypoint')
+		}
+	}
+})
+```
+
+#### When this binding fits best
+
+##### Key points
+
+- Use service bindings when another worker is a real dependency, not when one large worker is merely inconvenient to think about.
+- They are a strong fit for internal APIs, admin surfaces, search workers, and explicit worker-family boundaries.
+- If the dependency is actually shared data rather than another service boundary, a direct binding like D1, KV, or DO may stay simpler.
+
+#### Notes worth keeping visible
+
+##### Key points
+
+- Preview isolation follows resolved worker names, not just whatever branch or alias string you passed to a deploy command.
+- Named entrypoints are modeled, but critical production wiring is still worth validating in compiled output.
+- Service bindings are references, not preview-managed account resources like KV, D1, or queues.
+
+> **Note — A very good review question**
+>
+> Ask which worker names a preview will actually deploy before you assume the worker family is isolated.
+
+#### Cloudflare docs vs the Devflare layer
+
+Cloudflare Service bindings docs is the platform reference. This page is the Devflare translation layer: keep `bindings.services` readable in source, understand the typed env surface, and know which local, preview, or remote lane actually matches the binding.
+
+##### Highlights
+
+- **Cloudflare Service bindings docs** — Platform reference for worker-to-worker bindings, service entrypoints, and the underlying runtime contract. ([link](https://developers.cloudflare.com/workers/runtime-apis/bindings/service-bindings/))
+
+##### Reference table
+
+| Question | Cloudflare docs | This Devflare page |
+| --- | --- | --- |
+| Primary focus | Platform reference for worker-to-worker bindings, service entrypoints, and the underlying runtime contract. | How to author `bindings.services`, what the runtime surface looks like, and how Services fits a Devflare project. |
+| Testing and runtime lens | Cloudflare’s docs focus on the raw binding API, product semantics, and platform limits for the binding itself. | First-class local runtime and multi-worker tests. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
+| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
+
+#### Go deeper only if this one-page guide stops being enough
+
+##### Highlights
+
+- **Services internals** — See normalization, Wrangler `services`, and the preview or runtime details behind the authored shape. ([link](/docs/bindings/services/internals))
+- **Testing Services** — Start from `createTestContext()` plus `env.MY_SERVICE` and only escalate when the binding or deployment model genuinely needs it. ([link](/docs/bindings/services/testing))
+- **Services example** — Adapt one small end-to-end path before you hide the binding behind a bigger abstraction. ([link](/docs/bindings/services/example))
+
+---
+
+### How Devflare wires Services from config to runtime
+
+> Devflare resolves referenced worker configs, bundles the linked worker surfaces, and then exposes those services as local multi-worker bindings.
+
+| Field | Value |
+| --- | --- |
+| Route | [`/docs/bindings/services/internals`](/docs/bindings/services/internals) |
+| Group | Bindings |
+| Navigation title | Services internals |
+| Eyebrow | Under the hood |
+
+Service bindings feel more than cosmetic: the tooling follows the relationship far enough to keep local tests, type generation, and compiled output aligned.
+
+#### At a glance
+
+| Fact | Value |
+| --- | --- |
+| Normalization | Plain objects and `ref().worker(...)` values normalize into one service-binding model |
+| Compile target | Wrangler `services` |
+| Preview note | Preview can rewrite service names, but service bindings are not preview-managed resources like KV or D1 |
+
+#### Devflare normalizes the authored shape before it does anything louder
+
+Service bindings can be authored as plain binding objects or as `ref().worker(...)` results. Devflare normalizes those into one shape so compiler, type generation, and test setup can all reason about them consistently.
+
+When a binding comes from `ref()`, Devflare can follow the referenced config, discover the relevant worker surface, and keep that relationship visible in local tooling.
+
+##### Example — Services from authored config to generated output
+
+Keep the binding readable in source, then inspect only the Wrangler-facing slice Devflare emits when the config is compiled.
+
+###### File — devflare.config.ts
+
+```ts
+import { defineConfig, ref } from 'devflare/config'
+
+const mathService = ref(() => import('../math-service/devflare.config'))
+
+export default defineConfig({
+	name: 'gateway',
+	bindings: {
+		services: {
+			MATH_SERVICE: mathService.worker,
+			ADMIN: mathService.worker('AdminEntrypoint')
+		}
+	}
+})
+```
+
+###### File — .devflare/wrangler.jsonc
+
+```json
+{
+	"services": [
+		{ "binding": "MATH_SERVICE", "service": "math-service" }
+	]
+}
+```
+
+#### Local runtime support depends on what Devflare can model directly
+
+##### Key points
+
+- `resolveServiceBindings()` is responsible for following referenced configs and bundling the default `worker.ts` export or named entrypoints as needed.
+- Local multi-worker Miniflare wiring uses the resolved service metadata so a gateway worker can call another worker naturally in tests.
+- Type generation can emit service-specific interfaces; if that is not possible, the binding falls back to a generic `Fetcher` contract.
+
+#### Compile, preview, and cleanup behavior
+
+##### Key points
+
+- Compile emits the standard `services` array that Wrangler expects.
+- Preview flows can rewrite service names when the preview naming rules say they should, but there is no separate resource-provisioning lifecycle for services themselves.
+- Critical production wiring is still worth checking through `config print`, `build`, or dry-run deploy output.
+
+> **Tip — This is configuration as architecture, not just syntax**
+>
+> Service bindings work well in Devflare because the relationships are explicit enough for tooling to follow, type, and test.
+
+---
+
+### Test Services the way Devflare expects it to run
+
+> Service bindings are one of the clearest Devflare wins in multi-worker apps: you can keep the real worker boundary and still prove it through the default local harness.
+
+| Field | Value |
+| --- | --- |
+| Route | [`/docs/bindings/services/testing`](/docs/bindings/services/testing) |
+| Group | Bindings |
+| Navigation title | Testing Services |
+| Eyebrow | Testing |
+
+Start with `createTestContext()`, then call the bound service through the generated env shape. That proves the config relationship, the local worker family, and the callable contract in the same language the app itself uses.
+
+#### At a glance
+
+| Fact | Value |
+| --- | --- |
+| Best for | Gateway-to-service calls, entrypoint wiring, and typed multi-worker behavior |
+| Default harness | `createTestContext()` plus `env.MY_SERVICE` |
+| Escalate when | The risk is worker naming drift, preview topology, or compiled output correctness |
+
+#### Start with the default test loop
+
+The shortest honest test is usually one real service call through the generated env binding. That already proves the config relationship and the callable surface.
+
+Keep one test for the default worker entry and one for any named entrypoint that matters operationally.
+
+##### Example — Testing a service binding through the env
+
+```ts
+import { afterAll, beforeAll, expect, test } from 'bun:test'
+import { createTestContext } from 'devflare/test'
+import { env } from 'devflare'
+
+beforeAll(() => createTestContext())
+afterAll(() => env.dispose())
+
+test('service binding calls the default worker export', async () => {
+	expect(await env.MATH_SERVICE.add(5, 3)).toBe(8)
+})
+```
+
+#### The helper surface to remember
+
+##### Key points
+
+- Use the bound env service directly when the service relationship is the thing you want to prove.
+- Keep named entrypoints explicit in tests so they do not quietly drift from the config contract.
+- Run `devflare types` whenever service entrypoints change so env autocomplete and generated types stay in sync.
+
+#### When to move beyond the default harness
+
+##### Key points
+
+- Local tests prove the callable relationship, not that your preview or production worker names are what you intended.
+- If the service graph is business-critical, validate compiled output before deploys as well.
+- Test naming and topology at preview or build time when those are the real failure modes.
+
+> **Warning — A typed local call is not the whole deploy story**
+>
+> The local harness tells you the relationship is modeled correctly. A preview or build check tells you the resolved worker names are still the ones you expect.
+
+---
+
+### A small Services example you can adapt quickly
+
+> This example shows the smallest useful service-binding loop: one `ref()`, one gateway route, and one local multi-worker test.
+
+| Field | Value |
+| --- | --- |
+| Route | [`/docs/bindings/services/example`](/docs/bindings/services/example) |
+| Group | Bindings |
+| Navigation title | Services example |
+| Eyebrow | Starter example |
+
+That is enough to show why Devflare helps here: the relationship stays explicit in config, typed in env, and testable without hand-assembling your own mini service mesh in the test file.
+
+#### At a glance
+
+| Fact | Value |
+| --- | --- |
+| Config focus | Explicit `ref()` wiring |
+| Runtime shape | One env service call from the gateway worker |
+| Best use | Internal APIs and worker-family boundaries |
+
+#### Start by wiring the binding clearly in config
+
+##### Example — Gateway config with a service ref
+
+```ts
+import { defineConfig, ref } from 'devflare/config'
+
+const mathService = ref(() => import('../math-service/devflare.config'))
+
+export default defineConfig({
+	name: 'gateway',
+	files: {
+		fetch: 'src/fetch.ts'
+	},
+	bindings: {
+		services: {
+			MATH_SERVICE: mathService.worker
+		}
+	}
+})
+```
+
+#### Then use it in one honest runtime path
+
+##### Key points
+
+- Once this tiny path works, adding named entrypoints becomes an incremental extension, not a different architecture.
+- Keep one simple service example like this around if you want a smoke check for multi-worker wiring.
+
+##### Example — Use the service in the gateway worker
+
+```ts
+import { env } from 'devflare'
+
+export async function fetch(): Promise<Response> {
+	const result = await env.MATH_SERVICE.add(4, 5)
+	return Response.json({ result })
+}
+```
+
+#### Lock in the behavior with one small test or smoke path
+
+> **Important — This is the valuable bit**
+>
+> You do not need a whole microservice fleet to feel the Devflare value. One gateway call already proves that config refs, env bindings, and local multi-worker tests stay part of one coherent loop.
+
+##### Example — A single multi-worker test
+
+```ts
+import { afterAll, beforeAll, expect, test } from 'bun:test'
+import { createTestContext, cf } from 'devflare/test'
+import { env } from 'devflare'
+
+beforeAll(() => createTestContext())
+afterAll(() => env.dispose())
+
+test('GET / calls the math service', async () => {
+	const response = await cf.worker.get('/')
+	expect(await response.json()).toEqual({ result: 9 })
+})
+```
+
+---
+
+### Use the AI binding when the worker needs real Workers AI inference, not just a local mock
+
+> Devflare makes Workers AI usable by keeping the binding tiny in config, the worker call obvious, and the remote smoke test explicit instead of fake.
+
+| Field | Value |
+| --- | --- |
+| Route | [`/docs/bindings/ai`](/docs/bindings/ai) |
 | Group | Bindings |
 | Navigation title | AI |
 | Eyebrow | Binding reference |
 
-That means the docs should be honest: Devflare can compile and type the binding cleanly, but meaningful tests usually need remote mode and real account access.
+AI is still remote-oriented, but the first useful path is simple: one worker route, one `env.AI.run(...)` call, and one skip-aware remote test that says clearly when the real platform was involved.
 
 #### At a glance
 
@@ -7508,9 +7875,9 @@ That means the docs should be honest: Devflare can compile and type the binding 
 
 #### Author it in the simplest shape that still says what you mean
 
-AI is a remote-oriented binding. The binding exists in config, the env is typed, and the deploy story is real — but model inference itself still lives on Cloudflare infrastructure.
+AI is a remote-oriented binding, but the first worker path should still be tiny and concrete: receive one request, call one model, return one JSON response.
 
-The testing story leans on remote mode rather than pretending Miniflare can be a credible stand-in for actual model execution.
+The Devflare-specific win is not fake local inference. It is that config, worker code, and remote test gating stay explicit enough that you know when the real platform was actually exercised.
 
 ##### Example — Workers AI binding authoring
 
@@ -7567,9 +7934,9 @@ Cloudflare Workers AI docs is the platform reference. This page is the Devflare 
 
 ##### Highlights
 
-- **AI internals** — See normalization, Wrangler `ai` binding, and the preview or runtime details behind the authored shape. ([link](/docs/ai-internals))
-- **Testing AI** — Start from `createTestContext()` after remote mode is enabled, plus `shouldSkip.ai` and only escalate when the binding or deployment model genuinely needs it. ([link](/docs/ai-testing))
-- **AI example** — Adapt one small end-to-end path before you hide the binding behind a bigger abstraction. ([link](/docs/ai-example))
+- **AI internals** — See normalization, Wrangler `ai` binding, and the preview or runtime details behind the authored shape. ([link](/docs/bindings/ai/internals))
+- **Testing AI** — Start from `createTestContext()` after remote mode is enabled, plus `shouldSkip.ai` and only escalate when the binding or deployment model genuinely needs it. ([link](/docs/bindings/ai/testing))
+- **AI example** — Adapt one small end-to-end path before you hide the binding behind a bigger abstraction. ([link](/docs/bindings/ai/example))
 
 ---
 
@@ -7579,7 +7946,7 @@ Cloudflare Workers AI docs is the platform reference. This page is the Devflare 
 
 | Field | Value |
 | --- | --- |
-| Route | [`/docs/ai-internals`](/docs/ai-internals) |
+| Route | [`/docs/bindings/ai/internals`](/docs/bindings/ai/internals) |
 | Group | Bindings |
 | Navigation title | AI internals |
 | Eyebrow | Under the hood |
@@ -7658,7 +8025,7 @@ export default defineConfig({
 
 | Field | Value |
 | --- | --- |
-| Route | [`/docs/ai-testing`](/docs/ai-testing) |
+| Route | [`/docs/bindings/ai/testing`](/docs/bindings/ai/testing) |
 | Group | Bindings |
 | Navigation title | Testing AI |
 | Eyebrow | Testing |
@@ -7728,16 +8095,16 @@ describe.skipIf(skipAI)('AI binding', () => {
 
 ### A small AI example you can adapt quickly
 
-> This example keeps the AI path tiny: one binding, one inference call, one JSON response.
+> This example keeps the AI story honest and useful: one binding, one tiny inference route, and one skip-aware remote smoke test.
 
 | Field | Value |
 | --- | --- |
-| Route | [`/docs/ai-example`](/docs/ai-example) |
+| Route | [`/docs/bindings/ai/example`](/docs/bindings/ai/example) |
 | Group | Bindings |
 | Navigation title | AI example |
 | Eyebrow | Starter example |
 
-That is enough to prove the worker can talk to Workers AI without burying the example inside a whole chat product.
+That is enough to show the Devflare value: config stays tiny, the worker code stays normal, and the test tells you clearly when remote AI was really available.
 
 #### At a glance
 
@@ -7789,26 +8156,48 @@ export async function fetch(): Promise<Response> {
 }
 ```
 
-#### Keep the first version boring
+#### Lock in the behavior with one small test or smoke path
 
-> **Warning — This example still needs remote access**
+> **Important — The Devflare win is the explicit remote gate**
 >
-> It is a minimal worker example, not a promise of local AI emulation. Treat account access and cost control as part of the example setup.
+> A clear skip condition is more trustworthy than a fake local AI emulator that never touched the real platform. That honesty is part of what makes the Devflare AI story usable.
+
+##### Example — A skip-aware remote smoke test
+
+```ts
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
+import { createTestContext, cf, env, shouldSkip } from 'devflare/test'
+
+beforeAll(() => createTestContext())
+afterAll(() => env.dispose())
+
+const skipAI = await shouldSkip.ai
+
+describe.skipIf(skipAI)('AI route', () => {
+	test('calls Workers AI through the worker boundary', async () => {
+		const response = await cf.worker.get('/')
+		expect(response.ok).toBe(true)
+
+		const body = await response.json()
+		expect(body.result).toBeDefined()
+	})
+})
+```
 
 ---
 
 ### Use Vectorize when the worker really owns similarity search, not just string matching
 
-> Vectorize is fully modeled in Devflare config and preview naming, but meaningful tests are still remote-oriented because the index lives on Cloudflare infrastructure.
+> Devflare makes Vectorize usable by keeping the index name explicit in config, preview naming honest, and the real smoke test explicit instead of buried under mocks.
 
 | Field | Value |
 | --- | --- |
-| Route | [`/docs/vectorize-binding`](/docs/vectorize-binding) |
+| Route | [`/docs/bindings/vectorize`](/docs/bindings/vectorize) |
 | Group | Bindings |
 | Navigation title | Vectorize |
 | Eyebrow | Binding reference |
 
-That makes the docs pattern similar to AI: compile support is strong, preview lifecycle is explicit, and tests should be honest about when they are using the real index versus a fake.
+The right first path is small: one binding, one tiny upsert-and-query route, and one skip-aware remote smoke test that tells the truth about whether the real index was involved.
 
 #### At a glance
 
@@ -7881,9 +8270,9 @@ Cloudflare Vectorize docs is the platform reference. This page is the Devflare t
 
 ##### Highlights
 
-- **Vectorize internals** — See normalization, Wrangler `vectorize`, and the preview or runtime details behind the authored shape. ([link](/docs/vectorize-internals))
-- **Testing Vectorize** — Start from `createTestContext()` in remote mode plus `shouldSkip.vectorize` and only escalate when the binding or deployment model genuinely needs it. ([link](/docs/vectorize-testing))
-- **Vectorize example** — Adapt one small end-to-end path before you hide the binding behind a bigger abstraction. ([link](/docs/vectorize-example))
+- **Vectorize internals** — See normalization, Wrangler `vectorize`, and the preview or runtime details behind the authored shape. ([link](/docs/bindings/vectorize/internals))
+- **Testing Vectorize** — Start from `createTestContext()` in remote mode plus `shouldSkip.vectorize` and only escalate when the binding or deployment model genuinely needs it. ([link](/docs/bindings/vectorize/testing))
+- **Vectorize example** — Adapt one small end-to-end path before you hide the binding behind a bigger abstraction. ([link](/docs/bindings/vectorize/example))
 
 ---
 
@@ -7893,7 +8282,7 @@ Cloudflare Vectorize docs is the platform reference. This page is the Devflare t
 
 | Field | Value |
 | --- | --- |
-| Route | [`/docs/vectorize-internals`](/docs/vectorize-internals) |
+| Route | [`/docs/bindings/vectorize/internals`](/docs/bindings/vectorize/internals) |
 | Group | Bindings |
 | Navigation title | Vectorize internals |
 | Eyebrow | Under the hood |
@@ -7973,7 +8362,7 @@ export default defineConfig({
 
 | Field | Value |
 | --- | --- |
-| Route | [`/docs/vectorize-testing`](/docs/vectorize-testing) |
+| Route | [`/docs/bindings/vectorize/testing`](/docs/bindings/vectorize/testing) |
 | Group | Bindings |
 | Navigation title | Testing Vectorize |
 | Eyebrow | Testing |
@@ -8042,16 +8431,16 @@ describe.skipIf(skipVectorize)('Vectorize binding', () => {
 
 ### A small Vectorize example you can adapt quickly
 
-> This example keeps Vectorize honest: one index binding, one upsert, and one query against the same worker path.
+> This example keeps Vectorize honest and usable: one index binding, one upsert-and-query route, and one skip-aware remote smoke test.
 
 | Field | Value |
 | --- | --- |
-| Route | [`/docs/vectorize-example`](/docs/vectorize-example) |
+| Route | [`/docs/bindings/vectorize/example`](/docs/bindings/vectorize/example) |
 | Group | Bindings |
 | Navigation title | Vectorize example |
 | Eyebrow | Starter example |
 
-That is enough to show the binding shape without requiring a whole retrieval stack in the very first example.
+That is enough to show the binding shape, the worker contract, and the Devflare remote gate without dragging in a whole retrieval stack on page one.
 
 #### At a glance
 
@@ -8111,11 +8500,33 @@ export async function fetch(): Promise<Response> {
 }
 ```
 
-#### Keep the first version boring
+#### Lock in the behavior with one small test or smoke path
 
-> **Warning — The remote index still has to exist**
+> **Important — The Devflare win is honest lifecycle plus honest gating**
 >
-> This example is intentionally small, but it is not fictional. The named index has to exist and match the vector shape you send.
+> The named index still has to exist, but Devflare keeps that reality visible in config, preview naming, and skip-aware tests instead of hiding it behind fake local success.
+
+##### Example — A skip-aware remote Vectorize smoke test
+
+```ts
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
+import { createTestContext, cf, env, shouldSkip } from 'devflare/test'
+
+beforeAll(() => createTestContext())
+afterAll(() => env.dispose())
+
+const skipVectorize = await shouldSkip.vectorize
+
+describe.skipIf(skipVectorize)('Vectorize route', () => {
+	test('hits the configured index through the worker boundary', async () => {
+		const response = await cf.worker.get('/')
+		expect(response.ok).toBe(true)
+
+		const body = await response.json()
+		expect(body.result).toBeDefined()
+	})
+})
+```
 
 ---
 
@@ -8125,7 +8536,7 @@ export async function fetch(): Promise<Response> {
 
 | Field | Value |
 | --- | --- |
-| Route | [`/docs/hyperdrive-binding`](/docs/hyperdrive-binding) |
+| Route | [`/docs/bindings/hyperdrive`](/docs/bindings/hyperdrive) |
 | Group | Bindings |
 | Navigation title | Hyperdrive |
 | Eyebrow | Binding reference |
@@ -8156,7 +8567,7 @@ export default defineConfig({
 	bindings: {
 		hyperdrive: {
 			DB: 'app-postgres',
-				ANALYTICS_DB: { id: 'hyperdrive-id' }
+			ANALYTICS_DB: { id: 'hyperdrive-id' }
 		}
 	}
 })
@@ -8202,9 +8613,9 @@ Cloudflare Hyperdrive docs is the platform reference. This page is the Devflare 
 
 ##### Highlights
 
-- **Hyperdrive internals** — See normalization, Wrangler `hyperdrive`, and the preview or runtime details behind the authored shape. ([link](/docs/hyperdrive-internals))
-- **Testing Hyperdrive** — Start from `createTestContext()` plus small binding or smoke checks and only escalate when the binding or deployment model genuinely needs it. ([link](/docs/hyperdrive-testing))
-- **Hyperdrive example** — Adapt one small end-to-end path before you hide the binding behind a bigger abstraction. ([link](/docs/hyperdrive-example))
+- **Hyperdrive internals** — See normalization, Wrangler `hyperdrive`, and the preview or runtime details behind the authored shape. ([link](/docs/bindings/hyperdrive/internals))
+- **Testing Hyperdrive** — Start from `createTestContext()` plus small binding or smoke checks and only escalate when the binding or deployment model genuinely needs it. ([link](/docs/bindings/hyperdrive/testing))
+- **Hyperdrive example** — Adapt one small end-to-end path before you hide the binding behind a bigger abstraction. ([link](/docs/bindings/hyperdrive/example))
 
 ---
 
@@ -8214,7 +8625,7 @@ Cloudflare Hyperdrive docs is the platform reference. This page is the Devflare 
 
 | Field | Value |
 | --- | --- |
-| Route | [`/docs/hyperdrive-internals`](/docs/hyperdrive-internals) |
+| Route | [`/docs/bindings/hyperdrive/internals`](/docs/bindings/hyperdrive/internals) |
 | Group | Bindings |
 | Navigation title | Hyperdrive internals |
 | Eyebrow | Under the hood |
@@ -8249,7 +8660,7 @@ export default defineConfig({
 	bindings: {
 		hyperdrive: {
 			DB: 'app-postgres',
-				ANALYTICS_DB: { id: 'hyperdrive-id' }
+			ANALYTICS_DB: { id: 'hyperdrive-id' }
 		}
 	}
 })
@@ -8293,7 +8704,7 @@ export default defineConfig({
 
 | Field | Value |
 | --- | --- |
-| Route | [`/docs/hyperdrive-testing`](/docs/hyperdrive-testing) |
+| Route | [`/docs/bindings/hyperdrive/testing`](/docs/bindings/hyperdrive/testing) |
 | Group | Bindings |
 | Navigation title | Testing Hyperdrive |
 | Eyebrow | Testing |
@@ -8358,7 +8769,7 @@ test('Hyperdrive binding exposes connection info', () => {
 
 | Field | Value |
 | --- | --- |
-| Route | [`/docs/hyperdrive-example`](/docs/hyperdrive-example) |
+| Route | [`/docs/bindings/hyperdrive/example`](/docs/bindings/hyperdrive/example) |
 | Group | Bindings |
 | Navigation title | Hyperdrive example |
 | Eyebrow | Starter example |
@@ -8423,16 +8834,16 @@ export async function fetch(): Promise<Response> {
 
 ### Use Browser Rendering when the worker really needs a headless browser path
 
-> Devflare supports Browser Rendering, but there is exactly one browser binding today, and the best-supported local story lives in dev-server and integration flows.
+> Browser Rendering shines in Devflare’s bridge-backed dev story: keep one browser binding, one narrow worker route, and one smoke path that proves launch works.
 
 | Field | Value |
 | --- | --- |
-| Route | [`/docs/browser-binding`](/docs/browser-binding) |
+| Route | [`/docs/bindings/browser-rendering`](/docs/bindings/browser-rendering) |
 | Group | Bindings |
 | Navigation title | Browser Rendering |
 | Eyebrow | Binding reference |
 
-Browser work can live in the same docs library as every other binding, just with clear caveats about limits and testing style.
+The platform limit is still real — exactly one browser binding — but Devflare adds the missing local ergonomics through the browser shim, binding worker, and integration-friendly route model.
 
 #### At a glance
 
@@ -8505,9 +8916,9 @@ Cloudflare Browser Rendering docs is the platform reference. This page is the De
 
 ##### Highlights
 
-- **Browser Rendering internals** — See normalization, Wrangler `browser` binding, and the preview or runtime details behind the authored shape. ([link](/docs/browser-internals))
-- **Testing Browser Rendering** — Start from A narrow browser route exercised through the dev server, a preview URL, or another integration-style path and only escalate when the binding or deployment model genuinely needs it. ([link](/docs/browser-testing))
-- **Browser Rendering example** — Adapt one small end-to-end path before you hide the binding behind a bigger abstraction. ([link](/docs/browser-example))
+- **Browser Rendering internals** — See normalization, Wrangler `browser` binding, and the preview or runtime details behind the authored shape. ([link](/docs/bindings/browser-rendering/internals))
+- **Testing Browser Rendering** — Start from A narrow browser route exercised through the dev server, a preview URL, or another integration-style path and only escalate when the binding or deployment model genuinely needs it. ([link](/docs/bindings/browser-rendering/testing))
+- **Browser Rendering example** — Adapt one small end-to-end path before you hide the binding behind a bigger abstraction. ([link](/docs/bindings/browser-rendering/example))
 
 ---
 
@@ -8517,7 +8928,7 @@ Cloudflare Browser Rendering docs is the platform reference. This page is the De
 
 | Field | Value |
 | --- | --- |
-| Route | [`/docs/browser-internals`](/docs/browser-internals) |
+| Route | [`/docs/bindings/browser-rendering/internals`](/docs/bindings/browser-rendering/internals) |
 | Group | Bindings |
 | Navigation title | Browser Rendering internals |
 | Eyebrow | Under the hood |
@@ -8596,7 +9007,7 @@ export default defineConfig({
 
 | Field | Value |
 | --- | --- |
-| Route | [`/docs/browser-testing`](/docs/browser-testing) |
+| Route | [`/docs/bindings/browser-rendering/testing`](/docs/bindings/browser-rendering/testing) |
 | Group | Bindings |
 | Navigation title | Testing Browser Rendering |
 | Eyebrow | Testing |
@@ -8656,16 +9067,16 @@ test('browser-backed route responds', async () => {
 
 ### A small Browser Rendering example you can adapt quickly
 
-> This example shows the real browser shape most people care about: launch a browser, read one page title, close the browser cleanly.
+> This example shows the real browser path people actually need: one binding, one title-read route, and one smoke check through the dev server.
 
 | Field | Value |
 | --- | --- |
-| Route | [`/docs/browser-example`](/docs/browser-example) |
+| Route | [`/docs/bindings/browser-rendering/example`](/docs/bindings/browser-rendering/example) |
 | Group | Bindings |
 | Navigation title | Browser Rendering example |
 | Eyebrow | Starter example |
 
-It is intentionally smaller than a full PDF pipeline, but it uses the same worker-side idea: the browser binding is real infrastructure, not a pretend local object.
+It is intentionally smaller than a full PDF pipeline, but it uses the same Devflare idea: a narrow worker route on top of a bridge-backed local browser lane.
 
 #### At a glance
 
@@ -8721,11 +9132,27 @@ export async function fetch(): Promise<Response> {
 }
 ```
 
-#### Keep the first version boring
+#### Lock in the behavior with one small test or smoke path
 
-> **Warning — The example is small, not cheap**
+> **Important — The Devflare value is the bridge-backed local lane**
 >
-> Browser work is still heavier than most bindings. Keep your first path focused enough that failures are easy to diagnose.
+> Browser work is still heavier than most bindings, but Devflare gives it a real local/dev story instead of forcing you to document only the production path. Keep the first route narrow enough that launch failures are easy to diagnose.
+
+##### Example — A dev-server smoke check for the browser route
+
+```ts
+import { expect, test } from 'bun:test'
+
+const baseUrl = process.env.DEVFLARE_TEST_URL ?? 'http://127.0.0.1:8787'
+
+test('browser route returns a title', async () => {
+	const response = await fetch(new URL('/', baseUrl))
+	expect(response.ok).toBe(true)
+
+	const body = await response.json()
+	expect(body.title).toBeTruthy()
+})
+```
 
 ---
 
@@ -8735,7 +9162,7 @@ export async function fetch(): Promise<Response> {
 
 | Field | Value |
 | --- | --- |
-| Route | [`/docs/analytics-engine-binding`](/docs/analytics-engine-binding) |
+| Route | [`/docs/bindings/analytics-engine`](/docs/bindings/analytics-engine) |
 | Group | Bindings |
 | Navigation title | Analytics Engine |
 | Eyebrow | Binding reference |
@@ -8813,9 +9240,9 @@ Cloudflare Workers Analytics Engine docs is the platform reference. This page is
 
 ##### Highlights
 
-- **Analytics Engine internals** — See normalization, Wrangler `analytics_engine_datasets`, and the preview or runtime details behind the authored shape. ([link](/docs/analytics-engine-internals))
-- **Testing Analytics Engine** — Start from A thin worker test or explicit mock around `writeDataPoint()` and only escalate when the binding or deployment model genuinely needs it. ([link](/docs/analytics-engine-testing))
-- **Analytics Engine example** — Adapt one small end-to-end path before you hide the binding behind a bigger abstraction. ([link](/docs/analytics-engine-example))
+- **Analytics Engine internals** — See normalization, Wrangler `analytics_engine_datasets`, and the preview or runtime details behind the authored shape. ([link](/docs/bindings/analytics-engine/internals))
+- **Testing Analytics Engine** — Start from A thin worker test or explicit mock around `writeDataPoint()` and only escalate when the binding or deployment model genuinely needs it. ([link](/docs/bindings/analytics-engine/testing))
+- **Analytics Engine example** — Adapt one small end-to-end path before you hide the binding behind a bigger abstraction. ([link](/docs/bindings/analytics-engine/example))
 
 ---
 
@@ -8825,7 +9252,7 @@ Cloudflare Workers Analytics Engine docs is the platform reference. This page is
 
 | Field | Value |
 | --- | --- |
-| Route | [`/docs/analytics-engine-internals`](/docs/analytics-engine-internals) |
+| Route | [`/docs/bindings/analytics-engine/internals`](/docs/bindings/analytics-engine/internals) |
 | Group | Bindings |
 | Navigation title | Analytics Engine internals |
 | Eyebrow | Under the hood |
@@ -8905,7 +9332,7 @@ export default defineConfig({
 
 | Field | Value |
 | --- | --- |
-| Route | [`/docs/analytics-engine-testing`](/docs/analytics-engine-testing) |
+| Route | [`/docs/bindings/analytics-engine/testing`](/docs/bindings/analytics-engine/testing) |
 | Group | Bindings |
 | Navigation title | Testing Analytics Engine |
 | Eyebrow | Testing |
@@ -8972,7 +9399,7 @@ test('records an analytics point', () => {
 
 | Field | Value |
 | --- | --- |
-| Route | [`/docs/analytics-engine-example`](/docs/analytics-engine-example) |
+| Route | [`/docs/bindings/analytics-engine/example`](/docs/bindings/analytics-engine/example) |
 | Group | Bindings |
 | Navigation title | Analytics Engine example |
 | Eyebrow | Starter example |
@@ -9045,7 +9472,7 @@ export async function fetch(): Promise<Response> {
 
 | Field | Value |
 | --- | --- |
-| Route | [`/docs/send-email-binding`](/docs/send-email-binding) |
+| Route | [`/docs/bindings/send-email`](/docs/bindings/send-email) |
 | Group | Bindings |
 | Navigation title | Send Email |
 | Eyebrow | Binding reference |
@@ -9127,9 +9554,9 @@ Cloudflare send_email binding docs is the platform reference. This page is the D
 
 ##### Highlights
 
-- **Send Email internals** — See normalization, Wrangler `send_email`, and the preview or runtime details behind the authored shape. ([link](/docs/send-email-internals))
-- **Testing Send Email** — Start from `createTestContext()` plus `env.TRANSACTIONAL_EMAIL.send(...)` and only escalate when the binding or deployment model genuinely needs it. ([link](/docs/send-email-testing))
-- **Send Email example** — Adapt one small end-to-end path before you hide the binding behind a bigger abstraction. ([link](/docs/send-email-example))
+- **Send Email internals** — See normalization, Wrangler `send_email`, and the preview or runtime details behind the authored shape. ([link](/docs/bindings/send-email/internals))
+- **Testing Send Email** — Start from `createTestContext()` plus `env.TRANSACTIONAL_EMAIL.send(...)` and only escalate when the binding or deployment model genuinely needs it. ([link](/docs/bindings/send-email/testing))
+- **Send Email example** — Adapt one small end-to-end path before you hide the binding behind a bigger abstraction. ([link](/docs/bindings/send-email/example))
 
 ---
 
@@ -9139,7 +9566,7 @@ Cloudflare send_email binding docs is the platform reference. This page is the D
 
 | Field | Value |
 | --- | --- |
-| Route | [`/docs/send-email-internals`](/docs/send-email-internals) |
+| Route | [`/docs/bindings/send-email/internals`](/docs/bindings/send-email/internals) |
 | Group | Bindings |
 | Navigation title | Send Email internals |
 | Eyebrow | Under the hood |
@@ -9223,7 +9650,7 @@ export default defineConfig({
 
 | Field | Value |
 | --- | --- |
-| Route | [`/docs/send-email-testing`](/docs/send-email-testing) |
+| Route | [`/docs/bindings/send-email/testing`](/docs/bindings/send-email/testing) |
 | Group | Bindings |
 | Navigation title | Testing Send Email |
 | Eyebrow | Testing |
@@ -9292,7 +9719,7 @@ test('sends an outbound transactional email', async () => {
 
 | Field | Value |
 | --- | --- |
-| Route | [`/docs/send-email-example`](/docs/send-email-example) |
+| Route | [`/docs/bindings/send-email/example`](/docs/bindings/send-email/example) |
 | Group | Bindings |
 | Navigation title | Send Email example |
 | Eyebrow | Starter example |

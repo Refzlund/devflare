@@ -21,7 +21,16 @@ The clean contributor workflow for the core `devflare` package now lives behind 
 - `bun run devflare:check` — run the documentation app check lane
 - `bun run devflare:ci` — run the full validated `devflare` contributor lane
 
-`bun run ci` is now an alias for `bun run devflare:ci`.
+Common aliases and broader monorepo lanes:
+
+- `bun run dev` — alias for `devflare:dev`
+- `bun run test` / `bun run test:watch` — alias for the `devflare:test*` lanes
+- `bun run typecheck` / `bun run types` / `bun run check` — workspace-wide typecheck through Turbo
+- `bun run typecheck:root` — typecheck only the repo-root TypeScript surface (no workspace recursion)
+- `bun run build` — workspace-wide build through Turbo
+- `bun run lint` / `bun run lint:fix` / `bun run lint:root` — Biome-based linting (workspace and root)
+- `bun run ci` — alias for `devflare:ci`
+- `bun run ci:strict` — root lint + root typecheck + `devflare:ci` (strict gate used in CI)
 
 ## Notes
 
