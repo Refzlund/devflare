@@ -99,6 +99,12 @@ export {
 	type ResolveResourcesLocalOptions,
 	type ResolveResourcesDeployOptions
 } from './resolve-phased'
+export {
+	collectReferencedServiceNames,
+	validateServiceBindings,
+	ServiceBindingValidationError,
+	type ValidateServiceBindingsOptions
+} from './service-bindings-validation'
 
 // Cross-config referencing
 export {
