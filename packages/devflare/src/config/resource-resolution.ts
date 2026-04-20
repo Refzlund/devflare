@@ -279,8 +279,14 @@ export function resolveConfigForLocalRuntime(
 }
 
 /**
-	* Resolve Cloudflare-backed resource references such as KV/D1/Hyperdrive name bindings into
- * concrete IDs for build, deploy, and automation workflows.
+ * Resolve Cloudflare-backed resource references such as KV/D1/Hyperdrive
+ * name bindings into concrete IDs.
+ *
+ * Used by the deploy path and by automation/programmatic consumers that need
+ * fully-resolved bindings against a live Cloudflare account. The build path
+ * intentionally does NOT call this — `compileBuildConfig({ preserveNamedBindings: true })`
+ * keeps name-only bindings symbolic in the build artifact so builds remain
+ * reproducible offline. Pick this helper only when ID resolution is desired.
  */
 export async function resolveMaterializedConfigResources(
 	resolvedConfig: DevflareConfig,

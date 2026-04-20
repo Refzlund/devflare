@@ -276,7 +276,32 @@ function isAuthError(response: Response, envelope: CloudflareAPIResponse<unknown
  * Execute a Cloudflare JSON request and return the decoded envelope without
  * throwing on `success: false` so callers can inspect and retry on auth
  * errors before surfacing failures.
+ *
+ * Bursts of resource creates (KV, D1, Queues during deploy) can hit
+ * Cloudflare's per-account rate limits, and edge proxies occasionally return
+ * 5xx. We retry network errors and 429/5xx responses with bounded
+ * exponential backoff before surfacing the failure.
  */
+const RETRYABLE_STATUS = new Set([408, 425, 429, 500, 502, 503, 504])
+const RETRY_BASE_DELAY_MS = 250
+const RETRY_MAX_ATTEMPTS = 4
+
+function shouldRetryResponse(response: Response): boolean {
+	return RETRYABLE_STATUS.has(response.status)
+}
+
+function backoffDelayMs(attempt: number, retryAfterHeader: string | null): number {
+	if (retryAfterHeader) {
+		const parsed = Number(retryAfterHeader)
+		if (Number.isFinite(parsed) && parsed > 0) {
+			return Math.min(parsed * 1000, 10_000)
+		}
+	}
+	const base = RETRY_BASE_DELAY_MS * 2 ** attempt
+	const jitter = Math.random() * RETRY_BASE_DELAY_MS
+	return Math.min(base + jitter, 10_000)
+}
+
 async function requestCloudflareJson<T>(
 	path: string,
 	request: CloudflareJsonRequestOptions,
@@ -303,7 +328,29 @@ async function requestCloudflareJson<T>(
 		return { response, envelope: envelope as CloudflareAPIResponse<T> }
 	}
 
-	let result = await makeRequest(false)
+	let result: { response: Response; envelope: CloudflareAPIResponse<T> } | null = null
+	let lastError: unknown = null
+	for (let attempt = 0; attempt < RETRY_MAX_ATTEMPTS; attempt++) {
+		try {
+			result = await makeRequest(false)
+		} catch (error) {
+			lastError = error
+			if (attempt < RETRY_MAX_ATTEMPTS - 1) {
+				await new Promise((r) => setTimeout(r, backoffDelayMs(attempt, null)))
+				continue
+			}
+			throw error
+		}
+		const current = result
+		if (!shouldRetryResponse(current.response) || attempt === RETRY_MAX_ATTEMPTS - 1) {
+			break
+		}
+		await new Promise((r) => setTimeout(r, backoffDelayMs(attempt, current.response.headers.get('retry-after'))))
+	}
+
+	if (!result) {
+		throw lastError ?? new Error(`Cloudflare API request failed: ${endpoint}`)
+	}
 
 	if (request.allowAuthRetry === true && isAuthError(result.response, result.envelope) && !options?.token) {
 		defaultAuthSession.invalidate()

@@ -272,7 +272,16 @@ async function resolveLookupAccountId(
 	options: PrepareMaterializedConfigResourcesForDeployOptions,
 	cloudflareApi: DeployResourcePreparationApi
 ): Promise<string> {
-	const explicitAccountId = options.accountId ?? config.accountId
+	// Priority order matches command-utils.resolveCloudflareAccountId so the
+	// account that provisions resources is always the same one the worker is
+	// deployed against. Without the env-var fallback here, a CI job could
+	// auto-create KV/D1 namespaces in the personal "primary" account while
+	// `wrangler deploy` simultaneously targets the env-var account — leaving
+	// orphaned resources cross-account with no warning.
+	const envAccountId = typeof process !== 'undefined'
+		? process.env?.CLOUDFLARE_ACCOUNT_ID?.trim()
+		: undefined
+	const explicitAccountId = options.accountId ?? config.accountId ?? (envAccountId || undefined)
 	if (explicitAccountId) {
 		return explicitAccountId
 	}

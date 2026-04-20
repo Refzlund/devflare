@@ -694,7 +694,7 @@ function filterMigrationForClass(
 export function compileDOWorkerConfig(
 	config: DevflareConfig,
 	doWorkerEntry: string,
-	options?: { absoluteMain?: boolean; cwd?: string; environment?: string }
+	options?: { absoluteMain?: boolean; cwd?: string; environment?: string; preserveNamedBindings?: boolean }
 ): WranglerConfig[] {
 	const resolvedConfig = resolveConfigForEnvironment(config, options?.environment)
 
@@ -761,13 +761,13 @@ export function compileDOWorkerConfig(
 		// Include bindings that DOs might need (storage, browser, etc.)
 		if (resolvedConfig.bindings?.kv) {
 			result.kv_namespaces = Object.entries(resolvedConfig.bindings.kv).map(([binding, namespace]) => {
-				return getWranglerKVNamespaceBinding(binding, namespace)
+				return getWranglerKVNamespaceBinding(binding, namespace, options)
 			})
 		}
 
 		if (resolvedConfig.bindings?.d1) {
 			result.d1_databases = Object.entries(resolvedConfig.bindings.d1).map(([binding, database_id]) => {
-				return getWranglerD1DatabaseBinding(binding, database_id)
+				return getWranglerD1DatabaseBinding(binding, database_id, options)
 			})
 		}
 
