@@ -61,7 +61,7 @@ export default async function fetch(event) {
 }
 `.trim(),
 				'src/queue.ts': `
-export default async function queue(event, env) {
+export default async function queue(event, env, _ctx) {
 	for (const message of event.messages) {
 		await env.RESULTS.put('queue-result', String(message.body.value))
 		message.ack()
@@ -133,7 +133,7 @@ export default async function fetch(event) {
 }
 `.trim(),
 				'src/scheduled.ts': `
-export default async function scheduled(event, env) {
+export default async function scheduled(event, env, _ctx) {
 	await env.RESULTS.put('scheduled-result', event.cron || 'missing-cron')
 }
 `.trim()
