@@ -77,15 +77,23 @@ describe('disposeDevServerState', () => {
 		// rely on the fact that it will be called with our marker object. We
 		// can't trivially mock the import here, so instead replace viteProcess
 		// with a child-process-shaped stub whose `kill` records the order.
-		state.viteProcess = {
-			kill: () => order.push('vite'),
+		// Mock the spawned process so `stopSpawnedProcessTree` resolves
+		// immediately on every platform: setting `killed = true` short-circuits
+		// `waitForProcessExit`, and `pid = undefined` skips the win32
+		// `taskkill` branch so we don't try to spawn a real child process.
+		const fakeProc: { killed: boolean; pid: undefined; exitCode: number; kill: (signal?: string) => void; on: () => void; once: () => void; removeListener: () => void } = {
+			kill: (_signal?: string) => {
+				order.push('vite')
+				fakeProc.killed = true
+			},
 			killed: false,
-			pid: 12345,
+			pid: undefined,
 			exitCode: 0,
 			on: () => {},
 			once: () => {},
 			removeListener: () => {}
-		} as unknown as typeof state.viteProcess
+		}
+		state.viteProcess = fakeProc as unknown as typeof state.viteProcess
 
 		await disposeDevServerState(state)
 
