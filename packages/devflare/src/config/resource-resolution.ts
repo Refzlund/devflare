@@ -156,6 +156,11 @@ async function resolveResourceIdsByName<TResource extends { id: string; name: st
  * Local Miniflare/workerd flows can use either an explicit resource ID or the
  * stable resource name as the backing identifier, so this path avoids requiring
  * Cloudflare auth for local development and tests.
+ *
+ * @internal Prefer the unified `resolveResources(config, { phase: 'local' })`
+ * facade. This lower-level helper remains exported for backwards compatibility
+ * and as the implementation that the seam delegates to; it is not part of the
+ * recommended public surface and may be removed in a future major release.
  */
 export function resolveConfigForLocalRuntime(
 	config: DevflareConfig,
@@ -186,6 +191,10 @@ export function resolveConfigForLocalRuntime(
  * intentionally does NOT call this — `compileBuildConfig({ preserveNamedBindings: true })`
  * keeps name-only bindings symbolic in the build artifact so builds remain
  * reproducible offline. Pick this helper only when ID resolution is desired.
+ *
+ * @internal Prefer the unified `resolveResources(config, { phase: 'deploy' })`
+ * facade. This lower-level helper remains exported as the implementation the
+ * seam delegates to; it is not part of the recommended public surface.
  */
 export async function resolveMaterializedConfigResources(
 	resolvedConfig: DevflareConfig,
@@ -252,6 +261,10 @@ export async function resolveMaterializedConfigResources(
 /**
 	* Resolve Cloudflare-backed resource references such as KV/D1/Hyperdrive name bindings into
  * concrete IDs for build, deploy, and automation workflows.
+ *
+ * @internal Prefer the unified `resolveResources(config, { phase: 'deploy' })`
+ * facade. This wrapper is now a thin shim over the seam, retained for
+ * backwards compatibility with existing callers (`loadResolvedConfig`, etc.).
  */
 export async function resolveConfigResources(
 	config: DevflareConfig,
