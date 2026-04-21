@@ -282,9 +282,16 @@ export function materializePreviewScopedConfig(
 			...(bindings.hyperdrive
 				? {
 					hyperdrive: mapRecordValues(bindings.hyperdrive, (binding) => {
-						return typeof binding === 'string'
-							? materializePreviewScopedString(binding, options)
-							: binding
+						if (typeof binding === 'string') {
+							return materializePreviewScopedString(binding, options)
+						}
+						if (binding && typeof binding === 'object' && 'name' in binding && typeof binding.name === 'string') {
+							return {
+								...binding,
+								name: materializePreviewScopedString(binding.name, options)
+							}
+						}
+						return binding
 					})
 				}
 				: {}),

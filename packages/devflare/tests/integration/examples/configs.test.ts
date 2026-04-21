@@ -473,7 +473,7 @@ describe('repo example app configs', () => {
 		expect(isPreviewScopedName(config.bindings?.r2?.ASSETS)).toBe(true)
 		expect(isPreviewScopedName(config.bindings?.queues?.producers?.JOBS)).toBe(true)
 		expect(isPreviewScopedName(config.bindings?.vectorize?.DOCUMENT_INDEX.indexName)).toBe(true)
-		expect(isPreviewScopedName(config.bindings?.hyperdrive?.POSTGRES)).toBe(true)
+		expect(isPreviewScopedName((config.bindings?.hyperdrive?.POSTGRES as { name: string }).name)).toBe(true)
 		expect(isPreviewScopedName(config.bindings?.browser?.BROWSER)).toBe(true)
 		expect(isPreviewScopedName(config.bindings?.analyticsEngine?.APP_ANALYTICS.dataset)).toBe(true)
 		expect(config.bindings?.ai).toEqual({ binding: 'AI' })
@@ -504,7 +504,10 @@ describe('repo example app configs', () => {
 		expect(preview.bindings?.queues?.consumers?.[0]?.deadLetterQueue).toBe('devflare-testing-jobs-dlq-preview')
 		expect(preview.bindings?.vectorize?.DOCUMENT_INDEX.indexName).toBe('devflare-testing-document-index-preview')
 		expect(preview.bindings?.vectorize?.SEARCH_INDEX.indexName).toBe('devflare-testing-search-index-preview')
-		expect(preview.bindings?.hyperdrive?.POSTGRES).toBe('devflare-testing-preview')
+		expect(preview.bindings?.hyperdrive?.POSTGRES).toEqual({
+			name: 'devflare-testing-preview',
+			previewFallback: 'base'
+		})
 		expect(preview.bindings?.browser?.BROWSER).toBe('devflare-testing-browser-preview')
 		expect(preview.bindings?.analyticsEngine?.APP_ANALYTICS.dataset).toBe('devflare-testing-app-analytics-preview')
 		expect(preview.triggers?.crons).toEqual(['0 */6 * * *'])
