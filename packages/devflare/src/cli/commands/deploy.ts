@@ -29,7 +29,7 @@ import {
 } from '../../cloudflare/account'
 import { listWorkers } from '../../cloudflare/account-workers'
 import { getEffectiveAccountId } from '../../cloudflare/preferences'
-import { stringifyConfig, writeWranglerConfig } from '../../config/compiler'
+import { rebaseWranglerConfigPaths, stringifyConfig, writeWranglerConfig } from '../../config/compiler'
 import { getDependencies } from '../dependencies'
 import { prepareBuildArtifacts } from './build-artifacts'
 import {
@@ -269,10 +269,7 @@ async function prepareDeployConfig(options: {
 	}
 
 	const buildWranglerConfig = await readWranglerConfig(options.buildConfigPath)
-	const wranglerConfig = withBuildArtifactPaths(
-		compileConfig(deploymentStrategy.config),
-		buildWranglerConfig
-	)
+	const compiledWranglerConfig = compileConfig(deploymentStrategy.config)
 
 	// C4: write the resolved (ID-substituted) wrangler config to a sibling
 	// `.devflare/deploy/wrangler.jsonc` instead of overwriting the build
@@ -282,6 +279,24 @@ async function prepareDeployConfig(options: {
 	const deployArtefactDir = resolve(buildDir, '..', 'deploy')
 	await mkdir(deployArtefactDir, { recursive: true })
 	const deployArtefactPath = resolve(deployArtefactDir, 'wrangler.jsonc')
+
+	// `withBuildArtifactPaths` inherits `main`/`assets` from the build
+	// artefact when present (paths relative to `buildDir`), otherwise
+	// keeps the compiled values (paths relative to `options.cwd`). Rebase
+	// each path field relative to its true origin so wrangler can resolve
+	// the bundled entry-point and assets directory from the new
+	// `.devflare/deploy/wrangler.jsonc` location.
+	const compiledRebased = rebaseWranglerConfigPaths(
+		options.cwd,
+		deployArtefactDir,
+		compiledWranglerConfig
+	)
+	const buildRebased = rebaseWranglerConfigPaths(
+		buildDir,
+		deployArtefactDir,
+		buildWranglerConfig
+	)
+	const wranglerConfig = withBuildArtifactPaths(compiledRebased, buildRebased)
 
 	// C10: serialize concurrent deploys against the same artefact. Exclusive
 	// `wx` lock file with bounded wait so two `devflare deploy` invocations
