@@ -14,7 +14,10 @@ describe('testing preview deployment verifier', () => {
 		expect(config.name).toBe('devflare-testing-binding-matrix-pr-1')
 		expect(config.vars?.APP_NAME).toBe(DEFAULT_EXPECTED_APP_NAME)
 		expect(config.vars?.DEPLOYMENT_CHANNEL).toBe(DEFAULT_EXPECTED_DEPLOYMENT_CHANNEL)
-		expect(config.bindings?.hyperdrive?.POSTGRES).toBe('devflare-testing-pr-1')
+		expect(config.bindings?.hyperdrive?.POSTGRES).toEqual({
+			name: 'devflare-testing-pr-1',
+			previewFallback: 'base'
+		})
 	})
 
 	test('accepts a preview deployment snapshot with the expected workers and bindings', () => {
