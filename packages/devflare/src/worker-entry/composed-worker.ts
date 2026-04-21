@@ -2,8 +2,8 @@ import { dirname, relative, resolve } from 'pathe'
 import type { DevflareConfig } from '../config'
 import { normalizeDOBinding } from '../config/schema'
 import { resolveConfigForEnvironment } from '../config/resolve'
-import { findDurableObjectClasses } from '../transform/durable-object'
-import { DEFAULT_DO_PATTERN, findFiles } from '../utils/glob'
+import { DEFAULT_DO_PATTERN } from '../utils/glob'
+import { discoverDurableObjectFiles } from './durable-object-discovery'
 import { discoverRoutes, type RouteDiscoveryResult } from './routes'
 import {
 	resolveWorkerSurfacePaths,
@@ -380,35 +380,29 @@ async function createGeneratedDurableObjectExports(
 		return []
 	}
 
-	const fs = await import('node:fs/promises')
 	const pattern = typeof config.files?.durableObjects === 'string'
 		? config.files.durableObjects
 		: DEFAULT_DO_PATTERN
-	const matchedFiles = await findFiles(pattern, { cwd })
+	const discoveredFiles = await discoverDurableObjectFiles(cwd, pattern)
 	const exports: GeneratedDurableObjectExport[] = []
 	const discoveredClassNames = new Set<string>()
 
-	for (const filePath of matchedFiles) {
-		try {
-			const code = await fs.readFile(filePath, 'utf-8')
-			const classNames = findDurableObjectClasses(code).filter((className) => localClassNames.has(className))
+	for (const [filePath, allClassNames] of discoveredFiles) {
+		const classNames = allClassNames.filter((className) => localClassNames.has(className))
 
-			if (classNames.length === 0) {
-				continue
-			}
-
-			for (const className of classNames) {
-				discoveredClassNames.add(className)
-			}
-
-			exports.push({
-				importPath: toImportSpecifier(entryPath, filePath),
-				filePath,
-				classNames
-			})
-		} catch {
+		if (classNames.length === 0) {
 			continue
 		}
+
+		for (const className of classNames) {
+			discoveredClassNames.add(className)
+		}
+
+		exports.push({
+			importPath: toImportSpecifier(entryPath, filePath),
+			filePath,
+			classNames
+		})
 	}
 
 	const missingClassNames = Array.from(localClassNames).filter((className) => !discoveredClassNames.has(className))

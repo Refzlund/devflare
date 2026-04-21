@@ -2,7 +2,8 @@
 // Devflare Vite plugin — Durable Object discovery + auxiliary worker helpers
 // =============================================================================
 // Pure helpers extracted from `vite/plugin.ts`:
-//  - DO file/class discovery (`discoverDurableObjects`)
+//  - DO file/class discovery (re-exported from shared
+//    `worker-entry/durable-object-discovery.ts`)
 //  - Virtual DO entry module codegen (`generateVirtualDOEntry`)
 //  - Auxiliary worker config construction (`createAuxiliaryWorkerConfig`)
 //  - Diagnostic logging (`logDiscoveredDurableObjects`)
@@ -11,52 +12,17 @@
 // `plugin.ts` re-exports the same constant for backwards compatibility.
 // =============================================================================
 
-import { findDurableObjectClasses } from '../transform/durable-object'
-import { findFiles } from '../utils/glob'
 import type { WranglerConfig } from '../config/compiler'
+import { discoverDurableObjects, type DODiscoveryResult } from '../worker-entry/durable-object-discovery'
 
 export const VIRTUAL_DO_ENTRY = 'virtual:devflare-do-entry'
 export const RESOLVED_VIRTUAL_DO_ENTRY = '\0' + VIRTUAL_DO_ENTRY
 
-export interface DODiscoveryResult {
-	/** Map of file path → array of class names */
-	files: Map<string, string[]>
-	/** Worker name for the auxiliary DO worker */
-	workerName: string
-}
+// Re-exported from the shared helper so existing import paths keep working.
+export { discoverDurableObjects, type DODiscoveryResult }
 
 export interface AuxiliaryWorkerConfig {
 	config: Record<string, unknown>
-}
-
-/**
- * Discover DO classes from files matching the glob pattern.
- * Respects .gitignore automatically.
- */
-export async function discoverDurableObjects(
-	projectRoot: string,
-	pattern: string,
-	workerName: string
-): Promise<DODiscoveryResult> {
-	const files = new Map<string, string[]>()
-
-	const matchedFiles = await findFiles(pattern, { cwd: projectRoot })
-	const fs = await import('node:fs/promises')
-
-	for (const filePath of matchedFiles) {
-		try {
-			const code = await fs.readFile(filePath, 'utf-8')
-			const classNames = findDurableObjectClasses(code)
-
-			if (classNames.length > 0) {
-				files.set(filePath, classNames)
-			}
-		} catch (error) {
-			console.warn(`[devflare] Failed to read DO file: ${filePath}`, error)
-		}
-	}
-
-	return { files, workerName }
 }
 
 /**

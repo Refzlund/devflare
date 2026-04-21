@@ -10,8 +10,8 @@ import type { ConsolaInstance } from 'consola'
 import picomatch from 'picomatch'
 import type { DevflareRolldownOptions } from '../config/schema'
 import { findFiles, DEFAULT_DO_PATTERN } from '../utils/glob'
-import { findDurableObjectClasses } from '../transform/durable-object'
 import { transformDurableObject } from '../transform/durable-object'
+import { discoverDurableObjectFiles } from '../worker-entry/durable-object-discovery'
 import {
 	ensureDebugShim,
 	resolveWorkerCompatibleRolldownConfig,
@@ -91,26 +91,16 @@ function classToBindingName(className: string): string {
  * Respects .gitignore automatically.
  */
 async function discoverDOs(cwd: string, pattern: string): Promise<DiscoveredDO[]> {
-	const fs = await import('node:fs/promises')
 	const discovered: DiscoveredDO[] = []
+	const files = await discoverDurableObjectFiles(cwd, pattern)
 
-	// Find matching files using gitignore-aware glob
-	const files = await findFiles(pattern, { cwd })
-
-	for (const filePath of files) {
-		try {
-			const code = await fs.readFile(filePath, 'utf-8')
-			const classNames = findDurableObjectClasses(code)
-
-			for (const className of classNames) {
-				discovered.push({
-					filePath,
-					className,
-					bindingName: classToBindingName(className)
-				})
-			}
-		} catch {
-			// Skip files that can't be read
+	for (const [filePath, classNames] of files) {
+		for (const className of classNames) {
+			discovered.push({
+				filePath,
+				className,
+				bindingName: classToBindingName(className)
+			})
 		}
 	}
 
