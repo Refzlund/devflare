@@ -385,8 +385,13 @@ function handleBridgeWebSocket(request, env, ctx) {
 	server.addEventListener('close', () => {
 		for (const proxy of wsProxies.values()) {
 			// Best-effort cleanup: the DO-side WS may already be closed or in an
-			// invalid state; any throw here would abort sibling closes.
-			try { proxy.doWs.close() } catch {}
+			// invalid state; any throw here would abort sibling closes. Surface
+			// the swallowed error when DEVFLARE_DEBUG_BRIDGE is enabled.
+			try { proxy.doWs.close() } catch (error) {
+				if (globalThis.DEVFLARE_DEBUG_BRIDGE) {
+					console.warn('[devflare:bridge] proxy.doWs.close() failed', error)
+				}
+			}
 		}
 		wsProxies.clear()
 	})

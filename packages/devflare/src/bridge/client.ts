@@ -38,6 +38,7 @@ import type {
 	WebSocketLikeCloseEvent
 } from './v2/transport'
 import type { TransportV2DecodedBinaryFrame } from './v2/frames'
+import { bridgeLog } from './log'
 
 // -----------------------------------------------------------------------------
 // Internal — adapter that exposes a real browser/Node WebSocket as a
@@ -260,7 +261,9 @@ export class BridgeClient {
 		// Auto-reconnect
 		if (this.autoReconnect) {
 			setTimeout(() => {
-				this.connect().catch(() => {})
+				this.connect().catch((error) => {
+					bridgeLog.warn('auto-reconnect attempt failed', error)
+				})
 			}, this.reconnectDelay)
 		}
 	}
