@@ -76,6 +76,15 @@ export function hashSourceConfig(config: DevflareConfig): string {
 		if (key === 'accountId') return undefined
 		// Skip undefined/null sentinels for stable ordering.
 		if (value === null || value === undefined) return undefined
+		// `ref()` proxies expose throwing `name`/`config` getters when not
+		// yet resolved. They show up here via worker/DO bindings whose
+		// `__ref` back-pointer would otherwise recurse into the proxy.
+		// Replace any ref proxy with a stable, serializable identifier so
+		// the hash stays deterministic and never triggers resolution.
+		if (key === '__ref' && value && typeof value === 'object') {
+			const nameOverride = (value as { __nameOverride?: string }).__nameOverride
+			return nameOverride ? `ref:${nameOverride}` : 'ref:<unresolved>'
+		}
 		return value
 	})
 	return createHash('sha256').update(normalized).digest('hex')
