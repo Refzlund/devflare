@@ -11,10 +11,7 @@
 
 import { isAbsolute, relative, resolve } from 'pathe'
 import { resolveConfigPath } from '../config/loader'
-import {
-	resolveConfigForLocalRuntime,
-	resolveResources
-} from '../config'
+import { resolveResources } from '../config'
 import {
 	compileBuildConfig,
 	compileConfig,
@@ -63,7 +60,7 @@ export async function buildPluginContextState(
 ): Promise<ResolvedPluginContextState> {
 	const effectiveConfig = mode === 'build'
 		? await resolveResources(devflareConfig, { phase: 'build', environment })
-		: resolveConfigForLocalRuntime(devflareConfig, environment)
+		: await resolveResources(devflareConfig, { phase: 'local', environment })
 	const compiledWranglerConfig = mode === 'build'
 		? compileBuildConfig(effectiveConfig)
 		: compileConfig(effectiveConfig as ResolvedDevflareConfig)

@@ -238,5 +238,34 @@ describe('resolveResources facade', () => {
 			expect(seamCompiled.d1_databases).toEqual(legacyCompiled.d1_databases)
 			expect(seamCompiled.hyperdrive).toEqual(legacyCompiled.hyperdrive)
 		})
+
+		// C2 step 2 — Vite/local path migration. The Vite plugin's
+		// `mode==='serve'` branch and the programmatic helpers now go through
+		// resolveResources({phase:'local'}) instead of resolveConfigForLocalRuntime.
+		// This pins the equivalence at the compiled-Wrangler-config level.
+		test('phase=local → compileConfig matches resolveConfigForLocalRuntime → compileConfig', async () => {
+			const fixtureWithEnv: DevflareConfig = {
+				...baseFixture,
+				env: {
+					production: {
+						bindings: {
+							kv: {
+								CACHE: { name: 'cache-kv-prod' }
+							}
+						}
+					}
+				}
+			}
+
+			const seamCompiled = compileConfig(
+				await resolveResources(fixtureWithEnv, { phase: 'local', environment: 'production' })
+			)
+			const legacyCompiled = compileConfig(
+				resolveConfigForLocalRuntime(fixtureWithEnv, 'production')
+			)
+			expect(seamCompiled.kv_namespaces).toEqual(legacyCompiled.kv_namespaces)
+			expect(seamCompiled.d1_databases).toEqual(legacyCompiled.d1_databases)
+			expect(seamCompiled.hyperdrive).toEqual(legacyCompiled.hyperdrive)
+		})
 	})
 })

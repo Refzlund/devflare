@@ -9,7 +9,7 @@
 import { relative } from 'pathe'
 import {
 	loadResolvedConfig,
-	resolveConfigForLocalRuntime
+	resolveResources
 } from '../config'
 import { loadConfig } from '../config/loader'
 import { compileConfig, compileToProgrammaticConfig } from '../config/compiler'
@@ -42,9 +42,9 @@ async function loadProgrammaticDevflareConfig(options: ProgrammaticConfigOptions
 			configFile: options.configPath,
 			environment: options.environment
 		})
-		: resolveConfigForLocalRuntime(
+		: await resolveResources(
 			await loadConfig({ cwd, configFile: options.configPath }),
-			options.environment
+			{ phase: 'local', environment: options.environment }
 		)
 	return { cwd, devflareConfig }
 }
