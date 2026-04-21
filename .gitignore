@@ -13,6 +13,8 @@ results.csv
 
 packages/devflare/_*.txt
 _*.txt
+**/build_output*.txt
+output.txt
 
 # Build outputs
 dist/

@@ -44,9 +44,13 @@ mock.module('miniflare', () => ({
 	Miniflare: FakeMiniflare
 }))
 
-mock.module('../../../src/utils/send-email', () => ({
-	wrapEnvSendEmailBindings: (b: Record<string, unknown>) => ({ ...b, __wrapped: true })
-}))
+// Note: we deliberately do NOT mock '../../../src/utils/send-email' here.
+// Bun's `mock.module()` is process-global and leaks the patched module into
+// every other test file that runs in the same process — patching it here
+// would silently corrupt e.g. tests/unit/runtime/context.test.ts which
+// observes `runWithContext`'s env identity. The real `wrapEnvSendEmailBindings`
+// is a no-op for envs without SendEmail bindings, which is what the fixtures
+// below provide, so the bridge / multi-worker assertions below are unaffected.
 
 import { bootTestRuntime } from '../../../src/test/simple-context-runtime'
 
@@ -76,6 +80,6 @@ describe('bootTestRuntime', () => {
 		expect(miniflareCtorCalls[0].port).toBe(5678)
 		expect(result.activePort).toBe(5678)
 		expect(result.client).toBeNull()
-		expect(result.miniflareBindings).toEqual({ MW: 5678, __wrapped: true })
+		expect(result.miniflareBindings).toEqual({ MW: 5678 })
 	})
 })
