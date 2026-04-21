@@ -613,10 +613,36 @@ export function isViteBuildExecution(command: string, args: string[]): boolean {
 		return args[0] === 'build'
 	}
 
+	// `bun --bun <vite.js> build …` (devflare's preferred Bun-runtime spawn)
+	if (command === 'bun') {
+		const bunFlagIndex = args.indexOf('--bun')
+		const viteIndex = args.findIndex((arg) => arg.replace(/\\/g, '/').endsWith('/node_modules/vite/bin/vite.js'))
+		if (bunFlagIndex >= 0 && viteIndex >= 0 && args[viteIndex + 1] === 'build') {
+			return true
+		}
+	}
+
 	if (command === 'bunx') {
 		const viteIndex = args.indexOf('vite')
 		return viteIndex >= 0 && args[viteIndex + 1] === 'build'
 	}
 
 	return false
+}
+
+/**
+ * Extract the actual Vite entry script path from a captured execution,
+ * regardless of whether it was spawned directly or through `bun --bun`.
+ * Used by tests that assert workspace-local resolution.
+ */
+export function extractViteEntryPath(execution: { command: string; args: string[] }): string {
+	if (execution.command === 'bun') {
+		const viteIndex = execution.args.findIndex((arg) =>
+			arg.replace(/\\/g, '/').endsWith('/node_modules/vite/bin/vite.js')
+		)
+		if (viteIndex >= 0) {
+			return execution.args[viteIndex] ?? ''
+		}
+	}
+	return execution.command
 }

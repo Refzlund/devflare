@@ -91,4 +91,42 @@ export async function fetch(): Promise<Response> {
 			'Configured fetch handler "src/custom-fetch.ts" was not found'
 		)
 	})
+
+	test('defers composition when files.fetch points at a missing build artifact and no other surface needs composition', async () => {
+		// SvelteKit's adapter writes .svelte-kit/cloudflare/_worker.js during vite build, AFTER
+		// devflare resolves surface paths. With no other surfaces, devflare should silently
+		// skip composition so wrangler/vite can pick up the build output post-build.
+		const config = configSchema.parse({
+			name: 'sveltekit-adapter-passthrough',
+			compatibilityDate: '2026-04-12',
+			files: {
+				fetch: '.svelte-kit/cloudflare/_worker.js'
+			}
+		})
+
+		const composedEntry = await prepareComposedWorkerEntrypoint(TEST_DIR, config)
+		expect(composedEntry).toBeNull()
+	})
+
+	test('throws a helpful build-artifact error when files.fetch is a build path AND other surfaces require composition', async () => {
+		// When other surfaces need composition, devflare cannot defer to wrangler — the
+		// composed wrapper would have to import the missing artifact. Surface a clear error.
+		await mkdir(join(TEST_DIR, 'src'), { recursive: true })
+		await writeFile(join(TEST_DIR, 'src', 'queue.ts'), `
+export async function queue(): Promise<void> {}
+		`.trim())
+
+		const config = configSchema.parse({
+			name: 'sveltekit-with-queue',
+			compatibilityDate: '2026-04-12',
+			files: {
+				fetch: '.svelte-kit/cloudflare/_worker.js',
+				queue: 'src/queue.ts'
+			}
+		})
+
+		await expect(prepareComposedWorkerEntrypoint(TEST_DIR, config)).rejects.toThrow(
+			/looks like a framework build output[\s\S]+wrangler[\s\S]+passthrough/
+		)
+	})
 })

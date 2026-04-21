@@ -8,6 +8,7 @@ import {
 	createCliDependencies,
 	createLogger,
 	createProcessRunner,
+	extractViteEntryPath,
 	isViteBuildExecution,
 	readGeneratedDeployConfig,
 	readGeneratedDevConfig,
@@ -123,7 +124,7 @@ describe('build/deploy worker-only behavior', () => {
 		await runSuccessfulBuild(projectDir, logger)
 		const viteBuildExecution = executions.find(({ command, args }) => isViteBuildExecution(command, args))
 		expect(viteBuildExecution).toBeDefined()
-		expect(viteBuildExecution?.command.replace(/\\/g, '/')).toContain('/node_modules/vite/bin/vite.js')
+		expect(extractViteEntryPath(viteBuildExecution!).replace(/\\/g, '/')).toContain('/node_modules/vite/bin/vite.js')
 		await access(join(projectDir, '.devflare', 'vite.config.mjs'))
 	})
 
@@ -142,7 +143,7 @@ describe('build/deploy worker-only behavior', () => {
 		await runSuccessfulBuild(projectDir, logger)
 		const viteBuildExecution = executions.find(({ command, args }) => isViteBuildExecution(command, args))
 		expect(viteBuildExecution).toBeDefined()
-		expect(viteBuildExecution?.command.replace(/\\/g, '/')).toContain('/node_modules/vite/bin/vite.js')
+		expect(extractViteEntryPath(viteBuildExecution!).replace(/\\/g, '/')).toContain('/node_modules/vite/bin/vite.js')
 		expect(viteBuildExecution?.args).toContain('--config')
 		await access(join(projectDir, '.devflare', 'vite.config.mjs'))
 	})

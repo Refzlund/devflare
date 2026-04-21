@@ -284,18 +284,18 @@ export default defineConfig(async () => {
 		eyebrow: 'Frameworks',
 		title: 'Compose Devflare with SvelteKit by letting SvelteKit host the app and Devflare supply the Worker platform',
 		summary:
-			'Point Devflare at SvelteKit’s Cloudflare worker output—often via `files.fetch`, but sometimes by handing `wrangler.passthrough.main` the adapter worker directly—keep `sveltekit()` in `vite.config.ts`, and compose `devflare/sveltekit` into `src/hooks.server.ts` so local platform bindings line up with the Worker runtime Devflare manages.',
+			'Hand SvelteKit\'s Cloudflare adapter output to Devflare via `wrangler.passthrough.main` (the adapter worker is a build artifact and does not exist until `vite build` runs), keep `sveltekit()` in `vite.config.ts`, and compose `devflare/sveltekit` into `src/hooks.server.ts` so local platform bindings line up with the Worker runtime Devflare manages.',
 		description:
 			'This is the path for full SvelteKit apps where the framework owns the outer shell and Devflare keeps the Worker-facing platform story coherent. It matches the repository’s real documentation app and the SvelteKit integration example in the public docs.',
 		highlights: [
-			'Use the actual Cloudflare adapter output your package emits as the worker entry Devflare composes around. Many setups still emit `.svelte-kit/cloudflare/_worker.js`, while this repository’s docs app uses `.adapter-cloudflare/_worker.js`.',
+			'Use `wrangler.passthrough.main` (not `files.fetch`) to point at the adapter\'s `_worker.js`. The adapter writes that file during `vite build`, after Devflare has already resolved its handler paths — so `files.fetch` would fail with "Configured fetch handler … was not found" on a clean checkout.',
 			'Keep `devflarePlugin()` and `sveltekit()` together in `vite.config.ts` so Vite stays the app host while Devflare wires Worker config underneath it.',
 			'`handle` from `devflare/sveltekit` is the simplest hook path, and `createHandle()` is the escape hatch when you need custom hints or enable rules.',
 			'When composing with other hooks, put the Devflare handle first so `event.platform` is ready before downstream middleware reads it.'
 		],
 		facts: [
 			{ label: 'Best for', value: 'Full SvelteKit apps that deploy through Devflare' },
-			{ label: 'Worker entry', value: 'The adapter worker output your package actually emits, commonly `.svelte-kit/cloudflare/_worker.js` or a repo-specific path such as `.adapter-cloudflare/_worker.js`' },
+			{ label: 'Worker entry', value: 'The adapter worker output your package actually emits, commonly `.svelte-kit/cloudflare/_worker.js` or a repo-specific path such as `.adapter-cloudflare/_worker.js`, wired via `wrangler.passthrough.main`' },
 			{ label: 'Hook helper', value: '`devflare/sveltekit`' }
 		],
 		sourcePages: ['development-workflows.md', 'README.md', 'apps/documentation/README.md'],
@@ -312,8 +312,16 @@ export default defineConfig(async () => {
 export default defineConfig({
 	name: 'notes-app',
 	files: {
-		fetch: '.svelte-kit/cloudflare/_worker.js',
+		// fetch is supplied by SvelteKit's adapter output below;
+		// keep this false so devflare does not try to compose around an unbuilt artifact.
+		fetch: false,
 		durableObjects: 'src/do/**/*.ts'
+	},
+	wrangler: {
+		passthrough: {
+			// SvelteKit's @sveltejs/adapter-cloudflare writes this file during vite build.
+			main: '.svelte-kit/cloudflare/_worker.js'
+		}
 	}
 })`
 					},
@@ -331,7 +339,8 @@ export default defineConfig({
 				],
 				paragraphs: [
 					'SvelteKit still owns the app shell, routing, and framework build. Devflare plugs Worker-aware config, generated Wrangler output, and any Durable Object discovery into that Vite-driven flow.',
-					'Keep Devflare aligned with the adapter output your package actually emits. Many packages do that with `files.fetch` and an adapter default such as `.svelte-kit/cloudflare/_worker.js`. The documentation app in this repository instead points `wrangler.passthrough.main` at its configured `.adapter-cloudflare/_worker.js` output, which is equally valid when the package already owns the adapter worker directly.'
+					'The adapter worker is a **build artifact** — `@sveltejs/adapter-cloudflare` only writes `.svelte-kit/cloudflare/_worker.js` (or your repo\'s equivalent, like `.adapter-cloudflare/_worker.js`) during `vite build`. Devflare resolves handler paths *before* the framework build runs, so pointing `files.fetch` at that path fails on a clean checkout with `Configured fetch handler "…" was not found`. Use `wrangler.passthrough.main` instead: devflare skips composition entirely for the worker entry, and wrangler picks up the adapter output post-build.',
+					'If you also have queue handlers, scheduled handlers, durable objects, or routes, keep those in `files.queue` / `files.scheduled` / `files.durableObjects` / `files.routes` as normal source files — composition still applies to those surfaces.'
 				]
 			},
 			{

@@ -325,7 +325,22 @@ async function buildWorkerOnlyDeployArtifact(
 	})
 }
 
-async function resolveLocalViteExecutable(cwd: string, fs: FileSystem): Promise<string> {
+export async function resolveLocalViteExecutable(cwd: string, fs: FileSystem): Promise<string> {
+	// Prefer a workspace-local node_modules path over `import.meta.resolve`.
+	//
+	// Under Bun on Windows, `import.meta.resolve('vite/bin/vite.js')` can return
+	// Bun's install-cache realpath (e.g. `C:\Users\…\.bun\install\cache\vite@8.0.9@@@1\bin\vite.js`).
+	// Executing that realpath via Node breaks Vite 8's resolution of `rolldown` and other
+	// transitive deps, because Node's resolver no longer sees the workspace's hoisted
+	// node_modules tree from the cache directory.
+	//
+	// Walking up `node_modules/vite/bin/vite.js` from cwd preserves the symlinked path
+	// inside the workspace, which keeps Node's package resolution intact.
+	const workspaceLocal = await findWorkspaceLocalBinary(cwd, fs, ['vite', 'bin', 'vite.js'])
+	if (workspaceLocal) {
+		return workspaceLocal
+	}
+
 	const viteExecutablePath = resolvePackageSpecifier('vite/bin/vite.js', cwd)
 
 	try {
@@ -337,6 +352,44 @@ async function resolveLocalViteExecutable(cwd: string, fs: FileSystem): Promise<
 	}
 
 	return viteExecutablePath
+}
+
+/**
+ * Walk up the directory tree from `startDir` looking for
+ * `node_modules/<segments>`. Returns the first match or null.
+ *
+ * This preserves the workspace-local (symlinked) path rather than the
+ * package manager's underlying cache realpath, which matters for Node
+ * package resolution semantics under Bun on Windows.
+ */
+export async function findWorkspaceLocalBinary(
+	startDir: string,
+	fs: FileSystem,
+	segments: readonly string[]
+): Promise<string | null> {
+	let currentDir = resolve(startDir)
+	// Bound the walk by the filesystem root.
+	for (let depth = 0;depth < 64;depth++) {
+		const candidate = resolve(currentDir, 'node_modules', ...segments)
+		try {
+			await fs.access(candidate)
+			return candidate
+		} catch {
+			// not here, walk up
+		}
+		const parent = dirname(currentDir)
+		if (parent === currentDir) {
+			return null
+		}
+		currentDir = parent
+	}
+	return null
+}
+
+/** True when the current process is Bun (and `bun` is therefore on PATH). */
+export function isRunningUnderBun(): boolean {
+	return typeof (globalThis as { Bun?: unknown }).Bun !== 'undefined'
+		|| typeof (process.versions as { bun?: string }).bun === 'string'
 }
 
 export async function prepareBuildArtifacts(
@@ -413,17 +466,50 @@ export async function prepareBuildArtifacts(
 
 		await cleanupViteBuildOutputs(cwd, devWranglerConfig, logger)
 		logLine(logger, 'Running vite build...')
-		const buildProc = await deps.exec.exec(viteExecutablePath, ['build', '--config', generatedViteConfigPath], {
+
+		// When running under Bun, invoke Vite through `bun --bun <vite.js>` rather
+		// than letting execa launch Node directly. Two reasons:
+		//   1. Bun preserves workspace-local package resolution even if the
+		//      executable file path is a hoisted/cache symlink target.
+		//   2. Vite 8's `rolldown` import resolves correctly under Bun on Windows.
+		// `--bun` forces Bun's runtime even when the script has a Node shebang.
+		const useBunRuntime = isRunningUnderBun()
+		const buildCommand = useBunRuntime ? 'bun' : viteExecutablePath
+		const buildArgs = useBunRuntime
+			? ['--bun', viteExecutablePath, 'build', '--config', generatedViteConfigPath]
+			: ['build', '--config', generatedViteConfigPath]
+
+		const buildProc = await deps.exec.exec(buildCommand, buildArgs, {
 			cwd,
 			stdio: 'inherit',
 			env: {
 				...process.env,
 				DEVFLARE_BUILD: 'true'
-			}
+			},
+			// Don't reject on non-zero exit — we want to surface a richer error below.
+			reject: false
 		})
 
 		if (buildProc.exitCode !== 0) {
-			throw new Error('Build failed')
+			throw new Error(
+				`Vite build failed (exit code ${buildProc.exitCode}).\n`
+				+ `\n`
+				+ `Command: ${buildCommand} ${buildArgs.join(' ')}\n`
+				+ `Working directory: ${cwd}\n`
+				+ `Vite executable: ${viteExecutablePath}\n`
+				+ `Runtime: ${useBunRuntime ? 'bun --bun' : 'node (default execa runtime)'}\n`
+				+ `\n`
+				+ `Vite's own output is printed above. If you only see "UNHANDLED PROMISE REJECTION"\n`
+				+ `with no other detail, common causes are:\n`
+				+ `  - A Vite plugin or transitive dependency (e.g. rolldown) cannot be resolved\n`
+				+ `    from the executable's physical path. This commonly happens when the package\n`
+				+ `    manager resolves the Vite binary to a global cache directory outside the\n`
+				+ `    workspace's node_modules tree. Try reinstalling, or run vite directly to\n`
+				+ `    isolate: \`bunx --bun vite build --config ${relative(cwd, generatedViteConfigPath).replace(/\\/g, '/')}\`.\n`
+				+ `  - A peer dependency or framework adapter is missing. Re-check the package's\n`
+				+ `    devDependencies against the framework's documented requirements.\n`
+				+ `  - The generated vite config references a path that does not yet exist.`
+			)
 		}
 
 		const existingDeployConfigPath = await readDeployRedirect(cwd)

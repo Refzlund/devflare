@@ -6,6 +6,7 @@ import { DEFAULT_DO_PATTERN } from '../utils/glob'
 import { discoverDurableObjectFiles } from './durable-object-discovery'
 import { discoverRoutes, type RouteDiscoveryResult } from './routes'
 import {
+	looksLikeBuildArtifactPath,
 	resolveWorkerSurfacePaths,
 	type WorkerSurfacePaths
 } from './surface-paths'
@@ -421,6 +422,27 @@ async function createGeneratedDurableObjectExports(
 	return exports
 }
 
+/**
+ * Returns true when the resolved config has any composition signal other than
+ * `files.fetch` (queue / scheduled / email handler files, durable-object
+ * bindings, sendEmail bindings, or routes). Used to decide whether a missing
+ * build-artifact fetch path can be safely deferred to wrangler/vite.
+ */
+function mayRequireCompositionBesidesFetch(config: DevflareConfig): boolean {
+	const files = config.files ?? {}
+	if (typeof files.queue === 'string' && files.queue) return true
+	if (typeof files.scheduled === 'string' && files.scheduled) return true
+	if (typeof files.email === 'string' && files.email) return true
+	if (files.durableObjects) return true
+	if (files.routes) return true
+	const bindings = config.bindings ?? {}
+	const doBindings = bindings.durableObjects
+	if (doBindings && Object.keys(doBindings).length > 0) return true
+	const sendEmail = bindings.sendEmail
+	if (sendEmail && Object.keys(sendEmail).length > 0) return true
+	return false
+}
+
 function needsComposedWorkerEntrypoint(
 	cwd: string,
 	surfacePaths: WorkerSurfacePaths,
@@ -467,6 +489,28 @@ export async function prepareComposedWorkerEntrypoint(
 		&& Object.prototype.hasOwnProperty.call(resolvedConfig.wrangler.passthrough, 'main')
 	) {
 		return null
+	}
+
+	// Build-artifact deferral: if files.fetch points at a framework build output
+	// (e.g. `.svelte-kit/cloudflare/_worker.js`), the file does not exist yet at
+	// this stage. When no other surface requires composition, skip composition
+	// entirely so wrangler/vite picks up the build output post-build. When other
+	// surfaces ARE present, fall through to resolveWorkerSurfacePaths so the
+	// user gets a clear error explaining that composition cannot wrap an
+	// unbuilt artifact.
+	const configuredFetch = resolvedConfig.files?.fetch
+	if (typeof configuredFetch === 'string' && looksLikeBuildArtifactPath(configuredFetch)) {
+		const fs = await import('node:fs/promises')
+		const fetchAbsolute = resolve(cwd, configuredFetch)
+		let fetchExists = true
+		try {
+			await fs.access(fetchAbsolute)
+		} catch {
+			fetchExists = false
+		}
+		if (!fetchExists && !mayRequireCompositionBesidesFetch(resolvedConfig)) {
+			return null
+		}
 	}
 
 	const surfacePaths = await resolveWorkerSurfacePaths(cwd, resolvedConfig)

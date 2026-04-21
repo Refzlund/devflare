@@ -56,7 +56,7 @@ Keep the day-to-day Devflare surfaces easy to scan: runtime model, HTTP split, a
 - **Frameworks** — Choose the right host lane for worker-rendered Svelte, standalone Vite apps, and full SvelteKit shells without losing the worker-first mental model.
   - [Svelte in workers](/docs/svelte-with-rolldown) — When a worker-only fetch surface or Durable Object imports `.svelte`, add the Svelte compiler to `rolldown.options.plugins`. That compilation belongs to Devflare’s worker bundler, not the main Vite plugin chain.
   - [Vite standalone](/docs/vite-standalone) — An effective Vite config is what opts the package into Vite-backed flows: a local `vite.config.*`, a non-empty `config.vite`, or both together. Use `devflare/vite` when the package really is a Vite app and you want Devflare to keep Worker config, Durable Objects, and generated Wrangler output aligned underneath it.
-  - [SvelteKit](/docs/sveltekit-with-devflare) — Point Devflare at SvelteKit’s Cloudflare worker output—often via `files.fetch`, but sometimes by handing `wrangler.passthrough.main` the adapter worker directly—keep `sveltekit()` in `vite.config.ts`, and compose `devflare/sveltekit` into `src/hooks.server.ts` so local platform bindings line up with the Worker runtime Devflare manages.
+  - [SvelteKit](/docs/sveltekit-with-devflare) — Hand SvelteKit's Cloudflare adapter output to Devflare via `wrangler.passthrough.main` (the adapter worker is a build artifact and does not exist until `vite build` runs), keep `sveltekit()` in `vite.config.ts`, and compose `devflare/sveltekit` into `src/hooks.server.ts` so local platform bindings line up with the Worker runtime Devflare manages.
 
 ### Ship & operate
 Deploy explicitly, choose the right preview model, manage preview lifecycle cleanly, and keep CI/CD plus verification honest.
@@ -2583,6 +2583,26 @@ This is why `config.env` is more than a raw Wrangler mirror. It can change the D
 | `routes`, `assets`, `limits`, `observability` | Deployment routing, static assets, CPU limits, or observability should differ by lane. |
 | `rolldown`, `vite`, `wrangler` | The build host or the passthrough escape hatch needs environment-specific behavior. |
 
+#### Environment overrides: arrays replace, objects deep-merge, primitives replace
+
+Overlays compose onto the base config with three rules: object-shaped values are deep-merged key by key, primitive values (strings, numbers, booleans) are replaced wholesale, and array-shaped values are replaced wholesale (they do not append). Reading an environment block as an override of the base — not as an addition to it — keeps these rules predictable.
+
+The replace-arrays rule is the one most likely to surprise someone arriving from a config system that appended arrays. If a base config sets `routes: […]` and the overlay sets `routes: […]`, the overlay’s array becomes the resolved value; the base array is not concatenated. The same applies to `migrations` and to nested arrays like `triggers.crons`.
+
+##### Reference table
+
+| Field shape | Merge rule | Example |
+| --- | --- | --- |
+| `routes` (array) | Replace | Base `routes: [{ pattern: "app.example.com/*", zone_name: "example.com" }]` + overlay `routes: [{ pattern: "preview.example.com/*", zone_name: "example.com" }]` resolves to **only** the preview entry. |
+| `migrations` (array) | Replace | Base `migrations: [{ tag: "v1", new_classes: ["Room"] }]` + overlay `migrations: [{ tag: "v2", new_classes: ["Room", "User"] }]` resolves to **only** the v2 entry. To preserve history, restate the prior migrations in the overlay. |
+| `triggers.crons` (array under nested object) | Replace at the array level (the parent `triggers` object is still deep-merged) | Base `triggers: { crons: ["*/5 * * * *"] }` + overlay `triggers: { crons: ["0 * * * *"] }` resolves to `triggers.crons = ["0 * * * *"]`. Other keys on `triggers` deep-merge as usual. |
+| `bindings` (object) | Deep-merge | Adding `bindings.kv.NEW_NS` in an overlay extends the base `bindings.kv` map; existing namespaces survive unless the overlay names the same key. |
+| `name`, `compatibility_date` (primitive) | Replace | The overlay value wins when present; otherwise the base value stays. |
+
+> **Warning — Arrays replace, they do not append**
+>
+> If you only want to add one extra route, one extra cron, or one extra migration to the base, the overlay must restate the base entries alongside the new one. An overlay that lists only the new entry will silently drop the base entries from the resolved config.
+
 #### Choose the environment where it matters, and let explicit deploy targets do the rest
 
 ##### Steps
@@ -4176,7 +4196,7 @@ That means you should think in terms of host ownership, not a separate CLI mode.
 
 ### Compose Devflare with SvelteKit by letting SvelteKit host the app and Devflare supply the Worker platform
 
-> Point Devflare at SvelteKit’s Cloudflare worker output—often via `files.fetch`, but sometimes by handing `wrangler.passthrough.main` the adapter worker directly—keep `sveltekit()` in `vite.config.ts`, and compose `devflare/sveltekit` into `src/hooks.server.ts` so local platform bindings line up with the Worker runtime Devflare manages.
+> Hand SvelteKit's Cloudflare adapter output to Devflare via `wrangler.passthrough.main` (the adapter worker is a build artifact and does not exist until `vite build` runs), keep `sveltekit()` in `vite.config.ts`, and compose `devflare/sveltekit` into `src/hooks.server.ts` so local platform bindings line up with the Worker runtime Devflare manages.
 
 | Field | Value |
 | --- | --- |
@@ -4192,14 +4212,16 @@ This is the path for full SvelteKit apps where the framework owns the outer shel
 | Fact | Value |
 | --- | --- |
 | Best for | Full SvelteKit apps that deploy through Devflare |
-| Worker entry | The adapter worker output your package actually emits, commonly `.svelte-kit/cloudflare/_worker.js` or a repo-specific path such as `.adapter-cloudflare/_worker.js` |
+| Worker entry | The adapter worker output your package actually emits, commonly `.svelte-kit/cloudflare/_worker.js` or a repo-specific path such as `.adapter-cloudflare/_worker.js`, wired via `wrangler.passthrough.main` |
 | Hook helper | `devflare/sveltekit` |
 
 #### Wire the SvelteKit package like a SvelteKit app first
 
 SvelteKit still owns the app shell, routing, and framework build. Devflare plugs Worker-aware config, generated Wrangler output, and any Durable Object discovery into that Vite-driven flow.
 
-Keep Devflare aligned with the adapter output your package actually emits. Many packages do that with `files.fetch` and an adapter default such as `.svelte-kit/cloudflare/_worker.js`. The documentation app in this repository instead points `wrangler.passthrough.main` at its configured `.adapter-cloudflare/_worker.js` output, which is equally valid when the package already owns the adapter worker directly.
+The adapter worker is a **build artifact** — `@sveltejs/adapter-cloudflare` only writes `.svelte-kit/cloudflare/_worker.js` (or your repo's equivalent, like `.adapter-cloudflare/_worker.js`) during `vite build`. Devflare resolves handler paths *before* the framework build runs, so pointing `files.fetch` at that path fails on a clean checkout with `Configured fetch handler "…" was not found`. Use `wrangler.passthrough.main` instead: devflare skips composition entirely for the worker entry, and wrangler picks up the adapter output post-build.
+
+If you also have queue handlers, scheduled handlers, durable objects, or routes, keep those in `files.queue` / `files.scheduled` / `files.durableObjects` / `files.routes` as normal source files — composition still applies to those surfaces.
 
 ##### Example — `devflare.config.ts`
 
@@ -4209,8 +4231,16 @@ import { defineConfig } from 'devflare/config'
 export default defineConfig({
 	name: 'notes-app',
 	files: {
-		fetch: '.svelte-kit/cloudflare/_worker.js',
+		// fetch is supplied by SvelteKit's adapter output below;
+		// keep this false so devflare does not try to compose around an unbuilt artifact.
+		fetch: false,
 		durableObjects: 'src/do/**/*.ts'
+	},
+	wrangler: {
+		passthrough: {
+			// SvelteKit's @sveltejs/adapter-cloudflare writes this file during vite build.
+			main: '.svelte-kit/cloudflare/_worker.js'
+		}
 	}
 })
 ```
@@ -8995,9 +9025,11 @@ export default defineConfig({
 - Preview logic can materialize names, but Devflare does not provision or delete browser “resources” because they are not account-managed the same way storage bindings are.
 - The browser path can also warn about missing local WebSocket support when the environment lacks the `ws` dependency needed for proxying.
 
-> **Note — The honest browser story**
+> **Note — Local browser-rendering shim**
 >
-> Browser support is real, but it is infrastructural. Expect a stronger dev-server story than a tiny one-function local helper story.
+> The dev-side endpoint Devflare exposes for `@cloudflare/puppeteer` is the **local browser-rendering shim**. It accepts only loopback browser origins (e.g. `http://127.0.0.1:*`, `http://localhost:*`) plus origin-less tool traffic such as Puppeteer or curl.
+>
+> This loopback-only posture is the security model of the shim itself — it is devflare’s protected helper endpoint for the local Browser Rendering binding. It is **not** a policy applied to your normal worker routes; user app routes still follow whatever request and CORS rules the worker code itself defines.
 
 ---
 
