@@ -173,7 +173,8 @@ async function inspectWorkerVersionBindings(options: {
 		'view',
 		options.versionId,
 		'--name',
-		options.workerName
+		options.workerName,
+		'--json'
 	], {
 		cwd: options.cwd,
 		env: {
@@ -187,7 +188,7 @@ async function inspectWorkerVersionBindings(options: {
 		throw new Error(result.stderr || result.stdout || 'Wrangler versions view failed')
 	}
 
-	return parseWranglerVersionBindings(`${result.stdout}\n${result.stderr}`)
+	return parseWranglerVersionBindings(result.stdout)
 }
 
 export function collectTestingPreviewVerificationErrors(
