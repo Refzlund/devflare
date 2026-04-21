@@ -130,7 +130,7 @@ async function decodeCloudflareEnvelope<T>(
 
 	if (!parsed.ok) {
 		throw new CloudflareAPIError(
-			'Cloudflare API returned an invalid JSON response.',
+			`Cloudflare API returned an invalid JSON response. Body: ${truncateBody(text)}`,
 			response.status,
 			[]
 		)
@@ -138,13 +138,19 @@ async function decodeCloudflareEnvelope<T>(
 
 	if (!isEnvelopeShape(parsed.value)) {
 		throw new CloudflareAPIError(
-			`Cloudflare ${opts.endpoint} returned a non-envelope JSON response.`,
+			`Cloudflare ${opts.endpoint} returned a non-envelope JSON response. Body: ${truncateBody(text)}`,
 			response.status,
 			[]
 		)
 	}
 
 	return parsed.value as CloudflareAPIResponse<T>
+}
+
+function truncateBody(text: string, max = 500): string {
+	const trimmed = text.trim()
+	if (trimmed.length <= max) return trimmed
+	return `${trimmed.slice(0, max)}…[truncated, total ${trimmed.length} chars]`
 }
 
 /**

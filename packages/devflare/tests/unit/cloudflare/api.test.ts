@@ -205,7 +205,7 @@ describe('apiGetAll', () => {
 
 		await expect(apiGet('/items')).rejects.toMatchObject({
 			name: 'CloudflareAPIError',
-			message: 'Cloudflare API returned an invalid JSON response.',
+			message: expect.stringContaining('Cloudflare API returned an invalid JSON response.'),
 			code: 502
 		})
 	})
@@ -222,7 +222,7 @@ describe('apiGetAll', () => {
 
 		await expect(apiGet('/items')).rejects.toMatchObject({
 			name: 'CloudflareAPIError',
-			message: 'Cloudflare GET /items returned a non-envelope JSON response.',
+			message: expect.stringContaining('Cloudflare GET /items returned a non-envelope JSON response.'),
 			code: 200
 		})
 	})
