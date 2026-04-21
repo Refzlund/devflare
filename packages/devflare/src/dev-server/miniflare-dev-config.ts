@@ -122,13 +122,6 @@ export function buildMiniflareDevConfig(input: BuildMiniflareDevConfigInput): an
 	const browserBindingName = getSingleBrowserBindingName(bindings.browser)
 	const needsBrowserWorker = Boolean(browserBindingName && (hasDurableObjectBundles || shouldRunMainWorker))
 
-	if (!shouldRunMainWorker && !hasDurableObjectBundles && !needsBrowserWorker) {
-		return {
-			...sharedOptions,
-			...gatewayWorker
-		}
-	}
-
 	const workers: any[] = []
 	const durableObjects: Record<string, { className: string; scriptName: string }> = {}
 
