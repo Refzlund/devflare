@@ -97,6 +97,32 @@ function isEnvelopeShape(value: unknown): value is CloudflareAPIResponse<unknown
 		&& 'result' in record
 }
 
+/**
+ * Some Cloudflare API surfaces (notably the v4 Queues list endpoint)
+ * return a bare `{ result, result_info? }` body without the standard
+ * `{ success, errors, messages }` envelope. When the HTTP response is
+ * a 2xx, treat this as a successful envelope so callers don't fail on
+ * a perfectly valid payload.
+ */
+function coerceBareResultEnvelope(
+	value: unknown,
+	response: Response
+): CloudflareAPIResponse<unknown> | null {
+	if (!response.ok) return null
+	if (!value || typeof value !== 'object') return null
+	const record = value as Record<string, unknown>
+	if (!('result' in record)) return null
+	return {
+		success: true,
+		errors: [],
+		messages: [],
+		result: record.result,
+		...(record.result_info && typeof record.result_info === 'object'
+			? { result_info: record.result_info as CloudflareAPIResponse<unknown>['result_info'] }
+			: {})
+	}
+}
+
 function envelopeFailureError(
 	response: Response,
 	envelope: CloudflareAPIResponse<unknown>,
@@ -137,6 +163,10 @@ async function decodeCloudflareEnvelope<T>(
 	}
 
 	if (!isEnvelopeShape(parsed.value)) {
+		const coerced = coerceBareResultEnvelope(parsed.value, response)
+		if (coerced) {
+			return coerced as CloudflareAPIResponse<T>
+		}
 		throw new CloudflareAPIError(
 			`Cloudflare ${opts.endpoint} returned a non-envelope JSON response. Body: ${truncateBody(text)}`,
 			response.status,
