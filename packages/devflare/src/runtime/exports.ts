@@ -7,7 +7,7 @@
 // =============================================================================
 
 import { getContextOrNull, type EventContext, type RuntimeContextValue } from './context'
-import { createContextProxy, ContextAccessError } from './validation'
+import { createContextProxy } from './validation'
 
 declare global {
 	interface DevflareEnv { }
@@ -18,63 +18,14 @@ declare global {
 // =============================================================================
 
 /**
- * Creates a readonly proxy that throws on mutation attempts
+ * Creates a readonly proxy that throws on mutation attempts. Thin wrapper
+ * over {@link createContextProxy} with `mutable: false`.
  */
 function createReadonlyProxy<T extends object>(
 	getter: () => T | null | undefined,
 	name: string
 ): Readonly<T> {
-	return new Proxy({} as T, {
-		get(_target, prop) {
-			const ctx = getter()
-			if (ctx === undefined || ctx === null) {
-				throw new ContextAccessError(name, String(prop))
-			}
-			return ctx[prop as keyof T]
-		},
-
-		set(_target, prop) {
-			throw new TypeError(
-				`Cannot assign to '${String(prop)}' on '${name}' because it is read-only.\n` +
-				`Use 'locals' for mutable request-scoped data.`
-			)
-		},
-
-		deleteProperty(_target, prop) {
-			throw new TypeError(
-				`Cannot delete property '${String(prop)}' from '${name}' because it is read-only.`
-			)
-		},
-
-		has(_target, prop) {
-			const ctx = getter()
-			if (ctx === undefined || ctx === null) {
-				return false
-			}
-			return prop in ctx
-		},
-
-		ownKeys(_target) {
-			const ctx = getter()
-			if (ctx === undefined || ctx === null) {
-				return []
-			}
-			return Reflect.ownKeys(ctx)
-		},
-
-		getOwnPropertyDescriptor(_target, prop) {
-			const ctx = getter()
-			if (ctx === undefined || ctx === null) {
-				return undefined
-			}
-			const descriptor = Reflect.getOwnPropertyDescriptor(ctx, prop)
-			if (descriptor) {
-				// Mark as non-writable for readonly semantics
-				return { ...descriptor, writable: false }
-			}
-			return undefined
-		}
-	}) as Readonly<T>
+	return createContextProxy(getter, name, { mutable: false }) as Readonly<T>
 }
 
 // =============================================================================

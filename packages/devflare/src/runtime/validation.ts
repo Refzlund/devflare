@@ -55,31 +55,61 @@ export class ContextAccessError extends Error {
  * const db = env.DB // ❌ ContextAccessError with guidance
  * ```
  */
+export interface CreateContextProxyOptions {
+	/**
+	 * When `false`, the proxy throws a `TypeError` on `set` / `deleteProperty`
+	 * (read-only semantics) and reports descriptors as non-writable. Defaults
+	 * to `true` (mutable; mutations forwarded to the underlying object).
+	 */
+	mutable?: boolean
+}
+
 export function createContextProxy<T extends object>(
-	getter: () => T | undefined,
-	name: string
+	getter: () => T | null | undefined,
+	name: string,
+	options: CreateContextProxyOptions = {}
 ): T {
+	const mutable = options.mutable ?? true
 	return new Proxy({} as T, {
 		get(_target, prop) {
 			const ctx = getter()
-			if (ctx === undefined) {
+			if (ctx === undefined || ctx === null) {
 				throw new ContextAccessError(name, String(prop))
 			}
 			return ctx[prop as keyof T]
 		},
 
 		set(_target, prop, value) {
+			if (!mutable) {
+				throw new TypeError(
+					`Cannot assign to '${String(prop)}' on '${name}' because it is read-only.\n` +
+					`Use 'locals' for mutable request-scoped data.`
+				)
+			}
 			const ctx = getter()
-			if (ctx === undefined) {
+			if (ctx === undefined || ctx === null) {
 				throw new ContextAccessError(name, String(prop))
 			}
 			; (ctx as Record<string | symbol, unknown>)[prop] = value
 			return true
 		},
 
+		deleteProperty(_target, prop) {
+			if (!mutable) {
+				throw new TypeError(
+					`Cannot delete property '${String(prop)}' from '${name}' because it is read-only.`
+				)
+			}
+			const ctx = getter()
+			if (ctx === undefined || ctx === null) {
+				return true
+			}
+			return Reflect.deleteProperty(ctx, prop)
+		},
+
 		has(_target, prop) {
 			const ctx = getter()
-			if (ctx === undefined) {
+			if (ctx === undefined || ctx === null) {
 				return false
 			}
 			return prop in ctx
@@ -87,7 +117,7 @@ export function createContextProxy<T extends object>(
 
 		ownKeys(_target) {
 			const ctx = getter()
-			if (ctx === undefined) {
+			if (ctx === undefined || ctx === null) {
 				return []
 			}
 			return Reflect.ownKeys(ctx)
@@ -95,10 +125,17 @@ export function createContextProxy<T extends object>(
 
 		getOwnPropertyDescriptor(_target, prop) {
 			const ctx = getter()
-			if (ctx === undefined) {
+			if (ctx === undefined || ctx === null) {
 				return undefined
 			}
-			return Reflect.getOwnPropertyDescriptor(ctx, prop)
+			const descriptor = Reflect.getOwnPropertyDescriptor(ctx, prop)
+			if (!descriptor) {
+				return undefined
+			}
+			if (!mutable) {
+				return { ...descriptor, writable: false }
+			}
+			return descriptor
 		}
 	})
 }
