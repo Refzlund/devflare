@@ -253,11 +253,31 @@ async function main(): Promise<void> {
 	})
 }
 
-void main().catch((error) => {
-	const message = error instanceof Error ? error.message : String(error)
-	console.error(`[refresh-permission-groups] Failed: ${message}`)
-	process.exitCode = 1
-})
+// Only auto-run `main()` when this file is invoked as the CLI entrypoint
+// (e.g. `bun run scripts/refresh-permission-groups.ts`). Importing the named
+// exports from tests must NOT side-effect into `main()` — otherwise the
+// missing CLOUDFLARE_* env vars would throw, set `process.exitCode = 1`, and
+// poison the surrounding `bun test` run even though all assertions pass.
+const isCliEntry = (() => {
+	try {
+		const argv1 = process.argv[1]
+		if (!argv1) {
+			return false
+		}
+		// Bun exposes `import.meta.path`; resolve both via realpath-ish equality.
+		return import.meta.path === argv1 || import.meta.url === `file://${argv1}`
+	} catch {
+		return false
+	}
+})()
+
+if (isCliEntry) {
+	void main().catch((error) => {
+		const message = error instanceof Error ? error.message : String(error)
+		console.error(`[refresh-permission-groups] Failed: ${message}`)
+		process.exitCode = 1
+	})
+}
 
 // Exported for unit testing without running the CLI entrypoint.
 export { renderGeneratedFile, resolveUpdatedEntries }
