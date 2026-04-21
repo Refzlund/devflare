@@ -3,6 +3,7 @@
 // =============================================================================
 
 import { AsyncLocalStorage } from 'node:async_hooks'
+import { ContextAccessError } from './validation'
 import {
 	createDefaultEvent,
 	createDurableObjectAlarmEvent,
@@ -233,13 +234,21 @@ export const getDurableObjectWebSocketMessageEvent = createEventAccessor<Durable
 export const getDurableObjectWebSocketCloseEvent = createEventAccessor<DurableObjectWebSocketCloseEvent>('getDurableObjectWebSocketCloseEvent()', isDurableObjectWebSocketCloseEvent)
 export const getDurableObjectWebSocketErrorEvent = createEventAccessor<DurableObjectWebSocketErrorEvent>('getDurableObjectWebSocketErrorEvent()', isDurableObjectWebSocketErrorEvent)
 
-export class ContextUnavailableError extends Error {
+/**
+ * @deprecated Prefer {@link ContextAccessError} from `./validation`. This name
+ * is retained as a subclass for backward compatibility — both names refer to
+ * the same context-unavailable failure mode and `instanceof ContextAccessError`
+ * is true for any instance.
+ */
+export class ContextUnavailableError extends ContextAccessError {
 	readonly code = 'CONTEXT_UNAVAILABLE'
 
 	constructor(message?: string) {
-		super(
-			message
-			?? (
+		super('context', '<unavailable>')
+		if (message !== undefined) {
+			this.message = message
+		} else {
+			this.message =
 				`Context not available. Devflare uses AsyncLocalStorage to carry the active event through fetch, queue, scheduled, email, tail, and Durable Object handler call chains.\n\n` +
 				`This usually means one of:\n\n` +
 				`1. Accessing context at module top-level (runs at cold start, not per-request)\n` +
@@ -247,8 +256,7 @@ export class ContextUnavailableError extends Error {
 				`3. Missing 'nodejs_compat' compatibility flag in your worker config\n\n` +
 				`Fix: Move the access inside your handler, middleware, or a helper called from that handler trail.\n` +
 				`Learn more: https://devflare.dev/docs/context-errors`
-			)
-		)
+		}
 		this.name = 'ContextUnavailableError'
 	}
 }
