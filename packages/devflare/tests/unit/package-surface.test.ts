@@ -56,7 +56,7 @@ describe('main barrel public surface', () => {
 	test('removed names remain importable from devflare/test subpath', async () => {
 		const testMod = await import('../../src/test/index.ts')
 		expect('createTestContext' in testMod).toBe(true)
-		expect('createBridgeTestContext' in testMod).toBe(true)
+		expect('createBridgeTestContext' in testMod).toBe(false)
 	})
 
 	test('bridge internals remain importable from bridge subpath', async () => {

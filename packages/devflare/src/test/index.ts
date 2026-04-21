@@ -53,13 +53,3 @@ export {
 	type TestContextOptions,
 	type MockEnvOptions
 } from './utilities'
-
-// Bridge test context (for integration testing with real Miniflare)
-export {
-	createBridgeTestContext,
-	stopBridgeTestContext,
-	getBridgeTestContext,
-	testEnv,
-	type BridgeTestContext,
-	type BridgeTestContextOptions
-} from './bridge-context'

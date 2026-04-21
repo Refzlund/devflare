@@ -136,9 +136,5 @@ export const createMockR2 = unsupportedFunction<TestModule['createMockR2']>('cre
 export const createMockQueue = unsupportedFunction<TestModule['createMockQueue']>('createMockQueue')
 export const createMockEnv = unsupportedFunction<TestModule['createMockEnv']>('createMockEnv')
 export const withTestContext = unsupportedFunction<TestModule['withTestContext']>('withTestContext')
-export const createBridgeTestContext = unsupportedFunction<TestModule['createBridgeTestContext']>('createBridgeTestContext')
-export const stopBridgeTestContext = unsupportedFunction<TestModule['stopBridgeTestContext']>('stopBridgeTestContext')
-export const getBridgeTestContext = unsupportedFunction<TestModule['getBridgeTestContext']>('getBridgeTestContext')
-export const testEnv = createUnsupportedObject<TestModule['testEnv']>('testEnv')
 
 export { defineConfig as default } from './config/define'
