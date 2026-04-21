@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
-import { join } from 'pathe'
+import { isAbsolute, join } from 'pathe'
 import { configSchema } from '../../../src/config/schema'
 import { prepareComposedWorkerEntrypoint } from '../../../src/worker-entry/composed-worker'
 
@@ -59,13 +59,15 @@ export class Counter extends DurableObject<DevflareEnv> {}
 		})
 
 		const composedEntry = await prepareComposedWorkerEntrypoint(TEST_DIR, config)
-		expect(composedEntry).toBe('.devflare/worker-entrypoints/main.ts')
+		expect(composedEntry).not.toBeNull()
+		expect(composedEntry && isAbsolute(composedEntry)).toBe(true)
+		expect(composedEntry).toBe(join(TEST_DIR, '.devflare/worker-entrypoints/main.ts'))
 
 		if (!composedEntry) {
 			throw new Error('Expected composed worker entry to be generated')
 		}
 
-		const source = await readFile(join(TEST_DIR, composedEntry), 'utf-8')
+		const source = await readFile(composedEntry, 'utf-8')
 		expect(source).toContain("export { Counter } from '../../src/do.counter.ts'")
 	})
 

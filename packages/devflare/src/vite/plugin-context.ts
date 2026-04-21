@@ -9,7 +9,7 @@
 // - Resolve the plugin's own config-file path on the user's project.
 // =============================================================================
 
-import { isAbsolute, resolve } from 'pathe'
+import { isAbsolute, relative, resolve } from 'pathe'
 import { resolveConfigPath } from '../config/loader'
 import {
 	resolveConfigForEnvironment,
@@ -82,8 +82,9 @@ export async function buildPluginContextState(
 		? null
 		: await prepareComposedWorkerEntrypoint(projectRoot, effectiveConfig, environment)
 	if (composedMainEntry) {
-		wranglerConfig.main = composedMainEntry
-		cloudflareConfig.main = composedMainEntry
+		const relativeMain = relative(projectRoot, composedMainEntry)
+		wranglerConfig.main = relativeMain
+		cloudflareConfig.main = relativeMain
 	}
 
 	let durableObjects: DODiscoveryResult | null = null

@@ -6,6 +6,7 @@
 // `devflarePlugin()` itself. These are independent of plugin state.
 // =============================================================================
 
+import { relative } from 'pathe'
 import {
 	loadResolvedConfig,
 	resolveConfigForLocalRuntime
@@ -79,8 +80,9 @@ async function buildProgrammaticArtifacts(
 		: { ...wranglerConfig }
 
 	if (composedMainEntry) {
-		wranglerConfig.main = composedMainEntry
-		cloudflareConfig.main = composedMainEntry
+		const relativeMain = relative(cwd, composedMainEntry)
+		wranglerConfig.main = relativeMain
+		cloudflareConfig.main = relativeMain
 	}
 
 	const auxiliaryWorkers: AuxiliaryWorkerConfig[] = []

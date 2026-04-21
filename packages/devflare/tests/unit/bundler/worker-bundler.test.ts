@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
-import { join } from 'pathe'
+import { join, isAbsolute } from 'pathe'
 import { bundleWorkerEntry } from '../../../src/bundler'
 import { configSchema } from '../../../src/config/schema'
 import { prepareComposedWorkerEntrypoint } from '../../../src/worker-entry/composed-worker'
@@ -46,7 +46,7 @@ export async function fetch(): Promise<Response> {
 		})
 
 		const composedEntry = await prepareComposedWorkerEntrypoint(TEST_DIR, config)
-		expect(composedEntry).toBe('.devflare/worker-entrypoints/main.ts')
+		expect(composedEntry && isAbsolute(composedEntry)).toBe(true)
 
 		if (!composedEntry) {
 			throw new Error('Expected composed worker entry to be generated')
@@ -54,7 +54,7 @@ export async function fetch(): Promise<Response> {
 
 		const bundlePath = await bundleWorkerEntry({
 			cwd: TEST_DIR,
-			inputFile: join(TEST_DIR, composedEntry),
+			inputFile: composedEntry,
 			outFile: join(TEST_DIR, '.devflare', 'worker-entrypoints', 'main.js'),
 			sourcemap: true,
 			rolldownOptions: {
@@ -104,7 +104,7 @@ export async function fetch(): Promise<Response> {
 		})
 
 		const composedEntry = await prepareComposedWorkerEntrypoint(TEST_DIR, config)
-		expect(composedEntry).toBe('.devflare/worker-entrypoints/main.ts')
+		expect(composedEntry && isAbsolute(composedEntry)).toBe(true)
 
 		if (!composedEntry) {
 			throw new Error('Expected composed worker entry to be generated')
@@ -112,7 +112,7 @@ export async function fetch(): Promise<Response> {
 
 		const bundlePath = await bundleWorkerEntry({
 			cwd: TEST_DIR,
-			inputFile: join(TEST_DIR, composedEntry),
+			inputFile: composedEntry,
 			outFile: join(TEST_DIR, '.devflare', 'worker-entrypoints', 'main.js')
 		})
 
@@ -164,7 +164,7 @@ export async function fetch(): Promise<Response> {
 		})
 
 		const composedEntry = await prepareComposedWorkerEntrypoint(TEST_DIR, config)
-		expect(composedEntry).toBe('.devflare/worker-entrypoints/main.ts')
+		expect(composedEntry && isAbsolute(composedEntry)).toBe(true)
 
 		if (!composedEntry) {
 			throw new Error('Expected composed worker entry to be generated')
@@ -172,7 +172,7 @@ export async function fetch(): Promise<Response> {
 
 		const bundlePath = await bundleWorkerEntry({
 			cwd: TEST_DIR,
-			inputFile: join(TEST_DIR, composedEntry),
+			inputFile: composedEntry,
 			outFile: join(TEST_DIR, '.devflare', 'worker-entrypoints', 'main.js')
 		})
 
@@ -214,7 +214,7 @@ export async function fetch(request: Request): Promise<Response> {
 		})
 
 		const composedEntry = await prepareComposedWorkerEntrypoint(TEST_DIR, config)
-		expect(composedEntry).toBe('.devflare/worker-entrypoints/main.ts')
+		expect(composedEntry && isAbsolute(composedEntry)).toBe(true)
 
 		if (!composedEntry) {
 			throw new Error('Expected composed worker entry to be generated')
@@ -222,7 +222,7 @@ export async function fetch(request: Request): Promise<Response> {
 
 		await expect(bundleWorkerEntry({
 			cwd: TEST_DIR,
-			inputFile: join(TEST_DIR, composedEntry),
+			inputFile: composedEntry,
 			outFile: join(TEST_DIR, '.devflare', 'worker-entrypoints', 'main.js')
 		})).rejects.toThrow('Devflare worker bundles cannot contain unresolved dynamic import() expressions')
 	})

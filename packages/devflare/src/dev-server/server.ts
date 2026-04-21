@@ -179,7 +179,7 @@ export function createDevServer(options: DevServerOptions): DevServer {
 		const composedMainEntry = await prepareComposedWorkerEntrypoint(cwd, state.config, undefined, {
 			devInternalEmail: true
 		})
-		state.mainWorkerScriptPath = composedMainEntry ? resolve(cwd, composedMainEntry) : null
+		state.mainWorkerScriptPath = composedMainEntry ? composedMainEntry : null
 
 		if (state.mainWorkerScriptPath) {
 			await bundleMainWorker()

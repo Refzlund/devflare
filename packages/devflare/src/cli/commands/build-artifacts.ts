@@ -381,13 +381,13 @@ export async function prepareBuildArtifacts(
 
 	if (viteProject.shouldStartVite) {
 		if (composedMainEntry) {
-			deployWranglerConfig.main = composedMainEntry
-			logLine(logger, `Generated composed worker entry: ${composedMainEntry}`)
+			deployWranglerConfig.main = relative(cwd, composedMainEntry)
+			logLine(logger, `Generated composed worker entry: ${deployWranglerConfig.main}`)
 		}
 	} else if (composedMainEntry) {
 		const bundledMainEntryPath = await bundleWorkerEntry({
 			cwd,
-			inputFile: resolve(cwd, composedMainEntry),
+			inputFile: composedMainEntry,
 			outFile: resolve(cwd, '.devflare', 'worker-entrypoints', 'main.js'),
 			rolldownOptions: config.rolldown?.options,
 			sourcemap: config.rolldown?.sourcemap,

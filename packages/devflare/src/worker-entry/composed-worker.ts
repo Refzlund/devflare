@@ -503,5 +503,5 @@ export async function prepareComposedWorkerEntrypoint(
 		)
 	)
 
-	return '.devflare/worker-entrypoints/main.ts'
+	return entryPath
 }
