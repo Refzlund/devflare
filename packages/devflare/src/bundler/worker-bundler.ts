@@ -2,6 +2,7 @@ import { fileURLToPath } from 'node:url'
 import type { ConsolaInstance } from 'consola'
 import { dirname, resolve } from 'pathe'
 import type { DevflareRolldownOptions } from '../config/schema'
+import { createWorkerdBundlerDefaults } from './defaults'
 import {
 	ensureDebugShim,
 	resolveWorkerCompatibleRolldownConfig,
@@ -62,15 +63,17 @@ export async function bundleWorkerEntry(options: WorkerBundlerOptions): Promise<
 	await fs.rm(`${options.outFile}.map`, { force: true })
 
 	const alias = await resolveInternalAliasMap(outDir)
+	const defaults = createWorkerdBundlerDefaults()
 	const { inputOptions, outputOptions } = resolveWorkerCompatibleRolldownConfig({
 		cwd: options.cwd,
 		inputFile: options.inputFile,
 		outFile: options.outFile,
 		alias,
+		...defaults,
 		platform: 'browser',
 		rolldownOptions: options.rolldownOptions,
-		sourcemap: options.sourcemap,
-		minify: options.minify,
+		sourcemap: options.sourcemap ?? defaults.sourcemap,
+		minify: options.minify ?? defaults.minify,
 		defaultTsconfigMode: 'if-present'
 	})
 

@@ -17,6 +17,7 @@ import {
 	resolveWorkerCompatibleRolldownConfig,
 	writeWorkerCompatibleBundle
 } from './rolldown-shared'
+import { createWorkerdBundlerDefaults } from './defaults'
 
 // -----------------------------------------------------------------------------
 // Types
@@ -242,10 +243,12 @@ export default {
 			: [virtualEntryPlugin, userPlugins]
 
 	const outFile = resolve(classOutDir, 'index.js')
+	const defaults = createWorkerdBundlerDefaults()
 	const { inputOptions, outputOptions } = resolveWorkerCompatibleRolldownConfig({
 		cwd,
 		inputFile: virtualEntryId,
 		outFile,
+		...defaults,
 		platform: 'neutral',
 		alias: {
 			debug: debugShimPath
@@ -254,8 +257,8 @@ export default {
 			...userRolldownOptions,
 			plugins: mergedPlugins
 		},
-		sourcemap: bundleOptions?.sourcemap,
-		minify: bundleOptions?.minify,
+		sourcemap: bundleOptions?.sourcemap ?? defaults.sourcemap,
+		minify: bundleOptions?.minify ?? defaults.minify,
 		inlineDynamicImports: true,
 		defaultTsconfigMode: 'always'
 	})
