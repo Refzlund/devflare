@@ -1,6 +1,20 @@
 // =============================================================================
 // Browser Shim Server — HTTP/WebSocket server for local Browser Rendering
 // =============================================================================
+/**
+ * Devflare's **local browser-rendering shim**.
+ *
+ * Accepts only loopback browser origins (e.g. `http://127.0.0.1:*`,
+ * `http://localhost:*`) plus origin-less tool traffic (Puppeteer, curl, and
+ * other non-browser clients that do not send an `Origin` header). Cross-origin
+ * browser traffic is rejected at the request boundary.
+ *
+ * This is NOT a user-facing app route — it is devflare's protected helper
+ * endpoint used by the local Browser Rendering binding to satisfy the
+ * `@cloudflare/puppeteer` contract during local dev. The loopback-only posture
+ * applies to this shim only and does not apply to the user's normal worker
+ * routes.
+ */
 // Provides endpoints that @cloudflare/puppeteer expects:
 // - POST /v1/acquire → Launch browser, return sessionId
 // - GET /v1/connectDevtools?browser_session=X → WebSocket to Chrome DevTools

@@ -48,6 +48,63 @@ async function loadProgrammaticDevflareConfig(options: ProgrammaticConfigOptions
 	return { cwd, devflareConfig }
 }
 
+interface ProgrammaticArtifacts {
+	cwd: string
+	devflareConfig: Awaited<ReturnType<typeof loadProgrammaticDevflareConfig>>['devflareConfig']
+	composedMainEntry: string | null
+	wranglerConfig: ReturnType<typeof compileConfig>
+	cloudflareConfig: Record<string, unknown>
+	auxiliaryWorkers: AuxiliaryWorkerConfig[]
+}
+
+/**
+ * Single canonical builder for programmatic config artifacts.
+ *
+ * Both public helpers (`getCloudflareConfig`, `getDevflareConfigs`) project
+ * out of this. The function loads the devflare config, prepares the composed
+ * worker entrypoint, compiles the wrangler config, derives the matching
+ * cloudflare-vite-plugin config (with optional `programmatic` projection),
+ * and discovers auxiliary DO workers when applicable.
+ */
+async function buildProgrammaticArtifacts(
+	options: ProgrammaticConfigOptions,
+	mode: 'wrangler' | 'programmatic'
+): Promise<ProgrammaticArtifacts> {
+	const { cwd, devflareConfig } = await loadProgrammaticDevflareConfig(options)
+	const composedMainEntry = await prepareComposedWorkerEntrypoint(cwd, devflareConfig)
+
+	const wranglerConfig = compileConfig(devflareConfig)
+	const cloudflareConfig: Record<string, unknown> = mode === 'programmatic'
+		? compileToProgrammaticConfig(devflareConfig)
+		: { ...wranglerConfig }
+
+	if (composedMainEntry) {
+		wranglerConfig.main = composedMainEntry
+		cloudflareConfig.main = composedMainEntry
+	}
+
+	const auxiliaryWorkers: AuxiliaryWorkerConfig[] = []
+
+	const doPatternConfig = devflareConfig.files?.durableObjects
+	const doPattern = typeof doPatternConfig === 'string' ? doPatternConfig : DEFAULT_DO_PATTERN
+	if (doPatternConfig !== false) {
+		const doWorkerName = `${wranglerConfig.name}-do`
+		const discovery = await discoverDurableObjects(cwd, doPattern, doWorkerName)
+
+		if (discovery.files.size > 0) {
+			if (cloudflareConfig.durable_objects) {
+				const doConfig = cloudflareConfig.durable_objects as { bindings: Array<{ script_name?: string }> }
+				for (const binding of doConfig.bindings) {
+					binding.script_name = doWorkerName
+				}
+			}
+			auxiliaryWorkers.push(createAuxiliaryWorkerConfig(wranglerConfig, discovery))
+		}
+	}
+
+	return { cwd, devflareConfig, composedMainEntry, wranglerConfig, cloudflareConfig, auxiliaryWorkers }
+}
+
 /**
  * Get cloudflare config for programmatic use with @cloudflare/vite-plugin.
  * Call this in vite.config.ts before setting up plugins.
@@ -62,13 +119,7 @@ async function loadProgrammaticDevflareConfig(options: ProgrammaticConfigOptions
 export async function getCloudflareConfig(
 	options: ProgrammaticConfigOptions = {}
 ): Promise<Record<string, unknown>> {
-	const { cwd, devflareConfig } = await loadProgrammaticDevflareConfig(options)
-	const composedMainEntry = await prepareComposedWorkerEntrypoint(cwd, devflareConfig)
-	const cloudflareConfig = compileToProgrammaticConfig(devflareConfig)
-	if (composedMainEntry) {
-		cloudflareConfig.main = composedMainEntry
-	}
-
+	const { cloudflareConfig } = await buildProgrammaticArtifacts(options, 'programmatic')
 	return cloudflareConfig
 }
 
@@ -92,35 +143,6 @@ export async function getDevflareConfigs(
 	cloudflareConfig: Record<string, unknown>
 	auxiliaryWorkers: AuxiliaryWorkerConfig[]
 }> {
-	const { cwd, devflareConfig } = await loadProgrammaticDevflareConfig(options)
-	const composedMainEntry = await prepareComposedWorkerEntrypoint(cwd, devflareConfig)
-
-	const wranglerConfig = compileConfig(devflareConfig)
-	const cloudflareConfig = { ...wranglerConfig }
-	if (composedMainEntry) {
-		wranglerConfig.main = composedMainEntry
-		cloudflareConfig.main = composedMainEntry
-	}
-
-	const auxiliaryWorkers: AuxiliaryWorkerConfig[] = []
-
-	const doPatternConfig = devflareConfig.files?.durableObjects
-	const doPattern = typeof doPatternConfig === 'string' ? doPatternConfig : DEFAULT_DO_PATTERN
-	if (doPatternConfig !== false) {
-		const doWorkerName = `${wranglerConfig.name}-do`
-		const discovery = await discoverDurableObjects(cwd, doPattern, doWorkerName)
-
-		if (discovery.files.size > 0) {
-			if (cloudflareConfig.durable_objects) {
-				const doConfig = cloudflareConfig.durable_objects as { bindings: Array<{ script_name?: string }> }
-				for (const binding of doConfig.bindings) {
-					binding.script_name = doWorkerName
-				}
-			}
-
-			auxiliaryWorkers.push(createAuxiliaryWorkerConfig(wranglerConfig, discovery))
-		}
-	}
-
+	const { cloudflareConfig, auxiliaryWorkers } = await buildProgrammaticArtifacts(options, 'wrangler')
 	return { cloudflareConfig, auxiliaryWorkers }
 }

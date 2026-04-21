@@ -7,6 +7,16 @@
 // bridge transport. Sits below the codec layer (see codec.ts) which adds the
 // hello/welcome handshake and the body-stream registry on top of these
 // primitives.
+//
+// Inline-vs-HTTP fallback rule:
+// Body bytes below `HTTP_TRANSFER_THRESHOLD` (512 KB) ride inline as binary WS
+// frames over the same WebSocket carrying the RPC control plane. Above that
+// threshold the bridge switches to an out-of-band HTTP transfer because
+// workerd enforces a ~1 MB per-WebSocket-message limit, so a single oversized
+// inline frame would be rejected by the runtime before reaching the peer.
+// The transport choice is per-payload (decided when each body is serialized),
+// not per-connection: the WS stays open for the RPC envelope and the body
+// bytes simply travel via an HTTP fetch instead of a WS frame.
 // =============================================================================
 
 // -----------------------------------------------------------------------------
@@ -270,9 +280,7 @@ export function resetIdCounters(): void {
 /** Default chunk size for streaming (256 KB) */
 export const DEFAULT_CHUNK_SIZE = 256 * 1024
 
-/** Threshold for switching to HTTP transfer (10 MB) */
-// Threshold for using HTTP transfer instead of WebSocket for large data
-// workerd has a ~1MB WebSocket message limit, so we use HTTP for anything > 512KB
+/** Threshold for switching to HTTP transfer (512 KB — workerd ~1MB WS message limit). */
 export const HTTP_TRANSFER_THRESHOLD = 512 * 1024
 
 /** Default WebSocket port for bridge */

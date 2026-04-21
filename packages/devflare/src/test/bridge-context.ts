@@ -1,7 +1,13 @@
 // =============================================================================
 // Test Context — Real Miniflare-backed Testing
 // =============================================================================
-// Creates test contexts using actual Miniflare bindings for integration testing
+/**
+ * @deprecated Use createTestContext() from 'devflare/test' for new code.
+ * createBridgeTestContext() will be moved out of the main docs in favor of
+ * the unified createTestContext API.
+ *
+ * Creates test contexts using actual Miniflare bindings for integration testing.
+ */
 // =============================================================================
 
 import { loadConfig, type DevflareConfig } from '../config'

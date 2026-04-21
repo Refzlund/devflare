@@ -652,6 +652,33 @@ export const configurationDocs: DocPage[] = [
 				]
 			},
 			{
+				id: 'override-merge-rules',
+				title: 'Environment overrides: arrays replace, objects deep-merge, primitives replace',
+				paragraphs: [
+					'Overlays compose onto the base config with three rules: object-shaped values are deep-merged key by key, primitive values (strings, numbers, booleans) are replaced wholesale, and array-shaped values are replaced wholesale (they do not append). Reading an environment block as an override of the base — not as an addition to it — keeps these rules predictable.',
+					'The replace-arrays rule is the one most likely to surprise someone arriving from a config system that appended arrays. If a base config sets `routes: […]` and the overlay sets `routes: […]`, the overlay’s array becomes the resolved value; the base array is not concatenated. The same applies to `migrations` and to nested arrays like `triggers.crons`.'
+				],
+				table: {
+					headers: ['Field shape', 'Merge rule', 'Example'],
+					rows: [
+						['`routes` (array)', 'Replace', 'Base `routes: [{ pattern: "app.example.com/*", zone_name: "example.com" }]` + overlay `routes: [{ pattern: "preview.example.com/*", zone_name: "example.com" }]` resolves to **only** the preview entry.'],
+						['`migrations` (array)', 'Replace', 'Base `migrations: [{ tag: "v1", new_classes: ["Room"] }]` + overlay `migrations: [{ tag: "v2", new_classes: ["Room", "User"] }]` resolves to **only** the v2 entry. To preserve history, restate the prior migrations in the overlay.'],
+						['`triggers.crons` (array under nested object)', 'Replace at the array level (the parent `triggers` object is still deep-merged)', 'Base `triggers: { crons: ["*/5 * * * *"] }` + overlay `triggers: { crons: ["0 * * * *"] }` resolves to `triggers.crons = ["0 * * * *"]`. Other keys on `triggers` deep-merge as usual.'],
+						['`bindings` (object)', 'Deep-merge', 'Adding `bindings.kv.NEW_NS` in an overlay extends the base `bindings.kv` map; existing namespaces survive unless the overlay names the same key.'],
+						['`name`, `compatibility_date` (primitive)', 'Replace', 'The overlay value wins when present; otherwise the base value stays.']
+					]
+				},
+				callouts: [
+					{
+						tone: 'warning',
+						title: 'Arrays replace, they do not append',
+						body: [
+							'If you only want to add one extra route, one extra cron, or one extra migration to the base, the overlay must restate the base entries alongside the new one. An overlay that lists only the new entry will silently drop the base entries from the resolved config.'
+						]
+					}
+				]
+			},
+			{
 				id: 'when-to-pick-env',
 				title: 'Choose the environment where it matters, and let explicit deploy targets do the rest',
 				steps: [

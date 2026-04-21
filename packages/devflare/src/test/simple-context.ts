@@ -16,14 +16,13 @@ import { createEnvProxy, setBindingHints, type BindingHints } from '../bridge/pr
 import { __setTestContext } from '../env'
 import { hasCrossWorkerDOs, hasServiceBindings, resolveDOBindings, resolveServiceBindings } from './resolve-service-bindings'
 import { buildDurableObjectGateway } from './simple-context-durable-objects'
-import { getAvailablePort, resolveTransportFile } from './simple-context-paths'
-import { wrapEnvSendEmailBindings } from '../utils/send-email'
+import { resolveTransportFile } from './simple-context-paths'
 import { extractBindingHints } from './binding-hints'
 import { buildRemoteAndStaticBindings } from './simple-context-bindings'
 import { configureSurfaceHandlers, createBridgeEnvAccessor, createMultiWorkerEnvAccessor } from './simple-context-env'
 import { resolveHandlerPaths } from './simple-context-handlers'
 import { createDisposeContext, resolveTestContextConfig } from './simple-context-lifecycle'
-import { startBridgeBackedTestContext } from './simple-context-startup'
+import { bootTestRuntime } from './simple-context-runtime'
 import { decodeTransportValue, loadTransportDecoders, type TransportDecoderMap } from './simple-context-transport'
 import { applyMultiWorkerConfig } from './simple-context-multi-worker'
 import { buildInlineBridgeMfConfig } from './simple-context-mfconfig'
@@ -113,24 +112,12 @@ export async function createTestContext(configPath?: string): Promise<void> {
 		applyMultiWorkerConfig(mfConfig, config, serviceBindingResolution, doBindingResolution)
 	}
 
-	let activePort: number
-
-	if (hasMultiWorkerServices || hasMultiWorkerDOs) {
-		const { Miniflare } = await import('miniflare')
-		activePort = await getAvailablePort()
-		state.miniflare = new Miniflare({
-			...mfConfig,
-			port: activePort
-		})
-		await state.miniflare.ready
-		state.miniflareBindings = wrapEnvSendEmailBindings(await state.miniflare.getBindings())
-	} else {
-		const startedBridgeBackedTestContext = await startBridgeBackedTestContext(mfConfig)
-		activePort = startedBridgeBackedTestContext.port
-		state.miniflare = startedBridgeBackedTestContext.miniflare
-		state.miniflareBindings = startedBridgeBackedTestContext.miniflareBindings
-		state.client = startedBridgeBackedTestContext.client
-	}
+	const usesMultiWorker = Boolean(hasMultiWorkerServices || hasMultiWorkerDOs)
+	const runtime = await bootTestRuntime(mfConfig, usesMultiWorker)
+	const activePort = runtime.activePort
+	state.miniflare = runtime.miniflare
+	state.miniflareBindings = runtime.miniflareBindings
+	state.client = runtime.client
 
 	const disposeContext = createDisposeContext(state)
 
@@ -170,7 +157,7 @@ export async function createTestContext(configPath?: string): Promise<void> {
 		getEnv: getTestEnv
 	})
 
-	if (hasMultiWorkerServices || hasMultiWorkerDOs) {
+	if (usesMultiWorker) {
 		setBindingHints(hints)
 		__setTestContext(createMultiWorkerEnvAccessor(state), disposeContext)
 		return

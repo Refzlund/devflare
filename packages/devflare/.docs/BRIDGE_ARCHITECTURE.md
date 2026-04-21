@@ -1,5 +1,17 @@
 # Devflare Bridge Architecture
 
+> **TODO(B3):** finalize bare-verb vs namespaced RPC naming convention. The examples below currently show binding-prefixed RPC method names (e.g. `MY_KV.get`, `MY_DO.idFromName`); the on-the-wire convention is still being unified — see `INCONSISTENCIES.md → B3` and `bridge/server.ts` for the actual dispatch table.
+
+> **Source layout (current).** The bridge lives under `src/bridge/`:
+> - `bridge/v2/` — wire-protocol layer: `wire.ts` (RPC envelope, control plane, binary frame header, ID counters, `HTTP_TRANSFER_THRESHOLD`), `frames.ts` (binary frame encode/decode), `codec.ts` (handshake + body-stream registry on top of `wire.ts`), `transport.ts` (per-payload inline-vs-HTTP transport selection), `body-streams.ts` (pull-based stream registry), `value-codec.ts` / `value-serialization.ts` (POJO + StreamRef serialization), `control-messages.ts`, `ws-relay.ts` (WS pass-through plumbing), `serialization.ts`, `index.ts`.
+> - `bridge/client.ts` — Node/Bun-side client (used by the public `env` proxy).
+> - `bridge/server.ts` — in-worker dispatcher.
+> - `bridge/proxy.ts` — the `env` Proxy implementation that translates property access into RPC calls.
+> - `bridge/gateway-runtime.ts` — worker-side gateway that runs inside Miniflare.
+> - `bridge/miniflare.ts` — Miniflare lifecycle integration.
+>
+> The legacy `protocol.ts` / `serialization.ts` split referenced by older docs no longer exists — wire-level concerns now live in `bridge/v2/wire.ts` (control vocabulary) and `bridge/v2/value-codec.ts` (+ `value-serialization.ts`) for value shaping.
+
 ## Core Principle
 
 **Vite/SvelteKit/Node.js runs OUTSIDE workerd. Miniflare runs INSIDE workerd. The bridge connects them.**
@@ -57,7 +69,7 @@
 
 **Large file flow (HTTP fallback)**:
 ```
-1. RPC: { t: 'rpc.call', method: 'r2.put', params: ['BUCKET', 'big.zip', { httpUpload: true }] }
+1. RPC: { t: 'rpc.call', method: 'MY_BUCKET.put', params: ['big.zip', { httpUpload: true }] }
 2. Response: { t: 'rpc.ok', result: { uploadUrl: 'http://localhost:PORT/upload/xyz' } }
 3. Client streams file to uploadUrl via HTTP PUT
 4. Gateway streams to R2 binding
@@ -201,13 +213,13 @@ Browser connects to SvelteKit (not directly to Miniflare):
 // 3. Returns Promises that resolve when Miniflare responds
 
 await bridgeEnv.MY_KV.get('key')
-// → RPC: { t: 'rpc.call', id: '1', method: 'kv.get', params: ['MY_KV', 'key'] }
+// → RPC: { t: 'rpc.call', id: '1', method: 'MY_KV.get', params: ['key'] }
 // ← Response: { t: 'rpc.ok', id: '1', result: 'stored-value' }
 
 const stub = bridgeEnv.CHAT_ROOM.get(id)
 await stub.fetch(request)
-// → RPC: { t: 'rpc.call', id: '2', method: 'do.get', params: ['CHAT_ROOM', id] }
-// → RPC: { t: 'rpc.call', id: '3', method: 'do.fetch', params: [stubRef, serializedReq] }
+// → RPC: { t: 'rpc.call', id: '2', method: 'CHAT_ROOM.idFromName', params: [id] }
+// → RPC: { t: 'rpc.call', id: '3', method: 'CHAT_ROOM.fetch', params: [stubRef, serializedReq] }
 ```
 
 > **Note**: `bridgeEnv` is an internal bridge-layer primitive, not part of the stable root package contract.
@@ -242,9 +254,21 @@ bunx --bun devflare remote enable 30 # Enable remote-only tests for 30 minutes
 
 ```
 packages/devflare/src/bridge/
-├── protocol.ts      # Message types + binary framing
-├── serialization.ts # Request/Response/Stream
-├── client.ts        # Node.js WebSocket client
-├── server.ts        # Gateway worker (Miniflare)
-└── proxy.ts         # `env` Proxy
+├── v2/
+│   ├── wire.ts             # RPC envelope, control vocab, binary frame header, ID counters
+│   ├── frames.ts           # Binary frame encode/decode
+│   ├── codec.ts            # Hello/welcome handshake + body-stream registry on top of wire.ts
+│   ├── transport.ts        # Per-payload inline-vs-HTTP transport selection (HTTP_TRANSFER_THRESHOLD)
+│   ├── body-streams.ts     # Pull-based stream registry
+│   ├── value-codec.ts      # Request/Response/StreamRef value shaping
+│   ├── value-serialization.ts
+│   ├── control-messages.ts
+│   ├── ws-relay.ts         # WS pass-through plumbing
+│   ├── serialization.ts
+│   └── index.ts
+├── client.ts               # Node/Bun WebSocket client
+├── server.ts               # Gateway dispatcher (in-worker)
+├── proxy.ts                # `env` Proxy
+├── gateway-runtime.ts      # Worker-side gateway running inside Miniflare
+└── miniflare.ts            # Miniflare lifecycle integration
 ```

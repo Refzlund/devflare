@@ -7,29 +7,26 @@
 import type { ConsolaInstance } from 'consola'
 import type { Miniflare as MiniflareType } from 'miniflare'
 import { resolve } from 'pathe'
-import type { DevflareConfig } from '../config'
 import { loadConfig } from '../config/loader'
-import { type BrowserShim } from '../browser-shim'
-import { bundleWorkerEntry, type DOBundler, type DOBundleResult } from '../bundler'
+import { bundleWorkerEntry, type DOBundleResult } from '../bundler'
 import { checkRemoteBindingRequirements } from '../cli/wrangler-auth'
-import { clearLocalSendEmailBindings, setLocalSendEmailBindings } from '../utils/send-email'
+import { setLocalSendEmailBindings } from '../utils/send-email'
 import { prepareComposedWorkerEntrypoint } from '../worker-entry/composed-worker'
-import { discoverRoutes, type RouteDiscoveryResult } from '../worker-entry/routes'
+import { discoverRoutes } from '../worker-entry/routes'
 import { runD1Migrations } from './d1-migrations'
 import { createCompatibilityAwareMiniflareLog } from './miniflare-log'
 import { buildMiniflareDevConfig } from './miniflare-dev-config'
 import { createRuntimeStdioForwarder } from './runtime-stdio'
-import { stopSpawnedProcessTree } from './vite-utils'
 import { startViteProcess } from './vite-process'
 import { createReloadQueue } from './reload-queue'
 import {
 	collectWorkerWatchRoots,
 	hasWorkerSurfacePaths,
-	resolveMainWorkerSurfacePaths,
-	type WorkerSurfacePaths
+	resolveMainWorkerSurfacePaths
 } from './worker-surface-paths'
 import { applyWatcherTargetDiff, startWorkerSourceWatcher as createWorkerSourceWatcher } from './worker-source-watcher'
 import { logMiniflareBindingDiagnostics, logMiniflareConfigDiagnostics, logRemoteBindingRequirements, logWorkerHandlerDetection, maybeStartBrowserShim, maybeStartDOBundler, resolveViteIntegration, resolveWorkerConfigWatchPath } from './server-startup-helpers'
+import { createDevServerState, disposeDevServerState, type DevServerState } from './dev-server-state'
 
 // -----------------------------------------------------------------------------
 
@@ -80,78 +77,58 @@ export function createDevServer(options: DevServerOptions): DevServer {
 		debug = process.env.DEVFLARE_DEBUG === 'true'
 	} = options
 
-	let enableVite = enableViteRequested
-	let miniflare: MiniflareType | null = null
-	let doBundler: DOBundler | null = null
-	let workerSourceWatcher: import('chokidar').FSWatcher | null = null
-	let workerWatchTargets: string[] = []
-	let viteProcess: import('node:child_process').ChildProcess | null = null
-	let config: DevflareConfig | null = null
-	let browserShim: BrowserShim | null = null
-	let browserShimPort = 8788
-	let mainWorkerSurfacePaths: WorkerSurfacePaths = {
-		fetch: null,
-		queue: null,
-		scheduled: null,
-		email: null
-	}
-	let resolvedWorkerConfigPath: string | null = null
-	let mainWorkerScriptPath: string | null = null
-	let bundledMainWorkerScriptPath: string | null = null
-	let currentDoResult: DOBundleResult | null = null
-	let mainWorkerRoutes: RouteDiscoveryResult | null = null
-	let generatedViteConfigPath: string | null = null
+	const state: DevServerState = createDevServerState({ enableVite: enableViteRequested })
 
 	const reloadQueue = createReloadQueue({
 		reload: async () => {
-			if (!miniflare) return
+			if (!state.miniflare) return
 
 			const { Log, LogLevel } = await import('miniflare')
-			const mfConfig = buildMiniflareConfig(currentDoResult)
+			const mfConfig = buildMiniflareConfig(state.currentDoResult)
 			// Always enable debug logging to see worker load errors
 			mfConfig.log = createCompatibilityAwareMiniflareLog(Log, LogLevel.DEBUG, logger)
 			mfConfig.handleRuntimeStdio = createRuntimeStdioForwarder(logger)
 
 			logger?.info('Reloading Miniflare...')
-			await miniflare.setOptions(mfConfig)
+			await state.miniflare.setOptions(mfConfig)
 			logger?.success('Miniflare reloaded')
 		},
 		logger
 	})
 
 	async function bundleMainWorker(): Promise<void> {
-		if (!mainWorkerScriptPath || !config) {
-			bundledMainWorkerScriptPath = null
+		if (!state.mainWorkerScriptPath || !state.config) {
+			state.bundledMainWorkerScriptPath = null
 			return
 		}
 
-		bundledMainWorkerScriptPath = await bundleWorkerEntry({
+		state.bundledMainWorkerScriptPath = await bundleWorkerEntry({
 			cwd,
-			inputFile: mainWorkerScriptPath,
+			inputFile: state.mainWorkerScriptPath,
 			outFile: resolve(cwd, '.devflare', 'worker-entrypoints', 'main.js'),
-			rolldownOptions: config.rolldown?.options,
-			sourcemap: config.rolldown?.sourcemap,
-			minify: config.rolldown?.minify,
+			rolldownOptions: state.config.rolldown?.options,
+			sourcemap: state.config.rolldown?.sourcemap,
+			minify: state.config.rolldown?.minify,
 			logger
 		})
-		logger?.debug(`Bundled main worker → ${bundledMainWorkerScriptPath}`)
+		logger?.debug(`Bundled main worker → ${state.bundledMainWorkerScriptPath}`)
 	}
 
 	function buildMiniflareConfig(doResult: DOBundleResult | null) {
-		if (!config) throw new Error('Config not loaded')
+		if (!state.config) throw new Error('Config not loaded')
 
 		return buildMiniflareDevConfig({
-			config,
+			config: state.config,
 			cwd,
 			miniflarePort,
 			persist,
-			enableVite,
+			enableVite: state.enableVite,
 			debug,
-			mainWorkerSurfacePaths,
-			mainWorkerRoutes,
-			mainWorkerScriptPath,
-			bundledMainWorkerScriptPath,
-			browserShimPort,
+			mainWorkerSurfacePaths: state.mainWorkerSurfacePaths,
+			mainWorkerRoutes: state.mainWorkerRoutes,
+			mainWorkerScriptPath: state.mainWorkerScriptPath,
+			bundledMainWorkerScriptPath: state.bundledMainWorkerScriptPath,
+			browserShimPort: state.browserShimPort,
 			doResult,
 			logger
 		})
@@ -172,13 +149,13 @@ export function createDevServer(options: DevServerOptions): DevServer {
 			logMiniflareConfigDiagnostics(logger, mfConfig)
 		}
 
-		miniflare = new Miniflare(mfConfig)
-		await miniflare.ready
+		state.miniflare = new Miniflare(mfConfig)
+		await state.miniflare.ready
 
 		logger?.success(`Miniflare ready on http://localhost:${miniflarePort}`)
 
 		if (shouldLogMiniflareDiagnostics) {
-			await logMiniflareBindingDiagnostics(logger, miniflare, mfConfig)
+			await logMiniflareBindingDiagnostics(logger, state.miniflare, mfConfig)
 		}
 	}
 
@@ -186,67 +163,67 @@ export function createDevServer(options: DevServerOptions): DevServer {
 	 * Reload Miniflare with updated DO bundles
 	 */
 	async function reloadMiniflare(doResult: DOBundleResult | null): Promise<void> {
-		currentDoResult = doResult
+		state.currentDoResult = doResult
 		await reloadQueue.schedule()
 	}
 
 
 
 	async function refreshWorkerOnlySurfaceState(): Promise<void> {
-		if (!config) {
+		if (!state.config) {
 			return
 		}
 
-		mainWorkerSurfacePaths = await resolveMainWorkerSurfacePaths(cwd, config)
-		mainWorkerRoutes = await discoverRoutes(cwd, config)
-		const composedMainEntry = await prepareComposedWorkerEntrypoint(cwd, config, undefined, {
+		state.mainWorkerSurfacePaths = await resolveMainWorkerSurfacePaths(cwd, state.config)
+		state.mainWorkerRoutes = await discoverRoutes(cwd, state.config)
+		const composedMainEntry = await prepareComposedWorkerEntrypoint(cwd, state.config, undefined, {
 			devInternalEmail: true
 		})
-		mainWorkerScriptPath = composedMainEntry ? resolve(cwd, composedMainEntry) : null
+		state.mainWorkerScriptPath = composedMainEntry ? resolve(cwd, composedMainEntry) : null
 
-		if (mainWorkerScriptPath) {
+		if (state.mainWorkerScriptPath) {
 			await bundleMainWorker()
 		} else {
-			bundledMainWorkerScriptPath = null
+			state.bundledMainWorkerScriptPath = null
 		}
 
 		await syncWorkerWatchTargets()
 	}
 
 	function getWorkerWatchTargets(): string[] {
-		if (enableVite || !config) {
+		if (state.enableVite || !state.config) {
 			return []
 		}
 
-		const targets = collectWorkerWatchRoots(cwd, config, mainWorkerSurfacePaths)
-		if (resolvedWorkerConfigPath) {
-			targets.push(resolvedWorkerConfigPath)
+		const targets = collectWorkerWatchRoots(cwd, state.config, state.mainWorkerSurfacePaths)
+		if (state.resolvedWorkerConfigPath) {
+			targets.push(state.resolvedWorkerConfigPath)
 		}
 
 		return [...new Set(targets)]
 	}
 
 	async function syncWorkerWatchTargets(): Promise<void> {
-		if (!workerSourceWatcher) {
+		if (!state.workerSourceWatcher) {
 			return
 		}
-		workerWatchTargets = await applyWatcherTargetDiff(
-			workerSourceWatcher,
-			workerWatchTargets,
+		state.workerWatchTargets = await applyWatcherTargetDiff(
+			state.workerSourceWatcher,
+			state.workerWatchTargets,
 			getWorkerWatchTargets()
 		)
 	}
 
 	async function reloadWorkerOnlyConfig(): Promise<void> {
-		config = await loadConfig({ cwd, configFile: configPath })
-		setLocalSendEmailBindings(config.bindings?.sendEmail ?? {})
-		resolvedWorkerConfigPath = await resolveWorkerConfigWatchPath(cwd, configPath)
+		state.config = await loadConfig({ cwd, configFile: configPath })
+		setLocalSendEmailBindings(state.config.bindings?.sendEmail ?? {})
+		state.resolvedWorkerConfigPath = await resolveWorkerConfigWatchPath(cwd, configPath)
 		await refreshWorkerOnlySurfaceState()
-		await reloadMiniflare(currentDoResult)
+		await reloadMiniflare(state.currentDoResult)
 	}
 
 	async function startWorkerSourceWatcher(): Promise<void> {
-		if (enableVite || !config) {
+		if (state.enableVite || !state.config) {
 			return
 		}
 
@@ -255,15 +232,15 @@ export function createDevServer(options: DevServerOptions): DevServer {
 			return
 		}
 
-		workerWatchTargets = watchTargets
-		workerSourceWatcher = await createWorkerSourceWatcher({
+		state.workerWatchTargets = watchTargets
+		state.workerSourceWatcher = await createWorkerSourceWatcher({
 			watchTargets,
-			resolvedWorkerConfigPath,
+			resolvedWorkerConfigPath: state.resolvedWorkerConfigPath,
 			logger,
 			onConfigChange: reloadWorkerOnlyConfig,
 			onWorkerChange: async () => {
 				await refreshWorkerOnlySurfaceState()
-				await reloadMiniflare(currentDoResult)
+				await reloadMiniflare(state.currentDoResult)
 			}
 		})
 	}
@@ -275,45 +252,45 @@ export function createDevServer(options: DevServerOptions): DevServer {
 		logger?.info('Starting unified dev server...')
 
 		// Load config
-		config = await loadConfig({ cwd, configFile: configPath })
-		setLocalSendEmailBindings(config.bindings?.sendEmail ?? {})
-		resolvedWorkerConfigPath = await resolveWorkerConfigWatchPath(cwd, configPath)
-		logger?.debug('Loaded config:', config.name)
+		state.config = await loadConfig({ cwd, configFile: configPath })
+		setLocalSendEmailBindings(state.config.bindings?.sendEmail ?? {})
+		state.resolvedWorkerConfigPath = await resolveWorkerConfigWatchPath(cwd, configPath)
+		logger?.debug('Loaded config:', state.config.name)
 		const viteIntegration = await resolveViteIntegration({
 			cwd,
 			configPath,
 			miniflarePort,
-			enableViteRequested: enableVite,
+			enableViteRequested: state.enableVite,
 			logger
 		})
-		enableVite = viteIntegration.enableVite
-		generatedViteConfigPath = viteIntegration.generatedViteConfigPath
+		state.enableVite = viteIntegration.enableVite
+		state.generatedViteConfigPath = viteIntegration.generatedViteConfigPath
 		await refreshWorkerOnlySurfaceState()
 
 		if (
-			!enableVite
-			&& (hasWorkerSurfacePaths(mainWorkerSurfacePaths) || Boolean(mainWorkerRoutes?.routes.length))
+			!state.enableVite
+			&& (hasWorkerSurfacePaths(state.mainWorkerSurfacePaths) || Boolean(state.mainWorkerRoutes?.routes.length))
 		) {
 			logWorkerHandlerDetection(
 				logger,
-				enableVite,
+				state.enableVite,
 				true,
-				mainWorkerSurfacePaths,
-				mainWorkerRoutes
+				state.mainWorkerSurfacePaths,
+				state.mainWorkerRoutes
 			)
-		} else if (!enableVite) {
-			logWorkerHandlerDetection(logger, enableVite, false, mainWorkerSurfacePaths, mainWorkerRoutes)
+		} else if (!state.enableVite) {
+			logWorkerHandlerDetection(logger, state.enableVite, false, state.mainWorkerSurfacePaths, state.mainWorkerRoutes)
 		}
 
 		// Check for remote bindings and warn if requirements not met
-		const remoteCheck = await checkRemoteBindingRequirements(config)
+		const remoteCheck = await checkRemoteBindingRequirements(state.config)
 		logRemoteBindingRequirements(logger, remoteCheck)
 
 		// Start browser shim if browser rendering is configured
-		browserShim = await maybeStartBrowserShim(config, { browserShimPort, logger, verbose })
+		state.browserShim = await maybeStartBrowserShim(state.config, { browserShimPort: state.browserShimPort, logger, verbose })
 
 		// Bundle DOs if pattern is set
-		const doInit = await maybeStartDOBundler(config, {
+		const doInit = await maybeStartDOBundler(state.config, {
 			cwd,
 			logger,
 			onRebuild: async (result) => {
@@ -321,20 +298,20 @@ export function createDevServer(options: DevServerOptions): DevServer {
 				await reloadMiniflare(result)
 			}
 		})
-		doBundler = doInit.bundler
+		state.doBundler = doInit.bundler
 		const doResult: DOBundleResult | null = doInit.result
-		currentDoResult = doResult
+		state.currentDoResult = doResult
 
 		// Start Miniflare
 		await startMiniflare(doResult)
 		await startWorkerSourceWatcher()
 
-		if (enableVite) {
-			viteProcess = await startViteProcess({
+		if (state.enableVite) {
+			state.viteProcess = await startViteProcess({
 				cwd,
 				vitePort,
 				miniflarePort,
-				generatedViteConfigPath,
+				generatedViteConfigPath: state.generatedViteConfigPath,
 				logger
 			})
 		} else {
@@ -343,46 +320,21 @@ export function createDevServer(options: DevServerOptions): DevServer {
 
 		// Run D1 migrations after the dev runtime is started (give Miniflare more time to stabilize)
 		await new Promise((r) => setTimeout(r, 1000))
-		await runD1Migrations({ cwd, config, miniflarePort, logger })
+		await runD1Migrations({ cwd, config: state.config, miniflarePort, logger })
 	}
 
 	/**
 	 * Stop the dev server
 	 */
 	async function stop(): Promise<void> {
-		if (doBundler) {
-			await doBundler.close()
-			doBundler = null
-		}
-
-		if (workerSourceWatcher) {
-			await workerSourceWatcher.close()
-			workerSourceWatcher = null
-		}
-
-		if (miniflare) {
-			await miniflare.dispose()
-			miniflare = null
-		}
-
-		if (viteProcess) {
-			await stopSpawnedProcessTree(viteProcess)
-			viteProcess = null
-		}
-
-		if (browserShim) {
-			await browserShim.stop()
-			browserShim = null
-		}
-
-		clearLocalSendEmailBindings()
+		await disposeDevServerState(state)
 	}
 
 	/**
 	 * Get Miniflare instance
 	 */
 	function getMiniflare(): MiniflareType | null {
-		return miniflare
+		return state.miniflare
 	}
 
 	return {

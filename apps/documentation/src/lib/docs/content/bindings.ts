@@ -2781,9 +2781,10 @@ export default defineConfig({
 			],
 			callout: {
 				tone: 'info',
-				title: 'The honest browser story',
+				title: 'Local browser-rendering shim',
 				body: [
-					'Browser support is real, but it is infrastructural. Expect a stronger dev-server story than a tiny one-function local helper story.'
+					'The dev-side endpoint Devflare exposes for `@cloudflare/puppeteer` is the **local browser-rendering shim**. It accepts only loopback browser origins (e.g. `http://127.0.0.1:*`, `http://localhost:*`) plus origin-less tool traffic such as Puppeteer or curl.',
+					'This loopback-only posture is the security model of the shim itself — it is devflare’s protected helper endpoint for the local Browser Rendering binding. It is **not** a policy applied to your normal worker routes; user app routes still follow whatever request and CORS rules the worker code itself defines.'
 				]
 			}
 		},

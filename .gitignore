@@ -11,6 +11,9 @@ INCONSISTENCIES.md
 REMAINING.md
 results.csv
 
+packages/devflare/_*.txt
+_*.txt
+
 # Build outputs
 dist/
 *.tsbuildinfo
