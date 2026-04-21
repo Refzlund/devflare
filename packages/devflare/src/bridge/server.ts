@@ -336,8 +336,8 @@ export async function executeRpcMethod(
 			return serializeDOId((binding as DurableObjectNamespace).newUniqueId(params[0] as any))
 		case 'do.get': {
 			const doId = deserializeDOId(params[0] as any, binding as DurableObjectNamespace)
-			// Instantiate stub to validate id; we return a DOStub reference for the client
-			;(binding as DurableObjectNamespace).get(doId)
+				// Instantiate stub to validate id; we return a DOStub reference for the client
+				; (binding as DurableObjectNamespace).get(doId)
 			return { __type: 'DOStub', binding: bindingName, id: params[0] }
 		}
 		case 'do.fetch':

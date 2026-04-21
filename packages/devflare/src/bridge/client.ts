@@ -374,8 +374,8 @@ export class BridgeClient {
 
 		const proxy: ActiveWsProxy = {
 			clientWs: null as any,  // Not a real WS, we handle it
-			onMessage: () => {},
-			onClose: () => {}
+			onMessage: () => { },
+			onClose: () => { }
 		}
 		this.wsProxies.set(wid, proxy)
 

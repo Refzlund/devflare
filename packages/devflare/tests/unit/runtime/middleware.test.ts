@@ -27,8 +27,8 @@ import {
 
 function createMockCtx(): ExecutionContext {
 	return {
-		waitUntil: () => {},
-		passThroughOnException: () => {},
+		waitUntil: () => { },
+		passThroughOnException: () => { },
 		props: {}
 	} as ExecutionContext
 }
@@ -622,7 +622,7 @@ describe('R1-strict: 2-arg fetch handlers require explicit style', () => {
 
 describe('R1-strict: 2-arg queue handlers require explicit style', () => {
 	test('throws when an unmarked 2-arg queue handler is asserted', () => {
-		const handler = async (_batch: unknown, _env: unknown) => {}
+		const handler = async (_batch: unknown, _env: unknown) => { }
 
 		expect(() => assertExplicitQueueHandlerStyle(handler)).toThrow(
 			/Ambiguous 2-argument queue handler/
@@ -630,19 +630,19 @@ describe('R1-strict: 2-arg queue handlers require explicit style', () => {
 	})
 
 	test('accepts a 1-arg queue handler', () => {
-		const handler = async (_event: unknown) => {}
+		const handler = async (_event: unknown) => { }
 
 		expect(() => assertExplicitQueueHandlerStyle(handler)).not.toThrow()
 	})
 
 	test('accepts a 3-arg queue handler', () => {
-		const handler = async (_batch: unknown, _env: unknown, _ctx: unknown) => {}
+		const handler = async (_batch: unknown, _env: unknown, _ctx: unknown) => { }
 
 		expect(() => assertExplicitQueueHandlerStyle(handler)).not.toThrow()
 	})
 
 	test('accepts a marked 2-arg queue handler via defineQueueHandler', () => {
-		const handler = defineQueueHandler(async (_batch: unknown, _env: unknown) => {})
+		const handler = defineQueueHandler(async (_batch: unknown, _env: unknown) => { })
 
 		expect(() => assertExplicitQueueHandlerStyle(handler)).not.toThrow()
 	})
@@ -650,7 +650,7 @@ describe('R1-strict: 2-arg queue handlers require explicit style', () => {
 
 describe('R1-strict: 2-arg scheduled handlers require explicit style', () => {
 	test('throws when an unmarked 2-arg scheduled handler is asserted', () => {
-		const handler = async (_controller: unknown, _env: unknown) => {}
+		const handler = async (_controller: unknown, _env: unknown) => { }
 
 		expect(() => assertExplicitScheduledHandlerStyle(handler)).toThrow(
 			/Ambiguous 2-argument scheduled handler/
@@ -658,19 +658,19 @@ describe('R1-strict: 2-arg scheduled handlers require explicit style', () => {
 	})
 
 	test('accepts a 1-arg scheduled handler', () => {
-		const handler = async (_event: unknown) => {}
+		const handler = async (_event: unknown) => { }
 
 		expect(() => assertExplicitScheduledHandlerStyle(handler)).not.toThrow()
 	})
 
 	test('accepts a 3-arg scheduled handler', () => {
-		const handler = async (_controller: unknown, _env: unknown, _ctx: unknown) => {}
+		const handler = async (_controller: unknown, _env: unknown, _ctx: unknown) => { }
 
 		expect(() => assertExplicitScheduledHandlerStyle(handler)).not.toThrow()
 	})
 
 	test('accepts a marked 2-arg scheduled handler via defineScheduledHandler', () => {
-		const handler = defineScheduledHandler(async (_controller: unknown, _env: unknown) => {})
+		const handler = defineScheduledHandler(async (_controller: unknown, _env: unknown) => { })
 
 		expect(() => assertExplicitScheduledHandlerStyle(handler)).not.toThrow()
 	})
