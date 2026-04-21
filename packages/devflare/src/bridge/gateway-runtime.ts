@@ -115,37 +115,90 @@ function isDurableObjectNamespace(binding) {
 		&& typeof binding.newUniqueId === 'function'
 }
 
+// Tracks bare/legacy operation names already warned about (one shot per verb).
+const __warnedLegacyOps = new Set()
+
+function detectBindingKind(binding) {
+	if (!binding || typeof binding !== 'object') return null
+	if (isDurableObjectNamespace(binding)) return 'do'
+	if (typeof binding.head === 'function' && typeof binding.createMultipartUpload === 'function') return 'r2'
+	if (typeof binding.getWithMetadata === 'function') return 'kv'
+	if (typeof binding.prepare === 'function' && typeof binding.exec === 'function') return 'd1'
+	if (typeof binding.sendBatch === 'function') return 'queue'
+	if (typeof binding.run === 'function' && typeof binding.send !== 'function') return 'ai'
+	if (typeof binding.send === 'function') return 'email'
+	return null
+}
+
+function translateLegacyOperation(operation, binding) {
+	if (operation.indexOf('stmt.') === 0) return 'd1.' + operation
+	if (operation === 'stub.fetch') return 'do.fetch'
+	if (operation === 'stub.rpc') return 'do.rpc'
+	if (operation.indexOf('.') !== -1) return null
+	const kind = detectBindingKind(binding)
+	if (!kind) return null
+	return kind + '.' + operation
+}
+
 /**
  * Execute an RPC method against the gateway's bindings.
  *
- * Method format: "binding.operation" (operation may contain dots, e.g.
- * "r2.get", "stmt.first", "stub.rpc"). Method vocabulary must stay in sync
- * with the canonical server in src/bridge/server.ts.
+ * Method format: "binding.operation". Operations are namespaced by binding
+ * kind (e.g. "kv.get", "r2.head", "d1.stmt.first", "do.fetch", "queue.send",
+ * "email.send", "ai.run"). Bare verbs and legacy "stmt.*" / "stub.*" forms
+ * are translated to their namespaced equivalents at dispatch time and emit a
+ * one-shot deprecation warning. Method vocabulary must stay in sync with the
+ * canonical server in src/bridge/server.ts.
  */
 async function executeRpcMethod(method, params, env, _ctx) {
 	const parts = method.split('.')
 	if (parts.length < 2) throw new Error('Invalid method format: ' + method)
 
 	const bindingName = parts[0]
-	const operation = parts.slice(1).join('.')
+	let operation = parts.slice(1).join('.')
 	const binding = env[bindingName]
 
 	if (!binding) throw new Error('Binding not found: ' + bindingName)
 
-	// KV Namespace / DO (disambiguated by binding shape)
-	if (operation === 'get') {
-		if (isDurableObjectNamespace(binding)) {
-			return { __type: 'DOStub', binding: bindingName, id: params[0] }
+	const isNamespaced =
+		operation.indexOf('kv.') === 0 ||
+		operation.indexOf('r2.') === 0 ||
+		operation.indexOf('d1.') === 0 ||
+		operation.indexOf('do.') === 0 ||
+		operation.indexOf('queue.') === 0 ||
+		operation.indexOf('email.') === 0 ||
+		operation.indexOf('ai.') === 0 ||
+		operation.indexOf('var.') === 0
+	if (!isNamespaced) {
+		const translated = translateLegacyOperation(operation, binding)
+		if (!translated) {
+			throw new Error(
+				"Cannot resolve legacy bridge operation '" + operation + "' for binding '" + bindingName + "': unknown binding kind"
+			)
 		}
-		return binding.get(params[0], params[1])
+		if (!__warnedLegacyOps.has(operation)) {
+			__warnedLegacyOps.add(operation)
+			console.warn(
+				'[devflare][bridge] Deprecated bridge op "' + operation + '", forward to "' + translated + '". This will be removed in a future release.'
+			)
+		}
+		operation = translated
 	}
-	if (operation === 'put') return binding.put(params[0], params[1], params[2])
-	if (operation === 'delete') return binding.delete(params[0])
-	if (operation === 'list') return binding.list(params[0])
-	if (operation === 'getWithMetadata') return binding.getWithMetadata(params[0], params[1])
+
+	// KV
+	if (operation === 'kv.get') return binding.get(params[0], params[1])
+	if (operation === 'kv.put') return binding.put(params[0], params[1], params[2])
+	if (operation === 'kv.delete') return binding.delete(params[0])
+	if (operation === 'kv.list') return binding.list(params[0])
+	if (operation === 'kv.getWithMetadata') return binding.getWithMetadata(params[0], params[1])
+
+	// DO get (returns DOStub reference)
+	if (operation === 'do.get') {
+		return { __type: 'DOStub', binding: bindingName, id: params[0] }
+	}
 
 	// R2
-	if (operation === 'head') return serializeR2Object(await binding.head(params[0]))
+	if (operation === 'r2.head') return serializeR2Object(await binding.head(params[0]))
 	if (operation === 'r2.get') {
 		const obj = await binding.get(params[0], params[1])
 		if (!obj) return null
@@ -165,13 +218,13 @@ async function executeRpcMethod(method, params, env, _ctx) {
 	if (operation === 'r2.list') return serializeR2Objects(await binding.list(params[0]))
 
 	// D1
-	if (operation === 'exec') return binding.exec(params[0])
-	if (operation === 'batch') {
+	if (operation === 'd1.exec') return binding.exec(params[0])
+	if (operation === 'd1.batch') {
 		const statements = params[0].map((s) => binding.prepare(s.sql).bind(...(s.bindings || [])))
 		return binding.batch(statements)
 	}
-	if (operation.startsWith('stmt.')) {
-		const mode = operation.split('.')[1]
+	if (operation.indexOf('d1.stmt.') === 0) {
+		const mode = operation.split('.')[2]
 		const [sql, ...rest] = params
 		let bindings = rest
 		let extraParam
@@ -192,19 +245,19 @@ async function executeRpcMethod(method, params, env, _ctx) {
 	}
 
 	// Durable Objects
-	if (operation === 'idFromName') {
+	if (operation === 'do.idFromName') {
 		const id = binding.idFromName(params[0])
 		return { __type: 'DOId', hex: id.toString() }
 	}
-	if (operation === 'idFromString') {
+	if (operation === 'do.idFromString') {
 		const id = binding.idFromString(params[0])
 		return { __type: 'DOId', hex: id.toString() }
 	}
-	if (operation === 'newUniqueId') {
+	if (operation === 'do.newUniqueId') {
 		const id = binding.newUniqueId(params[0])
 		return { __type: 'DOId', hex: id.toString() }
 	}
-	if (operation === 'stub.fetch') {
+	if (operation === 'do.fetch') {
 		const [, serializedId, serializedReq] = params
 		const id = binding.idFromString(serializedId.hex)
 		const stub = binding.get(id)
@@ -217,7 +270,7 @@ async function executeRpcMethod(method, params, env, _ctx) {
 		}))
 		return serializeResponse(response)
 	}
-	if (operation === 'stub.rpc') {
+	if (operation === 'do.rpc') {
 		const [, serializedId, methodName, args] = params
 		const id = binding.idFromString(serializedId.hex)
 		const stub = binding.get(id)
@@ -232,8 +285,8 @@ async function executeRpcMethod(method, params, env, _ctx) {
 	}
 
 	// Queues
-	if (operation === 'send') return binding.send(params[0], params[1])
-	if (operation === 'sendBatch') return binding.sendBatch(params[0], params[1])
+	if (operation === 'queue.send') return binding.send(params[0], params[1])
+	if (operation === 'queue.sendBatch') return binding.sendBatch(params[0], params[1])
 
 	// Send Email
 	if (operation === 'email.send') {
@@ -252,7 +305,7 @@ async function executeRpcMethod(method, params, env, _ctx) {
 	}
 
 	// AI / generic run()
-	if (operation === 'run') {
+	if (operation === 'ai.run') {
 		if (typeof binding.run !== 'function') {
 			throw new Error('Binding ' + bindingName + ' does not support run(): ' + method)
 		}

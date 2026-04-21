@@ -38,19 +38,19 @@ export interface EnvProxyOptions {
 function createKVProxy(client: BridgeClient, bindingName: string): KVNamespace {
 	return {
 		async get(key: string, options?: any): Promise<any> {
-			return client.call(`${bindingName}.get`, [key, options])
+			return client.call(`${bindingName}.kv.get`, [key, options])
 		},
 		async put(key: string, value: any, options?: any): Promise<void> {
-			await client.call(`${bindingName}.put`, [key, value, options])
+			await client.call(`${bindingName}.kv.put`, [key, value, options])
 		},
 		async delete(key: string): Promise<void> {
-			await client.call(`${bindingName}.delete`, [key])
+			await client.call(`${bindingName}.kv.delete`, [key])
 		},
 		async list(options?: any): Promise<any> {
-			return client.call(`${bindingName}.list`, [options])
+			return client.call(`${bindingName}.kv.list`, [options])
 		},
 		async getWithMetadata(key: string, options?: any): Promise<any> {
-			return client.call(`${bindingName}.getWithMetadata`, [key, options])
+			return client.call(`${bindingName}.kv.getWithMetadata`, [key, options])
 		}
 	} as KVNamespace
 }
@@ -62,7 +62,7 @@ function createKVProxy(client: BridgeClient, bindingName: string): KVNamespace {
 function createR2Proxy(client: BridgeClient, bindingName: string): R2Bucket {
 	return {
 		async head(key: string): Promise<R2Object | null> {
-			return client.call(`${bindingName}.head`, [key]) as Promise<R2Object | null>
+			return client.call(`${bindingName}.r2.head`, [key]) as Promise<R2Object | null>
 		},
 		async get(key: string, options?: any): Promise<R2ObjectBody | R2Object | null> {
 			return client.call(`${bindingName}.r2.get`, [key, options]) as Promise<R2ObjectBody | R2Object | null>
@@ -106,10 +106,10 @@ function createR2Proxy(client: BridgeClient, bindingName: string): R2Bucket {
 			return client.call(`${bindingName}.r2.list`, [options]) as Promise<R2Objects>
 		},
 		async createMultipartUpload(key: string, options?: any): Promise<R2MultipartUpload> {
-			return client.call(`${bindingName}.createMultipartUpload`, [key, options]) as Promise<R2MultipartUpload>
+			return client.call(`${bindingName}.r2.createMultipartUpload`, [key, options]) as Promise<R2MultipartUpload>
 		},
 		async resumeMultipartUpload(key: string, uploadId: string): Promise<R2MultipartUpload> {
-			return client.call(`${bindingName}.resumeMultipartUpload`, [key, uploadId]) as Promise<R2MultipartUpload>
+			return client.call(`${bindingName}.r2.resumeMultipartUpload`, [key, uploadId]) as Promise<R2MultipartUpload>
 		}
 	} as unknown as R2Bucket
 }
@@ -138,13 +138,13 @@ function createD1Proxy(client: BridgeClient, bindingName: string): D1Database {
 				const s = stmt as any
 				return { sql: s._sql, bindings: s._bindings }
 			})
-			return client.call(`${bindingName}.batch`, [serialized])
+			return client.call(`${bindingName}.d1.batch`, [serialized])
 		},
 		async exec(sql: string): Promise<any> {
-			return client.call(`${bindingName}.exec`, [sql])
+			return client.call(`${bindingName}.d1.exec`, [sql])
 		},
 		async dump(): Promise<ArrayBuffer> {
-			return client.call(`${bindingName}.dump`, []) as Promise<ArrayBuffer>
+			return client.call(`${bindingName}.d1.dump`, []) as Promise<ArrayBuffer>
 		}
 	} as D1Database
 }
@@ -162,16 +162,16 @@ function createD1StatementProxy(
 			return createD1StatementProxy(client, bindingName, sql, values)
 		},
 		async first(column?: string): Promise<any> {
-			return client.call(`${bindingName}.stmt.first`, [sql, ...bindings, column])
+			return client.call(`${bindingName}.d1.stmt.first`, [sql, ...bindings, column])
 		},
 		async all(): Promise<any> {
-			return client.call(`${bindingName}.stmt.all`, [sql, ...bindings])
+			return client.call(`${bindingName}.d1.stmt.all`, [sql, ...bindings])
 		},
 		async run(): Promise<any> {
-			return client.call(`${bindingName}.stmt.run`, [sql, ...bindings])
+			return client.call(`${bindingName}.d1.stmt.run`, [sql, ...bindings])
 		},
 		async raw(options?: any): Promise<any> {
-			return client.call(`${bindingName}.stmt.raw`, [sql, ...bindings, options])
+			return client.call(`${bindingName}.d1.stmt.raw`, [sql, ...bindings, options])
 		}
 	}
 	return stmt as D1PreparedStatement
@@ -261,13 +261,13 @@ function createDOStubProxy(
 		if (resolvedId) return resolvedId
 		switch (idInfo.type) {
 			case 'name':
-				resolvedId = await client.call(`${bindingName}.idFromName`, [idInfo.value])
+				resolvedId = await client.call(`${bindingName}.do.idFromName`, [idInfo.value])
 				break
 			case 'hex':
 				resolvedId = { __type: 'DOId', hex: idInfo.value }
 				break
 			case 'unique':
-				resolvedId = await client.call(`${bindingName}.newUniqueId`, [idInfo.options])
+				resolvedId = await client.call(`${bindingName}.do.newUniqueId`, [idInfo.options])
 				break
 		}
 		return resolvedId
@@ -280,7 +280,7 @@ function createDOStubProxy(
 			const request = input instanceof Request ? input : new Request(input, init)
 
 			const { serialized } = await serializeRequest(request)
-			const result = await client.call(`${bindingName}.stub.fetch`, [bindingName, id, serialized])
+			const result = await client.call(`${bindingName}.do.fetch`, [bindingName, id, serialized])
 
 			// Deserialize response
 			return deserializeResponse(result as SerializedResponse)
@@ -408,7 +408,7 @@ function createDOStubProxy(
 			// Return a function that calls the DO via RPC
 			return async (...args: unknown[]) => {
 				const id = await resolveId()
-				let result = await client.call(`${bindingName}.stub.rpc`, [
+				let result = await client.call(`${bindingName}.do.rpc`, [
 					bindingName,
 					id,
 					prop,
@@ -431,10 +431,10 @@ function createDOStubProxy(
 function createQueueProxy(client: BridgeClient, bindingName: string): Queue<unknown> {
 	return {
 		async send(message: unknown, options?: any): Promise<void> {
-			await client.call(`${bindingName}.send`, [message, options])
+			await client.call(`${bindingName}.queue.send`, [message, options])
 		},
 		async sendBatch(messages: any[], options?: any): Promise<void> {
-			await client.call(`${bindingName}.sendBatch`, [messages, options])
+			await client.call(`${bindingName}.queue.sendBatch`, [messages, options])
 		}
 	} as Queue<unknown>
 }
@@ -446,7 +446,7 @@ function createQueueProxy(client: BridgeClient, bindingName: string): Queue<unkn
 function createAIProxy(client: BridgeClient, bindingName: string): any {
 	return {
 		async run(model: string, inputs: any, options?: any): Promise<any> {
-			return client.call(`${bindingName}.run`, [model, inputs, options])
+			return client.call(`${bindingName}.ai.run`, [model, inputs, options])
 		}
 	}
 }
@@ -611,7 +611,7 @@ function createSimpleBindingProxy(client: BridgeClient, bindingName: string): un
 		}
 
 		if (!pendingValue) {
-			pendingValue = client.call(`${bindingName}.value`, [])
+			pendingValue = client.call(`${bindingName}.var.value`, [])
 				.then((value) => {
 					cachedValue = value
 					fetched = true

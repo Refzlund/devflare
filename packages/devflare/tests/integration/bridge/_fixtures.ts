@@ -28,14 +28,31 @@ export const PORTS = {
 /**
  * Common executeRpc function used by all gateway workers.
  * Handles KV and DO RPC operations via WebSocket bridge.
+ *
+ * Operation names follow the namespaced convention shipped by the
+ * production bridge proxy (see src/bridge/proxy.ts and src/bridge/server.ts):
+ *   - kv.get / kv.put / kv.delete / kv.list
+ *   - do.idFromName / do.fetch / do.rpc
+ *
+ * Bare-verb forms are also accepted for back-compat with older test scripts.
  */
 const executeRpcScript = `
 	async function executeRpc(env, method, params) {
 		const [bindingName, ...rest] = method.split('.')
-		const operation = rest.join('.')
+		let operation = rest.join('.')
 		const binding = env[bindingName]
 
 		if (!binding) throw new Error('Binding not found: ' + bindingName)
+
+		// Strip leading kind prefix if present so the dispatcher below can stay
+		// flat. (Test fixture only — production server warns and translates.)
+		if (operation.indexOf('kv.') === 0) operation = operation.slice(3)
+		else if (operation.indexOf('do.') === 0) {
+			const tail = operation.slice(3)
+			if (tail === 'fetch') operation = 'stub.fetch'
+			else if (tail === 'rpc') operation = 'stub.rpc'
+			else operation = tail
+		}
 
 		// KV operations
 		if (operation === 'get') return binding.get(params[0], params[1])

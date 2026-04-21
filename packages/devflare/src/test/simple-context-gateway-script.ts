@@ -60,10 +60,29 @@ export default {
 
 async function executeRpc(env, method, params) {
 	const [bindingName, ...rest] = method.split('.')
-	const op = rest.join('.')
+	let op = rest.join('.')
 	const binding = env[bindingName]
 	const RAW_EMAIL = 'EmailMessage::raw'
 	if (!binding) throw new Error('Binding not found: ' + bindingName)
+
+	// Normalize namespaced op names (kv.*, r2.*, d1.*, do.*, queue.*, ai.*, var.*)
+	// down to the legacy verbs this dispatcher historically used. The bridge
+	// proxy always emits namespaced forms (see src/bridge/proxy.ts and B3 in
+	// REMAINING.md); this keeps the dispatcher backwards-compatible while the
+	// rest of the codebase converges on the namespaced convention.
+	if (op.indexOf('kv.') === 0) op = op.slice(3)
+	else if (op.indexOf('do.') === 0) {
+		const tail = op.slice(3)
+		if (tail === 'fetch') op = 'stub.fetch'
+		else if (tail === 'rpc') op = 'stub.rpc'
+		else op = tail
+	}
+	else if (op.indexOf('queue.') === 0) op = op.slice(6)
+	else if (op.indexOf('ai.') === 0) op = op.slice(3)
+	else if (op.indexOf('var.') === 0) op = op.slice(4)
+	else if (op.indexOf('d1.stmt.') === 0) op = 'prepare.' + op.slice('d1.stmt.'.length)
+	else if (op.indexOf('d1.') === 0) op = op.slice(3)
+	// r2.* and email.* keep their existing prefixes
 
 	// KV operations
 	if (op === 'get') return binding.get(params[0], params[1])
@@ -77,7 +96,7 @@ async function executeRpc(env, method, params) {
 	if (op === 'r2.put') return binding.put(params[0], params[1], params[2])
 	if (op === 'r2.delete') return binding.delete(params[0])
 	if (op === 'r2.list') return binding.list(params[0])
-	if (op === 'head') return binding.head(params[0])
+	if (op === 'r2.head' || op === 'head') return binding.head(params[0])
 
 	// D1 operations
 	if (op === 'exec') return binding.exec(params[0])

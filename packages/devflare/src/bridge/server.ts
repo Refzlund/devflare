@@ -229,6 +229,48 @@ async function handleRpcCall(
 // RPC Method Execution
 // -----------------------------------------------------------------------------
 
+// Tracks bare/legacy operation names we have already warned about, so the
+// deprecation log line fires at most once per verb per process.
+const warnedLegacyOps = new Set<string>()
+
+/**
+ * Detect a binding's kind by structural typing. Used by the legacy bare-verb
+ * fallback to map a verb like `get` to its namespaced form (e.g. `kv.get`).
+ * Returns null when the binding shape does not match a known kind.
+ */
+function detectBindingKind(binding: unknown): string | null {
+	if (!binding || typeof binding !== 'object') return null
+	const b = binding as Record<string, unknown>
+	if (
+		typeof b.idFromName === 'function' &&
+		typeof b.idFromString === 'function' &&
+		typeof b.newUniqueId === 'function'
+	) return 'do'
+	if (typeof b.head === 'function' && typeof b.createMultipartUpload === 'function') return 'r2'
+	if (typeof b.getWithMetadata === 'function') return 'kv'
+	if (typeof b.prepare === 'function' && typeof b.exec === 'function') return 'd1'
+	if (typeof b.sendBatch === 'function') return 'queue'
+	if (typeof b.run === 'function' && typeof b.send !== 'function') return 'ai'
+	if (typeof b.send === 'function') return 'email'
+	return null
+}
+
+/**
+ * Translate a legacy operation name (bare verb, or older `stmt.*` / `stub.*`
+ * sub-prefix) into its namespaced form. Returns null when no translation is
+ * needed (the operation is already namespaced) or when the binding kind cannot
+ * be resolved.
+ */
+function translateLegacyOperation(operation: string, binding: unknown): string | null {
+	if (operation.startsWith('stmt.')) return 'd1.' + operation
+	if (operation === 'stub.fetch') return 'do.fetch'
+	if (operation === 'stub.rpc') return 'do.rpc'
+	if (operation.includes('.')) return null
+	const kind = detectBindingKind(binding)
+	if (!kind) return null
+	return `${kind}.${operation}`
+}
+
 export async function executeRpcMethod(
 	method: string,
 	params: unknown[],
@@ -242,45 +284,60 @@ export async function executeRpcMethod(
 	}
 
 	const bindingName = parts[0]
-	const operation = parts.slice(1).join('.')
+	let operation = parts.slice(1).join('.')
 	const binding = env[bindingName]
 
 	if (!binding) {
 		throw new Error(`Binding not found: ${bindingName}`)
 	}
 
-	// Handle different binding types
-	switch (operation) {
-		// KV Namespace or Durable Object (disambiguated by binding shape)
-		case 'get': {
-			const b = binding as any
-			const isDoNamespace =
-				typeof b.idFromName === 'function' &&
-				typeof b.idFromString === 'function' &&
-				typeof b.newUniqueId === 'function'
-			if (isDoNamespace) {
-				const doId = deserializeDOId(params[0] as any, binding as DurableObjectNamespace)
-				// Instantiate stub to validate id; we return a DOStub reference for the client
-				;(binding as DurableObjectNamespace).get(doId)
-				return { __type: 'DOStub', binding: bindingName, id: params[0] }
-			}
-			return (binding as KVNamespace).get(params[0] as string, params[1] as any)
+	// Legacy bare-verb / sub-prefix fallback: translate to a namespaced op,
+	// log a one-shot deprecation warning, and continue dispatch.
+	const isLegacy =
+		!operation.startsWith('kv.') &&
+		!operation.startsWith('r2.') &&
+		!operation.startsWith('d1.') &&
+		!operation.startsWith('do.') &&
+		!operation.startsWith('queue.') &&
+		!operation.startsWith('email.') &&
+		!operation.startsWith('ai.') &&
+		!operation.startsWith('var.')
+	if (isLegacy) {
+		const translated = translateLegacyOperation(operation, binding)
+		if (!translated) {
+			throw new Error(
+				`Cannot resolve legacy bridge operation '${operation}' for binding '${bindingName}': unknown binding kind`
+			)
 		}
-		case 'put':
+		if (!warnedLegacyOps.has(operation)) {
+			warnedLegacyOps.add(operation)
+			console.warn(
+				`[devflare][bridge] Deprecated bridge op "${operation}", forward to "${translated}". This will be removed in a future release.`
+			)
+		}
+		operation = translated
+	}
+
+	// Handle different binding types (namespaced operations)
+	switch (operation) {
+		// KV Namespace
+		case 'kv.get':
+			return (binding as KVNamespace).get(params[0] as string, params[1] as any)
+		case 'kv.put':
 			return (binding as KVNamespace).put(
 				params[0] as string,
 				params[1] as any,
 				params[2] as any
 			)
-		case 'delete':
+		case 'kv.delete':
 			return (binding as KVNamespace).delete(params[0] as string)
-		case 'list':
+		case 'kv.list':
 			return (binding as KVNamespace).list(params[0] as any)
-		case 'getWithMetadata':
+		case 'kv.getWithMetadata':
 			return (binding as KVNamespace).getWithMetadata(params[0] as string, params[1] as any)
 
 		// R2 Bucket
-		case 'head':
+		case 'r2.head':
 			return serializeR2Object(await (binding as R2Bucket).head(params[0] as string))
 		case 'r2.get':
 			return serializeR2ObjectBody(await (binding as R2Bucket).get(params[0] as string, params[1] as any))
@@ -296,52 +353,60 @@ export async function executeRpcMethod(
 			return (binding as R2Bucket).list(params[0] as any)
 
 		// D1 Database
-		case 'prepare':
+		case 'd1.prepare':
 			return serializeD1Statement((binding as D1Database).prepare(params[0] as string))
-		case 'batch':
+		case 'd1.batch':
 			return (binding as D1Database).batch(params[0] as any)
-		case 'exec':
+		case 'd1.exec':
 			return (binding as D1Database).exec(params[0] as string)
-		case 'dump':
+		case 'd1.dump':
 			return (binding as D1Database).dump()
 
 		// D1 Statement operations (from prepared statement)
-		case 'stmt.bind':
+		case 'd1.stmt.bind':
 			// Statement binding handled specially
 			return { __type: 'D1Statement', sql: params[0], bindings: params.slice(1) }
-		case 'stmt.first':
+		case 'd1.stmt.first':
 			return executeD1Statement(binding as D1Database, params[0] as string, params.slice(1), 'first', params[params.length - 1])
-		case 'stmt.all':
+		case 'd1.stmt.all':
 			return executeD1Statement(binding as D1Database, params[0] as string, params.slice(1), 'all')
-		case 'stmt.run':
+		case 'd1.stmt.run':
 			return executeD1Statement(binding as D1Database, params[0] as string, params.slice(1), 'run')
-		case 'stmt.raw':
+		case 'd1.stmt.raw':
 			return executeD1Statement(binding as D1Database, params[0] as string, params.slice(1), 'raw', params[params.length - 1])
 
 		// Durable Objects
-		case 'idFromName':
+		case 'do.idFromName':
 			return serializeDOId((binding as DurableObjectNamespace).idFromName(params[0] as string))
-		case 'idFromString':
+		case 'do.idFromString':
 			return serializeDOId((binding as DurableObjectNamespace).idFromString(params[0] as string))
-		case 'newUniqueId':
+		case 'do.newUniqueId':
 			return serializeDOId((binding as DurableObjectNamespace).newUniqueId(params[0] as any))
-		case 'stub.fetch':
+		case 'do.get': {
+			const doId = deserializeDOId(params[0] as any, binding as DurableObjectNamespace)
+			// Instantiate stub to validate id; we return a DOStub reference for the client
+			;(binding as DurableObjectNamespace).get(doId)
+			return { __type: 'DOStub', binding: bindingName, id: params[0] }
+		}
+		case 'do.fetch':
 			return executeDoFetch(env, params[0] as string, params[1] as any, params[2] as any)
-		case 'stub.rpc':
+		case 'do.rpc':
 			// DO RPC: Call a method on the Durable Object stub
 			// params = [bindingName, serializedId, methodName, methodArgs]
 			return executeDoRpc(env, params[0] as string, params[1] as any, params[2] as string, params[3] as unknown[])
 
-		// Queue
+		// Email
 		case 'email.send':
 			return executeSendEmail(binding as SendEmail, params[0])
-		case 'send':
+
+		// Queue
+		case 'queue.send':
 			return (binding as Queue<unknown>).send(params[0], params[1] as any)
-		case 'sendBatch':
+		case 'queue.sendBatch':
 			return (binding as Queue<unknown>).sendBatch(params[0] as any, params[1] as any)
 
 		// AI (if available)
-		case 'run':
+		case 'ai.run':
 			if (typeof (binding as any).run !== 'function') {
 				throw new Error(`Binding ${bindingName} does not support run(): ${method}`)
 			}
@@ -350,6 +415,11 @@ export async function executeRpcMethod(
 		default:
 			throw new Error(`Unknown operation: ${method}`)
 	}
+}
+
+/** @internal Test-only: reset the one-shot legacy-op warning set. */
+export function __resetLegacyOpWarnings(): void {
+	warnedLegacyOps.clear()
 }
 
 async function executeSendEmail(binding: SendEmail, message: unknown): Promise<EmailSendResult> {
