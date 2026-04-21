@@ -8,10 +8,10 @@
 
 import { getContextOrNull, type EventContext, type RuntimeContextValue } from './context'
 import { createContextProxy } from './validation'
-
-declare global {
-	interface DevflareEnv { }
-}
+// Side-effect import to ensure the canonical `declare global { interface
+// DevflareEnv {} }` from `src/env.ts` is loaded so the type used below
+// resolves to the same global users augment via their `env.d.ts`.
+import '../env'
 
 // =============================================================================
 // Readonly Proxy Helper

@@ -188,9 +188,12 @@ export interface TestEnv {
 }
 
 /**
- * Base environment type - augmented by user's env.d.ts via module augmentation.
+ * Base environment type — alias for the global `DevflareEnv` interface that
+ * users augment via their project's `env.d.ts`. Re-exported from
+ * `devflare/test` so consumers can write `const e: DevflareEnv = ...` against
+ * their own augmented bindings without importing from a different module than
+ * the rest of the test API.
  */
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export interface DevflareEnv { }
+export type DevflareEnv = globalThis.DevflareEnv
 
 export { env } from '../env'
