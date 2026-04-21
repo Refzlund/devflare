@@ -209,5 +209,34 @@ describe('resolveResources facade', () => {
 			})
 			expect(seam.bindings?.kv).toEqual(legacy.bindings?.kv)
 		})
+
+		// C2 step 1 — compile/build path migration. The Vite plugin's
+		// `mode==='build'` branch now goes through resolveResources({phase:'build'})
+		// instead of the lower-level resolveConfigForEnvironment. This pins the
+		// equivalence at the compiled-Wrangler-config level.
+		test('phase=build → compileBuildConfig matches resolveConfigForEnvironment → compileBuildConfig', async () => {
+			const fixtureWithEnv: DevflareConfig = {
+				...baseFixture,
+				env: {
+					production: {
+						bindings: {
+							kv: {
+								CACHE: { name: 'cache-kv-prod' }
+							}
+						}
+					}
+				}
+			}
+
+			const seamCompiled = compileBuildConfig(
+				await resolveResources(fixtureWithEnv, { phase: 'build', environment: 'production' })
+			)
+			const legacyCompiled = compileBuildConfig(
+				resolveConfigForEnvironment(fixtureWithEnv, 'production')
+			)
+			expect(seamCompiled.kv_namespaces).toEqual(legacyCompiled.kv_namespaces)
+			expect(seamCompiled.d1_databases).toEqual(legacyCompiled.d1_databases)
+			expect(seamCompiled.hyperdrive).toEqual(legacyCompiled.hyperdrive)
+		})
 	})
 })
