@@ -21,9 +21,9 @@ import { describe, expect, mock, test } from 'bun:test'
 import {
 	compileBuildConfig,
 	compileConfig,
-	prepareConfigResourcesForDeploy,
-	resolveConfigForLocalRuntime
+	prepareConfigResourcesForDeploy
 } from '../../../src/config'
+import { resolveConfigForLocalRuntime } from '../../../src/config/resource-resolution'
 import type { DevflareConfig } from '../../../src/config/schema'
 
 const baseFixture: DevflareConfig = {

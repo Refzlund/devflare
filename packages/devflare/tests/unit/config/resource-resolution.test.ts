@@ -4,10 +4,12 @@ import { tmpdir } from 'node:os'
 import { join } from 'pathe'
 import {
 	loadResolvedConfig,
-	prepareConfigResourcesForDeploy,
+	prepareConfigResourcesForDeploy
+} from '../../../src/config'
+import {
 	resolveConfigForLocalRuntime,
 	resolveConfigResources
-} from '../../../src/config'
+} from '../../../src/config/resource-resolution'
 import type { DevflareConfig } from '../../../src/config/schema'
 
 const tempDirs: string[] = []

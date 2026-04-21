@@ -8,9 +8,9 @@ import {
 	isPreviewScopedName,
 	loadConfig,
 	resolveConfigForEnvironment,
-	resolveConfigForLocalRuntime,
 	type DevflareConfig
 } from '../../../src/config'
+import { resolveConfigForLocalRuntime } from '../../../src/config/resource-resolution'
 import { collectPreviewScopedResourcePlan } from '../../../src/config/preview-resources'
 
 const repoRoot = resolve(import.meta.dirname, '../../../../../')

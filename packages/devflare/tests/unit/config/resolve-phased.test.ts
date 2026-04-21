@@ -13,10 +13,12 @@ import {
 	compileConfig,
 	preview,
 	resolveConfigForEnvironment,
-	resolveConfigForLocalRuntime,
-	resolveConfigResources,
 	resolveResources
 } from '../../../src/config'
+import {
+	resolveConfigForLocalRuntime,
+	resolveConfigResources
+} from '../../../src/config/resource-resolution'
 import type { DevflareConfig } from '../../../src/config/schema'
 
 const baseFixture: DevflareConfig = {

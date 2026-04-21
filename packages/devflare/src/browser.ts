@@ -80,8 +80,6 @@ export const loadResolvedConfig = unsupportedFunction<ConfigModule['loadResolved
 export const compileConfig = unsupportedFunction<ConfigModule['compileConfig']>('compileConfig')
 export const stringifyConfig = unsupportedFunction<ConfigModule['stringifyConfig']>('stringifyConfig')
 export const configSchema = createUnsupportedObject<ConfigModule['configSchema']>('configSchema')
-export const resolveConfigForLocalRuntime = unsupportedFunction<ConfigModule['resolveConfigForLocalRuntime']>('resolveConfigForLocalRuntime')
-export const resolveConfigResources = unsupportedFunction<ConfigModule['resolveConfigResources']>('resolveConfigResources')
 
 export class ConfigNotFoundError extends Error {
 	readonly code = 'CONFIG_NOT_FOUND'

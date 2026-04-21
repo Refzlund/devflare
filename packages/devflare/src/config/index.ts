@@ -72,12 +72,9 @@ export {
 } from './loader'
 export { resolveConfigForEnvironment } from './resolve'
 export {
-	resolveConfigForLocalRuntime,
 	resolveMaterializedConfigResources,
-	resolveConfigResources,
 	type LoadResolvedConfigOptions,
-	type ResolveMaterializedConfigResourcesOptions,
-	type ResolveConfigResourcesOptions
+	type ResolveMaterializedConfigResourcesOptions
 } from './resource-resolution'
 export {
 	prepareConfigResourcesForDeploy,

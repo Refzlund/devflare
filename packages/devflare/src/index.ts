@@ -16,16 +16,13 @@ export {
 	ConfigNotFoundError,
 	ConfigValidationError,
 	ConfigResourceResolutionError,
-	resolveConfigForLocalRuntime,
-	resolveConfigResources,
 	type DevflareConfig,
 	type DevflareConfigInput,
 	type PreviewScopeFn,
 	type PreviewScopeOptions,
 	type PreviewScopedName,
 	type PreviewScopedNameOptions,
-	type LoadResolvedConfigOptions,
-	type ResolveConfigResourcesOptions
+	type LoadResolvedConfigOptions
 } from './config'
 
 // Cross-config referencing
