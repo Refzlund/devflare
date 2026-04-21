@@ -606,7 +606,7 @@ async function runSmoke(env: TestingEnv): Promise<StoredSmokeResult> {
 	return smokeResult
 }
 
-export async function fetch(request: Request, env: TestingEnv): Promise<Response> {
+export async function fetch(request: Request, env: TestingEnv, _ctx: ExecutionContext): Promise<Response> {
 	const url = new URL(request.url)
 
 	if (url.pathname === '/' || url.pathname === '/status') {
