@@ -11,7 +11,10 @@ import { describe, expect, mock, test } from 'bun:test'
 import {
 	compileBuildConfig,
 	compileConfig,
+	preview,
+	resolveConfigForEnvironment,
 	resolveConfigForLocalRuntime,
+	resolveConfigResources,
 	resolveResources
 } from '../../../src/config'
 import type { DevflareConfig } from '../../../src/config/schema'
@@ -139,6 +142,72 @@ describe('resolveResources facade', () => {
 		})
 		expect((built.bindings?.kv as Record<string, { name?: string; id?: string }> | undefined)?.CACHE).toEqual({
 			name: 'cache-kv-prod'
+		})
+	})
+
+	// C2 prep — guarantee the seam is a strict superset of the legacy entry
+	// points by always materialising preview-scoped values, regardless of phase.
+	describe('C2 superset equivalence with legacy entry points', () => {
+		const pv = preview.scope()
+		const previewFixture: DevflareConfig = {
+			name: 'preview-worker',
+			compatibilityDate: '2025-01-07',
+			compatibilityFlags: [],
+			bindings: {
+				kv: {
+					CACHE: pv('cache-kv')
+				}
+			}
+		}
+
+		test('phase=build materialises preview-scoped names like resolveConfigForEnvironment', async () => {
+			const seam = await resolveResources(previewFixture, {
+				phase: 'build',
+				environment: 'preview',
+				preview: { identifier: 'pr-123' }
+			})
+			const legacy = resolveConfigForEnvironment(previewFixture, 'preview')
+			// Seam materialises (with explicit identifier); legacy materialises
+			// without identifier so falls back to environment-as-suffix. Both
+			// must yield concrete strings, not preview markers.
+			const seamCache = (seam.bindings?.kv as Record<string, string> | undefined)?.CACHE
+			const legacyCache = (legacy.bindings?.kv as Record<string, string> | undefined)?.CACHE
+			expect(seamCache).toBe('cache-kv-pr-123')
+			expect(legacyCache).toBe('cache-kv-preview')
+			// Without explicit preview opts, seam matches legacy exactly.
+			const seamNoPreview = await resolveResources(previewFixture, {
+				phase: 'build',
+				environment: 'preview'
+			})
+			expect(seamNoPreview.bindings?.kv).toEqual(legacy.bindings?.kv)
+		})
+
+		test('phase=local matches resolveConfigForLocalRuntime for preview-scoped fixtures', async () => {
+			const seam = await resolveResources(previewFixture, { phase: 'local', environment: 'preview' })
+			const legacy = resolveConfigForLocalRuntime(previewFixture, 'preview')
+			expect(compileConfig(seam).kv_namespaces).toEqual(compileConfig(legacy).kv_namespaces)
+		})
+
+		test('phase=deploy matches resolveConfigResources for preview-scoped fixtures', async () => {
+			const cloudflare = cloudflareMocks()
+			cloudflare.listKVNamespaces = mock(async () => ([
+				{ id: 'resolved-cache-preview-id', name: 'cache-kv-preview' }
+			])) as typeof cloudflare.listKVNamespaces
+			const seam = await resolveResources(previewFixture, {
+				phase: 'deploy',
+				environment: 'preview',
+				cloudflare
+			})
+
+			const cloudflare2 = cloudflareMocks()
+			cloudflare2.listKVNamespaces = mock(async () => ([
+				{ id: 'resolved-cache-preview-id', name: 'cache-kv-preview' }
+			])) as typeof cloudflare2.listKVNamespaces
+			const legacy = await resolveConfigResources(previewFixture, {
+				environment: 'preview',
+				cloudflare: cloudflare2
+			})
+			expect(seam.bindings?.kv).toEqual(legacy.bindings?.kv)
 		})
 	})
 })

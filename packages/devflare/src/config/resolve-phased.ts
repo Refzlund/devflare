@@ -122,9 +122,15 @@ config: DevflareConfig,
 options: O
 ): Promise<PhaseConfig<O['phase']>> {
 const envMerged = mergeConfigForEnvironment(config, options.environment)
-const previewMerged = options.preview
-? materializePreviewScopedConfig(envMerged, options.preview)
-: envMerged
+// C2 prep: always materialize preview-scoped values so this seam is a strict
+// superset of the legacy per-phase entry points (`resolveConfigForEnvironment`,
+// `resolveConfigForLocalRuntime`, `resolveConfigResources`), which all
+// materialize preview unconditionally. Callers can still pass extra
+// `preview` resolution options (env / identifier overrides).
+const previewMerged = materializePreviewScopedConfig(envMerged, {
+environment: options.environment,
+...options.preview
+})
 
 switch (options.phase) {
 case 'build': {
