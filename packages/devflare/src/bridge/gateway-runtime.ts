@@ -115,47 +115,22 @@ function isDurableObjectNamespace(binding) {
 		&& typeof binding.newUniqueId === 'function'
 }
 
-// Tracks bare/legacy operation names already warned about (one shot per verb).
-const __warnedLegacyOps = new Set()
-
-function detectBindingKind(binding) {
-	if (!binding || typeof binding !== 'object') return null
-	if (isDurableObjectNamespace(binding)) return 'do'
-	if (typeof binding.head === 'function' && typeof binding.createMultipartUpload === 'function') return 'r2'
-	if (typeof binding.getWithMetadata === 'function') return 'kv'
-	if (typeof binding.prepare === 'function' && typeof binding.exec === 'function') return 'd1'
-	if (typeof binding.sendBatch === 'function') return 'queue'
-	if (typeof binding.run === 'function' && typeof binding.send !== 'function') return 'ai'
-	if (typeof binding.send === 'function') return 'email'
-	return null
-}
-
-function translateLegacyOperation(operation, binding) {
-	if (operation.indexOf('stmt.') === 0) return 'd1.' + operation
-	if (operation === 'stub.fetch') return 'do.fetch'
-	if (operation === 'stub.rpc') return 'do.rpc'
-	if (operation.indexOf('.') !== -1) return null
-	const kind = detectBindingKind(binding)
-	if (!kind) return null
-	return kind + '.' + operation
-}
-
 /**
  * Execute an RPC method against the gateway's bindings.
  *
- * Method format: "binding.operation". Operations are namespaced by binding
- * kind (e.g. "kv.get", "r2.head", "d1.stmt.first", "do.fetch", "queue.send",
- * "email.send", "ai.run"). Bare verbs and legacy "stmt.*" / "stub.*" forms
- * are translated to their namespaced equivalents at dispatch time and emit a
- * one-shot deprecation warning. Method vocabulary must stay in sync with the
- * canonical server in src/bridge/server.ts.
+ * Method format: "binding.operation". Operations must be namespaced by
+ * binding kind (e.g. "kv.get", "r2.head", "d1.stmt.first", "do.fetch",
+ * "queue.send", "email.send", "ai.run"). Bare verbs and the legacy
+ * "stmt.*" / "stub.*" sub-prefixes were removed in B3-final and now throw.
+ * Method vocabulary must stay in sync with the canonical server in
+ * src/bridge/server.ts.
  */
 async function executeRpcMethod(method, params, env, _ctx) {
 	const parts = method.split('.')
 	if (parts.length < 2) throw new Error('Invalid method format: ' + method)
 
 	const bindingName = parts[0]
-	let operation = parts.slice(1).join('.')
+	const operation = parts.slice(1).join('.')
 	const binding = env[bindingName]
 
 	if (!binding) throw new Error('Binding not found: ' + bindingName)
@@ -170,19 +145,11 @@ async function executeRpcMethod(method, params, env, _ctx) {
 		operation.indexOf('ai.') === 0 ||
 		operation.indexOf('var.') === 0
 	if (!isNamespaced) {
-		const translated = translateLegacyOperation(operation, binding)
-		if (!translated) {
-			throw new Error(
-				"Cannot resolve legacy bridge operation '" + operation + "' for binding '" + bindingName + "': unknown binding kind"
-			)
-		}
-		if (!__warnedLegacyOps.has(operation)) {
-			__warnedLegacyOps.add(operation)
-			console.warn(
-				'[devflare][bridge] Deprecated bridge op "' + operation + '", forward to "' + translated + '". This will be removed in a future release.'
-			)
-		}
-		operation = translated
+		throw new Error(
+			"[devflare][bridge] Unsupported bridge operation '" + operation + "' for binding '" + bindingName + "'. "
+			+ "Bare verbs and the legacy stmt.*/stub.* sub-prefixes were removed in B3-final; "
+			+ "use the namespaced form (e.g. kv.get, r2.put, d1.stmt.first, do.fetch)."
+		)
 	}
 
 	// KV

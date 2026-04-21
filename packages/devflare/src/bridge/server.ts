@@ -229,48 +229,6 @@ async function handleRpcCall(
 // RPC Method Execution
 // -----------------------------------------------------------------------------
 
-// Tracks bare/legacy operation names we have already warned about, so the
-// deprecation log line fires at most once per verb per process.
-const warnedLegacyOps = new Set<string>()
-
-/**
- * Detect a binding's kind by structural typing. Used by the legacy bare-verb
- * fallback to map a verb like `get` to its namespaced form (e.g. `kv.get`).
- * Returns null when the binding shape does not match a known kind.
- */
-function detectBindingKind(binding: unknown): string | null {
-	if (!binding || typeof binding !== 'object') return null
-	const b = binding as Record<string, unknown>
-	if (
-		typeof b.idFromName === 'function' &&
-		typeof b.idFromString === 'function' &&
-		typeof b.newUniqueId === 'function'
-	) return 'do'
-	if (typeof b.head === 'function' && typeof b.createMultipartUpload === 'function') return 'r2'
-	if (typeof b.getWithMetadata === 'function') return 'kv'
-	if (typeof b.prepare === 'function' && typeof b.exec === 'function') return 'd1'
-	if (typeof b.sendBatch === 'function') return 'queue'
-	if (typeof b.run === 'function' && typeof b.send !== 'function') return 'ai'
-	if (typeof b.send === 'function') return 'email'
-	return null
-}
-
-/**
- * Translate a legacy operation name (bare verb, or older `stmt.*` / `stub.*`
- * sub-prefix) into its namespaced form. Returns null when no translation is
- * needed (the operation is already namespaced) or when the binding kind cannot
- * be resolved.
- */
-function translateLegacyOperation(operation: string, binding: unknown): string | null {
-	if (operation.startsWith('stmt.')) return 'd1.' + operation
-	if (operation === 'stub.fetch') return 'do.fetch'
-	if (operation === 'stub.rpc') return 'do.rpc'
-	if (operation.includes('.')) return null
-	const kind = detectBindingKind(binding)
-	if (!kind) return null
-	return `${kind}.${operation}`
-}
-
 export async function executeRpcMethod(
 	method: string,
 	params: unknown[],
@@ -284,38 +242,32 @@ export async function executeRpcMethod(
 	}
 
 	const bindingName = parts[0]
-	let operation = parts.slice(1).join('.')
+	const operation = parts.slice(1).join('.')
 	const binding = env[bindingName]
 
 	if (!binding) {
 		throw new Error(`Binding not found: ${bindingName}`)
 	}
 
-	// Legacy bare-verb / sub-prefix fallback: translate to a namespaced op,
-	// log a one-shot deprecation warning, and continue dispatch.
-	const isLegacy =
-		!operation.startsWith('kv.') &&
-		!operation.startsWith('r2.') &&
-		!operation.startsWith('d1.') &&
-		!operation.startsWith('do.') &&
-		!operation.startsWith('queue.') &&
-		!operation.startsWith('email.') &&
-		!operation.startsWith('ai.') &&
-		!operation.startsWith('var.')
-	if (isLegacy) {
-		const translated = translateLegacyOperation(operation, binding)
-		if (!translated) {
-			throw new Error(
-				`Cannot resolve legacy bridge operation '${operation}' for binding '${bindingName}': unknown binding kind`
-			)
-		}
-		if (!warnedLegacyOps.has(operation)) {
-			warnedLegacyOps.add(operation)
-			console.warn(
-				`[devflare][bridge] Deprecated bridge op "${operation}", forward to "${translated}". This will be removed in a future release.`
-			)
-		}
-		operation = translated
+	// Strict namespacing — bare verbs (e.g. `get`, `put`) and the older
+	// `stmt.*` / `stub.*` sub-prefixes are no longer accepted. All operations
+	// must be prefixed with a binding kind: `kv.`, `r2.`, `d1.`, `do.`,
+	// `queue.`, `email.`, `ai.`, or `var.`.
+	const isNamespaced =
+		operation.startsWith('kv.') ||
+		operation.startsWith('r2.') ||
+		operation.startsWith('d1.') ||
+		operation.startsWith('do.') ||
+		operation.startsWith('queue.') ||
+		operation.startsWith('email.') ||
+		operation.startsWith('ai.') ||
+		operation.startsWith('var.')
+	if (!isNamespaced) {
+		throw new Error(
+			`[devflare][bridge] Unsupported bridge operation '${operation}' for binding '${bindingName}'. `
+			+ 'Bare verbs and the legacy `stmt.*` / `stub.*` sub-prefixes were removed in B3-final; '
+			+ 'use the namespaced form (e.g. `kv.get`, `r2.put`, `d1.stmt.first`, `do.fetch`).'
+		)
 	}
 
 	// Handle different binding types (namespaced operations)
@@ -415,11 +367,6 @@ export async function executeRpcMethod(
 		default:
 			throw new Error(`Unknown operation: ${method}`)
 	}
-}
-
-/** @internal Test-only: reset the one-shot legacy-op warning set. */
-export function __resetLegacyOpWarnings(): void {
-	warnedLegacyOps.clear()
 }
 
 async function executeSendEmail(binding: SendEmail, message: unknown): Promise<EmailSendResult> {
