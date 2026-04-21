@@ -2,13 +2,14 @@
 // Middleware System Tests — sequence() and fetch module dispatch
 // =============================================================================
 
-import { describe, expect, spyOn, test } from 'bun:test'
+import { describe, expect, test } from 'bun:test'
 import {
-	__resetToStringFallbackWarnings,
 	createResolveFetch,
 	defineFetchHandler,
 	invokeFetchHandler,
 	invokeFetchModule,
+	markResolveStyle,
+	markWorkerStyle,
 	resolveFetchHandler,
 	sequence,
 	type FetchMiddleware,
@@ -165,10 +166,10 @@ describe('invokeFetchHandler()', () => {
 		)
 
 		const response = await runWithEventContext(fetchEvent, async () => {
-			return invokeFetchHandler(async (event: any, resolve: any) => {
+			return invokeFetchHandler(defineFetchHandler(async (event: any, resolve: any) => {
 				const downstream = await resolve(event)
 				return new Response(`wrapped:${await downstream.text()}`)
-			}, fetchEvent, async () => new Response('ok'))
+			}, { style: 'resolve' }), fetchEvent, async () => new Response('ok'))
 		})
 
 		expect(await response.text()).toBe('wrapped:ok')
@@ -250,7 +251,7 @@ describe('createResolveFetch()', () => {
 		expect(await response.text()).toBe('')
 	})
 
-	test('passes route params as the second argument to method handlers', async () => {
+	test('passes route params via event.params for 1-arg method handlers', async () => {
 		const fetchEvent = createFetchEvent(
 			new Request('https://example.com/api/users/42', { method: 'GET' }),
 			{},
@@ -260,8 +261,8 @@ describe('createResolveFetch()', () => {
 
 		const response = await runWithEventContext(fetchEvent, async () => {
 			const resolve = createResolveFetch({
-				async GET(_event: any, params: { id: string }) {
-					return new Response(params.id)
+				async GET(event: FetchEvent & { params: { id: string } }) {
+					return new Response(event.params.id)
 				}
 			}, null, fetchEvent)
 
@@ -410,9 +411,9 @@ describe('invokeFetchModule()', () => {
 
 		const response = await runWithEventContext(fetchEvent, async () => {
 			return invokeFetchModule({
-				async fetch(request: any, env: any) {
+				fetch: defineFetchHandler(async (request: any, env: any) => {
 					return new Response(`${request.method}:${env.message}`)
-				}
+				}, { style: 'worker' })
 			}, fetchEvent)
 		})
 
@@ -455,97 +456,112 @@ describe('invokeFetchModule()', () => {
 	})
 })
 
-describe('toString() fallback warning', () => {
-	test('warns only once per unique handler source even when detection runs multiple times', async () => {
-		__resetToStringFallbackWarnings()
-		const warnSpy = spyOn(console, 'warn').mockImplementation(() => { })
+describe('R1-strict: 2-arg fetch handlers require explicit style', () => {
+	test('throws when an unmarked 2-arg handler is invoked via invokeFetchHandler', async () => {
+		const fetchEvent = createFetchEvent(
+			new Request('https://example.com/ambiguous'),
+			{},
+			createMockCtx()
+		)
 
-		try {
-			// Unmarked 2-arg handler — triggers the toString() fallback path.
-			const handler = async (event: unknown, resolve: (event: unknown) => Promise<Response>) => {
-				return resolve(event)
-			}
+		const handler = async (event: FetchEvent, resolve: ResolveFetch) => resolve(event)
 
-			const fetchEvent = createFetchEvent(
-				new Request('https://example.com/toString-warn'),
-				{},
-				createMockCtx()
+		await expect(
+			runWithEventContext(fetchEvent, async () =>
+				invokeFetchHandler(handler, fetchEvent, async () => new Response('ok'))
 			)
-
-			// Invoke detection multiple times on the same handler body.
-			await runWithEventContext(fetchEvent, async () => {
-				await invokeFetchHandler(handler, fetchEvent, async () => new Response('ok'))
-				await invokeFetchHandler(handler, fetchEvent, async () => new Response('ok'))
-				await invokeFetchHandler(handler, fetchEvent, async () => new Response('ok'))
-			})
-
-			const fallbackWarnings = warnSpy.mock.calls.filter((args) =>
-				typeof args[0] === 'string' && args[0].includes('parameter-name inspection')
-			)
-			expect(fallbackWarnings.length).toBe(1)
-		} finally {
-			warnSpy.mockRestore()
-			__resetToStringFallbackWarnings()
-		}
+		).rejects.toThrow(/Ambiguous 2-argument fetch handler/)
 	})
 
-	test('does NOT warn when the handler is explicitly marked resolve-style', async () => {
-		__resetToStringFallbackWarnings()
-		const warnSpy = spyOn(console, 'warn').mockImplementation(() => { })
+	test('throws when an unmarked 2-arg method handler is dispatched via createResolveFetch', async () => {
+		const fetchEvent = createFetchEvent(
+			new Request('https://example.com/api/items/9', { method: 'GET' }),
+			{},
+			createMockCtx(),
+			{ params: { id: '9' } }
+		)
 
-		try {
-			const handler = defineFetchHandler(
-				async (event: FetchEvent, resolve: ResolveFetch) => resolve(event),
-				{ style: 'resolve' }
-			)
-
-			const fetchEvent = createFetchEvent(
-				new Request('https://example.com/marker'),
-				{},
-				createMockCtx()
-			)
-
-			await runWithEventContext(fetchEvent, async () => {
-				await invokeFetchHandler(handler, fetchEvent, async () => new Response('ok'))
-				await invokeFetchHandler(handler, fetchEvent, async () => new Response('ok'))
-			})
-
-			const fallbackWarnings = warnSpy.mock.calls.filter((args) =>
-				typeof args[0] === 'string' && args[0].includes('parameter-name inspection')
-			)
-			expect(fallbackWarnings.length).toBe(0)
-		} finally {
-			warnSpy.mockRestore()
-			__resetToStringFallbackWarnings()
+		const moduleHandlers = {
+			async GET(_event: any, _params: { id: string }) {
+				return new Response('unreachable')
+			}
 		}
+
+		await expect(
+			runWithEventContext(fetchEvent, async () => {
+				const resolve = createResolveFetch(moduleHandlers, null, fetchEvent)
+				return resolve(fetchEvent)
+			})
+		).rejects.toThrow(/Ambiguous 2-argument fetch handler/)
 	})
 
-	test('throws under DEVFLARE_STRICT_MIDDLEWARE=1 when param-name sniffing is the deciding factor', async () => {
-		__resetToStringFallbackWarnings()
-		const previous = process.env.DEVFLARE_STRICT_MIDDLEWARE
-		process.env.DEVFLARE_STRICT_MIDDLEWARE = '1'
+	test('accepts a marked resolve-style 2-arg handler', async () => {
+		const fetchEvent = createFetchEvent(
+			new Request('https://example.com/marked-resolve'),
+			{},
+			createMockCtx()
+		)
 
-		try {
-			const handler = async (event: FetchEvent, resolve: ResolveFetch) => resolve(event)
+		const handler = defineFetchHandler(
+			async (event: FetchEvent, resolve: ResolveFetch) => resolve(event),
+			{ style: 'resolve' }
+		)
 
-			const fetchEvent = createFetchEvent(
-				new Request('https://example.com/strict'),
-				{},
-				createMockCtx()
-			)
+		const response = await runWithEventContext(fetchEvent, async () =>
+			invokeFetchHandler(handler, fetchEvent, async () => new Response('ok'))
+		)
 
-			await expect(
-				runWithEventContext(fetchEvent, async () =>
-					invokeFetchHandler(handler, fetchEvent, async () => new Response('ok'))
-				)
-			).rejects.toThrow(/parameter-name inspection/)
-		} finally {
-			if (previous === undefined) {
-				delete process.env.DEVFLARE_STRICT_MIDDLEWARE
-			} else {
-				process.env.DEVFLARE_STRICT_MIDDLEWARE = previous
-			}
-			__resetToStringFallbackWarnings()
-		}
+		expect(await response.text()).toBe('ok')
+	})
+
+	test('accepts a marked worker-style 2-arg handler', async () => {
+		const fetchEvent = createFetchEvent(
+			new Request('https://example.com/marked-worker', { method: 'POST' }),
+			{ message: 'hi' },
+			createMockCtx()
+		)
+
+		const handler = defineFetchHandler(
+			async (request: any, env: any) => new Response(`${request.method}:${env.message}`),
+			{ style: 'worker' }
+		)
+
+		const response = await runWithEventContext(fetchEvent, async () =>
+			invokeFetchHandler(handler, fetchEvent, async () => new Response('fallback'))
+		)
+
+		expect(await response.text()).toBe('POST:hi')
+	})
+
+	test('markWorkerStyle alone is sufficient for 2-arg worker handlers', async () => {
+		const fetchEvent = createFetchEvent(
+			new Request('https://example.com/marked-worker-bare'),
+			{ id: 1 },
+			createMockCtx()
+		)
+
+		const handler = markWorkerStyle(async (_request: any, env: any) => new Response(String(env.id)))
+
+		const response = await runWithEventContext(fetchEvent, async () =>
+			invokeFetchHandler(handler, fetchEvent, async () => new Response('fallback'))
+		)
+
+		expect(await response.text()).toBe('1')
+	})
+
+	test('markResolveStyle alone is sufficient for 2-arg resolve handlers', async () => {
+		const fetchEvent = createFetchEvent(
+			new Request('https://example.com/marked-resolve-bare'),
+			{},
+			createMockCtx()
+		)
+
+		const handler = markResolveStyle(async (event: FetchEvent, resolve: ResolveFetch) => resolve(event))
+
+		const response = await runWithEventContext(fetchEvent, async () =>
+			invokeFetchHandler(handler, fetchEvent, async () => new Response('inner'))
+		)
+
+		expect(await response.text()).toBe('inner')
 	})
 })

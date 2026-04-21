@@ -81,15 +81,25 @@ describe('middleware detection', () => {
 		expect(seen!.ctx).toBe(fetchEvent.ctx)
 	})
 
-	test('2-arg unmarked (request, env) handler is treated worker-style even when minified', async () => {
-		let seen: { a: unknown, b: unknown } | null = null
-
-		const handler = simulateMinification(((a: any, b: any) => {
-			seen = { a, b }
-			return new Response('worker-2')
-		}) as (a: any, b: any) => Response)
+	test('2-arg unmarked handler throws under R1-strict (no parameter-name fallback)', async () => {
+		const handler = simulateMinification(((_a: any, _b: any) => new Response('unreachable')) as (a: any, b: any) => Response)
 
 		const fetchEvent = createEvent('https://example.com/two')
+
+		await expect(
+			runWithEventContext(fetchEvent, async () => invokeFetchHandler(handler, fetchEvent))
+		).rejects.toThrow(/Ambiguous 2-argument fetch handler/)
+	})
+
+	test('2-arg handler marked worker-style is routed worker-style even when minified', async () => {
+		let seen: { a: unknown, b: unknown } | null = null
+
+		const handler = simulateMinification(defineFetchHandler(((a: any, b: any) => {
+			seen = { a, b }
+			return new Response('worker-2')
+		}) as (a: any, b: any) => Response, { style: 'worker' }))
+
+		const fetchEvent = createEvent('https://example.com/two-marked')
 		const response = await runWithEventContext(fetchEvent, async () => {
 			return invokeFetchHandler(handler, fetchEvent)
 		})

@@ -82,6 +82,7 @@ export {
 	invokeFetchModule,
 	defineFetchHandler,
 	markResolveStyle,
+	markWorkerStyle,
 	type Awaitable,
 	type ResolveFetch,
 	type FetchMiddleware

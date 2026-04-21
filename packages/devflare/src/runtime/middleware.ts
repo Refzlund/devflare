@@ -9,6 +9,7 @@ type FetchModule = Record<string, unknown>
 
 const FETCH_SEQUENCE_SYMBOL = Symbol.for('devflare.fetch-sequence')
 const FETCH_RESOLVE_STYLE_SYMBOL = Symbol.for('devflare.fetch-resolve-style')
+const FETCH_WORKER_STYLE_SYMBOL = Symbol.for('devflare.fetch-worker-style')
 
 /**
  * Promise-or-value helper used by worker-safe runtime APIs.
@@ -68,12 +69,33 @@ export function markResolveStyle<T extends AnyFunction>(handler: T): T {
 }
 
 /**
+ * Tag a handler as worker-style: `(request, env)` or `(request, env, ctx)`.
+ *
+ * Required for 2-argument worker-style handlers because devflare can no
+ * longer disambiguate `(event, resolve)` vs `(request, env)` from arity
+ * alone — the parameter-name fallback was removed in R1-strict.
+ */
+export function markWorkerStyle<T extends AnyFunction>(handler: T): T {
+	Object.defineProperty(handler, FETCH_WORKER_STYLE_SYMBOL, {
+		value: true,
+		enumerable: false,
+		configurable: true,
+		writable: false
+	})
+
+	return handler
+}
+
+/**
  * Explicit escape hatch for declaring a handler's calling convention.
  *
- * - `options.style === 'resolve'` marks the handler so
- *   `isResolveStyleFunction` will recognise it regardless of minification.
- * - `options.style === 'worker'` (or omitted) returns the handler as-is;
- *   worker-style detection falls back to arity (`>= 2`).
+ * - `options.style === 'resolve'` marks the handler so it is dispatched as
+ *   `(event, resolve) => Response`.
+ * - `options.style === 'worker'` marks the handler so it is dispatched as
+ *   `(request, env[, ctx]) => Response`.
+ *
+ * The marker is required for 2-argument handlers; 1-arg `(event)` and
+ * 3-arg `(request, env, ctx)` handlers do not need to be wrapped.
  */
 export function defineFetchHandler<T extends AnyFunction>(
 	handler: T,
@@ -83,189 +105,73 @@ export function defineFetchHandler<T extends AnyFunction>(
 		return markResolveStyle(handler)
 	}
 
+	if (options?.style === 'worker') {
+		return markWorkerStyle(handler)
+	}
+
 	return handler
+}
+
+function hasResolveStyleMarker(handler: AnyFunction): boolean {
+	const record = handler as unknown as Record<PropertyKey, unknown>
+	return Boolean(record[FETCH_RESOLVE_STYLE_SYMBOL] || record[FETCH_SEQUENCE_SYMBOL])
+}
+
+function hasWorkerStyleMarker(handler: AnyFunction): boolean {
+	const record = handler as unknown as Record<PropertyKey, unknown>
+	return Boolean(record[FETCH_WORKER_STYLE_SYMBOL])
 }
 
 /**
  * Detect resolve-style `(event, resolve) => Response` handlers.
  *
- * Checks the symbol markers attached by `markResolveStyle` / `sequence()`
- * first (fully minification-safe). Falls back to a best-effort parameter
- * name inspection for inline handlers that were not wrapped — this
- * fallback is fragile under aggressive minification.
- *
- * When the parameter-name path decides the result, a one-time-per-source
- * `console.warn` is emitted. Setting the environment variable
- * `DEVFLARE_STRICT_MIDDLEWARE=1` upgrades that warn into a thrown error so
- * production builds can catch unmarked handlers in CI.
+ * Symbol-based only — the previous parameter-name fallback was removed in
+ * R1-strict. Callers that rely on a 2-argument resolve-style handler must
+ * wrap it with `markResolveStyle`, `defineFetchHandler({ style: 'resolve' })`,
+ * or compose it via `sequence(...)`.
  */
 function isResolveStyleFunction(handler: AnyFunction): boolean {
-	const record = handler as unknown as Record<PropertyKey, unknown>
-	if (record[FETCH_RESOLVE_STYLE_SYMBOL] || record[FETCH_SEQUENCE_SYMBOL]) {
-		return true
-	}
-
-	if (handler.length !== 2) {
-		return false
-	}
-
-	const parameterNames = getFunctionParameterNames(handler)
-	const secondParameter = parameterNames[1]?.trim().toLowerCase() ?? ''
-	const matched = secondParameter === 'resolve' || secondParameter.endsWith('resolve')
-
-	if (matched) {
-		notifyParameterSniff(handler, 'resolve')
-	}
-
-	return matched
-}
-
-function normalizeParameterName(parameterName: string | undefined): string {
-	return parameterName?.trim().toLowerCase() ?? ''
+	return hasResolveStyleMarker(handler)
 }
 
 /**
- * Detect method handlers written as `(event, params) => Response`.
+ * Throw a clear error for ambiguous unmarked 2-argument fetch handlers.
  *
- * Best-effort only — `params`-style handlers are positional and rely on
- * parameter-name inspection. Authors shipping minified builds should prefer
- * 1-arg `(event) => event.params` access instead. When the parameter-name
- * match decides the result, a one-time-per-source `console.warn` is emitted
- * (or thrown under `DEVFLARE_STRICT_MIDDLEWARE=1`).
+ * In R1-strict, devflare no longer guesses the calling convention from
+ * parameter names. 2-arg handlers must be marked with
+ * `defineFetchHandler(fn, { style: 'resolve' | 'worker' })` (or wrapped via
+ * `markResolveStyle` / `markWorkerStyle` / `sequence(...)`) so dispatch is
+ * unambiguous and minification-safe.
  */
-function isParamsStyleFunction(handler: AnyFunction): boolean {
+function assertExplicit2ArgStyle(handler: AnyFunction): void {
 	if (handler.length !== 2) {
-		return false
+		return
 	}
 
-	const parameterNames = getFunctionParameterNames(handler)
-	const secondParameter = normalizeParameterName(parameterNames[1])
-	const matched = secondParameter === 'params' || secondParameter.endsWith('params')
-
-	if (matched) {
-		notifyParameterSniff(handler, 'params')
+	if (hasResolveStyleMarker(handler) || hasWorkerStyleMarker(handler)) {
+		return
 	}
 
-	return matched
-}
-
-function splitParameterList(source: string): string[] {
-	const parameters: string[] = []
-	let current = ''
-	let depth = 0
-
-	for (const char of source) {
-		if (char === ',' && depth === 0) {
-			if (current.trim()) {
-				parameters.push(current.trim())
-			}
-			current = ''
-			continue
-		}
-
-		if (char === '(' || char === '[' || char === '{' || char === '<') {
-			depth += 1
-		} else if (char === ')' || char === ']' || char === '}' || char === '>') {
-			depth = Math.max(0, depth - 1)
-		}
-
-		current += char
-	}
-
-	if (current.trim()) {
-		parameters.push(current.trim())
-	}
-
-	return parameters
-}
-
-const toStringWarnedOnce = new Set<string>()
-
-/**
- * Reset the once-per-process warning tracker. Test-only hook.
- */
-export function __resetToStringFallbackWarnings(): void {
-	toStringWarnedOnce.clear()
-}
-
-function isStrictMiddlewareEnabled(): boolean {
-	try {
-		return typeof process !== 'undefined' && process.env?.DEVFLARE_STRICT_MIDDLEWARE === '1'
-	} catch {
-		return false
-	}
-}
-
-function formatParamSniffMessage(kind: 'resolve' | 'params'): string {
-	if (kind === 'params') {
-		return (
-			'[devflare] Detected a 2-argument method handler via parameter-name inspection (params-style). '
-			+ 'This fallback is fragile under minification. Prefer the 1-arg signature '
-			+ '`(event) => event.params` for minification-safe builds.'
-		)
-	}
-	return (
-		'[devflare] Detected a 2-argument fetch handler via parameter-name inspection (resolve-style). '
-		+ 'This fallback is fragile under minification. Wrap resolve-style handlers with '
-		+ "`defineFetchHandler(fn, { style: 'resolve' })` or `sequence(...)` to make detection minification-safe."
+	throw new Error(
+		'[devflare] Ambiguous 2-argument fetch handler. The calling convention must be declared explicitly via '
+		+ "`defineFetchHandler(fn, { style: 'resolve' })` (for `(event, resolve) => Response`) or "
+		+ "`defineFetchHandler(fn, { style: 'worker' })` (for `(request, env) => Response`). "
+		+ 'Single-arg `(event) => Response` and 3-arg worker-style `(request, env, ctx) => Response` '
+		+ 'handlers do not require wrapping.'
 	)
 }
 
-function notifyParameterSniff(handler: AnyFunction, kind: 'resolve' | 'params'): void {
-	let source: string
-	try {
-		source = handler.toString()
-	} catch {
-		source = `[unstringifiable ${kind}]`
-	}
-
-	const dedupKey = `${kind}\u0000${source}`
-	const message = formatParamSniffMessage(kind)
-
-	if (isStrictMiddlewareEnabled()) {
-		throw new Error(`${message} Set DEVFLARE_STRICT_MIDDLEWARE=0 to downgrade this error to a warning.`)
-	}
-
-	if (!toStringWarnedOnce.has(dedupKey)) {
-		toStringWarnedOnce.add(dedupKey)
-		console.warn(message)
-	}
-}
-
-function getFunctionParameterNames(handler: AnyFunction): string[] {
-	let source: string
-	try {
-		source = handler.toString().trim()
-	} catch (err) {
-		// Minifiers, bound functions, or Proxy wrappers can throw on toString().
-		// Default to worker-style detection (safer for minified handlers).
-		console.debug('[devflare middleware] Function.prototype.toString() threw; defaulting to worker-style:', err)
-		return []
-	}
-
-	const parenthesizedMatch = source.match(/^[^(]*\(([^)]*)\)/)
-	if (parenthesizedMatch) {
-		return splitParameterList(parenthesizedMatch[1])
-	}
-
-	const singleParameterArrowMatch = source.match(/^(?:async\s+)?([^=()\s]+)\s*=>/)
-	if (singleParameterArrowMatch) {
-		return [singleParameterArrowMatch[1].trim()]
-	}
-
-	return []
-}
-
 /**
- * Detect Cloudflare Worker-style `fetch(request, env, ctx)` handlers.
+ * Detect Cloudflare Worker-style `fetch(request, env[, ctx])` handlers.
  *
  * Returns true when:
  * - arity is `>= 3` (unambiguous worker signature), or
- * - arity is `2` AND the handler is not marked resolve-style AND its
- *   second parameter name does not look like `resolve` or `params`.
+ * - the handler is explicitly marked worker-style via `markWorkerStyle` or
+ *   `defineFetchHandler({ style: 'worker' })`.
  *
- * Name inspection is a best-effort fallback; for minified builds prefer
- * `defineFetchHandler(fn, { style: 'resolve' })` on resolve-style handlers.
+ * In R1-strict, 2-argument worker-style handlers must be marked — there is
+ * no parameter-name fallback. Unmarked 2-arg handlers throw via
+ * `assertExplicit2ArgStyle` when invoked.
  */
 function isWorkerStyleFetchFunction(handler: AnyFunction): boolean {
 	if (isResolveStyleFunction(handler)) {
@@ -276,11 +182,7 @@ function isWorkerStyleFetchFunction(handler: AnyFunction): boolean {
 		return true
 	}
 
-	if (handler.length === 2) {
-		return !isParamsStyleFunction(handler)
-	}
-
-	return false
+	return hasWorkerStyleMarker(handler)
 }
 
 function invokeWorkerStyleFetchFunction<TEvent extends FetchEvent>(
@@ -301,9 +203,13 @@ function bindMethod(target: unknown, key: string): AnyFunction | null {
 	}
 
 	const boundHandler = value.bind(target)
-	return isResolveStyleFunction(value)
-		? markResolveStyle(boundHandler)
-		: boundHandler
+	if (isResolveStyleFunction(value)) {
+		markResolveStyle(boundHandler)
+	}
+	if (hasWorkerStyleMarker(value)) {
+		markWorkerStyle(boundHandler)
+	}
+	return boundHandler
 }
 
 function createFetchSequence<TEvent extends FetchEvent>(
@@ -469,14 +375,11 @@ async function invokeResolvedFetchHandler<TEvent extends FetchEvent>(
 		return handler(event, async () => createNotFoundResponse())
 	}
 
-	if (isParamsStyleFunction(handler)) {
-		return handler(event, (event as { params?: unknown }).params ?? {})
-	}
-
 	if (isWorkerStyleFetchFunction(handler)) {
 		return invokeWorkerStyleFetchFunction(handler, event)
 	}
 
+	assertExplicit2ArgStyle(handler)
 	return handler(event)
 }
 
@@ -517,9 +420,13 @@ export async function invokeFetchHandler<TEvent extends FetchEvent>(
 		return response ?? createNotFoundResponse()
 	}
 
-	const response = await (isWorkerStyleFetchFunction(handler)
-		? invokeWorkerStyleFetchFunction(handler, event)
-		: handler(event))
+	if (isWorkerStyleFetchFunction(handler)) {
+		const response = await invokeWorkerStyleFetchFunction(handler, event)
+		return response ?? createNotFoundResponse()
+	}
+
+	assertExplicit2ArgStyle(handler)
+	const response = await handler(event)
 	return response ?? createNotFoundResponse()
 }
 
