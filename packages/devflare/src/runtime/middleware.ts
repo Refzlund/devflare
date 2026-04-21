@@ -92,9 +92,12 @@ export function defineFetchHandler<T extends AnyFunction>(
  * Checks the symbol markers attached by `markResolveStyle` / `sequence()`
  * first (fully minification-safe). Falls back to a best-effort parameter
  * name inspection for inline handlers that were not wrapped — this
- * fallback is fragile under aggressive minification, so authors are
- * encouraged to wrap such handlers with `defineFetchHandler(fn, { style: 'resolve' })`
- * or `sequence(...)` when shipping minified builds.
+ * fallback is fragile under aggressive minification.
+ *
+ * When the parameter-name path decides the result, a one-time-per-source
+ * `console.warn` is emitted. Setting the environment variable
+ * `DEVFLARE_STRICT_MIDDLEWARE=1` upgrades that warn into a thrown error so
+ * production builds can catch unmarked handlers in CI.
  */
 function isResolveStyleFunction(handler: AnyFunction): boolean {
 	const record = handler as unknown as Record<PropertyKey, unknown>
@@ -108,7 +111,13 @@ function isResolveStyleFunction(handler: AnyFunction): boolean {
 
 	const parameterNames = getFunctionParameterNames(handler)
 	const secondParameter = parameterNames[1]?.trim().toLowerCase() ?? ''
-	return secondParameter === 'resolve' || secondParameter.endsWith('resolve')
+	const matched = secondParameter === 'resolve' || secondParameter.endsWith('resolve')
+
+	if (matched) {
+		notifyParameterSniff(handler, 'resolve')
+	}
+
+	return matched
 }
 
 function normalizeParameterName(parameterName: string | undefined): string {
@@ -118,12 +127,11 @@ function normalizeParameterName(parameterName: string | undefined): string {
 /**
  * Detect method handlers written as `(event, params) => Response`.
  *
- * Best-effort only. Same caveat as `isResolveStyleFunction`: for
- * minification-safe code, wrap method handlers with
- * `defineFetchHandler(fn, { style: 'resolve' })` is NOT appropriate here —
- * `params`-style handlers are positional and currently rely on parameter
- * name inspection. Authors shipping minified builds should prefer 1-arg
- * `(event) => event.params` access instead.
+ * Best-effort only — `params`-style handlers are positional and rely on
+ * parameter-name inspection. Authors shipping minified builds should prefer
+ * 1-arg `(event) => event.params` access instead. When the parameter-name
+ * match decides the result, a one-time-per-source `console.warn` is emitted
+ * (or thrown under `DEVFLARE_STRICT_MIDDLEWARE=1`).
  */
 function isParamsStyleFunction(handler: AnyFunction): boolean {
 	if (handler.length !== 2) {
@@ -132,7 +140,13 @@ function isParamsStyleFunction(handler: AnyFunction): boolean {
 
 	const parameterNames = getFunctionParameterNames(handler)
 	const secondParameter = normalizeParameterName(parameterNames[1])
-	return secondParameter === 'params' || secondParameter.endsWith('params')
+	const matched = secondParameter === 'params' || secondParameter.endsWith('params')
+
+	if (matched) {
+		notifyParameterSniff(handler, 'params')
+	}
+
+	return matched
 }
 
 function splitParameterList(source: string): string[] {
@@ -174,6 +188,50 @@ export function __resetToStringFallbackWarnings(): void {
 	toStringWarnedOnce.clear()
 }
 
+function isStrictMiddlewareEnabled(): boolean {
+	try {
+		return typeof process !== 'undefined' && process.env?.DEVFLARE_STRICT_MIDDLEWARE === '1'
+	} catch {
+		return false
+	}
+}
+
+function formatParamSniffMessage(kind: 'resolve' | 'params'): string {
+	if (kind === 'params') {
+		return (
+			'[devflare] Detected a 2-argument method handler via parameter-name inspection (params-style). '
+			+ 'This fallback is fragile under minification. Prefer the 1-arg signature '
+			+ '`(event) => event.params` for minification-safe builds.'
+		)
+	}
+	return (
+		'[devflare] Detected a 2-argument fetch handler via parameter-name inspection (resolve-style). '
+		+ 'This fallback is fragile under minification. Wrap resolve-style handlers with '
+		+ "`defineFetchHandler(fn, { style: 'resolve' })` or `sequence(...)` to make detection minification-safe."
+	)
+}
+
+function notifyParameterSniff(handler: AnyFunction, kind: 'resolve' | 'params'): void {
+	let source: string
+	try {
+		source = handler.toString()
+	} catch {
+		source = `[unstringifiable ${kind}]`
+	}
+
+	const dedupKey = `${kind}\u0000${source}`
+	const message = formatParamSniffMessage(kind)
+
+	if (isStrictMiddlewareEnabled()) {
+		throw new Error(`${message} Set DEVFLARE_STRICT_MIDDLEWARE=0 to downgrade this error to a warning.`)
+	}
+
+	if (!toStringWarnedOnce.has(dedupKey)) {
+		toStringWarnedOnce.add(dedupKey)
+		console.warn(message)
+	}
+}
+
 function getFunctionParameterNames(handler: AnyFunction): string[] {
 	let source: string
 	try {
@@ -183,15 +241,6 @@ function getFunctionParameterNames(handler: AnyFunction): string[] {
 		// Default to worker-style detection (safer for minified handlers).
 		console.debug('[devflare middleware] Function.prototype.toString() threw; defaulting to worker-style:', err)
 		return []
-	}
-
-	if (!toStringWarnedOnce.has(source)) {
-		toStringWarnedOnce.add(source)
-		console.warn(
-			'[devflare] Detected a 2-argument fetch handler via Function.prototype.toString() inspection. '
-			+ 'This fallback is fragile under minification. Wrap resolve-style handlers with '
-			+ "`defineFetchHandler(fn, { style: 'resolve' })` or `sequence(...)` to make detection minification-safe."
-		)
 	}
 
 	const parenthesizedMatch = source.match(/^[^(]*\(([^)]*)\)/)

@@ -6,13 +6,15 @@ import { describe, expect, spyOn, test } from 'bun:test'
 import {
 	__resetToStringFallbackWarnings,
 	createResolveFetch,
+	defineFetchHandler,
 	invokeFetchHandler,
 	invokeFetchModule,
 	resolveFetchHandler,
 	sequence,
-	type FetchMiddleware
+	type FetchMiddleware,
+	type ResolveFetch
 } from '../../../src/runtime/middleware'
-import { createFetchEvent, runWithEventContext } from '../../../src/runtime/context'
+import { createFetchEvent, runWithEventContext, type FetchEvent } from '../../../src/runtime/context'
 
 function createMockCtx(): ExecutionContext {
 	return {
@@ -478,11 +480,71 @@ describe('toString() fallback warning', () => {
 			})
 
 			const fallbackWarnings = warnSpy.mock.calls.filter((args) =>
-				typeof args[0] === 'string' && args[0].includes('Function.prototype.toString()')
+				typeof args[0] === 'string' && args[0].includes('parameter-name inspection')
 			)
 			expect(fallbackWarnings.length).toBe(1)
 		} finally {
 			warnSpy.mockRestore()
+			__resetToStringFallbackWarnings()
+		}
+	})
+
+	test('does NOT warn when the handler is explicitly marked resolve-style', async () => {
+		__resetToStringFallbackWarnings()
+		const warnSpy = spyOn(console, 'warn').mockImplementation(() => { })
+
+		try {
+			const handler = defineFetchHandler(
+				async (event: FetchEvent, resolve: ResolveFetch) => resolve(event),
+				{ style: 'resolve' }
+			)
+
+			const fetchEvent = createFetchEvent(
+				new Request('https://example.com/marker'),
+				{},
+				createMockCtx()
+			)
+
+			await runWithEventContext(fetchEvent, async () => {
+				await invokeFetchHandler(handler, fetchEvent, async () => new Response('ok'))
+				await invokeFetchHandler(handler, fetchEvent, async () => new Response('ok'))
+			})
+
+			const fallbackWarnings = warnSpy.mock.calls.filter((args) =>
+				typeof args[0] === 'string' && args[0].includes('parameter-name inspection')
+			)
+			expect(fallbackWarnings.length).toBe(0)
+		} finally {
+			warnSpy.mockRestore()
+			__resetToStringFallbackWarnings()
+		}
+	})
+
+	test('throws under DEVFLARE_STRICT_MIDDLEWARE=1 when param-name sniffing is the deciding factor', async () => {
+		__resetToStringFallbackWarnings()
+		const previous = process.env.DEVFLARE_STRICT_MIDDLEWARE
+		process.env.DEVFLARE_STRICT_MIDDLEWARE = '1'
+
+		try {
+			const handler = async (event: FetchEvent, resolve: ResolveFetch) => resolve(event)
+
+			const fetchEvent = createFetchEvent(
+				new Request('https://example.com/strict'),
+				{},
+				createMockCtx()
+			)
+
+			await expect(
+				runWithEventContext(fetchEvent, async () =>
+					invokeFetchHandler(handler, fetchEvent, async () => new Response('ok'))
+				)
+			).rejects.toThrow(/parameter-name inspection/)
+		} finally {
+			if (previous === undefined) {
+				delete process.env.DEVFLARE_STRICT_MIDDLEWARE
+			} else {
+				process.env.DEVFLARE_STRICT_MIDDLEWARE = previous
+			}
 			__resetToStringFallbackWarnings()
 		}
 	})
