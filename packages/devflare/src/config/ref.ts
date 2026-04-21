@@ -79,8 +79,21 @@ export interface WorkerBinding {
 export interface DOBindingRef {
 	/** DO class name */
 	readonly className: string
-	/** Worker name that hosts this DO (for cross-worker access) */
+	/**
+	 * Worker name that hosts this DO (for cross-worker access).
+	 *
+	 * Prefer the `kind` discriminator below for branching; reach for
+	 * `scriptName` only when you need the actual script identifier.
+	 */
 	readonly scriptName: string
+	/**
+	 * Discriminator: `ref()`-produced DO bindings are always
+	 * `'cross-worker'` because they target a host worker imported via a
+	 * separate `devflare.config`. Bindings on the same worker are emitted
+	 * directly via `bindings.durableObjects` and surface as a
+	 * `NormalizedDOBinding` with `kind: 'local'`.
+	 */
+	readonly kind: 'cross-worker'
 	/** @internal Reference for test context setup */
 	readonly __ref?: RefResult
 }
@@ -420,6 +433,7 @@ export function ref<TImport extends () => Promise<{ default: DevflareConfigInput
 				if (nameOverride) return nameOverride
 				return PENDING_REF_VALUE
 			},
+			kind: 'cross-worker',
 			__ref: proxy
 		}
 

@@ -19,10 +19,22 @@ export { formatBrowserBindingLimitMessage }
 export interface NormalizedDOBinding {
 	/** The DO class name (e.g., 'Counter') */
 	className: string
-	/** Optional script name — file path for local DOs, worker name for cross-worker DOs */
+	/**
+	 * Optional script name — file path for local DOs, worker name for
+	 * cross-worker DOs.
+	 *
+	 * Prefer the `kind` discriminator below for branching; reach for
+	 * `scriptName` only when you need the actual script identifier.
+	 */
 	scriptName?: string
 	/** Reference result for cross-worker DOs (from ref().DO_NAME) */
 	__ref?: unknown
+	/**
+	 * Discriminator: `'local'` when the DO class is hosted in the current
+	 * worker (no `scriptName`, no `__ref`), `'cross-worker'` when the DO is
+	 * declared via an explicit `scriptName` or via `ref()`.
+	 */
+	kind: 'local' | 'cross-worker'
 }
 
 export interface NormalizedD1Binding {
@@ -72,13 +84,18 @@ export function getSingleBrowserBindingName(bindings: BrowserBindings | undefine
  */
 export function normalizeDOBinding(config: DurableObjectBinding): NormalizedDOBinding {
 	if (typeof config === 'string') {
-		return { className: config }
+		return { className: config, kind: 'local' }
 	}
+
+	const scriptName = config.scriptName
+	const __ref = (config as { __ref?: unknown }).__ref
+	const kind: 'local' | 'cross-worker' = (scriptName || __ref) ? 'cross-worker' : 'local'
 
 	return {
 		className: config.className,
-		scriptName: config.scriptName,
-		__ref: (config as { __ref?: unknown }).__ref
+		scriptName,
+		__ref,
+		kind
 	}
 }
 

@@ -372,7 +372,7 @@ async function createGeneratedDurableObjectExports(
 	const localClassNames = new Set(
 		Object.values(config.bindings.durableObjects)
 			.map((binding) => normalizeDOBinding(binding))
-			.filter((binding) => !binding.scriptName)
+			.filter((binding) => binding.kind === 'local')
 			.map((binding) => binding.className)
 	)
 

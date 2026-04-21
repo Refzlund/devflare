@@ -425,7 +425,7 @@ function compileBindings(
 					name,
 					class_name: normalized.className
 				}
-				if (normalized.scriptName) {
+				if (normalized.kind === 'cross-worker' && normalized.scriptName) {
 					binding.script_name = normalized.scriptName
 				}
 				return binding

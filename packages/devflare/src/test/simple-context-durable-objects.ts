@@ -92,7 +92,7 @@ async function resolveLocalDurableObjects(
 		let scriptPath: string
 		let nativeRpc = false
 
-		if (doInfo.scriptName) {
+		if (doInfo.kind === 'cross-worker' && doInfo.scriptName) {
 			scriptPath = join(configDir, 'src', doInfo.scriptName)
 			try {
 				const code = await readFile(scriptPath, 'utf-8')
