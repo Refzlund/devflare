@@ -67,7 +67,15 @@ export async function installBuiltDevflare(
 
 export async function cleanupTempDirs(tempDirs: string[]): Promise<void> {
 	for (const tempDir of tempDirs) {
-		await rm(tempDir, { recursive: true, force: true })
+		try {
+			await rm(tempDir, { recursive: true, force: true })
+		} catch (error) {
+			// Best-effort cleanup. On CI, lingering workerd file handles or
+			// transient kernel errors (e.g. EFAULT on Linux runners) can make
+			// `rm -rf` fail even with `force: true`. The OS will reclaim the
+			// temp dir; failing afterAll here would mask real test results.
+			console.warn(`[cleanupTempDirs] failed to remove ${tempDir}:`, error)
+		}
 	}
 }
 
