@@ -92,7 +92,7 @@
 		"puppeteer-core": "^24.5.0",
 		"rolldown": "^1.0.0-rc.12",
 		"smol-toml": "^1.6.1",
-		"wrangler": "^3.99.0",
+		"wrangler": "^3.114.0",
 		"ws": "^8.19.0",
 		"zod": "^3.25.0"
 	},

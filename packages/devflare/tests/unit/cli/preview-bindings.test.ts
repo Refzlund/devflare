@@ -19,65 +19,60 @@ afterEach(() => {
 })
 
 describe('preview binding inspection helpers', () => {
-	test('parses Wrangler version binding tables', () => {
-		const parsed = parseWranglerVersionBindings(`
-Type                    Name                    Resource
-Queue                   JOBS                    jobs-queue
-Worker                  AUTH_SERVICE            auth-service
-Analytics Engine        ANALYTICS               analytics-dataset
-`.trim())
+	test('parses Wrangler versions view --json output into association rows', () => {
+		const parsed = parseWranglerVersionBindings(JSON.stringify({
+			id: 'version-demo',
+			metadata: { author_email: 'demo@example.com', created_on: '2025-01-04T00:00:00.000Z' },
+			resources: {
+				script: { handlers: ['fetch'] },
+				script_runtime: { compatibility_date: '2025-01-01' },
+				bindings: [
+					{ type: 'queue', name: 'JOBS', queue_name: 'jobs-queue' },
+					{ type: 'service', name: 'AUTH_SERVICE', service: 'auth-service' },
+					{ type: 'analytics_engine', name: 'ANALYTICS', dataset: 'analytics-dataset' },
+					{ type: 'kv_namespace', name: 'CACHE', namespace_id: 'kv_abc' },
+					{ type: 'd1', name: 'DB', id: 'd1_xyz' },
+					{ type: 'r2_bucket', name: 'ASSETS', bucket_name: 'assets-bucket' },
+					{ type: 'durable_object_namespace', name: 'COUNTER', class_name: 'Counter', script_name: 'main' },
+					{ type: 'browser', name: 'BROWSER' },
+					{ type: 'ai', name: 'AI' },
+					{ type: 'plain_text', name: 'APP_NAME', text: 'demo-preview' },
+					{ type: 'secret_text', name: 'API_KEY' }
+				]
+			}
+		}))
 
 		expect(parsed).toEqual([
 			{ type: 'Queue', bindingName: 'JOBS', resource: 'jobs-queue' },
 			{ type: 'Worker', bindingName: 'AUTH_SERVICE', resource: 'auth-service' },
-			{ type: 'Analytics Engine', bindingName: 'ANALYTICS', resource: 'analytics-dataset' }
+			{ type: 'Analytics Engine', bindingName: 'ANALYTICS', resource: 'analytics-dataset' },
+			{ type: 'KV Namespace', bindingName: 'CACHE', resource: 'kv_abc' },
+			{ type: 'D1 Database', bindingName: 'DB', resource: 'd1_xyz' },
+			{ type: 'R2 Bucket', bindingName: 'ASSETS', resource: 'assets-bucket' },
+			{ type: 'Durable Object Namespace', bindingName: 'COUNTER', resource: 'Counter' },
+			{ type: 'Browser', bindingName: 'BROWSER', resource: 'Browser Rendering' },
+			{ type: 'AI', bindingName: 'AI', resource: 'Workers AI' }
 		])
 	})
 
-	test('parses Wrangler version binding tables in the current compact binding/type format', () => {
-		const parsed = parseWranglerVersionBindings(`
-Binding                      Resource
-env.AUTH_SERVICE (demo-auth-service)             Worker
-env.SEARCH_INDEX (demo-search-index)             Vectorize Index
-env.APP_NAME ("demo-preview")                   Environment Variable
-Handlers:             fetch
-`.trim())
-
-		expect(parsed).toEqual([
-			{ type: 'Worker', bindingName: 'AUTH_SERVICE', resource: 'demo-auth-service' },
-			{ type: 'Vectorize Index', bindingName: 'SEARCH_INDEX', resource: 'demo-search-index' },
-			{ type: 'Environment Variable', bindingName: 'APP_NAME', resource: '"demo-preview"' }
-		])
+	test('parseWranglerVersionBindings returns [] when JSON is malformed or missing bindings', () => {
+		expect(parseWranglerVersionBindings('not json')).toEqual([])
+		expect(parseWranglerVersionBindings('{}')).toEqual([])
+		expect(parseWranglerVersionBindings(JSON.stringify({ resources: {} }))).toEqual([])
+		expect(parseWranglerVersionBindings(JSON.stringify({ resources: { bindings: [] } }))).toEqual([])
 	})
 
-	test('unified parser strips ANSI color codes from compact-format output', () => {
-		const esc = '\u001B'
-		const parsed = parseWranglerVersionBindings([
-			`${esc}[1mBinding                      Resource${esc}[0m`,
-			`  ${esc}[32menv.AUTH_SERVICE (demo-auth-service)${esc}[0m             Worker`,
-			`  env.SEARCH_INDEX (demo-search-index)             Vectorize Index`,
-			`Handlers:             fetch`
-		].join('\n'))
+	test('parseWranglerVersionBindings carries entrypoint suffix on service bindings', () => {
+		const parsed = parseWranglerVersionBindings(JSON.stringify({
+			resources: {
+				bindings: [
+					{ type: 'service', name: 'INTERNAL', service: 'core-worker', entrypoint: 'AdminAPI' }
+				]
+			}
+		}))
 
 		expect(parsed).toEqual([
-			{ type: 'Worker', bindingName: 'AUTH_SERVICE', resource: 'demo-auth-service' },
-			{ type: 'Vectorize Index', bindingName: 'SEARCH_INDEX', resource: 'demo-search-index' }
-		])
-	})
-
-	test('unified parser tolerates indented rows and trailing annotations in legacy-format output', () => {
-		const parsed = parseWranglerVersionBindings(`
-Type                    Name                    Resource
-----------------------------------------------------------
-  Queue                   JOBS                    jobs-queue
-  Worker                  AUTH_SERVICE            auth-service    (bound)
-Handlers: fetch
-Compatibility date: 2025-01-01
-`.trim())
-
-		expect(parsed).toEqual([
-			{ type: 'Queue', bindingName: 'JOBS', resource: 'jobs-queue' },
-			{ type: 'Worker', bindingName: 'AUTH_SERVICE', resource: 'auth-service (bound)' }
+			{ type: 'Worker', bindingName: 'INTERNAL', resource: 'core-worker#AdminAPI' }
 		])
 	})
 
@@ -170,27 +165,33 @@ Consumers: worker:demo-worker
 				execCalls.push({ command, args })
 				const joined = `${command} ${args.join(' ')}`
 
-				if (joined === 'bunx wrangler versions view version-demo --name demo-worker') {
+				if (joined === 'bunx wrangler versions view version-demo --name demo-worker --json') {
 					return {
 						exitCode: 0,
-						stdout: `
-Type                    Name                    Resource
-Queue                   JOBS                    jobs-queue
-Worker                  AUTH_SERVICE            auth-service
-`.trim(),
+						stdout: JSON.stringify({
+							resources: {
+								bindings: [
+									{ type: 'queue', name: 'JOBS', queue_name: 'jobs-queue' },
+									{ type: 'service', name: 'AUTH_SERVICE', service: 'auth-service' }
+								]
+							}
+						}),
 						stderr: '',
 						failed: false,
 						killed: false
 					}
 				}
 
-				if (joined === 'bunx wrangler versions view version-other --name other-worker') {
+				if (joined === 'bunx wrangler versions view version-other --name other-worker --json') {
 					return {
 						exitCode: 0,
-						stdout: `
-Type                    Name                    Resource
-Queue                   JOBS                    jobs-queue
-`.trim(),
+						stdout: JSON.stringify({
+							resources: {
+								bindings: [
+									{ type: 'queue', name: 'JOBS', queue_name: 'jobs-queue' }
+								]
+							}
+						}),
 						stderr: '',
 						failed: false,
 						killed: false
@@ -278,8 +279,8 @@ Consumers:
 		expect(dlqRow?.workerCount).toBe(0)
 		expect(dlqRow?.notes).toContain('dead letter queue')
 		expect(execCalls.map((call) => `${call.command} ${call.args.join(' ')}`)).toEqual([
-			'bunx wrangler versions view version-demo --name demo-worker',
-			'bunx wrangler versions view version-other --name other-worker',
+			'bunx wrangler versions view version-demo --name demo-worker --json',
+			'bunx wrangler versions view version-other --name other-worker --json',
 			'bunx wrangler queues info jobs-queue',
 			'bunx wrangler queues info jobs-dlq'
 		])

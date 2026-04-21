@@ -3,10 +3,6 @@ import { compileBuildConfig } from '../config/compiler'
 import type { DevflareConfig } from '../config/schema'
 import type { ProcessRunner } from './dependencies'
 
-const WRANGLER_TEXT_COLUMNS_REGEX = /\s{2,}/
-// eslint-disable-next-line no-control-regex
-const ANSI_ESCAPE_REGEX = /\x1B\[[0-9;]*[A-Za-z]/g
-
 export interface ParsedWranglerBindingRow {
 	type: string
 	bindingName: string
@@ -58,31 +54,6 @@ export interface InspectBindingAssociationsOptions {
 
 function normalizeCell(value: string | undefined): string {
 	return (value ?? '').trim().replace(/\s+/g, ' ')
-}
-
-function normalizeBindingName(value: string | undefined): string {
-	const normalized = normalizeCell(value)
-	return normalized.startsWith('env.') ? normalized.slice(4) : normalized
-}
-
-function parseCompactBindingLabel(value: string): {
-	bindingName: string
-	resource: string
-} {
-	const normalized = normalizeBindingName(value)
-	const match = normalized.match(/^(.*?)\s*\((.*)\)$/)
-
-	if (!match) {
-		return {
-			bindingName: normalized,
-			resource: ''
-		}
-	}
-
-	return {
-		bindingName: normalizeCell(match[1]),
-		resource: normalizeCell(match[2])
-	}
 }
 
 function buildAssociationKey(type: string, resource: string): string {
@@ -354,91 +325,138 @@ export function parseWranglerQueueInfo(output: string): ParsedQueueAssociation |
 	}
 }
 
-export function parseWranglerVersionBindings(output: string): ParsedWranglerBindingRow[] {
-	const lines = output.split(/\r?\n/)
-	const bindings: ParsedWranglerBindingRow[] = []
-	let inBindingTable = false
+/**
+ * Parse the JSON output of `wrangler versions view --json` into a flat list
+ * of `{ type, bindingName, resource }` rows that match the friendly type
+ * labels used by `collectBindingAssociationTargets`.
+ *
+ * Requires Wrangler 3.99+ (the `--json` flag on `versions view`).
+ */
+export function parseWranglerVersionBindings(jsonOutput: string): ParsedWranglerBindingRow[] {
+	let parsed: unknown
+	try {
+		parsed = JSON.parse(jsonOutput)
+	} catch {
+		return []
+	}
 
-	for (const rawLine of lines) {
-		const trimmed = preprocessWranglerLine(rawLine)
-		if (!trimmed) {
-			continue
-		}
+	const bindings = extractBindingsArray(parsed)
+	if (!bindings) {
+		return []
+	}
 
-		if (isBindingTableHeader(trimmed)) {
-			inBindingTable = true
-			continue
-		}
-
-		if (!inBindingTable) {
-			continue
-		}
-
-		if (/^-+$/.test(trimmed)) {
-			continue
-		}
-
-		const segments = trimmed.split(WRANGLER_TEXT_COLUMNS_REGEX).filter(Boolean)
-		if (segments.length === 0) {
-			continue
-		}
-
-		// Trailing annotations (e.g. `Handlers: fetch`) terminate the binding table.
-		if (segments[0].endsWith(':')) {
-			break
-		}
-
-		const parsed = parseBindingRow(segments)
-		if (parsed) {
-			bindings.push(parsed)
+	const rows: ParsedWranglerBindingRow[] = []
+	for (const raw of bindings) {
+		const row = mapWranglerBindingToRow(raw)
+		if (row) {
+			rows.push(row)
 		}
 	}
 
-	return bindings
+	return rows
 }
 
-function preprocessWranglerLine(rawLine: string): string {
-	return rawLine.replace(ANSI_ESCAPE_REGEX, '').replace(/\r$/, '').trim()
-}
-
-function isBindingTableHeader(line: string): boolean {
-	if (/^binding\s{2,}resource$/i.test(line)) {
-		return true
-	}
-	if (/^(binding\s+type|type)(\s{2,}name)?\s{2,}resource$/i.test(line)) {
-		return true
-	}
-	if (/^(binding\s+type|type)$/i.test(line)) {
-		return true
-	}
-	return false
-}
-
-function parseBindingRow(segments: string[]): ParsedWranglerBindingRow | null {
-	if (segments.length < 2) {
+function extractBindingsArray(parsed: unknown): unknown[] | null {
+	if (!parsed || typeof parsed !== 'object') {
 		return null
 	}
 
-	// Compact form: `env.NAME (resource)` followed by the type column.
-	if (/^env\./i.test(segments[0])) {
-		const parsed = parseCompactBindingLabel(segments[0])
-		return {
-			type: normalizeCell(segments.slice(1).join('  ')),
-			bindingName: parsed.bindingName,
-			resource: parsed.resource
-		}
+	const root = parsed as { resources?: { bindings?: unknown } }
+	const bindings = root.resources?.bindings
+	return Array.isArray(bindings) ? bindings : null
+}
+
+interface RawWranglerBinding {
+	type?: string
+	name?: string
+	[key: string]: unknown
+}
+
+function mapWranglerBindingToRow(raw: unknown): ParsedWranglerBindingRow | null {
+	if (!raw || typeof raw !== 'object') {
+		return null
 	}
 
-	// Legacy form: type | name | resource...
-	const [type, bindingName, ...resourceParts] = segments
+	const binding = raw as RawWranglerBinding
+	const type = typeof binding.type === 'string' ? binding.type : ''
+	const bindingName = typeof binding.name === 'string' ? binding.name : ''
+
 	if (!type || !bindingName) {
 		return null
 	}
 
+	const mapped = mapWranglerBindingType(type, binding)
+	if (!mapped) {
+		return null
+	}
+
 	return {
-		type: normalizeCell(type),
-		bindingName: normalizeBindingName(bindingName),
-		resource: normalizeCell(resourceParts.join('  '))
+		type: mapped.friendlyType,
+		bindingName,
+		resource: mapped.resource
+	}
+}
+
+function mapWranglerBindingType(
+	type: string,
+	binding: RawWranglerBinding
+): { friendlyType: string; resource: string } | null {
+	const stringField = (key: string): string =>
+		typeof binding[key] === 'string' ? binding[key] as string : ''
+
+	switch (type) {
+		case 'kv_namespace':
+			return { friendlyType: 'KV Namespace', resource: stringField('namespace_id') }
+		case 'd1':
+			return { friendlyType: 'D1 Database', resource: stringField('id') }
+		case 'r2_bucket':
+			return { friendlyType: 'R2 Bucket', resource: stringField('bucket_name') }
+		case 'durable_object_namespace':
+			return {
+				friendlyType: 'Durable Object Namespace',
+				resource: stringField('class_name')
+			}
+		case 'queue':
+			return { friendlyType: 'Queue', resource: stringField('queue_name') }
+		case 'service': {
+			const service = stringField('service') || (binding.name as string)
+			const entrypoint = stringField('entrypoint')
+			return {
+				friendlyType: 'Worker',
+				resource: entrypoint ? `${service}#${entrypoint}` : service
+			}
+		}
+		case 'ai':
+			return { friendlyType: 'AI', resource: 'Workers AI' }
+		case 'vectorize':
+			return { friendlyType: 'Vectorize', resource: stringField('index_name') }
+		case 'hyperdrive':
+			return { friendlyType: 'Hyperdrive', resource: stringField('id') }
+		case 'browser':
+			return { friendlyType: 'Browser', resource: 'Browser Rendering' }
+		case 'analytics_engine':
+			return { friendlyType: 'Analytics Engine', resource: stringField('dataset') }
+		case 'send_email':
+			return {
+				friendlyType: 'Send Email',
+				resource: stringField('destination_address')
+					|| stringField('name')
+					|| (binding.name as string)
+			}
+		case 'mtls_certificate':
+			return { friendlyType: 'mTLS Certificate', resource: stringField('certificate_id') }
+		case 'dispatch_namespace':
+			return { friendlyType: 'Dispatch Namespace', resource: stringField('namespace') }
+		case 'version_metadata':
+			return { friendlyType: 'Version Metadata', resource: 'Version Metadata' }
+		case 'plain_text':
+		case 'json':
+		case 'secret_text':
+			// Vars / secrets are intentionally ignored — they don't participate
+			// in cross-worker binding-association inspection.
+			return null
+		default:
+			return { friendlyType: type, resource: stringField('id') || stringField('name') || '' }
 	}
 }
 
@@ -453,7 +471,7 @@ async function inspectWorkerBindings(
 ): Promise<ParsedWranglerBindingRow[]> {
 	const output = await runWranglerInspectionCommand(
 		exec,
-		['wrangler', 'versions', 'view', options.versionId, '--name', options.workerName],
+		['wrangler', 'versions', 'view', options.versionId, '--name', options.workerName, '--json'],
 		options,
 		'Wrangler versions view failed'
 	)
