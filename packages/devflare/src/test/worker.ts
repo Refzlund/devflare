@@ -17,7 +17,7 @@
 import { join } from 'path'
 import { createFetchEvent, invokeFetchModule, resolveFetchHandler, runWithEventContext } from '../runtime'
 import { createRouteResolve, matchFetchRoute } from '../runtime'
-import type { RouteSegment } from '../router/types'
+import type { RouteSegment } from '../runtime/router/types'
 
 // -----------------------------------------------------------------------------
 // Types

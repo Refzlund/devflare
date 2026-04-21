@@ -97,7 +97,7 @@ export type {
 	RouteSegment,
 	RouteModuleDefinition,
 	RouteMatchResult
-} from '../router/types'
+} from './router/types'
 
 // Decorators (safe for workers)
 export {

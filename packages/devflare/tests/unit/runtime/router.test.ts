@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { createFetchEvent, runWithEventContext } from '../../../src/runtime/context'
 import { invokeFetchModule, sequence, type FetchMiddleware } from '../../../src/runtime/middleware'
 import { createRouteResolve, invokeRouteModules, matchFetchRoute } from '../../../src/runtime/router'
-import type { RouteModuleDefinition } from '../../../src/router/types'
+import type { RouteModuleDefinition } from '../../../src/runtime/router/types'
 
 function createMockCtx(): ExecutionContext {
 	return {

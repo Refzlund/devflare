@@ -4,7 +4,7 @@
 
 import { relative, resolve } from 'pathe'
 import type { DevflareConfig } from '../config'
-import type { RouteSegment } from '../router/types'
+import type { RouteSegment } from '../runtime/router/types'
 import { findFiles } from '../utils/glob'
 import { SUPPORTED_WORKER_EXTENSIONS } from './extensions'
 

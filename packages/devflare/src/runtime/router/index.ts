@@ -2,9 +2,9 @@
 // Runtime File Router
 // =============================================================================
 
-import type { RouteMatchResult, RouteModuleDefinition, RouteSegment } from '../router/types'
-import { createFetchEvent, runWithEventContext, type FetchEvent } from './context'
-import { invokeFetchModule, type ResolveFetch } from './middleware'
+import type { RouteMatchResult, RouteModuleDefinition, RouteSegment } from './types'
+import { createFetchEvent, runWithEventContext, type FetchEvent } from '../context'
+import { invokeFetchModule, type ResolveFetch } from '../middleware'
 
 function normalizePathname(pathname: string): string {
 	if (!pathname || pathname === '/') {
