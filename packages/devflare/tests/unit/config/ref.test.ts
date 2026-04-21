@@ -135,4 +135,64 @@ describe('ref', () => {
 		expect(() => ref(makeFn('foo')))
 			.toThrow(/template literal with an embedded expression|static string literal/)
 	})
+
+	test('UPPER_CASE prop access pre-resolution still returns a lazy DO ref', () => {
+		const mockConfig = {
+			name: 'test-worker',
+			compatibilityDate: '2025-01-07',
+			bindings: {
+				durableObjects: {
+					COUNTER: 'Counter'
+				}
+			}
+		}
+
+		const result = ref(async () => ({ default: mockConfig }))
+
+		// Before resolve: lenient, returns a binding for any UPPER_CASE prop.
+		const counter = (result as unknown as Record<string, unknown>).COUNTER
+		expect(counter).toBeDefined()
+		expect((counter as { kind: string }).kind).toBe('cross-worker')
+		// `in` is also lenient pre-resolution.
+		expect('UNKNOWN_DO' in (result as object)).toBe(true)
+	})
+
+	test('post-resolution: UPPER_CASE prop access returns the binding only when declared', async () => {
+		const mockConfig = {
+			name: 'test-worker',
+			compatibilityDate: '2025-01-07',
+			bindings: {
+				durableObjects: {
+					COUNTER: 'Counter'
+				}
+			}
+		}
+
+		const result = ref(async () => ({ default: mockConfig }))
+		await result.resolve()
+
+		const counter = (result as unknown as Record<string, unknown>).COUNTER
+		expect(counter).toBeDefined()
+		expect((counter as { className: string }).className).toBe('Counter')
+
+		const unknown = (result as unknown as Record<string, unknown>).UNKNOWN_DO
+		expect(unknown).toBeUndefined()
+
+		// `in` post-resolution must reflect the actual declared bindings.
+		expect('COUNTER' in (result as object)).toBe(true)
+		expect('UNKNOWN_DO' in (result as object)).toBe(false)
+	})
+
+	test('post-resolution with no DO bindings: any UPPER_CASE prop is undefined', async () => {
+		const mockConfig = {
+			name: 'no-dos-worker',
+			compatibilityDate: '2025-01-07'
+		}
+
+		const result = ref(async () => ({ default: mockConfig }))
+		await result.resolve()
+
+		expect((result as unknown as Record<string, unknown>).COUNTER).toBeUndefined()
+		expect('COUNTER' in (result as object)).toBe(false)
+	})
 })

@@ -468,18 +468,44 @@ export function ref<TImport extends () => Promise<{ default: DevflareConfigInput
 			}
 
 			// Dynamic DO binding access: ref.COUNTER, ref.RATE_LIMITER, etc.
-			// Property names that are UPPER_CASE are assumed to be DO bindings
+			// Property names that are UPPER_CASE are treated as DO bindings,
+			// but only when the resolved config actually declares the binding.
+			// Once resolved, accessing an unknown UPPER_CASE prop returns
+			// undefined instead of fabricating a DOBindingRef whose getters
+			// would just return PENDING_REF_VALUE forever. Pre-resolution we
+			// fall back to the lazy ref so consumers that grab refs eagerly
+			// (e.g. at module top level) keep working.
 			if (typeof prop === 'string' && /^[A-Z][A-Z0-9_]*$/.test(prop)) {
+				const cached = resolvedCache.get(proxy) as ResolvedData<TConfig> | undefined
+				if (cached) {
+					const doBindings = cached.config.bindings?.durableObjects as
+						| Record<string, unknown>
+						| undefined
+					if (!doBindings || !(prop in doBindings)) {
+						return undefined
+					}
+				}
 				return createDOBinding(prop)
 			}
 
 			return Reflect.get(target, prop)
 		},
 		has(target, prop) {
-			// Known props + any UPPER_CASE prop for DO bindings
+			// Known props + any UPPER_CASE prop that is actually declared as a
+			// DO binding in the resolved config (or any UPPER_CASE prop pre-
+			// resolution, mirroring the lenient `get` behaviour).
 			if (typeof prop === 'string') {
 				if (knownProps.has(prop)) return true
-				if (/^[A-Z][A-Z0-9_]*$/.test(prop)) return true
+				if (/^[A-Z][A-Z0-9_]*$/.test(prop)) {
+					const cached = resolvedCache.get(proxy) as ResolvedData<TConfig> | undefined
+					if (cached) {
+						const doBindings = cached.config.bindings?.durableObjects as
+							| Record<string, unknown>
+							| undefined
+						return !!doBindings && prop in doBindings
+					}
+					return true
+				}
 			}
 			return Reflect.has(target, prop)
 		}
