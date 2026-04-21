@@ -29,8 +29,7 @@ import {
 	withResolvedIdBindings,
 	type PendingNameBinding
 } from './binding-resolution-helpers'
-import { materializePreviewScopedConfig, type PreviewResolutionOptions } from './preview'
-import { mergeConfigForEnvironment } from './resolve'
+import { type PreviewResolutionOptions } from './preview'
 import {
 	getLocalD1DatabaseIdentifier,
 	getLocalHyperdriveConfigIdentifier,
@@ -38,7 +37,7 @@ import {
 	type DevflareConfig
 } from './schema'
 import { ConfigResourceResolutionError } from './resource-resolution'
-import { brandAsDeployConfig, type DeployConfig } from './resolve-phased'
+import { brandAsDeployConfig, resolveResources, type DeployConfig } from './resolve-phased'
 
 interface DeployResourcePreparationApi {
 	getPrimaryAccount: typeof getPrimaryAccount
@@ -574,14 +573,20 @@ export async function prepareConfigResourcesForDeploy(
 	config: DevflareConfig,
 	options: PrepareConfigResourcesForDeployOptions = {}
 ): Promise<PrepareConfigResourcesForDeployResult> {
-	const resolvedConfig = materializePreviewScopedConfig(
-		mergeConfigForEnvironment(config, options.environment),
-		{
+	// C2 step 3 — env-merge + preview-materialization is the build-phase work
+	// of the unified resolveResources seam. We then hand the prepared config to
+	// the materialised-deploy helper so we still get the richer
+	// `{ created, existing, warnings }` result that the seam itself does not
+	// expose for the provisioning case.
+	const resolvedConfig = await resolveResources(config, {
+		phase: 'build',
+		environment: options.environment,
+		preview: {
 			environment: options.environment,
 			env: options.env,
 			identifier: options.identifier
 		}
-	)
+	})
 
 	return prepareMaterializedConfigResourcesForDeploy(resolvedConfig, {
 		accountId: options.accountId,

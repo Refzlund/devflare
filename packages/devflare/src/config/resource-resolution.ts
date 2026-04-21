@@ -12,9 +12,9 @@ import {
 	type PendingNameBinding
 } from './binding-resolution-helpers'
 import { loadConfig, type LoadConfigOptions } from './loader'
-import { materializePreviewScopedConfig, type PreviewResolutionOptions } from './preview'
-import { brandAsDeployConfig, brandAsLocalConfig, type DeployConfig, type LocalConfig } from './resolve-phased'
-import { mergeConfigForEnvironment, resolveConfigForEnvironment } from './resolve'
+import { type PreviewResolutionOptions } from './preview'
+import { brandAsDeployConfig, brandAsLocalConfig, resolveResources, type DeployConfig, type LocalConfig } from './resolve-phased'
+import { resolveConfigForEnvironment } from './resolve'
 import {
 	getLocalD1DatabaseIdentifier,
 	getLocalHyperdriveConfigIdentifier,
@@ -257,16 +257,14 @@ export async function resolveConfigResources(
 	config: DevflareConfig,
 	options: ResolveConfigResourcesOptions = {}
 ): Promise<DeployConfig> {
-	const resolvedConfig = materializePreviewScopedConfig(
-		mergeConfigForEnvironment(config, options.environment),
-		{
+	return resolveResources(config, {
+		phase: 'deploy',
+		environment: options.environment,
+		preview: {
 			environment: options.environment,
 			env: options.env,
 			identifier: options.identifier
-		}
-	)
-
-	return resolveMaterializedConfigResources(resolvedConfig, {
+		},
 		accountId: options.accountId,
 		cloudflare: options.cloudflare
 	})
