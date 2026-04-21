@@ -10,6 +10,8 @@ type FetchModule = Record<string, unknown>
 const FETCH_SEQUENCE_SYMBOL = Symbol.for('devflare.fetch-sequence')
 const FETCH_RESOLVE_STYLE_SYMBOL = Symbol.for('devflare.fetch-resolve-style')
 const FETCH_WORKER_STYLE_SYMBOL = Symbol.for('devflare.fetch-worker-style')
+const QUEUE_WORKER_STYLE_SYMBOL = Symbol.for('devflare.queue-worker-style')
+const SCHEDULED_WORKER_STYLE_SYMBOL = Symbol.for('devflare.scheduled-worker-style')
 
 /**
  * Promise-or-value helper used by worker-safe runtime APIs.
@@ -158,6 +160,92 @@ function assertExplicit2ArgStyle(handler: AnyFunction): void {
 		+ "`defineFetchHandler(fn, { style: 'worker' })` (for `(request, env) => Response`). "
 		+ 'Single-arg `(event) => Response` and 3-arg worker-style `(request, env, ctx) => Response` '
 		+ 'handlers do not require wrapping.'
+	)
+}
+
+/**
+ * Tag a queue handler as worker-style: `(batch, env)` or `(batch, env, ctx)`.
+ *
+ * Required for 2-argument worker-style queue handlers because devflare can
+ * no longer disambiguate `(event)` vs `(batch, env)` from arity alone in
+ * R1-strict.
+ */
+export function defineQueueHandler<T extends AnyFunction>(handler: T): T {
+	Object.defineProperty(handler, QUEUE_WORKER_STYLE_SYMBOL, {
+		value: true,
+		enumerable: false,
+		configurable: true,
+		writable: false
+	})
+
+	return handler
+}
+
+/**
+ * Tag a scheduled handler as worker-style: `(controller, env)` or
+ * `(controller, env, ctx)`.
+ */
+export function defineScheduledHandler<T extends AnyFunction>(handler: T): T {
+	Object.defineProperty(handler, SCHEDULED_WORKER_STYLE_SYMBOL, {
+		value: true,
+		enumerable: false,
+		configurable: true,
+		writable: false
+	})
+
+	return handler
+}
+
+function hasQueueWorkerStyleMarker(handler: AnyFunction): boolean {
+	const record = handler as unknown as Record<PropertyKey, unknown>
+	return Boolean(record[QUEUE_WORKER_STYLE_SYMBOL])
+}
+
+function hasScheduledWorkerStyleMarker(handler: AnyFunction): boolean {
+	const record = handler as unknown as Record<PropertyKey, unknown>
+	return Boolean(record[SCHEDULED_WORKER_STYLE_SYMBOL])
+}
+
+/**
+ * Throw a clear error for ambiguous unmarked 2-argument queue handlers.
+ *
+ * Mirrors `assertExplicit2ArgStyle` for the queue surface. 2-arg handlers
+ * must be wrapped with `defineQueueHandler(fn)` so dispatch is unambiguous
+ * and minification-safe; 1-arg `(event)` and 3-arg `(batch, env, ctx)` do
+ * not require wrapping.
+ */
+export function assertExplicitQueueHandlerStyle(handler: AnyFunction): void {
+	if (handler.length !== 2) {
+		return
+	}
+
+	if (hasQueueWorkerStyleMarker(handler)) {
+		return
+	}
+
+	throw new Error(
+		'[devflare] Ambiguous 2-argument queue handler. The calling convention must be declared explicitly via '
+		+ '`defineQueueHandler(fn)` for `(batch, env) => void` worker-style handlers. '
+		+ 'Single-arg `(event) => void` and 3-arg `(batch, env, ctx) => void` handlers do not require wrapping.'
+	)
+}
+
+/**
+ * Throw a clear error for ambiguous unmarked 2-argument scheduled handlers.
+ */
+export function assertExplicitScheduledHandlerStyle(handler: AnyFunction): void {
+	if (handler.length !== 2) {
+		return
+	}
+
+	if (hasScheduledWorkerStyleMarker(handler)) {
+		return
+	}
+
+	throw new Error(
+		'[devflare] Ambiguous 2-argument scheduled handler. The calling convention must be declared explicitly via '
+		+ '`defineScheduledHandler(fn)` for `(controller, env) => void` worker-style handlers. '
+		+ 'Single-arg `(event) => void` and 3-arg `(controller, env, ctx) => void` handlers do not require wrapping.'
 	)
 }
 

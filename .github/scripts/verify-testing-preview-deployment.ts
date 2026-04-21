@@ -49,6 +49,8 @@ export interface TestingPreviewVerificationSnapshot {
 	previewUrl?: string
 	previewStatus?: TestingPreviewStatus
 	previewStatusError?: string
+	previewHealth?: PreviewHealthResult
+	previewHealthError?: string
 	availableWorkers: string[]
 	versionId?: string
 	bindingsInspected: boolean
@@ -120,12 +122,87 @@ function appendPreviewPath(previewUrl: string, pathSuffix: string): string {
 	return `${previewUrl.replace(/\/+$/g, '')}${pathSuffix}`
 }
 
+function isCloudflareAccessRedirect(response: Response): boolean {
+	if (response.status < 300 || response.status >= 400) {
+		return false
+	}
+
+	const location = response.headers.get('location')
+	if (!location) {
+		return false
+	}
+
+	try {
+		return new URL(location, 'http://placeholder.invalid').host.includes('cloudflareaccess.com')
+	} catch {
+		return false
+	}
+}
+
+async function readBodyExcerpt(response: Response): Promise<string> {
+	try {
+		const text = await response.text()
+		return text.length > 500 ? `${text.slice(0, 500)}…` : text
+	} catch {
+		return ''
+	}
+}
+
+export interface PreviewHealthResult {
+	ok: boolean
+	status: number
+	body: string
+	redirectedToAccess: boolean
+	locationHeader?: string
+}
+
+async function loadPreviewHealth(previewUrl: string, _attempt: number): Promise<PreviewHealthResult> {
+	const response = await fetch(appendPreviewPath(previewUrl, '/health'), {
+		redirect: 'manual',
+		cache: 'no-store',
+		headers: {
+			'cache-control': 'no-store'
+		},
+		signal: AbortSignal.timeout(15_000)
+	})
+
+	const locationHeader = response.headers.get('location') ?? undefined
+
+	if (isCloudflareAccessRedirect(response)) {
+		const body = await readBodyExcerpt(response)
+		return {
+			ok: false,
+			status: response.status,
+			body,
+			redirectedToAccess: true,
+			locationHeader
+		}
+	}
+
+	const body = await readBodyExcerpt(response)
+	return {
+		ok: response.ok,
+		status: response.status,
+		body,
+		redirectedToAccess: false,
+		locationHeader
+	}
+}
+
 async function loadPreviewStatus(previewUrl: string): Promise<TestingPreviewStatus> {
 	const response = await fetch(appendPreviewPath(previewUrl, '/status'), {
+		redirect: 'manual',
 		headers: {
 			'cache-control': 'no-store'
 		}
 	})
+
+	if (isCloudflareAccessRedirect(response)) {
+		const locationHeader = response.headers.get('location') ?? '(missing)'
+		throw new Error(
+			`Cloudflare Access intercepted ${appendPreviewPath(previewUrl, '/status')} (Location: ${locationHeader}). Cannot read /status.`
+		)
+	}
 
 	if (!response.ok) {
 		throw new Error(`Preview status endpoint returned ${response.status} ${response.statusText}.`)
@@ -198,7 +275,22 @@ export function collectTestingPreviewVerificationErrors(
 	const availableWorkers = new Set(snapshot.availableWorkers)
 	const bindingNames = new Set(snapshot.bindingNames)
 	const hasVerifiedPreviewUrl = typeof snapshot.previewUrl === 'string' && snapshot.previewUrl.trim().length > 0
-	const hasVerifiedPreviewStatus = Boolean(snapshot.previewStatus)
+
+	if (hasVerifiedPreviewUrl && snapshot.previewHealth) {
+		if (snapshot.previewHealth.redirectedToAccess) {
+			errors.push(
+				`Cloudflare Access intercepted ${snapshot.previewUrl}/health (Location: ${snapshot.previewHealth.locationHeader ?? '(missing)'}). The verifier cannot determine deployment health.`
+			)
+		} else if (!snapshot.previewHealth.ok) {
+			errors.push(
+				`Preview /health probe at ${snapshot.previewUrl}/health returned ${snapshot.previewHealth.status}. Body excerpt: ${snapshot.previewHealth.body || '(empty)'}`
+			)
+		}
+	} else if (hasVerifiedPreviewUrl && snapshot.previewHealthError) {
+		errors.push(
+			`Preview /health probe at ${snapshot.previewUrl}/health failed: ${snapshot.previewHealthError}`
+		)
+	}
 
 	if (snapshot.resolvedWorkerName !== snapshot.expectedWorkerName) {
 		errors.push(
@@ -219,9 +311,7 @@ export function collectTestingPreviewVerificationErrors(
 	}
 
 	if (!availableWorkers.has(snapshot.expectedWorkerName)) {
-		if (!snapshot.bindingsInspected && !hasVerifiedPreviewStatus) {
-			errors.push(`Expected deployed preview worker ${JSON.stringify(snapshot.expectedWorkerName)} was not found in the Cloudflare account.`)
-		}
+		errors.push(`Expected deployed preview worker ${JSON.stringify(snapshot.expectedWorkerName)} was not found in the Cloudflare account.`)
 	}
 
 	if (!snapshot.bindingsInspected) {
@@ -313,8 +403,16 @@ async function loadVerificationSnapshot(
 	let bindingRows: ParsedWranglerBindingRow[] = []
 	let previewStatus: TestingPreviewStatus | undefined
 	let previewStatusError: string | undefined
+	let previewHealth: PreviewHealthResult | undefined
+	let previewHealthError: string | undefined
 
 	if (previewUrl) {
+		try {
+			previewHealth = await loadPreviewHealth(previewUrl, 1)
+		} catch (error) {
+			previewHealthError = error instanceof Error ? error.message : String(error)
+		}
+
 		try {
 			previewStatus = await loadPreviewStatus(previewUrl)
 		} catch (error) {
@@ -353,6 +451,8 @@ async function loadVerificationSnapshot(
 			previewUrl,
 			previewStatus,
 			previewStatusError,
+			previewHealth,
+			previewHealthError,
 			availableWorkers,
 			versionId,
 			bindingsInspected: versionId !== undefined,

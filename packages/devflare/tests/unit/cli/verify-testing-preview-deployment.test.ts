@@ -117,7 +117,7 @@ describe('testing preview deployment verifier', () => {
 		expect(errors).toEqual([])
 	})
 
-	test('accepts a verified preview version even if worker inventory is briefly stale', () => {
+	test('reports a missing worker even when binding inspection succeeded against stale Wrangler metadata', () => {
 		const errors = collectTestingPreviewVerificationErrors({
 			expectedAppName: DEFAULT_EXPECTED_APP_NAME,
 			expectedDeploymentChannel: DEFAULT_EXPECTED_DEPLOYMENT_CHANNEL,
@@ -133,7 +133,7 @@ describe('testing preview deployment verifier', () => {
 			bindingNames: [...REQUIRED_MAIN_BINDINGS]
 		})
 
-		expect(errors).toEqual([])
+		expect(errors).toContain('Expected deployed preview worker "devflare-testing-binding-matrix-pr-1" was not found in the Cloudflare account.')
 	})
 
 	test('accepts a named preview deploy when Cloudflare withholds preview version metadata', () => {

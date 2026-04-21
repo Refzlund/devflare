@@ -10,7 +10,7 @@ interface ScheduledEnv {
 	APP_NAME: string
 }
 
-export async function scheduled(controller: ScheduledControllerLike, env: ScheduledEnv): Promise<void> {
+export async function scheduled(controller: ScheduledControllerLike, env: ScheduledEnv, _ctx: ExecutionContext): Promise<void> {
 	await writeJson(env.SESSIONS, stateKeys.scheduled, {
 		appName: env.APP_NAME,
 		cron: controller.cron,

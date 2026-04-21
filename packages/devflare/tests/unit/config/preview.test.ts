@@ -164,6 +164,30 @@ describe('resolveConfigForEnvironment', () => {
 		expect(previewConfig.bindings?.hyperdrive?.POSTGRES).toBe('postgres-hyperdrive-feature-queue-cleanup')
 	})
 
+	test('materializes hyperdrive object-form bindings while preserving previewFallback', () => {
+		const pv = preview.scope()
+		const config: DevflareConfig = {
+			name: 'demo-worker',
+			compatibilityDate: '2026-04-08',
+			compatibilityFlags: [],
+			bindings: {
+				hyperdrive: {
+					POSTGRES: { name: pv('postgres-base'), previewFallback: 'base' }
+				}
+			}
+		}
+
+		const previewConfig = resolveConfigForEnvironment(config, 'preview')
+		const postgres = previewConfig.bindings?.hyperdrive?.POSTGRES as
+			| { name: string, previewFallback?: 'base' }
+			| undefined
+
+		expect(typeof postgres?.name).toBe('string')
+		expect(postgres?.name).toBe('postgres-base-preview')
+		expect(isPreviewScopedName(postgres?.name ?? '')).toBe(false)
+		expect(postgres?.previewFallback).toBe('base')
+	})
+
 	test('keeps forced compatibility flags while replacing root custom flags when an environment override provides its own list', () => {
 		const config: DevflareConfig = {
 			name: 'demo-worker',

@@ -4,8 +4,12 @@
 
 import { describe, expect, test } from 'bun:test'
 import {
+	assertExplicitQueueHandlerStyle,
+	assertExplicitScheduledHandlerStyle,
 	createResolveFetch,
 	defineFetchHandler,
+	defineQueueHandler,
+	defineScheduledHandler,
 	invokeFetchHandler,
 	invokeFetchModule,
 	markResolveStyle,
@@ -15,12 +19,16 @@ import {
 	type FetchMiddleware,
 	type ResolveFetch
 } from '../../../src/runtime/middleware'
-import { createFetchEvent, runWithEventContext, type FetchEvent } from '../../../src/runtime/context'
+import {
+	createFetchEvent,
+	runWithEventContext,
+	type FetchEvent
+} from '../../../src/runtime/context'
 
 function createMockCtx(): ExecutionContext {
 	return {
-		waitUntil: () => { },
-		passThroughOnException: () => { },
+		waitUntil: () => {},
+		passThroughOnException: () => {},
 		props: {}
 	} as ExecutionContext
 }
@@ -136,19 +144,23 @@ describe('sequence()', () => {
 			createMockCtx()
 		)
 
-		await expect(runWithEventContext(fetchEvent, async () => {
-			return sequence(throwingMiddleware)(fetchEvent, async () => new Response('OK'))
-		})).rejects.toThrow('Middleware error')
+		await expect(
+			runWithEventContext(fetchEvent, async () => {
+				return sequence(throwingMiddleware)(fetchEvent, async () => new Response('OK'))
+			})
+		).rejects.toThrow('Middleware error')
 	})
 })
 
 describe('resolveFetchHandler()', () => {
 	test('returns null when the module only exports method handlers', () => {
-		expect(resolveFetchHandler({
-			async GET() {
-				return new Response('ok')
-			}
-		})).toBeNull()
+		expect(
+			resolveFetchHandler({
+				async GET() {
+					return new Response('ok')
+				}
+			})
+		).toBeNull()
 	})
 
 	test('returns the primary fetch entry when one is present', () => {
@@ -166,10 +178,17 @@ describe('invokeFetchHandler()', () => {
 		)
 
 		const response = await runWithEventContext(fetchEvent, async () => {
-			return invokeFetchHandler(defineFetchHandler(async (event: any, resolve: any) => {
-				const downstream = await resolve(event)
-				return new Response(`wrapped:${await downstream.text()}`)
-			}, { style: 'resolve' }), fetchEvent, async () => new Response('ok'))
+			return invokeFetchHandler(
+				defineFetchHandler(
+					async (event: any, resolve: any) => {
+						const downstream = await resolve(event)
+						return new Response(`wrapped:${await downstream.text()}`)
+					},
+					{ style: 'resolve' }
+				),
+				fetchEvent,
+				async () => new Response('ok')
+			)
 		})
 
 		expect(await response.text()).toBe('wrapped:ok')
@@ -218,11 +237,15 @@ describe('createResolveFetch()', () => {
 		)
 
 		const response = await runWithEventContext(fetchEvent, async () => {
-			const resolve = createResolveFetch({
-				async GET() {
-					return new Response('method-response')
-				}
-			}, null, fetchEvent)
+			const resolve = createResolveFetch(
+				{
+					async GET() {
+						return new Response('method-response')
+					}
+				},
+				null,
+				fetchEvent
+			)
 
 			return resolve(fetchEvent)
 		})
@@ -238,11 +261,15 @@ describe('createResolveFetch()', () => {
 		)
 
 		const response = await runWithEventContext(fetchEvent, async () => {
-			const resolve = createResolveFetch({
-				async GET() {
-					return new Response('body')
-				}
-			}, null, fetchEvent)
+			const resolve = createResolveFetch(
+				{
+					async GET() {
+						return new Response('body')
+					}
+				},
+				null,
+				fetchEvent
+			)
 
 			return resolve(fetchEvent)
 		})
@@ -260,11 +287,15 @@ describe('createResolveFetch()', () => {
 		)
 
 		const response = await runWithEventContext(fetchEvent, async () => {
-			const resolve = createResolveFetch({
-				async GET(event: FetchEvent & { params: { id: string } }) {
-					return new Response(event.params.id)
-				}
-			}, null, fetchEvent)
+			const resolve = createResolveFetch(
+				{
+					async GET(event: FetchEvent & { params: { id: string } }) {
+						return new Response(event.params.id)
+					}
+				},
+				null,
+				fetchEvent
+			)
 
 			return resolve(fetchEvent)
 		})
@@ -280,11 +311,15 @@ describe('createResolveFetch()', () => {
 		)
 
 		const response = await runWithEventContext(fetchEvent, async () => {
-			const resolve = createResolveFetch({
-				async GET(request: any, env: any, ctx: any) {
-					return new Response(`${request.method}:${env.message}:${typeof ctx.waitUntil}`)
-				}
-			}, null, fetchEvent)
+			const resolve = createResolveFetch(
+				{
+					async GET(request: any, env: any, ctx: any) {
+						return new Response(`${request.method}:${env.message}:${typeof ctx.waitUntil}`)
+					}
+				},
+				null,
+				fetchEvent
+			)
 
 			return resolve(fetchEvent)
 		})
@@ -295,39 +330,41 @@ describe('createResolveFetch()', () => {
 
 describe('invokeFetchModule()', () => {
 	test('rejects modules that export both named handle and named fetch', async () => {
-		const fetchEvent = createFetchEvent(
-			new Request('https://example.com/api'),
-			{},
-			createMockCtx()
-		)
+		const fetchEvent = createFetchEvent(new Request('https://example.com/api'), {}, createMockCtx())
 
-		await expect(runWithEventContext(fetchEvent, async () => {
-			return invokeFetchModule({
-				handle: sequence(async (event, resolve) => resolve(event)),
-				async fetch() {
-					return new Response('fetch-response')
-				}
-			}, fetchEvent)
-		})).rejects.toThrow('Export exactly one primary fetch entry per module')
+		await expect(
+			runWithEventContext(fetchEvent, async () => {
+				return invokeFetchModule(
+					{
+						handle: sequence(async (event, resolve) => resolve(event)),
+						async fetch() {
+							return new Response('fetch-response')
+						}
+					},
+					fetchEvent
+				)
+			})
+		).rejects.toThrow('Export exactly one primary fetch entry per module')
 	})
 
 	test('rejects default export objects that expose both handle and fetch', async () => {
-		const fetchEvent = createFetchEvent(
-			new Request('https://example.com/api'),
-			{},
-			createMockCtx()
-		)
+		const fetchEvent = createFetchEvent(new Request('https://example.com/api'), {}, createMockCtx())
 
-		await expect(runWithEventContext(fetchEvent, async () => {
-			return invokeFetchModule({
-				default: {
-					handle: sequence(async (event, resolve) => resolve(event)),
-					async fetch() {
-						return new Response('fetch-response')
-					}
-				}
-			}, fetchEvent)
-		})).rejects.toThrow('Export exactly one primary fetch entry per module')
+		await expect(
+			runWithEventContext(fetchEvent, async () => {
+				return invokeFetchModule(
+					{
+						default: {
+							handle: sequence(async (event, resolve) => resolve(event)),
+							async fetch() {
+								return new Response('fetch-response')
+							}
+						}
+					},
+					fetchEvent
+				)
+			})
+		).rejects.toThrow('Export exactly one primary fetch entry per module')
 	})
 
 	test('uses named handle to wrap HTTP method exports', async () => {
@@ -354,13 +391,16 @@ describe('invokeFetchModule()', () => {
 		)
 
 		const response = await runWithEventContext(fetchEvent, async () => {
-			return invokeFetchModule({
-				handle: sequence(handle1, handle2),
-				async GET() {
-					order.push('GET')
-					return new Response('method-response')
-				}
-			}, fetchEvent)
+			return invokeFetchModule(
+				{
+					handle: sequence(handle1, handle2),
+					async GET() {
+						order.push('GET')
+						return new Response('method-response')
+					}
+				},
+				fetchEvent
+			)
 		})
 
 		expect(order).toEqual([
@@ -390,12 +430,15 @@ describe('invokeFetchModule()', () => {
 		)
 
 		const response = await runWithEventContext(fetchEvent, async () => {
-			return invokeFetchModule({
-				fetch: sequence(middleware, async () => {
-					order.push('fetch')
-					return new Response('ok')
-				})
-			}, fetchEvent)
+			return invokeFetchModule(
+				{
+					fetch: sequence(middleware, async () => {
+						order.push('fetch')
+						return new Response('ok')
+					})
+				},
+				fetchEvent
+			)
 		})
 
 		expect(order).toEqual(['before', 'fetch', 'after'])
@@ -410,11 +453,17 @@ describe('invokeFetchModule()', () => {
 		)
 
 		const response = await runWithEventContext(fetchEvent, async () => {
-			return invokeFetchModule({
-				fetch: defineFetchHandler(async (request: any, env: any) => {
-					return new Response(`${request.method}:${env.message}`)
-				}, { style: 'worker' })
-			}, fetchEvent)
+			return invokeFetchModule(
+				{
+					fetch: defineFetchHandler(
+						async (request: any, env: any) => {
+							return new Response(`${request.method}:${env.message}`)
+						},
+						{ style: 'worker' }
+					)
+				},
+				fetchEvent
+			)
 		})
 
 		expect(await response.text()).toBe('PATCH:ok')
@@ -428,13 +477,16 @@ describe('invokeFetchModule()', () => {
 		)
 
 		const response = await runWithEventContext(fetchEvent, async () => {
-			return invokeFetchModule({
-				default: {
-					async fetch(event: typeof fetchEvent) {
-						return new Response(event.env.message)
+			return invokeFetchModule(
+				{
+					default: {
+						async fetch(event: typeof fetchEvent) {
+							return new Response(event.env.message)
+						}
 					}
-				}
-			}, fetchEvent)
+				},
+				fetchEvent
+			)
 		})
 
 		expect(await response.text()).toBe('ok')
@@ -556,12 +608,70 @@ describe('R1-strict: 2-arg fetch handlers require explicit style', () => {
 			createMockCtx()
 		)
 
-		const handler = markResolveStyle(async (event: FetchEvent, resolve: ResolveFetch) => resolve(event))
+		const handler = markResolveStyle(async (event: FetchEvent, resolve: ResolveFetch) =>
+			resolve(event)
+		)
 
 		const response = await runWithEventContext(fetchEvent, async () =>
 			invokeFetchHandler(handler, fetchEvent, async () => new Response('inner'))
 		)
 
 		expect(await response.text()).toBe('inner')
+	})
+})
+
+describe('R1-strict: 2-arg queue handlers require explicit style', () => {
+	test('throws when an unmarked 2-arg queue handler is asserted', () => {
+		const handler = async (_batch: unknown, _env: unknown) => {}
+
+		expect(() => assertExplicitQueueHandlerStyle(handler)).toThrow(
+			/Ambiguous 2-argument queue handler/
+		)
+	})
+
+	test('accepts a 1-arg queue handler', () => {
+		const handler = async (_event: unknown) => {}
+
+		expect(() => assertExplicitQueueHandlerStyle(handler)).not.toThrow()
+	})
+
+	test('accepts a 3-arg queue handler', () => {
+		const handler = async (_batch: unknown, _env: unknown, _ctx: unknown) => {}
+
+		expect(() => assertExplicitQueueHandlerStyle(handler)).not.toThrow()
+	})
+
+	test('accepts a marked 2-arg queue handler via defineQueueHandler', () => {
+		const handler = defineQueueHandler(async (_batch: unknown, _env: unknown) => {})
+
+		expect(() => assertExplicitQueueHandlerStyle(handler)).not.toThrow()
+	})
+})
+
+describe('R1-strict: 2-arg scheduled handlers require explicit style', () => {
+	test('throws when an unmarked 2-arg scheduled handler is asserted', () => {
+		const handler = async (_controller: unknown, _env: unknown) => {}
+
+		expect(() => assertExplicitScheduledHandlerStyle(handler)).toThrow(
+			/Ambiguous 2-argument scheduled handler/
+		)
+	})
+
+	test('accepts a 1-arg scheduled handler', () => {
+		const handler = async (_event: unknown) => {}
+
+		expect(() => assertExplicitScheduledHandlerStyle(handler)).not.toThrow()
+	})
+
+	test('accepts a 3-arg scheduled handler', () => {
+		const handler = async (_controller: unknown, _env: unknown, _ctx: unknown) => {}
+
+		expect(() => assertExplicitScheduledHandlerStyle(handler)).not.toThrow()
+	})
+
+	test('accepts a marked 2-arg scheduled handler via defineScheduledHandler', () => {
+		const handler = defineScheduledHandler(async (_controller: unknown, _env: unknown) => {})
+
+		expect(() => assertExplicitScheduledHandlerStyle(handler)).not.toThrow()
 	})
 })

@@ -81,8 +81,12 @@ export {
 	createResolveFetch,
 	invokeFetchModule,
 	defineFetchHandler,
+	defineQueueHandler,
+	defineScheduledHandler,
 	markResolveStyle,
 	markWorkerStyle,
+	assertExplicitQueueHandlerStyle,
+	assertExplicitScheduledHandlerStyle,
 	type Awaitable,
 	type ResolveFetch,
 	type FetchMiddleware

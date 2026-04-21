@@ -220,6 +220,7 @@ function buildDefaultExportBody(options: {
 	...(__devflareQueueHandler
 		? {
 			async queue(batch, env, ctx) {
+				assertExplicitQueueHandlerStyle(__devflareQueueHandler)
 				const __devflareEvent = createQueueEvent(batch, env, ctx)
 				return runWithEventContext(
 					__devflareEvent,
@@ -231,6 +232,7 @@ function buildDefaultExportBody(options: {
 	...(__devflareScheduledHandler
 		? {
 			async scheduled(controller, env, ctx) {
+				assertExplicitScheduledHandlerStyle(__devflareScheduledHandler)
 				const __devflareEvent = createScheduledEvent(controller, env, ctx)
 				return runWithEventContext(
 					__devflareEvent,
@@ -269,6 +271,8 @@ function getComposedWorkerEntrypointSource(
 	const importsBuilder = new CodeBuilder()
 	importsBuilder.importStatement(
 		[
+			'assertExplicitQueueHandlerStyle',
+			'assertExplicitScheduledHandlerStyle',
 			'createEmailEvent',
 			'createFetchEvent',
 			'createQueueEvent',
