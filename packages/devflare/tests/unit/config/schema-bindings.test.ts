@@ -287,6 +287,14 @@ describe('configSchema', () => {
 			})
 
 			expect(result.success).toBe(false)
+			if (!result.success) {
+				const browserIssue = result.error.issues.find((issue) =>
+					issue.path.includes('browser')
+				)
+				expect(browserIssue?.message).toContain('exactly one browser binding')
+				expect(browserIssue?.message).toContain('BROWSER_ONE')
+				expect(browserIssue?.message).toContain('BROWSER_TWO')
+			}
 		})
 
 		test('accepts Analytics Engine bindings', () => {

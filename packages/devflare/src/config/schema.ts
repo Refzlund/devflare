@@ -170,3 +170,4 @@ export {
 	normalizeHyperdriveBinding,
 	normalizeKVBinding
 } from './schema-normalization'
+export { browserBindingSchema, formatBrowserBindingLimitMessage } from './schema-bindings'

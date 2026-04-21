@@ -8,6 +8,10 @@ import {
 	type KVBinding
 } from './schema-bindings'
 
+// Re-exported so call sites can format the same message Zod uses without
+// importing schema-bindings directly.
+export { formatBrowserBindingLimitMessage }
+
 /**
  * Normalized DO binding shape — consistent representation for all DO binding variants.
  * Used throughout devflare for DO configuration handling.
@@ -42,15 +46,22 @@ export interface NormalizedHyperdriveBinding {
 	name?: string
 }
 
+/**
+ * Return the single browser binding name, or `undefined` when no browser
+ * binding is configured.
+ *
+ * invariant: `bindings` is expected to have been validated by
+ * `browserBindingSchema` (see `schema-bindings.ts`), which rejects
+ * configurations with more than one browser binding via
+ * `superRefine` + `formatBrowserBindingLimitMessage`. Callers that bypass
+ * Zod (e.g. by casting raw input as `DevflareConfig`) should re-validate
+ * via `browserBindingSchema.parse()` before relying on this selector.
+ */
 export function getSingleBrowserBindingName(bindings: BrowserBindings | undefined): string | undefined {
 	const bindingNames = getBrowserBindingNames(bindings)
 
 	if (bindingNames.length === 0) {
 		return undefined
-	}
-
-	if (bindingNames.length > 1) {
-		throw new Error(formatBrowserBindingLimitMessage(bindingNames))
 	}
 
 	return bindingNames[0]

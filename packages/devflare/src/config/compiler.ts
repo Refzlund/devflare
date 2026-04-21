@@ -4,6 +4,7 @@
 
 import { basename, isAbsolute, relative, resolve } from 'pathe'
 import {
+	browserBindingSchema,
 	getSingleBrowserBindingName,
 	normalizeHyperdriveBinding,
 	normalizeKVBinding,
@@ -218,7 +219,15 @@ function getWranglerHyperdriveBinding(
 function getWranglerBrowserBinding(
 	browserBindings: NonNullable<DevflareConfig['bindings']>['browser']
 ): { binding: string } | undefined {
-	const bindingName = getSingleBrowserBindingName(browserBindings)
+	if (!browserBindings) {
+		return undefined
+	}
+
+	// Re-validate via Zod so the canonical browser-binding-limit error is
+	// raised even when `compileConfig()` is called with input that bypassed
+	// `configSchema.parse()` (e.g. raw objects cast as DevflareConfig).
+	const parsed = browserBindingSchema.parse(browserBindings)
+	const bindingName = getSingleBrowserBindingName(parsed)
 	return bindingName ? { binding: bindingName } : undefined
 }
 
