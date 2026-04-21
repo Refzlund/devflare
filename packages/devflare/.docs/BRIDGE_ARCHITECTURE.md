@@ -1,6 +1,17 @@
 # Devflare Bridge Architecture
 
-> **TODO(B3):** finalize bare-verb vs namespaced RPC naming convention. The examples below currently show binding-prefixed RPC method names (e.g. `MY_KV.get`, `MY_DO.idFromName`); the on-the-wire convention is still being unified — see `INCONSISTENCIES.md → B3` and `bridge/server.ts` for the actual dispatch table.
+> **RPC naming convention.** Every wire op is namespaced by its binding kind:
+> `kv.*`, `r2.*`, `d1.*` (with `d1.stmt.*` for prepared-statement subops), `do.*`,
+> `queue.*`, `email.*`, `ai.*`, `var.*`. The full method on the wire is
+> `<bindingName>.<kind>.<verb>`, e.g. `MY_KV.kv.get`, `MY_DO.do.idFromName`,
+> `MY_DO.do.fetch`, `MY_DO.do.rpc`. The DO-vs-KV overlap on the bare `get` verb
+> (resolved as B4) no longer exists at the protocol level — `do.get` and
+> `kv.get` are distinct ops. For one release, the in-worker dispatcher still
+> accepts legacy bare verbs (and the older `stmt.*` / `stub.*` sub-prefixes),
+> auto-translates them based on binding shape, and emits a one-shot
+> `console.warn` per deprecated verb. The bridge proxy (`src/bridge/proxy.ts`)
+> always emits the namespaced form; only out-of-tree callers exercise the
+> legacy path.
 
 > **Source layout (current).** The bridge lives under `src/bridge/`:
 > - `bridge/v2/` — wire-protocol layer: `wire.ts` (RPC envelope, control plane, binary frame header, ID counters, `HTTP_TRANSFER_THRESHOLD`), `frames.ts` (binary frame encode/decode), `codec.ts` (handshake + body-stream registry on top of `wire.ts`), `transport.ts` (per-payload inline-vs-HTTP transport selection), `body-streams.ts` (pull-based stream registry), `value-codec.ts` / `value-serialization.ts` (POJO + StreamRef serialization), `control-messages.ts`, `ws-relay.ts` (WS pass-through plumbing), `serialization.ts`, `index.ts`.
@@ -213,13 +224,13 @@ Browser connects to SvelteKit (not directly to Miniflare):
 // 3. Returns Promises that resolve when Miniflare responds
 
 await bridgeEnv.MY_KV.get('key')
-// → RPC: { t: 'rpc.call', id: '1', method: 'MY_KV.get', params: ['key'] }
+// → RPC: { t: 'rpc.call', id: '1', method: 'MY_KV.kv.get', params: ['key'] }
 // ← Response: { t: 'rpc.ok', id: '1', result: 'stored-value' }
 
 const stub = bridgeEnv.CHAT_ROOM.get(id)
 await stub.fetch(request)
-// → RPC: { t: 'rpc.call', id: '2', method: 'CHAT_ROOM.idFromName', params: [id] }
-// → RPC: { t: 'rpc.call', id: '3', method: 'CHAT_ROOM.fetch', params: [stubRef, serializedReq] }
+// → RPC: { t: 'rpc.call', id: '2', method: 'CHAT_ROOM.do.idFromName', params: [id] }
+// → RPC: { t: 'rpc.call', id: '3', method: 'CHAT_ROOM.do.fetch', params: [stubRef, serializedReq] }
 ```
 
 > **Note**: `bridgeEnv` is an internal bridge-layer primitive, not part of the stable root package contract.
