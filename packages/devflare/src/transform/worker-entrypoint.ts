@@ -23,6 +23,7 @@
 
 import ts from 'typescript'
 import MagicString from 'magic-string'
+import { SUPPORTED_WORKER_EXTENSIONS, TS_WORKER_EXTENSIONS } from '../worker-entry/extensions'
 
 // -----------------------------------------------------------------------------
 // Types
@@ -199,22 +200,12 @@ export function findExportedFunctions(code: string): ExportedFunction[] {
 }
 
 /**
- * Extensions considered valid worker entrypoint sources.
- */
-const WORKER_EXTENSIONS = ['.ts', '.tsx', '.mts', '.cts', '.js', '.mjs', '.cjs'] as const
-
-/**
- * Extensions that may host TypeScript-only syntax (type annotations, interfaces).
- */
-const TS_EXTENSIONS = ['.ts', '.tsx', '.mts', '.cts'] as const
-
-/**
  * Returns true when the filename has an extension that permits TS-only syntax.
  * Gates injection of interfaces and type annotations into emitted worker code.
  */
 export function shouldEmitTsSyntax(filename: string): boolean {
 	const lower = filename.toLowerCase()
-	return TS_EXTENSIONS.some((ext) => lower.endsWith(ext))
+	return TS_WORKER_EXTENSIONS.some((ext) => lower.endsWith(ext))
 }
 
 /**
@@ -223,7 +214,7 @@ export function shouldEmitTsSyntax(filename: string): boolean {
  */
 export function shouldTransformWorker(code: string, filePath: string): boolean {
 	const lower = filePath.toLowerCase()
-	const isWorkerFile = WORKER_EXTENSIONS.some((ext) => lower.endsWith(`worker${ext}`))
+	const isWorkerFile = SUPPORTED_WORKER_EXTENSIONS.some((ext) => lower.endsWith(`worker${ext}`))
 	if (!isWorkerFile) {
 		return false
 	}

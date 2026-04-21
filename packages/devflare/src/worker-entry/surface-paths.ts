@@ -1,33 +1,14 @@
 import { resolve } from 'pathe'
 import type { DevflareConfig } from '../config'
+import { SUPPORTED_WORKER_EXTENSIONS } from './extensions'
 
-export const DEFAULT_FETCH_ENTRY_FILES = [
-	'src/fetch.ts',
-	'src/fetch.js',
-	'src/fetch.mts',
-	'src/fetch.mjs'
-] as const
+const defaultEntriesFor = (surface: string): readonly string[] =>
+	SUPPORTED_WORKER_EXTENSIONS.map((ext) => `src/${surface}${ext}`)
 
-export const DEFAULT_QUEUE_ENTRY_FILES = [
-	'src/queue.ts',
-	'src/queue.js',
-	'src/queue.mts',
-	'src/queue.mjs'
-] as const
-
-export const DEFAULT_SCHEDULED_ENTRY_FILES = [
-	'src/scheduled.ts',
-	'src/scheduled.js',
-	'src/scheduled.mts',
-	'src/scheduled.mjs'
-] as const
-
-export const DEFAULT_EMAIL_ENTRY_FILES = [
-	'src/email.ts',
-	'src/email.js',
-	'src/email.mts',
-	'src/email.mjs'
-] as const
+export const DEFAULT_FETCH_ENTRY_FILES = defaultEntriesFor('fetch')
+export const DEFAULT_QUEUE_ENTRY_FILES = defaultEntriesFor('queue')
+export const DEFAULT_SCHEDULED_ENTRY_FILES = defaultEntriesFor('scheduled')
+export const DEFAULT_EMAIL_ENTRY_FILES = defaultEntriesFor('email')
 
 export interface WorkerSurfacePaths {
 	fetch: string | null

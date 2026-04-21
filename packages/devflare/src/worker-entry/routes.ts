@@ -6,17 +6,13 @@ import { relative, resolve } from 'pathe'
 import type { DevflareConfig } from '../config'
 import type { RouteSegment } from '../router/types'
 import { findFiles } from '../utils/glob'
+import { SUPPORTED_WORKER_EXTENSIONS } from './extensions'
 
 export const DEFAULT_ROUTE_DIR = 'src/routes'
 
-const DEFAULT_ROUTE_FILE_PATTERNS = [
-	'**/*.ts',
-	'**/*.tsx',
-	'**/*.js',
-	'**/*.jsx',
-	'**/*.mts',
-	'**/*.mjs'
-]
+const DEFAULT_ROUTE_FILE_PATTERNS = SUPPORTED_WORKER_EXTENSIONS.map(
+	(ext) => `**/*${ext}`
+)
 
 export interface DiscoveredRoute {
 	readonly absolutePath: string
