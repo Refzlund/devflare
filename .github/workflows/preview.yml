@@ -616,8 +616,17 @@ jobs:
           DEVFLARE_PREVIEW_BRANCH: ${{ needs.resolve-context.outputs.branch-preview-scope }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_ACCESS_CLIENT_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
+          CLOUDFLARE_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
           TESTING_DEPLOY_VERSION_ID: ${{ steps.branch-deploy.outputs.version-id }}
-          TESTING_DEPLOY_PREVIEW_URL: ${{ steps.branch-deploy.outputs.preview-url }}
+          # The branch-preview workers are commonly gated by a Cloudflare Access
+          # policy. Live /health and /status probes only work when the Access
+          # service-token secrets are configured. Without them the verifier
+          # would (correctly) fail on every Access-redirect; expose the URL only
+          # when we can authenticate, otherwise emit a loud warning so the gap
+          # is visible. PR-preview workers are not gated, so this only affects
+          # the branch lane.
+          TESTING_DEPLOY_PREVIEW_URL: ${{ (secrets.CLOUDFLARE_ACCESS_CLIENT_ID != '' && secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET != '') && steps.branch-deploy.outputs.preview-url || '' }}
           TESTING_VERIFICATION_ATTEMPTS: '5'
           TESTING_VERIFICATION_DELAY_MS: '3000'
         run: |
@@ -626,6 +635,16 @@ jobs:
           if [ -z "${{ steps.branch-deploy.outputs.preview-url }}" ]; then
             echo 'Expected the deploy action to return a preview-url output for GitHub feedback.' >&2
             exit 1
+          fi
+
+          if [ -z "$TESTING_DEPLOY_PREVIEW_URL" ]; then
+            warning='Branch-preview live /health + /status probe SKIPPED: CLOUDFLARE_ACCESS_CLIENT_ID / CLOUDFLARE_ACCESS_CLIENT_SECRET secrets are not configured, and the branch-preview workers are gated by Cloudflare Access. Add the service-token secrets to enable end-to-end deploy verification on push events. Falling back to Wrangler metadata only.'
+            echo "::warning::$warning"
+            {
+              echo '### :warning: Branch-preview live verification skipped'
+              echo ''
+              echo "$warning"
+            } >> "$GITHUB_STEP_SUMMARY"
           fi
 
           bun .github/scripts/verify-testing-preview-deployment.ts "$DEVFLARE_PREVIEW_BRANCH"
@@ -710,6 +729,8 @@ jobs:
           DEVFLARE_PREVIEW_BRANCH: ${{ needs.resolve-context.outputs.pr-preview-scope }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_ACCESS_CLIENT_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
+          CLOUDFLARE_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
           TESTING_DEPLOY_VERSION_ID: ${{ steps.pr-deploy.outputs.version-id }}
           TESTING_DEPLOY_PREVIEW_URL: ${{ steps.pr-deploy.outputs.preview-url }}
           TESTING_VERIFICATION_ATTEMPTS: '5'

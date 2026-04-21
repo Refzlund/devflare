@@ -148,6 +148,21 @@ async function readBodyExcerpt(response: Response): Promise<string> {
 	}
 }
 
+// When the preview worker sits behind a Cloudflare Access policy, callers
+// must present a service-token (CF-Access-Client-Id / CF-Access-Client-Secret).
+// Both env vars must be set; partial config is treated as no config.
+function cloudflareAccessHeaders(): Record<string, string> {
+	const id = process.env.CLOUDFLARE_ACCESS_CLIENT_ID
+	const secret = process.env.CLOUDFLARE_ACCESS_CLIENT_SECRET
+	if (!id || !secret) {
+		return {}
+	}
+	return {
+		'CF-Access-Client-Id': id,
+		'CF-Access-Client-Secret': secret
+	}
+}
+
 export interface PreviewHealthResult {
 	ok: boolean
 	status: number
@@ -161,7 +176,8 @@ async function loadPreviewHealth(previewUrl: string, _attempt: number): Promise<
 		redirect: 'manual',
 		cache: 'no-store',
 		headers: {
-			'cache-control': 'no-store'
+			'cache-control': 'no-store',
+			...cloudflareAccessHeaders()
 		},
 		signal: AbortSignal.timeout(15_000)
 	})
@@ -193,7 +209,8 @@ async function loadPreviewStatus(previewUrl: string): Promise<TestingPreviewStat
 	const response = await fetch(appendPreviewPath(previewUrl, '/status'), {
 		redirect: 'manual',
 		headers: {
-			'cache-control': 'no-store'
+			'cache-control': 'no-store',
+			...cloudflareAccessHeaders()
 		}
 	})
 
