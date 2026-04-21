@@ -96,7 +96,12 @@ export default defineConfig({
 		hyperdrive: {
 			// Requires a real Hyperdrive config backed by a real database.
 			// Prefer the stable configured name over a raw id so Devflare can resolve it when needed.
-			POSTGRES: pv('devflare-testing')
+			// `previewFallback: 'base'` lets preview deploys reuse the base Hyperdrive
+			// config when no dedicated preview Hyperdrive exists in the account.
+			POSTGRES: {
+				name: pv('devflare-testing'),
+				previewFallback: 'base'
+			}
 		},
 
 		browser: {
