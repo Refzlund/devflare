@@ -647,12 +647,14 @@ function createSimpleBindingProxy(client: BridgeClient, bindingName: string): un
 let globalEnvProxy: Record<string, unknown> | null = null
 
 /**
- * Get the global env proxy for bridge RPC
- * 
- * Note: This is distinct from the published `import { env } from 'devflare'`
- * proxy, which provides unified request/test/bridge-aware access.
- * Use `bridgeEnv` for standalone internal bridge usage and `env` from the
- * main package within request handlers and normal test flows.
+ * Get the global env proxy for bridge RPC.
+ *
+ * @internal
+ * Internal bridge surface — not part of the documented public API. Prefer
+ * `import { env } from 'devflare'`, which transparently picks the right
+ * source (request context, test context, or bridge) for the current
+ * environment. `bridgeEnv` is retained as an internal escape hatch for the
+ * bridge implementation itself and may change without a major version bump.
  *
  * @example
  * ```ts

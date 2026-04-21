@@ -1,11 +1,17 @@
 // =============================================================================
 // Unified Environment Proxy
 // =============================================================================
-// Smart proxy that tries request-scoped context first, falls back to bridge
-// This allows a single `import { env } from 'devflare'` to work everywhere:
+// Smart proxy that tries request-scoped context first, then a test context
+// installed by createTestContext, then finally the internal bridge proxy.
+// This is the public Cloudflare-world portal — a single
+// `import { env } from 'devflare'` works everywhere:
 // - Inside request handlers: uses request-scoped context
-// - Outside request handlers: uses bridge to Miniflare (dev mode)
-// - In tests: uses test context set up by createTestContext()
+// - In bun:test / Bun scripts: uses createTestContext state when present,
+//   otherwise auto-connects through the internal bridge to Miniflare
+// - In dev/production workers: resolved via the request context layer
+//
+// The underlying `bridgeEnv` from ./bridge/proxy is an internal helper and
+// should not be imported by user code.
 // =============================================================================
 
 import { getContextOrNull } from './runtime/context'
