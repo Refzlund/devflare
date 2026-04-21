@@ -131,3 +131,51 @@ describe('executeRpcMethod — B3-final: bare verbs and legacy sub-prefixes thro
 	})
 })
 
+describe('executeRpcMethod — B5-frame: binding errors round-trip with typed cause', () => {
+	test('KV.get throw surfaces back through executeRpcMethod', async () => {
+		const kv = {
+			get: () => { throw new Error('kv blew up') },
+			put: () => { },
+			list: () => { },
+			delete: () => { },
+			getWithMetadata: () => { }
+		}
+		const env = { K: kv } as unknown as GatewayEnv
+		await expect(
+			executeRpcMethod('K.kv.get', ['k1'], env, noopCtx)
+		).rejects.toThrow(/kv blew up/)
+	})
+
+	test('R2.get throw surfaces back through executeRpcMethod', async () => {
+		const r2 = {
+			head: () => null,
+			get: () => { throw new Error('r2 blew up') },
+			put: () => { },
+			delete: () => { },
+			list: () => { },
+			createMultipartUpload: () => { }
+		}
+		const env = { B: r2 } as unknown as GatewayEnv
+		await expect(
+			executeRpcMethod('B.r2.get', ['some/key'], env, noopCtx)
+		).rejects.toThrow(/r2 blew up/)
+	})
+
+	test('D1 prepare-then-first throw surfaces back through executeRpcMethod', async () => {
+		const stmt = {
+			bind: () => stmt,
+			first: () => { throw new Error('d1 blew up') }
+		}
+		const d1 = {
+			prepare: () => stmt,
+			exec: () => { },
+			batch: () => { },
+			dump: () => { }
+		}
+		const env = { DB: d1 } as unknown as GatewayEnv
+		await expect(
+			executeRpcMethod('DB.d1.stmt.first', ['SELECT 1'], env, noopCtx)
+		).rejects.toThrow(/d1 blew up/)
+	})
+})
+

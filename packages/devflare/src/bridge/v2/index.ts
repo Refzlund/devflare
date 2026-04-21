@@ -52,7 +52,8 @@ export type {
 	TransportV2RpcCall,
 	TransportV2RpcErr,
 	TransportV2RpcMsg,
-	TransportV2RpcOk
+	TransportV2RpcOk,
+	TransportV2WireError
 } from './codec'
 
 export { createTransportV2Pair } from './transport'

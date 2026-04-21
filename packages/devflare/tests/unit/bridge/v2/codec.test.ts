@@ -1,5 +1,5 @@
-// =============================================================================
-// Bridge Transport v2 — End-to-End Codec + Streaming Serialization Tests
+﻿// =============================================================================
+// Bridge Transport v2 â€” End-to-End Codec + Streaming Serialization Tests
 // =============================================================================
 //
 // These tests use the in-memory `createTransportV2Pair()` to wire two
@@ -32,7 +32,7 @@ function pair(opts?: {
 	return { client, server }
 }
 
-describe('TransportV2Codec — handshake', () => {
+describe('TransportV2Codec â€” handshake', () => {
 	test('client.sendHello() resolves both sides with the negotiated capability intersection', async () => {
 		const { client, server } = pair({
 			clientCaps: ['streaming-bodies', 'codegen-gateway', 'experimental'],
@@ -57,7 +57,7 @@ describe('TransportV2Codec — handshake', () => {
 	})
 })
 
-describe('TransportV2Codec — RPC', () => {
+describe('TransportV2Codec â€” RPC', () => {
 	test('client.call resolves with the server\'s rpc.ok result', async () => {
 		const { client, server } = pair({
 			onServerCall: (call, srv) => {
@@ -96,7 +96,7 @@ describe('TransportV2Codec — RPC', () => {
 	})
 })
 
-describe('serializeRequestV2 / deserializeRequestV2 — streaming bodies', () => {
+describe('serializeRequestV2 / deserializeRequestV2 â€” streaming bodies', () => {
 	test('round-trips a streaming Request body through v2 without buffering', async () => {
 		const { client, server } = pair()
 		client.sendHello()
@@ -170,7 +170,7 @@ describe('serializeRequestV2 / deserializeRequestV2 — streaming bodies', () =>
 	})
 })
 
-describe('TransportV2Codec — frame routing isolation', () => {
+describe('TransportV2Codec â€” frame routing isolation', () => {
 	test('non-v2 control messages are forwarded to onUnknownControl', async () => {
 		const { a, b } = createTransportV2Pair()
 		const seen: string[] = []
@@ -209,3 +209,46 @@ describe('TransportV2Codec — frame routing isolation', () => {
 		right.close()
 	})
 })
+
+describe('TransportV2Codec — B5-frame: out-of-band wire error', () => {
+	test('sendWireError on one side fires onWireError on the other', async () => {
+		const { a, b } = createTransportV2Pair()
+		const seen: import('../../../../src/bridge/v2').TransportV2WireError[] = []
+		const left = new TransportV2Codec(a, { onWireError: (e) => seen.push(e) })
+		const right = new TransportV2Codec(b)
+		left.handshake.catch(() => {})
+		right.handshake.catch(() => {})
+		right.sendWireError({
+			scope: 'stream',
+			error: { code: 'EBADCHUNK', message: 'malformed body chunk', details: { sid: 7 } },
+			refId: 7
+		})
+		await Promise.resolve()
+		await Promise.resolve()
+		expect(seen).toHaveLength(1)
+		expect(seen[0]!.t).toBe('error')
+		expect(seen[0]!.scope).toBe('stream')
+		expect(seen[0]!.error.code).toBe('EBADCHUNK')
+		expect(seen[0]!.error.message).toBe('malformed body chunk')
+		expect(seen[0]!.refId).toBe(7)
+		left.close()
+		right.close()
+	})
+
+	test('malformed error frames fall through to onUnknownControl', async () => {
+		const { a, b } = createTransportV2Pair()
+		const unknown: string[] = []
+		const left = new TransportV2Codec(a, { onUnknownControl: (m) => unknown.push(m) })
+		const right = new TransportV2Codec(b)
+		left.handshake.catch(() => {})
+		right.handshake.catch(() => {})
+		// scope missing — must not be parsed as a wire error.
+		right.sendText('{"t":"error","error":{"code":"X","message":"y"}}')
+		await Promise.resolve()
+		await Promise.resolve()
+		expect(unknown).toHaveLength(1)
+		left.close()
+		right.close()
+	})
+})
+

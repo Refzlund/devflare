@@ -49,6 +49,31 @@ export interface RpcErr {
 	}
 }
 
+/**
+ * Out-of-band structured error frame (B5-frame).
+ *
+ * Sent for failures that are not scoped to a single in-flight RPC: malformed
+ * incoming frames, transport-level violations, stream/ws aborts that need a
+ * typed cause, and gateway-side bookkeeping errors. Replaces the prior
+ * silent-`catch {}` fallthroughs in client/server/codec so a structured cause
+ * surfaces back to the peer instead of being logged-only.
+ *
+ * `scope` lets the peer route the frame: 'rpc' for an RPC-related failure
+ * the server could not pin to a call id, 'stream'/'ws' for a body-stream or
+ * websocket-proxy failure, or 'transport' for protocol-level violations.
+ * `refId` optionally pins the error to a known stream/ws/rpc id.
+ */
+export interface WireError {
+	t: 'error'
+	scope: 'transport' | 'rpc' | 'stream' | 'ws'
+	error: {
+		code: string
+		message: string
+		details?: unknown
+	}
+	refId?: string | number
+}
+
 /** Event notification (worker → client) */
 export interface EventMsg {
 	t: 'event'
@@ -125,6 +150,7 @@ export type JsonMsg =
 	| RpcCall
 	| RpcOk
 	| RpcErr
+	| WireError
 	| EventMsg
 	| StreamOpen
 	| StreamPull

@@ -58,6 +58,17 @@ export interface TransportV2RpcErr {
 	error: { code: string; message: string; details?: unknown }
 }
 
+/**
+ * Out-of-band structured error frame (B5-frame). See
+ * `src/bridge/v2/wire.ts#WireError` for the canonical vocabulary spec.
+ */
+export interface TransportV2WireError {
+	t: 'error'
+	scope: 'transport' | 'rpc' | 'stream' | 'ws'
+	error: { code: string; message: string; details?: unknown }
+	refId?: string | number
+}
+
 export type TransportV2RpcMsg = TransportV2RpcCall | TransportV2RpcOk | TransportV2RpcErr
 
 export interface TransportV2CodecOptions {
@@ -69,6 +80,13 @@ export interface TransportV2CodecOptions {
 	onUnknownControl?: (data: string) => void
 	/** Called when a non-BodyChunk binary frame arrives. Used during dual-mode for v1 stream/ws frames. */
 	onUnknownBinary?: (frame: TransportV2DecodedBinaryFrame) => void
+	/**
+	 * Called when an out-of-band `error` frame (B5-frame) arrives — i.e.
+	 * a structured failure that is not pinned to a single RPC call id.
+	 * Useful for surfacing transport/stream/ws errors that previously fell
+	 * through silent `catch {}` blocks.
+	 */
+	onWireError?: (err: TransportV2WireError) => void
 }
 
 interface PendingRpc {
@@ -179,6 +197,17 @@ export class TransportV2Codec {
 		this.sendText(JSON.stringify(reply))
 	}
 
+	/**
+	 * Send an out-of-band structured `error` frame (B5-frame). Use for
+	 * failures that are not scoped to a single RPC call id — e.g. malformed
+	 * incoming frames, stream/ws aborts that need a typed cause, or gateway
+	 * bookkeeping errors. Replaces silent `catch {}` fallthroughs.
+	 */
+	sendWireError(err: Omit<TransportV2WireError, 't'>): void {
+		const frame: TransportV2WireError = { t: 'error', ...err }
+		this.sendText(JSON.stringify(frame))
+	}
+
 	/** Register a reader-side body stream. Returns the `ReadableStream`. Idempotent across the codec's `body.open` arrival. */
 	openBodyReader(bid: number): ReadableStream<Uint8Array> {
 		return this.bodyReaders.getOrOpen(bid)
@@ -228,6 +257,15 @@ export class TransportV2Codec {
 			const rpc = tryParseRpcMsg(data)
 			if (rpc !== null) {
 				this.#onRpcMessage(rpc)
+				return
+			}
+			// Probe for an out-of-band wire error frame (B5-frame). Lives at
+			// the same parser tier as RPC because it is not part of the v2
+			// control vocabulary in `frames.ts` but is part of the wider
+			// wire vocabulary in `wire.ts`.
+			const wireErr = tryParseWireError(data)
+			if (wireErr !== null) {
+				this.#options.onWireError?.(wireErr)
 				return
 			}
 			this.#options.onUnknownControl?.(data)
@@ -374,4 +412,21 @@ function tryParseRpcMsg(data: string): TransportV2RpcMsg | null {
 		return parsed as TransportV2RpcMsg
 	}
 	return null
+}
+
+function tryParseWireError(data: string): TransportV2WireError | null {
+	let parsed: unknown
+	try {
+		parsed = JSON.parse(data)
+	} catch {
+		return null
+	}
+	if (typeof parsed !== 'object' || parsed === null || !('t' in parsed)) return null
+	const candidate = parsed as { t: unknown; scope?: unknown; error?: unknown }
+	if (candidate.t !== 'error') return null
+	const scope = candidate.scope
+	if (scope !== 'transport' && scope !== 'rpc' && scope !== 'stream' && scope !== 'ws') return null
+	const err = candidate.error as { code?: unknown; message?: unknown } | undefined
+	if (!err || typeof err.code !== 'string' || typeof err.message !== 'string') return null
+	return parsed as TransportV2WireError
 }
