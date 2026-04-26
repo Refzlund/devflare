@@ -1,12 +1,13 @@
-import type { DocCategory, DocGroup, DocPage } from './types'
 import { bindingDocCategories, bindingDocs } from './content/bindings'
 import { buildAppsDocs } from './content/build-apps'
 import { configurationDocs } from './content/configuration'
 import { devflareDocs } from './content/devflare'
+import { examplesDocs } from './content/examples'
 import { frameworkDocs } from './content/frameworks'
 import { operationsDocs } from './content/operations'
 import { shipOperateDocs } from './content/ship-operate'
 import { startHereDocs } from './content/start-here'
+import type { DocCategory, DocGroup, DocPage } from './types'
 
 export function docPath(slug: string): string {
 	return `/docs/${slug}`
@@ -17,6 +18,7 @@ const allDocs: DocPage[] = [
 	...buildAppsDocs,
 	...configurationDocs,
 	...devflareDocs,
+	...examplesDocs,
 	...frameworkDocs,
 	...bindingDocs,
 	...operationsDocs,
@@ -65,9 +67,7 @@ interface DocGroupDefinition {
 }
 
 function pickDocs(slugs: string[]): DocPage[] {
-	return slugs
-		.map((slug) => docsBySlug.get(slug))
-		.filter((doc): doc is DocPage => Boolean(doc))
+	return slugs.map((slug) => docsBySlug.get(slug)).filter((doc): doc is DocPage => Boolean(doc))
 }
 
 const docStructure: DocGroupDefinition[] = [
@@ -86,9 +86,18 @@ const docStructure: DocGroupDefinition[] = [
 			{
 				id: 'foundations',
 				title: 'Foundations',
-				description: 'Start with the mental model, the smallest safe worker, and one real test before you branch into app-specific setup.',
+				description:
+					'Start with the mental model, the smallest safe worker, and one real test before you branch into app-specific setup.',
 				sidebarDisplay: 'links',
-				slugs: ['what-devflare-is', 'first-worker', 'first-unit-test', 'first-bindings', 'deploy-and-preview']
+				slugs: [
+					'docs-landing-paths',
+					'what-devflare-is',
+					'first-worker',
+					'first-unit-test',
+					'first-route-tree',
+					'first-bindings',
+					'deploy-and-preview'
+				]
 			}
 		]
 	},
@@ -100,46 +109,73 @@ const docStructure: DocGroupDefinition[] = [
 			{
 				id: 'cli',
 				title: 'CLI',
-				description: 'Use the everyday command loop, keep deploy intent explicit, and let package-local commands resolve the config you actually mean to act on.',
+				description:
+					'Use the everyday command loop, keep deploy intent explicit, and let package-local commands resolve the config you actually mean to act on.',
 				sidebarDisplay: 'standalone',
 				slugs: ['devflare-cli']
 			},
 			{
 				id: 'project-architecture',
 				title: 'Project Architecture',
-				description: 'See how real Devflare packages are laid out on disk, which files are authored versus generated, and how the monorepo boundary stays explicit.',
+				description:
+					'See how real Devflare packages are laid out on disk, which files are authored versus generated, and how the monorepo boundary stays explicit.',
 				sidebarDisplay: 'standalone',
-				slugs: ['project-architecture']
+				slugs: ['project-architecture', 'bridge-architecture-internals']
 			},
 			{
 				id: 'routing',
 				title: 'Routing',
-				description: 'Keep request-wide middleware separate from route leaves so HTTP stays readable as the app grows.',
+				description:
+					'Keep request-wide middleware separate from route leaves so HTTP stays readable as the app grows.',
 				sidebarDisplay: 'standalone',
 				slugs: ['http-routing']
 			},
 			{
 				id: 'configuration',
 				title: 'Configuration',
-				description: 'Keep authored config readable, stable, and clearly separated from generated output.',
-				slugs: ['config-basics', 'full-config', 'project-shape', 'worker-surfaces', 'generated-types', 'config-environments', 'config-previews', 'runtime-deploy-settings']
+				description:
+					'Keep authored config readable, stable, and clearly separated from generated output.',
+				slugs: [
+					'config-basics',
+					'full-config',
+					'project-shape',
+					'worker-surfaces',
+					'generated-types',
+					'config-environments',
+					'config-previews',
+					'runtime-deploy-settings'
+				]
 			},
 			{
 				id: 'runtime',
 				title: 'Runtime',
-				description: 'Keep the reusable runtime primitives nearby: AsyncLocalStorage-backed context, request-wide middleware composition, bridge transport, and other worker-wide helper surfaces belong here.',
-				slugs: ['runtime-context', 'sequence-middleware', 'transport-file']
+				description:
+					'Keep the reusable runtime primitives nearby: AsyncLocalStorage-backed context, request-wide middleware composition, bridge transport, and other worker-wide helper surfaces belong here.',
+				slugs: [
+					'runtime-context',
+					'sequence-middleware',
+					'runtime-handler-styles',
+					'transport-file'
+				]
 			},
 			{
 				id: 'testing',
 				title: 'Testing',
-				description: 'Start with why the testing experience feels different, use the testing map and built-in harness for runtime-shaped checks, and jump to binding-specific guides when the test story changes by binding.',
-				slugs: ['why-testing-feels-native', 'testing-overview', 'create-test-context', 'binding-testing-guides']
+				description:
+					'Start with why the testing experience feels different, use the testing map and built-in harness for runtime-shaped checks, and jump to binding-specific guides when the test story changes by binding.',
+				slugs: [
+					'why-testing-feels-native',
+					'testing-overview',
+					'create-test-context',
+					'binding-testing-guides',
+					'test-helper-reference'
+				]
 			},
 			{
 				id: 'frameworks',
 				title: 'Frameworks',
-				description: 'Choose the right host lane for worker-rendered Svelte, standalone Vite apps, and full SvelteKit shells without losing the worker-first mental model.',
+				description:
+					'Choose the right host lane for worker-rendered Svelte, standalone Vite apps, and full SvelteKit shells without losing the worker-first mental model.',
 				slugs: ['svelte-with-rolldown', 'vite-standalone', 'sveltekit-with-devflare']
 			}
 		]
@@ -152,7 +188,8 @@ const docStructure: DocGroupDefinition[] = [
 			{
 				id: 'ci-cd',
 				title: 'CI/CD',
-				description: 'Use small GitHub workflows that keep triggers, permissions, impact checks, deploy intent, and feedback easy to review.',
+				description:
+					'Use small GitHub workflows that keep triggers, permissions, impact checks, deploy intent, and feedback easy to review.',
 				slugs: ['github-workflows']
 			},
 			{
@@ -160,12 +197,18 @@ const docStructure: DocGroupDefinition[] = [
 				title: 'Deploy targets',
 				description:
 					'Move from local build output to production or preview deploys without guessing which destination you are about to hit.',
-				slugs: ['production-deploys', 'monorepo-turborepo', 'preview-strategies']
+				slugs: [
+					'deploy-command-recipes',
+					'production-deploys',
+					'monorepo-turborepo',
+					'preview-strategies'
+				]
 			},
 			{
 				id: 'operations',
 				title: 'Operations',
-				description: 'Choose account context, inspect live production, manage Worker names and tokens, gate paid remote tests deliberately, and reuse the public Cloudflare helper API when automation needs the same rules.',
+				description:
+					'Choose account context, inspect live production, manage Worker names and tokens, gate paid remote tests deliberately, and reuse the public Cloudflare helper API when automation needs the same rules.',
 				slugs: ['control-plane-operations', 'cloudflare-api']
 			},
 			{
@@ -178,8 +221,9 @@ const docStructure: DocGroupDefinition[] = [
 			{
 				id: 'verification',
 				title: 'Verification',
-				description: 'Use runtime-shaped tests and keep automation observable enough to trust during releases.',
-				slugs: ['testing-and-automation']
+				description:
+					'Use runtime-shaped tests and keep automation observable enough to trust during releases.',
+				slugs: ['testing-and-automation', 'docs-release-gates']
 			}
 		]
 	},
@@ -194,7 +238,17 @@ const docStructure: DocGroupDefinition[] = [
 				description:
 					'Choose the right architecture and product boundary first, then let the specific binding pages own the exact authoring and runtime mechanics.',
 				sidebarDisplay: 'links',
-				slugs: ['storage-bindings', 'r2-uploads-and-delivery', 'durable-objects-and-queues', 'multi-workers']
+				slugs: [
+					'binding-chooser',
+					'feature-index',
+					'recipe-packs',
+					'case-catalog',
+					'learn-from-real-tests',
+					'storage-bindings',
+					'r2-uploads-and-delivery',
+					'durable-objects-and-queues',
+					'multi-workers'
+				]
 			}
 		]
 	},
@@ -202,9 +256,7 @@ const docStructure: DocGroupDefinition[] = [
 		title: 'Bindings',
 		description:
 			'Use the per-binding guides for the exact authoring, runtime, testing, preview, and example details once the guide pages have already helped you choose the right pattern.',
-		categories: [
-			...bindingDocCategories
-		]
+		categories: [...bindingDocCategories]
 	}
 ]
 
@@ -226,8 +278,10 @@ export const docGroups: DocGroup[] = docStructure.map((group) => {
 	}
 })
 
-export const docs: DocPage[] = Array.from(new Map(
-	docGroups
-		.flatMap((group) => group.categories.flatMap((category) => category.items))
-		.map((doc) => [doc.slug, doc])
-).values())
+export const docs: DocPage[] = Array.from(
+	new Map(
+		docGroups
+			.flatMap((group) => group.categories.flatMap((category) => category.items))
+			.map((doc) => [doc.slug, doc])
+	).values()
+)

@@ -23,6 +23,14 @@ bun run deploy:preview
 bun run check
 ```
 
+## Documentation contribution contract
+
+- Author long-form docs in `apps/documentation/src/lib/docs/content*.ts`; do not patch generated `LLM.md` by hand.
+- Start feature pages with a copyable recipe: file path, command, expected result, and the next page to read.
+- Prefer many small examples over broad prose. Multi-file examples should name every file in the snippet metadata.
+- When public exports, config schema keys, CLI commands, binding support, or test helpers change, update the matching docs and run `bun run devflare:docs-integrity` from the repo root.
+- Regenerate the handbook with `bun run --cwd packages/devflare llm:generate` when the docs model changes.
+
 ## Monorepo + Turborepo workflow
 
 This app lives inside the repository's Bun + Turborepo workspace, so there are two layers to keep straight:

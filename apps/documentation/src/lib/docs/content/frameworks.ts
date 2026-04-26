@@ -7,7 +7,8 @@ export const frameworkDocs: DocPage[] = [
 		navTitle: 'Svelte in workers',
 		readTime: '5 min read',
 		eyebrow: 'Frameworks',
-		title: 'Render Svelte inside worker bundles by putting the compiler in Rolldown, not the app shell',
+		title:
+			'Render Svelte inside worker bundles by putting the compiler in Rolldown, not the app shell',
 		summary:
 			'When a worker-only fetch surface or Durable Object imports `.svelte`, add the Svelte compiler to `rolldown.options.plugins`. That compilation belongs to Devflare’s worker bundler, not the main Vite plugin chain.',
 		description:
@@ -19,11 +20,21 @@ export const frameworkDocs: DocPage[] = [
 			'The same plugin path applies to main worker bundles and Durable Object bundles when those modules import Svelte components.'
 		],
 		facts: [
-			{ label: 'Best for', value: 'Worker-only fetch surfaces or Durable Objects that import `.svelte`' },
+			{
+				label: 'Best for',
+				value: 'Worker-only fetch surfaces or Durable Objects that import `.svelte`'
+			},
 			{ label: 'Key extension point', value: '`rolldown.options.plugins`' },
-			{ label: 'Rendering shape', value: 'SSR-style component compilation inside the worker bundle' }
+			{
+				label: 'Rendering shape',
+				value: 'SSR-style component compilation inside the worker bundle'
+			}
 		],
-		sourcePages: ['development-workflows.md', 'configuration-reference.md', 'README.md'],
+		sourcePages: [
+			'packages/devflare/src/dev-server/server.ts',
+			'packages/devflare/src/config/schema.ts',
+			'README.md'
+		],
 		sections: [
 			{
 				id: 'choose-this-path',
@@ -87,7 +98,7 @@ export default defineConfig({
 				],
 				bullets: [
 					'`emitCss: false` keeps the worker bundle single-file instead of emitting a CSS asset pipeline the worker cannot naturally serve by itself.',
-					'`generate: \`ssr\`` fits worker-side rendering better than a browser DOM target.',
+					'`generate: `ssr`` fits worker-side rendering better than a browser DOM target.',
 					'`@rollup/plugin-node-resolve` helps `.svelte` files and `exports.svelte` packages resolve cleanly.'
 				]
 			},
@@ -97,6 +108,7 @@ export default defineConfig({
 				snippets: [
 					{
 						title: '`src/Greeting.svelte`',
+						filename: 'src/Greeting.svelte',
 						language: 'svelte',
 						code: String.raw`<script lang='ts'>
 	export let name: string
@@ -136,7 +148,8 @@ export async function fetch(): Promise<Response> {
 		navTitle: 'Vite standalone',
 		readTime: '5 min read',
 		eyebrow: 'Frameworks',
-		title: 'Use Devflare with a standalone Vite app when Vite is the outer host and Devflare owns Worker config underneath',
+		title:
+			'Use Devflare with a standalone Vite app when Vite is the outer host and Devflare owns Worker config underneath',
 		summary:
 			'An effective Vite config is what opts the package into Vite-backed flows: a local `vite.config.*`, a non-empty `config.vite`, or both together. Use `devflare/vite` when the package really is a Vite app and you want Devflare to keep Worker config, Durable Objects, and generated Wrangler output aligned underneath it.',
 		description:
@@ -149,11 +162,18 @@ export async function fetch(): Promise<Response> {
 			'If the package is really just a worker, stay worker-only instead of adding a Vite host that is not doing app-level work.'
 		],
 		facts: [
-			{ label: 'Best for', value: 'Standalone Vite apps that still ship Worker-aware runtime pieces' },
+			{
+				label: 'Best for',
+				value: 'Standalone Vite apps that still ship Worker-aware runtime pieces'
+			},
 			{ label: 'Mode switch', value: 'Local `vite.config.*` or non-empty `config.vite`' },
 			{ label: 'Primary helper', value: '`devflare/vite`' }
 		],
-		sourcePages: ['development-workflows.md', 'README.md', 'configuration-reference.md'],
+		sourcePages: [
+			'packages/devflare/src/dev-server/server.ts',
+			'README.md',
+			'packages/devflare/src/config/schema.ts'
+		],
 		sections: [
 			{
 				id: 'opt-into-vite',
@@ -220,12 +240,32 @@ export default defineConfig(async () => {
 				table: {
 					headers: ['Option', 'Type', 'Default', 'Description'],
 					rows: [
-						['`configPath`', '`string`', '`devflare.config.ts`', 'Path to the Devflare config file.'],
+						[
+							'`configPath`',
+							'`string`',
+							'`devflare.config.ts`',
+							'Path to the Devflare config file.'
+						],
 						['`environment`', '`string`', '—', 'Named environment from config to resolve.'],
 						['`doTransforms`', '`boolean`', '`true`', 'Enable Durable Object code transforms.'],
-						['`watchConfig`', '`boolean`', '`true`', 'Watch the config file for changes in dev mode.'],
-						['`bridgePort`', '`number`', '`DEVFLARE_BRIDGE_PORT`', 'Miniflare bridge port for WebSocket proxying.'],
-						['`wsProxyPatterns`', '`string[]`', '`[]`', 'Additional patterns to proxy WebSocket requests to Miniflare. Patterns from `wsRoutes` in config are included automatically.']
+						[
+							'`watchConfig`',
+							'`boolean`',
+							'`true`',
+							'Watch the config file for changes in dev mode.'
+						],
+						[
+							'`bridgePort`',
+							'`number`',
+							'`DEVFLARE_BRIDGE_PORT`',
+							'Miniflare bridge port for WebSocket proxying.'
+						],
+						[
+							'`wsProxyPatterns`',
+							'`string[]`',
+							'`[]`',
+							'Additional patterns to proxy WebSocket requests to Miniflare. Patterns from `wsRoutes` in config are included automatically.'
+						]
 					]
 				}
 			},
@@ -240,7 +280,7 @@ export default defineConfig(async () => {
 					'Devflare loads and validates `devflare.config.*` first.',
 					'If a local `vite.config.*` exists, Devflare loads it and overlays `config.vite` on top; otherwise it can synthesize `.devflare/vite.config.mjs` from `config.vite` alone. That merged result is the effective Vite config.',
 					'Devflare still compiles worker-aware config into generated Wrangler output and may generate `.devflare/worker-entrypoints/main.ts` when worker surfaces need wrapper glue or composition.',
-					'Build and deploy use the current package\'s installed Vite so the outer app build and the inner worker plumbing stay aligned.'
+					"Build and deploy use the current package's installed Vite so the outer app build and the inner worker plumbing stay aligned."
 				],
 				callouts: [
 					{
@@ -282,9 +322,10 @@ export default defineConfig(async () => {
 		navTitle: 'SvelteKit',
 		readTime: '5 min read',
 		eyebrow: 'Frameworks',
-		title: 'Compose Devflare with SvelteKit by letting SvelteKit host the app and Devflare supply the Worker platform',
+		title:
+			'Compose Devflare with SvelteKit by letting SvelteKit host the app and Devflare supply the Worker platform',
 		summary:
-			'Hand SvelteKit\'s Cloudflare adapter output to Devflare via `wrangler.passthrough.main` (the adapter worker is a build artifact and does not exist until `vite build` runs), keep `sveltekit()` in `vite.config.ts`, and compose `devflare/sveltekit` into `src/hooks.server.ts` so local platform bindings line up with the Worker runtime Devflare manages.',
+			"Hand SvelteKit's Cloudflare adapter output to Devflare via `wrangler.passthrough.main` (the adapter worker is a build artifact and does not exist until `vite build` runs), keep `sveltekit()` in `vite.config.ts`, and compose `devflare/sveltekit` into `src/hooks.server.ts` so local platform bindings line up with the Worker runtime Devflare manages.",
 		description:
 			'This is the path for full SvelteKit apps where the framework owns the outer shell and Devflare keeps the Worker-facing platform story coherent. It matches the repository’s real documentation app and the SvelteKit integration example in the public docs.',
 		highlights: [
@@ -295,10 +336,18 @@ export default defineConfig(async () => {
 		],
 		facts: [
 			{ label: 'Best for', value: 'Full SvelteKit apps that deploy through Devflare' },
-			{ label: 'Worker entry', value: 'The adapter worker output your package actually emits, commonly `.svelte-kit/cloudflare/_worker.js` or a repo-specific path such as `.adapter-cloudflare/_worker.js`, wired via `wrangler.passthrough.main`' },
+			{
+				label: 'Worker entry',
+				value:
+					'The adapter worker output your package actually emits, commonly `.svelte-kit/cloudflare/_worker.js` or a repo-specific path such as `.adapter-cloudflare/_worker.js`, wired via `wrangler.passthrough.main`'
+			},
 			{ label: 'Hook helper', value: '`devflare/sveltekit`' }
 		],
-		sourcePages: ['development-workflows.md', 'README.md', 'apps/documentation/README.md'],
+		sourcePages: [
+			'packages/devflare/src/dev-server/server.ts',
+			'README.md',
+			'apps/documentation/README.md'
+		],
 		sections: [
 			{
 				id: 'required-files',

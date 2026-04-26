@@ -9,7 +9,8 @@ export const operationsDocs: DocPage[] = [
 		navTitle: 'Control-plane operations',
 		readTime: '6 min read',
 		eyebrow: 'Operations',
-		title: 'Use the operator command families for account context, live production changes, renames, token bootstrap, and paid-test gates',
+		title:
+			'Use the operator command families for account context, live production changes, renames, token bootstrap, and paid-test gates',
 		summary:
 			'Devflare’s deeper CLI families exist so account selection, live production inspection, Worker renames, token lifecycle, and remote paid-test gates stay documented instead of dissolving into ad-hoc command snippets.',
 		description:
@@ -21,10 +22,23 @@ export const operationsDocs: DocPage[] = [
 			'`tokens`, `account usage|limits`, and `remote` are deliberate safety surfaces: one governs account-owned token bootstrap, one exposes Devflare-managed guardrails, and one gates paid remote tests.'
 		],
 		facts: [
-			{ label: 'Best for', value: 'Teams operating live accounts, releases, and paid test flows instead of only building locally' },
-			{ label: 'Read-only production view', value: '`devflare productions` and `devflare productions versions`' },
-			{ label: 'Mutation safety habit', value: 'Prefer dry runs first, then add `--apply` only when the target is obvious' },
-			{ label: 'Paid-test gate', value: '`devflare remote status|enable|disable` plus `DEVFLARE_REMOTE` awareness' }
+			{
+				label: 'Best for',
+				value:
+					'Teams operating live accounts, releases, and paid test flows instead of only building locally'
+			},
+			{
+				label: 'Read-only production view',
+				value: '`devflare productions` and `devflare productions versions`'
+			},
+			{
+				label: 'Mutation safety habit',
+				value: 'Prefer dry runs first, then add `--apply` only when the target is obvious'
+			},
+			{
+				label: 'Paid-test gate',
+				value: '`devflare remote status|enable|disable` plus `DEVFLARE_REMOTE` awareness'
+			}
 		],
 		sourcePages: [
 			'src/cli/help-pages/pages/core.ts',
@@ -55,10 +69,26 @@ bunx --bun devflare account workers`
 				table: {
 					headers: ['Command family', 'How account choice resolves', 'Practical habit'],
 					rows: [
-						['`devflare account ...`', '`--account` wins, then workspace account selection, `CLOUDFLARE_ACCOUNT_ID`, resolved config `accountId`, and finally the primary authenticated account.', 'Great for inventory, but still pass `--account` when a read or write must be unmistakable.'],
-						['`devflare productions ...`', '`--account` wins. Otherwise Devflare may scan local configs for primary workers, stop with an explicit error if that scan finds more than one configured `accountId`, and only then fall back to the narrower production account-resolution path.', 'In a monorepo or mixed-account tree, pass `--account` instead of asking productions to guess.'],
-						['Other config-backed families such as `previews` and `worker rename`', 'Explicit `--account` wins; otherwise Devflare can use resolved config `accountId` or later fall back to effective-account preferences and the authenticated account.', 'Set `accountId` in package config when that package genuinely belongs to one account.'],
-						['`devflare tokens ...`', 'Uses `--account` first, then workspace account selection, then the primary account visible to the bootstrap token.', 'Treat token management as its own lane and make the target account obvious in logs.']
+						[
+							'`devflare account ...`',
+							'`--account` wins, then workspace account selection, `CLOUDFLARE_ACCOUNT_ID`, resolved config `accountId`, and finally the primary authenticated account.',
+							'Great for inventory, but still pass `--account` when a read or write must be unmistakable.'
+						],
+						[
+							'`devflare productions ...`',
+							'`--account` wins. Otherwise Devflare may scan local configs for primary workers, stop with an explicit error if that scan finds more than one configured `accountId`, and only then fall back to the narrower production account-resolution path.',
+							'In a monorepo or mixed-account tree, pass `--account` instead of asking productions to guess.'
+						],
+						[
+							'Other config-backed families such as `previews` and `worker rename`',
+							'Explicit `--account` wins; otherwise Devflare can use resolved config `accountId` or later fall back to effective-account preferences and the authenticated account.',
+							'Set `accountId` in package config when that package genuinely belongs to one account.'
+						],
+						[
+							'`devflare tokens ...`',
+							'Uses `--account` first, then workspace account selection, then the primary account visible to the bootstrap token.',
+							'Treat token management as its own lane and make the target account obvious in logs.'
+						]
 					]
 				},
 				callouts: [
@@ -76,7 +106,8 @@ bunx --bun devflare account workers`
 			},
 			{
 				id: 'usage-and-limits',
-				title: 'Treat usage and limits as Devflare-managed guardrails, not Cloudflare billing dashboards',
+				title:
+					'Treat usage and limits as Devflare-managed guardrails, not Cloudflare billing dashboards',
 				paragraphs: [
 					'`devflare account usage` and `devflare account limits` expose the counters and ceilings Devflare uses for its own safety decisions. They are useful operator data, but they are not a full Cloudflare billing or quota dashboard.',
 					'Today that mostly means AI request counts, Vectorize operation counts, and related limits that help Devflare decide when remote or preview-heavy workflows should stay deliberate instead of accidental.'
@@ -106,10 +137,26 @@ bunx --bun devflare account workers`
 				table: {
 					headers: ['Command', 'What it is for', 'Safety rule'],
 					rows: [
-						['`devflare productions`', 'Inspect live production Workers and the active deployment shape.', 'Read-only by default.'],
-						['`devflare productions versions`', 'Inspect recent stored production versions and see which version is active.', 'Read-only by default.'],
-						['`devflare productions rollback`', 'Create a fresh production deployment that points at a previous or specific version.', 'Dry run unless you add `--apply`.'],
-						['`devflare productions delete`', 'Delete one live production Worker script.', 'Dry run unless you add `--apply`, and it does not delete independent account resources automatically.']
+						[
+							'`devflare productions`',
+							'Inspect live production Workers and the active deployment shape.',
+							'Read-only by default.'
+						],
+						[
+							'`devflare productions versions`',
+							'Inspect recent stored production versions and see which version is active.',
+							'Read-only by default.'
+						],
+						[
+							'`devflare productions rollback`',
+							'Create a fresh production deployment that points at a previous or specific version.',
+							'Dry run unless you add `--apply`.'
+						],
+						[
+							'`devflare productions delete`',
+							'Delete one live production Worker script.',
+							'Dry run unless you add `--apply`, and it does not delete independent account resources automatically.'
+						]
 					]
 				},
 				callouts: [
@@ -234,7 +281,8 @@ bunx --bun devflare remote disable`
 		navTitle: 'devflare/cloudflare',
 		readTime: '6 min read',
 		eyebrow: 'Library API',
-		title: 'Use `devflare/cloudflare` when scripts should reuse Devflare’s account, registry, and token helpers instead of reimplementing them',
+		title:
+			'Use `devflare/cloudflare` when scripts should reuse Devflare’s account, registry, and token helpers instead of reimplementing them',
 		summary:
 			'The `devflare/cloudflare` subpath exposes the same account-aware building blocks the CLI uses for auth, resource inventory, usage and limits, preview registry access, preferences, and managed token workflows.',
 		description:
@@ -247,14 +295,27 @@ bunx --bun devflare remote disable`
 		],
 		facts: [
 			{ label: 'Import path', value: '`devflare/cloudflare`' },
-			{ label: 'Primary surface', value: 'A flat `account` object plus standalone preview-registry helpers and schema exports' },
-			{ label: 'Best for', value: 'Release scripts, operator tooling, and Node-side automation that should reuse Devflare’s Cloudflare-side rules' }
+			{
+				label: 'Primary surface',
+				value: 'A flat `account` object plus standalone preview-registry helpers and schema exports'
+			},
+			{
+				label: 'Best for',
+				value:
+					'Release scripts, operator tooling, and Node-side automation that should reuse Devflare’s Cloudflare-side rules'
+			}
 		],
-		sourcePages: ['src/cloudflare/index.ts', 'src/cloudflare/preferences.ts', 'src/cloudflare/preview-registry.ts', 'src/cloudflare/registry-schema.ts'],
+		sourcePages: [
+			'src/cloudflare/index.ts',
+			'src/cloudflare/preferences.ts',
+			'src/cloudflare/preview-registry.ts',
+			'src/cloudflare/registry-schema.ts'
+		],
 		sections: [
 			{
 				id: 'when-to-use-it',
-				title: 'Use the library when your script needs Devflare’s control-plane knowledge, not just a shell command',
+				title:
+					'Use the library when your script needs Devflare’s control-plane knowledge, not just a shell command',
 				paragraphs: [
 					'Reach for `devflare/cloudflare` when a script should authenticate once, resolve an account deliberately, inspect resources, or talk to the preview registry using the same rules Devflare already ships.',
 					'If the job is already well-served by `devflare account`, `devflare previews`, or another CLI command and the main need is a readable operator workflow, the CLI is usually simpler. The library is for composition.'
@@ -276,11 +337,31 @@ bunx --bun devflare remote disable`
 				table: {
 					headers: ['Cluster', 'What it helps with', 'Examples'],
 					rows: [
-						['Auth and account identity', 'Check auth, inspect accounts, and resolve the account you should operate on.', '`account.isAuthenticated()`, `account.getAccounts()`, `account.getPrimaryAccount()`'],
-						['Resource inventory', 'List Workers, D1 databases, KV namespaces, R2 buckets, Vectorize indexes, and related account resources.', '`account.workers(accountId)`, `account.d1(accountId)`, `account.r2(accountId)`'],
-						['Usage and limits', 'Read Devflare-managed operational counters and ceilings that inform remote or preview-heavy workflows.', '`account.getUsageSummary(accountId, \"ai\")`, `account.getLimits(accountId)`'],
-						['Preferences and defaults', 'Read or update Devflare’s stored global or workspace account preferences.', '`account.getGlobalDefaultAccountId(primaryId)`, `account.setWorkspaceAccountId(accountId)`, `account.getEffectiveAccountId(primaryId)`'],
-						['Managed tokens and preview registry', 'Create or rotate Devflare-managed API tokens, and inspect or update preview-registry records with shared schemas.', '`account.listAccountOwnedAPITokens(accountId)`, `account.ensurePreviewRegistry({ ... })`, `devflarePreviewRecordSchema`']
+						[
+							'Auth and account identity',
+							'Check auth, inspect accounts, and resolve the account you should operate on.',
+							'`account.isAuthenticated()`, `account.getAccounts()`, `account.getPrimaryAccount()`'
+						],
+						[
+							'Resource inventory',
+							'List Workers, D1 databases, KV namespaces, R2 buckets, Vectorize indexes, and related account resources.',
+							'`account.workers(accountId)`, `account.d1(accountId)`, `account.r2(accountId)`'
+						],
+						[
+							'Usage and limits',
+							'Read Devflare-managed operational counters and ceilings that inform remote or preview-heavy workflows.',
+							'`account.getUsageSummary(accountId, "ai")`, `account.getLimits(accountId)`'
+						],
+						[
+							'Preferences and defaults',
+							'Read or update Devflare’s stored global or workspace account preferences.',
+							'`account.getGlobalDefaultAccountId(primaryId)`, `account.setWorkspaceAccountId(accountId)`, `account.getEffectiveAccountId(primaryId)`'
+						],
+						[
+							'Managed tokens and preview registry',
+							'Create or rotate Devflare-managed API tokens, and inspect or update preview-registry records with shared schemas.',
+							'`account.listAccountOwnedAPITokens(accountId)`, `account.ensurePreviewRegistry({ ... })`, `devflarePreviewRecordSchema`'
+						]
 					]
 				},
 				callouts: [
@@ -299,6 +380,7 @@ bunx --bun devflare remote disable`
 				snippets: [
 					{
 						title: 'List Workers for the primary account',
+						filename: 'scripts/list-workers.ts',
 						language: 'ts',
 						code: String.raw`import { account } from 'devflare/cloudflare'
 
@@ -342,7 +424,8 @@ for (const worker of workers) {
 			},
 			{
 				id: 'where-to-go-next',
-				title: 'Open the neighboring page when the question is policy or workflow, not raw API reuse',
+				title:
+					'Open the neighboring page when the question is policy or workflow, not raw API reuse',
 				cards: [
 					{
 						label: 'Ship & operate',

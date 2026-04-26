@@ -3,14 +3,12 @@ import type { DocCodeTreeEntry, DocPage } from '../types'
 const docsLink = (slug: string): string => `/docs/${slug}`
 
 const supportCoverageTooltips = {
-	Full:
-		'Full — Devflare has a first-class config, local runtime, testing, docs, and workflow story for this surface.',
+	Full: 'Full — Devflare has a first-class config, local runtime, testing, docs, and workflow story for this surface.',
 	Partial:
 		'Partial — the surface is supported, but important behavior still depends on remote Cloudflare infrastructure or platform caveats.',
 	Limited:
 		'Limited — there is a real supported lane, but the contract is intentionally narrower today.',
-	None:
-		'None — Devflare does not model that surface yet, so reach for raw Cloudflare tooling or Wrangler passthrough instead.'
+	None: 'None — Devflare does not model that surface yet, so reach for raw Cloudflare tooling or Wrangler passthrough instead.'
 } as const
 
 const firstWorkerConfigCode = String.raw`import { defineConfig } from 'devflare/config'
@@ -30,8 +28,7 @@ export async function fetch({ url }: FetchEvent): Promise<Response> {
 }`
 
 const firstWorkerTestCode = String.raw`import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
-import { createTestContext, cf } from 'devflare/test'
-import { env } from 'devflare'
+import { createTestContext, cf, env } from 'devflare/test'
 
 beforeAll(() => createTestContext())
 afterAll(() => env.dispose())
@@ -146,7 +143,7 @@ export default defineConfig({
 	]
 })`
 
-const durableObjectRouteCode = String.raw`import { env } from 'devflare'
+const durableObjectRouteCode = String.raw`import { env } from 'devflare/runtime'
 import { activeRequestId, activeRequestPath } from '../lib/request-context'
 
 export async function GET(): Promise<Response> {
@@ -233,7 +230,7 @@ export default defineConfig({
 	}
 })`
 
-const r2RouteCode = String.raw`import { env } from 'devflare'
+const r2RouteCode = String.raw`import { env } from 'devflare/runtime'
 import {
 	activeRequestPath,
 	activeRequestText,
@@ -302,7 +299,7 @@ export default defineConfig({
 })`
 
 const browserRouteCode = String.raw`import puppeteer from '@cloudflare/puppeteer'
-import { env } from 'devflare'
+import { env } from 'devflare/runtime'
 import { activeRequestId } from '../lib/request-context'
 
 export async function GET(): Promise<Response> {
@@ -356,14 +353,27 @@ export const startHereDocs: DocPage[] = [
 			'Stay close to the real Cloudflare platform contract instead of learning a fantasy abstraction you have to unlearn later.'
 		],
 		facts: [
-			{ label: 'Best for', value: 'Teams that want Cloudflare power without accumulating setup glue' },
-			{ label: 'Architecture shape', value: 'Config, runtime, tests, framework integration, and Cloudflare ops are separate by design' },
-			{ label: 'Build lane', value: 'Rolldown composes worker and Durable Object artifacts; Vite stays optional' },
-			{ label: 'Still true', value: 'Cloudflare limits and Wrangler-compatible output still matter' }
+			{
+				label: 'Best for',
+				value: 'Teams that want Cloudflare power without accumulating setup glue'
+			},
+			{
+				label: 'Architecture shape',
+				value:
+					'Config, runtime, tests, framework integration, and Cloudflare ops are separate by design'
+			},
+			{
+				label: 'Build lane',
+				value: 'Rolldown composes worker and Durable Object artifacts; Vite stays optional'
+			},
+			{
+				label: 'Still true',
+				value: 'Cloudflare limits and Wrangler-compatible output still matter'
+			}
 		],
 		sourcePages: [
 			'README.md',
-			'foundation.md',
+			'packages/devflare/README.md',
 			'package.json',
 			'config-entry.ts',
 			'context.ts',
@@ -424,7 +434,7 @@ export const startHereDocs: DocPage[] = [
 				description:
 					'The implementation splits by environment and lifecycle so the worker story can grow without collapsing into one giant tool blob.',
 				paragraphs: [
-					'`devflare/config` is for authored config, `devflare/runtime` is for worker code, `devflare/test` is for harnesses, and `devflare/vite` or `devflare/sveltekit` only join the picture when the package grows into a real app host. That split is one of the package\'s quiet strengths.',
+					"`devflare/config` is for authored config, `devflare/runtime` is for worker code, `devflare/test` is for harnesses, and `devflare/vite` or `devflare/sveltekit` only join the picture when the package grows into a real app host. That split is one of the package's quiet strengths.",
 					'The build and local-dev story stays honest too. Rolldown is the worker builder, generated entrypoints keep worker surfaces explicit, and Vite or SvelteKit can sit outside the worker runtime instead of swallowing it.'
 				],
 				cards: [
@@ -527,7 +537,7 @@ export const startHereDocs: DocPage[] = [
 						labelTooltip: supportCoverageTooltips.Full,
 						meta: 'Bridge-backed browser lane',
 						title: 'Browser Rendering',
-						body: 'Browser Rendering is fully supported through Devflare\'s bridge-backed local dev story, config model, generated typing, and runtime integration. The main platform caveat is still the Cloudflare one: exactly one browser binding.',
+						body: "Browser Rendering is fully supported through Devflare's bridge-backed local dev story, config model, generated typing, and runtime integration. The main platform caveat is still the Cloudflare one: exactly one browser binding.",
 						href: docsLink('bindings/browser-rendering')
 					}
 				]
@@ -678,7 +688,7 @@ export const startHereDocs: DocPage[] = [
 					'If the package later needs Vite or SvelteKit, Devflare layers that in as an outer host and uses the bridge-backed platform surface so framework endpoints can still interact with worker bindings in local dev.',
 					'Preview scopes, cleanup flows, production operations, and testing helpers stay connected to the same authored config and CLI instead of branching into separate half-documented workflows.'
 				]
-			},
+			}
 		]
 	},
 	{
@@ -700,21 +710,28 @@ export const startHereDocs: DocPage[] = [
 			'Focused package references such as `README.md` and implementation files can still inform a page without leaking into the page header.'
 		],
 		facts: [
-			{ label: 'Authoritative authoring layer', value: '`apps/documentation/src/lib/docs/content*.ts`' },
-			{ label: 'Primary reading surfaces', value: 'Task-focused `/docs/*` routes plus `/llm.md` and `/llm.txt` exports' },
+			{
+				label: 'Authoritative authoring layer',
+				value: '`apps/documentation/src/lib/docs/content*.ts`'
+			},
+			{
+				label: 'Primary reading surfaces',
+				value: 'Task-focused `/docs/*` routes plus `/llm.md` and `/llm.txt` exports'
+			},
 			{
 				label: 'Refresh commands',
-				value: '`bun run llm:generate` from `apps/documentation`, or the same command from `packages/devflare` when you also want the packaged copy refreshed'
+				value:
+					'`bun run llm:generate` from `apps/documentation`, or the same command from `packages/devflare` when you also want the packaged copy refreshed'
 			}
 		],
 		sourcePages: [
-			'foundation.md',
-			'configuration-overview.md',
-			'configuration-reference.md',
-			'bindings-and-composition.md',
-			'development-workflows.md',
-			'deploy-preview-cli.md',
-			'verification-testing-and-caveats.md',
+			'packages/devflare/README.md',
+			'packages/devflare/src/config/schema.ts',
+			'packages/devflare/src/config/schema.ts',
+			'packages/devflare/src/config/schema-bindings.ts',
+			'packages/devflare/src/dev-server/server.ts',
+			'packages/devflare/src/cli/commands/deploy.ts',
+			'packages/devflare/src/test/simple-context.ts',
 			'llm.ts',
 			'llm-documents.ts',
 			'generate-llm.ts'
@@ -834,7 +851,7 @@ export const startHereDocs: DocPage[] = [
 			{ label: 'Smallest safe shape', value: 'One config and one fetch handler' },
 			{ label: 'First commands', value: '`bun add -d devflare`, then `types`, then `dev`' }
 		],
-		sourcePages: ['README.md', 'foundation.md'],
+		sourcePages: ['README.md', 'packages/devflare/README.md'],
 		sections: [
 			{
 				id: 'get-started',
@@ -950,7 +967,7 @@ bunx --bun devflare dev`
 			{ label: 'Main helper', value: '`createTestContext()` plus `cf.worker.get()`' },
 			{ label: 'First proof', value: 'One request, one status check, one response assertion' }
 		],
-		sourcePages: ['README.md', 'foundation.md', 'simple-context.ts', 'cf.ts'],
+		sourcePages: ['README.md', 'packages/devflare/README.md', 'simple-context.ts', 'cf.ts'],
 		sections: [
 			{
 				id: 'write-one-test',
@@ -1042,7 +1059,10 @@ bunx --bun devflare dev`
 			'Add one binding-backed route at a time: first a counter, then a stored file, then one browser title read.'
 		],
 		facts: [
-			{ label: 'Best for', value: 'Growing the first worker without turning `src/fetch.ts` into one crowded file' },
+			{
+				label: 'Best for',
+				value: 'Growing the first worker without turning `src/fetch.ts` into one crowded file'
+			},
 			{ label: 'Base shape', value: 'Tiny `src/fetch.ts` plus `src/routes/**` and shared helpers' },
 			{ label: 'Habit to keep', value: '`bunx --bun devflare types` after binding changes' }
 		],
@@ -1055,7 +1075,7 @@ bunx --bun devflare dev`
 					'The additive move after the first worker is not a different app. It is the same worker with one tiny fetch entry, one route tree, and one shared request helper.',
 				paragraphs: [
 					'Once the first worker responds and maybe already has one small test, the next step is to keep `src/fetch.ts` tiny. Let it do request-wide setup, then let `src/routes/**` own the individual URLs.',
-					'That shape also makes Devflare\'s AsyncLocalStorage-backed runtime helpful in a calm way: helper modules can read the active request path, route params, request body, or request id through `getFetchEvent()` and `locals` without turning every function signature into plumbing.'
+					"That shape also makes Devflare's AsyncLocalStorage-backed runtime helpful in a calm way: helper modules can read the active request path, route params, request body, or request id through `getFetchEvent()` and `locals` without turning every function signature into plumbing."
 				],
 				steps: [
 					'Keep `src/fetch.ts` for request-wide setup only.',
@@ -1186,8 +1206,7 @@ bunx --bun devflare dev`
 			{
 				id: 'r2-round-trip',
 				title: 'Add one R2-backed route',
-				description:
-					'Keep the same worker shape and let one route file own the bucket round-trip.',
+				description: 'Keep the same worker shape and let one route file own the bucket round-trip.',
 				paragraphs: [
 					'Here the route path becomes the obvious home for the binding: `src/routes/files/[name].ts` owns both the `PUT` and `GET` flow for one named object.',
 					'The shared helper still provides request-wide context, route params, and request reads through AsyncLocalStorage, while the route file keeps the bucket contract visible and local to the URL that needs it.'
@@ -1228,8 +1247,7 @@ bunx --bun devflare dev`
 			{
 				id: 'browser-title-read',
 				title: 'Add one browser-backed route',
-				description:
-					'Keep the same worker shape and let one route prove the browser binding.',
+				description: 'Keep the same worker shape and let one route prove the browser binding.',
 				paragraphs: [
 					'Browser Rendering gets simpler when it looks like the other examples: the shared fetch file stays untouched, and one route file owns the browser work.',
 					'Install `@cloudflare/puppeteer` before you try this route, and remember that Devflare currently supports exactly one browser binding in config.'
@@ -1315,9 +1333,12 @@ bunx --bun devflare dev`
 		facts: [
 			{ label: 'Best for', value: 'The first named preview deploy and cleanup loop' },
 			{ label: 'Preview command', value: '`bunx --bun devflare deploy --preview <name>`' },
-			{ label: 'Cleanup command', value: '`bunx --bun devflare previews cleanup --scope <name> --apply`' }
+			{
+				label: 'Cleanup command',
+				value: '`bunx --bun devflare previews cleanup --scope <name> --apply`'
+			}
 		],
-		sourcePages: ['deploy-preview-cli.md', 'README.md'],
+		sourcePages: ['packages/devflare/src/cli/commands/deploy.ts', 'README.md'],
 		sections: [
 			{
 				id: 'deploy-a-preview',
@@ -1438,7 +1459,8 @@ bunx --bun devflare deploy --preview next`
 		navTitle: 'Runtime context',
 		readTime: '8 min read',
 		eyebrow: 'Runtime helpers',
-		title: 'Think in events first, then let AsyncLocalStorage carry the active context through the handler trail',
+		title:
+			'Think in events first, then let AsyncLocalStorage carry the active context through the handler trail',
 		summary:
 			'Devflare-managed entrypoints create a rich surface event, store `env`, `ctx`, `request`, `locals`, `type`, and the original event in `AsyncLocalStorage`, then expose that state through helpers such as `getFetchEvent()`, `getQueueEvent()`, `getContext()`, and the `env`, `ctx`, `event`, and `locals` runtime proxies inside the same handler trail.',
 		description:
@@ -1452,14 +1474,27 @@ bunx --bun devflare deploy --preview next`
 			'`runWithEventContext()` and `runWithContext()` are advanced escape hatches, not the normal app-facing API.'
 		],
 		facts: [
-			{ label: 'Context carrier', value: 'Node `AsyncLocalStorage` under Devflare-managed entrypoints' },
-			{ label: 'Main helpers', value: '`getFetchEvent()`, `getQueueEvent()`, `getContext()`, `env`, `ctx`, `event`, and `locals`' },
-			{ label: 'Stored shape', value: '`env`, `ctx`, `request`, `locals`, `type`, and the original event object' },
+			{
+				label: 'Context carrier',
+				value: 'Node `AsyncLocalStorage` under Devflare-managed entrypoints'
+			},
+			{
+				label: 'Main helpers',
+				value:
+					'`getFetchEvent()`, `getQueueEvent()`, `getContext()`, `env`, `ctx`, `event`, and `locals`'
+			},
+			{
+				label: 'Stored shape',
+				value: '`env`, `ctx`, `request`, `locals`, `type`, and the original event object'
+			},
 			{ label: 'Mutable lane', value: '`locals` / `event.locals`' },
-			{ label: 'Failure mode', value: 'Strict runtime helpers throw outside an active handler trail' }
+			{
+				label: 'Failure mode',
+				value: 'Strict runtime helpers throw outside an active handler trail'
+			}
 		],
 		sourcePages: [
-			'foundation.md',
+			'packages/devflare/README.md',
 			'context.ts',
 			'context-events.ts',
 			'context-types.ts',
@@ -1482,10 +1517,26 @@ bunx --bun devflare deploy --preview next`
 				table: {
 					headers: ['Helper family', 'Examples', 'What AsyncLocalStorage gives them'],
 					rows: [
-						['Per-surface getters', '`getFetchEvent()`, `getQueueEvent()`, `getScheduledEvent()`, `getEmailEvent()`, `getTailEvent()`', 'Return the current rich event after verifying the active surface type; `.safe()` returns `null` instead of throwing.'],
-						['Generic context getter', '`getContext()`', 'Returns the active stored context shape when one exists and throws when code is running outside an active handler trail.'],
-						['Readonly runtime proxies', '`env`, `ctx`, `event`', 'Read the active environment bindings, execution context, or original event from the current AsyncLocalStorage store without parameter threading.'],
-						['Mutable runtime proxy', '`locals`', 'Reads and writes the per-request or per-job mutable storage object attached to the active context.']
+						[
+							'Per-surface getters',
+							'`getFetchEvent()`, `getQueueEvent()`, `getScheduledEvent()`, `getEmailEvent()`, `getTailEvent()`',
+							'Return the current rich event after verifying the active surface type; `.safe()` returns `null` instead of throwing.'
+						],
+						[
+							'Generic context getter',
+							'`getContext()`',
+							'Returns the active stored context shape when one exists and throws when code is running outside an active handler trail.'
+						],
+						[
+							'Readonly runtime proxies',
+							'`env`, `ctx`, `event`',
+							'Read the active environment bindings, execution context, or original event from the current AsyncLocalStorage store without parameter threading.'
+						],
+						[
+							'Mutable runtime proxy',
+							'`locals`',
+							'Reads and writes the per-request or per-job mutable storage object attached to the active context.'
+						]
 					]
 				},
 				callouts: [
@@ -1559,6 +1610,7 @@ export function currentPath(): string {
 				snippets: [
 					{
 						title: 'Simplified shape of the value Devflare puts into AsyncLocalStorage',
+						filename: 'src/runtime/context.ts',
 						language: 'ts',
 						code: String.raw`type RequestContext = {
 	env: TEnv
@@ -1582,7 +1634,8 @@ export function currentPath(): string {
 			},
 			{
 				id: 'how-devflare-establishes-context',
-				title: 'Devflare first creates a rich event, then runs the handler trail inside AsyncLocalStorage',
+				title:
+					'Devflare first creates a rich event, then runs the handler trail inside AsyncLocalStorage',
 				paragraphs: [
 					'For fetch, queue, scheduled, email, tail, and Durable Object surfaces, Devflare first creates a rich event object using helpers such as `createFetchEvent()`, `createQueueEvent()`, or the Durable Object event builders. It then builds a `RequestContext` from that event and runs the handler trail inside `storage.run(...)`.',
 					'The same mechanism is reused by generated worker entrypoints, request-wide middleware, route resolution, Durable Object wrappers, the dev server, and `createTestContext()` helpers such as `cf.worker`, `cf.queue`, `cf.scheduled`, `cf.email`, and `cf.tail`. That shared mechanism is why runtime helpers feel consistent in app code and test code.'
@@ -1597,6 +1650,7 @@ export function currentPath(): string {
 				snippets: [
 					{
 						title: 'The important part of `runWithEventContext()` is intentionally small',
+						filename: 'src/runtime/context.ts',
 						language: 'ts',
 						code: String.raw`const context = {
 	env: event.env,
@@ -1626,11 +1680,36 @@ return storage.run(context, fn)`
 				table: {
 					headers: ['API', 'What it reads', 'Failure behavior', 'Mutation'],
 					rows: [
-						['Handler parameters', 'The explicit event object Devflare passes to the handler boundary.', 'No lookup needed at the boundary.', '`event.locals` is mutable.'],
-						['Per-surface getters like `getFetchEvent()`', 'The stored `context.event` after Devflare verifies the active surface type.', 'Throws `ContextUnavailableError`, while `.safe()` returns `null`.', 'Readonly event view.'],
-						['`getContext()`', 'The full active `RequestContext` object from the current AsyncLocalStorage store.', 'Throws `ContextUnavailableError` outside an active handler trail.', 'Use this mostly for debugging or advanced infrastructure helpers.'],
-						['`env`, `ctx`, `event` proxies', '`getContextOrNull()` through readonly proxy wrappers.', 'Property access throws `ContextAccessError` outside an active handler trail.', 'Readonly.'],
-						['`locals` proxy', '`getContextOrNull()?.locals` through the mutable context proxy.', 'Property access throws `ContextAccessError` outside an active handler trail.', 'Mutable and shared with `event.locals`.']
+						[
+							'Handler parameters',
+							'The explicit event object Devflare passes to the handler boundary.',
+							'No lookup needed at the boundary.',
+							'`event.locals` is mutable.'
+						],
+						[
+							'Per-surface getters like `getFetchEvent()`',
+							'The stored `context.event` after Devflare verifies the active surface type.',
+							'Throws `ContextUnavailableError`, while `.safe()` returns `null`.',
+							'Readonly event view.'
+						],
+						[
+							'`getContext()`',
+							'The full active `RequestContext` object from the current AsyncLocalStorage store.',
+							'Throws `ContextUnavailableError` outside an active handler trail.',
+							'Use this mostly for debugging or advanced infrastructure helpers.'
+						],
+						[
+							'`env`, `ctx`, `event` proxies',
+							'`getContextOrNull()` through readonly proxy wrappers.',
+							'Property access throws `ContextAccessError` outside an active handler trail.',
+							'Readonly.'
+						],
+						[
+							'`locals` proxy',
+							'`getContextOrNull()?.locals` through the mutable context proxy.',
+							'Property access throws `ContextAccessError` outside an active handler trail.',
+							'Mutable and shared with `event.locals`.'
+						]
 					]
 				},
 				paragraphs: [
@@ -1660,7 +1739,11 @@ return storage.run(context, fn)`
 						['Tail handler', '`TailEvent`', '`getTailEvent()`'],
 						['Durable Object fetch', '`DurableObjectFetchEvent`', '`getDurableObjectFetchEvent()`'],
 						['Durable Object alarm', '`DurableObjectAlarmEvent`', '`getDurableObjectAlarmEvent()`'],
-						['Durable Object WebSocket message / close / error', 'Dedicated WebSocket event types', '`getDurableObjectWebSocketMessageEvent()`, `getDurableObjectWebSocketCloseEvent()`, `getDurableObjectWebSocketErrorEvent()`'],
+						[
+							'Durable Object WebSocket message / close / error',
+							'Dedicated WebSocket event types',
+							'`getDurableObjectWebSocketMessageEvent()`, `getDurableObjectWebSocketCloseEvent()`, `getDurableObjectWebSocketErrorEvent()`'
+						],
 						['Any Durable Object surface', '`DurableObjectEvent`', '`getDurableObjectEvent()`']
 					]
 				},
@@ -1729,7 +1812,8 @@ export const handle = sequence(requestId)`
 			},
 			{
 				id: 'advanced-helpers',
-				title: '`runWithEventContext()` and `runWithContext()` are advanced helpers, not normal app code',
+				title:
+					'`runWithEventContext()` and `runWithContext()` are advanced helpers, not normal app code',
 				paragraphs: [
 					'By the time you are considering these helpers, the normal app-facing story should already be working: handlers, middleware, generated entrypoints, and `createTestContext()` establish context for you. These APIs exist for runtime and test infrastructure that must preserve or synthesize that context deliberately.',
 					'`runWithEventContext(event, fn)` preserves an existing rich event object. `runWithContext(env, ctx, request, fn, type)` is the lower-level compatibility helper: it creates fresh locals, synthesizes a default event with `createDefaultEvent()`, and then stores that event in AsyncLocalStorage before running your function.'
@@ -1764,11 +1848,22 @@ export const handle = sequence(requestId)`
 			'`files.routes` is app routing config, not Cloudflare deployment `routes`.'
 		],
 		facts: [
-			{ label: 'Best for', value: 'HTTP apps that need middleware, route params, or a mounted route tree' },
-			{ label: 'Primary order', value: '`src/fetch.ts` → same-module methods → matched route file' },
+			{
+				label: 'Best for',
+				value: 'HTTP apps that need middleware, route params, or a mounted route tree'
+			},
+			{
+				label: 'Primary order',
+				value: '`src/fetch.ts` → same-module methods → matched route file'
+			},
 			{ label: 'Route config', value: '`files.routes`' }
 		],
-		sourcePages: ['README.md', 'foundation.md', 'configuration-reference.md', 'verification-testing-and-caveats.md'],
+		sourcePages: [
+			'README.md',
+			'packages/devflare/README.md',
+			'packages/devflare/src/config/schema.ts',
+			'packages/devflare/src/test/simple-context.ts'
+		],
 		sections: [
 			{
 				id: 'two-layers',
@@ -1926,8 +2021,14 @@ export async function GET({ params }: FetchEvent): Promise<Response> {
 					headers: ['Shape', 'What it does'],
 					rows: [
 						['Omit `files.routes`', '`src/routes` is auto-discovered when that directory exists.'],
-						['`{ dir: \'app-routes\' }`', 'Changes the route root without changing the rest of the routing model.'],
-						['`{ dir: \'src/routes\', prefix: \'/api\' }`', 'Mounts discovered routes under a fixed prefix such as `/api`.'],
+						[
+							"`{ dir: 'app-routes' }`",
+							'Changes the route root without changing the rest of the routing model.'
+						],
+						[
+							"`{ dir: 'src/routes', prefix: '/api' }`",
+							'Mounts discovered routes under a fixed prefix such as `/api`.'
+						],
 						['`false`', 'Disables file-route discovery entirely.']
 					]
 				},
@@ -1953,8 +2054,14 @@ export async function GET({ params }: FetchEvent): Promise<Response> {
 					rows: [
 						['`src/routes/index.ts`', 'Matches `/`.'],
 						['`src/routes/users/[id].ts`', 'Matches `/users/:id` and exposes `event.params.id`.'],
-						['`src/routes/blog/[...slug].ts`', 'Matches one-or-more trailing segments and exposes `slug` as joined path text.'],
-						['`src/routes/docs/[[...slug]].ts`', 'Matches both the directory root and deeper optional rest paths.']
+						[
+							'`src/routes/blog/[...slug].ts`',
+							'Matches one-or-more trailing segments and exposes `slug` as joined path text.'
+						],
+						[
+							'`src/routes/docs/[[...slug]].ts`',
+							'Matches both the directory root and deeper optional rest paths.'
+						]
 					]
 				},
 				bullets: [
@@ -1998,7 +2105,11 @@ export async function GET({ params }: FetchEvent): Promise<Response> {
 			{ label: 'Source of truth', value: 'Authored config plus source files' },
 			{ label: 'Escape hatch', value: '`wrangler.passthrough`' }
 		],
-		sourcePages: ['configuration-overview.md', 'configuration-reference.md', 'README.md'],
+		sourcePages: [
+			'packages/devflare/src/config/schema.ts',
+			'packages/devflare/src/config/schema.ts',
+			'README.md'
+		],
 		sections: [
 			{
 				id: 'flow',
@@ -2027,7 +2138,10 @@ export async function GET({ params }: FetchEvent): Promise<Response> {
 					headers: ['Layer', 'Use it for'],
 					rows: [
 						['`vars`', 'String config that compiles into generated Wrangler output.'],
-						['`secrets`', 'Declaring which runtime secret bindings should exist. The schema accepts `{ required: false }`, but generated env typing still treats declared secrets as present either way today.'],
+						[
+							'`secrets`',
+							'Declaring which runtime secret bindings should exist. The schema accepts `{ required: false }`, but generated env typing still treats declared secrets as present either way today.'
+						],
 						['`.env`', 'Inputs used while evaluating `devflare.config.*` at config time.'],
 						['`.env.example`', 'Documenting config-time variables for the team.']
 					]
@@ -2086,6 +2200,3 @@ export default defineConfig({
 		]
 	}
 ]
-
-
-

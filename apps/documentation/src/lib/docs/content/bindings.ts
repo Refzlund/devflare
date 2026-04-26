@@ -72,6 +72,7 @@ interface BindingGuideDefinition {
 	configKey: string
 	authoringShape: string
 	localStory: string
+	compileOutput?: string
 	sourcePages: string[]
 	overview: BindingOverviewDefinition
 	internals: BindingInternalsDefinition
@@ -169,6 +170,10 @@ function createBindingInternalsSnippet(guide: BindingGuideDefinition): DocCodeSn
 }
 
 function createBindingCompileOutput(guide: BindingGuideDefinition): string {
+	if (guide.compileOutput) {
+		return guide.compileOutput
+	}
+
 	switch (guide.slugBase) {
 		case 'kv':
 			return String.raw`{
@@ -641,6 +646,165 @@ function createBindingPages(guide: BindingGuideDefinition): DocPage[] {
 	]
 }
 
+interface CompactBindingGuideDefinition {
+	slugBase: string
+	pathBase?: string
+	label: string
+	categoryDescription: string
+	configKey: string
+	authoringShape: string
+	localStory: string
+	sourcePages: string[]
+	compileTarget: string
+	envType: string
+	defaultHarness: string
+	testHelper: string
+	bestFor: string
+	remoteBoundary: string
+	configSnippet: ContentDocCodeSnippet
+	usageSnippet: ContentDocCodeSnippet
+	testSnippet?: ContentDocCodeSnippet
+	compileOutput: string
+}
+
+function createCompactBindingGuide(definition: CompactBindingGuideDefinition): BindingGuideDefinition {
+	return {
+		slugBase: definition.slugBase,
+		pathBase: definition.pathBase,
+		label: definition.label,
+		categoryDescription: definition.categoryDescription,
+		configKey: definition.configKey,
+		authoringShape: definition.authoringShape,
+		localStory: definition.localStory,
+		compileOutput: definition.compileOutput,
+		sourcePages: definition.sourcePages,
+		overview: {
+			readTime: '3 min read',
+			title: `Use ${definition.label} with the smallest config that states the binding contract`,
+			summary: `${definition.label} now has a first-class Devflare docs page with config, runtime usage, testing, local behavior, and remote boundaries in one repeatable shape.`,
+			description: `This page is intentionally recipe-first: copy the config, use the generated ${definition.envType} binding, then pick the right local or remote test lane.`,
+			highlights: [
+				`Author the feature at \`${definition.configKey}\` instead of hiding it in ad-hoc Wrangler JSON.`,
+				`Generated Env types expose ${definition.envType}.`,
+				`${definition.localStory}.`,
+				definition.remoteBoundary
+			],
+			bestFor: definition.bestFor,
+			authoringParagraphs: [
+				`Start with the smallest readable \`${definition.configKey}\` shape. If the feature needs a Cloudflare-created id or namespace, keep that explicit in config so reviewers can see where the remote boundary begins.`,
+				'Use this page as the quick contract, then open the deeper internals/testing/example tabs only when the first recipe is not enough.'
+			],
+			authoringSnippet: definition.configSnippet,
+			fitBullets: [
+				`Use ${definition.label} when ${definition.bestFor.toLowerCase()}.`,
+				'Keep binding names stable and uppercase in examples so generated Env declarations remain predictable.',
+				'Prefer Devflare native config while it covers the feature; use `wrangler.passthrough` only for unsupported Wrangler-only fields.'
+			],
+			caveatBullets: [
+				definition.localStory,
+				definition.remoteBoundary,
+				`For tests, start with ${definition.defaultHarness}; reach for ${definition.testHelper} when you want a pure unit test without Miniflare or Cloudflare.`
+			],
+			caveatCallout: {
+				tone: 'info',
+				title: 'Document the boundary at the same time as the recipe',
+				body: [
+					`The old docs often made developers infer whether ${definition.label} was local, remote, or fixture-backed. This page keeps that stance beside the first usable example.`
+				]
+			}
+		},
+		internals: {
+			readTime: '2 min read',
+			summary: `${definition.label} compiles from \`${definition.configKey}\` to ${definition.compileTarget}, with local/test behavior called out explicitly.`,
+			description: 'The internals page is deliberately short: it shows the authored config beside the Wrangler-facing output and names the exact places where Devflare stops pretending to be Cloudflare.',
+			highlights: [
+				`Compile target: ${definition.compileTarget}.`,
+				`Env type: ${definition.envType}.`,
+				`Default test lane: ${definition.defaultHarness}.`
+			],
+			normalizationFact: `Devflare normalizes \`${definition.configKey}\` before emitting ${definition.compileTarget}`,
+			compileTarget: definition.compileTarget,
+			previewNote: definition.remoteBoundary,
+			normalizationParagraphs: [
+				'The authored config stays camelCase and project-oriented. The compiler translates that into the Wrangler keys Cloudflare expects.',
+				'The generated output is intentionally shown so the docs can be checked against real compiler behavior instead of relying on memory.'
+			],
+			localRuntimeBullets: [
+				definition.localStory,
+				`The default docs recipe uses ${definition.defaultHarness}.`,
+				`Pure unit tests can use ${definition.testHelper} when the test only needs deterministic application behavior.`
+			],
+			compileBullets: [
+				`Devflare emits ${definition.compileTarget} from the native config surface.`,
+				'Preview and deployment lifecycle stay feature-specific; do not assume all Cloudflare products can be created, cloned, or cleaned up the same way.',
+				definition.remoteBoundary
+			]
+		},
+		testing: {
+			readTime: '3 min read',
+			summary: `Test ${definition.label} by choosing the local harness that matches the product boundary instead of reaching for Cloudflare by default.`,
+			description: 'The first test should prove application control flow. Escalate to Wrangler remote binding or deployed tests only when the Cloudflare-hosted behavior is the thing under test.',
+			highlights: [
+				`Default harness: ${definition.defaultHarness}.`,
+				`Pure helper: ${definition.testHelper}.`,
+				definition.remoteBoundary
+			],
+			bestFor: definition.bestFor,
+			defaultHarness: definition.defaultHarness,
+			escalation: 'The assertion depends on Cloudflare-hosted product behavior rather than the app calling the binding correctly',
+			paragraphs: [
+				'Keep the first test small. Name the binding, call the one method your route uses, and assert the behavior your app owns.',
+				'When Cloudflare owns the interesting behavior, mark that as a remote/deployed lane instead of building a local fake that claims too much.'
+			],
+			mainSnippet: definition.testSnippet ?? definition.usageSnippet,
+			helperBullets: [
+				`Use ${definition.defaultHarness} for config-backed local worker tests.`,
+				`Use ${definition.testHelper} for pure unit tests.`,
+				'Use `shouldSkip` or an explicit integration lane when the test needs Cloudflare credentials or a local Docker/Podman engine.'
+			],
+			caveatBullets: [
+				definition.remoteBoundary,
+				'Do not let a low-fidelity mock become product documentation. Keep mocks framed as application-flow tools.',
+				'If a test would mutate paid or remote Cloudflare state, gate it separately from ordinary unit tests.'
+			],
+			callout: {
+				tone: 'warning',
+				title: 'Local tests should be honest',
+				body: [
+					`For ${definition.label}, passing locally means the Devflare contract and app flow are correct. It does not automatically prove every hosted Cloudflare behavior.`
+				]
+			}
+		},
+		example: {
+			readTime: '2 min read',
+			summary: `A compact ${definition.label} recipe with config, worker usage, and the matching first test lane.`,
+			description: 'Use this as the copyable starter before threading the feature into a larger application.',
+			highlights: [
+				'One config block.',
+				'One runtime call path.',
+				'One test or smoke-check pattern.'
+			],
+			configFocus: definition.configKey,
+			runtimeShape: definition.envType,
+			bestUse: definition.bestFor,
+			configSnippet: definition.configSnippet,
+			usageSnippet: definition.usageSnippet,
+			testSnippet: definition.testSnippet,
+			notes: [
+				'Keep the first example short enough to paste into a new Worker.',
+				definition.remoteBoundary
+			],
+			callout: {
+				tone: 'accent',
+				title: 'Thread this into the next recipe',
+				body: [
+					'Once this smallest path works, add routing, generated types, and one focused test before adding feature-specific abstraction.'
+				]
+			}
+		}
+	}
+}
+
 const bindingGuides: BindingGuideDefinition[] = [
 	{
 		slugBase: 'kv',
@@ -756,8 +920,7 @@ export default defineConfig({
 				title: 'Testing KV through the real Devflare env',
 				language: 'ts',
 				code: String.raw`import { afterAll, beforeAll, expect, test } from 'bun:test'
-import { createTestContext } from 'devflare/test'
-import { env } from 'devflare'
+import { createTestContext, env } from 'devflare/test'
 
 beforeAll(() => createTestContext())
 afterAll(() => env.dispose())
@@ -818,7 +981,7 @@ export default defineConfig({
 			usageSnippet: {
 				title: 'A tiny fetch handler that uses KV',
 				language: 'ts',
-				code: String.raw`import { env } from 'devflare'
+				code: String.raw`import { env } from 'devflare/runtime'
 
 export async function fetch(request: Request): Promise<Response> {
 	const url = new URL(request.url)
@@ -835,8 +998,7 @@ export async function fetch(request: Request): Promise<Response> {
 				title: 'One tiny test is enough to trust the first version',
 				language: 'ts',
 				code: String.raw`import { afterAll, beforeAll, expect, test } from 'bun:test'
-import { createTestContext, cf } from 'devflare/test'
-import { env } from 'devflare'
+import { createTestContext, cf, env } from 'devflare/test'
 
 beforeAll(() => createTestContext())
 afterAll(() => env.dispose())
@@ -974,8 +1136,7 @@ export default defineConfig({
 				title: 'A tiny D1 test through the local harness',
 				language: 'ts',
 				code: String.raw`import { afterAll, beforeAll, expect, test } from 'bun:test'
-import { createTestContext } from 'devflare/test'
-import { env } from 'devflare'
+import { createTestContext, env } from 'devflare/test'
 
 beforeAll(() => createTestContext())
 afterAll(() => env.dispose())
@@ -1036,7 +1197,7 @@ export default defineConfig({
 			usageSnippet: {
 				title: 'A tiny route that proves the binding works',
 				language: 'ts',
-				code: String.raw`import { env } from 'devflare'
+				code: String.raw`import { env } from 'devflare/runtime'
 
 export async function fetch(): Promise<Response> {
 	const row = await env.DB.prepare('select 1 as ok').first<{ ok: number }>()
@@ -1047,8 +1208,7 @@ export async function fetch(): Promise<Response> {
 				title: 'A matching smoke test',
 				language: 'ts',
 				code: String.raw`import { afterAll, beforeAll, expect, test } from 'bun:test'
-import { createTestContext, cf } from 'devflare/test'
-import { env } from 'devflare'
+import { createTestContext, cf, env } from 'devflare/test'
 
 beforeAll(() => createTestContext())
 afterAll(() => env.dispose())
@@ -1078,7 +1238,7 @@ test('GET / returns a D1-backed health response', async () => {
 		configKey: 'bindings.r2',
 		authoringShape: 'Record<string, string>',
 		localStory: 'First-class local runtime and tests',
-		sourcePages: ['schema-bindings.ts', 'compiler.ts', 'simple-context.ts', 'verification-testing-and-caveats.md', 'apps/testing/*'],
+		sourcePages: ['schema-bindings.ts', 'compiler.ts', 'simple-context.ts', 'packages/devflare/src/test/simple-context.ts', 'apps/testing/*'],
 		overview: {
 			readTime: '4 min read',
 			title: 'Use R2 for object storage, but route browser delivery deliberately',
@@ -1184,8 +1344,7 @@ export default defineConfig({
 				title: 'Testing a real R2 binding',
 				language: 'ts',
 				code: String.raw`import { afterAll, beforeAll, expect, test } from 'bun:test'
-import { createTestContext } from 'devflare/test'
-import { env } from 'devflare'
+import { createTestContext, env } from 'devflare/test'
 
 beforeAll(() => createTestContext())
 afterAll(() => env.dispose())
@@ -1247,7 +1406,7 @@ export default defineConfig({
 			usageSnippet: {
 				title: 'Serve an object through the worker',
 				language: 'ts',
-				code: String.raw`import { env } from 'devflare'
+				code: String.raw`import { env } from 'devflare/runtime'
 
 export async function fetch(request: Request): Promise<Response> {
 	const url = new URL(request.url)
@@ -1269,8 +1428,7 @@ export async function fetch(request: Request): Promise<Response> {
 				title: 'A quick route-level check',
 				language: 'ts',
 				code: String.raw`import { afterAll, beforeAll, expect, test } from 'bun:test'
-import { createTestContext, cf } from 'devflare/test'
-import { env } from 'devflare'
+import { createTestContext, cf, env } from 'devflare/test'
 
 beforeAll(() => createTestContext())
 afterAll(() => env.dispose())
@@ -1301,7 +1459,7 @@ test('GET /files/hello.txt serves the stored object', async () => {
 		configKey: 'bindings.durableObjects',
 		authoringShape: 'Record<string, string | { className: string; scriptName?: string }>',
 		localStory: 'First-class local runtime and tests, including cross-worker references',
-		sourcePages: ['schema-bindings.ts', 'ref.ts', 'do-bundler.ts', 'simple-context.ts', 'deploy-preview-cli.md'],
+		sourcePages: ['schema-bindings.ts', 'ref.ts', 'do-bundler.ts', 'simple-context.ts', 'packages/devflare/src/cli/commands/deploy.ts'],
 		overview: {
 			readTime: '5 min read',
 			title: 'Use Durable Objects when coordination or state really belongs with a single object identity',
@@ -1415,8 +1573,7 @@ export default defineConfig({
 				title: 'Testing a Durable Object through the real namespace',
 				language: 'ts',
 				code: String.raw`import { afterAll, beforeAll, expect, test } from 'bun:test'
-import { createTestContext } from 'devflare/test'
-import { env } from 'devflare'
+import { createTestContext, env } from 'devflare/test'
 
 beforeAll(() => createTestContext())
 afterAll(() => env.dispose())
@@ -1517,7 +1674,7 @@ ${'export'} ${'class'} ${'Counter'} extends DurableObject<DevflareEnv> {
 					{
 						path: 'src/fetch.ts',
 						language: 'ts',
-						code: String.raw`import { env } from 'devflare'
+						code: String.raw`import { env } from 'devflare/runtime'
 
 export async function fetch(request: Request): Promise<Response> {
 	const url = new URL(request.url)
@@ -1531,7 +1688,7 @@ export async function fetch(request: Request): Promise<Response> {
 }`
 					}
 				],
-				code: String.raw`import { env } from 'devflare'
+				code: String.raw`import { env } from 'devflare/runtime'
 
 export async function fetch(request: Request): Promise<Response> {
 	const url = new URL(request.url)
@@ -1548,8 +1705,7 @@ export async function fetch(request: Request): Promise<Response> {
 				title: 'A direct test that shows the Devflare payoff immediately',
 				language: 'ts',
 				code: String.raw`import { afterAll, beforeAll, expect, test } from 'bun:test'
-import { createTestContext, cf } from 'devflare/test'
-import { env } from 'devflare'
+import { createTestContext, cf, env } from 'devflare/test'
 
 beforeAll(() => createTestContext())
 afterAll(() => env.dispose())
@@ -1697,8 +1853,7 @@ export default defineConfig({
 				title: 'Testing a queue consumer through Devflare helpers',
 				language: 'ts',
 				code: String.raw`import { afterAll, beforeAll, expect, test } from 'bun:test'
-import { createTestContext, cf } from 'devflare/test'
-import { env } from 'devflare'
+import { createTestContext, cf, env } from 'devflare/test'
 
 beforeAll(() => createTestContext())
 afterAll(() => env.dispose())
@@ -1772,7 +1927,7 @@ export default defineConfig({
 			usageSnippet: {
 				title: 'One fetch path and one queue consumer',
 				language: 'ts',
-				code: String.raw`import { env } from 'devflare'
+				code: String.raw`import { env } from 'devflare/runtime'
 import type { MessageBatch } from '@cloudflare/workers-types'
 
 export async function fetch(): Promise<Response> {
@@ -1791,8 +1946,7 @@ export async function queue(batch: MessageBatch<{ id: string }>): Promise<void> 
 				title: 'A direct consumer test',
 				language: 'ts',
 				code: String.raw`import { afterAll, beforeAll, expect, test } from 'bun:test'
-import { createTestContext, cf } from 'devflare/test'
-import { env } from 'devflare'
+import { createTestContext, cf, env } from 'devflare/test'
 
 beforeAll(() => createTestContext())
 afterAll(() => env.dispose())
@@ -1931,8 +2085,7 @@ export default defineConfig({
 				title: 'Testing a service binding through the env',
 				language: 'ts',
 				code: String.raw`import { afterAll, beforeAll, expect, test } from 'bun:test'
-import { createTestContext } from 'devflare/test'
-import { env } from 'devflare'
+import { createTestContext, env } from 'devflare/test'
 
 beforeAll(() => createTestContext())
 afterAll(() => env.dispose())
@@ -1994,7 +2147,7 @@ export default defineConfig({
 			usageSnippet: {
 				title: 'Use the service in the gateway worker',
 				language: 'ts',
-				code: String.raw`import { env } from 'devflare'
+				code: String.raw`import { env } from 'devflare/runtime'
 
 export async function fetch(): Promise<Response> {
 	const result = await env.MATH_SERVICE.add(4, 5)
@@ -2005,8 +2158,7 @@ export async function fetch(): Promise<Response> {
 				title: 'A single multi-worker test',
 				language: 'ts',
 				code: String.raw`import { afterAll, beforeAll, expect, test } from 'bun:test'
-import { createTestContext, cf } from 'devflare/test'
-import { env } from 'devflare'
+import { createTestContext, cf, env } from 'devflare/test'
 
 beforeAll(() => createTestContext())
 afterAll(() => env.dispose())
@@ -2036,7 +2188,7 @@ test('GET / calls the math service', async () => {
 		configKey: 'bindings.ai',
 		authoringShape: '{ binding: string }',
 		localStory: 'Remote-oriented; local tests require remote mode',
-		sourcePages: ['schema-bindings.ts', 'compiler.ts', 'wrangler-auth.ts', 'remote-ai.ts', 'verification-testing-and-caveats.md'],
+		sourcePages: ['schema-bindings.ts', 'compiler.ts', 'wrangler-auth.ts', 'remote-ai.ts', 'packages/devflare/src/test/simple-context.ts'],
 		overview: {
 			readTime: '4 min read',
 			title: 'Use the AI binding when the worker needs real Workers AI inference, not just a local mock',
@@ -2213,7 +2365,7 @@ export default defineConfig({
 			usageSnippet: {
 				title: 'A tiny inference endpoint',
 				language: 'ts',
-				code: String.raw`import { env } from 'devflare'
+				code: String.raw`import { env } from 'devflare/runtime'
 
 export async function fetch(): Promise<Response> {
 	const result = await env.AI.run('@cf/meta/llama-3.2-1b-instruct', {
@@ -2444,7 +2596,7 @@ export default defineConfig({
 			usageSnippet: {
 				title: 'A tiny write-and-query route',
 				language: 'ts',
-				code: String.raw`import { env } from 'devflare'
+				code: String.raw`import { env } from 'devflare/runtime'
 
 export async function fetch(): Promise<Response> {
 	const vector = Array(32).fill(0.5)
@@ -2608,8 +2760,7 @@ export default defineConfig({
 				title: 'A conservative Hyperdrive smoke test',
 				language: 'ts',
 				code: String.raw`import { afterAll, beforeAll, expect, test } from 'bun:test'
-import { createTestContext } from 'devflare/test'
-import { env } from 'devflare'
+import { createTestContext, env } from 'devflare/test'
 
 beforeAll(() => createTestContext())
 afterAll(() => env.dispose())
@@ -2670,7 +2821,7 @@ export default defineConfig({
 			usageSnippet: {
 				title: 'Expose the binding shape you will use later',
 				language: 'ts',
-				code: String.raw`import { env } from 'devflare'
+				code: String.raw`import { env } from 'devflare/runtime'
 
 export async function fetch(): Promise<Response> {
 	return Response.json({
@@ -2872,7 +3023,7 @@ export default defineConfig({
 				title: 'Read one page title with Puppeteer',
 				language: 'ts',
 				code: String.raw`import puppeteer from '@cloudflare/puppeteer'
-import { env } from 'devflare'
+import { env } from 'devflare/runtime'
 
 export async function fetch(): Promise<Response> {
 	const browser = await puppeteer.launch(env.BROWSER as Parameters<typeof puppeteer.launch>[0])
@@ -3094,7 +3245,7 @@ export default defineConfig({
 			usageSnippet: {
 				title: 'Write one analytics point in the worker',
 				language: 'ts',
-				code: String.raw`import { env } from 'devflare'
+				code: String.raw`import { env } from 'devflare/runtime'
 
 export async function fetch(): Promise<Response> {
 	env.APP_ANALYTICS.writeDataPoint({
@@ -3236,8 +3387,7 @@ export default defineConfig({
 				title: 'Testing an outbound Send Email binding',
 				language: 'ts',
 				code: String.raw`import { afterAll, beforeAll, expect, test } from 'bun:test'
-import { createTestContext } from 'devflare/test'
-import { env } from 'devflare'
+import { createTestContext, env } from 'devflare/test'
 
 beforeAll(() => createTestContext())
 afterAll(() => env.dispose())
@@ -3304,7 +3454,7 @@ export default defineConfig({
 			usageSnippet: {
 				title: 'Send one email from the worker',
 				language: 'ts',
-				code: String.raw`import { env } from 'devflare'
+				code: String.raw`import { env } from 'devflare/runtime'
 
 export async function fetch(): Promise<Response> {
 	await env.SUPPORT_EMAIL.send({
@@ -3332,7 +3482,831 @@ export async function fetch(): Promise<Response> {
 	}
 ]
 
-const activeBindingGuides = bindingGuides
+const compactBindingGuides: BindingGuideDefinition[] = [
+	createCompactBindingGuide({
+		slugBase: 'rate-limiting',
+		label: 'Rate Limiting',
+		categoryDescription: 'Fixed-window request limits with Miniflare-backed local behavior and a pure mock for unit tests.',
+		configKey: 'bindings.rateLimits',
+		authoringShape: 'Record<string, { namespaceId; simple: { limit; period } }>',
+		localStory: 'Offline-native: Miniflare and Devflare pure mocks can exercise application-level rate limit behavior',
+		sourcePages: ['packages/devflare/src/config/schema-bindings.ts', 'packages/devflare/src/config/compiler.ts', 'packages/devflare/src/test/utilities.ts', 'packages/devflare/src/test/offline-bindings.ts'],
+		compileTarget: 'Wrangler `ratelimits`',
+		envType: '`RateLimit`',
+		defaultHarness: '`createTestContext()` or `createOfflineEnv()`',
+		testHelper: '`createMockRateLimit()` / `createMockEnv({ rateLimits })`',
+		bestFor: 'login throttles, per-user limits, and API guardrails that can use Cloudflare fixed windows',
+		remoteBoundary: 'Cloudflare owns account namespace ids and production enforcement, but the local limiter is useful for deterministic app tests.',
+		configSnippet: {
+			title: 'Smallest Rate Limiting config',
+			language: 'ts',
+			code: String.raw`import { defineConfig } from 'devflare/config'
+
+export default defineConfig({
+	name: 'limited-worker',
+	bindings: {
+		rateLimits: {
+			LOGIN_RATE_LIMIT: {
+				namespaceId: '1001',
+				simple: {
+					limit: 20,
+					period: 60
+				}
+			}
+		}
+	}
+})`
+		},
+		usageSnippet: {
+			title: 'Use the limiter in a request path',
+			language: 'ts',
+			code: String.raw`import { env } from 'devflare/runtime'
+
+export async function fetch(request: Request): Promise<Response> {
+	const key = request.headers.get('cf-connecting-ip') ?? 'local'
+	const outcome = await env.LOGIN_RATE_LIMIT.limit({ key })
+
+	if (!outcome.success) {
+		return new Response('slow down', { status: 429 })
+	}
+
+	return new Response('ok')
+}`
+		},
+		testSnippet: {
+			title: 'Pure unit test for rate-limit branching',
+			language: 'ts',
+			code: String.raw`import { expect, test } from 'bun:test'
+import { createMockEnv } from 'devflare/test'
+
+test('blocks the second call in the same window', async () => {
+	const env = createMockEnv({
+		rateLimits: {
+			LOGIN_RATE_LIMIT: { limit: 1, period: 60 }
+		}
+	})
+
+	expect((await env.LOGIN_RATE_LIMIT.limit({ key: 'user-1' })).success).toBe(true)
+	expect((await env.LOGIN_RATE_LIMIT.limit({ key: 'user-1' })).success).toBe(false)
+})`
+		},
+		compileOutput: String.raw`{
+	"ratelimits": [
+		{ "name": "LOGIN_RATE_LIMIT", "namespace_id": "1001", "simple": { "limit": 20, "period": 60 } }
+	]
+}`
+	}),
+	createCompactBindingGuide({
+		slugBase: 'version-metadata',
+		label: 'Version Metadata',
+		categoryDescription: 'Version identity for deployed Workers, with deterministic metadata in local tests.',
+		configKey: 'bindings.versionMetadata',
+		authoringShape: '{ binding: string }',
+		localStory: 'Offline-native: Devflare can provide deterministic local metadata without Cloudflare state',
+		sourcePages: ['packages/devflare/src/config/schema-bindings.ts', 'packages/devflare/src/config/compiler.ts', 'packages/devflare/src/test/utilities.ts', 'packages/devflare/src/test/offline-bindings.ts'],
+		compileTarget: 'Wrangler `version_metadata`',
+		envType: '`WorkerVersionMetadata`',
+		defaultHarness: '`createTestContext()` or `createOfflineEnv()`',
+		testHelper: '`createMockVersionMetadata()` / `createMockEnv({ versionMetadata })`',
+		bestFor: 'responses, logs, and diagnostics that need the current Worker version id, tag, or timestamp',
+		remoteBoundary: 'Cloudflare supplies real deployment metadata; local tests should assert deterministic fallback behavior only.',
+		configSnippet: {
+			title: 'Smallest Version Metadata config',
+			language: 'ts',
+			code: String.raw`import { defineConfig } from 'devflare/config'
+
+export default defineConfig({
+	name: 'versioned-worker',
+	bindings: {
+		versionMetadata: {
+			binding: 'CF_VERSION_METADATA'
+		}
+	}
+})`
+		},
+		usageSnippet: {
+			title: 'Return the current version tag',
+			language: 'ts',
+			code: String.raw`import { env } from 'devflare/runtime'
+
+export async function fetch(): Promise<Response> {
+	return Response.json({
+		tag: env.CF_VERSION_METADATA.tag,
+		id: env.CF_VERSION_METADATA.id
+	})
+}`
+		},
+		testSnippet: {
+			title: 'Assert deterministic local metadata',
+			language: 'ts',
+			code: String.raw`import { expect, test } from 'bun:test'
+import { createMockEnv } from 'devflare/test'
+
+test('uses deterministic local version metadata', () => {
+	const env = createMockEnv({ versionMetadata: 'CF_VERSION_METADATA' })
+
+	expect(env.CF_VERSION_METADATA.tag).toBe('local')
+})`
+		},
+		compileOutput: String.raw`{
+	"version_metadata": {
+		"binding": "CF_VERSION_METADATA"
+	}
+}`
+	}),
+	createCompactBindingGuide({
+		slugBase: 'worker-loaders',
+		label: 'Worker Loaders',
+		categoryDescription: 'Dynamic Worker loader bindings for apps that explicitly supply or mock tenant Worker payloads.',
+		configKey: 'bindings.workerLoaders',
+		authoringShape: 'Record<string, {}>',
+		localStory: 'Offline-fixture: the binding exists locally, but tests should supply a Worker stub when behavior matters',
+		sourcePages: ['packages/devflare/src/config/schema-bindings.ts', 'packages/devflare/src/config/compiler.ts', 'packages/devflare/src/test/utilities.ts', 'packages/devflare/src/test/offline-bindings.ts'],
+		compileTarget: 'Wrangler `worker_loaders`',
+		envType: '`WorkerLoader`',
+		defaultHarness: '`createTestContext()` with explicit Worker payloads or a pure stub',
+		testHelper: '`createMockWorkerLoader()` / `createMockEnv({ workerLoaders })`',
+		bestFor: 'Dynamic Workers where the app loads Worker code at runtime from an explicit source',
+		remoteBoundary: 'Devflare wires the binding; it does not bundle, upload, discover, or provision dynamic Worker payloads for you.',
+		configSnippet: {
+			title: 'Smallest Worker Loader config',
+			language: 'ts',
+			code: String.raw`import { defineConfig } from 'devflare/config'
+
+export default defineConfig({
+	name: 'loader-worker',
+	bindings: {
+		workerLoaders: {
+			LOADER: {}
+		}
+	}
+})`
+		},
+		usageSnippet: {
+			title: 'Load an explicit Worker payload',
+			language: 'ts',
+			code: String.raw`import { env } from 'devflare/runtime'
+
+export async function fetch(request: Request): Promise<Response> {
+	const stub = env.LOADER.get('tenant-a', () => ({
+		compatibilityDate: '2026-04-26',
+		mainModule: 'index.js',
+		modules: {
+			'index.js': 'export default { fetch() { return new Response("ok") } }'
+		}
+	}))
+
+	return stub.fetch(request)
+}`
+		},
+		testSnippet: {
+			title: 'Pure test with an explicit Worker stub',
+			language: 'ts',
+			code: String.raw`import { expect, test } from 'bun:test'
+import { createMockWorkerLoader } from 'devflare/test'
+
+test('uses a supplied dynamic Worker stub', async () => {
+	const loader = createMockWorkerLoader({
+		stub: {
+			fetch: async () => new Response('tenant-ok')
+		}
+	})
+
+	const stub = loader.get('tenant-a', () => ({ mainModule: 'index.js', modules: {} }))
+	expect(await (await stub.fetch('https://example.com')).text()).toBe('tenant-ok')
+})`
+		},
+		compileOutput: String.raw`{
+	"worker_loaders": [
+		{ "binding": "LOADER" }
+	]
+}`
+	}),
+	createCompactBindingGuide({
+		slugBase: 'secrets-store',
+		label: 'Secrets Store',
+		categoryDescription: 'Account-level Secrets Store bindings with explicit fixture values for offline tests.',
+		configKey: 'bindings.secretsStore',
+		authoringShape: 'Record<string, { storeId; secretName }>',
+		localStory: 'Offline-native when tests provide fixture values; missing fixtures fail with a non-networked error',
+		sourcePages: ['packages/devflare/src/config/schema-bindings.ts', 'packages/devflare/src/config/compiler.ts', 'packages/devflare/src/test/utilities.ts', 'packages/devflare/src/test/offline-bindings.ts'],
+		compileTarget: 'Wrangler `secrets_store_secrets`',
+		envType: '`SecretsStoreSecret`',
+		defaultHarness: '`createOfflineEnv()` with `fixtures.secretsStore`',
+		testHelper: '`createMockSecretsStoreSecret()` / `createMockEnv({ secretsStore })`',
+		bestFor: 'shared account secrets that should be referenced by store id and secret name instead of copied into config',
+		remoteBoundary: 'Devflare does not read or provision secret values; tests must supply explicit fixtures.',
+		configSnippet: {
+			title: 'Smallest Secrets Store config',
+			language: 'ts',
+			code: String.raw`import { defineConfig } from 'devflare/config'
+
+export default defineConfig({
+	name: 'secret-worker',
+	bindings: {
+		secretsStore: {
+			API_TOKEN: {
+				storeId: 'store-123',
+				secretName: 'api-token'
+			}
+		}
+	}
+})`
+		},
+		usageSnippet: {
+			title: 'Read a Secrets Store value',
+			language: 'ts',
+			code: String.raw`import { env } from 'devflare/runtime'
+
+export async function fetch(): Promise<Response> {
+	const token = await env.API_TOKEN.get()
+	return new Response(token.length > 0 ? 'configured' : 'missing')
+}`
+		},
+		testSnippet: {
+			title: 'Fixture a Secrets Store value offline',
+			language: 'ts',
+			code: String.raw`import { expect, test } from 'bun:test'
+import { createOfflineEnv } from 'devflare/test'
+import config from '../devflare.config'
+
+test('reads a fixed offline secret', async () => {
+	const env = createOfflineEnv(config, {
+		secretsStore: {
+			API_TOKEN: 'test-token'
+		}
+	})
+
+	expect(await env.API_TOKEN.get()).toBe('test-token')
+})`
+		},
+		compileOutput: String.raw`{
+	"secrets_store_secrets": [
+		{ "binding": "API_TOKEN", "store_id": "store-123", "secret_name": "api-token" }
+	]
+}`
+	}),
+	createCompactBindingGuide({
+		slugBase: 'ai-search',
+		label: 'AI Search',
+		categoryDescription: 'AI Search instance and namespace bindings with fixture-backed local tests and remote relevance boundaries.',
+		configKey: 'bindings.aiSearch',
+		authoringShape: 'Record<string, { instanceName; remote? }> plus `aiSearchNamespaces` for namespace access',
+		localStory: 'Offline-fixture: deterministic in-memory instances can test application flow, not hosted relevance behavior',
+		sourcePages: ['packages/devflare/src/config/schema-bindings.ts', 'packages/devflare/src/config/compiler.ts', 'packages/devflare/src/test/ai-search.ts', 'packages/devflare/src/test/offline-bindings.ts'],
+		compileTarget: 'Wrangler `ai_search` / `ai_search_namespaces`',
+		envType: '`AiSearchInstance` or `AiSearchNamespace`',
+		defaultHarness: '`createOfflineEnv()` with AI Search fixtures',
+		testHelper: '`createMockAISearchInstance()` / `createMockAISearchNamespace()`',
+		bestFor: 'search/chat flows where the app calls an AI Search instance or namespace from a Worker',
+		remoteBoundary: 'Cloudflare owns crawling, indexing, ranking, and hosted model behavior; local mocks only prove app control flow.',
+		configSnippet: {
+			title: 'Smallest AI Search config',
+			language: 'ts',
+			code: String.raw`import { defineConfig } from 'devflare/config'
+
+export default defineConfig({
+	name: 'search-worker',
+	bindings: {
+		aiSearch: {
+			DOCS_SEARCH: {
+				instanceName: 'docs-search'
+			}
+		}
+	}
+})`
+		},
+		usageSnippet: {
+			title: 'Search one AI Search instance',
+			language: 'ts',
+			code: String.raw`import { env } from 'devflare/runtime'
+
+export async function fetch(request: Request): Promise<Response> {
+	const query = new URL(request.url).searchParams.get('q') ?? 'devflare'
+	const result = await env.DOCS_SEARCH.search({ query })
+
+	return Response.json(result.chunks)
+}`
+		},
+		testSnippet: {
+			title: 'Fixture AI Search results offline',
+			language: 'ts',
+			code: String.raw`import { expect, test } from 'bun:test'
+import { createMockAISearchInstance } from 'devflare/test'
+
+test('finds fixture content', async () => {
+	const search = createMockAISearchInstance({
+		items: [{ key: 'offline.md', content: 'Offline fixtures make tests deterministic' }]
+	})
+
+	const result = await search.search({ query: 'fixtures' })
+	expect(result.chunks.length).toBeGreaterThan(0)
+})`
+		},
+		compileOutput: String.raw`{
+	"ai_search": [
+		{ "binding": "DOCS_SEARCH", "instance_name": "docs-search" }
+	]
+}`
+	}),
+	createCompactBindingGuide({
+		slugBase: 'mtls-certificates',
+		label: 'mTLS Certificates',
+		categoryDescription: 'mTLS certificate Fetcher bindings with local handler fixtures and remote certificate-presentation boundaries.',
+		configKey: 'bindings.mtlsCertificates',
+		authoringShape: 'Record<string, string | { certificateId; remote? }>',
+		localStory: 'Offline-fixture: local tests can model Fetcher behavior, but not real certificate presentation',
+		sourcePages: ['packages/devflare/src/config/schema-bindings.ts', 'packages/devflare/src/config/compiler.ts', 'packages/devflare/src/test/utilities.ts', 'packages/devflare/src/test/offline-bindings.ts'],
+		compileTarget: 'Wrangler `mtls_certificates`',
+		envType: '`Fetcher`',
+		defaultHarness: '`createOfflineEnv()` with `fixtures.mtlsCertificates`',
+		testHelper: '`createMockMTLSCertificate()` / `createMockEnv({ mtlsCertificates })`',
+		bestFor: 'calling origins that require a Cloudflare-uploaded client certificate',
+		remoteBoundary: 'Real TLS client-certificate presentation is Cloudflare/Wrangler remote behavior.',
+		configSnippet: {
+			title: 'Smallest mTLS Certificate config',
+			language: 'ts',
+			code: String.raw`import { defineConfig } from 'devflare/config'
+
+export default defineConfig({
+	name: 'mtls-worker',
+	bindings: {
+		mtlsCertificates: {
+			CLIENT_CERT: {
+				certificateId: 'certificate-uuid'
+			}
+		}
+	}
+})`
+		},
+		usageSnippet: {
+			title: 'Fetch through the mTLS binding',
+			language: 'ts',
+			code: String.raw`import { env } from 'devflare/runtime'
+
+export async function fetch(): Promise<Response> {
+	return env.CLIENT_CERT.fetch('https://origin.example/status')
+}`
+		},
+		testSnippet: {
+			title: 'Fixture an mTLS Fetcher locally',
+			language: 'ts',
+			code: String.raw`import { expect, test } from 'bun:test'
+import { createMockMTLSCertificate } from 'devflare/test'
+
+test('uses a local mTLS Fetcher fixture', async () => {
+	const cert = createMockMTLSCertificate(async () => Response.json({ ok: true }))
+	const response = await cert.fetch('https://origin.example/status')
+
+	expect(await response.json()).toEqual({ ok: true })
+})`
+		},
+		compileOutput: String.raw`{
+	"mtls_certificates": [
+		{ "binding": "CLIENT_CERT", "certificate_id": "certificate-uuid" }
+	]
+}`
+	}),
+	createCompactBindingGuide({
+		slugBase: 'dispatch-namespaces',
+		label: 'Dispatch Namespaces',
+		categoryDescription: 'Workers for Platforms dispatch bindings with explicit local tenant fetcher fixtures.',
+		configKey: 'bindings.dispatchNamespaces',
+		authoringShape: 'Record<string, string | { namespace; outbound?; remote? }>',
+		localStory: 'Offline-fixture: tests can provide named tenant fetchers, but Devflare does not emulate tenant upload/lifecycle',
+		sourcePages: ['packages/devflare/src/config/schema-bindings.ts', 'packages/devflare/src/config/compiler.ts', 'packages/devflare/src/test/utilities.ts', 'packages/devflare/src/test/offline-bindings.ts'],
+		compileTarget: 'Wrangler `dispatch_namespaces`',
+		envType: '`DispatchNamespace`',
+		defaultHarness: '`createOfflineEnv()` with `fixtures.dispatchNamespaces`',
+		testHelper: '`createMockDispatchNamespace()` / `createMockEnv({ dispatchNamespaces })`',
+		bestFor: 'platform Workers that dispatch to tenant Workers by name',
+		remoteBoundary: 'Cloudflare owns dispatch namespace creation, tenant uploads, Worker metadata, and production routing.',
+		configSnippet: {
+			title: 'Smallest Dispatch Namespace config',
+			language: 'ts',
+			code: String.raw`import { defineConfig } from 'devflare/config'
+
+export default defineConfig({
+	name: 'platform-worker',
+	bindings: {
+		dispatchNamespaces: {
+			DISPATCHER: {
+				namespace: 'tenants'
+			}
+		}
+	}
+})`
+		},
+		usageSnippet: {
+			title: 'Dispatch to one tenant Worker',
+			language: 'ts',
+			code: String.raw`import { env } from 'devflare/runtime'
+
+export async function fetch(request: Request): Promise<Response> {
+	const tenant = new URL(request.url).searchParams.get('tenant') ?? 'default'
+	return env.DISPATCHER.get(tenant).fetch(request)
+}`
+		},
+		testSnippet: {
+			title: 'Fixture tenant dispatch locally',
+			language: 'ts',
+			code: String.raw`import { expect, test } from 'bun:test'
+import { createMockDispatchNamespace } from 'devflare/test'
+
+test('dispatches to a configured tenant', async () => {
+	const dispatcher = createMockDispatchNamespace({
+		workers: {
+			default: async () => new Response('tenant-ok')
+		}
+	})
+
+	expect(await (await dispatcher.get('default').fetch('https://example.com')).text()).toBe('tenant-ok')
+})`
+		},
+		compileOutput: String.raw`{
+	"dispatch_namespaces": [
+		{ "binding": "DISPATCHER", "namespace": "tenants" }
+	]
+}`
+	}),
+	createCompactBindingGuide({
+		slugBase: 'workflows',
+		label: 'Workflows',
+		categoryDescription: 'Workflow bindings for starting and inspecting workflow instances from Workers.',
+		configKey: 'bindings.workflows',
+		authoringShape: 'Record<string, { name; className; scriptName?; limits? }>',
+		localStory: 'Offline-native for application-level calls through Miniflare or deterministic workflow mocks',
+		sourcePages: ['packages/devflare/src/config/schema-bindings.ts', 'packages/devflare/src/config/compiler.ts', 'packages/devflare/src/test/utilities.ts', 'packages/devflare/src/test/offline-bindings.ts', 'cases/case16/*'],
+		compileTarget: 'Wrangler `workflows`',
+		envType: '`Workflow`',
+		defaultHarness: '`createTestContext()` or `createOfflineEnv()`',
+		testHelper: '`createMockWorkflow()` / `createMockEnv({ workflows })`',
+		bestFor: 'starting long-running workflow instances from a Worker path',
+		remoteBoundary: 'Devflare does not provision Workflow resources or inspect production instance state; Wrangler/Cloudflare own deployed lifecycle.',
+		configSnippet: {
+			title: 'Smallest Workflow binding config',
+			language: 'ts',
+			code: String.raw`import { defineConfig } from 'devflare/config'
+
+export default defineConfig({
+	name: 'workflow-client',
+	bindings: {
+		workflows: {
+			ORDER_WORKFLOW: {
+				name: 'order-workflow',
+				className: 'OrderWorkflow'
+			}
+		}
+	}
+})`
+		},
+		usageSnippet: {
+			title: 'Create one workflow instance',
+			language: 'ts',
+			code: String.raw`import { env } from 'devflare/runtime'
+
+export async function fetch(request: Request): Promise<Response> {
+	const orderId = new URL(request.url).searchParams.get('order') ?? 'demo'
+	const instance = await env.ORDER_WORKFLOW.create({
+		id: orderId,
+		params: { orderId }
+	})
+
+	return Response.json({ id: instance.id })
+}`
+		},
+		testSnippet: {
+			title: 'Pure workflow call test',
+			language: 'ts',
+			code: String.raw`import { expect, test } from 'bun:test'
+import { createMockWorkflow } from 'devflare/test'
+
+test('creates a workflow instance', async () => {
+	const workflow = createMockWorkflow()
+	const instance = await workflow.create({ id: 'order-1', params: { orderId: 'order-1' } })
+
+	expect(instance.id).toBe('order-1')
+})`
+		},
+		compileOutput: String.raw`{
+	"workflows": [
+		{ "binding": "ORDER_WORKFLOW", "name": "order-workflow", "class_name": "OrderWorkflow" }
+	]
+}`
+	}),
+	createCompactBindingGuide({
+		slugBase: 'pipelines',
+		label: 'Pipelines',
+		categoryDescription: 'Pipeline bindings for event ingestion, with local send recording and Cloudflare-managed sinks.',
+		configKey: 'bindings.pipelines',
+		authoringShape: 'Record<string, string | { pipeline; remote? }>',
+		localStory: 'Offline-native for send-recording tests; Cloudflare owns production batching and sink delivery',
+		sourcePages: ['packages/devflare/src/config/schema-bindings.ts', 'packages/devflare/src/config/compiler.ts', 'packages/devflare/src/test/utilities.ts', 'packages/devflare/src/test/offline-bindings.ts'],
+		compileTarget: 'Wrangler `pipelines`',
+		envType: '`Pipeline`',
+		defaultHarness: '`createTestContext()` or `createOfflineEnv()`',
+		testHelper: '`createMockPipeline()` / `createMockEnv({ pipelines })`',
+		bestFor: 'Worker-side event ingestion into Cloudflare Pipelines',
+		remoteBoundary: 'Devflare records local sends but does not create pipelines, manage R2 sinks, or emulate production batching.',
+		configSnippet: {
+			title: 'Smallest Pipeline config',
+			language: 'ts',
+			code: String.raw`import { defineConfig } from 'devflare/config'
+
+export default defineConfig({
+	name: 'events-worker',
+	bindings: {
+		pipelines: {
+			EVENTS: 'app-events'
+		}
+	}
+})`
+		},
+		usageSnippet: {
+			title: 'Send one record batch',
+			language: 'ts',
+			code: String.raw`import { env } from 'devflare/runtime'
+
+export async function fetch(): Promise<Response> {
+	await env.EVENTS.send([
+		{ timestamp: Date.now(), message: 'signup' }
+	])
+
+	return new Response('recorded')
+}`
+		},
+		testSnippet: {
+			title: 'Assert recorded Pipeline sends',
+			language: 'ts',
+			code: String.raw`import { expect, test } from 'bun:test'
+import { createMockPipeline } from 'devflare/test'
+
+test('records sent pipeline rows', async () => {
+	const pipeline = createMockPipeline()
+	await pipeline.send([{ message: 'signup' }])
+
+	expect(pipeline._getRecords()).toEqual([{ message: 'signup' }])
+})`
+		},
+		compileOutput: String.raw`{
+	"pipelines": [
+		{ "binding": "EVENTS", "pipeline": "app-events" }
+	]
+}`
+	}),
+	createCompactBindingGuide({
+		slugBase: 'images',
+		label: 'Images',
+		categoryDescription: 'Cloudflare Images binding docs with singleton config, local chain-shape tests, and hosted-image boundaries.',
+		configKey: 'bindings.images',
+		authoringShape: 'Record<string, true | { remote? }>',
+		localStory: 'Offline-native for low-fidelity chain-shape tests; Wrangler currently supports one Images binding per Worker',
+		sourcePages: ['packages/devflare/src/config/schema-bindings.ts', 'packages/devflare/src/config/compiler.ts', 'packages/devflare/src/test/utilities.ts', 'packages/devflare/src/test/offline-bindings.ts'],
+		compileTarget: 'Wrangler `images`',
+		envType: '`ImagesBinding`',
+		defaultHarness: '`createTestContext()` or `createOfflineEnv()`',
+		testHelper: '`createMockImagesBinding()` / `createMockEnv({ images })`',
+		bestFor: 'image transformation/upload paths where the Worker calls the Images binding',
+		remoteBoundary: 'The local mock proves call shape; Cloudflare owns hosted image APIs, transform fidelity, billing, and storage.',
+		configSnippet: {
+			title: 'Smallest Images config',
+			language: 'ts',
+			code: String.raw`import { defineConfig } from 'devflare/config'
+
+export default defineConfig({
+	name: 'images-worker',
+	bindings: {
+		images: {
+			IMAGES: true
+		}
+	}
+})`
+		},
+		usageSnippet: {
+			title: 'Transform uploaded image bytes',
+			language: 'ts',
+			code: String.raw`import { env } from 'devflare/runtime'
+
+export async function fetch(request: Request): Promise<Response> {
+	if (!request.body) {
+		return new Response('missing image', { status: 400 })
+	}
+
+	return env.IMAGES
+		.input(request.body)
+		.transform({ width: 320 })
+		.output({ format: 'image/jpeg' })
+}`
+		},
+		testSnippet: {
+			title: 'Pure Images chain-shape test',
+			language: 'ts',
+			code: String.raw`import { expect, test } from 'bun:test'
+import { createMockImagesBinding } from 'devflare/test'
+
+test('returns a deterministic image response', async () => {
+	const images = createMockImagesBinding()
+	const response = await images.input(new Blob(['image'])).transform({ width: 320 }).output()
+
+	expect(response.headers.get('content-type')).toBe('image/png')
+})`
+		},
+		compileOutput: String.raw`{
+	"images": {
+		"binding": "IMAGES"
+	}
+}`
+	}),
+	createCompactBindingGuide({
+		slugBase: 'media-transformations',
+		label: 'Media Transformations',
+		categoryDescription: 'Media Transformations binding docs with fixture-backed tests and clear remote fidelity boundaries.',
+		configKey: 'bindings.media',
+		authoringShape: 'Record<string, true | { remote? }>',
+		localStory: 'Offline-fixture: pure tests can model the chain, but real media processing is hosted Cloudflare behavior',
+		sourcePages: ['packages/devflare/src/config/schema-bindings.ts', 'packages/devflare/src/config/compiler.ts', 'packages/devflare/src/test/utilities.ts', 'packages/devflare/src/test/offline-bindings.ts'],
+		compileTarget: 'Wrangler `media`',
+		envType: '`MediaBinding`',
+		defaultHarness: '`createOfflineEnv()` with media fixtures',
+		testHelper: '`createMockMediaBinding()` / `createMockEnv({ media })`',
+		bestFor: 'video/audio transformation paths where the Worker calls Cloudflare Media Transformations',
+		remoteBoundary: 'Cloudflare owns real media output, codecs, duration handling, and billing; local tests only prove call shape.',
+		configSnippet: {
+			title: 'Smallest Media Transformations config',
+			language: 'ts',
+			code: String.raw`import { defineConfig } from 'devflare/config'
+
+export default defineConfig({
+	name: 'media-worker',
+	bindings: {
+		media: {
+			MEDIA: true
+		}
+	}
+})`
+		},
+		usageSnippet: {
+			title: 'Run one media transformation chain',
+			language: 'ts',
+			code: String.raw`import { env } from 'devflare/runtime'
+
+export async function fetch(request: Request): Promise<Response> {
+	if (!request.body) {
+		return new Response('missing media', { status: 400 })
+	}
+
+	return env.MEDIA
+		.input(request.body)
+		.transform({ width: 640 })
+		.output({ format: 'video/mp4' })
+}`
+		},
+		testSnippet: {
+			title: 'Pure Media chain-shape test',
+			language: 'ts',
+			code: String.raw`import { expect, test } from 'bun:test'
+import { createMockMediaBinding } from 'devflare/test'
+
+test('returns a deterministic media response', async () => {
+	const media = createMockMediaBinding()
+	const response = await media.input(new Blob(['media'])).transform({ width: 640 }).output()
+
+	expect(response.headers.get('content-type')).toBe('video/mp4')
+})`
+		},
+		compileOutput: String.raw`{
+	"media": {
+		"binding": "MEDIA"
+	}
+}`
+	}),
+	createCompactBindingGuide({
+		slugBase: 'artifacts',
+		label: 'Artifacts',
+		categoryDescription: 'Artifacts bindings for Git-compatible file storage, with in-memory repo/token tests.',
+		configKey: 'bindings.artifacts',
+		authoringShape: 'Record<string, string | { namespace; remote? }>',
+		localStory: 'Offline-fixture: repo metadata and token flows can be modeled in memory, not as real Git remotes',
+		sourcePages: ['packages/devflare/src/config/schema-bindings.ts', 'packages/devflare/src/config/compiler.ts', 'packages/devflare/src/test/utilities.ts', 'packages/devflare/src/test/offline-bindings.ts'],
+		compileTarget: 'Wrangler `artifacts`',
+		envType: '`Artifacts`',
+		defaultHarness: '`createOfflineEnv()` with artifact fixtures',
+		testHelper: '`createMockArtifacts()` / `createMockEnv({ artifacts })`',
+		bestFor: 'Worker-managed repo metadata, temporary tokens, and artifact namespace workflows',
+		remoteBoundary: 'Cloudflare owns real Git protocol, durable namespace storage, permissions, and remote URLs.',
+		configSnippet: {
+			title: 'Smallest Artifacts config',
+			language: 'ts',
+			code: String.raw`import { defineConfig } from 'devflare/config'
+
+export default defineConfig({
+	name: 'artifact-worker',
+	bindings: {
+		artifacts: {
+			ARTIFACTS: 'build-artifacts'
+		}
+	}
+})`
+		},
+		usageSnippet: {
+			title: 'Create one Artifacts repository',
+			language: 'ts',
+			code: String.raw`import { env } from 'devflare/runtime'
+
+export async function fetch(): Promise<Response> {
+	const repo = await env.ARTIFACTS.create('run-logs', {
+		description: 'CI run logs'
+	})
+
+	return Response.json({ remote: repo.remote })
+}`
+		},
+		testSnippet: {
+			title: 'Pure Artifacts repo test',
+			language: 'ts',
+			code: String.raw`import { expect, test } from 'bun:test'
+import { createMockArtifacts } from 'devflare/test'
+
+test('creates an in-memory artifact repo', async () => {
+	const artifacts = createMockArtifacts()
+	const repo = await artifacts.create('run-logs')
+
+	expect(repo.name).toBe('run-logs')
+})`
+		},
+		compileOutput: String.raw`{
+	"artifacts": [
+		{ "binding": "ARTIFACTS", "namespace": "build-artifacts" }
+	]
+}`
+	}),
+	createCompactBindingGuide({
+		slugBase: 'containers',
+		label: 'Containers',
+		categoryDescription: 'Cloudflare Containers config plus Devflare local Docker/Podman test helpers for explicit container tests.',
+		configKey: 'containers',
+		authoringShape: 'Array<{ className; image; maxInstances?; instanceType?; imageBuildContext? }>',
+		localStory: 'Offline-native only when an explicit Docker/Podman engine is available and the image can run without pulling',
+		sourcePages: ['packages/devflare/src/config/schema-runtime.ts', 'packages/devflare/src/config/compiler.ts', 'packages/devflare/src/test/containers.ts', 'packages/devflare/src/test/offline-bindings.ts'],
+		compileTarget: 'Wrangler `containers`',
+		envType: 'Container class config plus `devflare/test` container helpers',
+		defaultHarness: '`devflare/test` containers helpers guarded by `shouldSkip.containers`',
+		testHelper: '`detectContainerEngine()` / `createContainerManager()` / `containers`',
+		bestFor: 'explicit local interaction tests against a container image and deployed Cloudflare Containers config',
+		remoteBoundary: 'Cloudflare owns deployed container rollout, registry image availability, SSH, scaling, and the full Containers Durable Object runtime.',
+		configSnippet: {
+			title: 'Smallest Containers config',
+			language: 'ts',
+			code: String.raw`import { defineConfig } from 'devflare/config'
+
+export default defineConfig({
+	name: 'container-worker',
+	containers: [
+		{
+			className: 'ApiContainer',
+			image: 'localhost/devflare-api:latest',
+			maxInstances: 1
+		}
+	]
+})`
+		},
+		usageSnippet: {
+			title: 'Gate an explicit local container test',
+			language: 'ts',
+			code: String.raw`import { expect, test } from 'bun:test'
+import { containers, shouldSkip } from 'devflare/test'
+
+test.skipIf(await shouldSkip.containers())('container responds locally', async () => {
+	const app = await containers.start({
+		image: 'localhost/devflare-api:latest',
+		ports: [8080],
+		pull: false
+	})
+
+	const response = await fetch(app.url(8080, '/health'))
+	expect(response.status).toBe(200)
+})`
+		},
+		testSnippet: {
+			title: 'Detect Docker or Podman before running container tests',
+			language: 'ts',
+			code: String.raw`import { expect, test } from 'bun:test'
+import { detectContainerEngine } from 'devflare/test'
+
+test('container engine detection is explicit', async () => {
+	const engine = await detectContainerEngine()
+	expect(['available', 'missing', 'unhealthy']).toContain(engine.status)
+})`
+		},
+		compileOutput: String.raw`{
+	"containers": [
+		{ "class_name": "ApiContainer", "image": "localhost/devflare-api:latest", "max_instances": 1 }
+	]
+}`
+	})
+]
+
+const activeBindingGuides = [...bindingGuides, ...compactBindingGuides]
 
 export interface BindingTestingGuideLink {
 	label: string

@@ -43,8 +43,8 @@ export const buildAppsDocs: DocPage[] = [
 			{ label: 'Open next', value: 'The specific binding guide once the storage shape is clear' }
 		],
 		sourcePages: [
-			'bindings-and-composition.md',
-			'configuration-overview.md',
+			'packages/devflare/src/config/schema-bindings.ts',
+			'packages/devflare/src/config/schema.ts',
 			'schema-bindings.ts',
 			'schema-normalization.ts',
 			'resource-resolution.ts'
@@ -224,7 +224,7 @@ export async function GET({ env, params }: FetchEvent<DevflareEnv>): Promise<Res
 			'schema-bindings.ts',
 			'src/test/simple-context.ts',
 			'src/bridge/proxy.ts',
-			'verification-testing-and-caveats.md',
+			'packages/devflare/src/test/simple-context.ts',
 			'apps/testing/*'
 		],
 		sections: [
@@ -444,12 +444,12 @@ export async function GET({ env, params }: FetchEvent<DevflareEnv>): Promise<Res
 			{ label: 'Preview warning', value: 'Durable Object-heavy previews and queue-owned resources have different release questions' }
 		],
 		sourcePages: [
-			'bindings-and-composition.md',
+			'packages/devflare/src/config/schema-bindings.ts',
 			'README.md',
 			'schema-bindings.ts',
 			'do-bundler.ts',
 			'queue.ts',
-			'deploy-preview-cli.md'
+			'packages/devflare/src/cli/commands/deploy.ts'
 		],
 		sections: [
 			{
@@ -599,7 +599,7 @@ export default defineConfig({
 			{ label: 'Main release risk', value: 'Resolved worker naming and preview topology drift' }
 		],
 		sourcePages: [
-			'bindings-and-composition.md',
+			'packages/devflare/src/config/schema-bindings.ts',
 			'README.md',
 			'schema-bindings.ts',
 			'ref.ts',
@@ -671,8 +671,7 @@ export default defineConfig({
 						title: 'One real service call through the default harness',
 						language: 'ts',
 						code: String.raw`import { afterAll, beforeAll, expect, test } from 'bun:test'
-import { createTestContext } from 'devflare/test'
-import { env } from 'devflare'
+import { createTestContext, env } from 'devflare/test'
 
 beforeAll(() => createTestContext())
 afterAll(() => env.dispose())

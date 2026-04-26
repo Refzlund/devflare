@@ -359,7 +359,8 @@ export const configurationDocs: DocPage[] = [
 		navTitle: 'Full config',
 		readTime: '6 min read',
 		eyebrow: 'Configuration',
-		title: 'Scan one full `devflare.config.ts` example with the main current config lanes in one place',
+		title:
+			'Scan one full `devflare.config.ts` example with the main current config lanes in one place',
 		summary:
 			'See one canonical `devflare.config.ts` that touches the main current config lanes in a single file, with hover coverage on every property shown in the example.',
 		description:
@@ -371,9 +372,19 @@ export const configurationDocs: DocPage[] = [
 			'Deeper pages still own the richer variants, caveats, and operational details for each lane.'
 		],
 		facts: [
-			{ label: 'Best for', value: 'Seeing the whole current config shape before you zoom into one subsection' },
-			{ label: 'Reading pattern', value: 'Scan the example first, then hover properties, then open the specialist page you actually need' },
-			{ label: 'Important boundary', value: 'This example is canonical, but not every binding family variant is shown inline' }
+			{
+				label: 'Best for',
+				value: 'Seeing the whole current config shape before you zoom into one subsection'
+			},
+			{
+				label: 'Reading pattern',
+				value:
+					'Scan the example first, then hover properties, then open the specialist page you actually need'
+			},
+			{
+				label: 'Important boundary',
+				value: 'This example is canonical, but not every binding family variant is shown inline'
+			}
 		],
 		sourcePages: [
 			'src/config/schema.ts',
@@ -416,12 +427,36 @@ export const configurationDocs: DocPage[] = [
 				table: {
 					headers: ['Lane', 'What it owns', 'Open next when you need more'],
 					rows: [
-						['`name`, `accountId`, `compatibility*`', 'Worker identity and runtime posture.', '`config-basics` and `runtime-deploy-settings`'],
-						['`previews`, `files`, `bindings`, `triggers`', 'The authored Worker shape: surfaces, bindings, and scheduled intent.', '`project-shape`, `worker-surfaces`, and `config-previews`'],
-						['`vars`, `secrets`, `env`', 'Runtime strings, secret declarations, and environment overlays.', '`config-environments`'],
-						['`routes`, `wsRoutes`, `assets`', 'Deployment routing, dev WebSocket proxy rules, and static asset delivery.', '`runtime-deploy-settings`'],
-						['`limits`, `observability`, `migrations`', 'Operational posture and release-time controls.', '`runtime-deploy-settings`'],
-						['`rolldown`, `vite`, `wrangler`', 'Bundler coordination, host integration, and unsupported Wrangler passthrough.', '`config-basics`, `vite-standalone`, and `svelte-with-rolldown`']
+						[
+							'`name`, `accountId`, `compatibility*`',
+							'Worker identity and runtime posture.',
+							'`config-basics` and `runtime-deploy-settings`'
+						],
+						[
+							'`previews`, `files`, `bindings`, `triggers`',
+							'The authored Worker shape: surfaces, bindings, and scheduled intent.',
+							'`project-shape`, `worker-surfaces`, and `config-previews`'
+						],
+						[
+							'`vars`, `secrets`, `env`',
+							'Runtime strings, secret declarations, and environment overlays.',
+							'`config-environments`'
+						],
+						[
+							'`routes`, `wsRoutes`, `assets`',
+							'Deployment routing, dev WebSocket proxy rules, and static asset delivery.',
+							'`runtime-deploy-settings`'
+						],
+						[
+							'`limits`, `observability`, `migrations`',
+							'Operational posture and release-time controls.',
+							'`runtime-deploy-settings`'
+						],
+						[
+							'`rolldown`, `vite`, `wrangler`',
+							'Bundler coordination, host integration, and unsupported Wrangler passthrough.',
+							'`config-basics`, `vite-standalone`, and `svelte-with-rolldown`'
+						]
 					]
 				}
 			},
@@ -463,7 +498,8 @@ export const configurationDocs: DocPage[] = [
 		navTitle: 'Project shape',
 		readTime: '5 min read',
 		eyebrow: 'Configuration',
-		title: 'Configure the project shape around explicit file surfaces before the package gets noisy',
+		title:
+			'Configure the project shape around explicit file surfaces before the package gets noisy',
 		summary:
 			'Start with one fetch file, then add routes, background handlers, Durable Objects, assets, and transport rules only when the project genuinely needs them.',
 		description:
@@ -475,11 +511,22 @@ export const configurationDocs: DocPage[] = [
 			'Use explicit disable values such as `files.routes: false` or `files.transport: null` when you want autodiscovery out of the way.'
 		],
 		facts: [
-			{ label: 'Best for', value: 'Teams deciding how many runtime surfaces one package actually needs' },
+			{
+				label: 'Best for',
+				value: 'Teams deciding how many runtime surfaces one package actually needs'
+			},
 			{ label: 'Primary shape keys', value: '`files.*`, `assets`, `routes`, and `wsRoutes`' },
-			{ label: 'Safest habit', value: 'Add one surface only when the current project shape truly asks for it' }
+			{
+				label: 'Safest habit',
+				value: 'Add one surface only when the current project shape truly asks for it'
+			}
 		],
-		sourcePages: ['configuration-reference.md', 'README.md', 'schema-runtime.ts', 'config-autodiscovery.test.ts'],
+		sourcePages: [
+			'packages/devflare/src/config/schema.ts',
+			'README.md',
+			'schema-runtime.ts',
+			'config-autodiscovery.test.ts'
+		],
 		sections: [
 			{
 				id: 'start-small',
@@ -511,12 +558,36 @@ export const configurationDocs: DocPage[] = [
 				table: {
 					headers: ['Config lane', 'Use it when', 'Project effect'],
 					rows: [
-						['`files.fetch`', 'One main Worker surface should own request-wide behavior.', 'Points Devflare at the fetch entry you author directly.'],
-						['`files.routes`', 'The project needs route modules or a mounted route prefix.', 'Lets a route tree sit beside or replace the main fetch file.'],
-						['`files.queue`, `files.scheduled`, `files.email`', 'The package consumes background or platform-triggered events.', 'Adds separate handler files for those runtime surfaces.'],
-						['`files.durableObjects`, `files.entrypoints`, `files.workflows`', 'The project needs stateful classes, named entrypoints, or workflow definitions.', 'Turns globs into additional Worker-owned code surfaces Devflare can discover and bundle.'],
-						['`files.transport`', 'Custom value transport is needed for richer Worker or Durable Object contracts.', 'Lets you point at one explicit transport file, or disable autodiscovery with `null`.'],
-						['`assets`, `routes`, `wsRoutes`', 'Static files, deployment routing, or dev WebSocket proxy behavior need their own config.', 'Keeps non-handler project concerns out of the file-surface lane.']
+						[
+							'`files.fetch`',
+							'One main Worker surface should own request-wide behavior.',
+							'Points Devflare at the fetch entry you author directly.'
+						],
+						[
+							'`files.routes`',
+							'The project needs route modules or a mounted route prefix.',
+							'Lets a route tree sit beside or replace the main fetch file.'
+						],
+						[
+							'`files.queue`, `files.scheduled`, `files.email`',
+							'The package consumes background or platform-triggered events.',
+							'Adds separate handler files for those runtime surfaces.'
+						],
+						[
+							'`files.durableObjects`, `files.entrypoints`, `files.workflows`',
+							'The project needs stateful classes, named entrypoints, or workflow definitions.',
+							'Turns globs into additional Worker-owned code surfaces Devflare can discover and bundle.'
+						],
+						[
+							'`files.transport`',
+							'Custom value transport is needed for richer Worker or Durable Object contracts.',
+							'Lets you point at one explicit transport file, or disable autodiscovery with `null`.'
+						],
+						[
+							'`assets`, `routes`, `wsRoutes`',
+							'Static files, deployment routing, or dev WebSocket proxy behavior need their own config.',
+							'Keeps non-handler project concerns out of the file-surface lane.'
+						]
 					]
 				},
 				snippets: [
@@ -591,7 +662,8 @@ export const configurationDocs: DocPage[] = [
 		navTitle: 'Environments',
 		readTime: '5 min read',
 		eyebrow: 'Configuration',
-		title: 'Use `config.env` overlays to change only what differs between local, preview, and production',
+		title:
+			'Use `config.env` overlays to change only what differs between local, preview, and production',
 		summary:
 			'Keep one base config, layer environment-specific overrides with `config.env`, and let Devflare resolve preview or production details only in the commands that actually need them.',
 		description:
@@ -604,11 +676,23 @@ export const configurationDocs: DocPage[] = [
 			'Keep `.env`, `vars`, and `secrets` in separate roles so config-time inputs and runtime bindings do not blur together.'
 		],
 		facts: [
-			{ label: 'Best for', value: 'Projects that need different bindings or runtime behavior in preview and production' },
-			{ label: 'Merge model', value: 'Base config first, then `config.env[name]`, then preview materialization when relevant' },
+			{
+				label: 'Best for',
+				value: 'Projects that need different bindings or runtime behavior in preview and production'
+			},
+			{
+				label: 'Merge model',
+				value:
+					'Base config first, then `config.env[name]`, then preview materialization when relevant'
+			},
 			{ label: 'Main habit', value: 'Repeat only the keys that actually differ by environment' }
 		],
-		sourcePages: ['configuration-overview.md', 'configuration-reference.md', 'schema-env.ts', 'resolve.ts'],
+		sourcePages: [
+			'packages/devflare/src/config/schema.ts',
+			'packages/devflare/src/config/schema.ts',
+			'schema-env.ts',
+			'resolve.ts'
+		],
 		sections: [
 			{
 				id: 'merge-model',
@@ -640,11 +724,26 @@ export const configurationDocs: DocPage[] = [
 				table: {
 					headers: ['Override lane', 'Typical reason to change it'],
 					rows: [
-						['`name`, compatibility settings', 'The environment truly needs a different runtime identity or compatibility posture.'],
-						['`files`, `bindings`, `triggers`', 'Preview or production uses different surfaces, resources, or schedules.'],
-						['`vars`, `secrets`', 'Runtime strings or secret-binding declarations differ by environment.'],
-						['`routes`, `assets`, `limits`, `observability`', 'Deployment routing, static assets, CPU limits, or observability should differ by lane.'],
-						['`rolldown`, `vite`, `wrangler`', 'The build host or the passthrough escape hatch needs environment-specific behavior.']
+						[
+							'`name`, compatibility settings',
+							'The environment truly needs a different runtime identity or compatibility posture.'
+						],
+						[
+							'`files`, `bindings`, `triggers`',
+							'Preview or production uses different surfaces, resources, or schedules.'
+						],
+						[
+							'`vars`, `secrets`',
+							'Runtime strings or secret-binding declarations differ by environment.'
+						],
+						[
+							'`routes`, `assets`, `limits`, `observability`',
+							'Deployment routing, static assets, CPU limits, or observability should differ by lane.'
+						],
+						[
+							'`rolldown`, `vite`, `wrangler`',
+							'The build host or the passthrough escape hatch needs environment-specific behavior.'
+						]
 					]
 				},
 				paragraphs: [
@@ -661,11 +760,31 @@ export const configurationDocs: DocPage[] = [
 				table: {
 					headers: ['Field shape', 'Merge rule', 'Example'],
 					rows: [
-						['`routes` (array)', 'Replace', 'Base `routes: [{ pattern: "app.example.com/*", zone_name: "example.com" }]` + overlay `routes: [{ pattern: "preview.example.com/*", zone_name: "example.com" }]` resolves to **only** the preview entry.'],
-						['`migrations` (array)', 'Replace', 'Base `migrations: [{ tag: "v1", new_classes: ["Room"] }]` + overlay `migrations: [{ tag: "v2", new_classes: ["Room", "User"] }]` resolves to **only** the v2 entry. To preserve history, restate the prior migrations in the overlay.'],
-						['`triggers.crons` (array under nested object)', 'Replace at the array level (the parent `triggers` object is still deep-merged)', 'Base `triggers: { crons: ["*/5 * * * *"] }` + overlay `triggers: { crons: ["0 * * * *"] }` resolves to `triggers.crons = ["0 * * * *"]`. Other keys on `triggers` deep-merge as usual.'],
-						['`bindings` (object)', 'Deep-merge', 'Adding `bindings.kv.NEW_NS` in an overlay extends the base `bindings.kv` map; existing namespaces survive unless the overlay names the same key.'],
-						['`name`, `compatibility_date` (primitive)', 'Replace', 'The overlay value wins when present; otherwise the base value stays.']
+						[
+							'`routes` (array)',
+							'Replace',
+							'Base `routes: [{ pattern: "app.example.com/*", zone_name: "example.com" }]` + overlay `routes: [{ pattern: "preview.example.com/*", zone_name: "example.com" }]` resolves to **only** the preview entry.'
+						],
+						[
+							'`migrations` (array)',
+							'Replace',
+							'Base `migrations: [{ tag: "v1", new_classes: ["Room"] }]` + overlay `migrations: [{ tag: "v2", new_classes: ["Room", "User"] }]` resolves to **only** the v2 entry. To preserve history, restate the prior migrations in the overlay.'
+						],
+						[
+							'`triggers.crons` (array under nested object)',
+							'Replace at the array level (the parent `triggers` object is still deep-merged)',
+							'Base `triggers: { crons: ["*/5 * * * *"] }` + overlay `triggers: { crons: ["0 * * * *"] }` resolves to `triggers.crons = ["0 * * * *"]`. Other keys on `triggers` deep-merge as usual.'
+						],
+						[
+							'`bindings` (object)',
+							'Deep-merge',
+							'Adding `bindings.kv.NEW_NS` in an overlay extends the base `bindings.kv` map; existing namespaces survive unless the overlay names the same key.'
+						],
+						[
+							'`name`, `compatibility_date` (primitive)',
+							'Replace',
+							'The overlay value wins when present; otherwise the base value stays.'
+						]
 					]
 				},
 				callouts: [
@@ -680,7 +799,8 @@ export const configurationDocs: DocPage[] = [
 			},
 			{
 				id: 'when-to-pick-env',
-				title: 'Choose the environment where it matters, and let explicit deploy targets do the rest',
+				title:
+					'Choose the environment where it matters, and let explicit deploy targets do the rest',
 				steps: [
 					'Use commands like `devflare config --env <name>` or `devflare build --env <name>` when you want to inspect or compile one named environment intentionally.',
 					'Let explicit preview deploys target the preview environment instead of also layering on an unrelated `--env` decision.',
@@ -738,9 +858,19 @@ export const configurationDocs: DocPage[] = [
 		],
 		facts: [
 			{ label: 'Authoring primitive', value: '`preview.scope()` from `devflare/config`' },
-			{ label: 'Typical result', value: '`notes-cache-kv` → `notes-cache-kv-next` for a `next` preview scope' },
-			{ label: 'Main lifecycle command', value: '`bunx --bun devflare previews cleanup --scope <name> --apply`' },
-			{ label: 'Best for', value: 'Previews that need their own disposable state instead of borrowing production infrastructure' }
+			{
+				label: 'Typical result',
+				value: '`notes-cache-kv` → `notes-cache-kv-next` for a `next` preview scope'
+			},
+			{
+				label: 'Main lifecycle command',
+				value: '`bunx --bun devflare previews cleanup --scope <name> --apply`'
+			},
+			{
+				label: 'Best for',
+				value:
+					'Previews that need their own disposable state instead of borrowing production infrastructure'
+			}
 		],
 		sourcePages: [
 			'README.md',
@@ -754,7 +884,8 @@ export const configurationDocs: DocPage[] = [
 		sections: [
 			{
 				id: 'mark-preview-owned-bindings',
-				title: 'Mark preview-owned bindings in config instead of mutating production names at deploy time',
+				title:
+					'Mark preview-owned bindings in config instead of mutating production names at deploy time',
 				paragraphs: [
 					'The point of preview-scoped bindings is not to make names look fancy. It is to keep preview infrastructure isolated from production infrastructure while still authoring one readable config.',
 					'`preview.scope()` returns an opaque marker around the base resource name. Devflare later materializes that marker into a real name for the active preview identifier, which means the authored config can stay stable while preview deploys resolve to preview-owned databases, buckets, queues, and other resources.'
@@ -784,13 +915,43 @@ export const configurationDocs: DocPage[] = [
 					'The identifier order is deliberate: an explicit identifier wins first, then `DEVFLARE_PREVIEW_IDENTIFIER`, then PR or branch-derived env values, and only then the synthetic `preview` fallback for generic preview environments.'
 				],
 				table: {
-					headers: ['Authored binding target', 'When it resolves', 'Resolved name', 'What that means'],
+					headers: [
+						'Authored binding target',
+						'When it resolves',
+						'Resolved name',
+						'What that means'
+					],
 					rows: [
-						['`pv(\'notes-cache-kv\')`', 'Local work or non-preview resolution', '`notes-cache-kv`', 'The base config stays readable and does not invent preview names unless a preview identifier is actually in play.'],
-						['`pv(\'notes-cache-kv\')`', 'Plain `--preview` or generic preview environment', '`notes-cache-kv-preview`', 'The synthetic `preview` identifier keeps same-worker preview uploads separate from the base resource name.'],
-						['`pv(\'notes-cache-kv\')`', 'Named preview like `--preview next` or `--scope next`', '`notes-cache-kv-next`', 'A named preview scope gets its own clearly-associated resource names and cleanup target.'],
-						['`pv(\'notes-cache-kv\')`', '`DEVFLARE_PREVIEW_BRANCH=Feature/TeSt-Branch`', '`notes-cache-kv-feature-test-branch`', 'Branch-derived identifiers are sanitized into safe resource-name fragments.'],
-						['`preview.scope({ separator: \'--\' })`', 'Custom separator plus preview identifier', '`notes-cache-kv--next`', 'You can change the separator when the resource naming convention needs it.']
+						[
+							"`pv('notes-cache-kv')`",
+							'Local work or non-preview resolution',
+							'`notes-cache-kv`',
+							'The base config stays readable and does not invent preview names unless a preview identifier is actually in play.'
+						],
+						[
+							"`pv('notes-cache-kv')`",
+							'Plain `--preview` or generic preview environment',
+							'`notes-cache-kv-preview`',
+							'The synthetic `preview` identifier keeps same-worker preview uploads separate from the base resource name.'
+						],
+						[
+							"`pv('notes-cache-kv')`",
+							'Named preview like `--preview next` or `--scope next`',
+							'`notes-cache-kv-next`',
+							'A named preview scope gets its own clearly-associated resource names and cleanup target.'
+						],
+						[
+							"`pv('notes-cache-kv')`",
+							'`DEVFLARE_PREVIEW_BRANCH=Feature/TeSt-Branch`',
+							'`notes-cache-kv-feature-test-branch`',
+							'Branch-derived identifiers are sanitized into safe resource-name fragments.'
+						],
+						[
+							"`preview.scope({ separator: '--' })`",
+							'Custom separator plus preview identifier',
+							'`notes-cache-kv--next`',
+							'You can change the separator when the resource naming convention needs it.'
+						]
 					]
 				},
 				bullets: [
@@ -805,12 +966,36 @@ export const configurationDocs: DocPage[] = [
 				table: {
 					headers: ['Binding lane', 'Preview naming story', 'Lifecycle behavior'],
 					rows: [
-						['KV, D1, and R2', 'Author the resource name with `preview.scope()`.', 'Preview deploys can create or reuse the scoped resource, and cleanup can delete it later by the same scope.'],
-						['Queues and DLQs', 'Producer, consumer, and dead-letter queue names can all be scoped.', 'Preview deploys can provision the queue resources and cleanup can remove them together.'],
-						['Vectorize', 'Index names can be preview-scoped too.', 'Devflare can provision the preview index shape from the base index metadata and delete it during cleanup later.'],
-						['Hyperdrive', 'Names can be materialized for preview scopes.', 'Devflare does not auto-clone stored credentials, so it warns and can fall back to the base Hyperdrive binding when the preview config does not already exist.'],
-						['Analytics Engine and Browser Rendering', 'Dataset or binding names can be materialized.', 'Devflare reports warnings instead of provisioning or deleting account resources because those families do not follow the same managed lifecycle.'],
-						['Service bindings, Durable Objects, and routes on dedicated preview workers', 'Isolation follows preview worker names and ownership more than account resource naming.', 'Deleting dedicated preview worker scripts also removes preview-only service bindings, Durable Object bindings, and routes attached only to those workers.']
+						[
+							'KV, D1, and R2',
+							'Author the resource name with `preview.scope()`.',
+							'Preview deploys can create or reuse the scoped resource, and cleanup can delete it later by the same scope.'
+						],
+						[
+							'Queues and DLQs',
+							'Producer, consumer, and dead-letter queue names can all be scoped.',
+							'Preview deploys can provision the queue resources and cleanup can remove them together.'
+						],
+						[
+							'Vectorize',
+							'Index names can be preview-scoped too.',
+							'Devflare can provision the preview index shape from the base index metadata and delete it during cleanup later.'
+						],
+						[
+							'Hyperdrive',
+							'Names can be materialized for preview scopes.',
+							'Devflare does not auto-clone stored credentials, so it warns and can fall back to the base Hyperdrive binding when the preview config does not already exist.'
+						],
+						[
+							'Analytics Engine and Browser Rendering',
+							'Dataset or binding names can be materialized.',
+							'Devflare reports warnings instead of provisioning or deleting account resources because those families do not follow the same managed lifecycle.'
+						],
+						[
+							'Service bindings, Durable Objects, and routes on dedicated preview workers',
+							'Isolation follows preview worker names and ownership more than account resource naming.',
+							'Deleting dedicated preview worker scripts also removes preview-only service bindings, Durable Object bindings, and routes attached only to those workers.'
+						]
 					]
 				},
 				callouts: [
@@ -872,7 +1057,8 @@ export const configurationDocs: DocPage[] = [
 		navTitle: 'Worker surfaces',
 		readTime: '6 min read',
 		eyebrow: 'Configuration',
-		title: 'Treat fetch, queue, scheduled, and email handlers as separate Worker surfaces with their own files',
+		title:
+			'Treat fetch, queue, scheduled, and email handlers as separate Worker surfaces with their own files',
 		summary:
 			'Devflare can compose or wrap several Worker surfaces into one generated entrypoint, but the authored source of truth should stay in explicit files such as `src/fetch.ts`, `src/queue.ts`, `src/scheduled.ts`, and `src/email.ts`.',
 		description:
@@ -885,8 +1071,15 @@ export const configurationDocs: DocPage[] = [
 		],
 		facts: [
 			{ label: 'Best for', value: 'Packages that own both HTTP and background event surfaces' },
-			{ label: 'Default files', value: '`src/fetch.ts`, `src/queue.ts`, `src/scheduled.ts`, `src/email.ts`' },
-			{ label: 'Generated output', value: '`.devflare/worker-entrypoints/main.ts` when Devflare needs to wrap or compose the worker surfaces it discovered' },
+			{
+				label: 'Default files',
+				value: '`src/fetch.ts`, `src/queue.ts`, `src/scheduled.ts`, `src/email.ts`'
+			},
+			{
+				label: 'Generated output',
+				value:
+					'`.devflare/worker-entrypoints/main.ts` when Devflare needs to wrap or compose the worker surfaces it discovered'
+			},
 			{ label: 'Test helpers', value: '`cf.worker`, `cf.queue`, `cf.scheduled`, and `cf.email`' }
 		],
 		sourcePages: [
@@ -895,7 +1088,7 @@ export const configurationDocs: DocPage[] = [
 			'src/dev-server/worker-surface-paths.ts',
 			'src/dev-server/worker-source-watcher.ts',
 			'src/cli/help-pages/pages/core.ts',
-			'verification-testing-and-caveats.md'
+			'packages/devflare/src/test/simple-context.ts'
 		],
 		sections: [
 			{
@@ -908,10 +1101,30 @@ export const configurationDocs: DocPage[] = [
 				table: {
 					headers: ['Surface', 'Conventional file', 'Use it when', 'Helper'],
 					rows: [
-						['Fetch', '`src/fetch.ts` or `src/routes/**`', 'HTTP requests belong to one main handler or route tree.', '`cf.worker.get()` / `cf.worker.fetch()`'],
-						['Queue consumer', '`src/queue.ts`', 'The package owns deferred, batched, or retryable queue work.', '`cf.queue.trigger()`'],
-						['Scheduled handler', '`src/scheduled.ts` plus `triggers.crons`', 'Time-based jobs should run from config-owned schedules.', '`cf.scheduled.trigger()`'],
-						['Email handler', '`src/email.ts`', 'The Worker handles inbound email or local email-handler flows.', '`cf.email.send()`']
+						[
+							'Fetch',
+							'`src/fetch.ts` or `src/routes/**`',
+							'HTTP requests belong to one main handler or route tree.',
+							'`cf.worker.get()` / `cf.worker.fetch()`'
+						],
+						[
+							'Queue consumer',
+							'`src/queue.ts`',
+							'The package owns deferred, batched, or retryable queue work.',
+							'`cf.queue.trigger()`'
+						],
+						[
+							'Scheduled handler',
+							'`src/scheduled.ts` plus `triggers.crons`',
+							'Time-based jobs should run from config-owned schedules.',
+							'`cf.scheduled.trigger()`'
+						],
+						[
+							'Email handler',
+							'`src/email.ts`',
+							'The Worker handles inbound email or local email-handler flows.',
+							'`cf.email.send()`'
+						]
 					]
 				}
 			},
@@ -981,10 +1194,26 @@ export const configurationDocs: DocPage[] = [
 				table: {
 					headers: ['Config key', 'What it points at', 'Why it is different'],
 					rows: [
-						['`files.durableObjects`', 'Durable Object class files or globs', 'These classes are discovered and wrapped; they are not a standalone top-level event surface like fetch or queue.'],
-						['`files.entrypoints`', 'Named entrypoint files or globs', 'These support typed cross-worker references and discovery, not a separate Cloudflare event hook.'],
-						['`files.workflows`', 'Workflow definition files or globs', 'These are additional discovered modules, not a direct replacement for fetch, queue, scheduled, or email handlers.'],
-						['`files.transport`', 'One custom transport file', 'This is a serialization hook for bridge-backed calls, not an event handler that Cloudflare dispatches directly.']
+						[
+							'`files.durableObjects`',
+							'Durable Object class files or globs',
+							'These classes are discovered and wrapped; they are not a standalone top-level event surface like fetch or queue.'
+						],
+						[
+							'`files.entrypoints`',
+							'Named entrypoint files or globs',
+							'These support typed cross-worker references and discovery, not a separate Cloudflare event hook.'
+						],
+						[
+							'`files.workflows`',
+							'Workflow definition files or globs',
+							'These are additional discovered modules, not a direct replacement for fetch, queue, scheduled, or email handlers.'
+						],
+						[
+							'`files.transport`',
+							'One custom transport file',
+							'This is a serialization hook for bridge-backed calls, not an event handler that Cloudflare dispatches directly.'
+						]
 					]
 				},
 				cards: [
@@ -1016,7 +1245,8 @@ export const configurationDocs: DocPage[] = [
 		navTitle: 'Generated types',
 		readTime: '6 min read',
 		eyebrow: 'Configuration',
-		title: 'Use `devflare types` to keep `env.d.ts` and `Entrypoints` aligned with the project you actually authored',
+		title:
+			'Use `devflare types` to keep `env.d.ts` and `Entrypoints` aligned with the project you actually authored',
 		summary:
 			'`devflare types` turns config, discovered Durable Objects, named entrypoints, and cross-worker references into one generated TypeScript contract instead of a pile of hand-maintained env guesswork.',
 		description:
@@ -1028,10 +1258,21 @@ export const configurationDocs: DocPage[] = [
 			'When Devflare cannot derive a concrete service interface, it falls back to `Fetcher` instead of pretending it knows more than it does.'
 		],
 		facts: [
-			{ label: 'Best for', value: 'Packages that use bindings, Durable Objects, service bindings, or named worker entrypoints' },
+			{
+				label: 'Best for',
+				value:
+					'Packages that use bindings, Durable Objects, service bindings, or named worker entrypoints'
+			},
 			{ label: 'Main command', value: '`bunx --bun devflare types`' },
-			{ label: 'Default output', value: '`env.d.ts` relative to the directory you run the command from unless you override it' },
-			{ label: 'Best pairing', value: '`defineConfig<import(\'./env\').Entrypoints>()` on the referenced worker config' }
+			{
+				label: 'Default output',
+				value:
+					'`env.d.ts` relative to the directory you run the command from unless you override it'
+			},
+			{
+				label: 'Best pairing',
+				value: "`defineConfig<import('./env').Entrypoints>()` on the referenced worker config"
+			}
 		],
 		sourcePages: [
 			'README.md',
@@ -1055,6 +1296,7 @@ export const configurationDocs: DocPage[] = [
 				snippets: [
 					{
 						title: 'A generated file should read like output, not a second config file',
+						filename: 'env.d.ts',
 						language: 'ts',
 						code: generatedTypesOutputCode
 					},
@@ -1081,11 +1323,31 @@ bunx --bun devflare types --output env.generated.d.ts`
 				table: {
 					headers: ['Input Devflare reads', 'Where it comes from', 'Typed result'],
 					rows: [
-						['`bindings`, `vars`, and `secrets`', 'The resolved top-level `devflare.config.*` from the current working directory or explicit `--config` path.', 'Members on global `DevflareEnv`.'],
-						['Local Durable Object classes', '`files.durableObjects` or the default `**/do.*.{ts,js}` discovery pattern.', '`DurableObjectNamespace<...>` when the class can be located accurately.'],
-						['Named worker entrypoints', '`files.entrypoints` or the default `**/ep.*.{ts,js}` discovery pattern plus exported classes extending `WorkerEntrypoint`.', 'An exported `Entrypoints` union for `defineConfig<Entrypoints>()`.'],
-						['`ref()` references', 'Imported Devflare configs in other packages or subfolders.', 'Typed service bindings and cross-worker Durable Object namespaces when Devflare can resolve them.'],
-						['Unknown or unresolvable service surface', 'A target worker or entrypoint that cannot be turned into a stable interface.', '`Fetcher` fallback instead of fake precision.']
+						[
+							'`bindings`, `vars`, and `secrets`',
+							'The resolved top-level `devflare.config.*` from the current working directory or explicit `--config` path.',
+							'Members on global `DevflareEnv`.'
+						],
+						[
+							'Local Durable Object classes',
+							'`files.durableObjects` or the default `**/do.*.{ts,js}` discovery pattern.',
+							'`DurableObjectNamespace<...>` when the class can be located accurately.'
+						],
+						[
+							'Named worker entrypoints',
+							'`files.entrypoints` or the default `**/ep.*.{ts,js}` discovery pattern plus exported classes extending `WorkerEntrypoint`.',
+							'An exported `Entrypoints` union for `defineConfig<Entrypoints>()`.'
+						],
+						[
+							'`ref()` references',
+							'Imported Devflare configs in other packages or subfolders.',
+							'Typed service bindings and cross-worker Durable Object namespaces when Devflare can resolve them.'
+						],
+						[
+							'Unknown or unresolvable service surface',
+							'A target worker or entrypoint that cannot be turned into a stable interface.',
+							'`Fetcher` fallback instead of fake precision.'
+						]
 					]
 				},
 				bullets: [
@@ -1109,8 +1371,8 @@ bunx --bun devflare types --output env.generated.d.ts`
 				id: 'typed-entrypoints',
 				title: 'Type the worker that owns the entrypoints, then let `ref()` carry that knowledge',
 				paragraphs: [
-					'The `Entrypoints` union matters most on the worker being referenced. Import that generated type into the worker\'s own config and pass it to `defineConfig<Entrypoints>()`, then callers that use `ref(() => import(...))` can ask for named entrypoints without turning those names into loose string conventions.',
-					'That keeps the typing relationship honest: the worker that owns `ep.*.ts` files declares which entrypoints exist, and the worker that consumes them gets autocomplete and checking through `ref().worker(\'...\')` later.'
+					"The `Entrypoints` union matters most on the worker being referenced. Import that generated type into the worker's own config and pass it to `defineConfig<Entrypoints>()`, then callers that use `ref(() => import(...))` can ask for named entrypoints without turning those names into loose string conventions.",
+					"That keeps the typing relationship honest: the worker that owns `ep.*.ts` files declares which entrypoints exist, and the worker that consumes them gets autocomplete and checking through `ref().worker('...')` later."
 				],
 				snippets: [
 					{
@@ -1220,7 +1482,8 @@ export default defineConfig({
 		navTitle: 'Runtime & deploy settings',
 		readTime: '7 min read',
 		eyebrow: 'Configuration',
-		title: 'Keep runtime posture and deployment shape in authored config instead of scattered deploy conventions',
+		title:
+			'Keep runtime posture and deployment shape in authored config instead of scattered deploy conventions',
 		summary:
 			'Use config for account context, compatibility posture, assets, deployment routes, WebSocket proxy rules, migrations, observability, limits, and preview cron behavior instead of rediscovering those settings in scripts later.',
 		description:
@@ -1232,9 +1495,17 @@ export default defineConfig({
 			'`limits`, `observability`, `migrations`, and `previews.includeCrons` are source-controlled runtime and release knobs; in practice `previews.includeCrons` decides whether branch-scoped preview deploys keep cron triggers.'
 		],
 		facts: [
-			{ label: 'Best for', value: 'Projects that need explicit runtime posture and delivery shape beyond the basic file surfaces' },
+			{
+				label: 'Best for',
+				value:
+					'Projects that need explicit runtime posture and delivery shape beyond the basic file surfaces'
+			},
 			{ label: 'Forced compatibility flags', value: '`nodejs_compat` and `nodejs_als`' },
-			{ label: 'Routing split', value: '`files.routes` is app routing, while top-level `routes` is Cloudflare deployment routing' },
+			{
+				label: 'Routing split',
+				value:
+					'`files.routes` is app routing, while top-level `routes` is Cloudflare deployment routing'
+			},
 			{ label: 'Preview cron default', value: '`previews.includeCrons` defaults to `false`' }
 		],
 		sourcePages: [
@@ -1255,9 +1526,21 @@ export default defineConfig({
 				table: {
 					headers: ['Key', 'Use it when', 'Important behavior'],
 					rows: [
-						['`accountId`', 'Remote bindings, name-based resource lookup, or account-aware commands should target one Cloudflare account explicitly.', 'Remote AI and Vectorize flows need a clear account, and config-level `accountId` becomes one resolution lane for account-aware operations and config-driven resource resolution.'],
-						['`compatibilityDate`', 'The package should pin runtime behavior instead of inheriting date drift.', 'Devflare defaults it to the current date when you omit it, so explicit pinning is the safer choice once the package is real.'],
-						['`compatibilityFlags`', 'You need extra Workers compatibility flags beyond the default posture.', 'Devflare always includes `nodejs_compat` and `nodejs_als`, so custom flags should be deliberate additions instead of copy-by-habit repetition.']
+						[
+							'`accountId`',
+							'Remote bindings, name-based resource lookup, or account-aware commands should target one Cloudflare account explicitly.',
+							'Remote AI and Vectorize flows need a clear account, and config-level `accountId` becomes one resolution lane for account-aware operations and config-driven resource resolution.'
+						],
+						[
+							'`compatibilityDate`',
+							'The package should pin runtime behavior instead of inheriting date drift.',
+							'Devflare defaults it to the current date when you omit it, so explicit pinning is the safer choice once the package is real.'
+						],
+						[
+							'`compatibilityFlags`',
+							'You need extra Workers compatibility flags beyond the default posture.',
+							'Devflare always includes `nodejs_compat` and `nodejs_als`, so custom flags should be deliberate additions instead of copy-by-habit repetition.'
+						]
 					]
 				},
 				callouts: [
@@ -1280,9 +1563,21 @@ export default defineConfig({
 				table: {
 					headers: ['Key', 'What it controls', 'Common use'],
 					rows: [
-						['`assets`', 'Static asset directory plus optional binding name', 'Point Devflare at one static directory and keep asset delivery visible in source.'],
-						['`routes`', 'Cloudflare deployment route patterns', 'Attach the Worker to host or zone patterns at deploy time.'],
-						['`wsRoutes`', 'Dev-mode Durable Object WebSocket proxy patterns', 'Forward development WebSocket paths into Durable Object namespaces explicitly.']
+						[
+							'`assets`',
+							'Static asset directory plus optional binding name',
+							'Point Devflare at one static directory and keep asset delivery visible in source.'
+						],
+						[
+							'`routes`',
+							'Cloudflare deployment route patterns',
+							'Attach the Worker to host or zone patterns at deploy time.'
+						],
+						[
+							'`wsRoutes`',
+							'Dev-mode Durable Object WebSocket proxy patterns',
+							'Forward development WebSocket paths into Durable Object namespaces explicitly.'
+						]
 					]
 				},
 				snippets: [
@@ -1308,10 +1603,22 @@ export default defineConfig({
 				table: {
 					headers: ['Key', 'Why it exists'],
 					rows: [
-						['`previews.includeCrons`', 'Choose whether branch-scoped preview deploys keep cron triggers instead of omitting them to avoid shared-schedule conflicts.'],
-						['`limits.cpu_ms`', 'Declare CPU expectations in config rather than treating them as after-the-fact deploy tuning.'],
-						['`observability.enabled` / `head_sampling_rate`', 'Keep tracing or sampling posture explicit for the environments that need it.'],
-						['`migrations`', 'Track Durable Object class lifecycle in the same source-controlled package that owns those classes.']
+						[
+							'`previews.includeCrons`',
+							'Choose whether branch-scoped preview deploys keep cron triggers instead of omitting them to avoid shared-schedule conflicts.'
+						],
+						[
+							'`limits.cpu_ms`',
+							'Declare CPU expectations in config rather than treating them as after-the-fact deploy tuning.'
+						],
+						[
+							'`observability.enabled` / `head_sampling_rate`',
+							'Keep tracing or sampling posture explicit for the environments that need it.'
+						],
+						[
+							'`migrations`',
+							'Track Durable Object class lifecycle in the same source-controlled package that owns those classes.'
+						]
 					]
 				},
 				paragraphs: [

@@ -7,9 +7,11 @@ const workflowActionRepo = 'Refzlund/devflare/.github/actions'
 const workflowActionRef = 'next'
 
 const workflowLink = (file: string): string => `${workflowRepoBase}/${file}`
-const workflowActionSourceLink = (action: string): string => `${workflowActionSourceBase}/${action}/action.yml`
+const workflowActionSourceLink = (action: string): string =>
+	`${workflowActionSourceBase}/${action}/action.yml`
 const workflowScriptLink = (file: string): string => `${workflowScriptBase}/${file}`
-const workflowActionUse = (action: string): string => `${workflowActionRepo}/${action}@${workflowActionRef}`
+const workflowActionUse = (action: string): string =>
+	`${workflowActionRepo}/${action}@${workflowActionRef}`
 const docsLink = (slug: string): string => `/docs/${slug}`
 
 const setupWorkspaceActionCode = String.raw`- uses: ${workflowActionUse('devflare-setup-workspace')}
@@ -98,9 +100,15 @@ export const shipOperateDocs: DocPage[] = [
 			'`devflare-github-feedback` publishes PR comments and deployment records independently from deploy execution.'
 		],
 		facts: [
-			{ label: 'Best for', value: 'GitHub Actions with validation, preview, production, and cleanup lanes' },
+			{
+				label: 'Best for',
+				value: 'GitHub Actions with validation, preview, production, and cleanup lanes'
+			},
 			{ label: 'Supported actions', value: '4 reusable actions' },
-			{ label: 'Package selector', value: '`working-directory` picks which Devflare config deploys' }
+			{
+				label: 'Package selector',
+				value: '`working-directory` picks which Devflare config deploys'
+			}
 		],
 		sourcePages: [
 			workflowLink('workspace-ci.yml'),
@@ -123,11 +131,31 @@ export const shipOperateDocs: DocPage[] = [
 				table: {
 					headers: ['Layer', 'Owns', 'Should not own'],
 					rows: [
-						['Workflow file', 'Triggers, permissions, concurrency, package selection, and verification order.', 'Deploy argument construction, Bun setup, or PR comment formatting.'],
-						['`devflare-setup-workspace`', 'Bun installation, cache restore, and one shared workspace install.', 'Target selection or any deploy step.'],
-						['`devflare-deploy-impact`', 'Change detection for one deployment target.', 'Cloudflare deploys or GitHub reporting.'],
-						['`devflare-deploy`', 'One explicit production or named preview-scope deploy.', 'PR comment policy or multi-package orchestration.'],
-						['`devflare-github-feedback`', 'PR comments, deployment records, and inactive cleanup updates.', 'Cloudflare deploy execution.']
+						[
+							'Workflow file',
+							'Triggers, permissions, concurrency, package selection, and verification order.',
+							'Deploy argument construction, Bun setup, or PR comment formatting.'
+						],
+						[
+							'`devflare-setup-workspace`',
+							'Bun installation, cache restore, and one shared workspace install.',
+							'Target selection or any deploy step.'
+						],
+						[
+							'`devflare-deploy-impact`',
+							'Change detection for one deployment target.',
+							'Cloudflare deploys or GitHub reporting.'
+						],
+						[
+							'`devflare-deploy`',
+							'One explicit production or named preview-scope deploy.',
+							'PR comment policy or multi-package orchestration.'
+						],
+						[
+							'`devflare-github-feedback`',
+							'PR comments, deployment records, and inactive cleanup updates.',
+							'Cloudflare deploy execution.'
+						]
 					]
 				},
 				bullets: [
@@ -194,12 +222,13 @@ export const shipOperateDocs: DocPage[] = [
 				bullets: [
 					'Best fit: one job that deploys more than one package or deploys and then runs follow-up verification.',
 					'In a monorepo, keep `working-directory: .` so package deploy steps can reuse the root install.',
-					'Later `devflare-deploy` steps should set `skip-setup: \'true\'` and `skip-install: \'true\'` after shared setup already ran.',
+					"Later `devflare-deploy` steps should set `skip-setup: 'true'` and `skip-install: 'true'` after shared setup already ran.",
 					'If you only have one simple deploy step, you can let `devflare-deploy` handle setup itself instead.'
 				],
 				snippets: [
 					{
 						title: 'Prepare the workspace once',
+						filename: '.github/workflows/preview.yml',
 						language: 'yaml',
 						code: setupWorkspaceActionCode
 					}
@@ -224,9 +253,18 @@ export const shipOperateDocs: DocPage[] = [
 				table: {
 					headers: ['Key field', 'Why it matters'],
 					rows: [
-						['`target-package`', 'Selects the workspace package whose changes should trigger a deploy.'],
-						['`extra-paths`', 'Lets shared files outside the package root invalidate that target too.'],
-						['`should-deploy`', 'The boolean gate your workflow should use before any deploy step runs.'],
+						[
+							'`target-package`',
+							'Selects the workspace package whose changes should trigger a deploy.'
+						],
+						[
+							'`extra-paths`',
+							'Lets shared files outside the package root invalidate that target too.'
+						],
+						[
+							'`should-deploy`',
+							'The boolean gate your workflow should use before any deploy step runs.'
+						],
 						['`reason`', 'Short explanation you can surface in summaries, PR comments, and logs.'],
 						['`changed-files`', 'Audit trail for what the comparison actually saw.']
 					]
@@ -240,6 +278,7 @@ export const shipOperateDocs: DocPage[] = [
 				snippets: [
 					{
 						title: 'Gate the deploy before Cloudflare work starts',
+						filename: '.github/workflows/preview.yml',
 						language: 'yaml',
 						code: deployImpactActionCode
 					}
@@ -259,7 +298,7 @@ export const shipOperateDocs: DocPage[] = [
 				title: '`devflare-deploy`',
 				paragraphs: [
 					'Use `devflare-deploy` for the actual Devflare deploy step. It can prepare Bun and dependencies for a standalone job, or it can reuse shared setup from an earlier `devflare-setup-workspace` step.',
-					'The action requires one explicit target. Use `production: \'true\'` for `--prod`, or `preview-scope: <name>` for `--preview <name>`. `working-directory` selects which package-local `devflare.config.ts` and scripts are in play.',
+					"The action requires one explicit target. Use `production: 'true'` for `--prod`, or `preview-scope: <name>` for `--preview <name>`. `working-directory` selects which package-local `devflare.config.ts` and scripts are in play.",
 					'Its outputs are the hand-off point for the rest of the workflow: `preview-url`, `version-id`, `verification-note`, `status`, `failure-stage`, `exit-code`, and `log-excerpt` are all meant for later verification and GitHub feedback.'
 				],
 				table: {
@@ -267,26 +306,40 @@ export const shipOperateDocs: DocPage[] = [
 					rows: [
 						['`working-directory`', 'Selects the package-local Devflare config and scripts.'],
 						['`production`', 'Requests an explicit `--prod` deployment.'],
-						['`preview-scope`', 'Requests an explicit named preview deployment via `--preview <name>`.'],
-						['`verify-deployment`', 'Controls whether the action enforces Cloudflare control-plane verification.'],
-						['`require-fresh-production-deployment`', 'Tightens production verification when a new live deployment must be visible.'],
-						['`preview-url`, `version-id`, `verification-note`, `status`', 'Outputs the rest of the workflow should consume for verification and feedback.']
+						[
+							'`preview-scope`',
+							'Requests an explicit named preview deployment via `--preview <name>`.'
+						],
+						[
+							'`verify-deployment`',
+							'Controls whether the action enforces Cloudflare control-plane verification.'
+						],
+						[
+							'`require-fresh-production-deployment`',
+							'Tightens production verification when a new live deployment must be visible.'
+						],
+						[
+							'`preview-url`, `version-id`, `verification-note`, `status`',
+							'Outputs the rest of the workflow should consume for verification and feedback.'
+						]
 					]
 				},
 				snippets: [
 					{
 						title: 'Named preview deploy',
+						filename: '.github/workflows/preview.yml',
 						language: 'yaml',
 						code: previewDeployActionCode
 					},
 					{
 						title: 'Explicit production deploy',
+						filename: '.github/workflows/production.yml',
 						language: 'yaml',
 						code: productionDeployActionCode
 					}
 				],
 				bullets: [
-					'Production is the supported lane for strict control-plane verification. Leave `verify-deployment` at its default `true`, and enable `require-fresh-production-deployment: \'true\'` when you need a hard failure if Cloudflare keeps the old live deployment.',
+					"Production is the supported lane for strict control-plane verification. Leave `verify-deployment` at its default `true`, and enable `require-fresh-production-deployment: 'true'` when you need a hard failure if Cloudflare keeps the old live deployment.",
 					'Preview workflows in this repository use named preview scopes and then perform app-level verification after the deploy step. That is the supported preview posture here.',
 					'Use `deploy-command` when the package already wraps Devflare behind `bun run deploy --` or another package-local script.',
 					'Use `install-working-directory` to reuse a workspace-root install while still deploying from a package subdirectory.',
@@ -322,9 +375,18 @@ export const shipOperateDocs: DocPage[] = [
 						['`mode`', 'Choose PR comments, GitHub deployments, or both.'],
 						['`operation`', 'Differentiate normal reporting from cleanup or inactive updates.'],
 						['`status`', 'Publish `success`, `failure`, `skipped`, `in_progress`, or `inactive`.'],
-						['`comment-key` and `comment-section-key`', 'Keep one durable PR comment and merge multiple preview sections into it.'],
-						['`environment` and `environment-url`', 'Populate the GitHub Deployments UI with the right environment identity.'],
-						['`log-url` and `log-excerpt`', 'Make failure context readable without digging through raw workflow output.']
+						[
+							'`comment-key` and `comment-section-key`',
+							'Keep one durable PR comment and merge multiple preview sections into it.'
+						],
+						[
+							'`environment` and `environment-url`',
+							'Populate the GitHub Deployments UI with the right environment identity.'
+						],
+						[
+							'`log-url` and `log-excerpt`',
+							'Make failure context readable without digging through raw workflow output.'
+						]
 					]
 				},
 				bullets: [
@@ -336,6 +398,7 @@ export const shipOperateDocs: DocPage[] = [
 				snippets: [
 					{
 						title: 'Publish grouped PR feedback',
+						filename: '.github/workflows/preview.yml',
 						language: 'yaml',
 						code: githubFeedbackCommentCode
 					}
@@ -350,12 +413,42 @@ export const shipOperateDocs: DocPage[] = [
 				table: {
 					headers: ['Strategy', 'Workflow file', 'Verification style', 'GitHub surface'],
 					rows: [
-						['Validation only', '`workspace-ci.yml`', 'Workspace build, typecheck, and test validation.', 'None — this lane does not deploy.'],
-						['Branch preview', '`preview.yml`', 'Target checks plus app-level verification after deploy.', 'GitHub deployment record.'],
-						['Pull request preview', '`preview.yml`', 'Target checks plus app-level verification after deploy.', 'Grouped PR comment.'],
-						['Multi-package preview family', '`preview.yml`', 'Per-package deploys plus family-level verification.', 'GitHub deployment record and grouped PR comment.'],
-						['Production', '`documentation-production.yml`', 'Deploy action control-plane checks plus live URL verification.', 'GitHub deployment record.'],
-						['Cleanup', '`preview.yml`', 'Successful cleanup command plus inactive feedback update.', 'Inactive deployment or PR comment section.']
+						[
+							'Validation only',
+							'`workspace-ci.yml`',
+							'Workspace build, typecheck, and test validation.',
+							'None — this lane does not deploy.'
+						],
+						[
+							'Branch preview',
+							'`preview.yml`',
+							'Target checks plus app-level verification after deploy.',
+							'GitHub deployment record.'
+						],
+						[
+							'Pull request preview',
+							'`preview.yml`',
+							'Target checks plus app-level verification after deploy.',
+							'Grouped PR comment.'
+						],
+						[
+							'Multi-package preview family',
+							'`preview.yml`',
+							'Per-package deploys plus family-level verification.',
+							'GitHub deployment record and grouped PR comment.'
+						],
+						[
+							'Production',
+							'`documentation-production.yml`',
+							'Deploy action control-plane checks plus live URL verification.',
+							'GitHub deployment record.'
+						],
+						[
+							'Cleanup',
+							'`preview.yml`',
+							'Successful cleanup command plus inactive feedback update.',
+							'Inactive deployment or PR comment section.'
+						]
 					]
 				},
 				cards: [
@@ -481,7 +574,7 @@ export const shipOperateDocs: DocPage[] = [
 				],
 				bullets: [
 					'Run on default-branch pushes or manual dispatch.',
-					'Use `production: \'true\'` instead of inferring production from branch names inside shell logic.',
+					"Use `production: 'true'` instead of inferring production from branch names inside shell logic.",
 					'Keep `verify-deployment` enabled for production.',
 					'Use the deploy output URL or the stable production URL for a live content check like `/build.json`.',
 					'Publish the final environment URL and version ID back to GitHub.'
@@ -520,9 +613,7 @@ export const shipOperateDocs: DocPage[] = [
 					{
 						tone: 'accent',
 						title: 'Cleanup is part of the contract',
-						body: [
-							'A preview strategy that never documents cleanup is just deferred archaeology.'
-						]
+						body: ['A preview strategy that never documents cleanup is just deferred archaeology.']
 					}
 				]
 			}
@@ -547,10 +638,13 @@ export const shipOperateDocs: DocPage[] = [
 		],
 		facts: [
 			{ label: 'Best for', value: 'Production deploys and preflight checks' },
-			{ label: 'Required target', value: '`--prod`, `--production`, `--preview`, or `--preview <name>`' },
+			{
+				label: 'Required target',
+				value: '`--prod`, `--production`, `--preview`, or `--preview <name>`'
+			},
 			{ label: 'Best debug habit', value: 'Inspect compiled output before deploying' }
 		],
-		sourcePages: ['deploy-preview-cli.md', 'README.md'],
+		sourcePages: ['packages/devflare/src/cli/commands/deploy.ts', 'README.md'],
 		sections: [
 			{
 				id: 'command-shape',
@@ -642,7 +736,11 @@ bunx --bun devflare deploy --production --message "Release 1" --tag release-1`
 			{ label: 'Turbo role', value: 'Validation, caching, filters, orchestration' },
 			{ label: 'Deploy rule', value: 'Run `devflare` from the package that owns the config' }
 		],
-		sourcePages: ['README.md', 'deploy-preview-cli.md', 'verification-testing-and-caveats.md'],
+		sourcePages: [
+			'README.md',
+			'packages/devflare/src/cli/commands/deploy.ts',
+			'packages/devflare/src/test/simple-context.ts'
+		],
 		sections: [
 			{
 				id: 'workspace-shape',
@@ -664,9 +762,18 @@ bunx --bun devflare deploy --production --message "Release 1" --tag release-1`
 				table: {
 					headers: ['Layer', 'Owns'],
 					rows: [
-						['Turborepo', 'Task graph, caching, filters, workspace validation lanes, and targeted build/check/test/type flows.'],
-						['Devflare', 'Config resolution, type generation, worker bundling, preview deploys, production deploys, and preview lifecycle commands.'],
-						['GitHub Actions', 'Triggers, permissions, branch/PR policy, feedback, and the working directory that selects the target package.']
+						[
+							'Turborepo',
+							'Task graph, caching, filters, workspace validation lanes, and targeted build/check/test/type flows.'
+						],
+						[
+							'Devflare',
+							'Config resolution, type generation, worker bundling, preview deploys, production deploys, and preview lifecycle commands.'
+						],
+						[
+							'GitHub Actions',
+							'Triggers, permissions, branch/PR policy, feedback, and the working directory that selects the target package.'
+						]
 					]
 				},
 				callouts: [
@@ -789,7 +896,7 @@ bunx --bun devflare previews cleanup --scope pr-123 --apply`
 			{ label: 'Same-worker mode', value: 'Plain `--preview`' },
 			{ label: 'Named scope mode', value: '`--preview <name>`' }
 		],
-		sourcePages: ['deploy-preview-cli.md', 'README.md'],
+		sourcePages: ['packages/devflare/src/cli/commands/deploy.ts', 'README.md'],
 		sections: [
 			{
 				id: 'choose-model',
@@ -797,9 +904,18 @@ bunx --bun devflare previews cleanup --scope pr-123 --apply`
 				table: {
 					headers: ['Preview style', 'Use it when'],
 					rows: [
-						['Plain `--preview`', 'You want a same-worker preview upload and the synthetic `preview` identifier is enough for any `preview.scope()` resource names.'],
-						['Named `--preview <name>`', 'You need an explicit preview identifier for resource names or branch-scoped preview workers.'],
-						['Branch-scoped worker family', 'The app is Durable Object-heavy or otherwise needs stronger isolation than same-worker preview uploads can provide.']
+						[
+							'Plain `--preview`',
+							'You want a same-worker preview upload and the synthetic `preview` identifier is enough for any `preview.scope()` resource names.'
+						],
+						[
+							'Named `--preview <name>`',
+							'You need an explicit preview identifier for resource names or branch-scoped preview workers.'
+						],
+						[
+							'Branch-scoped worker family',
+							'The app is Durable Object-heavy or otherwise needs stronger isolation than same-worker preview uploads can provide.'
+						]
 					]
 				},
 				paragraphs: [
@@ -879,9 +995,12 @@ export default defineConfig({
 		facts: [
 			{ label: 'Best for', value: 'Preview lifecycle management' },
 			{ label: 'Registry backing', value: 'D1 (`devflare-registry` by default)' },
-			{ label: 'Cleanup warning', value: 'Dedicated preview workers may own more than just the script' }
+			{
+				label: 'Cleanup warning',
+				value: 'Dedicated preview workers may own more than just the script'
+			}
 		],
-		sourcePages: ['deploy-preview-cli.md', 'README.md'],
+		sourcePages: ['packages/devflare/src/cli/commands/deploy.ts', 'README.md'],
 		sections: [
 			{
 				id: 'registry-role',
@@ -962,7 +1081,7 @@ bunx --bun devflare previews cleanup --all --apply`
 			{ label: 'Important nuance', value: '`cf.worker.fetch()` is not a full `waitUntil()` drain' },
 			{ label: 'Workflow companion', value: '`/docs/github-workflows`' }
 		],
-		sourcePages: ['verification-testing-and-caveats.md', 'README.md'],
+		sourcePages: ['packages/devflare/src/test/simple-context.ts', 'README.md'],
 		sections: [
 			{
 				id: 'ownership',
@@ -1014,9 +1133,21 @@ bunx --bun devflare previews cleanup --all --apply`
 				table: {
 					headers: ['When the check depends on...', 'Prefer', 'Why'],
 					rows: [
-						['`waitUntil()` side effects from an HTTP handler', 'Assert the side effect directly or move to a higher-fidelity check.', '`cf.worker.fetch()` returns when the handler resolves, not when every background task drains.'],
-						['Queue, scheduled, or tail background work', '`cf.queue.trigger()`, `cf.scheduled.trigger()`, or `cf.tail.trigger()`', 'Those helpers wait for their background work before they return, so they are a better fit for async side-effect assertions.'],
-						['Binding-specific or transport-specific behavior', 'The binding guide or `create-test-context` page first', 'Different bindings and bridge-backed values have different honest harness rules, and the local testing pages already own those details.']
+						[
+							'`waitUntil()` side effects from an HTTP handler',
+							'Assert the side effect directly or move to a higher-fidelity check.',
+							'`cf.worker.fetch()` returns when the handler resolves, not when every background task drains.'
+						],
+						[
+							'Queue, scheduled, or tail background work',
+							'`cf.queue.trigger()`, `cf.scheduled.trigger()`, or `cf.tail.trigger()`',
+							'Those helpers wait for their background work before they return, so they are a better fit for async side-effect assertions.'
+						],
+						[
+							'Binding-specific or transport-specific behavior',
+							'The binding guide or `create-test-context` page first',
+							'Different bindings and bridge-backed values have different honest harness rules, and the local testing pages already own those details.'
+						]
 					]
 				},
 				callouts: [
@@ -1077,6 +1208,7 @@ bunx --bun devflare previews cleanup --all --apply`
 				snippets: [
 					{
 						title: 'Thin preview deploy step',
+						filename: '.github/workflows/preview.yml',
 						language: 'yaml',
 						code: thinPreviewDeployStepCode
 					}

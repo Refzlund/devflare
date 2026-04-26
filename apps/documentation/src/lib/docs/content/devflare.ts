@@ -1,5 +1,5 @@
-﻿import { bindingTestingGuides } from './bindings'
-import type { DocCodeTreeEntry, DocPage } from '../types'
+﻿import type { DocCodeTreeEntry, DocPage } from '../types'
+import { bindingTestingGuides } from './bindings'
 
 const docsLink = (slug: string): string => `/docs/${slug}`
 
@@ -66,8 +66,7 @@ export class Counter {
 }`
 
 const testingFeelsNativeTestCode = String.raw`import { afterAll, beforeAll, expect, test } from 'bun:test'
-import { createTestContext } from 'devflare/test'
-import { env } from 'devflare'
+import { createTestContext, env } from 'devflare/test'
 import { DoubleableNumber } from '../src/DoubleableNumber'
 
 beforeAll(() => createTestContext())
@@ -388,7 +387,8 @@ export const devflareDocs: DocPage[] = [
 		navTitle: 'Project Architecture',
 		readTime: '9 min read',
 		eyebrow: 'Project setup',
-		title: 'Structure Devflare projects around one authored config, explicit runtime files, and package-local deploy ownership',
+		title:
+			'Structure Devflare projects around one authored config, explicit runtime files, and package-local deploy ownership',
 		summary:
 			'This is the practical answer to “what does a real Devflare project look like on disk?” — from a small worker package, to a multi-surface app, to a hosted SvelteKit package, to a Bun monorepo with several deployable workers.',
 		description:
@@ -401,10 +401,17 @@ export const devflareDocs: DocPage[] = [
 			'In a monorepo, Turbo can orchestrate validation across the workspace, but package-local `devflare` commands still decide what actually builds or deploys.'
 		],
 		facts: [
-			{ label: 'Best for', value: 'Teams deciding how to lay out a new Devflare package or a multi-package workspace before file structure gets noisy' },
+			{
+				label: 'Best for',
+				value:
+					'Teams deciding how to lay out a new Devflare package or a multi-package workspace before file structure gets noisy'
+			},
 			{ label: 'Primary authored file', value: '`devflare.config.ts` in each deployable package' },
 			{ label: 'Generated files', value: '`env.d.ts`, `.devflare/**`, and `.wrangler/deploy/**`' },
-			{ label: 'Monorepo rule', value: 'Validate from the root, but deploy from the package that owns the config' }
+			{
+				label: 'Monorepo rule',
+				value: 'Validate from the root, but deploy from the package that owns the config'
+			}
 		],
 		sourcePages: [
 			'README.md',
@@ -433,18 +440,66 @@ export const devflareDocs: DocPage[] = [
 				table: {
 					headers: ['Path or pattern', 'Own it when', 'What it means'],
 					rows: [
-						['`devflare.config.ts`', 'Every deployable package', 'The authored Devflare source of truth for files, bindings, env overlays, previews, and deployment posture.'],
-						['`package.json`', 'Every package', 'Package-local scripts, dependencies, and the command loop that should run from that package.'],
-						['`src/fetch.ts`', 'The package owns request-wide HTTP behavior', 'The main worker entry for broad middleware or request handling.'],
-						['`src/routes/**`', 'The package uses file-based HTTP leaves', 'URL-specific route handlers that sit beside, or replace, one large fetch file.'],
-						['`src/queue.ts`, `src/scheduled.ts`, `src/email.ts`', 'The package consumes those platform events', 'Separate event surfaces instead of burying background logic inside fetch code.'],
-						['`src/do/**/*.ts`', 'The package owns Durable Object classes', 'Stateful classes discovered and bundled through config.'],
-						['`src/ep/**/*.ts`', 'The package exposes named worker entrypoints', 'Classes discovered for typed `ref().worker(...)` service boundaries.'],
-						['`src/workflows/**/*.ts`', 'The package owns workflow definitions', 'Additional discovered runtime modules that stay explicit in config review.'],
-						['`src/transport.ts`', 'Local RPC-style bridge calls must preserve custom values', 'Custom encode/decode rules for local bridge-backed calls, most often in tests or Durable Object method round-trips.'],
-						['`env.d.ts`', 'You run `devflare types`', 'Generated binding and entrypoint types. Do not hand-edit it.'],
-						['`vite.config.ts`, `svelte.config.js`, `src/routes/+page.svelte`', 'The package is a hosted Vite or SvelteKit app', 'Host-app files that sit around the Devflare worker story instead of replacing it.'],
-						['`.devflare/**`, `.wrangler/deploy/**`', 'Devflare has built, checked, or prepared deploy output', 'Generated build and deploy artifacts. Useful to inspect, not the authored architecture.']
+						[
+							'`devflare.config.ts`',
+							'Every deployable package',
+							'The authored Devflare source of truth for files, bindings, env overlays, previews, and deployment posture.'
+						],
+						[
+							'`package.json`',
+							'Every package',
+							'Package-local scripts, dependencies, and the command loop that should run from that package.'
+						],
+						[
+							'`src/fetch.ts`',
+							'The package owns request-wide HTTP behavior',
+							'The main worker entry for broad middleware or request handling.'
+						],
+						[
+							'`src/routes/**`',
+							'The package uses file-based HTTP leaves',
+							'URL-specific route handlers that sit beside, or replace, one large fetch file.'
+						],
+						[
+							'`src/queue.ts`, `src/scheduled.ts`, `src/email.ts`',
+							'The package consumes those platform events',
+							'Separate event surfaces instead of burying background logic inside fetch code.'
+						],
+						[
+							'`src/do/**/*.ts`',
+							'The package owns Durable Object classes',
+							'Stateful classes discovered and bundled through config.'
+						],
+						[
+							'`src/ep/**/*.ts`',
+							'The package exposes named worker entrypoints',
+							'Classes discovered for typed `ref().worker(...)` service boundaries.'
+						],
+						[
+							'`src/workflows/**/*.ts`',
+							'The package owns workflow definitions',
+							'Additional discovered runtime modules that stay explicit in config review.'
+						],
+						[
+							'`src/transport.ts`',
+							'Local RPC-style bridge calls must preserve custom values',
+							'Custom encode/decode rules for local bridge-backed calls, most often in tests or Durable Object method round-trips.'
+						],
+						[
+							'`env.d.ts`',
+							'You run `devflare types`',
+							'Generated binding and entrypoint types. Do not hand-edit it.'
+						],
+						[
+							'`vite.config.ts`, `svelte.config.js`, `src/routes/+page.svelte`',
+							'The package is a hosted Vite or SvelteKit app',
+							'Host-app files that sit around the Devflare worker story instead of replacing it.'
+						],
+						[
+							'`.devflare/**`, `.wrangler/deploy/**`',
+							'Devflare has built, checked, or prepared deploy output',
+							'Generated build and deploy artifacts. Useful to inspect, not the authored architecture.'
+						]
 					]
 				},
 				callouts: [
@@ -466,7 +521,8 @@ export const devflareDocs: DocPage[] = [
 				],
 				snippets: [
 					{
-						title: 'Small worker package with one config, one fetch file, one route tree, and generated output kept in its lane',
+						title:
+							'Small worker package with one config, one fetch file, one route tree, and generated output kept in its lane',
 						activeFile: 'devflare.config.ts',
 						structure: projectArchitectureStarterStructure,
 						files: [
@@ -537,12 +593,27 @@ export const devflareDocs: DocPage[] = [
 					headers: ['File lane', 'Why it exists'],
 					rows: [
 						['`src/fetch.ts`', 'Request-wide middleware and the outer HTTP trail.'],
-						['`src/routes/**`', 'Leaf handlers that mirror URLs instead of bloating the global fetch file.'],
-						['`src/queue.ts`, `src/scheduled.ts`, `src/email.ts`', 'Background and platform-triggered event surfaces with their own runtime contracts.'],
-						['`src/do/**/*.ts`', 'Stateful Durable Object classes discovered and bundled through config.'],
+						[
+							'`src/routes/**`',
+							'Leaf handlers that mirror URLs instead of bloating the global fetch file.'
+						],
+						[
+							'`src/queue.ts`, `src/scheduled.ts`, `src/email.ts`',
+							'Background and platform-triggered event surfaces with their own runtime contracts.'
+						],
+						[
+							'`src/do/**/*.ts`',
+							'Stateful Durable Object classes discovered and bundled through config.'
+						],
 						['`src/ep/**/*.ts`', 'Named worker entrypoints for typed cross-worker boundaries.'],
-						['`src/workflows/**/*.ts`', 'Workflow definitions discovered as part of the package runtime shape.'],
-						['`src/transport.ts`', 'Local bridge serialization only when custom values need to survive a bridge-backed call.']
+						[
+							'`src/workflows/**/*.ts`',
+							'Workflow definitions discovered as part of the package runtime shape.'
+						],
+						[
+							'`src/transport.ts`',
+							'Local bridge serialization only when custom values need to survive a bridge-backed call.'
+						]
 					]
 				},
 				callouts: [
@@ -601,7 +672,8 @@ export const devflareDocs: DocPage[] = [
 			},
 			{
 				id: 'monorepo-example',
-				title: 'In a monorepo, Turbo orchestrates the workspace but packages still deploy themselves',
+				title:
+					'In a monorepo, Turbo orchestrates the workspace but packages still deploy themselves',
 				paragraphs: [
 					'This repository is the monorepo example. The root owns workspace scripts, workspaces, and Turbo task orchestration. But deployable packages still keep their own `devflare.config.ts` files and package-local commands. That is true for `apps/documentation`, `apps/testing`, sidecar workers under `apps/testing/workers/*`, and the smaller cases under `cases/*`.',
 					'That split is what keeps the monorepo honest. Root scripts decide what to validate or cache. Package-local Devflare commands decide what actually resolves, builds, deploys, or cleans up.'
@@ -714,10 +786,17 @@ export default defineConfig({
 			'Keep commands package-local so the resolved `devflare.config.*` is the package you actually mean to act on.'
 		],
 		facts: [
-			{ label: 'Best for', value: 'Everyday dev, config inspection, explicit deploys, and the Cloudflare control-plane work around those deploys' },
+			{
+				label: 'Best for',
+				value:
+					'Everyday dev, config inspection, explicit deploys, and the Cloudflare control-plane work around those deploys'
+			},
 			{ label: 'Fastest orientation', value: '`bunx --bun devflare --help`' },
 			{ label: 'Help depth', value: '`devflare help <command> [subcommand]`' },
-			{ label: 'Safest habit', value: 'Run commands from the package that owns the `devflare.config.*` you mean to resolve' }
+			{
+				label: 'Safest habit',
+				value: 'Run commands from the package that owns the `devflare.config.*` you mean to resolve'
+			}
 		],
 		sourcePages: [
 			'README.md',
@@ -770,22 +849,86 @@ bunx --bun devflare productions rollback --help`
 					headers: ['Command', 'Primary job', 'What the deeper help covers'],
 					rows: [
 						['`init`', 'Scaffold a new package.', 'Template choice and generated starter scripts.'],
-						['`dev`', 'Start local development.', 'Worker-only defaults, Vite auto-detection, logging, and persistence.'],
-						['`build`', 'Compile deploy-ready artifacts.', 'Environment resolution and Wrangler-facing output.'],
-						['`deploy`', 'Ship explicitly to production or preview.', 'Target selection, dry runs, preview naming, messages, and tags.'],
-						['`types`', 'Generate `env.d.ts` and typed bindings.', 'Custom output paths plus entrypoint and Durable Object discovery.'],
-						['`doctor`', 'Check local project health.', 'Config, package, TypeScript, Vite, and generated artifact diagnostics.'],
-						['`config`', 'Print resolved config.', '`print`, raw Devflare JSON, or compiled Wrangler JSON.'],
-						['`account`', 'Inspect Cloudflare account inventories and limits.', 'Resource lists, usage limits, and interactive global/workspace selection.'],
-						['`login`', 'Authenticate with Cloudflare via Wrangler.', '`--force` behavior and reuse of existing sessions.'],
-						['`previews`', 'Operate on preview lifecycle state.', '`list`, `bindings`, and `cleanup`.'],
-						['`productions`', 'Inspect and mutate live production state.', '`versions`, `rollback`, and `delete`.'],
-						['`worker`', 'Run Worker control-plane operations.', 'Currently `rename`, plus config-sync expectations.'],
-						['`tokens`', 'Manage Devflare-managed account-owned API tokens.', 'List, create, roll, and delete managed tokens.'],
-						['`ai`', 'Print the bundled Workers AI pricing snapshot.', 'Read-only pricing surface; verify current rates in Cloudflare docs when it matters.'],
-						['`remote`', 'Toggle remote test mode for paid features.', '`status`, `enable`, and `disable`.'],
-						['`help`', 'Render root or command-specific help.', 'Nested help resolution for command families and subcommands.'],
-						['`version`', 'Print the installed version.', 'Same information as the global `--version` flag.']
+						[
+							'`dev`',
+							'Start local development.',
+							'Worker-only defaults, Vite auto-detection, logging, and persistence.'
+						],
+						[
+							'`build`',
+							'Compile deploy-ready artifacts.',
+							'Environment resolution and Wrangler-facing output.'
+						],
+						[
+							'`deploy`',
+							'Ship explicitly to production or preview.',
+							'Target selection, dry runs, preview naming, messages, and tags.'
+						],
+						[
+							'`types`',
+							'Generate `env.d.ts` and typed bindings.',
+							'Custom output paths plus entrypoint and Durable Object discovery.'
+						],
+						[
+							'`doctor`',
+							'Check local project health.',
+							'Config, package, TypeScript, Vite, and generated artifact diagnostics.'
+						],
+						[
+							'`config`',
+							'Print resolved config.',
+							'`print`, raw Devflare JSON, or compiled Wrangler JSON.'
+						],
+						[
+							'`account`',
+							'Inspect Cloudflare account inventories and limits.',
+							'Resource lists, usage limits, and interactive global/workspace selection.'
+						],
+						[
+							'`login`',
+							'Authenticate with Cloudflare via Wrangler.',
+							'`--force` behavior and reuse of existing sessions.'
+						],
+						[
+							'`previews`',
+							'Operate on preview lifecycle state.',
+							'`list`, `bindings`, and `cleanup`.'
+						],
+						[
+							'`productions`',
+							'Inspect and mutate live production state.',
+							'`versions`, `rollback`, and `delete`.'
+						],
+						[
+							'`worker`',
+							'Run Worker control-plane operations.',
+							'Currently `rename`, plus config-sync expectations.'
+						],
+						[
+							'`tokens`',
+							'Manage Devflare-managed account-owned API tokens.',
+							'List, create, roll, and delete managed tokens.'
+						],
+						[
+							'`ai`',
+							'Print the bundled Workers AI pricing snapshot.',
+							'Read-only pricing surface; verify current rates in Cloudflare docs when it matters.'
+						],
+						[
+							'`remote`',
+							'Toggle remote test mode for paid features.',
+							'`status`, `enable`, and `disable`.'
+						],
+						[
+							'`help`',
+							'Render root or command-specific help.',
+							'Nested help resolution for command families and subcommands.'
+						],
+						[
+							'`version`',
+							'Print the installed version.',
+							'Same information as the global `--version` flag.'
+						]
 					]
 				}
 			},
@@ -799,12 +942,36 @@ bunx --bun devflare productions rollback --help`
 				table: {
 					headers: ['Option', 'What it means', 'Where it matters most'],
 					rows: [
-						['`--config <path>`', 'Pick the exact `devflare.config.*` file to resolve.', '`build`, `deploy`, `types`, `doctor`, `config`, `previews`, `productions`, and `worker rename`.'],
-						['`--env <name>`', 'Resolve `config.env[name]` before the command runs.', '`build`, `config`, preview-aware inspection, and production discovery flows.'],
-						['`--debug`', 'Print stack traces and extra debug output.', 'Build, deploy, type generation, and other failure-heavy paths.'],
-						['`--no-color`', 'Disable ANSI color output.', 'CI logs, copied transcripts, or plain-text debugging.'],
-						['`-h, --help`', 'Show the detailed help page for the current command path.', 'Every root command and nested subcommand surface.'],
-						['`-v, --version`', 'Print the installed version and exit.', 'Root invocation when you need to verify the installed package quickly.']
+						[
+							'`--config <path>`',
+							'Pick the exact `devflare.config.*` file to resolve.',
+							'`build`, `deploy`, `types`, `doctor`, `config`, `previews`, `productions`, and `worker rename`.'
+						],
+						[
+							'`--env <name>`',
+							'Resolve `config.env[name]` before the command runs.',
+							'`build`, `config`, preview-aware inspection, and production discovery flows.'
+						],
+						[
+							'`--debug`',
+							'Print stack traces and extra debug output.',
+							'Build, deploy, type generation, and other failure-heavy paths.'
+						],
+						[
+							'`--no-color`',
+							'Disable ANSI color output.',
+							'CI logs, copied transcripts, or plain-text debugging.'
+						],
+						[
+							'`-h, --help`',
+							'Show the detailed help page for the current command path.',
+							'Every root command and nested subcommand surface.'
+						],
+						[
+							'`-v, --version`',
+							'Print the installed version and exit.',
+							'Root invocation when you need to verify the installed package quickly.'
+						]
 					]
 				},
 				bullets: [
@@ -934,7 +1101,8 @@ bunx --bun devflare productions versions`
 		navTitle: 'sequence(...)',
 		readTime: '5 min read',
 		eyebrow: 'Runtime helper',
-		title: 'Compose request-wide middleware with `sequence(...)` instead of burying flow control inside one big fetch file',
+		title:
+			'Compose request-wide middleware with `sequence(...)` instead of burying flow control inside one big fetch file',
 		summary:
 			'Use `sequence(...)` from `devflare/runtime` when broad HTTP concerns must wrap route resolution or another fetch handler in a clear top-to-bottom order.',
 		description:
@@ -946,11 +1114,19 @@ bunx --bun devflare productions versions`
 			'Export exactly one primary fetch entry per module: `fetch` or `handle`, not both.'
 		],
 		facts: [
-			{ label: 'Best for', value: 'Request-wide concerns that should wrap routes or another fetch handler cleanly' },
+			{
+				label: 'Best for',
+				value: 'Request-wide concerns that should wrap routes or another fetch handler cleanly'
+			},
 			{ label: 'Primary signature', value: '`(event, resolve) => Response`' },
 			{ label: 'Good pairing', value: '`src/fetch.ts` plus `src/routes/**` leaf handlers' }
 		],
-		sourcePages: ['foundation.md', 'development-workflows.md', 'README.md', 'src/runtime/middleware.ts'],
+		sourcePages: [
+			'packages/devflare/README.md',
+			'packages/devflare/src/dev-server/server.ts',
+			'README.md',
+			'src/runtime/middleware.ts'
+		],
 		sections: [
 			{
 				id: 'main-shape',
@@ -1099,9 +1275,18 @@ export async function GET({ params }: FetchEvent): Promise<Response> {
 		],
 		facts: [
 			{ label: 'Key advantage', value: 'Tests can stay worker-shaped instead of mock-shaped' },
-			{ label: 'Core trick', value: '`createTestContext()` plus a unified `env` proxy and bridge-backed bindings' },
-			{ label: 'Durable Object experience', value: 'Direct `env.COUNTER.getByName(...).increment()` calls in tests' },
-			{ label: 'Optional extra', value: '`src/transport.ts` when bridge-backed calls must round-trip custom classes' }
+			{
+				label: 'Core trick',
+				value: '`createTestContext()` plus a unified `env` proxy and bridge-backed bindings'
+			},
+			{
+				label: 'Durable Object experience',
+				value: 'Direct `env.COUNTER.getByName(...).increment()` calls in tests'
+			},
+			{
+				label: 'Optional extra',
+				value: '`src/transport.ts` when bridge-backed calls must round-trip custom classes'
+			}
 		],
 		sourcePages: [
 			'src/test/simple-context.ts',
@@ -1162,11 +1347,31 @@ export async function GET({ params }: FetchEvent): Promise<Response> {
 				table: {
 					headers: ['Layer', 'What Devflare wires', 'Why it feels smoother'],
 					rows: [
-						['`createTestContext()`', 'Finds the nearest config, boots Miniflare, discovers worker surfaces, and prepares bindings from the same authored project shape.', 'The harness starts where the app starts instead of from a separate test-only setup story.'],
-						['Unified `env` proxy', 'Prefers request-scoped env, then test-context env, then bridge-backed env access.', 'One `import { env } from \'devflare\'` can stay valid across app code, tests, and local bridge-backed flows.'],
-						['`cf.*` helpers', 'Create runtime-shaped fetch, queue, scheduled, email, and tail events/controllers and install them into AsyncLocalStorage before user code runs.', 'Helpers such as `getFetchEvent()` and `locals` keep working in tests instead of only in real requests.'],
-						['Bridge proxies', 'Route KV, D1, R2, Durable Object, queue, service, and send-email calls into the local worker world.', 'Bindings can be exercised through their real shapes instead of custom in-memory fakes.'],
-						['Transport hooks', 'Optionally encode and decode custom values for local RPC-style bridge calls.', 'A Durable Object method can return a real class again on the caller side when that behavior matters.']
+						[
+							'`createTestContext()`',
+							'Finds the nearest config, boots Miniflare, discovers worker surfaces, and prepares bindings from the same authored project shape.',
+							'The harness starts where the app starts instead of from a separate test-only setup story.'
+						],
+						[
+							'Unified `env` proxy',
+							'Prefers request-scoped env, then test-context env, then bridge-backed env access.',
+							"One `import { env } from 'devflare'` can stay valid across app code, tests, and local bridge-backed flows."
+						],
+						[
+							'`cf.*` helpers',
+							'Create runtime-shaped fetch, queue, scheduled, email, and tail events/controllers and install them into AsyncLocalStorage before user code runs.',
+							'Helpers such as `getFetchEvent()` and `locals` keep working in tests instead of only in real requests.'
+						],
+						[
+							'Bridge proxies',
+							'Route KV, D1, R2, Durable Object, queue, service, and send-email calls into the local worker world.',
+							'Bindings can be exercised through their real shapes instead of custom in-memory fakes.'
+						],
+						[
+							'Transport hooks',
+							'Optionally encode and decode custom values for local RPC-style bridge calls.',
+							'A Durable Object method can return a real class again on the caller side when that behavior matters.'
+						]
 					]
 				},
 				bullets: [
@@ -1177,9 +1382,10 @@ export async function GET({ params }: FetchEvent): Promise<Response> {
 			},
 			{
 				id: 'durable-object-round-trip',
-				title: 'This is the part that usually sells people: a Durable Object method can feel native in a test',
+				title:
+					'This is the part that usually sells people: a Durable Object method can feel native in a test',
 				paragraphs: [
-					'One of Devflare\'s nicest testing moves is that a Durable Object method can be called straight from the test through `env.COUNTER.getByName(\'main\').increment(2)` instead of forcing you through a fake stub or an HTTP wrapper route.',
+					"One of Devflare's nicest testing moves is that a Durable Object method can be called straight from the test through `env.COUNTER.getByName('main').increment(2)` instead of forcing you through a fake stub or an HTTP wrapper route.",
 					'When the return value is more than plain JSON, `src/transport.ts` can keep the bridge honest by rebuilding the real class on the caller side. That is how a local test can still receive a `DoubleableNumber` with working instance behavior instead of a flattened object.'
 				],
 				snippets: [
@@ -1239,11 +1445,31 @@ export async function GET({ params }: FetchEvent): Promise<Response> {
 				table: {
 					headers: ['Surface', 'What the test calls', 'What Devflare keeps aligned'],
 					rows: [
-						['Routes and fetch middleware', '`cf.worker.get()` or `cf.worker.fetch()`', 'Request shape, route params, and AsyncLocalStorage-backed fetch context.'],
-						['Queue consumers', '`cf.queue.trigger()`', 'Batch shape, retry or ack behavior, and queued `waitUntil()` work.'],
-						['Scheduled jobs', '`cf.scheduled.trigger()`', 'Cron controller shape, scheduled context, and background work timing.'],
-						['Email and tail handlers', '`cf.email.send()` and `cf.tail.trigger()`', 'Handler-style invocation with the right local helper semantics instead of custom throwaway scaffolding.'],
-						['Bindings and Durable Object methods', '`env.DB`, `env.CACHE`, `env.FILES`, or `env.COUNTER.getByName(...).increment()`', 'The same binding contract app code uses, optionally with transport-backed custom value round-trips.']
+						[
+							'Routes and fetch middleware',
+							'`cf.worker.get()` or `cf.worker.fetch()`',
+							'Request shape, route params, and AsyncLocalStorage-backed fetch context.'
+						],
+						[
+							'Queue consumers',
+							'`cf.queue.trigger()`',
+							'Batch shape, retry or ack behavior, and queued `waitUntil()` work.'
+						],
+						[
+							'Scheduled jobs',
+							'`cf.scheduled.trigger()`',
+							'Cron controller shape, scheduled context, and background work timing.'
+						],
+						[
+							'Email and tail handlers',
+							'`cf.email.send()` and `cf.tail.trigger()`',
+							'Handler-style invocation with the right local helper semantics instead of custom throwaway scaffolding.'
+						],
+						[
+							'Bindings and Durable Object methods',
+							'`env.DB`, `env.CACHE`, `env.FILES`, or `env.COUNTER.getByName(...).increment()`',
+							'The same binding contract app code uses, optionally with transport-backed custom value round-trips.'
+						]
 					]
 				},
 				paragraphs: [
@@ -1314,12 +1540,27 @@ export async function GET({ params }: FetchEvent): Promise<Response> {
 			'Use `Testing & automation` when the question shifts from local harness behavior to CI, preview validation, and workflow observability.'
 		],
 		facts: [
-			{ label: 'Best for', value: 'Finding the right testing doc before you disappear into the wrong rabbit hole' },
+			{
+				label: 'Best for',
+				value: 'Finding the right testing doc before you disappear into the wrong rabbit hole'
+			},
 			{ label: 'Default harness', value: '`createTestContext()` plus `cf.*` helpers' },
-			{ label: 'Binding-specific docs', value: 'At the bottom of each binding overview page and in the binding testing index' },
-			{ label: 'Automation lane', value: '`/docs/testing-and-automation` for CI, preview checks, and workflow feedback' }
+			{
+				label: 'Binding-specific docs',
+				value: 'At the bottom of each binding overview page and in the binding testing index'
+			},
+			{
+				label: 'Automation lane',
+				value: '`/docs/testing-and-automation` for CI, preview checks, and workflow feedback'
+			}
 		],
-		sourcePages: ['verification-testing-and-caveats.md', 'README.md', 'simple-context.ts', 'cf.ts', 'apps/testing/*'],
+		sourcePages: [
+			'packages/devflare/src/test/simple-context.ts',
+			'README.md',
+			'simple-context.ts',
+			'cf.ts',
+			'apps/testing/*'
+		],
 		sections: [
 			{
 				id: 'start-with-one-proof',
@@ -1333,8 +1574,7 @@ export async function GET({ params }: FetchEvent): Promise<Response> {
 						title: 'The boring first loop is still the right default',
 						language: 'ts',
 						code: String.raw`import { afterAll, beforeAll, expect, test } from 'bun:test'
-import { createTestContext, cf } from 'devflare/test'
-import { env } from 'devflare'
+import { createTestContext, cf, env } from 'devflare/test'
 
 beforeAll(() => createTestContext())
 afterAll(() => env.dispose())
@@ -1412,13 +1652,41 @@ test('GET /health proves the worker boots', async () => {
 				table: {
 					headers: ['If the question is...', 'Open this page first', 'Why'],
 					rows: [
-						['Can I prove the worker answers one real request?', '`Your first unit test`', 'It keeps the first check small and prevents the harness from becoming accidental ceremony.'],
-						['Why does Devflare testing feel smoother than the usual Worker setup?', '`Why tests feel native`', 'It explains the unified env, bridge-backed bindings, AsyncLocalStorage-backed helper surfaces, and direct Durable Object story.'],
-						['How does the default runtime-shaped harness behave?', '`createTestContext()`', 'It documents autodiscovery, `cf.*`, helper timing, and when the harness waits for background work.'],
-						['How should I test this specific binding?', '`Binding testing guides`', 'Each binding has its own testing page with the right default harness and escalation path.'],
-						['Why are getters or proxies failing in a test?', '`Runtime context`', 'The runtime-context page explains the AsyncLocalStorage-backed model underneath the helper APIs.'],
-						['Why is a custom class not round-tripping in a test?', '`transport.ts`', 'Transport docs explain the extra serialization hook for bridge-backed calls.'],
-						['How should this fit into CI or preview validation?', '`Testing & automation`', 'Automation guidance belongs on the CI-facing page, not in the local harness docs.']
+						[
+							'Can I prove the worker answers one real request?',
+							'`Your first unit test`',
+							'It keeps the first check small and prevents the harness from becoming accidental ceremony.'
+						],
+						[
+							'Why does Devflare testing feel smoother than the usual Worker setup?',
+							'`Why tests feel native`',
+							'It explains the unified env, bridge-backed bindings, AsyncLocalStorage-backed helper surfaces, and direct Durable Object story.'
+						],
+						[
+							'How does the default runtime-shaped harness behave?',
+							'`createTestContext()`',
+							'It documents autodiscovery, `cf.*`, helper timing, and when the harness waits for background work.'
+						],
+						[
+							'How should I test this specific binding?',
+							'`Binding testing guides`',
+							'Each binding has its own testing page with the right default harness and escalation path.'
+						],
+						[
+							'Why are getters or proxies failing in a test?',
+							'`Runtime context`',
+							'The runtime-context page explains the AsyncLocalStorage-backed model underneath the helper APIs.'
+						],
+						[
+							'Why is a custom class not round-tripping in a test?',
+							'`transport.ts`',
+							'Transport docs explain the extra serialization hook for bridge-backed calls.'
+						],
+						[
+							'How should this fit into CI or preview validation?',
+							'`Testing & automation`',
+							'Automation guidance belongs on the CI-facing page, not in the local harness docs.'
+						]
 					]
 				},
 				callouts: [
@@ -1461,7 +1729,8 @@ test('GET /health proves the worker boots', async () => {
 		navTitle: 'Binding testing',
 		readTime: '8 min read',
 		eyebrow: 'Testing index',
-		title: 'Open the right binding testing guide instead of reconstructing the test story from scratch',
+		title:
+			'Open the right binding testing guide instead of reconstructing the test story from scratch',
 		summary:
 			'Every binding overview page already links a hidden testing guide. This page collects those guides in one place so you can jump straight to the right harness, caveats, and escalation path for the binding that changed.',
 		description:
@@ -1474,11 +1743,27 @@ test('GET /health proves the worker boots', async () => {
 		],
 		facts: [
 			{ label: 'Best for', value: 'Jumping straight to the right binding-specific testing guide' },
-			{ label: 'Where the links also live', value: 'At the bottom of each binding overview page in the “Go deeper” section' },
-			{ label: 'Default pattern', value: 'Usually `createTestContext()` plus the real binding or helper surface' },
-			{ label: 'Notable exceptions', value: 'AI and Vectorize are remote-oriented, and some other bindings need higher-fidelity checks sooner' }
+			{
+				label: 'Where the links also live',
+				value: 'At the bottom of each binding overview page in the “Go deeper” section'
+			},
+			{
+				label: 'Default pattern',
+				value: 'Usually `createTestContext()` plus the real binding or helper surface'
+			},
+			{
+				label: 'Notable exceptions',
+				value:
+					'AI and Vectorize are remote-oriented, and some other bindings need higher-fidelity checks sooner'
+			}
 		],
-		sourcePages: ['verification-testing-and-caveats.md', 'README.md', 'simple-context.ts', 'cf.ts', 'apps/testing/*'],
+		sourcePages: [
+			'packages/devflare/src/test/simple-context.ts',
+			'README.md',
+			'simple-context.ts',
+			'cf.ts',
+			'apps/testing/*'
+		],
 		sections: [
 			{
 				id: 'how-to-use-this-index',
@@ -1523,6 +1808,82 @@ test('GET /health proves the worker boots', async () => {
 						]
 					}
 				]
+			},
+			{
+				id: 'copyable-helper-chooser',
+				title: 'Copy the smallest helper that matches the boundary',
+				paragraphs: [
+					'Pick the helper from the thing you need to prove. Use pure mocks for small functions, `createOfflineEnv()` when config-derived binding names matter, `createTestContext()` when the Worker surface matters, and skip-gated lanes when Docker/Podman or Cloudflare credentials are part of the test.'
+				],
+				snippets: [
+					{
+						title: 'Four helper lanes in one test file',
+						language: 'ts',
+						code: String.raw`import { afterAll, beforeAll, expect, test } from 'bun:test'
+import {
+	cf,
+	createMockEnv,
+	createOfflineEnv,
+	createTestContext,
+	env,
+	shouldSkip
+} from 'devflare/test'
+import config from '../devflare.config'
+
+test('pure binding logic uses a mock env', async () => {
+	const env = createMockEnv({ kv: { CACHE: 'CACHE' } })
+	await env.CACHE.put('key', 'value')
+	expect(await env.CACHE.get('key')).toBe('value')
+})
+
+test('config-derived offline tests keep real binding names', () => {
+	const env = createOfflineEnv(config, {
+		secretsStore: {
+			API_TOKEN: 'test-token'
+		}
+	})
+
+	expect(env.API_TOKEN).toBeDefined()
+})
+
+beforeAll(() => createTestContext())
+afterAll(() => env.dispose())
+
+test('worker behavior uses the runtime-shaped harness', async () => {
+	const response = await cf.worker.get('/health')
+	expect(response.status).toBe(200)
+})
+
+test.skipIf(await shouldSkip.containers())('container tests are explicit opt-in lanes', async () => {
+	expect(await shouldSkip.containers()).toBe(false)
+})`
+					}
+				],
+				table: {
+					headers: ['Need to prove', 'Start with', 'Runs in ordinary CI?'],
+					rows: [
+						[
+							'A pure function calls one binding method',
+							'`createMockEnv()` or a specific `createMock*` helper',
+							'Yes'
+						],
+						[
+							'The env should match `devflare.config.ts` without booting Miniflare',
+							'`createOfflineEnv()`',
+							'Yes'
+						],
+						[
+							'A Worker route, queue, scheduled, email, tail, or service flow works',
+							'`createTestContext()` plus `cf.*`',
+							'Yes, unless the feature itself needs a remote boundary'
+						],
+						[
+							'Docker/Podman, Cloudflare auth, or deployed behavior is the point',
+							'`shouldSkip.*` plus a separate integration lane',
+							'Only when the runner has the dependency'
+						]
+					]
+				}
 			}
 		]
 	},
@@ -1545,11 +1906,26 @@ test('GET /health proves the worker boots', async () => {
 			'`src/transport.ts` stays optional and only matters when a local RPC-style bridge call under test—most commonly a Durable Object method round-trip—must preserve custom classes.'
 		],
 		facts: [
-			{ label: 'Best for', value: 'Runtime-shaped tests that should stay close to the real worker surface' },
+			{
+				label: 'Best for',
+				value: 'Runtime-shaped tests that should stay close to the real worker surface'
+			},
 			{ label: 'Default harness', value: '`createTestContext()` plus `cf.*` helpers' },
-			{ label: 'Optional extra', value: '`src/transport.ts` for custom class round-trips across local RPC-style bridge calls, especially Durable Object methods' }
+			{
+				label: 'Optional extra',
+				value:
+					'`src/transport.ts` for custom class round-trips across local RPC-style bridge calls, especially Durable Object methods'
+			}
 		],
-		sourcePages: ['src/test/simple-context.ts', 'src/test/simple-context-durable-objects.ts', 'src/test/simple-context-paths.ts', 'src/test/cf.ts', 'src/test/tail.ts', 'src/runtime/context.ts', 'tests/integration/test-context/config-autodiscovery.test.ts'],
+		sourcePages: [
+			'src/test/simple-context.ts',
+			'src/test/simple-context-durable-objects.ts',
+			'src/test/simple-context-paths.ts',
+			'src/test/cf.ts',
+			'src/test/tail.ts',
+			'src/runtime/context.ts',
+			'tests/integration/test-context/config-autodiscovery.test.ts'
+		],
 		sections: [
 			{
 				id: 'autodiscovery',
@@ -1571,11 +1947,20 @@ test('GET /health proves the worker boots', async () => {
 				table: {
 					headers: ['Helper', 'Current behavior'],
 					rows: [
-						['`cf.worker.fetch()`', 'Returns when the handler resolves and does not eagerly wait for all `waitUntil()` work.'],
+						[
+							'`cf.worker.fetch()`',
+							'Returns when the handler resolves and does not eagerly wait for all `waitUntil()` work.'
+						],
 						['`cf.queue.trigger()`', 'Waits for queued background work before it returns.'],
 						['`cf.scheduled.trigger()`', 'Waits for scheduled background work before it returns.'],
-						['`cf.email.send()`', 'In `createTestContext()` tests, directly invokes the configured local email handler and waits for its queued `waitUntil()` work; otherwise it falls back to the local email endpoint.'],
-						['`cf.tail.trigger()`', 'Works when `src/tail.ts` exists, supports a default or named `tail` export, and waits for the handler plus its `waitUntil()` work before it returns.']
+						[
+							'`cf.email.send()`',
+							'In `createTestContext()` tests, directly invokes the configured local email handler and waits for its queued `waitUntil()` work; otherwise it falls back to the local email endpoint.'
+						],
+						[
+							'`cf.tail.trigger()`',
+							'Works when `src/tail.ts` exists, supports a default or named `tail` export, and waits for the handler plus its `waitUntil()` work before it returns.'
+						]
 					]
 				},
 				paragraphs: [
@@ -1631,8 +2016,7 @@ export async function tail({ events }: TailEvent): Promise<void> {
 								path: 'tests/tail.test.ts',
 								language: 'ts',
 								code: String.raw`import { afterAll, beforeAll, expect, test } from 'bun:test'
-import { createTestContext, cf } from 'devflare/test'
-import { env } from 'devflare'
+import { createTestContext, cf, env } from 'devflare/test'
 import { seenScripts } from '../src/tail-state'
 
 beforeAll(() => createTestContext())
@@ -1679,8 +2063,7 @@ test('tail handler sees trace items', async () => {
 						filename: 'tests/worker.test.ts',
 						language: 'ts',
 						code: String.raw`import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
-import { createTestContext, cf } from 'devflare/test'
-import { env } from 'devflare'
+import { createTestContext, cf, env } from 'devflare/test'
 
 beforeAll(() => createTestContext())
 afterAll(() => env.dispose())
@@ -1705,7 +2088,8 @@ describe('worker runtime', () => {
 			},
 			{
 				id: 'when-to-add-transport',
-				title: 'Add `transport.ts` only when local RPC-style bridge calls in tests must preserve custom classes',
+				title:
+					'Add `transport.ts` only when local RPC-style bridge calls in tests must preserve custom classes',
 				paragraphs: [
 					'Most `createTestContext()` tests do not need a transport file because strings, numbers, arrays, and plain JSON objects already cross the bridge naturally.',
 					'Reach for `src/transport.ts` when a local RPC-style bridge call returns a real class instance and the caller needs that class again instead of a plain object. In practice that is most often a Durable Object method round-trip inside `createTestContext()`, not an ordinary HTTP response.'
@@ -1767,7 +2151,8 @@ describe('worker runtime', () => {
 		navTitle: 'transport.ts',
 		readTime: '4 min read',
 		eyebrow: 'Runtime transport',
-		title: 'Use `src/transport.ts` when local RPC-style bridge calls must round-trip custom classes cleanly',
+		title:
+			'Use `src/transport.ts` when local RPC-style bridge calls must round-trip custom classes cleanly',
 		summary:
 			'Most workers do not need a transport file. Add one when Devflare’s local RPC-style bridge must encode and decode custom values, especially across Durable Object method calls in tests.',
 		description:
@@ -1779,11 +2164,21 @@ describe('worker runtime', () => {
 			'Set `files.transport: null` to disable autodiscovery explicitly.'
 		],
 		facts: [
-			{ label: 'Best for', value: 'Bridge-backed Durable Object results that return custom classes' },
+			{
+				label: 'Best for',
+				value: 'Bridge-backed Durable Object results that return custom classes'
+			},
 			{ label: 'Usually unnecessary', value: 'Strings, numbers, arrays, and plain JSON objects' },
 			{ label: 'Disable rule', value: '`files.transport: null`' }
 		],
-		sourcePages: ['src/test/simple-context.ts', 'src/test/simple-context-durable-objects.ts', 'src/test/simple-context-paths.ts', 'src/dev-server/worker-surface-paths.ts', 'src/config/schema-runtime.ts', 'tests/integration/test-context/config-autodiscovery.test.ts'],
+		sourcePages: [
+			'src/test/simple-context.ts',
+			'src/test/simple-context-durable-objects.ts',
+			'src/test/simple-context-paths.ts',
+			'src/dev-server/worker-surface-paths.ts',
+			'src/config/schema-runtime.ts',
+			'tests/integration/test-context/config-autodiscovery.test.ts'
+		],
 		sections: [
 			{
 				id: 'when-you-need-it',
@@ -1893,8 +2288,7 @@ export class Counter {
 						filename: 'tests/counter.test.ts',
 						language: 'ts',
 						code: String.raw`import { afterAll, beforeAll, expect, test } from 'bun:test'
-import { createTestContext } from 'devflare/test'
-import { env } from 'devflare'
+import { createTestContext, env } from 'devflare/test'
 import { DoubleableNumber } from '../src/DoubleableNumber'
 
 beforeAll(() => createTestContext())
@@ -1944,6 +2338,7 @@ export default defineConfig({
 					},
 					{
 						title: 'Disable transport autodiscovery explicitly',
+						filename: 'devflare.config.ts',
 						language: 'ts',
 						code: String.raw`files: {
 	transport: null
