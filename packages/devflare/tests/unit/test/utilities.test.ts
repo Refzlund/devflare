@@ -3,11 +3,23 @@
 // =============================================================================
 
 import { describe, expect, test, mock } from 'bun:test'
+import type { Pipeline } from 'cloudflare:pipelines'
 import {
 	createMockTestContext,
 	createMockKV,
 	createMockD1,
 	createMockR2,
+	createMockRateLimit,
+	createMockVersionMetadata,
+	createMockWorkerLoader,
+	createMockMTLSCertificate,
+	createMockDispatchNamespace,
+	createMockWorkflow,
+	createMockPipeline,
+	createMockImagesBinding,
+	createMockMediaBinding,
+	createMockArtifacts,
+	createMockSecretsStoreSecret,
 	createMockEnv,
 	withTestContext,
 	type TestContextOptions
@@ -273,6 +285,80 @@ describe('createMockR2', () => {
 	})
 })
 
+describe('createMockRateLimit', () => {
+	test('allows requests until the configured limit is reached', async () => {
+		const limiter = createMockRateLimit({ limit: 2, period: 60 })
+
+		expect(await limiter.limit({ key: 'user-1' })).toEqual({ success: true })
+		expect(await limiter.limit({ key: 'user-1' })).toEqual({ success: true })
+		expect(await limiter.limit({ key: 'user-1' })).toEqual({ success: false })
+		expect(await limiter.limit({ key: 'user-2' })).toEqual({ success: true })
+	})
+})
+
+describe('createMockVersionMetadata', () => {
+	test('creates deterministic local Worker version metadata', () => {
+		expect(createMockVersionMetadata()).toEqual({
+			id: 'devflare-local-version',
+			tag: 'local',
+			timestamp: '1970-01-01T00:00:00.000Z'
+		})
+	})
+})
+
+describe('createMockWorkerLoader', () => {
+	test('returns the configured WorkerStub from load()', () => {
+		const stub = {
+			getEntrypoint: () => ({ fetch: async () => new Response('ok') }),
+			getDurableObjectClass: () => ({ idFromName: () => ({ toString: () => 'id' }) })
+		} as unknown as WorkerStub
+		const loader = createMockWorkerLoader({ stub })
+
+		expect(loader.load({
+			compatibilityDate: '2026-04-26',
+			mainModule: 'index.js',
+			modules: {
+				'index.js': 'export default {}'
+			}
+		})).toBe(stub)
+	})
+})
+
+describe('createMockMTLSCertificate', () => {
+	test('creates a Fetcher backed by the configured handler', async () => {
+		const fetcher = createMockMTLSCertificate(async (input) => {
+			const request = new Request(input)
+			return new Response(request.url)
+		})
+
+		const response = await fetcher.fetch('https://secure.example/path')
+
+		expect(await response.text()).toBe('https://secure.example/path')
+	})
+})
+
+describe('createMockDispatchNamespace', () => {
+	test('returns a configured Fetcher from get()', async () => {
+		const namespace = createMockDispatchNamespace({
+			workers: {
+				tenant: async () => new Response('tenant response')
+			}
+		})
+
+		const response = await namespace.get('tenant').fetch('https://tenant.example')
+
+		expect(await response.text()).toBe('tenant response')
+	})
+})
+
+describe('createMockSecretsStoreSecret', () => {
+	test('returns the configured secret value from get()', async () => {
+		const secret = createMockSecretsStoreSecret('super-secret')
+
+		expect(await secret.get()).toBe('super-secret')
+	})
+})
+
 describe('createMockEnv', () => {
 	test('creates env with KV bindings', () => {
 		const mockEnv = createMockEnv({
@@ -300,6 +386,199 @@ describe('createMockEnv', () => {
 
 		expect(mockEnv.BUCKET).toBeDefined()
 		expect(typeof mockEnv.BUCKET.put).toBe('function')
+	})
+
+	test('creates env with Rate Limiting bindings', async () => {
+		const mockEnv = createMockEnv({
+			rateLimits: {
+				MY_RATE_LIMITER: { limit: 1, period: 60 }
+			}
+		}) as { MY_RATE_LIMITER: RateLimit }
+
+		expect(await mockEnv.MY_RATE_LIMITER.limit({ key: 'user-1' })).toEqual({ success: true })
+		expect(await mockEnv.MY_RATE_LIMITER.limit({ key: 'user-1' })).toEqual({ success: false })
+	})
+
+	test('creates env with Version Metadata binding', () => {
+		const mockEnv = createMockEnv({
+			versionMetadata: 'CF_VERSION_METADATA'
+		}) as { CF_VERSION_METADATA: WorkerVersionMetadata }
+
+		expect(mockEnv.CF_VERSION_METADATA).toEqual(createMockVersionMetadata())
+	})
+
+	test('creates env with Worker Loader bindings', () => {
+		const mockEnv = createMockEnv({
+			workerLoaders: ['LOADER']
+		}) as { LOADER: WorkerLoader }
+
+		expect(typeof mockEnv.LOADER.load).toBe('function')
+		expect(typeof mockEnv.LOADER.get).toBe('function')
+	})
+
+	test('creates env with mTLS Certificate bindings', async () => {
+		const mockEnv = createMockEnv({
+			mtlsCertificates: {
+				API_CERT: async () => new Response('secure')
+			}
+		}) as { API_CERT: Fetcher }
+
+		const response = await mockEnv.API_CERT.fetch('https://secure.example')
+
+		expect(await response.text()).toBe('secure')
+	})
+
+	test('creates env with Dispatch Namespace bindings', async () => {
+		const mockEnv = createMockEnv({
+			dispatchNamespaces: {
+				DISPATCHER: {
+					workers: {
+						tenant: async () => new Response('tenant')
+					}
+				}
+			}
+		}) as { DISPATCHER: DispatchNamespace }
+
+		const response = await mockEnv.DISPATCHER.get('tenant').fetch('https://tenant.example')
+
+		expect(await response.text()).toBe('tenant')
+	})
+
+	test('creates Workflow bindings', async () => {
+		const workflow = createMockWorkflow()
+		const created = await workflow.create({ id: 'order-1', params: { id: 1 } })
+		const fetched = await workflow.get('order-1')
+
+		expect(created.id).toBe('order-1')
+		expect(fetched).toBe(created)
+		expect(await fetched.status()).toEqual({ status: 'queued' })
+	})
+
+	test('creates env with Workflow bindings', async () => {
+		const mockEnv = createMockEnv({
+			workflows: ['ORDER_WORKFLOW']
+		}) as { ORDER_WORKFLOW: Workflow }
+
+		const instance = await mockEnv.ORDER_WORKFLOW.create({ id: 'order-2' })
+
+		expect(instance.id).toBe('order-2')
+	})
+
+	test('creates Pipeline bindings', async () => {
+		const pipeline = createMockPipeline()
+
+		await pipeline.send([{ event: 'signup' }])
+
+		expect(pipeline._getRecords()).toEqual([{ event: 'signup' }])
+	})
+
+	test('creates env with Pipeline bindings', async () => {
+		const mockEnv = createMockEnv({
+			pipelines: ['EVENTS']
+		}) as { EVENTS: Pipeline }
+
+		await mockEnv.EVENTS.send([{ event: 'login' }])
+
+		expect((mockEnv.EVENTS as ReturnType<typeof createMockPipeline>)._getRecords()).toEqual([
+			{ event: 'login' }
+		])
+	})
+
+	test('creates Images bindings', async () => {
+		const images = createMockImagesBinding({
+			info: {
+				format: 'image/png',
+				fileSize: 12,
+				width: 16,
+				height: 9
+			},
+			response: new Response('image', {
+				headers: { 'Content-Type': 'image/png' }
+			})
+		})
+
+		const stream = new ReadableStream<Uint8Array>()
+		const info = await images.info(stream)
+		const result = await images.input(stream).transform({ width: 16 }).output({ format: 'image/png' })
+
+		expect((info as { width?: number }).width).toBe(16)
+		expect(result.contentType()).toBe('image/png')
+		expect(await result.response().text()).toBe('image')
+	})
+
+	test('creates env with Images bindings', async () => {
+		const mockEnv = createMockEnv({
+			images: 'IMAGES'
+		}) as { IMAGES: ImagesBinding }
+
+		const response = (await mockEnv.IMAGES
+			.input(new ReadableStream<Uint8Array>())
+			.output({ format: 'image/png' })).response()
+
+		expect(response.headers.get('Content-Type')).toBe('image/png')
+	})
+
+	test('creates Media Transformations bindings', async () => {
+		const media = createMockMediaBinding({
+			response: new Response('media', {
+				headers: { 'Content-Type': 'video/mp4' }
+			})
+		})
+
+		const result = media
+			.input(new ReadableStream<Uint8Array>())
+			.transform({ width: 480, height: 270 })
+			.output({ mode: 'video', duration: '5s' })
+
+		expect(await result.contentType()).toBe('video/mp4')
+		expect(await (await result.response()).text()).toBe('media')
+	})
+
+	test('creates env with Media Transformations bindings', async () => {
+		const mockEnv = createMockEnv({
+			media: 'MEDIA'
+		}) as { MEDIA: MediaBinding }
+
+		const response = await mockEnv.MEDIA
+			.input(new ReadableStream<Uint8Array>())
+			.output({ mode: 'audio' })
+			.response()
+
+		expect(response.headers.get('Content-Type')).toBe('video/mp4')
+	})
+
+	test('creates Artifacts bindings', async () => {
+		const artifacts = createMockArtifacts()
+
+		const created = await artifacts.create('starter-repo', {
+			description: 'Repository for tests'
+		})
+		const repo = await artifacts.get('starter-repo')
+		const listed = await artifacts.list()
+
+		expect(created.name).toBe('starter-repo')
+		expect(repo.name).toBe('starter-repo')
+		expect(listed.repos.map((entry) => entry.name)).toEqual(['starter-repo'])
+	})
+
+	test('creates env with Artifacts bindings', async () => {
+		const mockEnv = createMockEnv({
+			artifacts: ['ARTIFACTS']
+		}) as { ARTIFACTS: Artifacts }
+
+		await mockEnv.ARTIFACTS.create('starter-repo')
+
+		expect((await mockEnv.ARTIFACTS.list()).total).toBe(1)
+	})
+
+	test('creates env with Secrets Store bindings', async () => {
+		const mockEnv = createMockEnv({
+			secretsStore: {
+				API_TOKEN: 'super-secret'
+			}
+		}) as { API_TOKEN: SecretsStoreSecret }
+
+		expect(await mockEnv.API_TOKEN.get()).toBe('super-secret')
 	})
 
 	test('creates env with vars', () => {

@@ -459,6 +459,13 @@ export function collectPreviewScopedResourcePlan(
 					&& 'name' in bindingConfig
 					&& typeof bindingConfig.name === 'string'
 				) {
+					if (
+						'previewId' in bindingConfig
+						&& typeof bindingConfig.previewId === 'string'
+						&& bindingConfig.previewId.trim()
+					) {
+						return null
+					}
 					const ref = createPreviewScopedResourceRef(bindingConfig.name, bindingName, options)
 					if (ref && (bindingConfig as { previewFallback?: unknown }).previewFallback === 'base') {
 						ref.allowBaseFallback = true
@@ -481,6 +488,9 @@ export function collectPreviewScopedResourcePlan(
 	if (bindings.browser) {
 		plan.browser = Object.entries(bindings.browser)
 			.map(([bindingName, bindingConfig]) => {
+				if (typeof bindingConfig !== 'string') {
+					return null
+				}
 				return createPreviewScopedResourceRef(bindingConfig, bindingName, options)
 			})
 			.filter((ref): ref is PreviewScopedResourceRef => ref !== null)
@@ -606,7 +616,7 @@ export async function preparePreviewScopedResourcesForDeploy(
 			const bindingLabel = ref.bindingName ? `"${ref.bindingName}"` : `for preview name "${ref.previewName}"`
 			throw new Error(
 				`Preview Hyperdrive binding ${bindingLabel} has no dedicated preview Hyperdrive configuration "${ref.previewName}" in this account. `
-				+ 'Either provision a dedicated preview Hyperdrive (or set `previewId` / `previewLocalConnectionString` on the binding), '
+				+ 'Either provision a dedicated preview Hyperdrive (or set `previewId` on the binding), '
 				+ "or opt in to reusing the base Hyperdrive by setting `previewFallback: 'base'` on the binding."
 			)
 		}

@@ -252,6 +252,19 @@ function buildDefaultExportBody(options: {
 				)
 			}
 		}
+		: {}),
+	...(__devflareTailHandler
+		? {
+			async tail(events, env, ctx) {
+				const __devflareEvent = createTailEvent(events, env, ctx)
+				return runWithEventContext(
+					__devflareEvent,
+					() => __devflareTailHandler.length >= 2
+						? __devflareTailHandler(events, env, ctx)
+						: __devflareTailHandler(__devflareEvent, env, ctx)
+				)
+			}
+		}
 		: {})
 }`
 }
@@ -279,6 +292,7 @@ function getComposedWorkerEntrypointSource(
 			'createQueueEvent',
 			'createRouteResolve',
 			'createScheduledEvent',
+			'createTailEvent',
 			'invokeFetchModule',
 			'matchFetchRoute',
 			'runWithEventContext',
@@ -291,7 +305,8 @@ function getComposedWorkerEntrypointSource(
 		{ identifier: '__devflareFetchModule', importPath: surfaceImportPaths.fetch },
 		{ identifier: '__devflareQueueModule', importPath: surfaceImportPaths.queue },
 		{ identifier: '__devflareScheduledModule', importPath: surfaceImportPaths.scheduled },
-		{ identifier: '__devflareEmailModule', importPath: surfaceImportPaths.email }
+		{ identifier: '__devflareEmailModule', importPath: surfaceImportPaths.email },
+		{ identifier: '__devflareTailModule', importPath: surfaceImportPaths.tail }
 	]
 
 	const fallbacksBuilder = new CodeBuilder()
@@ -332,6 +347,7 @@ function getComposedWorkerEntrypointSource(
 	builder.constDeclaration('__devflareQueueHandler', "__devflareResolveHandler(__devflareQueueModule, 'queue')")
 	builder.constDeclaration('__devflareScheduledHandler', "__devflareResolveHandler(__devflareScheduledModule, 'scheduled')")
 	builder.constDeclaration('__devflareEmailHandler', "__devflareResolveHandler(__devflareEmailModule, 'email')")
+	builder.constDeclaration('__devflareTailHandler', "__devflareResolveHandler(__devflareTailModule, 'tail')")
 	emitDevOnlyEmailHooks(builder, { enabled: includeDevOnlyHooks })
 	builder.blank()
 	builder.exportDefault(buildDefaultExportBody({
@@ -433,6 +449,7 @@ function mayRequireCompositionBesidesFetch(config: DevflareConfig): boolean {
 	if (typeof files.queue === 'string' && files.queue) return true
 	if (typeof files.scheduled === 'string' && files.scheduled) return true
 	if (typeof files.email === 'string' && files.email) return true
+	if (typeof files.tail === 'string' && files.tail) return true
 	if (files.durableObjects) return true
 	if (files.routes) return true
 	const bindings = config.bindings ?? {}
@@ -453,6 +470,7 @@ function needsComposedWorkerEntrypoint(
 		surfacePaths.queue
 		|| surfacePaths.scheduled
 		|| surfacePaths.email
+		|| surfacePaths.tail
 		|| routeDiscovery?.routes.length
 	)
 
@@ -529,7 +547,8 @@ export async function prepareComposedWorkerEntrypoint(
 		fetch: surfacePaths.fetch ? toImportSpecifier(entryPath, surfacePaths.fetch) : null,
 		queue: surfacePaths.queue ? toImportSpecifier(entryPath, surfacePaths.queue) : null,
 		scheduled: surfacePaths.scheduled ? toImportSpecifier(entryPath, surfacePaths.scheduled) : null,
-		email: surfacePaths.email ? toImportSpecifier(entryPath, surfacePaths.email) : null
+		email: surfacePaths.email ? toImportSpecifier(entryPath, surfacePaths.email) : null,
+		tail: surfacePaths.tail ? toImportSpecifier(entryPath, surfacePaths.tail) : null
 	}
 	const durableObjectExports = await createGeneratedDurableObjectExports(entryPath, cwd, resolvedConfig)
 	const routeImports = createGeneratedRouteModuleImports(entryPath, routeDiscovery)

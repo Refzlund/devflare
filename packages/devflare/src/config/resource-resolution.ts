@@ -3,6 +3,7 @@ import { getEffectiveAccountId } from '../cloudflare/preferences'
 import {
 	collectPendingNameBindings,
 	formatMissingBindings,
+	materializeHyperdriveIdBindings,
 	materializeIdBindings,
 	materializeResolvedNameBindings,
 	normalizeD1NameBinding,
@@ -17,7 +18,6 @@ import { brandAsDeployConfig, brandAsLocalConfig, resolveResources, type DeployC
 import { resolveConfigForEnvironment } from './resolve'
 import {
 	getLocalD1DatabaseIdentifier,
-	getLocalHyperdriveConfigIdentifier,
 	getLocalKVNamespaceIdentifier,
 	type DevflareConfig
 } from './schema'
@@ -178,7 +178,7 @@ export function resolveConfigForLocalRuntime(
 	return brandAsLocalConfig(withResolvedIdBindings(resolvedConfig, {
 		kv: kvBindings ? materializeIdBindings(kvBindings, getLocalKVNamespaceIdentifier) : undefined,
 		d1: d1Bindings ? materializeIdBindings(d1Bindings, getLocalD1DatabaseIdentifier) : undefined,
-		hyperdrive: hyperdriveBindings ? materializeIdBindings(hyperdriveBindings, getLocalHyperdriveConfigIdentifier) : undefined
+		hyperdrive: materializeHyperdriveIdBindings(hyperdriveBindings)
 	}))
 }
 
@@ -220,7 +220,7 @@ export async function resolveMaterializedConfigResources(
 		return brandAsDeployConfig(withResolvedIdBindings(resolvedConfig, {
 			kv: kvBindings ? materializeIdBindings(kvBindings, getLocalKVNamespaceIdentifier) : undefined,
 			d1: d1Bindings ? materializeIdBindings(d1Bindings, getLocalD1DatabaseIdentifier) : undefined,
-			hyperdrive: hyperdriveBindings ? materializeIdBindings(hyperdriveBindings, getLocalHyperdriveConfigIdentifier) : undefined
+			hyperdrive: materializeHyperdriveIdBindings(hyperdriveBindings)
 		}))
 	}
 
@@ -254,7 +254,7 @@ export async function resolveMaterializedConfigResources(
 	return brandAsDeployConfig(withResolvedIdBindings(resolvedConfig, {
 		kv: materializeResolvedNameBindings(kvBindings, normalizeKVNameBinding, namespaceIdsByName),
 		d1: materializeResolvedNameBindings(d1Bindings, normalizeD1NameBinding, databaseIdsByName),
-		hyperdrive: materializeResolvedNameBindings(hyperdriveBindings, normalizeHyperdriveNameBinding, hyperdriveIdsByName)
+		hyperdrive: materializeHyperdriveIdBindings(hyperdriveBindings, hyperdriveIdsByName)
 	}))
 }
 

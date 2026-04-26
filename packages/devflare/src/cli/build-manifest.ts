@@ -45,6 +45,18 @@ export interface BuildManifest {
 		d1: string[]
 		r2: string[]
 		queues: string[]
+		rateLimits: string[]
+		versionMetadata: string[]
+		workerLoaders: string[]
+		mtlsCertificates: string[]
+		dispatchNamespaces: string[]
+		workflows: string[]
+		pipelines: string[]
+		images: string[]
+		media: string[]
+		artifacts: string[]
+		secretsStore: string[]
+		tailConsumers: string[]
 		hyperdrive: string[]
 		vectorize: string[]
 		services: string[]
@@ -97,6 +109,20 @@ export function summarizeBindings(config: DevflareConfig): BuildManifest['bindin
 		d1: Object.keys(bindings.d1 ?? {}).sort(),
 		r2: Object.keys(bindings.r2 ?? {}).sort(),
 		queues: Object.keys(bindings.queues ?? {}).sort(),
+		rateLimits: Object.keys(bindings.rateLimits ?? {}).sort(),
+		versionMetadata: bindings.versionMetadata ? [bindings.versionMetadata.binding] : [],
+		workerLoaders: Object.keys(bindings.workerLoaders ?? {}).sort(),
+		mtlsCertificates: Object.keys(bindings.mtlsCertificates ?? {}).sort(),
+		dispatchNamespaces: Object.keys(bindings.dispatchNamespaces ?? {}).sort(),
+		workflows: Object.keys(bindings.workflows ?? {}).sort(),
+		pipelines: Object.keys(bindings.pipelines ?? {}).sort(),
+		images: Object.keys(bindings.images ?? {}).sort(),
+		media: Object.keys(bindings.media ?? {}).sort(),
+		artifacts: Object.keys(bindings.artifacts ?? {}).sort(),
+		secretsStore: Object.keys(bindings.secretsStore ?? {}).sort(),
+		tailConsumers: (config.tailConsumers ?? [])
+			.map((consumer) => typeof consumer === 'string' ? consumer : consumer.service)
+			.sort(),
 		hyperdrive: Object.keys(bindings.hyperdrive ?? {}).sort(),
 		vectorize: Object.keys(bindings.vectorize ?? {}).sort(),
 		services: Object.keys(bindings.services ?? {}).sort()

@@ -17,6 +17,7 @@ import type { DevflareConfig } from '../../../src/config'
 const baseConfig: DevflareConfig = {
 	name: 'my-worker',
 	compatibilityDate: '2026-04-01',
+	compatibilityFlags: [],
 	bindings: {
 		kv: { CACHE: { name: 'cache-kv' } },
 		d1: { DB: { name: 'main-db' } }
@@ -42,10 +43,82 @@ describe('build-manifest', () => {
 	})
 
 	test('summarizeBindings collects sorted binding keys per type', () => {
-		const summary = summarizeBindings(baseConfig)
+		const summary = summarizeBindings({
+			...baseConfig,
+			tailConsumers: [
+				'observability-tail'
+			],
+			bindings: {
+				...baseConfig.bindings,
+				rateLimits: {
+					MY_RATE_LIMITER: {
+						namespaceId: '1001',
+						simple: { limit: 100, period: 60 }
+					}
+				},
+				versionMetadata: { binding: 'CF_VERSION_METADATA' },
+				workerLoaders: {
+					LOADER: {}
+				},
+				mtlsCertificates: {
+					API_CERT: {
+						certificateId: 'cert-123'
+					}
+				},
+				dispatchNamespaces: {
+					DISPATCHER: {
+						namespace: 'customers'
+					}
+				},
+				workflows: {
+					ORDER_WORKFLOW: {
+						name: 'orders',
+						className: 'OrderWorkflow'
+					}
+				},
+				pipelines: {
+					EVENTS: {
+						pipeline: 'events-stream'
+					}
+				},
+				images: {
+					IMAGES: {
+						remote: true
+					}
+				},
+				media: {
+					MEDIA: {
+						remote: true
+					}
+				},
+				artifacts: {
+					ARTIFACTS: {
+						namespace: 'default'
+					}
+				},
+				secretsStore: {
+					API_TOKEN: {
+						storeId: 'store-123',
+						secretName: 'api-token'
+					}
+				}
+			}
+		})
 		expect(summary.kv).toEqual(['CACHE'])
 		expect(summary.d1).toEqual(['DB'])
 		expect(summary.r2).toEqual([])
+		expect(summary.rateLimits).toEqual(['MY_RATE_LIMITER'])
+		expect(summary.versionMetadata).toEqual(['CF_VERSION_METADATA'])
+		expect(summary.workerLoaders).toEqual(['LOADER'])
+		expect(summary.mtlsCertificates).toEqual(['API_CERT'])
+		expect(summary.dispatchNamespaces).toEqual(['DISPATCHER'])
+		expect(summary.workflows).toEqual(['ORDER_WORKFLOW'])
+		expect(summary.pipelines).toEqual(['EVENTS'])
+		expect(summary.images).toEqual(['IMAGES'])
+		expect(summary.media).toEqual(['MEDIA'])
+		expect(summary.artifacts).toEqual(['ARTIFACTS'])
+		expect(summary.secretsStore).toEqual(['API_TOKEN'])
+		expect(summary.tailConsumers).toEqual(['observability-tail'])
 	})
 
 	test('createBuildManifest stamps version + target + bindings snapshot', () => {

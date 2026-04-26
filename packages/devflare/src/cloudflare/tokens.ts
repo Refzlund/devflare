@@ -14,18 +14,40 @@ const ACCOUNT_OWNED_TOKEN_SCOPE = 'com.cloudflare.api.account'
 const ACCOUNT_API_TOKENS_PERMISSION_GROUP_NAME_PATTERN = /^Account API Tokens\b/i
 const DEVFLARE_MANAGED_TOKEN_NAME_PATTERN = /^devflare-/i
 
+// Devflare-managed tokens must include every variant (Read / Write / Edit /
+// Admin / Metadata Read / etc.) of every product permission group it touches.
+// Cloudflare's REST endpoints often distinguish read vs. edit vs. admin
+// operations on the *same* resource (e.g. listing R2 buckets requires the
+// "Workers R2 Storage" read permission while creating a bucket requires the
+// edit permission), so granting only one variant deterministically breaks
+// downstream provisioning. Each pattern below intentionally matches the full
+// product family (`/^Product /i`) rather than a specific verb, so any new
+// variant Cloudflare publishes — including new admin tiers — gets picked up
+// automatically when the token is (re-)created.
 const DEVFLARE_PERMISSION_GROUP_NAME_PATTERNS = [
-	/^Account Analytics Read$/i,
-	/^Account Settings Read$/i,
-	/^Analytics Read$/i,
+	/^Account Analytics /i,
+	/^Account Settings /i,
+	/^Account Filter Lists /i,
 	/^AI /i,
+	/^Analytics /i,
 	/^Browser Rendering /i,
-	/^D1 (Metadata Read|Read|Write)$/i,
-	/^Email (Routing|Sending) /i,
+	/^Cache Purge\b/i,
+	/^D1 /i,
+	/^DNS /i,
+	/^Email /i,
 	/^Hyperdrive /i,
+	/^Images /i,
+	/^Logs /i,
+	/^Logpush /i,
+	/^Pages /i,
 	/^Queues /i,
+	/^R2 /i,
+	/^SSL and Certificates /i,
+	/^Stream /i,
 	/^Vectorize /i,
-	/^Workers /i
+	/^Workers /i,
+	/^Zone Settings /i,
+	/^Zone /i
 ] as const
 
 /**

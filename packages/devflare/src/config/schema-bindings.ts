@@ -86,10 +86,83 @@ export const queuesConfigSchema = z.object({
 })
 
 /**
+ * Rate Limiting binding configuration.
+ * Devflare uses camelCase authoring and compiles to Wrangler's `ratelimits`
+ * array (`namespace_id`, `simple.limit`, `simple.period`).
+ */
+export const rateLimitBindingSchema = z.object({
+	/** Positive integer string unique to the Cloudflare account */
+	namespaceId: z.string().regex(/^[1-9]\d*$/, 'namespaceId must be a positive integer string'),
+	/** Simple rate limiting is the only currently supported Cloudflare mode */
+	simple: z.object({
+		/** Number of allowed calls within the configured period */
+		limit: z.number().int().positive(),
+		/** Rate limit window in seconds */
+		period: z.union([z.literal(10), z.literal(60)])
+	}).strict()
+}).strict()
+
+/**
+ * Version Metadata binding configuration.
+ */
+export const versionMetadataBindingSchema = z.object({
+	/** Binding name exposed in env (for example, CF_VERSION_METADATA) */
+	binding: z.string().min(1)
+}).strict()
+
+/**
+ * Worker Loader binding configuration for Dynamic Workers.
+ */
+export const workerLoaderBindingSchema = z.object({}).strict()
+
+/**
+ * Secrets Store binding configuration.
+ * Devflare uses camelCase authoring and compiles to Wrangler's
+ * `secrets_store_secrets` array (`store_id`, `secret_name`).
+ */
+export const secretsStoreBindingSchema = z.object({
+	/** Secrets Store ID containing the account-level secret */
+	storeId: z.string().min(1),
+	/** Secret name within the store */
+	secretName: z.string().min(1)
+}).strict()
+
+/**
  * Service binding schema.
  * Binds to another Worker for RPC-style communication.
  * Accepts plain objects or WorkerBinding from ref().worker.
  */
+const serviceBindingKeys = new Set(['service', 'environment', 'entrypoint', '__ref'])
+
+function isServiceBindingValue(val: unknown): boolean {
+	if ((typeof val !== 'object' && typeof val !== 'function') || val === null) {
+		return false
+	}
+
+	const obj = val as Record<string, unknown>
+	if (typeof obj.service !== 'string' || obj.service.trim().length === 0) {
+		return false
+	}
+
+	if (obj.environment !== undefined && (typeof obj.environment !== 'string' || obj.environment.trim().length === 0)) {
+		return false
+	}
+
+	if (obj.entrypoint !== undefined && (typeof obj.entrypoint !== 'string' || obj.entrypoint.trim().length === 0)) {
+		return false
+	}
+
+	if (typeof val === 'object') {
+		for (const key of Object.keys(obj)) {
+			if (!serviceBindingKeys.has(key)) {
+				return false
+			}
+		}
+	}
+
+	return true
+}
+
 export const serviceBindingSchema = z.custom<{
 	/** Target worker/service name */
 	service: string
@@ -99,15 +172,8 @@ export const serviceBindingSchema = z.custom<{
 	entrypoint?: string
 	/** @internal Reference marker for ref() bindings */
 	__ref?: unknown
-}>((val) => {
-	if (typeof val !== 'object' && typeof val !== 'function') {
-		return false
-	}
-
-	const obj = val as Record<string, unknown>
-	return typeof obj.service === 'string'
-}, {
-	message: 'Expected service binding object with { service: string } or ref().worker'
+}>(isServiceBindingValue, {
+	message: 'Expected service binding object with { service: string, environment?: string, entrypoint?: string } or ref().worker'
 })
 
 /**
@@ -116,8 +182,34 @@ export const serviceBindingSchema = z.custom<{
  */
 export const aiBindingSchema = z.object({
 	/** Binding name exposed in env (e.g., 'AI') */
-	binding: z.string()
-})
+	binding: z.string(),
+	/** Ask Wrangler local development to connect this binding to the remote Workers AI service */
+	remote: z.boolean().optional(),
+	/** Use Cloudflare's staging Workers AI environment for this binding */
+	staging: z.boolean().optional()
+}).strict()
+
+/**
+ * AI Search namespace binding configuration.
+ * Provides access to all AI Search instances in a namespace.
+ */
+export const aiSearchNamespaceBindingSchema = z.object({
+	/** AI Search namespace name */
+	namespace: z.string().min(1),
+	/** Ask Wrangler local development to connect this binding remotely */
+	remote: z.boolean().optional()
+}).strict()
+
+/**
+ * AI Search instance binding configuration.
+ * Provides direct access to one AI Search instance in the default namespace.
+ */
+export const aiSearchInstanceBindingSchema = z.object({
+	/** AI Search instance name */
+	instanceName: z.string().min(1),
+	/** Ask Wrangler local development to connect this binding remotely */
+	remote: z.boolean().optional()
+}).strict()
 
 /**
  * Vectorize index binding configuration.
@@ -125,7 +217,9 @@ export const aiBindingSchema = z.object({
  */
 export const vectorizeBindingSchema = z.object({
 	/** Name of the Vectorize index */
-	indexName: z.string()
+	indexName: z.string(),
+	/** Ask Wrangler local development to connect this binding to the remote index */
+	remote: z.boolean().optional()
 })
 
 /**
@@ -134,12 +228,16 @@ export const vectorizeBindingSchema = z.object({
  */
 export const hyperdriveBindingByIdSchema = z.object({
 	/** Explicit Hyperdrive configuration ID */
-	id: z.string()
+	id: z.string(),
+	/** Direct database connection string used by local Miniflare/Wrangler dev */
+	localConnectionString: z.string().optional()
 }).strict()
 
 export const hyperdriveBindingByNameSchema = z.object({
 	/** Stable Hyperdrive configuration name to resolve to an ID at config/build/deploy time */
 	name: z.string(),
+	/** Direct database connection string used by local Miniflare/Wrangler dev */
+	localConnectionString: z.string().optional(),
 	/**
 	 * Opt-in fallback behavior for preview-scoped Hyperdrive bindings.
 	 * When set to `'base'`, Devflare is permitted to reuse the base Hyperdrive
@@ -149,7 +247,7 @@ export const hyperdriveBindingByNameSchema = z.object({
 	previewFallback: z.literal('base').optional(),
 	/** Explicit dedicated preview Hyperdrive configuration ID */
 	previewId: z.string().optional(),
-	/** Explicit local connection string used for preview/dev runs */
+	/** Legacy alias for a preview/dev local connection string; prefer localConnectionString */
 	previewLocalConnectionString: z.string().optional()
 }).strict()
 
@@ -169,7 +267,7 @@ export function formatBrowserBindingLimitMessage(bindingNames: string[]): string
 	return `${SINGLE_BROWSER_BINDING_ERROR_MESSAGE} Configured bindings: ${bindingNames.join(', ')}`
 }
 
-export function getBrowserBindingNames(bindings: Record<string, string> | undefined): string[] {
+export function getBrowserBindingNames(bindings: Record<string, unknown> | undefined): string[] {
 	return bindings ? Object.keys(bindings) : []
 }
 
@@ -177,7 +275,15 @@ export function getBrowserBindingNames(bindings: Record<string, string> | undefi
  * Browser Rendering binding configuration.
  * Provides headless browser access for rendering/screenshots.
  */
-export const browserBindingSchema = z.record(z.string(), z.string()).superRefine((bindings, ctx) => {
+export const browserBindingValueSchema = z.union([
+	z.string(),
+	z.object({
+		/** Ask Wrangler local development to connect this binding to the remote Browser Rendering service */
+		remote: z.boolean().optional()
+	}).strict()
+])
+
+export const browserBindingSchema = z.record(z.string(), browserBindingValueSchema).superRefine((bindings, ctx) => {
 	const bindingNames = getBrowserBindingNames(bindings)
 	if (bindingNames.length > 1) {
 		ctx.addIssue({
@@ -246,29 +352,43 @@ export const kvBindingSchema = z.union([
 	kvBindingByNameSchema
 ])
 
+export const mtlsCertificateBindingByIdSchema = z.object({
+	/** Uploaded mTLS certificate UUID from `wrangler mtls-certificate upload` */
+	certificateId: z.string().min(1),
+	/** Ask Wrangler local development to use the remote binding when available */
+	remote: z.boolean().optional()
+}).strict()
+
+export const mtlsCertificateBindingByWranglerIdSchema = z.object({
+	/** Wrangler-native uploaded mTLS certificate UUID */
+	certificate_id: z.string().min(1),
+	/** Ask Wrangler local development to use the remote binding when available */
+	remote: z.boolean().optional()
+}).strict()
+
 /**
  * C17 — mTLS Certificate binding.
  * The id is the UUID returned by `wrangler mtls-certificate upload`.
  */
 export const mtlsCertificateBindingSchema = z.union([
-	z.string(),
-	z.object({
-		certificate_id: z.string()
-	}).strict()
+	z.string().min(1),
+	mtlsCertificateBindingByIdSchema,
+	mtlsCertificateBindingByWranglerIdSchema
 ])
 
 /**
  * C17 — Workers for Platforms (Dispatch Namespace) binding.
  */
 export const dispatchNamespaceBindingSchema = z.union([
-	z.string(),
+	z.string().min(1),
 	z.object({
-		namespace: z.string(),
+		namespace: z.string().min(1),
 		outbound: z.object({
-			service: z.string(),
+			service: z.string().min(1),
 			environment: z.string().optional(),
 			parameters: z.array(z.string()).optional()
-		}).optional()
+		}).strict().optional(),
+		remote: z.boolean().optional()
 	}).strict()
 ])
 
@@ -277,25 +397,50 @@ export const dispatchNamespaceBindingSchema = z.union([
  * to invoke). Distinct from a worker declaring its own workflows.
  */
 export const workflowBindingSchema = z.object({
-	name: z.string(),
-	className: z.string(),
-	scriptName: z.string().optional()
+	name: z.string().min(1),
+	className: z.string().min(1),
+	scriptName: z.string().min(1).optional(),
+	remote: z.boolean().optional(),
+	limits: z.object({
+		steps: z.number().int().positive()
+	}).strict().optional()
 }).strict()
 
 /**
  * C17 — Cloudflare Pipelines binding.
  */
 export const pipelineBindingSchema = z.union([
-	z.string(),
+	z.string().min(1),
 	z.object({
-		pipeline: z.string()
+		pipeline: z.string().min(1),
+		remote: z.boolean().optional()
 	}).strict()
 ])
 
 /**
  * C17 — Cloudflare Images binding (transformation/upload service).
  */
-export const imagesBindingSchema = z.object({}).strict().or(z.literal(true))
+export const imagesBindingSchema = z.object({
+	remote: z.boolean().optional()
+}).strict().or(z.literal(true))
+
+/**
+ * C17 — Cloudflare Media Transformations binding.
+ */
+export const mediaBindingSchema = z.object({
+	remote: z.boolean().optional()
+}).strict().or(z.literal(true))
+
+/**
+ * C17 — Cloudflare Artifacts binding.
+ */
+export const artifactsBindingSchema = z.union([
+	z.string().min(1),
+	z.object({
+		namespace: z.string().min(1),
+		remote: z.boolean().optional()
+	}).strict()
+])
 
 /**
  * All worker bindings configuration.
@@ -332,6 +477,26 @@ export const bindingsSchema = z.object({
 	queues: queuesConfigSchema.optional(),
 
 	/**
+	 * Rate Limiting bindings.
+	 */
+	rateLimits: z.record(z.string(), rateLimitBindingSchema).optional(),
+
+	/**
+	 * Version Metadata binding.
+	 */
+	versionMetadata: versionMetadataBindingSchema.optional(),
+
+	/**
+	 * Worker Loader bindings for Dynamic Workers.
+	 */
+	workerLoaders: z.record(z.string(), workerLoaderBindingSchema).optional(),
+
+	/**
+	 * Secrets Store bindings.
+	 */
+	secretsStore: z.record(z.string(), secretsStoreBindingSchema).optional(),
+
+	/**
 	 * Service bindings to other Workers.
 	 * Enables RPC-style communication between workers.
 	 */
@@ -341,6 +506,16 @@ export const bindingsSchema = z.object({
 	 * Workers AI binding for ML inference.
 	 */
 	ai: aiBindingSchema.optional(),
+
+	/**
+	 * AI Search namespace bindings.
+	 */
+	aiSearchNamespaces: z.record(z.string(), aiSearchNamespaceBindingSchema).optional(),
+
+	/**
+	 * AI Search instance bindings.
+	 */
+	aiSearch: z.record(z.string(), aiSearchInstanceBindingSchema).optional(),
 
 	/**
 	 * Vectorize index bindings for vector similarity search.
@@ -402,19 +577,60 @@ export const bindingsSchema = z.object({
 	 * Maps a binding name to access the Images service from the worker
 	 * (transformation/upload via `env.<binding>`).
 	 */
-	images: z.record(z.string(), imagesBindingSchema).optional()
+	images: z.record(z.string(), imagesBindingSchema).optional().superRefine((bindings, ctx) => {
+		if (!bindings || Object.keys(bindings).length <= 1) {
+			return
+		}
+
+		ctx.addIssue({
+			code: z.ZodIssueCode.custom,
+			message: 'Wrangler currently supports one Images binding per Worker'
+		})
+	}),
+
+	/**
+	 * C17 — Cloudflare Media Transformations binding.
+	 * Maps a binding name to access the Media Transformations service from
+	 * the worker (video/audio/frame extraction via `env.<binding>`).
+	 */
+	media: z.record(z.string(), mediaBindingSchema).optional().superRefine((bindings, ctx) => {
+		if (!bindings || Object.keys(bindings).length <= 1) {
+			return
+		}
+
+		ctx.addIssue({
+			code: z.ZodIssueCode.custom,
+			message: 'Wrangler currently supports one Media Transformations binding per Worker'
+		})
+	}),
+
+	/**
+	 * C17 — Cloudflare Artifacts bindings.
+	 * Maps a binding name to an Artifacts namespace for Git-compatible
+	 * file storage.
+	 */
+	artifacts: z.record(z.string(), artifactsBindingSchema).optional()
 }).optional()
 
 export type BrowserBindings = z.infer<typeof browserBindingSchema>
+export type BrowserBinding = z.infer<typeof browserBindingValueSchema>
 export type D1Binding = z.infer<typeof d1BindingSchema>
 export type DurableObjectBinding = z.infer<typeof durableObjectBindingSchema>
 export type HyperdriveBinding = z.infer<typeof hyperdriveBindingSchema>
 export type KVBinding = z.infer<typeof kvBindingSchema>
 export type QueueConsumer = z.infer<typeof queueConsumerSchema>
 export type QueuesConfig = z.infer<typeof queuesConfigSchema>
+export type RateLimitBinding = z.infer<typeof rateLimitBindingSchema>
+export type VersionMetadataBinding = z.infer<typeof versionMetadataBindingSchema>
+export type WorkerLoaderBinding = z.infer<typeof workerLoaderBindingSchema>
+export type SecretsStoreBinding = z.infer<typeof secretsStoreBindingSchema>
 export type ServiceBinding = z.infer<typeof serviceBindingSchema>
+export type AiSearchNamespaceBinding = z.infer<typeof aiSearchNamespaceBindingSchema>
+export type AiSearchInstanceBinding = z.infer<typeof aiSearchInstanceBindingSchema>
 export type MtlsCertificateBinding = z.infer<typeof mtlsCertificateBindingSchema>
 export type DispatchNamespaceBinding = z.infer<typeof dispatchNamespaceBindingSchema>
 export type WorkflowBinding = z.infer<typeof workflowBindingSchema>
 export type PipelineBinding = z.infer<typeof pipelineBindingSchema>
 export type ImagesBinding = z.infer<typeof imagesBindingSchema>
+export type MediaBinding = z.infer<typeof mediaBindingSchema>
+export type ArtifactsBinding = z.infer<typeof artifactsBindingSchema>

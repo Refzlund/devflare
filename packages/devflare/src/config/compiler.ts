@@ -10,11 +10,20 @@ import {
 	normalizeKVBinding,
 	normalizeD1Binding,
 	normalizeDOBinding,
+	normalizeMtlsCertificateBinding,
+	normalizeDispatchNamespaceBinding,
+	normalizeWorkflowBinding,
+	normalizePipelineBinding,
+	normalizeImagesBinding,
+	normalizeMediaBinding,
+	normalizeArtifactsBinding,
 	type DevflareConfig,
 	type D1Binding,
 	type HyperdriveBinding,
 	type KVBinding
 } from './schema'
+import { normalizeCompatibilityFlags } from './compatibility'
+import { toWranglerSecretsConfig } from './local-dev-vars'
 import { resolveConfigForEnvironment } from './resolve'
 import type { ResolvedConfig } from './resolve-phased'
 
@@ -27,6 +36,10 @@ export interface WranglerConfig {
 	main?: string
 	compatibility_date: string
 	compatibility_flags?: string[]
+	rules?: WranglerModuleRule[]
+	find_additional_modules?: boolean
+	base_dir?: string
+	preserve_file_names?: boolean
 	preview_urls?: boolean
 	workers_dev?: boolean
 
@@ -53,16 +66,91 @@ export interface WranglerConfig {
 			retry_delay?: number
 		}>
 	}
+	ratelimits?: Array<{
+		name: string
+		namespace_id: string
+		simple: {
+			limit: number
+			period: 10 | 60
+		}
+	}>
+	version_metadata?: {
+		binding: string
+	}
+	worker_loaders?: Array<{
+		binding: string
+	}>
+	secrets_store_secrets?: Array<{
+		binding: string
+		store_id: string
+		secret_name: string
+	}>
+	mtls_certificates?: Array<{
+		binding: string
+		certificate_id: string
+		remote?: boolean
+	}>
+	dispatch_namespaces?: Array<{
+		binding: string
+		namespace: string
+		outbound?: {
+			service: string
+			environment?: string
+			parameters?: string[]
+		}
+		remote?: boolean
+	}>
+	workflows?: Array<{
+		binding: string
+		name: string
+		class_name: string
+		script_name?: string
+		remote?: boolean
+		limits?: {
+			steps: number
+		}
+	}>
+	pipelines?: Array<{
+		binding: string
+		pipeline: string
+		remote?: boolean
+	}>
 	services?: Array<{
 		binding: string
 		service: string
 		entrypoint?: string
 		environment?: string
 	}>
-	ai?: { binding: string }
-	vectorize?: Array<{ binding: string; index_name: string }>
+	ai?: { binding: string; remote?: boolean; staging?: boolean }
+	ai_search_namespaces?: Array<{ binding: string; namespace: string; remote?: boolean }>
+	ai_search?: Array<{ binding: string; instance_name: string; remote?: boolean }>
+	vectorize?: Array<{ binding: string; index_name: string; remote?: boolean }>
 	hyperdrive?: WranglerHyperdriveBinding[]
-	browser?: { binding: string }
+	browser?: { binding: string; remote?: boolean }
+	images?: {
+		binding: string
+		remote?: boolean
+	}
+	media?: {
+		binding: string
+		remote?: boolean
+	}
+	artifacts?: Array<{
+		binding: string
+		namespace: string
+		remote?: boolean
+	}>
+	containers?: Array<{
+		class_name: string
+		image: string
+		max_instances?: number
+		instance_type?: string
+		name?: string
+		image_build_context?: string
+		image_vars?: Record<string, string>
+		rollout_active_grace_period?: number
+		rollout_step_percentage?: number | number[]
+	}>
 	analytics_engine_datasets?: Array<{ binding: string; dataset: string }>
 	send_email?: Array<{
 		name: string
@@ -75,9 +163,16 @@ export interface WranglerConfig {
 	triggers?: {
 		crons?: string[]
 	}
+	tail_consumers?: Array<{
+		service: string
+		environment?: string
+	}>
 
 	// Variables
 	vars?: Record<string, string>
+	secrets?: {
+		required?: string[]
+	}
 
 	// Routes
 	routes?: Array<{
@@ -91,17 +186,49 @@ export interface WranglerConfig {
 	assets?: {
 		directory: string
 		binding?: string
+		html_handling?: 'auto-trailing-slash' | 'force-trailing-slash' | 'drop-trailing-slash' | 'none'
+		not_found_handling?: 'single-page-application' | '404-page' | 'none'
+		run_worker_first?: boolean | string[]
+	}
+
+	// Placement
+	placement?: {
+		mode: 'off' | 'smart'
+		hint?: string
+	} | {
+		mode?: 'targeted'
+		region: string
+	} | {
+		mode?: 'targeted'
+		host: string
+	} | {
+		mode?: 'targeted'
+		hostname: string
 	}
 
 	// Observability
 	observability?: {
 		enabled?: boolean
 		head_sampling_rate?: number
+		logs?: {
+			enabled?: boolean
+			head_sampling_rate?: number
+			invocation_logs?: boolean
+			persist?: boolean
+			destinations?: string[]
+		}
+		traces?: {
+			enabled?: boolean
+			head_sampling_rate?: number
+			persist?: boolean
+			destinations?: string[]
+		}
 	}
 
 	// Limits
 	limits?: {
 		cpu_ms?: number
+		subrequests?: number
 	}
 
 	// Migrations
@@ -126,8 +253,14 @@ export type WranglerD1DatabaseBinding =
 	| { binding: string; database_name: string }
 
 export type WranglerHyperdriveBinding =
-	| { binding: string; id: string }
-	| { binding: string; name: string }
+	| { binding: string; id: string; localConnectionString?: string }
+	| { binding: string; name: string; localConnectionString?: string }
+
+export interface WranglerModuleRule {
+	type: 'ESModule' | 'CommonJS' | 'CompiledWasm' | 'Text' | 'Data'
+	globs: string[]
+	fallthrough?: boolean
+}
 
 interface CompileConfigOptions {
 	preserveNamedBindings?: boolean
@@ -200,14 +333,16 @@ function getWranglerHyperdriveBinding(
 	if (normalized.configurationId) {
 		return {
 			binding: bindingName,
-			id: normalized.configurationId
+			id: normalized.configurationId,
+			...(normalized.localConnectionString && { localConnectionString: normalized.localConnectionString })
 		}
 	}
 
 	if (options.preserveNamedBindings && normalized.name) {
 		return {
 			binding: bindingName,
-			name: normalized.name
+			name: normalized.name,
+			...(normalized.localConnectionString && { localConnectionString: normalized.localConnectionString })
 		}
 	}
 
@@ -218,7 +353,7 @@ function getWranglerHyperdriveBinding(
 
 function getWranglerBrowserBinding(
 	browserBindings: NonNullable<DevflareConfig['bindings']>['browser']
-): { binding: string } | undefined {
+): { binding: string; remote?: boolean } | undefined {
 	if (!browserBindings) {
 		return undefined
 	}
@@ -228,7 +363,17 @@ function getWranglerBrowserBinding(
 	// `configSchema.parse()` (e.g. raw objects cast as DevflareConfig).
 	const parsed = browserBindingSchema.parse(browserBindings)
 	const bindingName = getSingleBrowserBindingName(parsed)
-	return bindingName ? { binding: bindingName } : undefined
+	if (!bindingName) {
+		return undefined
+	}
+
+	const bindingConfig = parsed[bindingName]
+	return {
+		binding: bindingName,
+		...(typeof bindingConfig === 'object' && bindingConfig.remote !== undefined && {
+			remote: bindingConfig.remote
+		})
+	}
 }
 
 function compileWranglerMigrations(
@@ -245,6 +390,52 @@ function compileWranglerMigrations(
 		}),
 		...(migration.deleted_classes && { deleted_classes: migration.deleted_classes }),
 		...(migration.new_sqlite_classes && { new_sqlite_classes: migration.new_sqlite_classes })
+	}))
+}
+
+function compileModuleOptions(
+	config: DevflareConfig,
+	result: WranglerConfig
+): void {
+	if (config.rules && config.rules.length > 0) {
+		result.rules = config.rules
+	}
+
+	if (config.findAdditionalModules !== undefined) {
+		result.find_additional_modules = config.findAdditionalModules
+	}
+
+	if (config.baseDir) {
+		result.base_dir = config.baseDir
+	}
+
+	if (config.preserveFileNames !== undefined) {
+		result.preserve_file_names = config.preserveFileNames
+	}
+}
+
+function compileContainers(
+	config: DevflareConfig,
+	result: WranglerConfig
+): void {
+	if (!config.containers || config.containers.length === 0) {
+		return
+	}
+
+	result.containers = config.containers.map((container) => ({
+		class_name: container.className,
+		image: container.image,
+		...(container.maxInstances !== undefined && { max_instances: container.maxInstances }),
+		...(container.instanceType && { instance_type: container.instanceType }),
+		...(container.name && { name: container.name }),
+		...(container.imageBuildContext && { image_build_context: container.imageBuildContext }),
+		...(container.imageVars && { image_vars: container.imageVars }),
+		...(container.rolloutActiveGracePeriod !== undefined && {
+			rollout_active_grace_period: container.rolloutActiveGracePeriod
+		}),
+		...(container.rolloutStepPercentage !== undefined && {
+			rollout_step_percentage: container.rolloutStepPercentage
+		})
 	}))
 }
 
@@ -284,9 +475,13 @@ function compileConfigInternal(
 	environment?: string,
 	options: CompileConfigOptions = {}
 ): WranglerConfig {
-	const mergedConfig = options.alreadyResolved
+	const resolvedConfig = options.alreadyResolved
 		? config
 		: resolveConfigForEnvironment(config, environment)
+	const mergedConfig = {
+		...resolvedConfig,
+		compatibilityFlags: normalizeCompatibilityFlags(resolvedConfig.compatibilityFlags)
+	}
 
 	const result: WranglerConfig = {
 		name: mergedConfig.name,
@@ -307,6 +502,8 @@ function compileConfigInternal(
 		result.main = mainEntry
 	}
 
+	compileModuleOptions(mergedConfig, result)
+
 	// Compatibility flags
 	if (mergedConfig.compatibilityFlags && mergedConfig.compatibilityFlags.length > 0) {
 		result.compatibility_flags = mergedConfig.compatibilityFlags
@@ -322,9 +519,25 @@ function compileConfigInternal(
 		result.triggers = { crons: mergedConfig.triggers.crons }
 	}
 
+	if (mergedConfig.tailConsumers && mergedConfig.tailConsumers.length > 0) {
+		result.tail_consumers = mergedConfig.tailConsumers.map((consumer) => (
+			typeof consumer === 'string'
+				? { service: consumer }
+				: {
+					service: consumer.service,
+					...(consumer.environment && { environment: consumer.environment })
+				}
+		))
+	}
+
 	// Variables
 	if (mergedConfig.vars && Object.keys(mergedConfig.vars).length > 0) {
 		result.vars = mergedConfig.vars
+	}
+
+	const secrets = toWranglerSecretsConfig(mergedConfig.secrets)
+	if (secrets) {
+		result.secrets = secrets
 	}
 
 	// Routes
@@ -341,8 +554,20 @@ function compileConfigInternal(
 	if (mergedConfig.assets && mergedConfig.assets.directory) {
 		result.assets = {
 			directory: mergedConfig.assets.directory,
-			...(mergedConfig.assets.binding && { binding: mergedConfig.assets.binding })
+			...(mergedConfig.assets.binding && { binding: mergedConfig.assets.binding }),
+			...(mergedConfig.assets.html_handling && { html_handling: mergedConfig.assets.html_handling }),
+			...(mergedConfig.assets.not_found_handling && {
+				not_found_handling: mergedConfig.assets.not_found_handling
+			}),
+			...(mergedConfig.assets.run_worker_first !== undefined && {
+				run_worker_first: mergedConfig.assets.run_worker_first
+			})
 		}
+	}
+
+	// Placement
+	if (mergedConfig.placement) {
+		result.placement = mergedConfig.placement
 	}
 
 	// Observability
@@ -354,6 +579,8 @@ function compileConfigInternal(
 	if (mergedConfig.limits) {
 		result.limits = mergedConfig.limits
 	}
+
+	compileContainers(mergedConfig, result)
 
 	// Migrations
 	if (mergedConfig.migrations && mergedConfig.migrations.length > 0) {
@@ -456,6 +683,129 @@ function compileBindings(
 		}
 	}
 
+	// Rate Limiting
+	if (bindings.rateLimits) {
+		result.ratelimits = Object.entries(bindings.rateLimits).map(([name, config]) => ({
+			name,
+			namespace_id: config.namespaceId,
+			simple: {
+				limit: config.simple.limit,
+				period: config.simple.period
+			}
+		}))
+	}
+
+	// Version Metadata
+	if (bindings.versionMetadata) {
+		result.version_metadata = {
+			binding: bindings.versionMetadata.binding
+		}
+	}
+
+	// Worker Loaders
+	if (bindings.workerLoaders) {
+		result.worker_loaders = Object.keys(bindings.workerLoaders).map((binding) => ({ binding }))
+	}
+
+	// mTLS Certificates
+	if (bindings.mtlsCertificates) {
+		result.mtls_certificates = Object.entries(bindings.mtlsCertificates).map(([binding, config]) => {
+			const normalized = normalizeMtlsCertificateBinding(config)
+			return {
+				binding,
+				certificate_id: normalized.certificateId,
+				...(normalized.remote !== undefined && { remote: normalized.remote })
+			}
+		})
+	}
+
+	// Dispatch Namespaces
+	if (bindings.dispatchNamespaces) {
+		result.dispatch_namespaces = Object.entries(bindings.dispatchNamespaces).map(([binding, config]) => {
+			const normalized = normalizeDispatchNamespaceBinding(config)
+			return {
+				binding,
+				namespace: normalized.namespace,
+				...(normalized.outbound && { outbound: normalized.outbound }),
+				...(normalized.remote !== undefined && { remote: normalized.remote })
+			}
+		})
+	}
+
+	// Workflows
+	if (bindings.workflows) {
+		result.workflows = Object.entries(bindings.workflows).map(([binding, config]) => {
+			const normalized = normalizeWorkflowBinding(config)
+			return {
+				binding,
+				name: normalized.name,
+				class_name: normalized.className,
+				...(normalized.scriptName && { script_name: normalized.scriptName }),
+				...(normalized.remote !== undefined && { remote: normalized.remote }),
+				...(normalized.limits && { limits: normalized.limits })
+			}
+		})
+	}
+
+	// Pipelines
+	if (bindings.pipelines) {
+		result.pipelines = Object.entries(bindings.pipelines).map(([binding, config]) => {
+			const normalized = normalizePipelineBinding(config)
+			return {
+				binding,
+				pipeline: normalized.pipeline,
+				...(normalized.remote !== undefined && { remote: normalized.remote })
+			}
+		})
+	}
+
+	// Images
+	if (bindings.images) {
+		const [entry] = Object.entries(bindings.images)
+		if (entry) {
+			const [binding, config] = entry
+			const normalized = normalizeImagesBinding(binding, config)
+			result.images = {
+				binding: normalized.binding,
+				...(normalized.remote !== undefined && { remote: normalized.remote })
+			}
+		}
+	}
+
+	// Media Transformations
+	if (bindings.media) {
+		const [entry] = Object.entries(bindings.media)
+		if (entry) {
+			const [binding, config] = entry
+			const normalized = normalizeMediaBinding(binding, config)
+			result.media = {
+				binding: normalized.binding,
+				...(normalized.remote !== undefined && { remote: normalized.remote })
+			}
+		}
+	}
+
+	// Artifacts
+	if (bindings.artifacts) {
+		result.artifacts = Object.entries(bindings.artifacts).map(([binding, config]) => {
+			const normalized = normalizeArtifactsBinding(config)
+			return {
+				binding,
+				namespace: normalized.namespace,
+				...(normalized.remote !== undefined && { remote: normalized.remote })
+			}
+		})
+	}
+
+	// Secrets Store
+	if (bindings.secretsStore) {
+		result.secrets_store_secrets = Object.entries(bindings.secretsStore).map(([binding, config]) => ({
+			binding,
+			store_id: config.storeId,
+			secret_name: config.secretName
+		}))
+	}
+
 	// Services
 	if (bindings.services) {
 		result.services = Object.entries(bindings.services).map(([binding, config]) => ({
@@ -468,14 +818,36 @@ function compileBindings(
 
 	// AI
 	if (bindings.ai && bindings.ai.binding) {
-		result.ai = { binding: bindings.ai.binding }
+		result.ai = {
+			binding: bindings.ai.binding,
+			...(bindings.ai.remote !== undefined && { remote: bindings.ai.remote }),
+			...(bindings.ai.staging !== undefined && { staging: bindings.ai.staging })
+		}
+	}
+
+	// AI Search
+	if (bindings.aiSearchNamespaces) {
+		result.ai_search_namespaces = Object.entries(bindings.aiSearchNamespaces).map(([binding, config]) => ({
+			binding,
+			namespace: config.namespace,
+			...(config.remote !== undefined && { remote: config.remote })
+		}))
+	}
+
+	if (bindings.aiSearch) {
+		result.ai_search = Object.entries(bindings.aiSearch).map(([binding, config]) => ({
+			binding,
+			instance_name: config.instanceName,
+			...(config.remote !== undefined && { remote: config.remote })
+		}))
 	}
 
 	// Vectorize
 	if (bindings.vectorize) {
 		result.vectorize = Object.entries(bindings.vectorize).map(([binding, config]) => ({
 			binding,
-			index_name: config.indexName
+			index_name: config.indexName,
+			...(config.remote !== undefined && { remote: config.remote })
 		}))
 	}
 
@@ -540,6 +912,16 @@ function rebasePathForConfigDir(
 		: resolve(projectRoot, pathValue)
 
 	return relative(configDir, absolutePath).replace(/\\/g, '/')
+}
+
+function isLocalContainerPath(pathValue: string): boolean {
+	return pathValue === 'Dockerfile'
+		|| pathValue.startsWith('.')
+		|| pathValue.startsWith('/')
+		|| pathValue.startsWith('\\')
+		|| isAbsolute(pathValue)
+		|| pathValue.endsWith('/Dockerfile')
+		|| pathValue.endsWith('\\Dockerfile')
 }
 
 function pathIsInsideDirectory(directoryPath: string, candidatePath: string): boolean {
@@ -613,6 +995,23 @@ export function rebaseWranglerConfigPaths(
 					...config.assets,
 					directory: rebasePathForConfigDir(projectRoot, configDir, config.assets.directory)
 				}
+			}
+			: {}),
+		...(config.containers
+			? {
+				containers: config.containers.map((container) => ({
+					...container,
+					image: isLocalContainerPath(container.image)
+						? rebasePathForConfigDir(projectRoot, configDir, container.image)
+						: container.image,
+					...(container.image_build_context && {
+						image_build_context: rebasePathForConfigDir(
+							projectRoot,
+							configDir,
+							container.image_build_context
+						)
+					})
+				}))
 			}
 			: {})
 	}
@@ -774,6 +1173,8 @@ export function compileDOWorkerConfig(
 			main: mainPath,
 			compatibility_date: resolvedConfig.compatibilityDate
 		}
+
+		compileModuleOptions(resolvedConfig, result)
 
 		if (resolvedConfig.compatibilityFlags && resolvedConfig.compatibilityFlags.length > 0) {
 			result.compatibility_flags = resolvedConfig.compatibilityFlags

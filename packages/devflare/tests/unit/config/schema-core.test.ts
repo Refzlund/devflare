@@ -296,6 +296,94 @@ describe('configSchema', () => {
 			}
 		})
 
+		test('accepts module rules for text, data, and compiled WASM assets', () => {
+			const result = configSchema.safeParse({
+				name: 'my-worker',
+				compatibilityDate: '2025-01-07',
+				rules: [
+					{ type: 'Text', globs: ['**/*.txt'], fallthrough: true },
+					{ type: 'Data', globs: ['**/*.bin'] },
+					{ type: 'CompiledWasm', globs: ['**/*.wasm'] }
+				],
+				findAdditionalModules: true,
+				baseDir: './src',
+				preserveFileNames: true
+			})
+
+			expect(result.success).toBe(true)
+			if (result.success) {
+				expect(result.data.rules).toEqual([
+					{ type: 'Text', globs: ['**/*.txt'], fallthrough: true },
+					{ type: 'Data', globs: ['**/*.bin'] },
+					{ type: 'CompiledWasm', globs: ['**/*.wasm'] }
+				])
+				expect(result.data.findAdditionalModules).toBe(true)
+				expect(result.data.baseDir).toBe('./src')
+				expect(result.data.preserveFileNames).toBe(true)
+			}
+		})
+
+		test('rejects Python module rules so beta Python Workers remain explicit passthrough', () => {
+			const result = configSchema.safeParse({
+				name: 'my-worker',
+				compatibilityDate: '2025-01-07',
+				rules: [
+					{ type: 'PythonModule', globs: ['**/*.py'] }
+				]
+			})
+
+			expect(result.success).toBe(false)
+		})
+
+		test('accepts native Containers config with offline local-dev options', () => {
+			const result = configSchema.safeParse({
+				name: 'my-worker',
+				compatibilityDate: '2026-04-26',
+				containers: [
+					{
+						className: 'MyContainer',
+						image: './Dockerfile',
+						maxInstances: 3,
+						instanceType: 'lite',
+						imageBuildContext: '.',
+						imageVars: {
+							NODE_VERSION: '22'
+						},
+						rolloutStepPercentage: [10, 100]
+					}
+				]
+			})
+
+			expect(result.success).toBe(true)
+			if (result.success) {
+				expect(result.data.containers?.[0]).toEqual({
+					className: 'MyContainer',
+					image: './Dockerfile',
+					maxInstances: 3,
+					instanceType: 'lite',
+					imageBuildContext: '.',
+					imageVars: {
+						NODE_VERSION: '22'
+					},
+					rolloutStepPercentage: [10, 100]
+				})
+			}
+		})
+
+		test('rejects Containers config without a class name', () => {
+			const result = configSchema.safeParse({
+				name: 'my-worker',
+				compatibilityDate: '2026-04-26',
+				containers: [
+					{
+						image: './Dockerfile'
+					}
+				]
+			})
+
+			expect(result.success).toBe(false)
+		})
+
 		test('accepts DO migrations', () => {
 			const result = configSchema.safeParse({
 				name: 'my-worker',
@@ -303,11 +391,13 @@ describe('configSchema', () => {
 				migrations: [
 					{
 						tag: 'v1',
-						new_classes: ['Counter']
+						new_sqlite_classes: ['Counter']
 					},
 					{
 						tag: 'v2',
-						renamed_classes: [{ from: 'Counter', to: 'CounterV2' }]
+						new_classes: ['LegacyCounter'],
+						renamed_classes: [{ from: 'Counter', to: 'CounterV2' }],
+						deleted_classes: ['OldCounter']
 					}
 				]
 			})
@@ -315,7 +405,51 @@ describe('configSchema', () => {
 			expect(result.success).toBe(true)
 			if (result.success) {
 				expect(result.data.migrations?.[0].tag).toBe('v1')
+				expect(result.data.migrations?.[0].new_sqlite_classes).toEqual(['Counter'])
+				expect(result.data.migrations?.[1].deleted_classes).toEqual(['OldCounter'])
 			}
+		})
+
+		test('rejects unsupported DO transfer migrations instead of stripping them', () => {
+			const result = configSchema.safeParse({
+				name: 'my-worker',
+				compatibilityDate: '2025-01-07',
+				migrations: [
+					{
+						tag: 'v4',
+						transferred_classes: [
+							{
+								from: 'OldCounter',
+								from_script: 'old-worker',
+								to: 'Counter'
+							}
+						]
+					}
+				]
+			})
+
+			expect(result.success).toBe(false)
+		})
+
+		test('rejects extra fields inside DO renamed_classes entries', () => {
+			const result = configSchema.safeParse({
+				name: 'my-worker',
+				compatibilityDate: '2025-01-07',
+				migrations: [
+					{
+						tag: 'v3',
+						renamed_classes: [
+							{
+								from: 'Counter',
+								to: 'CounterV2',
+								from_script: 'old-worker'
+							}
+						]
+					}
+				]
+			})
+
+			expect(result.success).toBe(false)
 		})
 	})
 })

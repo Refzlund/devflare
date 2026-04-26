@@ -36,20 +36,24 @@ function mergeEnvironmentValue(base: unknown, override: unknown): unknown {
 	return override
 }
 
+function withNormalizedCompatibilityFlags(config: DevflareConfig): DevflareConfig {
+	return {
+		...config,
+		compatibilityFlags: normalizeCompatibilityFlags(config.compatibilityFlags)
+	}
+}
+
 export function mergeConfigForEnvironment(
 	config: DevflareConfig,
 	environment?: string
 ): DevflareConfig {
 	if (!environment || !config.env?.[environment]) {
-		return config
+		return withNormalizedCompatibilityFlags(config)
 	}
 
 	const mergedConfig = mergeEnvironmentValue(config, config.env[environment]) as DevflareConfig
 
-	return {
-		...mergedConfig,
-		compatibilityFlags: normalizeCompatibilityFlags(mergedConfig.compatibilityFlags)
-	}
+	return withNormalizedCompatibilityFlags(mergedConfig)
 }
 
 /**

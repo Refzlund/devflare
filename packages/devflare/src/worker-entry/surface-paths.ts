@@ -9,6 +9,7 @@ export const DEFAULT_FETCH_ENTRY_FILES = defaultEntriesFor('fetch')
 export const DEFAULT_QUEUE_ENTRY_FILES = defaultEntriesFor('queue')
 export const DEFAULT_SCHEDULED_ENTRY_FILES = defaultEntriesFor('scheduled')
 export const DEFAULT_EMAIL_ENTRY_FILES = defaultEntriesFor('email')
+export const DEFAULT_TAIL_ENTRY_FILES = defaultEntriesFor('tail')
 
 /**
  * Path prefixes that are known framework / bundler build outputs.
@@ -40,6 +41,7 @@ export interface WorkerSurfacePaths {
 	queue: string | null
 	scheduled: string | null
 	email: string | null
+	tail: string | null
 }
 
 export async function resolveWorkerHandlerPath(
@@ -106,7 +108,8 @@ export async function resolveWorkerSurfacePaths(
 		fetch: await resolveWorkerHandlerPath(cwd, config.files?.fetch, DEFAULT_FETCH_ENTRY_FILES, 'fetch'),
 		queue: await resolveWorkerHandlerPath(cwd, config.files?.queue, DEFAULT_QUEUE_ENTRY_FILES, 'queue'),
 		scheduled: await resolveWorkerHandlerPath(cwd, config.files?.scheduled, DEFAULT_SCHEDULED_ENTRY_FILES, 'scheduled'),
-		email: await resolveWorkerHandlerPath(cwd, config.files?.email, DEFAULT_EMAIL_ENTRY_FILES, 'email')
+		email: await resolveWorkerHandlerPath(cwd, config.files?.email, DEFAULT_EMAIL_ENTRY_FILES, 'email'),
+		tail: await resolveWorkerHandlerPath(cwd, config.files?.tail, DEFAULT_TAIL_ENTRY_FILES, 'tail')
 	}
 }
 

@@ -1,0 +1,234 @@
+import { describe, expect, test } from 'bun:test'
+import type { Pipeline } from 'cloudflare:pipelines'
+import {
+	createOfflineBindings,
+	createOfflineEnv,
+	describeOfflineSupport,
+	getOfflineSupportMatrix
+} from '../../../src/test'
+
+describe('offline support matrix', () => {
+	test('classifies services by honest offline support tier', () => {
+		const matrix = getOfflineSupportMatrix()
+
+		expect(matrix.containers.tier).toBe('offline-native')
+		expect(matrix.workflows.tier).toBe('offline-native')
+		expect(matrix.aiSearch.tier).toBe('offline-fixture')
+		expect(matrix.media.tier).toBe('offline-fixture')
+		expect(matrix.mtlsCertificates.tier).toBe('offline-fixture')
+		expect(matrix.ai.tier).toBe('remote-boundary')
+		expect(matrix.vectorize.tier).toBe('remote-boundary')
+		expect(matrix.builds.tier).toBe('remote-boundary')
+	})
+
+	test('describes unknown services as remote-boundary instead of guessing', () => {
+		const support = describeOfflineSupport('future-cloudflare-product')
+
+		expect(support.tier).toBe('remote-boundary')
+		expect(support.reason).toContain('No offline support classification')
+		expect(support.recommendation).toContain('remote')
+	})
+
+	test('exports skip getters for documented remote-boundary integration tests', async () => {
+		const testApi = await import('../../../src/test')
+
+		expect('aiSearch' in testApi.shouldSkip).toBe(true)
+		expect('aiGateway' in testApi.shouldSkip).toBe(true)
+		expect('media' in testApi.shouldSkip).toBe(true)
+		expect('mtlsCertificates' in testApi.shouldSkip).toBe(true)
+		expect('artifacts' in testApi.shouldSkip).toBe(true)
+		expect('builds' in testApi.shouldSkip).toBe(true)
+	})
+})
+
+describe('createOfflineBindings', () => {
+	const config = {
+		name: 'offline-worker',
+		compatibilityDate: '2026-04-26',
+		compatibilityFlags: [],
+		vars: {
+			PUBLIC_VALUE: 'local'
+		},
+		bindings: {
+			rateLimits: {
+				RATE_LIMITER: {
+					namespaceId: '1001',
+					simple: {
+						limit: 1,
+						period: 10 as const
+					}
+				}
+			},
+			versionMetadata: {
+				binding: 'CF_VERSION_METADATA'
+			},
+			workerLoaders: {
+				LOADER: {}
+			},
+			mtlsCertificates: {
+				API_CERT: 'cert-123'
+			},
+			dispatchNamespaces: {
+				DISPATCHER: 'tenants'
+			},
+			workflows: {
+				ORDER_WORKFLOW: {
+					name: 'orders',
+					className: 'OrderWorkflow'
+				}
+			},
+			pipelines: {
+				EVENTS: 'events-stream'
+			},
+			images: {
+				IMAGES: true as const
+			},
+			media: {
+				MEDIA: true as const
+			},
+			artifacts: {
+				ARTIFACTS: 'default'
+			},
+			secretsStore: {
+				API_TOKEN: {
+					storeId: 'store-123',
+					secretName: 'api-token'
+				}
+			},
+			aiSearch: {
+				BLOG_SEARCH: {
+					instanceName: 'blog'
+				}
+			},
+			aiSearchNamespaces: {
+				SEARCH: {
+					namespace: 'default'
+				}
+			},
+			ai: {
+				binding: 'AI',
+				remote: true
+			},
+			vectorize: {
+				DOCUMENTS: {
+					indexName: 'docs',
+					remote: true
+				}
+			}
+		}
+	}
+
+	test('derives deterministic pure-test bindings from devflare config', async () => {
+		const result = createOfflineBindings(config, {
+			secretsStore: {
+				API_TOKEN: 'offline-secret'
+			},
+			mtlsCertificates: {
+				API_CERT: () => new Response('cert fetch')
+			},
+			dispatchNamespaces: {
+				DISPATCHER: {
+					workers: {
+						tenant: () => new Response('tenant response')
+					}
+				}
+			},
+			aiSearch: {
+				BLOG_SEARCH: {
+					items: [
+						{
+							key: 'cache.md',
+							content: 'Cloudflare cache API stores responses',
+							metadata: { slug: '/cache' }
+						}
+					]
+				}
+			},
+			aiSearchNamespaces: {
+				SEARCH: {
+					instances: {
+						docs: {
+							items: [
+								{
+									key: 'offline.md',
+									content: 'Offline support is fixture backed'
+								}
+							]
+						}
+					}
+				}
+			}
+		})
+
+		expect(result.env.PUBLIC_VALUE).toBe('local')
+		expect(await (result.env.API_TOKEN as SecretsStoreSecret).get()).toBe('offline-secret')
+		expect(await (await (result.env.API_CERT as Fetcher).fetch('https://example.com')).text()).toBe(
+			'cert fetch'
+		)
+		expect(
+			await (
+				await (result.env.DISPATCHER as DispatchNamespace)
+					.get('tenant')
+					.fetch('https://example.com')
+			).text()
+		).toBe('tenant response')
+
+		const firstLimit = await (result.env.RATE_LIMITER as RateLimit).limit({ key: 'user-1' })
+		const secondLimit = await (result.env.RATE_LIMITER as RateLimit).limit({ key: 'user-1' })
+		expect(firstLimit.success).toBe(true)
+		expect(secondLimit.success).toBe(false)
+
+		await (result.env.EVENTS as Pipeline).send([{ message: 'hello' }])
+		expect((result.env.EVENTS as Pipeline & { _getRecords(): unknown[] })._getRecords()).toEqual([
+			{ message: 'hello' }
+		])
+
+		const search = await (result.env.BLOG_SEARCH as AiSearchInstance).search({ query: 'cache' })
+		expect(search.chunks).toHaveLength(1)
+		expect(search.chunks[0].item.key).toBe('cache.md')
+
+		const multi = await (result.env.SEARCH as AiSearchNamespace).search({
+			query: 'offline',
+			ai_search_options: {
+				instance_ids: ['docs']
+			}
+		})
+		expect(multi.chunks).toHaveLength(1)
+		expect(multi.chunks[0].instance_id).toBe('docs')
+
+		expect(result.remoteBoundaries.map((boundary) => boundary.service)).toContain('ai')
+		expect(result.remoteBoundaries.map((boundary) => boundary.service)).toContain('vectorize')
+		expect(result.missingFixtures).toEqual([])
+	})
+
+	test('makes missing secret fixtures explicit and non-networked', async () => {
+		const result = createOfflineBindings(config)
+
+		expect(result.missingFixtures).toEqual([
+			{
+				service: 'secretsStore',
+				binding: 'API_TOKEN',
+				reason:
+					'Secrets Store values are not present in config; pass fixtures.secretsStore.API_TOKEN for offline tests.'
+			}
+		])
+		await expect((result.env.API_TOKEN as SecretsStoreSecret).get()).rejects.toThrow(
+			'fixtures.secretsStore.API_TOKEN'
+		)
+	})
+
+	test('createOfflineEnv returns only the derived env object', async () => {
+		const env = createOfflineEnv(config, {
+			secretsStore: {
+				API_TOKEN: 'offline-secret'
+			}
+		})
+
+		expect(await (env.API_TOKEN as SecretsStoreSecret).get()).toBe('offline-secret')
+		expect(env.CF_VERSION_METADATA).toEqual({
+			id: 'devflare-local-version',
+			tag: 'local',
+			timestamp: '1970-01-01T00:00:00.000Z'
+		})
+	})
+})

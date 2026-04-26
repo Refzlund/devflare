@@ -1,11 +1,18 @@
 import {
 	formatBrowserBindingLimitMessage,
 	getBrowserBindingNames,
+	type ArtifactsBinding,
 	type BrowserBindings,
 	type D1Binding,
+	type DispatchNamespaceBinding,
 	type DurableObjectBinding,
 	type HyperdriveBinding,
-	type KVBinding
+	type ImagesBinding,
+	type KVBinding,
+	type MediaBinding,
+	type MtlsCertificateBinding,
+	type PipelineBinding,
+	type WorkflowBinding
 } from './schema-bindings'
 
 // Re-exported so call sites can format the same message Zod uses without
@@ -56,6 +63,71 @@ export interface NormalizedHyperdriveBinding {
 	configurationId?: string
 	/** Stable Hyperdrive configuration name when the binding is configured by name */
 	name?: string
+	/** Direct database connection string for local Hyperdrive emulation */
+	localConnectionString?: string
+}
+
+export interface NormalizedMtlsCertificateBinding {
+	/** Uploaded mTLS certificate UUID */
+	certificateId: string
+	/** Wrangler local-development remote-binding preference */
+	remote?: boolean
+}
+
+export interface NormalizedDispatchNamespaceBinding {
+	/** Dispatch namespace name */
+	namespace: string
+	/** Optional outbound Worker config */
+	outbound?: {
+		service: string
+		environment?: string
+		parameters?: string[]
+	}
+	/** Wrangler local-development remote-binding preference */
+	remote?: boolean
+}
+
+export interface NormalizedWorkflowBinding {
+	/** Workflow resource name */
+	name: string
+	/** Exported Workflow class name */
+	className: string
+	/** Optional Worker script name when the Workflow class is external */
+	scriptName?: string
+	/** Wrangler local-development remote-binding preference */
+	remote?: boolean
+	/** Optional Workflow-specific limits */
+	limits?: {
+		steps: number
+	}
+}
+
+export interface NormalizedPipelineBinding {
+	/** Pipeline or stream name/id */
+	pipeline: string
+	/** Wrangler local-development remote-binding preference */
+	remote?: boolean
+}
+
+export interface NormalizedImagesBinding {
+	/** Images binding name */
+	binding: string
+	/** Wrangler local-development remote-binding preference */
+	remote?: boolean
+}
+
+export interface NormalizedMediaBinding {
+	/** Media Transformations binding name */
+	binding: string
+	/** Wrangler local-development remote-binding preference */
+	remote?: boolean
+}
+
+export interface NormalizedArtifactsBinding {
+	/** Artifacts namespace */
+	namespace: string
+	/** Wrangler local-development remote-binding preference */
+	remote?: boolean
 }
 
 /**
@@ -140,11 +212,154 @@ export function normalizeHyperdriveBinding(config: HyperdriveBinding): Normalize
 		return { name: config }
 	}
 
+	const localConnectionString = 'localConnectionString' in config
+		? config.localConnectionString
+		: 'previewLocalConnectionString' in config
+			? config.previewLocalConnectionString
+			: undefined
+
 	if ('id' in config) {
-		return { configurationId: config.id }
+		return {
+			configurationId: config.id,
+			...(localConnectionString && { localConnectionString })
+		}
 	}
 
-	return { name: config.name }
+	return {
+		name: config.name,
+		...(localConnectionString && { localConnectionString })
+	}
+}
+
+/**
+ * Normalize an mTLS certificate binding to Devflare's camelCase shape.
+ */
+export function normalizeMtlsCertificateBinding(
+	config: MtlsCertificateBinding
+): NormalizedMtlsCertificateBinding {
+	if (typeof config === 'string') {
+		return { certificateId: config }
+	}
+
+	if ('certificateId' in config) {
+		return {
+			certificateId: config.certificateId,
+			...(config.remote !== undefined && { remote: config.remote })
+		}
+	}
+
+	return {
+		certificateId: config.certificate_id,
+		...(config.remote !== undefined && { remote: config.remote })
+	}
+}
+
+/**
+ * Normalize a Dispatch Namespace binding to its object form.
+ */
+export function normalizeDispatchNamespaceBinding(
+	config: DispatchNamespaceBinding
+): NormalizedDispatchNamespaceBinding {
+	if (typeof config === 'string') {
+		return { namespace: config }
+	}
+
+	return {
+		namespace: config.namespace,
+		...(config.outbound && {
+			outbound: {
+				service: config.outbound.service,
+				...(config.outbound.environment && { environment: config.outbound.environment }),
+				...(config.outbound.parameters && { parameters: config.outbound.parameters })
+			}
+		}),
+		...(config.remote !== undefined && { remote: config.remote })
+	}
+}
+
+/**
+ * Normalize a Workflow binding to its object form.
+ */
+export function normalizeWorkflowBinding(
+	config: WorkflowBinding
+): NormalizedWorkflowBinding {
+	return {
+		name: config.name,
+		className: config.className,
+		...(config.scriptName && { scriptName: config.scriptName }),
+		...(config.remote !== undefined && { remote: config.remote }),
+		...(config.limits && {
+			limits: {
+				steps: config.limits.steps
+			}
+		})
+	}
+}
+
+/**
+ * Normalize a Pipeline binding to its object form.
+ */
+export function normalizePipelineBinding(
+	config: PipelineBinding
+): NormalizedPipelineBinding {
+	if (typeof config === 'string') {
+		return { pipeline: config }
+	}
+
+	return {
+		pipeline: config.pipeline,
+		...(config.remote !== undefined && { remote: config.remote })
+	}
+}
+
+/**
+ * Normalize an Images binding to Wrangler's singleton binding object.
+ */
+export function normalizeImagesBinding(
+	binding: string,
+	config: ImagesBinding
+): NormalizedImagesBinding {
+	if (config === true) {
+		return { binding }
+	}
+
+	return {
+		binding,
+		...(config.remote !== undefined && { remote: config.remote })
+	}
+}
+
+/**
+ * Normalize a Media Transformations binding to Wrangler's singleton binding object.
+ */
+export function normalizeMediaBinding(
+	binding: string,
+	config: MediaBinding
+): NormalizedMediaBinding {
+	if (config === true) {
+		return { binding }
+	}
+
+	return {
+		binding,
+		...(config.remote !== undefined && { remote: config.remote })
+	}
+}
+
+/**
+ * Normalize an Artifacts binding to its object form.
+ */
+export function normalizeArtifactsBinding(
+	config: ArtifactsBinding
+): NormalizedArtifactsBinding {
+	if (typeof config === 'string') {
+		return { namespace: config }
+	}
+
+	return {
+		namespace: config.namespace,
+		...(config.remote !== undefined && { remote: config.remote })
+	}
 }
 
 /**

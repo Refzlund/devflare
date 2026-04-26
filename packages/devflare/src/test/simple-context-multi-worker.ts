@@ -43,6 +43,17 @@ export function applyMultiWorkerConfig(
 		...(mfConfig.kvNamespaces && { kvNamespaces: mfConfig.kvNamespaces }),
 		...(mfConfig.r2Buckets && { r2Buckets: mfConfig.r2Buckets }),
 		...(mfConfig.d1Databases && { d1Databases: mfConfig.d1Databases }),
+		...(mfConfig.ratelimits && { ratelimits: mfConfig.ratelimits }),
+		...(mfConfig.versionMetadata && { versionMetadata: mfConfig.versionMetadata }),
+		...(mfConfig.workerLoaders && { workerLoaders: mfConfig.workerLoaders }),
+		...(mfConfig.mtlsCertificates && { mtlsCertificates: mfConfig.mtlsCertificates }),
+		...(mfConfig.dispatchNamespaces && { dispatchNamespaces: mfConfig.dispatchNamespaces }),
+		...(mfConfig.workflows && { workflows: mfConfig.workflows }),
+		...(mfConfig.pipelines && { pipelines: mfConfig.pipelines }),
+		...(mfConfig.images && { images: mfConfig.images }),
+		...(mfConfig.media && { media: mfConfig.media }),
+		...(mfConfig.artifacts && { artifacts: mfConfig.artifacts }),
+		...(mfConfig.secretsStoreSecrets && { secretsStoreSecrets: mfConfig.secretsStoreSecrets }),
 		...(mfConfig.email && { email: mfConfig.email }),
 		...(Object.keys(primaryDurableObjects).length > 0 && { durableObjects: primaryDurableObjects }),
 		...(serviceBindingResolution?.primaryServiceBindings && {
@@ -77,6 +88,17 @@ export function applyMultiWorkerConfig(
 	delete mfConfig.kvNamespaces
 	delete mfConfig.r2Buckets
 	delete mfConfig.d1Databases
+	delete mfConfig.ratelimits
+	delete mfConfig.versionMetadata
+	delete mfConfig.workerLoaders
+	delete mfConfig.mtlsCertificates
+	delete mfConfig.dispatchNamespaces
+	delete mfConfig.workflows
+	delete mfConfig.pipelines
+	delete mfConfig.images
+	delete mfConfig.media
+	delete mfConfig.artifacts
+	delete mfConfig.secretsStoreSecrets
 	delete mfConfig.durableObjects
 	mfConfig.workers = workers
 }

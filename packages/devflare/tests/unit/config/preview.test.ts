@@ -101,7 +101,8 @@ describe('resolveConfigForEnvironment', () => {
 				},
 				vectorize: {
 					DOCUMENT_INDEX: {
-						indexName: pv('document-index')
+						indexName: pv('document-index'),
+						remote: true
 					}
 				},
 				browser: {
@@ -133,6 +134,7 @@ describe('resolveConfigForEnvironment', () => {
 		expect(previewConfig.bindings?.queues?.consumers?.[0]?.queue).toBe('jobs-queue-preview')
 		expect(previewConfig.bindings?.queues?.consumers?.[0]?.deadLetterQueue).toBe('jobs-dlq-preview')
 		expect(previewConfig.bindings?.vectorize?.DOCUMENT_INDEX.indexName).toBe('document-index-preview')
+		expect(previewConfig.bindings?.vectorize?.DOCUMENT_INDEX.remote).toBe(true)
 		expect(previewConfig.bindings?.browser?.BROWSER).toBe('browser-renderer-preview')
 		expect(previewConfig.bindings?.analyticsEngine?.APP_ANALYTICS.dataset).toBe('analytics-dataset-preview')
 
@@ -188,6 +190,31 @@ describe('resolveConfigForEnvironment', () => {
 		expect(postgres?.previewFallback).toBe('base')
 	})
 
+	test('uses explicit previewId for preview Hyperdrive object-form bindings', () => {
+		const pv = preview.scope()
+		const config: DevflareConfig = {
+			name: 'demo-worker',
+			compatibilityDate: '2026-04-08',
+			compatibilityFlags: [],
+			bindings: {
+				hyperdrive: {
+					POSTGRES: {
+						name: pv('postgres-base'),
+						previewId: 'preview-hyperdrive-id',
+						localConnectionString: 'postgres://user:pass@localhost:5432/app'
+					}
+				}
+			}
+		}
+
+		const previewConfig = resolveConfigForEnvironment(config, 'preview')
+
+		expect(previewConfig.bindings?.hyperdrive?.POSTGRES).toEqual({
+			id: 'preview-hyperdrive-id',
+			localConnectionString: 'postgres://user:pass@localhost:5432/app'
+		})
+	})
+
 	test('keeps forced compatibility flags while replacing root custom flags when an environment override provides its own list', () => {
 		const config: DevflareConfig = {
 			name: 'demo-worker',
@@ -206,6 +233,22 @@ describe('resolveConfigForEnvironment', () => {
 			'nodejs_compat',
 			'nodejs_als',
 			'preview-flag'
+		])
+	})
+
+	test('normalizes compatibility flags even without an environment override', () => {
+		const config: DevflareConfig = {
+			name: 'demo-worker',
+			compatibilityDate: '2026-04-08',
+			compatibilityFlags: ['url_standard']
+		}
+
+		const resolvedConfig = resolveConfigForEnvironment(config)
+
+		expect(resolvedConfig.compatibilityFlags).toEqual([
+			'nodejs_compat',
+			'nodejs_als',
+			'url_standard'
 		])
 	})
 

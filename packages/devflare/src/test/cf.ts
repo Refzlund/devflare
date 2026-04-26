@@ -52,7 +52,7 @@ export type { TraceItemOptions, TailTriggerResult } from './tail'
  * - `cf.queue` — Queue consumer testing
  * - `cf.scheduled` — Cron/scheduled handler testing
  * - `cf.worker` — Fetch handler testing
- * - `cf.tail` — Tail helper surface (auto-detects `src/tail.ts` when present; no public `files.tail` config key)
+ * - `cf.tail` — Tail helper surface (uses `files.tail`, or auto-detects `src/tail.ts` when present)
  *
  * The helpers use the real Miniflare-backed bindings created by `createTestContext()`,
  * but several helper surfaces still synthesize event/controller objects around those
@@ -156,8 +156,8 @@ export const cf = {
 	 * - `cf.tail.trigger(events)` — Trigger tail handler with trace items
 	 * - `cf.tail.create(options)` — Create a TraceItem with defaults
 	 *
-	 * When `createTestContext()` finds `src/tail.ts`, `cf.tail.trigger()` is wired automatically.
-	 * There is still no public `files.tail` config key.
+	 * When `createTestContext()` finds `files.tail` or `src/tail.ts`,
+	 * `cf.tail.trigger()` is wired automatically.
 	 */
 	tail
 }

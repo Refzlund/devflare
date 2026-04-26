@@ -40,6 +40,51 @@ export {
 // Skip helper for conditional test execution
 export { shouldSkip } from './should-skip'
 
+// Local Cloudflare Containers testing helpers
+export {
+	containers,
+	createContainerManager,
+	detectContainerEngine,
+	getContainerSkipReason,
+	stopActiveContainers,
+	type ContainerCommandResult,
+	type ContainerCommandRunner,
+	type ContainerEngineCheck,
+	type ContainerEngineName,
+	type ContainerEnginePreference,
+	type ContainerEngineStatus,
+	type ContainerManager,
+	type ContainerManagerOptions,
+	type DevflareContainerInstance,
+	type LocalContainerState,
+	type StartContainerOptions
+} from './containers'
+
+// Offline-first support matrix and config-derived pure-test env helpers
+export {
+	createOfflineBindings,
+	createOfflineEnv,
+	describeOfflineSupport,
+	getOfflineSupportMatrix,
+	type OfflineBindingFixtures,
+	type OfflineBindingsResult,
+	type OfflineMissingFixture,
+	type OfflineRemoteBoundary,
+	type OfflineSupportEntry,
+	type OfflineSupportTier
+} from './offline-bindings'
+
+// AI Search pure unit-test mocks
+export {
+	createMockAISearchInstance,
+	createMockAISearchNamespace,
+	type MockAISearchInstance,
+	type MockAISearchInstanceOptions,
+	type MockAISearchItemFixture,
+	type MockAISearchNamespace,
+	type MockAISearchNamespaceOptions
+} from './ai-search'
+
 // Mock utilities (for unit testing without Miniflare)
 export {
 	createMockTestContext,
@@ -47,9 +92,31 @@ export {
 	createMockD1,
 	createMockR2,
 	createMockQueue,
+	createMockRateLimit,
+	createMockVersionMetadata,
+	createMockWorkerLoader,
+	createMockMTLSCertificate,
+	createMockDispatchNamespace,
+	createMockWorkflow,
+	createMockPipeline,
+	createMockImagesBinding,
+	createMockMediaBinding,
+	createMockArtifacts,
+	createMockSecretsStoreSecret,
 	createMockEnv,
 	withTestContext,
 	type TestContext,
 	type TestContextOptions,
-	type MockEnvOptions
+	type MockEnvOptions,
+	type MockRateLimitOptions,
+	type MockWorkerLoaderOptions,
+	type MockFetchInput,
+	type MockFetcherHandler,
+	type MockDispatchNamespaceOptions,
+	type MockWorkflowOptions,
+	type MockWorkflowInstanceOptions,
+	type MockPipeline,
+	type MockImagesBindingOptions,
+	type MockMediaBindingOptions,
+	type MockArtifactsOptions
 } from './utilities'

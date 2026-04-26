@@ -188,6 +188,108 @@ function collectBindingAssociationTargets(config: DevflareConfig): BindingAssoci
 		}
 	}
 
+	for (const binding of compiled.ratelimits ?? []) {
+		addAssociationTarget(targets, {
+			reference: binding.name,
+			type: 'Rate Limiting',
+			resource: binding.namespace_id
+		})
+	}
+
+	if (compiled.version_metadata) {
+		addAssociationTarget(targets, {
+			reference: compiled.version_metadata.binding,
+			type: 'Version Metadata',
+			resource: 'Version Metadata'
+		})
+	}
+
+	for (const binding of compiled.worker_loaders ?? []) {
+		addAssociationTarget(targets, {
+			reference: binding.binding,
+			type: 'Worker Loader',
+			resource: 'Worker Loader'
+		})
+	}
+
+	for (const binding of compiled.mtls_certificates ?? []) {
+		addAssociationTarget(targets, {
+			reference: binding.binding,
+			type: 'mTLS Certificate',
+			resource: binding.certificate_id
+		})
+	}
+
+	for (const binding of compiled.dispatch_namespaces ?? []) {
+		addAssociationTarget(targets, {
+			reference: binding.binding,
+			type: 'Dispatch Namespace',
+			resource: binding.namespace,
+			note: binding.outbound ? `outbound ${binding.outbound.service}` : undefined
+		})
+	}
+
+	for (const binding of compiled.workflows ?? []) {
+		addAssociationTarget(targets, {
+			reference: binding.binding,
+			type: 'Workflow',
+			resource: binding.name,
+			note: binding.script_name ? `script ${binding.script_name}` : binding.class_name
+		})
+	}
+
+	for (const binding of compiled.pipelines ?? []) {
+		addAssociationTarget(targets, {
+			reference: binding.binding,
+			type: 'Pipeline',
+			resource: binding.pipeline,
+			note: binding.remote ? 'remote local binding' : undefined
+		})
+	}
+
+	if (compiled.images) {
+		addAssociationTarget(targets, {
+			reference: compiled.images.binding,
+			type: 'Images',
+			resource: 'Images',
+			note: compiled.images.remote ? 'remote local binding' : undefined
+		})
+	}
+
+	if (compiled.media) {
+		addAssociationTarget(targets, {
+			reference: compiled.media.binding,
+			type: 'Media Transformations',
+			resource: 'Media Transformations',
+			note: compiled.media.remote ? 'remote local binding' : undefined
+		})
+	}
+
+	for (const binding of compiled.artifacts ?? []) {
+		addAssociationTarget(targets, {
+			reference: binding.binding,
+			type: 'Artifacts',
+			resource: binding.namespace,
+			note: binding.remote ? 'remote local binding' : undefined
+		})
+	}
+
+	for (const binding of compiled.secrets_store_secrets ?? []) {
+		addAssociationTarget(targets, {
+			reference: binding.binding,
+			type: 'Secrets Store',
+			resource: `${binding.store_id}/${binding.secret_name}`
+		})
+	}
+
+	for (const consumer of compiled.tail_consumers ?? []) {
+		addAssociationTarget(targets, {
+			type: 'Tail Consumer',
+			resource: consumer.service,
+			note: consumer.environment ? `env ${consumer.environment}` : undefined
+		})
+	}
+
 	for (const binding of compiled.services ?? []) {
 		addAssociationTarget(targets, {
 			reference: binding.binding,
@@ -418,6 +520,8 @@ function mapWranglerBindingType(
 			}
 		case 'queue':
 			return { friendlyType: 'Queue', resource: stringField('queue_name') }
+		case 'ratelimit':
+			return { friendlyType: 'Rate Limiting', resource: stringField('namespace_id') }
 		case 'service': {
 			const service = stringField('service') || (binding.name as string)
 			const entrypoint = stringField('entrypoint')
@@ -447,8 +551,28 @@ function mapWranglerBindingType(
 			return { friendlyType: 'mTLS Certificate', resource: stringField('certificate_id') }
 		case 'dispatch_namespace':
 			return { friendlyType: 'Dispatch Namespace', resource: stringField('namespace') }
+		case 'workflow':
+			return {
+				friendlyType: 'Workflow',
+				resource: stringField('workflow_name') || stringField('name')
+			}
+		case 'pipeline':
+			return { friendlyType: 'Pipeline', resource: stringField('pipeline') }
+		case 'images':
+			return { friendlyType: 'Images', resource: 'Images' }
+		case 'media':
+			return { friendlyType: 'Media Transformations', resource: 'Media Transformations' }
+		case 'artifacts':
+			return { friendlyType: 'Artifacts', resource: stringField('namespace') }
 		case 'version_metadata':
 			return { friendlyType: 'Version Metadata', resource: 'Version Metadata' }
+		case 'worker_loader':
+			return { friendlyType: 'Worker Loader', resource: 'Worker Loader' }
+		case 'secrets_store_secret':
+			return {
+				friendlyType: 'Secrets Store',
+				resource: `${stringField('store_id')}/${stringField('secret_name')}`
+			}
 		case 'plain_text':
 		case 'json':
 		case 'secret_text':

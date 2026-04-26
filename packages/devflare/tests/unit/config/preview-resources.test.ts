@@ -195,6 +195,43 @@ describe('preview-scoped resource lifecycle', () => {
 		expect(result.warnings.some((warning) => warning.includes('Browser Rendering'))).toBe(true)
 	})
 
+	test('uses explicit previewId Hyperdrive bindings without lifecycle lookup', async () => {
+		const config: DevflareConfig = {
+			name: 'preview-hyperdrive-worker',
+			compatibilityDate: '2026-04-08',
+			compatibilityFlags: [],
+			bindings: {
+				hyperdrive: {
+					POSTGRES: {
+						name: pv('testing-hyperdrive'),
+						previewId: 'preview-hyperdrive-id'
+					}
+				}
+			}
+		}
+
+		const plan = collectPreviewScopedResourcePlan(config, {
+			environment: 'preview',
+			identifier: 'pr-7'
+		})
+		expect(plan.hyperdrive).toEqual([])
+
+		const result = await preparePreviewScopedResourcesForDeploy(config, {
+			environment: 'preview',
+			identifier: 'pr-7',
+			cloudflare: {
+				listHyperdrives: async () => {
+					throw new Error('should not list Hyperdrive configs')
+				}
+			}
+		})
+
+		expect(result.config.bindings?.hyperdrive?.POSTGRES).toEqual({
+			id: 'preview-hyperdrive-id'
+		})
+		expect(result.accountId).toBeUndefined()
+	})
+
 	test('cleans up existing preview-scoped resources for the active preview identifier', async () => {
 		const deleted: string[] = []
 		const result = await cleanupPreviewScopedResources(createPreviewScopedResourceConfig(), {

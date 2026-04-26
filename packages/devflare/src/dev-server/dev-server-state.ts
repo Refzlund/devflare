@@ -67,7 +67,8 @@ export function createDevServerState(initial: {
 			fetch: null,
 			queue: null,
 			scheduled: null,
-			email: null
+			email: null,
+			tail: null
 		},
 		resolvedWorkerConfigPath: null,
 		mainWorkerScriptPath: null,

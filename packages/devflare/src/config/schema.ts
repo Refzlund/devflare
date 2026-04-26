@@ -23,13 +23,17 @@ import { envConfigSchemaInner } from './schema-env'
 import {
 	assetsConfigSchema,
 	compatibilityDateSchema,
+	containersConfigSchema,
 	filesSchema,
 	limitsSchema,
 	migrationSchema,
+	moduleRulesSchema,
 	observabilitySchema,
+	placementSchema,
 	previewsConfigSchema,
 	routeConfigSchema,
 	secretConfigSchema,
+	tailConsumerSchema,
 	triggersSchema,
 	wranglerConfigSchema,
 	wsRouteConfigSchema
@@ -87,6 +91,21 @@ export const rootConfigShape = {
 	/** Trigger configuration (cron schedules). */
 	triggers: triggersSchema,
 
+	/** Wrangler module rules for non-JavaScript imports and additional modules. */
+	rules: moduleRulesSchema,
+
+	/** Whether Wrangler should include additional files matching module rules. */
+	findAdditionalModules: z.boolean().optional(),
+
+	/** Base directory for Wrangler module rule discovery. */
+	baseDir: z.string().optional(),
+
+	/** Whether Wrangler should preserve bundled file names. */
+	preserveFileNames: z.boolean().optional(),
+
+	/** Tail Workers that consume traces from this Worker. */
+	tailConsumers: z.array(tailConsumerSchema).optional(),
+
 	/** Environment variables. */
 	vars: z.record(z.string(), z.string()).optional(),
 
@@ -102,7 +121,13 @@ export const rootConfigShape = {
 	/** Static assets configuration. */
 	assets: assetsConfigSchema,
 
-	/** Resource limits (CPU time). */
+	/** Cloudflare Containers launched alongside the Worker. */
+	containers: containersConfigSchema,
+
+	/** Worker placement behavior. */
+	placement: placementSchema,
+
+	/** Resource limits. */
 	limits: limitsSchema,
 
 	/** Observability settings (logging, tracing). */
@@ -150,15 +175,33 @@ export type {
 	KVBinding,
 	QueueConsumer,
 	QueuesConfig,
-	ServiceBinding
+	RateLimitBinding,
+	VersionMetadataBinding,
+	WorkerLoaderBinding,
+	SecretsStoreBinding,
+	DispatchNamespaceBinding,
+	WorkflowBinding,
+	PipelineBinding,
+	ImagesBinding,
+	MediaBinding,
+	ArtifactsBinding,
+	ServiceBinding,
+	MtlsCertificateBinding
 } from './schema-bindings'
 export type { DevflareEnvConfig } from './schema-env'
-export type { AssetsConfig, MigrationConfig, PreviewConfig, RouteConfig, WsRouteConfig } from './schema-runtime'
+export type { AssetsConfig, ContainerConfig, MigrationConfig, ModuleRuleConfig, PlacementConfig, PreviewConfig, RouteConfig, TailConsumerConfig, WsRouteConfig } from './schema-runtime'
 export type {
 	NormalizedD1Binding,
+	NormalizedDispatchNamespaceBinding,
 	NormalizedDOBinding,
 	NormalizedHyperdriveBinding,
-	NormalizedKVBinding
+	NormalizedKVBinding,
+	NormalizedMtlsCertificateBinding,
+	NormalizedWorkflowBinding,
+	NormalizedPipelineBinding,
+	NormalizedImagesBinding,
+	NormalizedMediaBinding,
+	NormalizedArtifactsBinding
 } from './schema-normalization'
 export {
 	getLocalD1DatabaseIdentifier,
@@ -166,8 +209,15 @@ export {
 	getLocalKVNamespaceIdentifier,
 	getSingleBrowserBindingName,
 	normalizeD1Binding,
+	normalizeDispatchNamespaceBinding,
 	normalizeDOBinding,
 	normalizeHyperdriveBinding,
-	normalizeKVBinding
+	normalizeKVBinding,
+	normalizeMtlsCertificateBinding,
+	normalizeWorkflowBinding,
+	normalizePipelineBinding,
+	normalizeImagesBinding,
+	normalizeMediaBinding,
+	normalizeArtifactsBinding
 } from './schema-normalization'
 export { browserBindingSchema, formatBrowserBindingLimitMessage } from './schema-bindings'

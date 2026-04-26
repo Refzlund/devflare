@@ -10,6 +10,7 @@ import {
 	resolveConfigForEnvironment,
 	type DevflareConfig
 } from '../../../src/config'
+import { brandAsLocalConfig } from '../../../src/config/resolve-phased'
 import { resolveConfigForLocalRuntime } from '../../../src/config/resource-resolution'
 import { collectPreviewScopedResourcePlan } from '../../../src/config/preview-resources'
 
@@ -703,7 +704,7 @@ describe('repo example app configs', () => {
 
 	test('apps/documentation compiles into a preview-capable generated Wrangler config', async () => {
 		const config = await loadConfig({ cwd: documentationAppDir })
-		const compiled = compileConfig(config)
+		const compiled = compileConfig(brandAsLocalConfig(config))
 
 		expect(compiled.name).toBe('devflare-docs')
 		expect(compiled.main).toBe('.adapter-cloudflare/_worker.js')
@@ -733,7 +734,7 @@ describe('repo example app configs', () => {
 			const documentationConfigModule = await import(
 				`${documentationConfigModulePath}?preview-worker-name-test=${Date.now()}`
 			)
-			const compiled = compileConfig(documentationConfigModule.default)
+			const compiled = compileConfig(brandAsLocalConfig(documentationConfigModule.default))
 
 			expect(documentationConfigModule.default.name).toBe('devflare-docs-pr-1')
 			expect(compiled.name).toBe('devflare-docs-pr-1')

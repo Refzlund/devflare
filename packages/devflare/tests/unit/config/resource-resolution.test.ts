@@ -40,7 +40,10 @@ describe('config resource resolution', () => {
 					REPORTING: 'reporting-db'
 				},
 				hyperdrive: {
-					POSTGRES: { name: 'devflare-testing' },
+					POSTGRES: {
+						name: 'devflare-testing',
+						localConnectionString: 'postgres://user:pass@localhost:5432/app'
+					},
 					REPLICA: { id: 'replica-hyperdrive-id' },
 					REPORTING_POSTGRES: 'reporting-postgres'
 				}
@@ -58,7 +61,10 @@ describe('config resource resolution', () => {
 			REPORTING: { id: 'reporting-db' }
 		})
 		expect(result.bindings?.hyperdrive).toEqual({
-			POSTGRES: { id: 'devflare-testing' },
+			POSTGRES: {
+				id: 'devflare-testing',
+				localConnectionString: 'postgres://user:pass@localhost:5432/app'
+			},
 			REPLICA: { id: 'replica-hyperdrive-id' },
 			REPORTING_POSTGRES: { id: 'reporting-postgres' }
 		})
@@ -104,7 +110,10 @@ describe('config resource resolution', () => {
 					REPORTING: 'reporting-db'
 				},
 				hyperdrive: {
-					POSTGRES: { name: 'devflare-testing' },
+					POSTGRES: {
+						name: 'devflare-testing',
+						localConnectionString: 'postgres://user:pass@localhost:5432/app'
+					},
 					REPORTING_POSTGRES: 'reporting-postgres',
 					REPLICA: { id: 'replica-hyperdrive-id' }
 				},
@@ -133,7 +142,10 @@ describe('config resource resolution', () => {
 			REPORTING: { id: 'reporting-db-id' }
 		})
 		expect(result.bindings?.hyperdrive).toEqual({
-			POSTGRES: { id: 'resolved-postgres-id' },
+			POSTGRES: {
+				id: 'resolved-postgres-id',
+				localConnectionString: 'postgres://user:pass@localhost:5432/app'
+			},
 			REPORTING_POSTGRES: { id: 'reporting-postgres-id' },
 			REPLICA: { id: 'replica-hyperdrive-id' }
 		})

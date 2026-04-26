@@ -8,8 +8,18 @@
 // are detected.
 // =============================================================================
 
-import { getLocalD1DatabaseIdentifier } from '../config'
+import {
+	getLocalD1DatabaseIdentifier,
+	normalizeArtifactsBinding,
+	normalizeDispatchNamespaceBinding,
+	normalizeImagesBinding,
+	normalizeMediaBinding,
+	normalizeMtlsCertificateBinding,
+	normalizePipelineBinding,
+	normalizeWorkflowBinding
+} from '../config'
 import type { DevflareConfig } from '../config'
+import { buildHyperdrivesConfig } from '../dev-server/miniflare-bindings'
 
 /**
  * Build the seed Miniflare config for an inline (single-worker) bridge.
@@ -34,6 +44,10 @@ export function buildInlineBridgeMfConfig(config: DevflareConfig): any {
 			})
 		)
 	}
+	const hyperdrivesConfig = buildHyperdrivesConfig(config.bindings ?? {})
+	if (hyperdrivesConfig) {
+		mfConfig.hyperdrives = hyperdrivesConfig
+	}
 
 	if (config.bindings?.queues?.producers) {
 		const queueProducers: Record<string, { queueName: string }> = {}
@@ -41,6 +55,159 @@ export function buildInlineBridgeMfConfig(config: DevflareConfig): any {
 			queueProducers[bindingName] = { queueName }
 		}
 		mfConfig.queueProducers = queueProducers
+	}
+
+	if (config.bindings?.rateLimits) {
+		mfConfig.ratelimits = Object.fromEntries(
+			Object.entries(config.bindings.rateLimits).map(([bindingName, binding]) => [
+				bindingName,
+				{
+					simple: {
+						limit: binding.simple.limit,
+						period: binding.simple.period
+					}
+				}
+			])
+		)
+	}
+
+	if (config.bindings?.versionMetadata) {
+		mfConfig.versionMetadata = config.bindings.versionMetadata.binding
+	}
+
+	if (config.bindings?.workerLoaders) {
+		mfConfig.workerLoaders = Object.fromEntries(
+			Object.keys(config.bindings.workerLoaders).map((bindingName) => [bindingName, {}])
+		)
+	}
+
+	if (config.bindings?.mtlsCertificates) {
+		mfConfig.mtlsCertificates = Object.fromEntries(
+			Object.entries(config.bindings.mtlsCertificates).map(([bindingName, binding]) => {
+				const normalized = normalizeMtlsCertificateBinding(binding)
+				return [
+					bindingName,
+					{
+						certificate_id: normalized.certificateId
+					}
+				]
+			})
+		)
+	}
+
+	if (config.bindings?.dispatchNamespaces) {
+		mfConfig.dispatchNamespaces = Object.fromEntries(
+			Object.entries(config.bindings.dispatchNamespaces).map(([bindingName, binding]) => {
+				const normalized = normalizeDispatchNamespaceBinding(binding)
+				return [
+					bindingName,
+					{
+						namespace: normalized.namespace
+					}
+				]
+			})
+		)
+	}
+
+	if (config.bindings?.workflows) {
+		mfConfig.workflows = Object.fromEntries(
+			Object.entries(config.bindings.workflows).map(([bindingName, binding]) => {
+				const normalized = normalizeWorkflowBinding(binding)
+				return [
+					bindingName,
+					{
+						name: normalized.name,
+						className: normalized.className,
+						...(normalized.scriptName && { scriptName: normalized.scriptName }),
+						...(normalized.limits && { stepLimit: normalized.limits.steps })
+					}
+				]
+			})
+		)
+	}
+
+	if (config.bindings?.pipelines) {
+		mfConfig.pipelines = Object.fromEntries(
+			Object.entries(config.bindings.pipelines).map(([bindingName, binding]) => {
+				const normalized = normalizePipelineBinding(binding)
+				return [
+					bindingName,
+					typeof binding === 'string'
+						? normalized.pipeline
+						: { pipeline: normalized.pipeline }
+				]
+			})
+		)
+	}
+
+	if (config.bindings?.images) {
+		const [entry] = Object.entries(config.bindings.images)
+		if (entry) {
+			const [bindingName, binding] = entry
+			const normalized = normalizeImagesBinding(bindingName, binding)
+			mfConfig.images = {
+				binding: normalized.binding
+			}
+		}
+	}
+
+	if (config.bindings?.media) {
+		const [entry] = Object.entries(config.bindings.media)
+		if (entry) {
+			const [bindingName, binding] = entry
+			const normalized = normalizeMediaBinding(bindingName, binding)
+			mfConfig.media = {
+				binding: normalized.binding
+			}
+		}
+	}
+
+	if (config.bindings?.artifacts) {
+		mfConfig.artifacts = Object.fromEntries(
+			Object.entries(config.bindings.artifacts).map(([bindingName, binding]) => {
+				const normalized = normalizeArtifactsBinding(binding)
+				return [
+					bindingName,
+					{
+						namespace: normalized.namespace
+					}
+				]
+			})
+		)
+	}
+
+	if (config.bindings?.aiSearchNamespaces) {
+		mfConfig.aiSearchNamespaces = Object.fromEntries(
+			Object.entries(config.bindings.aiSearchNamespaces).map(([bindingName, binding]) => [
+				bindingName,
+				{
+					namespace: binding.namespace
+				}
+			])
+		)
+	}
+
+	if (config.bindings?.aiSearch) {
+		mfConfig.aiSearchInstances = Object.fromEntries(
+			Object.entries(config.bindings.aiSearch).map(([bindingName, binding]) => [
+				bindingName,
+				{
+					instance_name: binding.instanceName
+				}
+			])
+		)
+	}
+
+	if (config.bindings?.secretsStore) {
+		mfConfig.secretsStoreSecrets = Object.fromEntries(
+			Object.entries(config.bindings.secretsStore).map(([bindingName, binding]) => [
+				bindingName,
+				{
+					store_id: binding.storeId,
+					secret_name: binding.secretName
+				}
+			])
+		)
 	}
 
 	if (Object.keys(localWorkerBindings).length > 0) {

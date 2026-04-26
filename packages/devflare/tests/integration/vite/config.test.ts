@@ -9,6 +9,7 @@ import { join } from 'pathe'
 import { compileConfig } from '../../../src/config/compiler'
 import type { DevflareConfig, DevflareConfigInput } from '../../../src/config/schema'
 import { configSchema } from '../../../src/config/schema'
+import { brandAsLocalConfig, type LocalConfig } from '../../../src/config/resolve-phased'
 import { resolveViteUserConfig } from '../../../src/vite'
 import { devflarePlugin, getPluginContext } from '../../../src/vite/plugin'
 import { createTestHarness, createMockProcessRunner, type TestHarness } from '../mocks'
@@ -17,8 +18,8 @@ import { setDependencies, clearDependencies } from '../../../src/cli/dependencie
 /**
  * Helper to parse and validate config from input
  */
-function parseConfig(input: DevflareConfigInput): DevflareConfig {
-	return configSchema.parse(input)
+function parseConfig(input: DevflareConfigInput): LocalConfig {
+	return brandAsLocalConfig(configSchema.parse(input))
 }
 
 describe('vite plugin config generation', () => {

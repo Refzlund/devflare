@@ -26,7 +26,8 @@ describe('createDevServerState', () => {
 			fetch: null,
 			queue: null,
 			scheduled: null,
-			email: null
+			email: null,
+			tail: null
 		})
 		expect(state.resolvedWorkerConfigPath).toBeNull()
 		expect(state.mainWorkerScriptPath).toBeNull()

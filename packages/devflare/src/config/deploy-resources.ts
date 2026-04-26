@@ -21,6 +21,7 @@ import { getEffectiveAccountId } from '../cloudflare/preferences'
 import {
 	collectPendingNameBindings,
 	formatMissingBindings,
+	materializeHyperdriveIdBindings,
 	materializeIdBindings,
 	materializeResolvedNameBindings,
 	normalizeD1NameBinding,
@@ -32,7 +33,6 @@ import {
 import { type PreviewResolutionOptions } from './preview'
 import {
 	getLocalD1DatabaseIdentifier,
-	getLocalHyperdriveConfigIdentifier,
 	getLocalKVNamespaceIdentifier,
 	type DevflareConfig
 } from './schema'
@@ -424,7 +424,7 @@ export async function prepareMaterializedConfigResourcesForDeploy(
 			config: brandAsDeployConfig(withResolvedIdBindings(resolvedConfig, {
 				kv: kvBindings ? materializeIdBindings(kvBindings, getLocalKVNamespaceIdentifier) : undefined,
 				d1: d1Bindings ? materializeIdBindings(d1Bindings, getLocalD1DatabaseIdentifier) : undefined,
-				hyperdrive: hyperdriveBindings ? materializeIdBindings(hyperdriveBindings, getLocalHyperdriveConfigIdentifier) : undefined
+				hyperdrive: materializeHyperdriveIdBindings(hyperdriveBindings)
 			})),
 			created,
 			existing,
@@ -553,8 +553,8 @@ export async function prepareMaterializedConfigResourcesForDeploy(
 			: undefined,
 		hyperdrive: hyperdriveBindings
 			? pendingHyperdriveNameBindings.length > 0
-				? materializeResolvedNameBindings(hyperdriveBindings, normalizeHyperdriveNameBinding, hyperdriveIdsByName.idsByName)
-				: materializeIdBindings(hyperdriveBindings, getLocalHyperdriveConfigIdentifier)
+				? materializeHyperdriveIdBindings(hyperdriveBindings, hyperdriveIdsByName.idsByName)
+				: materializeHyperdriveIdBindings(hyperdriveBindings)
 			: undefined
 	})
 

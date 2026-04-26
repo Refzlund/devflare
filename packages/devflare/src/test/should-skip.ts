@@ -13,6 +13,7 @@ import { getEffectiveAccountId } from '../cloudflare/preferences'
 import { canProceedWithTest } from '../cloudflare/usage'
 import { isRemoteModeActive, getRemoteModeStatus } from '../cloudflare/remote-config'
 import type { CloudflareService } from '../cloudflare/types'
+import { getContainerSkipReason } from './containers'
 
 // -----------------------------------------------------------------------------
 // Services That ALWAYS Require Remote Bindings
@@ -24,6 +25,12 @@ import type { CloudflareService } from '../cloudflare/types'
  */
 const REMOTE_ONLY_SERVICES: Set<CloudflareService> = new Set([
 	'ai',
+	'ai_search',
+	'ai_gateway',
+	'media',
+	'mtls_certificates',
+	'artifacts',
+	'builds',
 	'vectorize'
 ])
 
@@ -36,6 +43,7 @@ const REMOTE_ONLY_SERVICES: Set<CloudflareService> = new Set([
  * Each service gets a Promise<boolean> that resolves to true if should SKIP
  */
 const skipResults = new Map<CloudflareService, Promise<boolean>>()
+let containerSkipResult: Promise<boolean> | null = null
 
 /**
  * Known operational error patterns that should cause skipping rather than failing.
@@ -152,6 +160,19 @@ function getSkipResult(service: CloudflareService): Promise<boolean> {
 	return result
 }
 
+function getContainerSkipResult(): Promise<boolean> {
+	if (!containerSkipResult) {
+		containerSkipResult = getContainerSkipReason().then((reason) => {
+			if (reason) {
+				console.log(`CONTAINERS tests skipped: ${reason}`)
+				return true
+			}
+			return false
+		})
+	}
+	return containerSkipResult
+}
+
 // -----------------------------------------------------------------------------
 // Public API — Property-based access
 // -----------------------------------------------------------------------------
@@ -173,6 +194,16 @@ export const shouldSkip = {
 	/** Skip AI tests if not authenticated or over limits */
 	get ai(): Promise<boolean> {
 		return getSkipResult('ai')
+	},
+
+	/** Skip AI Search remote integration tests unless remote mode and Cloudflare auth are available */
+	get aiSearch(): Promise<boolean> {
+		return getSkipResult('ai_search')
+	},
+
+	/** Skip AI Gateway remote integration tests unless remote mode and Cloudflare auth are available */
+	get aiGateway(): Promise<boolean> {
+		return getSkipResult('ai_gateway')
 	},
 
 	/** Skip Vectorize tests if not authenticated or over limits */
@@ -208,5 +239,30 @@ export const shouldSkip = {
 	/** Skip Durable Objects tests if not authenticated or over limits */
 	get durableObjects(): Promise<boolean> {
 		return getSkipResult('durable_objects')
+	},
+
+	/** Skip Media Transformations remote integration tests unless remote mode and Cloudflare auth are available */
+	get media(): Promise<boolean> {
+		return getSkipResult('media')
+	},
+
+	/** Skip mTLS Certificate remote integration tests unless remote mode and Cloudflare auth are available */
+	get mtlsCertificates(): Promise<boolean> {
+		return getSkipResult('mtls_certificates')
+	},
+
+	/** Skip Artifacts remote integration tests unless remote mode and Cloudflare auth are available */
+	get artifacts(): Promise<boolean> {
+		return getSkipResult('artifacts')
+	},
+
+	/** Skip Cloudflare Builds integration tests unless remote mode and Cloudflare auth are available */
+	get builds(): Promise<boolean> {
+		return getSkipResult('builds')
+	},
+
+	/** Skip local Container tests unless explicitly enabled and Docker/Podman is reachable */
+	get containers(): Promise<boolean> {
+		return getContainerSkipResult()
 	}
 } as const

@@ -84,6 +84,13 @@ export function resetQueueState(): void {
 // Message Builder
 // -----------------------------------------------------------------------------
 
+const EMPTY_QUEUE_METADATA: MessageBatchMetadata = {
+	metrics: {
+		backlogCount: 0,
+		backlogBytes: 0
+	}
+}
+
 /**
  * Create a mock Message object that tracks ack/retry/noRetry calls
  */
@@ -123,6 +130,7 @@ function createMessage<T>(options: QueueMessageOptions<T>): Message<T> & {
 function createMessageBatch<T>(messages: Array<Message<T> & { _state: string }>): MessageBatch<T> {
 	return {
 		queue: 'test-queue',
+		metadata: EMPTY_QUEUE_METADATA,
 		messages,
 		ackAll() {
 			for (const msg of messages) {

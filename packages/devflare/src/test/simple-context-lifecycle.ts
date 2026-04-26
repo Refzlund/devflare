@@ -9,6 +9,7 @@
 
 import { dirname, resolve } from 'path'
 import { loadConfig } from '../config'
+import { applyLocalDevVarsToConfig } from '../config/local-dev-vars'
 import type { DevflareConfig } from '../config'
 import type { BridgeClient } from '../bridge/client'
 import { __clearTestContext } from '../env'
@@ -18,6 +19,7 @@ import { resetQueueState } from './queue'
 import { resetScheduledState } from './scheduled'
 import { resetTailState } from './tail'
 import { resetWorkerState } from './worker'
+import { stopActiveContainers } from './containers'
 
 interface DisposeStateView {
 	client: BridgeClient | null
@@ -63,9 +65,13 @@ export async function resolveTestContextConfig(
 	}
 
 	const configDir = dirname(absolutePath)
-	const config = await loadConfig({
+	const loadedConfig = await loadConfig({
 		cwd: configDir,
 		configFile: absolutePath.split(/[/\\]/).pop()
+	})
+	const config = await applyLocalDevVarsToConfig(loadedConfig, {
+		cwd: configDir,
+		configPath: absolutePath
 	})
 
 	return { absolutePath, configDir, config }
@@ -86,6 +92,7 @@ export function createDisposeContext(state: DisposeStateView): () => Promise<voi
 			await state.miniflare.dispose()
 			state.miniflare = null
 		}
+		await stopActiveContainers()
 		state.envProxy = null
 		state.transportDecode = null
 		state.remoteBindings = null

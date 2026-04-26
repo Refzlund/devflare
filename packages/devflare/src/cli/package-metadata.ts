@@ -57,12 +57,13 @@ export async function getPackageVersion(): Promise<string> {
 
 export async function getInitDependencyVersions(): Promise<InitDependencyVersions> {
 	const metadata = await getPackageMetadata()
+	const dependencies = metadata.dependencies ?? {}
 	const devDependencies = metadata.devDependencies ?? {}
 
 	return {
 		devflare: `^${metadata.version ?? '0.0.0'}`,
 		typescript: devDependencies.typescript ?? '^5.7.0',
-		wrangler: devDependencies.wrangler ?? '^3.99.0',
+		wrangler: dependencies.wrangler ?? devDependencies.wrangler ?? '^4.85.0',
 		workersTypes: devDependencies['@cloudflare/workers-types'] ?? '^4.20250109.0'
 	}
 }

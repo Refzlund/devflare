@@ -68,6 +68,33 @@ export function materializeIdBindings<TBinding>(
 	)
 }
 
+export function materializeHyperdriveIdBindings(
+	bindings: HyperdriveBindings | undefined,
+	idsByName?: Map<string, string>
+): Record<string, { id: string; localConnectionString?: string }> | undefined {
+	if (!bindings) {
+		return undefined
+	}
+
+	return Object.fromEntries(
+		Object.entries(bindings).map(([bindingName, bindingConfig]) => {
+			const normalized = normalizeHyperdriveBinding(bindingConfig)
+			return [
+				bindingName,
+				{
+					id: normalized.configurationId
+						?? idsByName?.get(normalized.name ?? '')
+						?? normalized.name
+						?? '',
+					...(normalized.localConnectionString && {
+						localConnectionString: normalized.localConnectionString
+					})
+				}
+			]
+		})
+	)
+}
+
 export function collectPendingNameBindings<TBinding>(
 	bindings: Record<string, TBinding> | undefined,
 	normalizeBinding: (binding: TBinding) => NormalizedNameBinding
@@ -109,7 +136,7 @@ export function withResolvedIdBindings(
 	bindings: {
 		kv?: Record<string, { id: string }>
 		d1?: Record<string, { id: string }>
-		hyperdrive?: Record<string, { id: string }>
+		hyperdrive?: Record<string, { id: string; localConnectionString?: string }>
 	}
 ): DevflareConfig {
 	return {

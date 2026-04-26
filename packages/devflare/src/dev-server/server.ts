@@ -8,6 +8,7 @@ import type { ConsolaInstance } from 'consola'
 import type { Miniflare as MiniflareType } from 'miniflare'
 import { resolve } from 'pathe'
 import { loadConfig } from '../config/loader'
+import { applyLocalDevVarsToConfig } from '../config/local-dev-vars'
 import { bundleWorkerEntry, type DOBundleResult } from '../bundler'
 import { checkRemoteBindingRequirements } from '../cli/wrangler-auth'
 import { setLocalSendEmailBindings } from '../utils/send-email'
@@ -215,11 +216,22 @@ export function createDevServer(options: DevServerOptions): DevServer {
 	}
 
 	async function reloadWorkerOnlyConfig(): Promise<void> {
-		state.config = await loadConfig({ cwd, configFile: configPath })
+		await loadRuntimeConfig()
+		if (!state.config) {
+			return
+		}
 		setLocalSendEmailBindings(state.config.bindings?.sendEmail ?? {})
-		state.resolvedWorkerConfigPath = await resolveWorkerConfigWatchPath(cwd, configPath)
 		await refreshWorkerOnlySurfaceState()
 		await reloadMiniflare(state.currentDoResult)
+	}
+
+	async function loadRuntimeConfig(): Promise<void> {
+		const loadedConfig = await loadConfig({ cwd, configFile: configPath })
+		state.resolvedWorkerConfigPath = await resolveWorkerConfigWatchPath(cwd, configPath)
+		state.config = await applyLocalDevVarsToConfig(loadedConfig, {
+			cwd,
+			configPath: state.resolvedWorkerConfigPath ?? undefined
+		})
 	}
 
 	async function startWorkerSourceWatcher(): Promise<void> {
@@ -252,9 +264,11 @@ export function createDevServer(options: DevServerOptions): DevServer {
 		logger?.info('Starting unified dev server...')
 
 		// Load config
-		state.config = await loadConfig({ cwd, configFile: configPath })
+		await loadRuntimeConfig()
+		if (!state.config) {
+			throw new Error('Config not loaded')
+		}
 		setLocalSendEmailBindings(state.config.bindings?.sendEmail ?? {})
-		state.resolvedWorkerConfigPath = await resolveWorkerConfigWatchPath(cwd, configPath)
 		logger?.debug('Loaded config:', state.config.name)
 		const viteIntegration = await resolveViteIntegration({
 			cwd,

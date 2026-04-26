@@ -14,7 +14,25 @@ import { getSingleBrowserBindingName } from '../config/schema'
 import type { DOBundleResult } from '../bundler'
 import { getBrowserBindingScript } from '../browser-shim/binding-worker'
 import type { RouteDiscoveryResult } from '../worker-entry/routes'
-import { buildQueueConsumers, buildQueueProducers, buildSendEmailConfig } from './miniflare-bindings'
+import {
+	buildQueueConsumers,
+	buildQueueProducers,
+	buildRateLimitsConfig,
+	buildSecretsStoreConfig,
+	buildSendEmailConfig,
+	buildVersionMetadataConfig,
+	buildWorkerLoadersConfig,
+	buildMtlsCertificatesConfig,
+	buildDispatchNamespacesConfig,
+	buildWorkflowsConfig,
+	buildPipelinesConfig,
+	buildHyperdrivesConfig,
+	buildImagesConfig,
+	buildMediaConfig,
+	buildArtifactsConfig,
+	buildAiSearchNamespacesConfig,
+	buildAiSearchInstancesConfig
+} from './miniflare-bindings'
 import { getGatewayScript } from './gateway-script'
 import {
 	buildServiceBindings,
@@ -83,7 +101,9 @@ export function buildMiniflareDevConfig(input: BuildMiniflareDevConfigInput): an
 		kvPersist: persist ? `${persistPath}/kv` : undefined,
 		r2Persist: persist ? `${persistPath}/r2` : undefined,
 		d1Persist: persist ? `${persistPath}/d1` : undefined,
-		durableObjectsPersist: persist ? `${persistPath}/do` : undefined
+		durableObjectsPersist: persist ? `${persistPath}/do` : undefined,
+		workflowsPersist: persist ? `${persistPath}/workflows` : undefined,
+		imagesPersist: persist ? `${persistPath}/images` : undefined
 	}
 
 	const createServiceBindings = (
@@ -91,12 +111,40 @@ export function buildMiniflareDevConfig(input: BuildMiniflareDevConfigInput): an
 	) => buildServiceBindings(bindings, extraBindings)
 
 	const sendEmailConfig = buildSendEmailConfig(bindings)
+	const rateLimitsConfig = buildRateLimitsConfig(bindings)
+	const versionMetadataConfig = buildVersionMetadataConfig(bindings)
+	const workerLoadersConfig = buildWorkerLoadersConfig(bindings)
+	const mtlsCertificatesConfig = buildMtlsCertificatesConfig(bindings)
+	const dispatchNamespacesConfig = buildDispatchNamespacesConfig(bindings)
+	const workflowsConfig = buildWorkflowsConfig(bindings)
+	const pipelinesConfig = buildPipelinesConfig(bindings)
+	const hyperdrivesConfig = buildHyperdrivesConfig(bindings)
+	const imagesConfig = buildImagesConfig(bindings)
+	const mediaConfig = buildMediaConfig(bindings)
+	const artifactsConfig = buildArtifactsConfig(bindings)
+	const aiSearchNamespacesConfig = buildAiSearchNamespacesConfig(bindings)
+	const aiSearchInstancesConfig = buildAiSearchInstancesConfig(bindings)
+	const secretsStoreConfig = buildSecretsStoreConfig(bindings)
 
 	const workerContext: MakeMiniflareWorkerContext = {
 		cwd,
 		loadedConfig,
 		bindings,
 		sendEmailConfig,
+		rateLimitsConfig,
+		versionMetadataConfig,
+		workerLoadersConfig,
+		mtlsCertificatesConfig,
+		dispatchNamespacesConfig,
+		workflowsConfig,
+		pipelinesConfig,
+		hyperdrivesConfig,
+		imagesConfig,
+		mediaConfig,
+		artifactsConfig,
+		aiSearchNamespacesConfig,
+		aiSearchInstancesConfig,
+		secretsStoreConfig,
 		queueProducers
 	}
 

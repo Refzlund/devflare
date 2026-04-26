@@ -36,11 +36,17 @@ export type CloudflareService =
 	| 'd1'
 	| 'r2'
 	| 'ai'
+	| 'ai_search'
+	| 'ai_gateway'
 	| 'vectorize'
 	| 'durable_objects'
 	| 'queues'
 	| 'hyperdrive'
 	| 'browser'
+	| 'media'
+	| 'mtls_certificates'
+	| 'artifacts'
+	| 'builds'
 
 export interface ServiceStatus {
 	service: CloudflareService

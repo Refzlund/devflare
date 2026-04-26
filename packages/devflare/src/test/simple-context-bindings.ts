@@ -12,6 +12,7 @@ import { isRemoteModeActive } from '../cloudflare/remote-config'
 import { createRemoteAI } from './remote-ai'
 import { createRemoteVectorize } from './remote-vectorize'
 import { createLocalSendEmailBinding } from '../utils/send-email'
+import { createMockVersionMetadata } from './utilities'
 
 /**
  * Build the initial remote/static binding map for a test context.
@@ -52,6 +53,10 @@ export function buildRemoteAndStaticBindings(config: DevflareConfig): Record<str
 		for (const [name, binding] of Object.entries(config.bindings.sendEmail)) {
 			remoteBindings[name] = createLocalSendEmailBinding(binding)
 		}
+	}
+
+	if (config.bindings?.versionMetadata) {
+		remoteBindings[config.bindings.versionMetadata.binding] = createMockVersionMetadata()
 	}
 
 	return remoteBindings

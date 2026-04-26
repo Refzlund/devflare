@@ -57,7 +57,7 @@ export async function resolveHandlerPaths(
 		resolveHandlerPath(configDir, config.files?.queue, DEFAULT_QUEUE_PATH),
 		resolveHandlerPath(configDir, config.files?.scheduled, DEFAULT_SCHEDULED_PATH),
 		resolveHandlerPath(configDir, config.files?.email, DEFAULT_EMAIL_PATH),
-		resolveHandlerPath(configDir, undefined, DEFAULT_TAIL_PATH),
+		resolveHandlerPath(configDir, config.files?.tail, DEFAULT_TAIL_PATH),
 		discoverRoutes(configDir, config)
 	])
 

@@ -46,6 +46,12 @@ function createMockState(): DurableObjectState {
 function createMockQueueBatch(): MessageBatch<{ value: string }> {
 	return {
 		queue: 'test-queue',
+		metadata: {
+			metrics: {
+				backlogCount: 0,
+				backlogBytes: 0
+			}
+		},
 		messages: [
 			{
 				id: 'msg-1',

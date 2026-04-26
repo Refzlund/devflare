@@ -1,6 +1,6 @@
 {
 	"name": "devflare",
-	"version": "1.0.0-next.18",
+	"version": "1.0.0-next.19",
 	"description": "Devflare is a developer-first toolkit for Cloudflare Workers that sits on top of Miniflare and Wrangler-compatible config",
 	"type": "module",
 	"main": "./dist/index.js",
@@ -86,19 +86,19 @@
 		"globby": "^16.1.0",
 		"jsonc-parser": "^3.3.1",
 		"magic-string": "^0.30.17",
-		"miniflare": "^3.20250109.0",
+		"miniflare": "^4.20260424.0",
 		"pathe": "^2.0.2",
 		"picomatch": "^4.0.3",
 		"puppeteer-core": "^24.5.0",
 		"rolldown": "^1.0.0-rc.12",
 		"smol-toml": "^1.6.1",
-		"wrangler": "^3.114.0",
+		"wrangler": "^4.85.0",
 		"ws": "^8.19.0",
 		"zod": "^3.25.0"
 	},
 	"devDependencies": {
 		"@cloudflare/vite-plugin": "^1.0.0",
-		"@cloudflare/workers-types": "^4.20250109.0",
+		"@cloudflare/workers-types": "^4.20260426.1",
 		"@types/bun": "^1.1.14",
 		"@types/picomatch": "^4.0.2",
 		"@types/ws": "^8.18.1",
@@ -107,7 +107,7 @@
 	},
 	"peerDependencies": {
 		"@cloudflare/vite-plugin": "^1.0.0",
-		"@cloudflare/workers-types": "^4.20250109.0",
+		"@cloudflare/workers-types": "^4.20260426.1",
 		"vite": "^6.0.0 || ^7.0.0 || ^8.0.0"
 	},
 	"peerDependenciesMeta": {

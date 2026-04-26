@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import type { DevflareConfig } from '../../../src/config'
 import { compileConfig } from '../../../src/config/compiler'
+import { brandAsLocalConfig } from '../../../src/config/resolve-phased'
 import { applyDeploymentStrategy, describeDeploymentStrategy } from '../../../src/cli/deploy-strategy'
 
 function createQueueAndCronConfig(): DevflareConfig {
@@ -38,12 +39,12 @@ function createQueueAndCronConfigWithPreviewCrons(): DevflareConfig {
 describe('deploy strategy integration', () => {
 	test('branch-scoped preview deploy strategy omits queue consumers and cron triggers from emitted Wrangler config by default', () => {
 		const config = createQueueAndCronConfig()
-		const defaultWranglerConfig = compileConfig(config)
+		const defaultWranglerConfig = compileConfig(brandAsLocalConfig(config))
 		const branchScopedPreview = applyDeploymentStrategy(config, {
 			environment: 'preview',
 			previewBranch: 'feature/queue-preview'
 		})
-		const branchPreviewWranglerConfig = compileConfig(branchScopedPreview.config)
+		const branchPreviewWranglerConfig = compileConfig(brandAsLocalConfig(branchScopedPreview.config))
 
 		expect(defaultWranglerConfig.queues?.producers).toEqual([
 			{ binding: 'TASK_QUEUE', queue: 'task-queue' }
@@ -69,7 +70,7 @@ describe('deploy strategy integration', () => {
 			environment: 'preview',
 			previewBranch: 'feature/cron-preview'
 		})
-		const branchPreviewWranglerConfig = compileConfig(branchScopedPreview.config)
+		const branchPreviewWranglerConfig = compileConfig(brandAsLocalConfig(branchScopedPreview.config))
 
 		expect(branchScopedPreview.strategy).toBe('preview-scope')
 		expect(branchScopedPreview.omittedResources).toEqual(['queue-consumers'])

@@ -129,4 +129,32 @@ export async function queue(): Promise<void> {}
 			/looks like a framework build output[\s\S]+wrangler[\s\S]+passthrough/
 		)
 	})
+
+	test('composes files.tail into a Worker tail handler', async () => {
+		await mkdir(join(TEST_DIR, 'src'), { recursive: true })
+		await writeFile(join(TEST_DIR, 'src', 'tail.ts'), `
+export default {
+	async tail(events, env, ctx) {
+		ctx.waitUntil(Promise.resolve(events.length))
+	}
+}
+		`.trim())
+
+		const config = configSchema.parse({
+			name: 'tail-composition-test',
+			compatibilityDate: '2026-04-26',
+			files: {
+				fetch: false,
+				tail: 'src/tail.ts'
+			}
+		})
+
+		const composedEntry = await prepareComposedWorkerEntrypoint(TEST_DIR, config)
+		expect(composedEntry).toBe(join(TEST_DIR, '.devflare/worker-entrypoints/main.ts'))
+
+		const source = await readFile(composedEntry!, 'utf-8')
+		expect(source).toContain("import * as __devflareTailModule from '../../src/tail.ts'")
+		expect(source).toContain('async tail(events, env, ctx)')
+		expect(source).toContain('createTailEvent(events, env, ctx)')
+	})
 })

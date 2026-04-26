@@ -76,6 +76,89 @@ describe('selectDevflarePermissionGroups', () => {
 		}).toThrow('Could not map the available Cloudflare permission groups')
 	})
 
+	test('keeps every Read/Write/Edit/Admin variant for each Devflare-managed product so deploy provisioning never fails on a missing variant', () => {
+		// The deploy pipeline lists, creates and updates resources across every
+		// product family below — a missing variant on the resulting token
+		// surfaces as `ERROR Deployment failed: Could not list <Product> ...`
+		// during `bunx devflare deploy`, so this test guards that all common
+		// verbs survive selection per product.
+		const productVariantFixtures: ReadonlyArray<{
+			productName: string
+			variants: ReadonlyArray<string>
+		}> = [
+				{ productName: 'R2', variants: ['Read', 'Write', 'Edit', 'Admin'] },
+				{ productName: 'D1', variants: ['Read', 'Write', 'Edit', 'Admin', 'Metadata Read'] },
+				{ productName: 'Workers Scripts', variants: ['Read', 'Write', 'Edit'] },
+				{ productName: 'Workers KV Storage', variants: ['Read', 'Write', 'Edit'] },
+				{ productName: 'Workers R2 Storage', variants: ['Read', 'Write', 'Edit', 'Bucket Item Read', 'Bucket Item Write'] },
+				{ productName: 'Queues', variants: ['Read', 'Write', 'Edit', 'Admin'] },
+				{ productName: 'Hyperdrive', variants: ['Read', 'Write', 'Edit'] },
+				{ productName: 'Vectorize', variants: ['Read', 'Write', 'Edit'] },
+				{ productName: 'AI', variants: ['Read', 'Write', 'Edit'] },
+				{ productName: 'Browser Rendering', variants: ['Read', 'Write', 'Edit'] },
+				{ productName: 'Pages', variants: ['Read', 'Write', 'Edit'] },
+				{ productName: 'Email Routing', variants: ['Read', 'Write', 'Edit'] },
+				{ productName: 'Images', variants: ['Read', 'Write', 'Edit'] },
+				{ productName: 'Stream', variants: ['Read', 'Write', 'Edit'] },
+				{ productName: 'Logs', variants: ['Read', 'Write', 'Edit'] },
+				{ productName: 'Logpush', variants: ['Read', 'Write', 'Edit'] },
+				{ productName: 'DNS', variants: ['Read', 'Write', 'Edit'] },
+				{ productName: 'Cache Purge', variants: [''] }
+			]
+
+		const fixtures = productVariantFixtures.flatMap(({ productName, variants }) => {
+			return variants.map((variant) => {
+				const fullName = variant === '' ? productName : `${productName} ${variant}`
+				return {
+					id: fullName.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+					name: fullName,
+					scopes: ['com.cloudflare.api.account']
+				}
+			})
+		})
+
+		const selectedNames = new Set(
+			selectDevflarePermissionGroups(fixtures).map((group) => group.name)
+		)
+
+		const missing: string[] = []
+		for (const { productName, variants } of productVariantFixtures) {
+			for (const variant of variants) {
+				const fullName = variant === '' ? productName : `${productName} ${variant}`
+				if (!selectedNames.has(fullName)) {
+					missing.push(fullName)
+				}
+			}
+		}
+
+		expect(missing).toEqual([])
+	})
+
+	test('still excludes Account API Tokens permission groups even when other Account-prefixed groups are loosened', () => {
+		// `Account API Tokens Write/Read` lets a token rotate / delete other
+		// tokens — that authority must never end up on a deploy token, even
+		// after loosening `Account Settings` / `Account Analytics` patterns.
+		const selected = selectDevflarePermissionGroups([
+			{
+				id: 'account-api-tokens-write',
+				name: 'Account API Tokens Write',
+				scopes: ['com.cloudflare.api.account']
+			},
+			{
+				id: 'account-api-tokens-read',
+				name: 'Account API Tokens Read',
+				scopes: ['com.cloudflare.api.account']
+			},
+			{
+				id: 'account-settings-edit',
+				name: 'Account Settings Edit',
+				scopes: ['com.cloudflare.api.account']
+			}
+		])
+
+		expect(selected.map((group) => group.id)).toEqual(['account-settings-edit'])
+	})
+
 	test('keeps every reusable permission group for all-flags mode but still excludes token-management groups', () => {
 		const selected = selectAllReusablePermissionGroups([
 			{

@@ -19,12 +19,90 @@ import { generateBindingTypes } from '../../../../src/cli/commands/type-generati
 const fixtureConfig = {
 	bindings: {
 		kv: { MY_KV: { id: 'kv-id', preview_id: 'kv-prev' } },
-		d1: { MY_DB: { database_id: 'db-1', database_name: 'db' } },
+		d1: { MY_DB: { id: 'db-1' } },
 		r2: { MY_BUCKET: 'bucket-1' },
 		queues: { producers: { MY_QUEUE: 'queue-1' } },
-		ai: { binding: 'AI' },
-		browser: { MY_BROWSER: 'browser-1' }
+		rateLimits: {
+			MY_RATE_LIMITER: {
+				namespaceId: '1001',
+				simple: { limit: 100, period: 60 as const }
+			}
+		},
+		versionMetadata: { binding: 'CF_VERSION_METADATA' },
+		workerLoaders: {
+			LOADER: {}
+		},
+		mtlsCertificates: {
+			API_CERT: {
+				certificateId: 'cert-123'
+			}
+		},
+		dispatchNamespaces: {
+			DISPATCHER: {
+				namespace: 'customers'
+			}
+		},
+		workflows: {
+			ORDER_WORKFLOW: {
+				name: 'orders',
+				className: 'OrderWorkflow'
+			}
+		},
+		pipelines: {
+			EVENTS: {
+				pipeline: 'events-stream'
+			}
+		},
+		images: {
+			IMAGES: {
+				remote: true
+			}
+		},
+		media: {
+			MEDIA: {
+				remote: true
+			}
+		},
+		artifacts: {
+			ARTIFACTS: {
+				namespace: 'default'
+			}
+		},
+		secretsStore: {
+			API_TOKEN: {
+				storeId: 'store-123',
+				secretName: 'api-token'
+			}
+		},
+		ai: {
+			binding: 'AI',
+			remote: true,
+			staging: true
+		},
+		aiSearchNamespaces: {
+			AI_SEARCH: {
+				namespace: 'default',
+				remote: true
+			}
+		},
+		aiSearch: {
+			DOCS_SEARCH: {
+				instanceName: 'docs',
+				remote: true
+			}
+		},
+		browser: {
+			MY_BROWSER: {
+				remote: true
+			}
+		}
 	},
+	rules: [
+		{ type: 'Text', globs: ['**/*.txt'] },
+		{ type: 'Data', globs: ['**/*.bin'] },
+		{ type: 'CompiledWasm', globs: ['**/*.wasm'] },
+		{ type: 'ESModule', globs: ['**/*.mjs'] }
+	],
 	vars: { MY_VAR: 'hello' },
 	secrets: { MY_SECRET: { required: true } }
 }
@@ -39,11 +117,23 @@ describe('generateBindingTypes — P1-codegen fixture', () => {
 	test('imports the workers-types it actually uses', () => {
 		expect(generated).toContain("import type {")
 		expect(generated).toContain("from '@cloudflare/workers-types'")
+		expect(generated).toContain("import type { Pipeline } from 'cloudflare:pipelines'")
 		expect(generated).toContain('KVNamespace')
 		expect(generated).toContain('D1Database')
 		expect(generated).toContain('R2Bucket')
 		expect(generated).toContain('Queue')
+		expect(generated).toContain('RateLimit')
+		expect(generated).toContain('WorkerVersionMetadata')
+		expect(generated).toContain('WorkerLoader')
+		expect(generated).toContain('DispatchNamespace')
+		expect(generated).toContain('Workflow')
+		expect(generated).toContain('ImagesBinding')
+		expect(generated).toContain('MediaBinding')
+		expect(generated).toContain('Artifacts')
+		expect(generated).toContain('SecretsStoreSecret')
 		expect(generated).toContain('Ai')
+		expect(generated).toContain('AiSearchNamespace')
+		expect(generated).toContain('AiSearchInstance')
 		expect(generated).toContain('Fetcher')
 	})
 
@@ -54,9 +144,32 @@ describe('generateBindingTypes — P1-codegen fixture', () => {
 		expect(generated).toContain('MY_DB: D1Database')
 		expect(generated).toContain('MY_BUCKET: R2Bucket')
 		expect(generated).toContain('MY_QUEUE: Queue')
+		expect(generated).toContain('MY_RATE_LIMITER: RateLimit')
+		expect(generated).toContain('CF_VERSION_METADATA: WorkerVersionMetadata')
+		expect(generated).toContain('LOADER: WorkerLoader')
+		expect(generated).toContain('API_CERT: Fetcher')
+		expect(generated).toContain('DISPATCHER: DispatchNamespace')
+		expect(generated).toContain('ORDER_WORKFLOW: Workflow')
+		expect(generated).toContain('EVENTS: Pipeline')
+		expect(generated).toContain('IMAGES: ImagesBinding')
+		expect(generated).toContain('MEDIA: MediaBinding')
+		expect(generated).toContain('ARTIFACTS: Artifacts')
+		expect(generated).toContain('API_TOKEN: SecretsStoreSecret')
+		expect(generated).toContain('AI_SEARCH: AiSearchNamespace')
+		expect(generated).toContain('DOCS_SEARCH: AiSearchInstance')
 		expect(generated).toContain('MY_BROWSER: Fetcher')
 		expect(generated).toContain('MY_VAR: string')
 		expect(generated).toContain('MY_SECRET: string')
+	})
+
+	test('emits ambient module declarations for native module rules', () => {
+		expect(generated).toContain("declare module '*.txt'")
+		expect(generated).toContain('const value: string')
+		expect(generated).toContain("declare module '*.bin'")
+		expect(generated).toContain('const value: ArrayBuffer')
+		expect(generated).toContain("declare module '*.wasm'")
+		expect(generated).toContain('const value: WebAssembly.Module')
+		expect(generated).not.toContain("declare module '*.mjs'")
 	})
 
 	test('emits the Entrypoints type fallback when no entrypoints were discovered', () => {

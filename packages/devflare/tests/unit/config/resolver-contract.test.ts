@@ -23,6 +23,7 @@ import {
 	compileConfig,
 	prepareConfigResourcesForDeploy
 } from '../../../src/config'
+import { brandAsDeployConfig } from '../../../src/config/resolve-phased'
 import { resolveConfigForLocalRuntime } from '../../../src/config/resource-resolution'
 import type { DevflareConfig } from '../../../src/config/schema'
 
@@ -70,7 +71,10 @@ const cloudflareMocks = () => ({
 		name
 	})),
 	listR2Buckets: mock(async () => []),
-	createR2Bucket: mock(async (_account: string, name: string) => ({ name })),
+	createR2Bucket: mock(async (_account: string, name: string) => ({
+		name,
+		createdOn: new Date('2026-04-26T00:00:00.000Z')
+	})),
 	listQueues: mock(async () => []),
 	createQueue: mock(async (_account: string, name: string) => ({
 		id: `queue-${name}`,
@@ -165,7 +169,7 @@ describe('cross-phase resolver contract', () => {
 	test('binding key set across deploy phase matches build/dev phase for the same input', async () => {
 		const cloudflare = cloudflareMocks()
 		const deployResult = await prepareConfigResourcesForDeploy(baseFixture, { cloudflare })
-		const deployWranglerConfig = compileConfig(deployResult.config)
+		const deployWranglerConfig = compileConfig(brandAsDeployConfig(deployResult.config))
 
 		const deployBindingNames = new Set([
 			...(deployWranglerConfig.kv_namespaces ?? []).map((entry) => entry.binding),
@@ -182,7 +186,7 @@ describe('cross-phase resolver contract', () => {
 		// resolveConfigForLocalRuntime() first to materialize ids, and what
 		// blocks accidental misuse in callers that should be using
 		// compileBuildConfig() instead.
-		expect(() => compileConfig(baseFixture)).toThrow(
+		expect(() => compileConfig(baseFixture as never)).toThrow(
 			/must be resolved before compiling Wrangler config/
 		)
 	})

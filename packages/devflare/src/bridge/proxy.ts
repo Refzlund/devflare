@@ -428,15 +428,41 @@ function createDOStubProxy(
 // Queue Proxy
 // -----------------------------------------------------------------------------
 
+interface QueueMetricsSnapshot {
+	backlogCount: number
+	backlogBytes: number
+	oldestMessageTimestamp?: Date
+}
+
+interface QueueResponseSnapshot {
+	metadata: {
+		metrics: QueueMetricsSnapshot
+	}
+}
+
+const EMPTY_QUEUE_METRICS: QueueMetricsSnapshot = {
+	backlogCount: 0,
+	backlogBytes: 0
+}
+
+function createQueueResponse(): QueueResponseSnapshot {
+	return { metadata: { metrics: EMPTY_QUEUE_METRICS } }
+}
+
 function createQueueProxy(client: BridgeClient, bindingName: string): Queue<unknown> {
 	return {
-		async send(message: unknown, options?: any): Promise<void> {
-			await client.call(`${bindingName}.queue.send`, [message, options])
+		async metrics(): Promise<QueueMetricsSnapshot> {
+			return EMPTY_QUEUE_METRICS
 		},
-		async sendBatch(messages: any[], options?: any): Promise<void> {
+		async send(message: unknown, options?: unknown): Promise<QueueResponseSnapshot> {
+			await client.call(`${bindingName}.queue.send`, [message, options])
+			return createQueueResponse()
+		},
+		async sendBatch(messages: Iterable<unknown>, options?: unknown): Promise<QueueResponseSnapshot> {
 			await client.call(`${bindingName}.queue.sendBatch`, [messages, options])
+			return createQueueResponse()
 		}
-	} as Queue<unknown>
+	} as unknown as Queue<unknown>
 }
 
 // -----------------------------------------------------------------------------

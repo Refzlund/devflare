@@ -206,6 +206,7 @@ export function materializePreviewScopedConfig(
 	}
 
 	const bindings = config.bindings
+	const hasPreviewIdentifier = Boolean(resolvePreviewIdentifier(options).identifier)
 
 	return {
 		...config,
@@ -286,6 +287,17 @@ export function materializePreviewScopedConfig(
 							return materializePreviewScopedString(binding, options)
 						}
 						if (binding && typeof binding === 'object' && 'name' in binding && typeof binding.name === 'string') {
+							if (hasPreviewIdentifier && binding.previewId) {
+								return {
+									id: binding.previewId,
+									...(binding.localConnectionString && {
+										localConnectionString: binding.localConnectionString
+									}),
+									...(!binding.localConnectionString && binding.previewLocalConnectionString && {
+										localConnectionString: binding.previewLocalConnectionString
+									})
+								}
+							}
 							return {
 								...binding,
 								name: materializePreviewScopedString(binding.name, options)
@@ -298,7 +310,9 @@ export function materializePreviewScopedConfig(
 			...(bindings.browser
 				? {
 					browser: mapRecordValues(bindings.browser, (binding) => {
-						return materializePreviewScopedString(binding, options)
+						return typeof binding === 'string'
+							? materializePreviewScopedString(binding, options)
+							: binding
 					})
 				}
 				: {}),

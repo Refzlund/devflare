@@ -56,6 +56,8 @@ export interface TailTriggerResult {
 	itemCount: number
 }
 
+type TailHandler = (events: TraceItem[] | ReturnType<typeof createTailEvent>, env?: Record<string, unknown>, ctx?: ExecutionContext) => unknown
+
 // -----------------------------------------------------------------------------
 // Global State (set by createTestContext)
 // -----------------------------------------------------------------------------
@@ -177,12 +179,17 @@ async function trigger(
 	const absolutePath = join(configDir, tailHandlerPath)
 	const handlerModule = await import(absolutePath)
 
-	// Get the default export (the tail handler function)
-	const tailHandler = handlerModule.default ?? handlerModule.tail
+	// Get the tail handler function from default function, default object, or named export.
+	const defaultExport = handlerModule.default
+	const tailHandler = typeof defaultExport === 'function'
+		? defaultExport
+		: defaultExport && typeof defaultExport.tail === 'function'
+			? defaultExport.tail.bind(defaultExport)
+			: handlerModule.tail
 	if (typeof tailHandler !== 'function') {
 		throw new Error(
 			`Tail handler at "${tailHandlerPath}" must export a default function or named "tail" export.\n` +
-			+ `Expected: export async function tail(event) { ... }`
+			+ `Expected: export async function tail(event) { ... } or export default { tail(events, env, ctx) { ... } }`
 		)
 	}
 
@@ -204,7 +211,9 @@ async function trigger(
 		// Call the handler
 		await runWithEventContext(
 			tailEvent,
-			() => tailHandler(tailEvent)
+			() => (tailHandler as TailHandler).length >= 2
+				? tailHandler(traceItems, env, ctx)
+				: tailHandler(tailEvent, env, ctx)
 		)
 
 		// Wait for all waitUntil promises

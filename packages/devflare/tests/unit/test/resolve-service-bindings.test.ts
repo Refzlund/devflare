@@ -51,6 +51,12 @@ describe('resolveServiceBindings', () => {
 		await mkdir(join(workerDir, 'src'), { recursive: true })
 		await mkdir(join(workerDir, 'rpc', 'admin'), { recursive: true })
 
+		await writeFile(join(workerDir, 'src', 'worker.ts'), `
+export async function defaultPing(): Promise<string> {
+	return 'DEFAULT_RPC_SENTINEL'
+}
+`.trim())
+
 		await writeFile(join(workerDir, 'src', 'fetch.ts'), `
 export async function fetch(): Promise<Response> {
 	return new Response('FETCH_FILE_SHOULD_NOT_BE_BUNDLED')
@@ -84,6 +90,10 @@ export class AdminEntrypoint extends WorkerEntrypoint {
 			compatibilityFlags: ['nodejs_compat', 'nodejs_als'],
 			bindings: {
 				services: {
+					DEFAULT: {
+						service: 'math-worker',
+						__ref: ref
+					},
 					ADMIN: {
 						service: 'math-worker',
 						entrypoint: 'AdminEntrypoint',
@@ -99,7 +109,11 @@ export class AdminEntrypoint extends WorkerEntrypoint {
 			name: 'math-worker',
 			entrypoint: 'AdminEntrypoint'
 		})
+		expect(result.primaryServiceBindings.DEFAULT).toEqual({
+			name: 'math-worker'
+		})
 		expect(result.workers).toHaveLength(1)
+		expect(result.workers[0]?.script).toContain('DEFAULT_RPC_SENTINEL')
 		expect(result.workers[0]?.script).toContain('ENTRYPOINT_RPC_SENTINEL')
 		expect(result.workers[0]?.script).not.toContain('FETCH_FILE_SHOULD_NOT_BE_BUNDLED')
 	})
