@@ -5,6 +5,7 @@ import { dirname, join } from 'pathe'
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), '../../../')
 let buildPromise: Promise<void> | null = null
+const RETRYABLE_COPY_ERROR_CODES = new Set(['EBADF', 'EBUSY', 'EMFILE', 'ENFILE', 'EPERM'])
 
 export interface InstallBuiltDevflareOptions {
 	includeBin?: boolean
@@ -27,16 +28,36 @@ export async function ensurePackageBuilt(): Promise<void> {
 			])
 
 			if (exitCode !== 0) {
-				throw new Error([
-					'Package build failed',
-					stdout.trim(),
-					stderr.trim()
-				].filter(Boolean).join('\n\n'))
+				throw new Error(
+					['Package build failed', stdout.trim(), stderr.trim()].filter(Boolean).join('\n\n')
+				)
 			}
 		})()
 	}
 
 	await buildPromise
+}
+
+async function retryCopy(operation: () => Promise<void>): Promise<void> {
+	const attempts = 5
+
+	for (let attempt = 1; attempt <= attempts; attempt += 1) {
+		try {
+			await operation()
+			return
+		} catch (error) {
+			const code = (error as { code?: unknown }).code
+			if (
+				attempt >= attempts ||
+				typeof code !== 'string' ||
+				!RETRYABLE_COPY_ERROR_CODES.has(code)
+			) {
+				throw error
+			}
+
+			await Bun.sleep(100 * attempt)
+		}
+	}
 }
 
 export async function installBuiltDevflare(
@@ -49,18 +70,26 @@ export async function installBuiltDevflare(
 
 	const packagedDevflareDir = join(projectDir, 'node_modules', 'devflare')
 	await mkdir(packagedDevflareDir, { recursive: true })
-	await cp(join(packageRoot, 'package.json'), join(packagedDevflareDir, 'package.json'))
-	await cp(join(packageRoot, 'dist'), join(packagedDevflareDir, 'dist'), { recursive: true })
+	await retryCopy(() =>
+		cp(join(packageRoot, 'package.json'), join(packagedDevflareDir, 'package.json'))
+	)
+	await retryCopy(() =>
+		cp(join(packageRoot, 'dist'), join(packagedDevflareDir, 'dist'), { recursive: true })
+	)
 
 	if (options.includeBin) {
-		await cp(join(packageRoot, 'bin'), join(packagedDevflareDir, 'bin'), { recursive: true })
+		await retryCopy(() =>
+			cp(join(packageRoot, 'bin'), join(packagedDevflareDir, 'bin'), { recursive: true })
+		)
 	}
 
 	for (const dependencyName of options.runtimeDependencies ?? []) {
-		await cp(
-			join(packageRoot, 'node_modules', dependencyName),
-			join(projectDir, 'node_modules', dependencyName),
-			{ recursive: true, dereference: true }
+		await retryCopy(() =>
+			cp(
+				join(packageRoot, 'node_modules', dependencyName),
+				join(projectDir, 'node_modules', dependencyName),
+				{ recursive: true, dereference: true }
+			)
 		)
 	}
 }
@@ -140,8 +169,12 @@ export async function waitForResponseText(
 	expectedText: string,
 	timeoutMs = 8000
 ): Promise<string> {
-	return await waitForText(async () => {
-		const response = await fetch(url)
-		return await response.text()
-	}, expectedText, timeoutMs)
+	return await waitForText(
+		async () => {
+			const response = await fetch(url)
+			return await response.text()
+		},
+		expectedText,
+		timeoutMs
+	)
 }

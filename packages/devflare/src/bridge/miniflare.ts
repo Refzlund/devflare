@@ -46,6 +46,15 @@ export interface MiniflareInstance {
 	_mf: MiniflareType
 }
 
+export function isIgnorableMiniflareDisposeError(error: unknown): boolean {
+	if (!(error instanceof Error)) {
+		return false
+	}
+
+	const details = error as Error & { code?: unknown; syscall?: unknown }
+	return details.code === 'EBADF' && details.syscall === 'kill'
+}
+
 export interface MiniflareOptions {
 	/** Devflare config to derive bindings from */
 	config?: DevflareConfig
@@ -78,12 +87,15 @@ export interface MiniflareOptions {
 	/** Dispatch Namespace bindings */
 	dispatchNamespaces?: Record<string, { namespace: string }>
 	/** Workflow bindings */
-	workflows?: Record<string, {
-		name: string
-		className: string
-		scriptName?: string
-		stepLimit?: number
-	}>
+	workflows?: Record<
+		string,
+		{
+			name: string
+			className: string
+			scriptName?: string
+			stepLimit?: number
+		}
+	>
 	/** Pipeline bindings */
 	pipelines?: Record<string, string | { pipeline: string }>
 	/** Images binding */
@@ -95,11 +107,14 @@ export interface MiniflareOptions {
 	/** Secrets Store bindings */
 	secretsStore?: Record<string, { store_id: string; secret_name: string }>
 	/** Send Email bindings */
-	sendEmail?: Record<string, {
-		destinationAddress?: string
-		allowedDestinationAddresses?: string[]
-		allowedSenderAddresses?: string[]
-	}>
+	sendEmail?: Record<
+		string,
+		{
+			destinationAddress?: string
+			allowedDestinationAddresses?: string[]
+			allowedSenderAddresses?: string[]
+		}
+	>
 	/** Environment variables */
 	bindings?: Record<string, string>
 	/** Project root used to load `.dev.vars`/`.env*` for config-based Miniflare */
@@ -344,17 +359,12 @@ function applyBindingsConfig(
 	config.bindings = bindings
 }
 
-function applyQueueConfig(
-	config: MfOptionsWithEmail,
-	queues: MiniflareOptions['queues']
-): void {
+function applyQueueConfig(config: MfOptionsWithEmail, queues: MiniflareOptions['queues']): void {
 	if (!queues?.length) {
 		return
 	}
 
-	config.queueProducers = Object.fromEntries(
-		queues.map((queueName) => [queueName, { queueName }])
-	)
+	config.queueProducers = Object.fromEntries(queues.map((queueName) => [queueName, { queueName }]))
 }
 
 function applyRateLimitConfig(
@@ -453,10 +463,7 @@ function applyImagesConfig(
 	}
 }
 
-function applyMediaConfig(
-	config: MfOptionsWithEmail,
-	media: MiniflareOptions['media']
-): void {
+function applyMediaConfig(config: MfOptionsWithEmail, media: MiniflareOptions['media']): void {
 	if (!media) {
 		return
 	}
@@ -520,7 +527,13 @@ function createMiniflareInstanceHandle(mf: MiniflareType): MiniflareInstance {
 		ready: Promise.resolve(),
 
 		async dispose() {
-			await mf.dispose()
+			try {
+				await mf.dispose()
+			} catch (error) {
+				if (!isIgnorableMiniflareDisposeError(error)) {
+					throw error
+				}
+			}
 		},
 
 		async getBindings() {
@@ -565,10 +578,10 @@ export async function startMiniflareFromConfig(
 ): Promise<MiniflareInstance> {
 	const runtimeConfig = options.cwd
 		? await applyLocalDevVarsToConfig(config, {
-			cwd: options.cwd,
-			configPath: options.configPath,
-			environment: options.environment
-		})
+				cwd: options.cwd,
+				configPath: options.configPath,
+				environment: options.environment
+			})
 		: config
 	const bindings = runtimeConfig.bindings ?? {}
 
@@ -579,151 +592,149 @@ export async function startMiniflareFromConfig(
 		compatibilityFlags: runtimeConfig.compatibilityFlags,
 		kvNamespaces: bindings.kv
 			? Object.fromEntries(
-				Object.entries(bindings.kv).map(([bindingName, bindingConfig]) => {
-					return [bindingName, getLocalKVNamespaceIdentifier(bindingConfig)]
-				})
-			)
+					Object.entries(bindings.kv).map(([bindingName, bindingConfig]) => {
+						return [bindingName, getLocalKVNamespaceIdentifier(bindingConfig)]
+					})
+				)
 			: undefined,
 		r2Buckets: bindings.r2 ? bindings.r2 : undefined,
 		d1Databases: bindings.d1
 			? Object.fromEntries(
-				Object.entries(bindings.d1).map(([bindingName, bindingConfig]) => {
-					return [bindingName, getLocalD1DatabaseIdentifier(bindingConfig)]
-				})
-			)
+					Object.entries(bindings.d1).map(([bindingName, bindingConfig]) => {
+						return [bindingName, getLocalD1DatabaseIdentifier(bindingConfig)]
+					})
+				)
 			: undefined,
 		queues: bindings.queues?.consumers?.map((c) => c.queue),
 		rateLimits: bindings.rateLimits
 			? Object.fromEntries(
-				Object.entries(bindings.rateLimits).map(([bindingName, binding]) => [
-					bindingName,
-					{
-						simple: {
-							limit: binding.simple.limit,
-							period: binding.simple.period
+					Object.entries(bindings.rateLimits).map(([bindingName, binding]) => [
+						bindingName,
+						{
+							simple: {
+								limit: binding.simple.limit,
+								period: binding.simple.period
+							}
 						}
-					}
-				])
-			)
+					])
+				)
 			: undefined,
 		versionMetadata: bindings.versionMetadata?.binding,
 		workerLoaders: bindings.workerLoaders
 			? Object.fromEntries(
-				Object.keys(bindings.workerLoaders).map((bindingName) => [bindingName, {}])
-			)
+					Object.keys(bindings.workerLoaders).map((bindingName) => [bindingName, {}])
+				)
 			: undefined,
 		mtlsCertificates: bindings.mtlsCertificates
 			? Object.fromEntries(
-				Object.entries(bindings.mtlsCertificates).map(([bindingName, binding]) => {
-					const normalized = normalizeMtlsCertificateBinding(binding)
-					return [
-						bindingName,
-						{
-							certificate_id: normalized.certificateId
-						}
-					]
-				})
-			)
+					Object.entries(bindings.mtlsCertificates).map(([bindingName, binding]) => {
+						const normalized = normalizeMtlsCertificateBinding(binding)
+						return [
+							bindingName,
+							{
+								certificate_id: normalized.certificateId
+							}
+						]
+					})
+				)
 			: undefined,
 		dispatchNamespaces: bindings.dispatchNamespaces
 			? Object.fromEntries(
-				Object.entries(bindings.dispatchNamespaces).map(([bindingName, binding]) => {
-					const normalized = normalizeDispatchNamespaceBinding(binding)
-					return [
-						bindingName,
-						{
-							namespace: normalized.namespace
-						}
-					]
-				})
-			)
+					Object.entries(bindings.dispatchNamespaces).map(([bindingName, binding]) => {
+						const normalized = normalizeDispatchNamespaceBinding(binding)
+						return [
+							bindingName,
+							{
+								namespace: normalized.namespace
+							}
+						]
+					})
+				)
 			: undefined,
 		workflows: bindings.workflows
 			? Object.fromEntries(
-				Object.entries(bindings.workflows).map(([bindingName, binding]) => {
-					const normalized = normalizeWorkflowBinding(binding)
-					return [
-						bindingName,
-						{
-							name: normalized.name,
-							className: normalized.className,
-							...(normalized.scriptName && { scriptName: normalized.scriptName }),
-							...(normalized.limits && { stepLimit: normalized.limits.steps })
-						}
-					]
-				})
-			)
+					Object.entries(bindings.workflows).map(([bindingName, binding]) => {
+						const normalized = normalizeWorkflowBinding(binding)
+						return [
+							bindingName,
+							{
+								name: normalized.name,
+								className: normalized.className,
+								...(normalized.scriptName && { scriptName: normalized.scriptName }),
+								...(normalized.limits && { stepLimit: normalized.limits.steps })
+							}
+						]
+					})
+				)
 			: undefined,
 		pipelines: bindings.pipelines
 			? Object.fromEntries(
-				Object.entries(bindings.pipelines).map(([bindingName, binding]) => {
-					const normalized = normalizePipelineBinding(binding)
-					return [
-						bindingName,
-						typeof binding === 'string'
-							? normalized.pipeline
-							: { pipeline: normalized.pipeline }
-					]
-				})
-			)
+					Object.entries(bindings.pipelines).map(([bindingName, binding]) => {
+						const normalized = normalizePipelineBinding(binding)
+						return [
+							bindingName,
+							typeof binding === 'string' ? normalized.pipeline : { pipeline: normalized.pipeline }
+						]
+					})
+				)
 			: undefined,
 		images: bindings.images
 			? (() => {
-				const [entry] = Object.entries(bindings.images ?? {})
-				if (!entry) return undefined
-				const [bindingName, binding] = entry
-				const normalized = normalizeImagesBinding(bindingName, binding)
-				return { binding: normalized.binding }
-			})()
+					const [entry] = Object.entries(bindings.images ?? {})
+					if (!entry) return undefined
+					const [bindingName, binding] = entry
+					const normalized = normalizeImagesBinding(bindingName, binding)
+					return { binding: normalized.binding }
+				})()
 			: undefined,
 		media: bindings.media
 			? (() => {
-				const [entry] = Object.entries(bindings.media ?? {})
-				if (!entry) return undefined
-				const [bindingName, binding] = entry
-				const normalized = normalizeMediaBinding(bindingName, binding)
-				return { binding: normalized.binding }
-			})()
+					const [entry] = Object.entries(bindings.media ?? {})
+					if (!entry) return undefined
+					const [bindingName, binding] = entry
+					const normalized = normalizeMediaBinding(bindingName, binding)
+					return { binding: normalized.binding }
+				})()
 			: undefined,
 		artifacts: bindings.artifacts
 			? Object.fromEntries(
-				Object.entries(bindings.artifacts).map(([bindingName, binding]) => {
-					const normalized = normalizeArtifactsBinding(binding)
-					return [
-						bindingName,
-						{
-							namespace: normalized.namespace
-						}
-					]
-				})
-			)
+					Object.entries(bindings.artifacts).map(([bindingName, binding]) => {
+						const normalized = normalizeArtifactsBinding(binding)
+						return [
+							bindingName,
+							{
+								namespace: normalized.namespace
+							}
+						]
+					})
+				)
 			: undefined,
 		secretsStore: bindings.secretsStore
 			? Object.fromEntries(
-				Object.entries(bindings.secretsStore).map(([bindingName, binding]) => [
-					bindingName,
-					{
-						store_id: binding.storeId,
-						secret_name: binding.secretName
-					}
-				])
-			)
+					Object.entries(bindings.secretsStore).map(([bindingName, binding]) => [
+						bindingName,
+						{
+							store_id: binding.storeId,
+							secret_name: binding.secretName
+						}
+					])
+				)
 			: undefined,
 		sendEmail: bindings.sendEmail ? bindings.sendEmail : undefined,
 		bindings: runtimeConfig.vars,
 		durableObjects: bindings.durableObjects
 			? Object.fromEntries(
-				Object.entries(bindings.durableObjects).map(([bindingName, doConfig]) => {
-					const normalized = normalizeDOBinding(doConfig)
-					return [
-						bindingName,
-						{
-							className: normalized.className,
-							scriptPath: normalized.scriptName
-						}
-					]
-				})
-			)
+					Object.entries(bindings.durableObjects).map(([bindingName, doConfig]) => {
+						const normalized = normalizeDOBinding(doConfig)
+						return [
+							bindingName,
+							{
+								className: normalized.className,
+								scriptPath: normalized.scriptName
+							}
+						]
+					})
+				)
 			: undefined
 	}
 

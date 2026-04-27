@@ -9,6 +9,7 @@
 // =============================================================================
 
 import type { BrowserShim } from '../browser-shim'
+import { isIgnorableMiniflareDisposeError } from '../bridge/miniflare'
 import type { DOBundler, DOBundleResult } from '../bundler'
 import type { DevflareConfig } from '../config'
 import type { RouteDiscoveryResult } from '../worker-entry/routes'
@@ -104,7 +105,13 @@ export async function disposeDevServerState(state: DevServerState): Promise<void
 	}
 
 	if (state.miniflare) {
-		await state.miniflare.dispose()
+		try {
+			await state.miniflare.dispose()
+		} catch (error) {
+			if (!isIgnorableMiniflareDisposeError(error)) {
+				throw error
+			}
+		}
 		state.miniflare = null
 	}
 

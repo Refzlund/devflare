@@ -3,12 +3,18 @@ import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'pathe'
 import { createDevServer, type DevServer } from '../../../src/dev-server'
-import { cleanupTempDirs, getAvailablePort, installBuiltDevflare } from '../helpers/built-devflare.helpers'
+import {
+	cleanupTempDirs,
+	getAvailablePort,
+	installBuiltDevflare
+} from '../helpers/built-devflare.helpers'
 
 const tempDirs: string[] = []
+const DEV_SERVER_HOOK_TIMEOUT_MS = 20_000
+
 afterAll(async () => {
 	await cleanupTempDirs(tempDirs)
-})
+}, DEV_SERVER_HOOK_TIMEOUT_MS)
 
 describe('worker-only dev server root env imports', () => {
 	test('starts successfully when the fetch worker imports env from the root package', async () => {
@@ -21,20 +27,36 @@ describe('worker-only dev server root env imports', () => {
 		const workerUrl = `http://127.0.0.1:${port}/`
 
 		await mkdir(join(projectDir, 'src'), { recursive: true })
-		await writeFile(join(projectDir, 'package.json'), JSON.stringify({
-			name: 'worker-root-env-test',
-			private: true,
-			type: 'module'
-		}, null, 2))
-		await writeFile(join(projectDir, 'tsconfig.json'), JSON.stringify({
-			compilerOptions: {
-				target: 'ESNext',
-				module: 'ESNext',
-				moduleResolution: 'Bundler'
-			}
-		}, null, 2))
+		await writeFile(
+			join(projectDir, 'package.json'),
+			JSON.stringify(
+				{
+					name: 'worker-root-env-test',
+					private: true,
+					type: 'module'
+				},
+				null,
+				2
+			)
+		)
+		await writeFile(
+			join(projectDir, 'tsconfig.json'),
+			JSON.stringify(
+				{
+					compilerOptions: {
+						target: 'ESNext',
+						module: 'ESNext',
+						moduleResolution: 'Bundler'
+					}
+				},
+				null,
+				2
+			)
+		)
 
-		await writeFile(join(projectDir, 'devflare.config.ts'), `
+		await writeFile(
+			join(projectDir, 'devflare.config.ts'),
+			`
 export default {
 	name: 'worker-root-env-test',
 	compatibilityDate: '2026-03-17',
@@ -46,9 +68,12 @@ export default {
 		MESSAGE: 'ok'
 	}
 }
-`.trim())
+`.trim()
+		)
 
-		await writeFile(join(projectDir, 'src', 'fetch.ts'), `
+		await writeFile(
+			join(projectDir, 'src', 'fetch.ts'),
+			`
 import { env } from 'devflare'
 
 export default {
@@ -56,7 +81,8 @@ export default {
 		return new Response(String(env.MESSAGE))
 	}
 }
-`.trim())
+`.trim()
+		)
 
 		let devServer: DevServer | null = null
 
@@ -90,20 +116,36 @@ export default {
 		const workerUrl = `http://127.0.0.1:${port}/`
 
 		await mkdir(join(projectDir, 'src'), { recursive: true })
-		await writeFile(join(projectDir, 'package.json'), JSON.stringify({
-			name: 'worker-root-env-send-email-test',
-			private: true,
-			type: 'module'
-		}, null, 2))
-		await writeFile(join(projectDir, 'tsconfig.json'), JSON.stringify({
-			compilerOptions: {
-				target: 'ESNext',
-				module: 'ESNext',
-				moduleResolution: 'Bundler'
-			}
-		}, null, 2))
+		await writeFile(
+			join(projectDir, 'package.json'),
+			JSON.stringify(
+				{
+					name: 'worker-root-env-send-email-test',
+					private: true,
+					type: 'module'
+				},
+				null,
+				2
+			)
+		)
+		await writeFile(
+			join(projectDir, 'tsconfig.json'),
+			JSON.stringify(
+				{
+					compilerOptions: {
+						target: 'ESNext',
+						module: 'ESNext',
+						moduleResolution: 'Bundler'
+					}
+				},
+				null,
+				2
+			)
+		)
 
-		await writeFile(join(projectDir, 'devflare.config.ts'), `
+		await writeFile(
+			join(projectDir, 'devflare.config.ts'),
+			`
 export default {
 	name: 'worker-root-env-send-email-test',
 	compatibilityDate: '2026-03-17',
@@ -120,9 +162,12 @@ export default {
 		}
 	}
 }
-`.trim())
+`.trim()
+		)
 
-		await writeFile(join(projectDir, 'src', 'fetch.ts'), `
+		await writeFile(
+			join(projectDir, 'src', 'fetch.ts'),
+			`
 import { env } from 'devflare'
 
 export default {
@@ -136,7 +181,8 @@ export default {
 		return new Response('sent')
 	}
 }
-`.trim())
+`.trim()
+		)
 
 		let devServer: DevServer | null = null
 
@@ -173,24 +219,47 @@ export default {
 		await mkdir(join(projectDir, 'node_modules', 'svelte', 'src', 'internal', 'server'), {
 			recursive: true
 		})
-		await writeFile(join(projectDir, 'package.json'), JSON.stringify({
-			name: 'worker-root-env-svelte-test',
-			private: true,
-			type: 'module'
-		}, null, 2))
-		await writeFile(join(projectDir, 'node_modules', 'svelte', 'package.json'), JSON.stringify({
-			name: 'svelte',
-			type: 'module'
-		}, null, 2))
-		await writeFile(join(projectDir, 'tsconfig.json'), JSON.stringify({
-			compilerOptions: {
-				target: 'ESNext',
-				module: 'ESNext',
-				moduleResolution: 'Bundler'
-			}
-		}, null, 2))
+		await writeFile(
+			join(projectDir, 'package.json'),
+			JSON.stringify(
+				{
+					name: 'worker-root-env-svelte-test',
+					private: true,
+					type: 'module'
+				},
+				null,
+				2
+			)
+		)
+		await writeFile(
+			join(projectDir, 'node_modules', 'svelte', 'package.json'),
+			JSON.stringify(
+				{
+					name: 'svelte',
+					type: 'module'
+				},
+				null,
+				2
+			)
+		)
+		await writeFile(
+			join(projectDir, 'tsconfig.json'),
+			JSON.stringify(
+				{
+					compilerOptions: {
+						target: 'ESNext',
+						module: 'ESNext',
+						moduleResolution: 'Bundler'
+					}
+				},
+				null,
+				2
+			)
+		)
 
-		await writeFile(join(projectDir, 'devflare.config.ts'), `
+		await writeFile(
+			join(projectDir, 'devflare.config.ts'),
+			`
 export default {
 	name: 'worker-root-env-svelte-test',
 	compatibilityDate: '2026-03-17',
@@ -198,9 +267,12 @@ export default {
 		fetch: 'src/fetch.ts'
 	}
 }
-`.trim())
+`.trim()
+		)
 
-		await writeFile(join(projectDir, 'node_modules', 'svelte', 'src', 'internal', 'server', 'render-context.js'), `
+		await writeFile(
+			join(projectDir, 'node_modules', 'svelte', 'src', 'internal', 'server', 'render-context.js'),
+			`
 let als = null
 let als_import = null
 const noop = () => {}
@@ -215,8 +287,11 @@ export async function init_render_context() {
 	}).then(noop, noop)
 	return als_import
 }
-`.trim())
-		await writeFile(join(projectDir, 'node_modules', 'svelte', 'src', 'internal', 'server', 'crypto.js'), `
+`.trim()
+		)
+		await writeFile(
+			join(projectDir, 'node_modules', 'svelte', 'src', 'internal', 'server', 'crypto.js'),
+			`
 let cryptoValue
 const obfuscated_import = (module_name) => import(
 	/* @vite-ignore */
@@ -230,9 +305,12 @@ export async function cryptoMode() {
 
 	return cryptoValue ? 'crypto-ready' : 'crypto-missing'
 }
-`.trim())
+`.trim()
+		)
 
-		await writeFile(join(projectDir, 'src', 'fetch.ts'), `
+		await writeFile(
+			join(projectDir, 'src', 'fetch.ts'),
+			`
 import { cryptoMode } from 'svelte/src/internal/server/crypto.js'
 import { hasAls, init_render_context } from 'svelte/src/internal/server/render-context.js'
 
@@ -245,7 +323,8 @@ export default {
 		})
 	}
 }
-`.trim())
+`.trim()
+		)
 
 		let devServer: DevServer | null = null
 
@@ -261,7 +340,7 @@ export default {
 
 			const response = await fetch(workerUrl)
 			expect(response.status).toBe(200)
-			expect(await response.json() as Record<string, unknown>).toEqual({
+			expect((await response.json()) as Record<string, unknown>).toEqual({
 				als: true,
 				crypto: 'crypto-ready'
 			})

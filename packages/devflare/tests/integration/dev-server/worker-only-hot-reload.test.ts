@@ -10,6 +10,8 @@ import {
 	waitForResponseText
 } from '../helpers/built-devflare.helpers'
 
+const DEV_SERVER_HOOK_TIMEOUT_MS = 20_000
+
 describe('worker-only dev server hot reload', () => {
 	let projectDir = ''
 	let devServer: DevServer | null = null
@@ -40,30 +42,48 @@ export default defineConfig({
 		workerUrl = `http://127.0.0.1:${port}/`
 		configPath = join(projectDir, 'devflare.config.ts')
 		messagePath = join(projectDir, 'src', 'lib', 'message.ts')
-		localDefineConfigImportPath = join(dirname(fileURLToPath(import.meta.url)), '../../../src/index.ts')
-			.replace(/\\/g, '/')
+		localDefineConfigImportPath = join(
+			dirname(fileURLToPath(import.meta.url)),
+			'../../../src/index.ts'
+		).replace(/\\/g, '/')
 
 		await mkdir(join(projectDir, 'src', 'lib'), { recursive: true })
 		await installBuiltDevflare(projectDir)
 
-		await writeFile(join(projectDir, 'package.json'), JSON.stringify({
-			name: 'worker-only-hot-reload-test',
-			private: true,
-			type: 'module'
-		}, null, 2))
+		await writeFile(
+			join(projectDir, 'package.json'),
+			JSON.stringify(
+				{
+					name: 'worker-only-hot-reload-test',
+					private: true,
+					type: 'module'
+				},
+				null,
+				2
+			)
+		)
 
-		await writeFile(join(projectDir, 'tsconfig.json'), JSON.stringify({
-			compilerOptions: {
-				target: 'ESNext',
-				module: 'ESNext',
-				moduleResolution: 'Bundler'
-			}
-		}, null, 2))
+		await writeFile(
+			join(projectDir, 'tsconfig.json'),
+			JSON.stringify(
+				{
+					compilerOptions: {
+						target: 'ESNext',
+						module: 'ESNext',
+						moduleResolution: 'Bundler'
+					}
+				},
+				null,
+				2
+			)
+		)
 
 		await writeFile(configPath, getConfigFileContent('before-config'))
 
 		await writeFile(messagePath, `export const message = 'before'\n`)
-		await writeFile(join(projectDir, 'src', 'fetch.ts'), `
+		await writeFile(
+			join(projectDir, 'src', 'fetch.ts'),
+			`
 import { message } from './lib/message'
 
 export default async function fetch(event) {
@@ -75,7 +95,8 @@ export default async function fetch(event) {
 
 	return new Response(message)
 }
-`)
+`
+		)
 
 		devServer = createDevServer({
 			cwd: projectDir,
@@ -86,7 +107,7 @@ export default async function fetch(event) {
 
 		await devServer.start()
 		await waitForResponseText(workerUrl, 'before')
-	})
+	}, DEV_SERVER_HOOK_TIMEOUT_MS)
 
 	afterAll(async () => {
 		if (devServer) {
@@ -96,7 +117,7 @@ export default async function fetch(event) {
 		if (projectDir) {
 			await rm(projectDir, { recursive: true, force: true })
 		}
-	})
+	}, DEV_SERVER_HOOK_TIMEOUT_MS)
 
 	test('serves the configured fetch worker when Vite is disabled', async () => {
 		const response = await fetch(workerUrl)
@@ -128,34 +149,53 @@ describe('worker-only dev server late worker discovery', () => {
 		port = await getAvailablePort()
 		workerUrl = `http://127.0.0.1:${port}/`
 		fetchPath = join(projectDir, 'src', 'fetch.ts')
-		localDefineConfigImportPath = join(dirname(fileURLToPath(import.meta.url)), '../../../src/index.ts')
-			.replace(/\\/g, '/')
+		localDefineConfigImportPath = join(
+			dirname(fileURLToPath(import.meta.url)),
+			'../../../src/index.ts'
+		).replace(/\\/g, '/')
 
 		await mkdir(join(projectDir, 'src'), { recursive: true })
 		await installBuiltDevflare(projectDir)
 
-		await writeFile(join(projectDir, 'package.json'), JSON.stringify({
-			name: 'worker-only-late-fetch-test',
-			private: true,
-			type: 'module'
-		}, null, 2))
+		await writeFile(
+			join(projectDir, 'package.json'),
+			JSON.stringify(
+				{
+					name: 'worker-only-late-fetch-test',
+					private: true,
+					type: 'module'
+				},
+				null,
+				2
+			)
+		)
 
-		await writeFile(join(projectDir, 'tsconfig.json'), JSON.stringify({
-			compilerOptions: {
-				target: 'ESNext',
-				module: 'ESNext',
-				moduleResolution: 'Bundler'
-			}
-		}, null, 2))
+		await writeFile(
+			join(projectDir, 'tsconfig.json'),
+			JSON.stringify(
+				{
+					compilerOptions: {
+						target: 'ESNext',
+						module: 'ESNext',
+						moduleResolution: 'Bundler'
+					}
+				},
+				null,
+				2
+			)
+		)
 
-		await writeFile(join(projectDir, 'devflare.config.ts'), `
+		await writeFile(
+			join(projectDir, 'devflare.config.ts'),
+			`
 import { defineConfig } from '${localDefineConfigImportPath}'
 
 export default defineConfig({
 	name: 'worker-only-late-fetch-test',
 	compatibilityDate: '2026-03-17'
 })
-`)
+`
+		)
 
 		devServer = createDevServer({
 			cwd: projectDir,
@@ -165,8 +205,10 @@ export default defineConfig({
 		})
 
 		await devServer.start()
-		expect(await waitForResponseText(workerUrl, 'Devflare Bridge Gateway')).toBe('Devflare Bridge Gateway')
-	})
+		expect(await waitForResponseText(workerUrl, 'Devflare Bridge Gateway')).toBe(
+			'Devflare Bridge Gateway'
+		)
+	}, DEV_SERVER_HOOK_TIMEOUT_MS)
 
 	afterAll(async () => {
 		if (devServer) {
@@ -176,16 +218,19 @@ export default defineConfig({
 		if (projectDir) {
 			await rm(projectDir, { recursive: true, force: true })
 		}
-	})
+	}, DEV_SERVER_HOOK_TIMEOUT_MS)
 
 	test('reloads when a default src/fetch.ts file is created after startup', async () => {
-		await writeFile(fetchPath, `
+		await writeFile(
+			fetchPath,
+			`
 export default {
 	async fetch() {
 		return new Response('late-fetch')
 	}
 }
-`)
+`
+		)
 
 		expect(await waitForResponseText(workerUrl, 'late-fetch')).toBe('late-fetch')
 	}, 10000)

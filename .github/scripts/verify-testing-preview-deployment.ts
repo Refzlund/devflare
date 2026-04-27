@@ -1,13 +1,21 @@
 import { dirname, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
-import { account, type APIClientOptions, type WorkerDeploymentInfo } from '../../packages/devflare/src/cloudflare'
+import {
+	account,
+	type APIClientOptions,
+	type WorkerDeploymentInfo
+} from '../../packages/devflare/src/cloudflare'
 import { getDependencies } from '../../packages/devflare/src/cli/dependencies'
 import {
 	parseWranglerVersionBindings,
 	type ParsedWranglerBindingRow
 } from '../../packages/devflare/src/cli/preview-bindings'
-import { loadConfig, resolveConfigForEnvironment, type DevflareConfig } from '../../packages/devflare/src/config'
+import {
+	loadConfig,
+	resolveConfigForEnvironment,
+	type DevflareConfig
+} from '../../packages/devflare/src/config'
 import { resolveTestingWorkerNames } from '../../apps/testing/worker-names'
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url))
@@ -49,6 +57,7 @@ export interface TestingPreviewVerificationSnapshot {
 	previewUrl?: string
 	previewStatus?: TestingPreviewStatus
 	previewStatusError?: string
+	previewStatusAccessBlocked?: boolean
 	previewHealth?: PreviewHealthResult
 	previewHealthError?: string
 	availableWorkers: string[]
@@ -106,8 +115,9 @@ export async function loadTestingPreviewConfig(previewScope: string): Promise<De
 }
 
 function uniqueSorted(values: string[]): string[] {
-	return Array.from(new Set(values.filter((value) => value.trim().length > 0)))
-		.sort((left, right) => left.localeCompare(right))
+	return Array.from(new Set(values.filter((value) => value.trim().length > 0))).sort(
+		(left, right) => left.localeCompare(right)
+	)
 }
 
 function readOptionalString(value: unknown): string | undefined {
@@ -171,7 +181,10 @@ export interface PreviewHealthResult {
 	locationHeader?: string
 }
 
-async function loadPreviewHealth(previewUrl: string, _attempt: number): Promise<PreviewHealthResult> {
+async function loadPreviewHealth(
+	previewUrl: string,
+	_attempt: number
+): Promise<PreviewHealthResult> {
 	const response = await fetch(appendPreviewPath(previewUrl, '/health'), {
 		redirect: 'manual',
 		cache: 'no-store',
@@ -225,7 +238,7 @@ async function loadPreviewStatus(previewUrl: string): Promise<TestingPreviewStat
 		throw new Error(`Preview status endpoint returned ${response.status} ${response.statusText}.`)
 	}
 
-	const payload = await response.json() as Record<string, unknown>
+	const payload = (await response.json()) as Record<string, unknown>
 
 	return {
 		appName: readOptionalString(payload.appName),
@@ -245,7 +258,9 @@ function resolveActiveVersionId(deployments: WorkerDeploymentInfo[]): string | u
 	})
 
 	for (const deployment of sortedDeployments) {
-		const version = [...deployment.versions].sort((left, right) => right.percentage - left.percentage)[0]
+		const version = [...deployment.versions].sort(
+			(left, right) => right.percentage - left.percentage
+		)[0]
 		if (version?.versionId) {
 			return version.versionId
 		}
@@ -261,22 +276,18 @@ async function inspectWorkerVersionBindings(options: {
 	cwd: string
 }): Promise<ParsedWranglerBindingRow[]> {
 	const deps = await getDependencies()
-	const result = await deps.exec.exec('bunx', [
-		'wrangler',
-		'versions',
-		'view',
-		options.versionId,
-		'--name',
-		options.workerName,
-		'--json'
-	], {
-		cwd: options.cwd,
-		env: {
-			...process.env,
-			CLOUDFLARE_ACCOUNT_ID: options.accountId,
-			FORCE_COLOR: process.env.FORCE_COLOR ?? '0'
+	const result = await deps.exec.exec(
+		'bunx',
+		['wrangler', 'versions', 'view', options.versionId, '--name', options.workerName, '--json'],
+		{
+			cwd: options.cwd,
+			env: {
+				...process.env,
+				CLOUDFLARE_ACCOUNT_ID: options.accountId,
+				FORCE_COLOR: process.env.FORCE_COLOR ?? '0'
+			}
 		}
-	})
+	)
 
 	if (result.exitCode !== 0) {
 		throw new Error(result.stderr || result.stdout || 'Wrangler versions view failed')
@@ -291,13 +302,16 @@ export function collectTestingPreviewVerificationErrors(
 	const errors: string[] = []
 	const availableWorkers = new Set(snapshot.availableWorkers)
 	const bindingNames = new Set(snapshot.bindingNames)
-	const hasVerifiedPreviewUrl = typeof snapshot.previewUrl === 'string' && snapshot.previewUrl.trim().length > 0
+	const hasVerifiedPreviewUrl =
+		typeof snapshot.previewUrl === 'string' && snapshot.previewUrl.trim().length > 0
 
 	if (hasVerifiedPreviewUrl && snapshot.previewHealth) {
 		if (snapshot.previewHealth.redirectedToAccess) {
-			errors.push(
-				`Cloudflare Access intercepted ${snapshot.previewUrl}/health (Location: ${snapshot.previewHealth.locationHeader ?? '(missing)'}). The verifier cannot determine deployment health.`
-			)
+			if (!snapshot.bindingsInspected) {
+				errors.push(
+					`Cloudflare Access intercepted ${snapshot.previewUrl}/health (Location: ${snapshot.previewHealth.locationHeader ?? '(missing)'}). The verifier cannot determine deployment health.`
+				)
+			}
 		} else if (!snapshot.previewHealth.ok) {
 			errors.push(
 				`Preview /health probe at ${snapshot.previewUrl}/health returned ${snapshot.previewHealth.status}. Body excerpt: ${snapshot.previewHealth.body || '(empty)'}`
@@ -328,22 +342,34 @@ export function collectTestingPreviewVerificationErrors(
 	}
 
 	if (!availableWorkers.has(snapshot.expectedWorkerName)) {
-		errors.push(`Expected deployed preview worker ${JSON.stringify(snapshot.expectedWorkerName)} was not found in the Cloudflare account.`)
+		errors.push(
+			`Expected deployed preview worker ${JSON.stringify(snapshot.expectedWorkerName)} was not found in the Cloudflare account.`
+		)
 	}
 
 	if (!snapshot.bindingsInspected) {
-		for (const sidecarWorkerName of [snapshot.expectedAuthWorkerName, snapshot.expectedSearchWorkerName]) {
+		for (const sidecarWorkerName of [
+			snapshot.expectedAuthWorkerName,
+			snapshot.expectedSearchWorkerName
+		]) {
 			if (!availableWorkers.has(sidecarWorkerName)) {
-				errors.push(`Expected preview sidecar worker ${JSON.stringify(sidecarWorkerName)} was not found in the Cloudflare account.`)
+				errors.push(
+					`Expected preview sidecar worker ${JSON.stringify(sidecarWorkerName)} was not found in the Cloudflare account.`
+				)
 			}
 		}
 	}
 
 	if (!snapshot.versionId && !hasVerifiedPreviewUrl) {
-		errors.push(`Could not resolve an active deployment version for ${JSON.stringify(snapshot.expectedWorkerName)}.`)
+		errors.push(
+			`Could not resolve an active deployment version for ${JSON.stringify(snapshot.expectedWorkerName)}.`
+		)
 	}
 
-	if (hasVerifiedPreviewUrl && !snapshot.previewStatus) {
+	const canUseMetadataInsteadOfStatus =
+		snapshot.bindingsInspected && snapshot.previewStatusAccessBlocked === true
+
+	if (hasVerifiedPreviewUrl && !snapshot.previewStatus && !canUseMetadataInsteadOfStatus) {
 		errors.push(
 			snapshot.previewStatusError
 				? `Could not load the preview status endpoint from ${JSON.stringify(snapshot.previewUrl)}: ${snapshot.previewStatusError}`
@@ -392,7 +418,9 @@ export function collectTestingPreviewVerificationErrors(
 	if (snapshot.bindingsInspected) {
 		for (const bindingName of REQUIRED_MAIN_BINDINGS) {
 			if (!bindingNames.has(bindingName)) {
-				errors.push(`Expected binding ${JSON.stringify(bindingName)} was missing from the deployed preview Worker version.`)
+				errors.push(
+					`Expected binding ${JSON.stringify(bindingName)} was missing from the deployed preview Worker version.`
+				)
 			}
 		}
 	}
@@ -420,6 +448,7 @@ async function loadVerificationSnapshot(
 	let bindingRows: ParsedWranglerBindingRow[] = []
 	let previewStatus: TestingPreviewStatus | undefined
 	let previewStatusError: string | undefined
+	let previewStatusAccessBlocked = false
 	let previewHealth: PreviewHealthResult | undefined
 	let previewHealthError: string | undefined
 
@@ -434,6 +463,7 @@ async function loadVerificationSnapshot(
 			previewStatus = await loadPreviewStatus(previewUrl)
 		} catch (error) {
 			previewStatusError = error instanceof Error ? error.message : String(error)
+			previewStatusAccessBlocked = previewStatusError.includes('Cloudflare Access intercepted ')
 		}
 	}
 
@@ -458,7 +488,9 @@ async function loadVerificationSnapshot(
 	return {
 		snapshot: {
 			expectedAppName: process.env.TESTING_EXPECTED_APP_NAME?.trim() || DEFAULT_EXPECTED_APP_NAME,
-			expectedDeploymentChannel: process.env.TESTING_EXPECTED_DEPLOYMENT_CHANNEL?.trim() || DEFAULT_EXPECTED_DEPLOYMENT_CHANNEL,
+			expectedDeploymentChannel:
+				process.env.TESTING_EXPECTED_DEPLOYMENT_CHANNEL?.trim() ||
+				DEFAULT_EXPECTED_DEPLOYMENT_CHANNEL,
 			expectedWorkerName: workerNames.mainWorkerName,
 			expectedAuthWorkerName: workerNames.authServiceName,
 			expectedSearchWorkerName: workerNames.searchServiceName,
@@ -468,6 +500,7 @@ async function loadVerificationSnapshot(
 			previewUrl,
 			previewStatus,
 			previewStatusError,
+			previewStatusAccessBlocked,
 			previewHealth,
 			previewHealthError,
 			availableWorkers,
@@ -476,7 +509,9 @@ async function loadVerificationSnapshot(
 			bindingNames: uniqueSorted(bindingRows.map((row) => row.bindingName))
 		},
 		bindingRows,
-		availableTestingWorkers: availableWorkers.filter((workerName) => workerName.startsWith('devflare-testing-'))
+		availableTestingWorkers: availableWorkers.filter((workerName) =>
+			workerName.startsWith('devflare-testing-')
+		)
 	}
 }
 
@@ -485,9 +520,7 @@ function formatBindingRows(rows: ParsedWranglerBindingRow[]): string {
 		return '(none)'
 	}
 
-	return rows
-		.map((row) => `${row.type}: ${row.bindingName} -> ${row.resource}`)
-		.join('\n')
+	return rows.map((row) => `${row.type}: ${row.bindingName} -> ${row.resource}`).join('\n')
 }
 
 function createDiagnosticsMessage(input: {
@@ -509,6 +542,7 @@ function createDiagnosticsMessage(input: {
 		`Deploy preview URL: ${input.snapshot.previewUrl ?? 'not provided'}`,
 		`Preview status APP_NAME: ${JSON.stringify(input.snapshot.previewStatus?.appName)}`,
 		`Preview status error: ${input.snapshot.previewStatusError ?? 'none'}`,
+		`Preview status access blocked: ${String(input.snapshot.previewStatusAccessBlocked)}`,
 		`Preview status DEPLOYMENT_CHANNEL: ${JSON.stringify(input.snapshot.previewStatus?.deploymentChannel)}`,
 		`Preview status service bindings: ${String(input.snapshot.previewStatus?.hasServiceBindings)}`,
 		`Preview status durable objects: ${String(input.snapshot.previewStatus?.hasDurableObjectBindings)}`,
@@ -517,7 +551,7 @@ function createDiagnosticsMessage(input: {
 		`Preview status send email: ${String(input.snapshot.previewStatus?.hasSendEmailBindings)}`,
 		`Preview status hyperdrive: ${String(input.snapshot.previewStatus?.hasHyperdriveBinding)}`,
 		`Active preview version: ${input.snapshot.versionId ?? 'not found'}`,
-		`Binding inspection: ${input.snapshot.bindingsInspected ? 'completed via wrangler versions view' : (input.snapshot.previewUrl ? 'skipped because Cloudflare did not expose preview version metadata after a successful named preview deploy' : 'not available')}`,
+		`Binding inspection: ${input.snapshot.bindingsInspected ? 'completed via wrangler versions view' : input.snapshot.previewUrl ? 'skipped because Cloudflare did not expose preview version metadata after a successful named preview deploy' : 'not available'}`,
 		`Testing workers in account: ${input.availableTestingWorkers.join(', ') || '(none)'}`,
 		`Deployed main-worker binding names: ${input.snapshot.bindingNames.join(', ') || '(none)'}`,
 		'Deployed main-worker binding rows:',
@@ -528,21 +562,29 @@ function createDiagnosticsMessage(input: {
 }
 
 async function runVerification(): Promise<void> {
-	const previewScope = process.argv[2]?.trim() || process.env.DEVFLARE_PREVIEW_BRANCH?.trim() || process.env.DEVFLARE_PREVIEW_IDENTIFIER?.trim()
+	const previewScope =
+		process.argv[2]?.trim() ||
+		process.env.DEVFLARE_PREVIEW_BRANCH?.trim() ||
+		process.env.DEVFLARE_PREVIEW_IDENTIFIER?.trim()
 	const accountId = process.env.CLOUDFLARE_ACCOUNT_ID?.trim()
-	const requestedVersionId = process.argv[3]?.trim() || process.env.TESTING_DEPLOY_VERSION_ID?.trim()
+	const requestedVersionId =
+		process.argv[3]?.trim() || process.env.TESTING_DEPLOY_VERSION_ID?.trim()
 	const attempts = Number(process.env.TESTING_VERIFICATION_ATTEMPTS ?? '5')
 	const delayMs = Number(process.env.TESTING_VERIFICATION_DELAY_MS ?? '3000')
 
 	if (!previewScope) {
-		throw new Error('Provide a preview scope argument or set DEVFLARE_PREVIEW_BRANCH / DEVFLARE_PREVIEW_IDENTIFIER.')
+		throw new Error(
+			'Provide a preview scope argument or set DEVFLARE_PREVIEW_BRANCH / DEVFLARE_PREVIEW_IDENTIFIER.'
+		)
 	}
 
 	if (!accountId) {
-		throw new Error('CLOUDFLARE_ACCOUNT_ID must be set before verifying the testing preview deployment.')
+		throw new Error(
+			'CLOUDFLARE_ACCOUNT_ID must be set before verifying the testing preview deployment.'
+		)
 	}
 
-	for (let attempt = 1;attempt <= attempts;attempt += 1) {
+	for (let attempt = 1; attempt <= attempts; attempt += 1) {
 		try {
 			const { snapshot, bindingRows, availableTestingWorkers } = await loadVerificationSnapshot(
 				previewScope,
@@ -552,12 +594,14 @@ async function runVerification(): Promise<void> {
 			const errors = collectTestingPreviewVerificationErrors(snapshot)
 
 			if (errors.length > 0) {
-				throw new Error(createDiagnosticsMessage({
-					snapshot,
-					bindingRows,
-					availableTestingWorkers,
-					errors
-				}))
+				throw new Error(
+					createDiagnosticsMessage({
+						snapshot,
+						bindingRows,
+						availableTestingWorkers,
+						errors
+					})
+				)
 			}
 
 			if (!snapshot.bindingsInspected && snapshot.previewUrl) {
@@ -566,8 +610,16 @@ async function runVerification(): Promise<void> {
 				)
 			}
 
+			if (snapshot.bindingsInspected && snapshot.previewStatusAccessBlocked) {
+				console.warn(
+					`Live /status was blocked by Cloudflare Access for ${JSON.stringify(snapshot.expectedWorkerName)}; verified deployment settings and bindings through Wrangler metadata instead.`
+				)
+			}
+
 			console.log(`Verified testing preview scope ${JSON.stringify(previewScope)}.`)
-			console.log(`Verified main worker ${snapshot.expectedWorkerName} version ${snapshot.versionId ?? 'not exposed by Cloudflare'}.`)
+			console.log(
+				`Verified main worker ${snapshot.expectedWorkerName} version ${snapshot.versionId ?? 'not exposed by Cloudflare'}.`
+			)
 			console.log(`Verified bindings: ${REQUIRED_MAIN_BINDINGS.join(', ')}.`)
 			return
 		} catch (error) {
@@ -576,7 +628,9 @@ async function runVerification(): Promise<void> {
 			}
 
 			const message = error instanceof Error ? error.message : String(error)
-			console.error(`Testing preview verification attempt ${attempt}/${attempts} failed; retrying in ${delayMs}ms...`)
+			console.error(
+				`Testing preview verification attempt ${attempt}/${attempts} failed; retrying in ${delayMs}ms...`
+			)
 			console.error(message)
 			await Bun.sleep(delayMs)
 		}

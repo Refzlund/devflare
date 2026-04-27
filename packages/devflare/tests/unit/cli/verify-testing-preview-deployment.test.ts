@@ -61,13 +61,25 @@ describe('testing preview deployment verifier', () => {
 			bindingNames: ['SESSIONS', 'AUTH_SERVICE']
 		})
 
-		expect(errors).toContain('Resolved preview worker name was "devflare-testing-binding-matrix" instead of "devflare-testing-binding-matrix-pr-1".')
-		expect(errors).toContain('Resolved APP_NAME was "testing-binding-matrix" instead of "testing-binding-matrix-preview".')
+		expect(errors).toContain(
+			'Resolved preview worker name was "devflare-testing-binding-matrix" instead of "devflare-testing-binding-matrix-pr-1".'
+		)
+		expect(errors).toContain(
+			'Resolved APP_NAME was "testing-binding-matrix" instead of "testing-binding-matrix-preview".'
+		)
 		expect(errors).toContain('Resolved DEPLOYMENT_CHANNEL was "development" instead of "preview".')
-		expect(errors).toContain('Expected deployed preview worker "devflare-testing-binding-matrix-pr-1" was not found in the Cloudflare account.')
-		expect(errors).toContain('Expected preview sidecar worker "devflare-testing-auth-service-pr-1" was not found in the Cloudflare account.')
-		expect(errors).toContain('Expected preview sidecar worker "devflare-testing-search-service-pr-1" was not found in the Cloudflare account.')
-		expect(errors).toContain('Could not resolve an active deployment version for "devflare-testing-binding-matrix-pr-1".')
+		expect(errors).toContain(
+			'Expected deployed preview worker "devflare-testing-binding-matrix-pr-1" was not found in the Cloudflare account.'
+		)
+		expect(errors).toContain(
+			'Expected preview sidecar worker "devflare-testing-auth-service-pr-1" was not found in the Cloudflare account.'
+		)
+		expect(errors).toContain(
+			'Expected preview sidecar worker "devflare-testing-search-service-pr-1" was not found in the Cloudflare account.'
+		)
+		expect(errors).toContain(
+			'Could not resolve an active deployment version for "devflare-testing-binding-matrix-pr-1".'
+		)
 	})
 
 	test('reports missing bindings when a preview Worker version was inspected', () => {
@@ -90,8 +102,12 @@ describe('testing preview deployment verifier', () => {
 			bindingNames: ['SESSIONS', 'AUTH_SERVICE']
 		})
 
-		expect(errors).toContain('Expected binding "SESSION_ROOM" was missing from the deployed preview Worker version.')
-		expect(errors).toContain('Expected binding "POSTGRES" was missing from the deployed preview Worker version.')
+		expect(errors).toContain(
+			'Expected binding "SESSION_ROOM" was missing from the deployed preview Worker version.'
+		)
+		expect(errors).toContain(
+			'Expected binding "POSTGRES" was missing from the deployed preview Worker version.'
+		)
 	})
 
 	test('does not fail just because preview sidecar deploy steps were skipped on this run', () => {
@@ -133,7 +149,9 @@ describe('testing preview deployment verifier', () => {
 			bindingNames: [...REQUIRED_MAIN_BINDINGS]
 		})
 
-		expect(errors).toContain('Expected deployed preview worker "devflare-testing-binding-matrix-pr-1" was not found in the Cloudflare account.')
+		expect(errors).toContain(
+			'Expected deployed preview worker "devflare-testing-binding-matrix-pr-1" was not found in the Cloudflare account.'
+		)
 	})
 
 	test('accepts a named preview deploy when Cloudflare withholds preview version metadata', () => {
@@ -200,7 +218,9 @@ describe('testing preview deployment verifier', () => {
 			bindingNames: []
 		})
 
-		expect(errors).toContain('Expected preview sidecar worker "devflare-testing-auth-service-pr-1" was not found in the Cloudflare account.')
+		expect(errors).toContain(
+			'Expected preview sidecar worker "devflare-testing-auth-service-pr-1" was not found in the Cloudflare account.'
+		)
 	})
 
 	test('reports preview status endpoint errors with the preview URL context intact', () => {
@@ -228,5 +248,35 @@ describe('testing preview deployment verifier', () => {
 		expect(errors).toContain(
 			'Could not load the preview status endpoint from "https://devflare-testing-binding-matrix-pr-1.example.workers.dev": Preview status endpoint returned 503 Service Unavailable.'
 		)
+	})
+
+	test('accepts complete Wrangler metadata when live probes are blocked by Cloudflare Access', () => {
+		const errors = collectTestingPreviewVerificationErrors({
+			expectedAppName: DEFAULT_EXPECTED_APP_NAME,
+			expectedDeploymentChannel: DEFAULT_EXPECTED_DEPLOYMENT_CHANNEL,
+			expectedWorkerName: 'devflare-testing-binding-matrix-next',
+			expectedAuthWorkerName: 'devflare-testing-auth-service-next',
+			expectedSearchWorkerName: 'devflare-testing-search-service-next',
+			resolvedWorkerName: 'devflare-testing-binding-matrix-next',
+			resolvedAppName: DEFAULT_EXPECTED_APP_NAME,
+			resolvedDeploymentChannel: DEFAULT_EXPECTED_DEPLOYMENT_CHANNEL,
+			previewUrl: 'https://devflare-testing-binding-matrix-next.example.workers.dev',
+			previewHealth: {
+				ok: false,
+				status: 302,
+				body: '',
+				redirectedToAccess: true,
+				locationHeader: 'https://example.cloudflareaccess.com/cdn-cgi/access/login'
+			},
+			previewStatusAccessBlocked: true,
+			previewStatusError:
+				'Cloudflare Access intercepted https://devflare-testing-binding-matrix-next.example.workers.dev/status (Location: https://example.cloudflareaccess.com/cdn-cgi/access/login). Cannot read /status.',
+			availableWorkers: ['devflare-testing-binding-matrix-next'],
+			versionId: 'version-123',
+			bindingsInspected: true,
+			bindingNames: [...REQUIRED_MAIN_BINDINGS]
+		})
+
+		expect(errors).toEqual([])
 	})
 })

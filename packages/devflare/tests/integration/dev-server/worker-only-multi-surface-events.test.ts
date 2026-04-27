@@ -9,16 +9,20 @@ import {
 } from './worker-only-multi-surface.helpers'
 
 const tempDirs: string[] = []
+const DEV_SERVER_HOOK_TIMEOUT_MS = 20_000
+const DEV_SERVER_TEST_TIMEOUT_MS = 15_000
 
 afterAll(async () => {
 	await cleanupTempDirs(tempDirs)
-})
+}, DEV_SERVER_HOOK_TIMEOUT_MS)
 
 describe('worker-only dev server multi-surface handlers', () => {
-	test('supports event-first handlers and AsyncLocalStorage getters across fetch, queue, scheduled, email, and Durable Objects', async () => {
-		const projectDir = await createProject(tempDirs, {
-			prefix: 'devflare-worker-only-events-',
-			config: `
+	test(
+		'supports event-first handlers and AsyncLocalStorage getters across fetch, queue, scheduled, email, and Durable Objects',
+		async () => {
+			const projectDir = await createProject(tempDirs, {
+				prefix: 'devflare-worker-only-events-',
+				config: `
 export default {
 	name: 'worker-only-event-surface-test',
 	compatibilityDate: '2026-03-17',
@@ -52,8 +56,8 @@ export default {
 	}
 }
 `.trim(),
-			files: {
-				'src/fetch.ts': `
+				files: {
+					'src/fetch.ts': `
 import type { FetchEvent } from 'devflare/runtime'
 import { getFetchEvent } from 'devflare/runtime'
 
@@ -94,7 +98,7 @@ export async function fetch({ url, request, env }: FetchEvent<DevflareEnv>): Pro
 	return new Response('not-found', { status: 404 })
 }
 `.trim(),
-				'src/queue.ts': `
+					'src/queue.ts': `
 import type { QueueEvent } from 'devflare/runtime'
 import { getQueueEvent } from 'devflare/runtime'
 
@@ -104,7 +108,7 @@ export async function queue(event: QueueEvent<{ value: string }, DevflareEnv>): 
 	activeEvent.messages[0].ack()
 }
 `.trim(),
-				'src/scheduled.ts': `
+					'src/scheduled.ts': `
 import type { ScheduledEvent } from 'devflare/runtime'
 import { getScheduledEvent } from 'devflare/runtime'
 
@@ -112,7 +116,7 @@ export async function scheduled({ env, controller }: ScheduledEvent<DevflareEnv>
 	await env.RESULTS.put('scheduled', getScheduledEvent().controller.cron || controller.cron || 'missing-cron')
 }
 `.trim(),
-				'src/email.ts': `
+					'src/email.ts': `
 import type { EmailEvent } from 'devflare/runtime'
 import { getEmailEvent } from 'devflare/runtime'
 
@@ -120,7 +124,7 @@ export async function email({ env, message }: EmailEvent<DevflareEnv>): Promise<
 	await env.RESULTS.put('email', message.from + '->' + getEmailEvent().to)
 }
 `.trim(),
-				'src/do/logger.ts': `
+					'src/do/logger.ts': `
 import { DurableObject } from 'cloudflare:workers'
 import type { DurableObjectFetchEvent } from 'devflare/runtime'
 import { getDurableObjectFetchEvent } from 'devflare/runtime'
@@ -132,98 +136,108 @@ export class Logger extends DurableObject {
 	}
 }
 `.trim()
-			}
-		})
-
-		const port = await getAvailablePort()
-		const baseUrl = `http://127.0.0.1:${port}`
-		let devServer: DevServer | null = null
-
-		try {
-			devServer = createDevServer({
-				cwd: projectDir,
-				miniflarePort: port,
-				enableVite: false,
-				persist: false
+				}
 			})
 
-			await devServer.start()
+			const port = await getAvailablePort()
+			const baseUrl = `http://127.0.0.1:${port}`
+			let devServer: DevServer | null = null
 
-			const fetchResponse = await fetch(`${baseUrl}/fetch`)
-			expect(fetchResponse.status).toBe(200)
-			const fetchPayload = await fetchResponse.json() as {
-				requestUrl: string
-				eventUrl: string
-				sameUrl: boolean
-				safeInside: boolean
+			try {
+				devServer = createDevServer({
+					cwd: projectDir,
+					miniflarePort: port,
+					enableVite: false,
+					persist: false
+				})
+
+				await devServer.start()
+
+				const fetchResponse = await fetch(`${baseUrl}/fetch`)
+				expect(fetchResponse.status).toBe(200)
+				const fetchPayload = (await fetchResponse.json()) as {
+					requestUrl: string
+					eventUrl: string
+					sameUrl: boolean
+					safeInside: boolean
+				}
+				expect(fetchPayload).toEqual({
+					requestUrl: `${baseUrl}/fetch`,
+					eventUrl: `${baseUrl}/fetch`,
+					sameUrl: true,
+					safeInside: true
+				})
+
+				const queueResponse = await fetch(`${baseUrl}/queue`, { method: 'POST' })
+				expect(queueResponse.status).toBe(202)
+				expect(
+					await waitForText(
+						() => readWorkerText(`${baseUrl}/queue-result`),
+						'event-queued:task-queue'
+					)
+				).toBe('event-queued:task-queue')
+
+				const miniflare = devServer.getMiniflare() as {
+					getWorker(workerName?: string): Promise<{
+						scheduled(options?: { cron?: string; scheduledTime?: Date }): Promise<unknown>
+					}>
+				} | null
+				if (!miniflare) {
+					throw new Error('Miniflare was not available after starting the dev server')
+				}
+
+				const worker = await miniflare.getWorker('worker-only-event-surface-test')
+				await worker.scheduled({
+					cron: '0 * * * *',
+					scheduledTime: new Date('2026-03-17T00:00:00.000Z')
+				})
+
+				expect(
+					await waitForText(() => readWorkerText(`${baseUrl}/scheduled-result`), '0 * * * *')
+				).toBe('0 * * * *')
+
+				const emailResponse = await fetch(
+					`${baseUrl}/cdn-cgi/handler/email?from=sender@example.com&to=worker@example.com`,
+					{
+						method: 'POST',
+						headers: {
+							'Content-Type': 'text/plain'
+						},
+						body: [
+							'From: sender@example.com',
+							'To: worker@example.com',
+							'Subject: Test email',
+							'',
+							'Hello from the event test'
+						].join('\r\n')
+					}
+				)
+				expect(emailResponse.status).toBe(200)
+				expect(
+					await waitForText(
+						() => readWorkerText(`${baseUrl}/email-result`),
+						'sender@example.com->worker@example.com'
+					)
+				).toBe('sender@example.com->worker@example.com')
+
+				const doResponse = await fetch(`${baseUrl}/do`)
+				expect(doResponse.status).toBe(200)
+				expect(await doResponse.text()).toBe('http://do/inspect|http://do/inspect')
+			} finally {
+				if (devServer) {
+					await devServer.stop()
+				}
 			}
-			expect(fetchPayload).toEqual({
-				requestUrl: `${baseUrl}/fetch`,
-				eventUrl: `${baseUrl}/fetch`,
-				sameUrl: true,
-				safeInside: true
-			})
+		},
+		DEV_SERVER_TEST_TIMEOUT_MS
+	)
 
-			const queueResponse = await fetch(`${baseUrl}/queue`, { method: 'POST' })
-			expect(queueResponse.status).toBe(202)
-			expect(await waitForText(
-				() => readWorkerText(`${baseUrl}/queue-result`),
-				'event-queued:task-queue'
-			)).toBe('event-queued:task-queue')
-
-			const miniflare = devServer.getMiniflare() as {
-				getWorker(workerName?: string): Promise<{
-					scheduled(options?: { cron?: string; scheduledTime?: Date }): Promise<unknown>
-				}>
-			} | null
-			if (!miniflare) {
-				throw new Error('Miniflare was not available after starting the dev server')
-			}
-
-			const worker = await miniflare.getWorker('worker-only-event-surface-test')
-			await worker.scheduled({
-				cron: '0 * * * *',
-				scheduledTime: new Date('2026-03-17T00:00:00.000Z')
-			})
-
-			expect(await waitForText(
-				() => readWorkerText(`${baseUrl}/scheduled-result`),
-				'0 * * * *'
-			)).toBe('0 * * * *')
-
-			const emailResponse = await fetch(`${baseUrl}/cdn-cgi/handler/email?from=sender@example.com&to=worker@example.com`, {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'text/plain'
-				},
-				body: [
-					'From: sender@example.com',
-					'To: worker@example.com',
-					'Subject: Test email',
-					'',
-					'Hello from the event test'
-				].join('\r\n')
-			})
-			expect(emailResponse.status).toBe(200)
-			expect(await waitForText(
-				() => readWorkerText(`${baseUrl}/email-result`),
-				'sender@example.com->worker@example.com'
-			)).toBe('sender@example.com->worker@example.com')
-
-			const doResponse = await fetch(`${baseUrl}/do`)
-			expect(doResponse.status).toBe(200)
-			expect(await doResponse.text()).toBe('http://do/inspect|http://do/inspect')
-		} finally {
-			if (devServer) {
-				await devServer.stop()
-			}
-		}
-	})
-
-	test('supports request-wide handle middleware with resolve(event) around HTTP method exports', async () => {
-		const projectDir = await createProject(tempDirs, {
-			prefix: 'devflare-worker-only-handle-middleware-',
-			config: `
+	test(
+		'supports request-wide handle middleware with resolve(event) around HTTP method exports',
+		async () => {
+			const projectDir = await createProject(tempDirs, {
+				prefix: 'devflare-worker-only-handle-middleware-',
+				config: `
 export default {
 	name: 'worker-only-handle-middleware-test',
 	compatibilityDate: '2026-03-17',
@@ -232,8 +246,8 @@ export default {
 	}
 }
 `.trim(),
-			files: {
-				'src/fetch.ts': `
+				files: {
+					'src/fetch.ts': `
 import { createFetchEvent, sequence } from 'devflare/runtime'
 import type { FetchEvent, ResolveFetch } from 'devflare/runtime'
 
@@ -281,33 +295,35 @@ export async function GET(event: FetchEvent): Promise<Response> {
 	})
 }
 `.trim()
-			}
-		})
-
-		const port = await getAvailablePort()
-		const baseUrl = `http://127.0.0.1:${port}`
-		let devServer: DevServer | null = null
-
-		try {
-			devServer = createDevServer({
-				cwd: projectDir,
-				miniflarePort: port,
-				enableVite: false,
-				persist: false
+				}
 			})
 
-			await devServer.start()
+			const port = await getAvailablePort()
+			const baseUrl = `http://127.0.0.1:${port}`
+			let devServer: DevServer | null = null
 
-			const response = await fetch(baseUrl)
-			expect(response.status).toBe(200)
-			expect(await response.text()).toBe('handle1-before>handle2-before>GET')
-			expect(response.headers.get('x-order')).toBe(
-				'handle1-before>handle2-before>GET>handle2-after>handle1-after'
-			)
-		} finally {
-			if (devServer) {
-				await devServer.stop()
+			try {
+				devServer = createDevServer({
+					cwd: projectDir,
+					miniflarePort: port,
+					enableVite: false,
+					persist: false
+				})
+
+				await devServer.start()
+
+				const response = await fetch(baseUrl)
+				expect(response.status).toBe(200)
+				expect(await response.text()).toBe('handle1-before>handle2-before>GET')
+				expect(response.headers.get('x-order')).toBe(
+					'handle1-before>handle2-before>GET>handle2-after>handle1-after'
+				)
+			} finally {
+				if (devServer) {
+					await devServer.stop()
+				}
 			}
-		}
-	})
+		},
+		DEV_SERVER_TEST_TIMEOUT_MS
+	)
 })
