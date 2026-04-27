@@ -21,6 +21,10 @@ import {
 } from '../config'
 import { applyLocalDevVarsToConfig } from '../config/local-dev-vars'
 import { seedMiniflareLocalSecrets } from '../secrets/local-secrets'
+import {
+	createCompatibilityAwareMiniflareLog,
+	resolveMiniflareLogLevel
+} from '../dev-server/miniflare-log'
 import { GATEWAY_RUNTIME_JS } from './gateway-runtime'
 
 // -----------------------------------------------------------------------------
@@ -258,9 +262,10 @@ function createBaseMiniflareConfig(
 		script: generateGatewayScript(),
 		port: options.port ?? 8787,
 		host: '127.0.0.1',
-		log: options.verbose
-			? new runtime.Log(runtime.LogLevel.DEBUG)
-			: new runtime.Log(runtime.LogLevel.WARN),
+		log: createCompatibilityAwareMiniflareLog(
+			runtime.Log,
+			resolveMiniflareLogLevel(runtime.LogLevel, options.verbose ? 'DEBUG' : 'WARN')
+		),
 		compatibilityDate: options.compatibilityDate ?? '2024-01-01',
 		compatibilityFlags: options.compatibilityFlags ?? []
 	}

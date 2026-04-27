@@ -6,12 +6,19 @@ export interface MiniflareCompatibilityLogger {
 	info(message: string): void
 }
 
+const MINIFLARE_LOG_LEVEL_FALLBACKS = {
+	WARN: 2,
+	DEBUG: 4
+} as const
+
 interface MiniflareLogLike {
 	warn(message: string): void
 	info(message: string): void
 }
 
 type MiniflareLogConstructor = new (level?: number) => MiniflareLogLike
+type MiniflareLogLevelName = keyof typeof MINIFLARE_LOG_LEVEL_FALLBACKS
+type MiniflareLogLevelExport = Partial<Record<MiniflareLogLevelName, number>> | undefined
 
 function normalizeMiniflareMessage(message: string): string {
 	return message
@@ -30,6 +37,13 @@ export function formatCompatibilityDateFallbackNotice(message: string): string |
 
 	const [, _supportedDate, requestedDate, fallbackDate] = match
 	return `Using latest supported Cloudflare Workers Runtime compatibility date ${fallbackDate} (requested ${requestedDate})`
+}
+
+export function resolveMiniflareLogLevel(
+	logLevel: MiniflareLogLevelExport,
+	levelName: MiniflareLogLevelName
+): number {
+	return logLevel?.[levelName] ?? MINIFLARE_LOG_LEVEL_FALLBACKS[levelName]
 }
 
 export function createCompatibilityAwareMiniflareLog<TBase extends MiniflareLogConstructor>(

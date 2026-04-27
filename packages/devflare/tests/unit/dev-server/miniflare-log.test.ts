@@ -1,7 +1,8 @@
 import { describe, expect, mock, test } from 'bun:test'
 import {
 	createCompatibilityAwareMiniflareLog,
-	formatCompatibilityDateFallbackNotice
+	formatCompatibilityDateFallbackNotice,
+	resolveMiniflareLogLevel
 } from '../../../src/dev-server/miniflare-log'
 
 const rawCompatibilityWarning = [
@@ -72,5 +73,12 @@ describe('createCompatibilityAwareMiniflareLog', () => {
 
 		expect(log.warnings).toEqual(['A different Miniflare warning'])
 		expect(log.infos).toEqual([])
+	})
+})
+
+describe('resolveMiniflareLogLevel', () => {
+	test('falls back to Miniflare numeric log levels when the enum export is unavailable', () => {
+		expect(resolveMiniflareLogLevel(undefined, 'WARN')).toBe(2)
+		expect(resolveMiniflareLogLevel(undefined, 'DEBUG')).toBe(4)
 	})
 })
