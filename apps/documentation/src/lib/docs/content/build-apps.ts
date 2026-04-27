@@ -37,9 +37,19 @@ export const buildAppsDocs: DocPage[] = [
 			'The binding guides own the mechanics; this page owns the decision rules.'
 		],
 		facts: [
-			{ label: 'Best for', value: 'Choosing between KV, D1, R2, and Hyperdrive before you dive into one binding guide' },
-			{ label: 'Main question', value: 'Is the data keyed, query-shaped, object-shaped, or an existing remote database connection?' },
-			{ label: 'Safest default', value: 'Prefer stable names in config when the binding supports them' },
+			{
+				label: 'Best for',
+				value: 'Choosing between KV, D1, R2, and Hyperdrive before you dive into one binding guide'
+			},
+			{
+				label: 'Main question',
+				value:
+					'Is the data keyed, query-shaped, object-shaped, or an existing remote database connection?'
+			},
+			{
+				label: 'Safest default',
+				value: 'Prefer stable names in config when the binding supports them'
+			},
 			{ label: 'Open next', value: 'The specific binding guide once the storage shape is clear' }
 		],
 		sourcePages: [
@@ -60,10 +70,26 @@ export const buildAppsDocs: DocPage[] = [
 				table: {
 					headers: ['Binding', 'Reach for it when', 'Usually the wrong fit'],
 					rows: [
-						['`KV`', 'You need keyed lookups, cache-like state, feature flags, or lightweight session markers.', 'You need relational queries, joins, or object delivery.'],
-						['`D1`', 'You need SQL, relations, filters, or schema-shaped data.', 'You only need key lookup or one blob of file data.'],
-						['`R2`', 'You need objects, uploads, generated files, or browser-facing file delivery through a Worker.', 'You need query semantics or tiny cache records.'],
-						['`Hyperdrive`', 'You already have a remote PostgreSQL system and the worker should reach it through Cloudflare acceleration.', 'A local-first or greenfield schema could live in D1 instead.']
+						[
+							'`KV`',
+							'You need keyed lookups, cache-like state, feature flags, or lightweight session markers.',
+							'You need relational queries, joins, or object delivery.'
+						],
+						[
+							'`D1`',
+							'You need SQL, relations, filters, or schema-shaped data.',
+							'You only need key lookup or one blob of file data.'
+						],
+						[
+							'`R2`',
+							'You need objects, uploads, generated files, or browser-facing file delivery through a Worker.',
+							'You need query semantics or tiny cache records.'
+						],
+						[
+							'`Hyperdrive`',
+							'You already have a remote PostgreSQL system and the worker should reach it through Cloudflare acceleration.',
+							'A local-first or greenfield schema could live in D1 instead.'
+						]
 					]
 				},
 				callouts: [
@@ -201,7 +227,8 @@ export async function GET({ env, params }: FetchEvent<DevflareEnv>): Promise<Res
 		navTitle: 'R2 uploads & delivery',
 		readTime: '7 min read',
 		eyebrow: 'Guide',
-		title: 'Handle R2 uploads and file delivery explicitly instead of treating bucket URLs as the product',
+		title:
+			'Handle R2 uploads and file delivery explicitly instead of treating bucket URLs as the product',
 		summary:
 			'Use presigned `PUT` URLs for direct uploads, public buckets on custom domains for truly public assets, and private buckets plus Worker auth for protected files. Keep `r2.dev` out of production, and when a preview or environment needs its own bucket, scope it intentionally instead of borrowing production storage.',
 		description:
@@ -214,7 +241,11 @@ export async function GET({ env, params }: FetchEvent<DevflareEnv>): Promise<Res
 			'Devflare gives you real local R2 bindings in runtime and tests, but it does not promise a stable browser-facing local bucket URL contract, so local browser flows should usually go through your Worker routes.'
 		],
 		facts: [
-			{ label: 'Safest upload default', value: 'Presigned `PUT` URL plus browser-direct upload plus object key stored in your app database' },
+			{
+				label: 'Safest upload default',
+				value:
+					'Presigned `PUT` URL plus browser-direct upload plus object key stored in your app database'
+			},
 			{ label: 'Safest private delivery default', value: 'Private bucket plus Worker-gated reads' },
 			{ label: 'Do not ship this as prod delivery', value: '`r2.dev`' },
 			{ label: 'Team-only fit', value: 'Custom domain plus Cloudflare Access' }
@@ -261,7 +292,7 @@ export async function GET({ env, params }: FetchEvent<DevflareEnv>): Promise<Res
 				],
 				paragraphs: [
 					'This is the usual safe default because large files do not have to stream through your app server or Worker just to end up in object storage anyway.',
-					'Cloudflare\'s UGC guidance says the same thing: let the Worker control auth and upload intent, then let the client stream directly to R2. If you need post-upload workflows, R2 event notifications can push object-create events into Queues for moderation, metadata writes, or follow-up processing.'
+					"Cloudflare's UGC guidance says the same thing: let the Worker control auth and upload intent, then let the client stream directly to R2. If you need post-upload workflows, R2 event notifications can push object-create events into Queues for moderation, metadata writes, or follow-up processing."
 				],
 				bullets: [
 					'Generate object keys server-side, for example `users/<userId>/<uuid>.jpg`.',
@@ -309,15 +340,35 @@ export async function GET({ env, params }: FetchEvent<DevflareEnv>): Promise<Res
 				table: {
 					headers: ['Pattern', 'Use it when', 'Main caveat'],
 					rows: [
-						['Public bucket on a custom domain', 'Images, assets, or media should be public and cacheable for anyone.', 'Use a custom domain for real delivery; `r2.dev` is not the production path.'],
-						['Private bucket plus Worker-gated reads', 'Access depends on the current user, tenant, payment state, or other app authorization.', 'Your Worker becomes the delivery boundary, so own the auth, cache headers, and response metadata deliberately.'],
-						['Presigned `GET` URL on the S3 endpoint', 'A download should be directly accessible for a short time without a custom delivery layer.', 'Presigned URLs are bearer tokens and do not work with custom domains.'],
-						['Custom domain plus Cloudflare Access', 'Only teammates or organization users should reach the bucket.', 'Disable `r2.dev` so the bucket is not still reachable through the public development URL.'],
-						['Custom domain plus Worker token auth or WAF HMAC validation', 'You want expiring direct links on `cdn.example.com` without exposing the whole bucket.', 'This is not the same feature as presigned R2 URLs; you are building or validating the access layer at the custom domain boundary.']
+						[
+							'Public bucket on a custom domain',
+							'Images, assets, or media should be public and cacheable for anyone.',
+							'Use a custom domain for real delivery; `r2.dev` is not the production path.'
+						],
+						[
+							'Private bucket plus Worker-gated reads',
+							'Access depends on the current user, tenant, payment state, or other app authorization.',
+							'Your Worker becomes the delivery boundary, so own the auth, cache headers, and response metadata deliberately.'
+						],
+						[
+							'Presigned `GET` URL on the S3 endpoint',
+							'A download should be directly accessible for a short time without a custom delivery layer.',
+							'Presigned URLs are bearer tokens and do not work with custom domains.'
+						],
+						[
+							'Custom domain plus Cloudflare Access',
+							'Only teammates or organization users should reach the bucket.',
+							'Disable `r2.dev` so the bucket is not still reachable through the public development URL.'
+						],
+						[
+							'Custom domain plus Worker token auth or WAF HMAC validation',
+							'You want expiring direct links on `cdn.example.com` without exposing the whole bucket.',
+							'This is not the same feature as presigned R2 URLs; you are building or validating the access layer at the custom domain boundary.'
+						]
 					]
 				},
 				paragraphs: [
-					'Cloudflare\'s public bucket docs are clear about this split: custom domains are the right place for cache, WAF, Access, and other edge controls, while `r2.dev` is a development-oriented public URL and should not be treated as the polished product surface.',
+					"Cloudflare's public bucket docs are clear about this split: custom domains are the right place for cache, WAF, Access, and other edge controls, while `r2.dev` is a development-oriented public URL and should not be treated as the polished product surface.",
 					'When the content is private or app-controlled, the safest default is still a private bucket with a Worker route in front of it. That keeps auth and response headers under your control instead of forcing the bucket URL to become your application boundary.'
 				],
 				cards: [
@@ -348,7 +399,7 @@ export async function GET({ env, params }: FetchEvent<DevflareEnv>): Promise<Res
 				id: 'dev-and-prod',
 				title: 'Keep development and production boundaries honest',
 				paragraphs: [
-					'Cloudflare\'s development guidance says local Worker development uses local simulated bindings by default, and Devflare follows the same practical posture: local R2 bindings are available to your worker code, tests, and bridge helpers without requiring a real remote bucket just to iterate.',
+					"Cloudflare's development guidance says local Worker development uses local simulated bindings by default, and Devflare follows the same practical posture: local R2 bindings are available to your worker code, tests, and bridge helpers without requiring a real remote bucket just to iterate.",
 					'Browser-visible local file flows should go through your Worker routes or app routes. Devflare does not promise a stable browser-facing local bucket origin, and depending on one would make local behavior more brittle than the product boundary probably needs to be.'
 				],
 				snippets: [
@@ -426,7 +477,8 @@ export async function GET({ env, params }: FetchEvent<DevflareEnv>): Promise<Res
 		navTitle: 'State & async patterns',
 		readTime: '6 min read',
 		eyebrow: 'Binding strategy',
-		title: 'Choose Durable Objects for single-identity state, queues for deferred work, and the binding guides for the mechanics',
+		title:
+			'Choose Durable Objects for single-identity state, queues for deferred work, and the binding guides for the mechanics',
 		summary:
 			'Use Durable Objects when one identity should own state or coordination. Use queues when work should happen later, in batches, or with retries. Then open the specific binding guide once the pattern is clear.',
 		description:
@@ -438,10 +490,20 @@ export async function GET({ env, params }: FetchEvent<DevflareEnv>): Promise<Res
 			'Preview and testing questions usually belong on the binding guides once the basic pattern choice is done.'
 		],
 		facts: [
-			{ label: 'Best for', value: 'Choosing between stateful identities, background work, or a mix of both' },
+			{
+				label: 'Best for',
+				value: 'Choosing between stateful identities, background work, or a mix of both'
+			},
 			{ label: 'Choose by', value: 'State ownership vs deferred work ownership' },
-			{ label: 'Best local proof', value: 'One real object call or one real queue trigger through the default harness' },
-			{ label: 'Preview warning', value: 'Durable Object-heavy previews and queue-owned resources have different release questions' }
+			{
+				label: 'Best local proof',
+				value: 'One real object call or one real queue trigger through the default harness'
+			},
+			{
+				label: 'Preview warning',
+				value:
+					'Durable Object-heavy previews and queue-owned resources have different release questions'
+			}
 		],
 		sourcePages: [
 			'packages/devflare/src/config/schema-bindings.ts',
@@ -462,9 +524,21 @@ export async function GET({ env, params }: FetchEvent<DevflareEnv>): Promise<Res
 				table: {
 					headers: ['Pattern', 'Reach for it when', 'Usually the wrong fit'],
 					rows: [
-						['`Durable Objects`', 'One identity should own state, coordination, ordering, alarms, or WebSocket-adjacent behavior.', 'The work is fire-and-forget, batchable, or mainly about retries.'],
-						['`Queues`', 'The request can enqueue work and return while a consumer handles retries, batching, or slow follow-up tasks.', 'The user needs the state transition to finish synchronously in the request path.'],
-						['`Use both`', 'A request or Durable Object owns the immediate state, then enqueues slower side work such as email, indexing, or downstream writes.', 'One primitive already tells the whole story and the second one would only add ceremony.']
+						[
+							'`Durable Objects`',
+							'One identity should own state, coordination, ordering, alarms, or WebSocket-adjacent behavior.',
+							'The work is fire-and-forget, batchable, or mainly about retries.'
+						],
+						[
+							'`Queues`',
+							'The request can enqueue work and return while a consumer handles retries, batching, or slow follow-up tasks.',
+							'The user needs the state transition to finish synchronously in the request path.'
+						],
+						[
+							'`Use both`',
+							'A request or Durable Object owns the immediate state, then enqueues slower side work such as email, indexing, or downstream writes.',
+							'One primitive already tells the whole story and the second one would only add ceremony.'
+						]
 					]
 				},
 				callouts: [
@@ -593,9 +667,16 @@ export default defineConfig({
 			'Preview isolation depends on resolved worker names, so naming validation still matters after the local test passes.'
 		],
 		facts: [
-			{ label: 'Best for', value: 'Service bindings, worker families, and deciding when another worker boundary is actually real' },
+			{
+				label: 'Best for',
+				value:
+					'Service bindings, worker families, and deciding when another worker boundary is actually real'
+			},
 			{ label: 'Core tools', value: '`ref()`, service bindings, and generated env types' },
-			{ label: 'Best local proof', value: '`createTestContext()` plus one real service call through `env.MY_SERVICE`' },
+			{
+				label: 'Best local proof',
+				value: '`createTestContext()` plus one real service call through `env.MY_SERVICE`'
+			},
 			{ label: 'Main release risk', value: 'Resolved worker naming and preview topology drift' }
 		],
 		sourcePages: [
@@ -618,9 +699,21 @@ export default defineConfig({
 				table: {
 					headers: ['If the real thing is...', 'Prefer...', 'Why'],
 					rows: [
-						['A separate runtime capability or internal API', '`Service bindings` and another worker', 'The boundary is a real worker-to-worker relationship, not just shared state.'],
-						['One stateful identity or serialized mutation lane', '`Durable Objects`', 'The core need is state ownership, not another general-purpose service boundary.'],
-						['Shared data, files, or a background job handoff', '`KV`, `D1`, `R2`, or `Queues`', 'The problem is data or deferred work, not a second worker API.']
+						[
+							'A separate runtime capability or internal API',
+							'`Service bindings` and another worker',
+							'The boundary is a real worker-to-worker relationship, not just shared state.'
+						],
+						[
+							'One stateful identity or serialized mutation lane',
+							'`Durable Objects`',
+							'The core need is state ownership, not another general-purpose service boundary.'
+						],
+						[
+							'Shared data, files, or a background job handoff',
+							'`KV`, `D1`, `R2`, or `Queues`',
+							'The problem is data or deferred work, not a second worker API.'
+						]
 					]
 				},
 				callouts: [

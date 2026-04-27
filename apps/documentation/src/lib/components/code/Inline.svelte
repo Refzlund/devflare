@@ -1,60 +1,61 @@
 <script lang="ts">
-	import { onDestroy } from 'svelte'
-	import { tooltip } from '$lib/components/layout/Tooltip.svelte'
-	import type { Snippet } from 'svelte'
+import { tooltip } from '$lib/components/layout/Tooltip.svelte'
+import { onDestroy } from 'svelte'
+import type { Snippet } from 'svelte'
 
-	const COPY_LABEL = 'Copy inline code'
-	const COPIED_LABEL = 'Copied inline code'
-	const COPIED_TOOLTIP = 'Copied!'
+const COPY_LABEL = 'Copy inline code'
+const COPIED_LABEL = 'Copied inline code'
+const COPIED_TOOLTIP = 'Copied!'
 
-	let {
-		children,
-		text = '',
-		class: className = ''
-	}: {
-		children?: Snippet
-		text?: string
-		class?: string
-	} = $props()
+const {
+	children,
+	text = '',
+	class: className = ''
+}: {
+	children?: Snippet
+	text?: string
+	class?: string
+} = $props()
 
-	let copied = $state(false)
-	let buttonElement = $state<HTMLButtonElement | undefined>(undefined)
-	let copyResetHandle: ReturnType<typeof setTimeout> | undefined
+let copied = $state(false)
+// biome-ignore lint/style/useConst: Svelte bind:this assigns the element after mount.
+let buttonElement = $state<HTMLButtonElement | undefined>(undefined)
+let copyResetHandle: ReturnType<typeof setTimeout> | undefined
 
-	async function copyInlineCode(): Promise<void> {
-		if (!text || typeof navigator === 'undefined' || !navigator.clipboard) {
-			return
-		}
-
-		await navigator.clipboard.writeText(text)
-		copied = true
-
-		if (buttonElement) {
-			tooltip.show(COPIED_TOOLTIP, buttonElement)
-		}
-
-		if (copyResetHandle) {
-			clearTimeout(copyResetHandle)
-		}
-
-		copyResetHandle = setTimeout(() => {
-			copied = false
-
-			if (buttonElement && tooltip.anchor === buttonElement) {
-				tooltip.hide()
-			}
-		}, 1500)
+async function copyInlineCode(): Promise<void> {
+	if (!text || typeof navigator === 'undefined' || !navigator.clipboard) {
+		return
 	}
 
-	onDestroy(() => {
-		if (copyResetHandle) {
-			clearTimeout(copyResetHandle)
-		}
+	await navigator.clipboard.writeText(text)
+	copied = true
+
+	if (buttonElement) {
+		tooltip.show(COPIED_TOOLTIP, buttonElement)
+	}
+
+	if (copyResetHandle) {
+		clearTimeout(copyResetHandle)
+	}
+
+	copyResetHandle = setTimeout(() => {
+		copied = false
 
 		if (buttonElement && tooltip.anchor === buttonElement) {
 			tooltip.hide()
 		}
-	})
+	}, 1500)
+}
+
+onDestroy(() => {
+	if (copyResetHandle) {
+		clearTimeout(copyResetHandle)
+	}
+
+	if (buttonElement && tooltip.anchor === buttonElement) {
+		tooltip.hide()
+	}
+})
 </script>
 
 <button

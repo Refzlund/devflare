@@ -1,710 +1,52 @@
 // =============================================================================
-// Deploy Command — Deploy to Cloudflare
+// Deploy Command: deploy to Cloudflare
 // =============================================================================
 
-import { mkdir, open, readFile, rm, writeFile } from 'node:fs/promises'
-import { type ConsolaInstance } from 'consola'
-import { basename, dirname, isAbsolute, join, resolve } from 'pathe'
-import type { ParsedArgs, CliOptions, CliResult } from '../index'
+import type { ConsolaInstance } from 'consola'
+import { join } from 'pathe'
+import { getWorkersSubdomain } from '../../cloudflare/account'
+import { reconcilePreviewRegistry } from '../../cloudflare/preview-registry'
 import {
 	compileBuildConfig,
 	compileConfig,
 	loadConfig,
 	prepareConfigResourcesForDeploy,
-	readWranglerConfig,
-	resolveConfigForEnvironment,
-	ServiceBindingValidationError,
-	validateServiceBindings,
-	type DeployResourceNames,
-	type DevflareConfig,
-	type PrepareConfigResourcesForDeployResult,
-	type WranglerConfig
+	resolveConfigForEnvironment
 } from '../../config'
-import {
-	getPrimaryAccount,
-	getWorkerVersionDetail,
-	listWorkerVersions,
-	getWorkersSubdomain,
-	listWorkerDeployments
-} from '../../cloudflare/account'
-import { listWorkers } from '../../cloudflare/account-workers'
-import { getEffectiveAccountId } from '../../cloudflare/preferences'
-import { rebaseWranglerConfigPaths, stringifyConfig, writeWranglerConfig } from '../../config/compiler'
+import { stringifyConfig } from '../../config/compiler'
 import { getDependencies } from '../dependencies'
-import { prepareBuildArtifacts } from './build-artifacts'
+import { applyDeploymentStrategy, describeDeploymentStrategy } from '../deploy-strategy'
 import {
-	compareManifests,
-	createBuildManifest,
-	formatDriftWarning,
-	readBuildManifest
-} from '../build-manifest'
-import { getPackageVersion } from '../package-metadata'
-import { preparePreviewScopedResourcesForDeploy } from '../../config/preview-resources'
+	applyResolvedDeployTarget,
+	resolveDeployTarget,
+	withTemporaryEnvironment
+} from '../deploy-target'
+import type { CliOptions, CliResult, ParsedArgs } from '../index'
 import {
 	formatWorkersDevUrl,
 	mergeParsedWranglerDeployOutputs,
 	parseWranglerDeployOutput,
 	parseWranglerStructuredOutput
 } from '../preview'
-import {
-	applyResolvedDeployTarget,
-	resolveDeployTarget,
-	withTemporaryEnvironment
-} from '../deploy-target'
-import { applyDeploymentStrategy, describeDeploymentStrategy } from '../deploy-strategy'
-import { reconcilePreviewRegistry } from '../../cloudflare/preview-registry'
 import { createCliTheme, dim, green, logLine, yellow, yellowBold } from '../ui'
-import { resolvePackageSpecifier } from '../../utils/resolve-package'
-
-interface DeployResultMetadata {
-	status: 'success' | 'failure'
-	exitCode: number
-	workerName?: string
-	preview: boolean
-	branchScopedPreview: boolean
-	previewScope?: string
-	versionId?: string
-	previewUrl?: string
-	workersDevUrl?: string
-	verificationNote?: string
-	outputUrls: string[]
-	structuredOutput?: string
-	error?: string
-}
-
-interface PreparedDeployConfigResult {
-	config: DevflareConfig
-	deployConfigPath: string
-	previewScopedResources: Awaited<ReturnType<typeof preparePreviewScopedResourcesForDeploy>> | null
-	deployResources: PrepareConfigResourcesForDeployResult
-	wranglerConfig: WranglerConfig
-}
-
-function summarizeDeployResourceNames(resources: DeployResourceNames): string | null {
-	const segments = [
-		resources.kv.length > 0 ? `KV ${resources.kv.length}` : null,
-		resources.d1.length > 0 ? `D1 ${resources.d1.length}` : null,
-		resources.r2.length > 0 ? `R2 ${resources.r2.length}` : null,
-		resources.queues.length > 0 ? `Queues ${resources.queues.length}` : null,
-		resources.vectorize.length > 0 ? `Vectorize ${resources.vectorize.length}` : null,
-		resources.hyperdrive.length > 0 ? `Hyperdrive ${resources.hyperdrive.length}` : null
-	].filter((segment): segment is string => segment !== null)
-
-	return segments.length > 0 ? segments.join(' · ') : null
-}
-
-async function readDeployRedirectPath(filePath: string): Promise<string | null> {
-	const fs = await import('node:fs/promises')
-
-	try {
-		const rawConfig = await fs.readFile(filePath, 'utf-8')
-		const parsed = JSON.parse(rawConfig) as { configPath?: unknown }
-		if (typeof parsed.configPath !== 'string' || parsed.configPath.length === 0) {
-			return null
-		}
-
-		return resolve(dirname(filePath), parsed.configPath)
-	} catch {
-		return null
-	}
-}
-
-async function resolveBuildArtifactConfigPath(buildPath: string, cwd: string): Promise<string> {
-	const fs = await import('node:fs/promises')
-	const absoluteBuildPath = isAbsolute(buildPath)
-		? buildPath
-		: resolve(cwd, buildPath)
-
-	let stat
-	try {
-		stat = await fs.stat(absoluteBuildPath)
-	} catch {
-		throw new Error(`Could not find build artifact path: ${absoluteBuildPath}`)
-	}
-
-	if (stat.isFile()) {
-		if (basename(absoluteBuildPath) === 'config.json') {
-			const redirectedConfigPath = await readDeployRedirectPath(absoluteBuildPath)
-			if (!redirectedConfigPath) {
-				throw new Error(`Build redirect ${absoluteBuildPath} did not contain a valid configPath.`)
-			}
-
-			return redirectedConfigPath
-		}
-
-		return absoluteBuildPath
-	}
-
-	const candidates = [
-		resolve(absoluteBuildPath, 'wrangler.jsonc'),
-		resolve(absoluteBuildPath, '.wrangler', 'deploy', 'config.json'),
-		resolve(absoluteBuildPath, 'config.json'),
-		resolve(absoluteBuildPath, '.devflare', 'build', 'wrangler.jsonc')
-	]
-
-	for (const candidatePath of candidates) {
-		try {
-			const candidateStat = await fs.stat(candidatePath)
-			if (!candidateStat.isFile()) {
-				continue
-			}
-
-			if (basename(candidatePath) === 'config.json') {
-				const redirectedConfigPath = await readDeployRedirectPath(candidatePath)
-				if (redirectedConfigPath) {
-					return redirectedConfigPath
-				}
-				continue
-			}
-
-			return candidatePath
-		} catch {
-			// Try the next candidate.
-		}
-	}
-
-	throw new Error(
-		`Could not resolve a Wrangler build config from ${absoluteBuildPath}. Pass a .devflare/build directory, a generated wrangler.jsonc, or a .wrangler/deploy/config.json redirect.`
-	)
-}
-
-function withBuildArtifactPaths(
-	compiledConfig: WranglerConfig,
-	buildConfig: WranglerConfig
-): WranglerConfig {
-	return {
-		...compiledConfig,
-		...(buildConfig.main ? { main: buildConfig.main } : {}),
-		...(buildConfig.assets ? { assets: buildConfig.assets } : {})
-	}
-}
-
-async function prepareDeployConfig(options: {
-	cwd: string
-	configPath?: string
-	environment?: string
-	buildConfigPath: string
-	preview: boolean
-	branchName?: string
-	logger?: ConsolaInstance
-	force?: boolean
-}): Promise<PreparedDeployConfigResult> {
-	const rawConfig = await loadConfig({
-		cwd: options.cwd,
-		configFile: options.configPath
-	})
-
-	// R2: detect drift between the build artefact manifest and the current
-	// source/target. Fixes C5 (bindings drift), C8 (preview->production
-	// silent flip), C11 (cross-version artefact reuse).
-	const manifestDir = dirname(options.buildConfigPath)
-	const manifest = await readBuildManifest(manifestDir)
-	if (manifest) {
-		const currentManifest = createBuildManifest(rawConfig, {
-			devflareVersion: await getPackageVersion(),
-			intendedTarget: {
-				environment: options.environment,
-				preview: options.preview,
-				branchName: options.branchName
-			}
-		})
-		const drift = compareManifests(manifest, currentManifest)
-		const warning = formatDriftWarning(drift)
-		if (warning && options.logger) {
-			if (options.force) {
-				logLine(options.logger, warning)
-				logLine(options.logger, 'Continuing because --force was passed.')
-			} else {
-				// Drift is a warning, not a hard error - surface it loudly so
-				// CI logs flag it, but don't block the deploy. Hard-blocking
-				// would be a behaviour change for existing pipelines that
-				// build then deploy with slightly different env vars.
-				logLine(options.logger, warning)
-			}
-		}
-	}
-
-	const previewScopedResources = options.environment === 'preview'
-		? await preparePreviewScopedResourcesForDeploy(rawConfig, {
-			environment: options.environment
-		})
-		: null
-	const deployResources = await prepareConfigResourcesForDeploy(
-		previewScopedResources?.config ?? rawConfig,
-		{
-			environment: options.environment,
-			accountId: previewScopedResources?.accountId,
-			cloudflare: previewScopedResources?.resourceResolutionCloudflare
-		}
-	)
-	const deploymentStrategy = applyDeploymentStrategy(deployResources.config, {
-		environment: options.environment,
-		preview: options.preview,
-		branchName: options.branchName,
-		previewBranch: process.env.DEVFLARE_PREVIEW_BRANCH
-	})
-
-	// C16: deploy-time service-binding preflight. Surface typos in
-	// `bindings.services[*].service` before invoking Wrangler so users get
-	// a clear error pointing at the config instead of a runtime dispatch
-	// failure on the deployed worker.
-	const validationAccountId = previewScopedResources?.accountId
-		?? deploymentStrategy.config.accountId
-		?? process.env.CLOUDFLARE_ACCOUNT_ID
-	if (validationAccountId) {
-		try {
-			await validateServiceBindings(deploymentStrategy.config, validationAccountId, {
-				listWorkers: (accountId) => listWorkers(accountId),
-				selfWorkerName: deploymentStrategy.config.name
-			})
-		} catch (error) {
-			if (error instanceof ServiceBindingValidationError) {
-				throw error
-			}
-			// Non-validation failures (network/credentials) are non-fatal
-			// preflight noise - Wrangler's own deploy will surface auth
-			// problems clearly, and we don't want preflight to block when
-			// the validation account lookup itself fails.
-		}
-	}
-
-	const buildWranglerConfig = await readWranglerConfig(options.buildConfigPath)
-	const compiledWranglerConfig = compileConfig(deploymentStrategy.config)
-
-	// C4: write the resolved (ID-substituted) wrangler config to a sibling
-	// `.devflare/deploy/wrangler.jsonc` instead of overwriting the build
-	// artefact in place. Re-running `devflare deploy --build <path>` is
-	// non-destructive to the original build output.
-	const buildDir = dirname(options.buildConfigPath)
-	const deployArtefactDir = resolve(buildDir, '..', 'deploy')
-	await mkdir(deployArtefactDir, { recursive: true })
-	const deployArtefactPath = resolve(deployArtefactDir, 'wrangler.jsonc')
-
-	// `withBuildArtifactPaths` inherits `main`/`assets` from the build
-	// artefact when present (paths relative to `buildDir`), otherwise
-	// keeps the compiled values (paths relative to `options.cwd`). Rebase
-	// each path field relative to its true origin so wrangler can resolve
-	// the bundled entry-point and assets directory from the new
-	// `.devflare/deploy/wrangler.jsonc` location.
-	const compiledRebased = rebaseWranglerConfigPaths(
-		options.cwd,
-		deployArtefactDir,
-		compiledWranglerConfig
-	)
-	const buildRebased = rebaseWranglerConfigPaths(
-		buildDir,
-		deployArtefactDir,
-		buildWranglerConfig
-	)
-	const wranglerConfig = withBuildArtifactPaths(compiledRebased, buildRebased)
-
-	// C10: serialize concurrent deploys against the same artefact. Exclusive
-	// `wx` lock file with bounded wait so two `devflare deploy` invocations
-	// targeting the same `.devflare/deploy/` cannot tear each other's writes.
-	const lockPath = resolve(deployArtefactDir, '.lock')
-	const lockHandle = await acquireDeployArtefactLock(lockPath)
-	try {
-		await writeWranglerConfig(deployArtefactDir, wranglerConfig, 'wrangler.jsonc')
-	} finally {
-		await releaseDeployArtefactLock(lockHandle, lockPath)
-	}
-
-	return {
-		config: deploymentStrategy.config,
-		deployConfigPath: deployArtefactPath,
-		previewScopedResources,
-		deployResources,
-		wranglerConfig
-	}
-}
-
-/**
- * C10 — bounded-wait exclusive lock around the deploy artefact directory.
- *
- * Uses `open(path, 'wx')` (O_EXCL) which atomically fails when the file
- * already exists, so the only way to acquire the lock is to be the process
- * that successfully created it. Stale locks (older than 60s) are forcibly
- * cleared so a crashed deploy cannot wedge subsequent runs.
- */
-async function acquireDeployArtefactLock(
-	lockPath: string,
-	options: { maxWaitMs?: number; staleAfterMs?: number } = {}
-): Promise<{ close: () => Promise<void> }> {
-	const maxWaitMs = options.maxWaitMs ?? 30_000
-	const staleAfterMs = options.staleAfterMs ?? 60_000
-	const pollMs = 100
-	const start = Date.now()
-	while (true) {
-		try {
-			const handle = await open(lockPath, 'wx')
-			await handle.writeFile(`${process.pid}\n${Date.now()}`)
-			return handle
-		} catch (err) {
-			if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err
-			try {
-				const existing = await readFile(lockPath, 'utf-8')
-				const ts = Number.parseInt(existing.split('\n')[1] ?? '0', 10)
-				if (Number.isFinite(ts) && Date.now() - ts > staleAfterMs) {
-					await rm(lockPath, { force: true })
-					continue
-				}
-			} catch {
-				continue
-			}
-			if (Date.now() - start > maxWaitMs) {
-				throw new Error(
-					`Timed out waiting for deploy artefact lock at ${lockPath}. ` +
-					`Another \`devflare deploy\` may be running against the same artefact directory.`
-				)
-			}
-			await new Promise((r) => setTimeout(r, pollMs))
-		}
-	}
-}
-
-async function releaseDeployArtefactLock(
-	handle: { close: () => Promise<void> },
-	lockPath: string
-): Promise<void> {
-	try {
-		await handle.close()
-	} catch {
-		// Already closed.
-	}
-	await rm(lockPath, { force: true })
-}
-
-async function getCurrentGitBranch(cwd: string): Promise<string | null> {
-	const deps = await getDependencies()
-	const gitResult = await deps.exec.exec('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd })
-	if (gitResult.exitCode !== 0) {
-		return null
-	}
-
-	const branchName = gitResult.stdout.trim()
-	if (!branchName || branchName === 'HEAD') {
-		return null
-	}
-
-	return branchName
-}
-
-async function resolveLocalWranglerExecutable(
-	cwd: string,
-	fs: Awaited<ReturnType<typeof getDependencies>>['fs']
-): Promise<string | null> {
-	const wranglerExecutablePath = resolvePackageSpecifier('wrangler/bin/wrangler.js', cwd)
-
-	try {
-		await fs.access(wranglerExecutablePath)
-		return wranglerExecutablePath
-	} catch {
-		return null
-	}
-}
-
-function inferRecordSource(): 'cli' | 'github-action' {
-	return process.env.GITHUB_ACTIONS === 'true' ? 'github-action' : 'cli'
-}
-
-function shouldVerifyDeployControlPlane(): boolean {
-	const configured = process.env.DEVFLARE_VERIFY_DEPLOYMENT?.trim().toLowerCase()
-	if (!configured) {
-		return false
-	}
-
-	return !['0', 'false', 'no', 'off'].includes(configured)
-}
-
-function shouldRequireFreshProductionDeployment(): boolean {
-	const configured = process.env.DEVFLARE_REQUIRE_FRESH_PRODUCTION_DEPLOYMENT?.trim().toLowerCase()
-	if (!configured) {
-		return false
-	}
-
-	return !['0', 'false', 'no', 'off'].includes(configured)
-}
-
-async function writeDeployResultMetadata(metadata: DeployResultMetadata): Promise<void> {
-	const metadataPath = process.env.DEVFLARE_DEPLOY_METADATA_PATH?.trim()
-	if (!metadataPath) {
-		return
-	}
-
-	await mkdir(dirname(metadataPath), { recursive: true })
-	await writeFile(metadataPath, JSON.stringify(metadata, null, '\t'), 'utf8')
-}
-
-function getDeployVerificationSettings(): { attempts: number; delayMs: number } {
-	const attempts = Number.parseInt(process.env.DEVFLARE_VERIFY_DEPLOYMENT_ATTEMPTS ?? '', 10)
-	const delayMs = Number.parseInt(process.env.DEVFLARE_VERIFY_DEPLOYMENT_DELAY_MS ?? '', 10)
-
-	return {
-		attempts: Number.isFinite(attempts) && attempts > 0 ? attempts : 5,
-		delayMs: Number.isFinite(delayMs) && delayMs >= 0 ? delayMs : 1500
-	}
-}
-
-const DEPLOYMENT_LOOKBACK_TOLERANCE_MS = 2 * 60 * 1000
-
-function normalizeCloudflareAccountId(value: string | undefined): string | undefined {
-	const trimmed = value?.trim()
-	if (!trimmed) {
-		return undefined
-	}
-
-	return /^[a-f0-9]{32}$/i.test(trimmed) ? trimmed : undefined
-}
-
-async function waitForDeployVerification(delayMs: number): Promise<void> {
-	if (delayMs <= 0) {
-		return
-	}
-
-	await new Promise((resolve) => setTimeout(resolve, delayMs))
-}
-
-async function retryDeployVerification<T>(
-	description: string,
-	operation: () => Promise<T>
-): Promise<T> {
-	const { attempts, delayMs } = getDeployVerificationSettings()
-	let lastError: unknown
-
-	for (let attempt = 1;attempt <= attempts;attempt++) {
-		try {
-			return await operation()
-		} catch (error) {
-			lastError = error
-			if (attempt < attempts) {
-				await waitForDeployVerification(delayMs)
-			}
-		}
-	}
-
-	const message = lastError instanceof Error ? lastError.message : String(lastError)
-	throw new Error(
-		`Cloudflare could not verify ${description} after ${attempts} attempt${attempts === 1 ? '' : 's'}: ${message}`
-	)
-}
-
-async function resolveDeployAccountId(
-	preferredAccountId: string | undefined
-): Promise<string | undefined> {
-	if (preferredAccountId !== undefined) {
-		return normalizeCloudflareAccountId(preferredAccountId)
-	}
-
-	const apiToken = process.env.CLOUDFLARE_API_TOKEN?.trim()
-	const apiKey = process.env.CLOUDFLARE_API_KEY?.trim()
-	const apiEmail = process.env.CLOUDFLARE_EMAIL?.trim()
-	if (!apiToken && !(apiKey && apiEmail)) {
-		return undefined
-	}
-
-	try {
-		const primaryAccount = await getPrimaryAccount()
-		if (!primaryAccount) {
-			return undefined
-		}
-
-		const effective = await getEffectiveAccountId(primaryAccount.id)
-		return normalizeCloudflareAccountId(effective.accountId)
-	} catch {
-		return undefined
-	}
-}
-
-function selectDeploymentVersionId(deployment: {
-	versions: Array<{
-		percentage: number
-		versionId: string
-	}>
-}): string | undefined {
-	return deployment.versions.find((version) => version.percentage === 100)?.versionId
-		?? deployment.versions[0]?.versionId
-}
-
-function getWorkerVersionTimestamp(version: {
-	metadata: {
-		createdOn?: Date
-		modifiedOn?: Date
-	}
-}): Date | undefined {
-	return version.metadata.modifiedOn ?? version.metadata.createdOn
-}
-
-async function resolveVersionIdFromLatestDeployment(options: {
-	accountId: string
-	workerName: string
-	verificationDescription: string
-	deploymentLabel: 'Latest deployment' | 'Current deployment'
-	deployedAfter?: Date
-}): Promise<{
-	deploymentId: string
-	versionId: string
-}> {
-	return retryDeployVerification(options.verificationDescription, async () => {
-		const deployments = await listWorkerDeployments(options.accountId, options.workerName)
-		const latestDeployment = [...deployments].sort(
-			(a, b) => b.createdOn.getTime() - a.createdOn.getTime()
-		)[0]
-
-		if (!latestDeployment) {
-			throw new Error(`No deployments were found for Worker "${options.workerName}".`)
-		}
-
-		if (
-			options.deployedAfter
-			&& latestDeployment.createdOn.getTime() < options.deployedAfter.getTime() - DEPLOYMENT_LOOKBACK_TOLERANCE_MS
-		) {
-			throw new Error(
-				`${options.deploymentLabel} ${latestDeployment.id} was created before this deploy started.`
-			)
-		}
-
-		const versionId = selectDeploymentVersionId(latestDeployment)
-		if (!versionId) {
-			throw new Error(
-				`${options.deploymentLabel} ${latestDeployment.id} does not reference any version ids.`
-			)
-		}
-
-		return {
-			deploymentId: latestDeployment.id,
-			versionId
-		}
-	})
-}
-
-async function resolveVersionIdFromLatestWorkerVersion(options: {
-	accountId: string
-	workerName: string
-	preview: boolean
-	deployedAfter: Date
-}): Promise<string> {
-	return retryDeployVerification(
-		`the latest ${options.preview ? 'preview ' : ''}version for Worker "${options.workerName}"`,
-		async () => {
-			const versions = await listWorkerVersions(options.accountId, options.workerName)
-			const latestVersion = [...versions]
-				.filter((version) => version.id)
-				.filter((version) => version.metadata.hasPreview === options.preview)
-				.sort((a, b) => {
-					const left = getWorkerVersionTimestamp(a)?.getTime() ?? 0
-					const right = getWorkerVersionTimestamp(b)?.getTime() ?? 0
-					return right - left
-				})[0]
-
-			if (!latestVersion) {
-				throw new Error(
-					`No ${options.preview ? 'preview ' : ''}versions were found for Worker "${options.workerName}".`
-				)
-			}
-
-			const latestVersionTimestamp = getWorkerVersionTimestamp(latestVersion)
-			if (!latestVersionTimestamp) {
-				throw new Error(
-					`Latest version ${latestVersion.id} did not include a creation timestamp.`
-				)
-			}
-
-			if (latestVersionTimestamp.getTime() < options.deployedAfter.getTime() - DEPLOYMENT_LOOKBACK_TOLERANCE_MS) {
-				throw new Error(
-					`Latest version ${latestVersion.id} was created before this deploy started.`
-				)
-			}
-
-			return latestVersion.id
-		}
-	)
-}
-
-async function resolveVersionIdFromLatestProductionDeployment(options: {
-	accountId: string
-	workerName: string
-	deployedAfter: Date
-}): Promise<{
-	deploymentId: string
-	versionId: string
-}> {
-	return resolveVersionIdFromLatestDeployment({
-		accountId: options.accountId,
-		workerName: options.workerName,
-		verificationDescription: `the latest deployment for Worker "${options.workerName}"`,
-		deploymentLabel: 'Latest deployment',
-		deployedAfter: options.deployedAfter
-	})
-}
-
-async function resolveVersionIdFromCurrentProductionDeployment(options: {
-	accountId: string
-	workerName: string
-}): Promise<{
-	deploymentId: string
-	versionId: string
-}> {
-	return resolveVersionIdFromLatestDeployment({
-		accountId: options.accountId,
-		workerName: options.workerName,
-		verificationDescription: `the current active deployment for Worker "${options.workerName}"`,
-		deploymentLabel: 'Current deployment'
-	})
-}
-
-async function verifyDeployControlPlane(options: {
-	accountId: string
-	workerName: string
-	versionId: string
-	preview: boolean
-	logger: ConsolaInstance
-	theme: ReturnType<typeof createCliTheme>
-}): Promise<void> {
-	logLine(options.logger, dim('Verifying Cloudflare control-plane state…', options.theme))
-
-	await retryDeployVerification(`Worker version ${options.versionId}`, async () => {
-		const version = await getWorkerVersionDetail(
-			options.accountId,
-			options.workerName,
-			options.versionId
-		)
-
-		if (!version.id) {
-			throw new Error(`Cloudflare returned an empty version record for ${options.versionId}.`)
-		}
-
-		return version
-	})
-
-	if (options.preview) {
-		options.logger.success(
-			`Verified preview upload in Cloudflare control plane for version ${options.versionId}`
-		)
-		return
-	}
-
-	const deployment = await retryDeployVerification(
-		`a deployment that references version ${options.versionId}`,
-		async () => {
-			const deployments = await listWorkerDeployments(options.accountId, options.workerName)
-			const match = deployments.find((item) =>
-				item.versions.some((version) => version.versionId === options.versionId)
-			)
-
-			if (!match) {
-				throw new Error(
-					`No deployment for Worker "${options.workerName}" references version ${options.versionId} yet.`
-				)
-			}
-
-			return match
-		}
-	)
-
-	options.logger.success(
-		`Verified Cloudflare deployment ${deployment.id} for version ${options.versionId}`
-	)
-}
+import { prepareBuildArtifacts } from './build-artifacts'
+import { inferRecordSource, writeDeployResultMetadata } from './deploy/metadata'
+import {
+	prepareDeployConfig,
+	resolveBuildArtifactConfigPath,
+	summarizeDeployResourceNames
+} from './deploy/prepare'
+import { resolveLocalWranglerExecutable } from './deploy/runtime'
+import {
+	normalizeCloudflareAccountId,
+	resolveDeployAccountId,
+	resolveVersionIdFromCurrentProductionDeployment,
+	resolveVersionIdFromLatestProductionDeployment,
+	resolveVersionIdFromLatestWorkerVersion,
+	shouldRequireFreshProductionDeployment,
+	shouldVerifyDeployControlPlane,
+	verifyDeployControlPlane
+} from './deploy/verification'
 
 export async function runDeployCommand(
 	parsed: ParsedArgs,
@@ -745,11 +87,13 @@ export async function runDeployCommand(
 		deployMessage = resolvedParsed.options.message as string | undefined
 		deployTag = resolvedParsed.options.tag as string | undefined
 		previewScopeName = branchName?.trim() || deployTarget.previewScopeRaw || undefined
-		resolvedPreviewScopeName = previewScopeName || process.env.DEVFLARE_PREVIEW_BRANCH?.trim() || undefined
+		resolvedPreviewScopeName =
+			previewScopeName || process.env.DEVFLARE_PREVIEW_BRANCH?.trim() || undefined
 		requireFreshProductionDeployment = !preview && shouldRequireFreshProductionDeployment()
 
 		return await withTemporaryEnvironment(deployTarget.envOverrides, async () => {
-			resolvedPreviewScopeName = previewScopeName || process.env.DEVFLARE_PREVIEW_BRANCH?.trim() || undefined
+			resolvedPreviewScopeName =
+				previewScopeName || process.env.DEVFLARE_PREVIEW_BRANCH?.trim() || undefined
 			if (dryRun) {
 				const config = await loadConfig({ cwd, configFile: configPath })
 				const deploymentStrategy = applyDeploymentStrategy(
@@ -782,7 +126,10 @@ export async function runDeployCommand(
 						describeOnly: true
 					})
 					const resolvedWranglerConfig = compileConfig(describeResult.config)
-					logLine(logger, dim('Resolved view (would-create placeholders for missing resources):', theme))
+					logLine(
+						logger,
+						dim('Resolved view (would-create placeholders for missing resources):', theme)
+					)
 					logLine(logger, stringifyConfig(resolvedWranglerConfig))
 					const wouldCreate = [
 						...describeResult.created.kv.map((n) => `KV: ${n}`),
@@ -794,7 +141,10 @@ export async function runDeployCommand(
 						logLine(logger, dim(`Would create:\n  - ${wouldCreate.join('\n  - ')}`, theme))
 					}
 				} catch (describeErr) {
-					logLine(logger, dim(`(resolved view unavailable: ${(describeErr as Error).message})`, theme))
+					logLine(
+						logger,
+						dim(`(resolved view unavailable: ${(describeErr as Error).message})`, theme)
+					)
 				}
 				return { exitCode: 0 }
 			}
@@ -829,12 +179,16 @@ export async function runDeployCommand(
 				logLine(logger, `Reused preview-scoped resources: ${existingPreviewResourcesSummary}`)
 			}
 
-			const createdDeployResourcesSummary = summarizeDeployResourceNames(prepared.deployResources.created)
+			const createdDeployResourcesSummary = summarizeDeployResourceNames(
+				prepared.deployResources.created
+			)
 			if (createdDeployResourcesSummary) {
 				logLine(logger, `Provisioned deploy resources: ${createdDeployResourcesSummary}`)
 			}
 
-			const existingDeployResourcesSummary = summarizeDeployResourceNames(prepared.deployResources.existing)
+			const existingDeployResourcesSummary = summarizeDeployResourceNames(
+				prepared.deployResources.existing
+			)
 			if (existingDeployResourcesSummary) {
 				logLine(logger, `Reused deploy resources: ${existingDeployResourcesSummary}`)
 			}
@@ -854,23 +208,37 @@ export async function runDeployCommand(
 			logLine(logger, `${dim('worker', theme)} ${green(prepared.config.name, theme)}`)
 			const localWranglerExecutable = await resolveLocalWranglerExecutable(cwd, deps.fs)
 
-			const isBranchScopedPreviewDeployment = !preview
-				&& environment === 'preview'
-				&& typeof resolvedPreviewScopeName === 'string'
-				&& resolvedPreviewScopeName.length > 0
+			const isBranchScopedPreviewDeployment =
+				!preview &&
+				environment === 'preview' &&
+				typeof resolvedPreviewScopeName === 'string' &&
+				resolvedPreviewScopeName.length > 0
 
 			if (preview) {
 				logger.warn('Cloudflare preview uploads cannot be the first upload for a brand-new Worker.')
-				if (prepared.config.bindings?.durableObjects && Object.keys(prepared.config.bindings.durableObjects).length > 0) {
-					logger.warn('Cloudflare does not currently generate preview URLs for Workers that implement Durable Objects.')
+				if (
+					prepared.config.bindings?.durableObjects &&
+					Object.keys(prepared.config.bindings.durableObjects).length > 0
+				) {
+					logger.warn(
+						'Cloudflare does not currently generate preview URLs for Workers that implement Durable Objects.'
+					)
 				}
 				if (prepared.config.migrations && prepared.config.migrations.length > 0) {
-					logger.warn('Cloudflare versions upload does not currently support Durable Object migrations.')
+					logger.warn(
+						'Cloudflare versions upload does not currently support Durable Object migrations.'
+					)
 				}
 			}
 
 			// Deploy with wrangler
-			logLine(logger, dim(preview ? 'Uploading preview version with Wrangler…' : 'Deploying with Wrangler…', theme))
+			logLine(
+				logger,
+				dim(
+					preview ? 'Uploading preview version with Wrangler…' : 'Deploying with Wrangler…',
+					theme
+				)
+			)
 			const deployStartedAt = new Date()
 
 			const wranglerOutputDirectory = join(cwd, '.devflare')
@@ -911,7 +279,7 @@ export async function runDeployCommand(
 
 			let structuredOutput = ''
 			try {
-				structuredOutput = await deps.fs.readFile(wranglerOutputFilePath, 'utf8') as string
+				structuredOutput = (await deps.fs.readFile(wranglerOutputFilePath, 'utf8')) as string
 			} catch {
 				structuredOutput = ''
 			} finally {
@@ -923,15 +291,21 @@ export async function runDeployCommand(
 			}
 
 			const parsedConsoleOutput = parseWranglerDeployOutput(
-				[deployProc.stdout, deployProc.stderr].filter((value): value is string => typeof value === 'string' && value.length > 0).join('\n')
+				[deployProc.stdout, deployProc.stderr]
+					.filter((value): value is string => typeof value === 'string' && value.length > 0)
+					.join('\n')
 			)
 			const parsedStructuredOutput = structuredOutput
 				? parseWranglerStructuredOutput(structuredOutput)
 				: { urls: [], versionId: undefined, previewUrl: undefined }
-			const parsedOutput = mergeParsedWranglerDeployOutputs(parsedConsoleOutput, parsedStructuredOutput)
+			const parsedOutput = mergeParsedWranglerDeployOutputs(
+				parsedConsoleOutput,
+				parsedStructuredOutput
+			)
 			const workersDevUrl = parsedOutput.urls.find((url) => url.includes('workers.dev'))
-			const configuredAccountId = normalizeCloudflareAccountId(prepared.config.accountId)
-				?? normalizeCloudflareAccountId(process.env.CLOUDFLARE_ACCOUNT_ID)
+			const configuredAccountId =
+				normalizeCloudflareAccountId(prepared.config.accountId) ??
+				normalizeCloudflareAccountId(process.env.CLOUDFLARE_ACCOUNT_ID)
 			let resolvedAccountId = configuredAccountId
 			let didAttemptAccountResolution = false
 			const versionRecoveryDiagnostics: string[] = []
@@ -989,21 +363,14 @@ export async function runDeployCommand(
 				resolvedAccountId = await ensureResolvedAccountId()
 			}
 
-			if (
-				isBranchScopedPreviewDeployment
-				&& !resolvedPreviewUrl
-				&& resolvedAccountId
-			) {
+			if (isBranchScopedPreviewDeployment && !resolvedPreviewUrl && resolvedAccountId) {
 				const workersSubdomain = await getWorkersSubdomain(resolvedAccountId)
 				if (workersSubdomain) {
 					resolvedPreviewUrl = formatWorkersDevUrl(prepared.config.name, workersSubdomain)
 				}
 			}
 
-			if (
-				!resolvedVersionId
-				&& resolvedAccountId
-			) {
+			if (!resolvedVersionId && resolvedAccountId) {
 				try {
 					resolvedVersionId = await resolveVersionIdFromLatestWorkerVersion({
 						accountId: resolvedAccountId,
@@ -1014,10 +381,7 @@ export async function runDeployCommand(
 
 					logger.success(`Version ID: ${resolvedVersionId}`)
 					loggedVersionId = true
-					logLine(
-						logger,
-						dim('Resolved version id from Cloudflare version metadata', theme)
-					)
+					logLine(logger, dim('Resolved version id from Cloudflare version metadata', theme))
 				} catch (error) {
 					const message = error instanceof Error ? error.message : String(error)
 					versionRecoveryDiagnostics.push(`version lookup: ${message}`)
@@ -1110,11 +474,7 @@ export async function runDeployCommand(
 				logger.success(`Version ID: ${resolvedVersionId}`)
 			}
 
-			if (
-				isBranchScopedPreviewDeployment
-				&& !resolvedPreviewUrl
-				&& resolvedAccountId
-			) {
+			if (isBranchScopedPreviewDeployment && !resolvedPreviewUrl && resolvedAccountId) {
 				const workersSubdomain = await getWorkersSubdomain(resolvedAccountId)
 				if (workersSubdomain) {
 					resolvedPreviewUrl = formatWorkersDevUrl(prepared.config.name, workersSubdomain)
@@ -1127,9 +487,10 @@ export async function runDeployCommand(
 
 			if (shouldVerifyDeployControlPlane()) {
 				if (!resolvedVersionId) {
-					const recoveryDetails = versionRecoveryDiagnostics.length > 0
-						? ` Cloudflare fallback checks also failed: ${versionRecoveryDiagnostics.join(' | ')}`
-						: ''
+					const recoveryDetails =
+						versionRecoveryDiagnostics.length > 0
+							? ` Cloudflare fallback checks also failed: ${versionRecoveryDiagnostics.join(' | ')}`
+							: ''
 					await persistDeployMetadata({
 						status: 'failure',
 						exitCode: 1,
@@ -1139,40 +500,40 @@ export async function runDeployCommand(
 						`Deployment verification failed: Wrangler did not return a Worker version id, so Devflare could not prove which version Cloudflare accepted.${recoveryDetails}`
 					)
 					return { exitCode: 1, output: structuredOutput }
-				} else {
-					resolvedAccountId = await ensureResolvedAccountId()
+				}
 
-					if (!resolvedAccountId) {
-						await persistDeployMetadata({
-							status: 'failure',
-							exitCode: 1,
-							error: 'Devflare could not resolve a Cloudflare account id.'
-						})
-						logger.error(
-							'Deployment verification failed: Devflare could not resolve a Cloudflare account id. Pass cloudflare-account-id to the action or set accountId in devflare.config.ts.'
-						)
-						return { exitCode: 1, output: structuredOutput }
-					}
+				resolvedAccountId = await ensureResolvedAccountId()
 
-					try {
-						await verifyDeployControlPlane({
-							accountId: resolvedAccountId,
-							workerName: prepared.config.name,
-							versionId: resolvedVersionId,
-							preview,
-							logger,
-							theme
-						})
-					} catch (error) {
-						const message = error instanceof Error ? error.message : String(error)
-						await persistDeployMetadata({
-							status: 'failure',
-							exitCode: 1,
-							error: message
-						})
-						logger.error(`Deployment verification failed: ${message}`)
-						return { exitCode: 1, output: structuredOutput }
-					}
+				if (!resolvedAccountId) {
+					await persistDeployMetadata({
+						status: 'failure',
+						exitCode: 1,
+						error: 'Devflare could not resolve a Cloudflare account id.'
+					})
+					logger.error(
+						'Deployment verification failed: Devflare could not resolve a Cloudflare account id. Pass cloudflare-account-id to the action or set accountId in devflare.config.ts.'
+					)
+					return { exitCode: 1, output: structuredOutput }
+				}
+
+				try {
+					await verifyDeployControlPlane({
+						accountId: resolvedAccountId,
+						workerName: prepared.config.name,
+						versionId: resolvedVersionId,
+						preview,
+						logger,
+						theme
+					})
+				} catch (error) {
+					const message = error instanceof Error ? error.message : String(error)
+					await persistDeployMetadata({
+						status: 'failure',
+						exitCode: 1,
+						error: message
+					})
+					logger.error(`Deployment verification failed: ${message}`)
+					return { exitCode: 1, output: structuredOutput }
 				}
 			}
 
@@ -1180,9 +541,8 @@ export async function runDeployCommand(
 				const previewRegistryScope = isBranchScopedPreviewDeployment
 					? deployTarget.previewScope
 					: undefined
-				const previewRegistryUrl = preview || isBranchScopedPreviewDeployment
-					? resolvedPreviewUrl
-					: undefined
+				const previewRegistryUrl =
+					preview || isBranchScopedPreviewDeployment ? resolvedPreviewUrl : undefined
 
 				try {
 					await reconcilePreviewRegistry({
@@ -1215,7 +575,8 @@ export async function runDeployCommand(
 			status: 'failure',
 			exitCode: 1,
 			preview,
-			branchScopedPreview: !preview && environment === 'preview' && Boolean(resolvedPreviewScopeName),
+			branchScopedPreview:
+				!preview && environment === 'preview' && Boolean(resolvedPreviewScopeName),
 			previewScope: resolvedPreviewScopeName,
 			outputUrls: [],
 			...(error instanceof Error ? { error: error.message } : { error: String(error) })

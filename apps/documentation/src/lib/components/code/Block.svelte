@@ -1,78 +1,78 @@
 <script lang="ts">
-	import { onDestroy } from 'svelte'
-	import type { DocCodeFile, DocCodeSnippet, DocCodeTreeEntry } from '$lib/docs/types'
-	import { getCopyCode, normalizeSnippet } from './block'
-	import Pane from './Pane.svelte'
-	import Tabs from './Tabs.svelte'
-	import Tree from './Tree.svelte'
+import type { DocCodeFile, DocCodeSnippet, DocCodeTreeEntry } from '$lib/docs/types'
+import { onDestroy } from 'svelte'
+import Pane from './Pane.svelte'
+import Tabs from './Tabs.svelte'
+import Tree from './Tree.svelte'
+import { getCopyCode, normalizeSnippet } from './block'
 
-	let {
+const {
+	title,
+	description,
+	language,
+	code,
+	filename,
+	files,
+	structure,
+	activeFile: initialActiveFile
+}: DocCodeSnippet = $props()
+
+const normalized = $derived(
+	normalizeSnippet({
 		title,
 		description,
 		language,
 		code,
 		filename,
-		files,
-		structure,
+		files: files as DocCodeFile[] | undefined,
+		structure: structure as DocCodeTreeEntry[] | undefined,
 		activeFile: initialActiveFile
-	}: DocCodeSnippet = $props()
-
-	let normalized = $derived(
-		normalizeSnippet({
-			title,
-			description,
-			language,
-			code,
-			filename,
-			files: files as DocCodeFile[] | undefined,
-			structure: structure as DocCodeTreeEntry[] | undefined,
-			activeFile: initialActiveFile
-		})
-	)
-	let activePath = $state<string | undefined>(undefined)
-	let copied = $state(false)
-	let copyResetHandle: ReturnType<typeof setTimeout> | undefined
-	let showStandaloneMeta = $derived(normalized.files.length === 1 && !normalized.hasStructure)
-
-	$effect(() => {
-		if (!activePath || !normalized.files.some((file) => file.path === activePath)) {
-			activePath = normalized.activeFile
-		}
 	})
+)
+let activePath = $state<string | undefined>(undefined)
+let copied = $state(false)
+let copyResetHandle: ReturnType<typeof setTimeout> | undefined
+const showStandaloneMeta = $derived(normalized.files.length === 1 && !normalized.hasStructure)
 
-	let currentFile = $derived(
-		normalized.files.find((file) => file.path === activePath) ?? normalized.files[0]
-	)
+$effect(() => {
+	if (!activePath || !normalized.files.some((file) => file.path === activePath)) {
+		activePath = normalized.activeFile
+	}
+})
 
-	function selectFile(path: string): void {
-		if (!normalized.files.some((file) => file.path === path)) {
-			return
-		}
+const currentFile = $derived(
+	normalized.files.find((file) => file.path === activePath) ?? normalized.files[0]
+)
 
-		activePath = path
+function selectFile(path: string): void {
+	if (!normalized.files.some((file) => file.path === path)) {
+		return
+	}
+
+	activePath = path
+	copied = false
+}
+
+async function copyCode(): Promise<void> {
+	if (typeof navigator === 'undefined' || !navigator.clipboard || !currentFile) {
+		return
+	}
+
+	await navigator.clipboard.writeText(getCopyCode(currentFile))
+	copied = true
+	if (copyResetHandle) {
+		clearTimeout(copyResetHandle)
+	}
+	copyResetHandle = setTimeout(() => {
 		copied = false
+	}, 1500)
+}
+
+onDestroy(() => {
+	if (copyResetHandle) {
+		clearTimeout(copyResetHandle)
 	}
-
-	async function copyCode(): Promise<void> {
-		if (typeof navigator === 'undefined' || !navigator.clipboard || !currentFile) {
-			return
-		}
-
-		await navigator.clipboard.writeText(getCopyCode(currentFile))
-		copied = true
-		if (copyResetHandle) {
-			clearTimeout(copyResetHandle)
-		}
-		copyResetHandle = setTimeout(() => {
-			copied = false
-		}, 1500)
-	}
-
-	onDestroy(() => {
-		if (copyResetHandle) {
-			clearTimeout(copyResetHandle)
-		}
-	})
+})
 </script>
 
 

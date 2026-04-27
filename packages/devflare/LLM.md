@@ -127,7 +127,7 @@ Use the per-binding guides for the exact authoring, runtime, testing, preview, a
   - [Durable Objects](/docs/bindings/durable-objects) — The fast Devflare payoff is simple: put one counter object in a `do.*` file, call it from the worker, and call the same object directly in tests.
   - [Durable Objects internals](/docs/bindings/durable-objects/internals) — Durable Object bindings normalize into a stable binding shape, compile into Wrangler `durable_objects.bindings`, and participate in Devflare’s own DO bundling path.
   - [Testing Durable Objects](/docs/bindings/durable-objects/testing) — Durable Objects are well-supported in the default Devflare harness, which means you can test real object behavior without hand-building a fake namespace first.
-  - [Durable Objects example](/docs/bindings/durable-objects/example) — This example shows the whole Durable Object story in the smallest useful shape: one auto-discovered object, one worker route, and one direct test.
+  - [Durable Objects example](/docs/bindings/durable-objects/example) — A real Durable Objects application path with config and runtime code kept side by side.
 
 - **Queues** — Producer and consumer bindings for background work with a strong local trigger story.
   - [Queues](/docs/bindings/queues) — Devflare models Queue producers and consumers explicitly, which makes local tests and preview naming much easier to reason about.
@@ -139,19 +139,19 @@ Use the per-binding guides for the exact authoring, runtime, testing, preview, a
   - [Services](/docs/bindings/services) — The fast Devflare payoff is simple: wire one worker to another with `ref()`, call it through `env.MATH_SERVICE`, and prove the same relationship locally in one test.
   - [Services internals](/docs/bindings/services/internals) — Devflare resolves referenced worker configs, bundles the linked worker surfaces, and then exposes those services as local multi-worker bindings.
   - [Testing Services](/docs/bindings/services/testing) — Service bindings are one of the clearest Devflare wins in multi-worker apps: you can keep the real worker boundary and still prove it through the default local harness.
-  - [Services example](/docs/bindings/services/example) — This example shows the smallest useful service-binding loop: one `ref()`, one gateway route, and one local multi-worker test.
+  - [Services example](/docs/bindings/services/example) — A real Services application path with config and runtime code kept side by side.
 
 - **AI** — Workers AI bindings for remote inference, with a deliberately remote-oriented testing story.
   - [AI](/docs/bindings/ai) — Devflare makes Workers AI usable by keeping the binding tiny in config, the worker call obvious, and the remote smoke test explicit instead of fake.
   - [AI internals](/docs/bindings/ai/internals) — AI has a smaller compiler story than storage bindings, but a more explicit auth and remote-runtime story.
   - [Testing AI](/docs/bindings/ai/testing) — The right AI test strategy is selective: use remote mode when you mean to test inference, and skip cleanly when the environment is not allowed to do that.
-  - [AI example](/docs/bindings/ai/example) — This example keeps the AI story honest and useful: one binding, one tiny inference route, and one skip-aware remote smoke test.
+  - [AI example](/docs/bindings/ai/example) — A real AI application path with config and runtime code kept side by side.
 
 - **Vectorize** — Vector similarity indexes with explicit remote testing and preview-aware index naming.
   - [Vectorize](/docs/bindings/vectorize) — Devflare makes Vectorize usable by keeping the index name explicit in config, preview naming honest, and the real smoke test explicit instead of buried under mocks.
   - [Vectorize internals](/docs/bindings/vectorize/internals) — Vectorize compiles cleanly into Wrangler output and participates in preview resource lifecycle, but the runtime value of the binding mostly lives in remote infrastructure.
   - [Testing Vectorize](/docs/bindings/vectorize/testing) — The right Vectorize tests are targeted remote checks: a small insert or query, a clear skip condition, and a real index behind the binding.
-  - [Vectorize example](/docs/bindings/vectorize/example) — This example keeps Vectorize honest and usable: one index binding, one upsert-and-query route, and one skip-aware remote smoke test.
+  - [Vectorize example](/docs/bindings/vectorize/example) — A real Vectorize application path with config and runtime code kept side by side.
 
 - **Hyperdrive** — PostgreSQL-oriented bindings with schema support, name resolution, and a narrower proven local story than D1 or KV.
   - [Hyperdrive](/docs/bindings/hyperdrive) — Hyperdrive is modeled in Devflare config and compile flows like other name-based resources, but its tested local ergonomics are thinner than D1 or KV.
@@ -181,79 +181,79 @@ Use the per-binding guides for the exact authoring, runtime, testing, preview, a
   - [Rate Limiting](/docs/bindings/rate-limiting) — Rate Limiting now has a first-class Devflare docs page with config, runtime usage, testing, local behavior, and remote boundaries in one repeatable shape.
   - [Rate Limiting internals](/docs/bindings/rate-limiting/internals) — Rate Limiting compiles from `bindings.rateLimits` to Wrangler `ratelimits`, with local/test behavior called out explicitly.
   - [Testing Rate Limiting](/docs/bindings/rate-limiting/testing) — Test Rate Limiting by choosing the local harness that matches the product boundary instead of reaching for Cloudflare by default.
-  - [Rate Limiting example](/docs/bindings/rate-limiting/example) — A compact Rate Limiting recipe with config, worker usage, and the matching first test lane.
+  - [Rate Limiting example](/docs/bindings/rate-limiting/example) — A compact Rate Limiting recipe with config and worker usage in one application path.
 
 - **Version Metadata** — Version identity for deployed Workers, with deterministic metadata in local tests.
   - [Version Metadata](/docs/bindings/version-metadata) — Version Metadata now has a first-class Devflare docs page with config, runtime usage, testing, local behavior, and remote boundaries in one repeatable shape.
   - [Version Metadata internals](/docs/bindings/version-metadata/internals) — Version Metadata compiles from `bindings.versionMetadata` to Wrangler `version_metadata`, with local/test behavior called out explicitly.
   - [Testing Version Metadata](/docs/bindings/version-metadata/testing) — Test Version Metadata by choosing the local harness that matches the product boundary instead of reaching for Cloudflare by default.
-  - [Version Metadata example](/docs/bindings/version-metadata/example) — A compact Version Metadata recipe with config, worker usage, and the matching first test lane.
+  - [Version Metadata example](/docs/bindings/version-metadata/example) — A compact Version Metadata recipe with config and worker usage in one application path.
 
 - **Worker Loaders** — Dynamic Worker loader bindings for apps that explicitly supply or mock tenant Worker payloads.
   - [Worker Loaders](/docs/bindings/worker-loaders) — Worker Loaders now has a first-class Devflare docs page with config, runtime usage, testing, local behavior, and remote boundaries in one repeatable shape.
   - [Worker Loaders internals](/docs/bindings/worker-loaders/internals) — Worker Loaders compiles from `bindings.workerLoaders` to Wrangler `worker_loaders`, with local/test behavior called out explicitly.
   - [Testing Worker Loaders](/docs/bindings/worker-loaders/testing) — Test Worker Loaders by choosing the local harness that matches the product boundary instead of reaching for Cloudflare by default.
-  - [Worker Loaders example](/docs/bindings/worker-loaders/example) — A compact Worker Loaders recipe with config, worker usage, and the matching first test lane.
+  - [Worker Loaders example](/docs/bindings/worker-loaders/example) — A compact Worker Loaders recipe with config and worker usage in one application path.
 
 - **Secrets Store** — Account-level Secrets Store bindings with explicit fixture values for offline tests.
   - [Secrets Store](/docs/bindings/secrets-store) — Secrets Store now has a first-class Devflare docs page with config, runtime usage, testing, local behavior, and remote boundaries in one repeatable shape.
   - [Secrets Store internals](/docs/bindings/secrets-store/internals) — Secrets Store compiles from `bindings.secretsStore` to Wrangler `secrets_store_secrets`, with local/test behavior called out explicitly.
   - [Testing Secrets Store](/docs/bindings/secrets-store/testing) — Test Secrets Store by choosing the local harness that matches the product boundary instead of reaching for Cloudflare by default.
-  - [Secrets Store example](/docs/bindings/secrets-store/example) — A compact Secrets Store recipe with config, worker usage, and the matching first test lane.
+  - [Secrets Store example](/docs/bindings/secrets-store/example) — A compact Secrets Store recipe with config and worker usage in one application path.
 
 - **AI Search** — AI Search instance and namespace bindings with fixture-backed local tests and remote relevance boundaries.
   - [AI Search](/docs/bindings/ai-search) — AI Search now has a first-class Devflare docs page with config, runtime usage, testing, local behavior, and remote boundaries in one repeatable shape.
   - [AI Search internals](/docs/bindings/ai-search/internals) — AI Search compiles from `bindings.aiSearch` to Wrangler `ai_search` / `ai_search_namespaces`, with local/test behavior called out explicitly.
   - [Testing AI Search](/docs/bindings/ai-search/testing) — Test AI Search by choosing the local harness that matches the product boundary instead of reaching for Cloudflare by default.
-  - [AI Search example](/docs/bindings/ai-search/example) — A compact AI Search recipe with config, worker usage, and the matching first test lane.
+  - [AI Search example](/docs/bindings/ai-search/example) — A compact AI Search recipe with config and worker usage in one application path.
 
 - **mTLS Certificates** — mTLS certificate Fetcher bindings with local handler fixtures and remote certificate-presentation boundaries.
   - [mTLS Certificates](/docs/bindings/mtls-certificates) — mTLS Certificates now has a first-class Devflare docs page with config, runtime usage, testing, local behavior, and remote boundaries in one repeatable shape.
   - [mTLS Certificates internals](/docs/bindings/mtls-certificates/internals) — mTLS Certificates compiles from `bindings.mtlsCertificates` to Wrangler `mtls_certificates`, with local/test behavior called out explicitly.
   - [Testing mTLS Certificates](/docs/bindings/mtls-certificates/testing) — Test mTLS Certificates by choosing the local harness that matches the product boundary instead of reaching for Cloudflare by default.
-  - [mTLS Certificates example](/docs/bindings/mtls-certificates/example) — A compact mTLS Certificates recipe with config, worker usage, and the matching first test lane.
+  - [mTLS Certificates example](/docs/bindings/mtls-certificates/example) — A compact mTLS Certificates recipe with config and worker usage in one application path.
 
 - **Dispatch Namespaces** — Workers for Platforms dispatch bindings with explicit local tenant fetcher fixtures.
   - [Dispatch Namespaces](/docs/bindings/dispatch-namespaces) — Dispatch Namespaces now has a first-class Devflare docs page with config, runtime usage, testing, local behavior, and remote boundaries in one repeatable shape.
   - [Dispatch Namespaces internals](/docs/bindings/dispatch-namespaces/internals) — Dispatch Namespaces compiles from `bindings.dispatchNamespaces` to Wrangler `dispatch_namespaces`, with local/test behavior called out explicitly.
   - [Testing Dispatch Namespaces](/docs/bindings/dispatch-namespaces/testing) — Test Dispatch Namespaces by choosing the local harness that matches the product boundary instead of reaching for Cloudflare by default.
-  - [Dispatch Namespaces example](/docs/bindings/dispatch-namespaces/example) — A compact Dispatch Namespaces recipe with config, worker usage, and the matching first test lane.
+  - [Dispatch Namespaces example](/docs/bindings/dispatch-namespaces/example) — A compact Dispatch Namespaces recipe with config and worker usage in one application path.
 
 - **Workflows** — Workflow bindings for starting and inspecting workflow instances from Workers.
   - [Workflows](/docs/bindings/workflows) — Workflows now has a first-class Devflare docs page with config, runtime usage, testing, local behavior, and remote boundaries in one repeatable shape.
   - [Workflows internals](/docs/bindings/workflows/internals) — Workflows compiles from `bindings.workflows` to Wrangler `workflows`, with local/test behavior called out explicitly.
   - [Testing Workflows](/docs/bindings/workflows/testing) — Test Workflows by choosing the local harness that matches the product boundary instead of reaching for Cloudflare by default.
-  - [Workflows example](/docs/bindings/workflows/example) — A compact Workflows recipe with config, worker usage, and the matching first test lane.
+  - [Workflows example](/docs/bindings/workflows/example) — A compact Workflows recipe with config and worker usage in one application path.
 
 - **Pipelines** — Pipeline bindings for event ingestion, with local send recording and Cloudflare-managed sinks.
   - [Pipelines](/docs/bindings/pipelines) — Pipelines now has a first-class Devflare docs page with config, runtime usage, testing, local behavior, and remote boundaries in one repeatable shape.
   - [Pipelines internals](/docs/bindings/pipelines/internals) — Pipelines compiles from `bindings.pipelines` to Wrangler `pipelines`, with local/test behavior called out explicitly.
   - [Testing Pipelines](/docs/bindings/pipelines/testing) — Test Pipelines by choosing the local harness that matches the product boundary instead of reaching for Cloudflare by default.
-  - [Pipelines example](/docs/bindings/pipelines/example) — A compact Pipelines recipe with config, worker usage, and the matching first test lane.
+  - [Pipelines example](/docs/bindings/pipelines/example) — A compact Pipelines recipe with config and worker usage in one application path.
 
 - **Images** — Cloudflare Images binding docs with singleton config, local chain-shape tests, and hosted-image boundaries.
   - [Images](/docs/bindings/images) — Images now has a first-class Devflare docs page with config, runtime usage, testing, local behavior, and remote boundaries in one repeatable shape.
   - [Images internals](/docs/bindings/images/internals) — Images compiles from `bindings.images` to Wrangler `images`, with local/test behavior called out explicitly.
   - [Testing Images](/docs/bindings/images/testing) — Test Images by choosing the local harness that matches the product boundary instead of reaching for Cloudflare by default.
-  - [Images example](/docs/bindings/images/example) — A compact Images recipe with config, worker usage, and the matching first test lane.
+  - [Images example](/docs/bindings/images/example) — A compact Images recipe with config and worker usage in one application path.
 
 - **Media Transformations** — Media Transformations binding docs with fixture-backed tests and clear remote fidelity boundaries.
   - [Media Transformations](/docs/bindings/media-transformations) — Media Transformations now has a first-class Devflare docs page with config, runtime usage, testing, local behavior, and remote boundaries in one repeatable shape.
   - [Media Transformations internals](/docs/bindings/media-transformations/internals) — Media Transformations compiles from `bindings.media` to Wrangler `media`, with local/test behavior called out explicitly.
   - [Testing Media Transformations](/docs/bindings/media-transformations/testing) — Test Media Transformations by choosing the local harness that matches the product boundary instead of reaching for Cloudflare by default.
-  - [Media Transformations example](/docs/bindings/media-transformations/example) — A compact Media Transformations recipe with config, worker usage, and the matching first test lane.
+  - [Media Transformations example](/docs/bindings/media-transformations/example) — A compact Media Transformations recipe with config and worker usage in one application path.
 
 - **Artifacts** — Artifacts bindings for Git-compatible file storage, with in-memory repo/token tests.
   - [Artifacts](/docs/bindings/artifacts) — Artifacts now has a first-class Devflare docs page with config, runtime usage, testing, local behavior, and remote boundaries in one repeatable shape.
   - [Artifacts internals](/docs/bindings/artifacts/internals) — Artifacts compiles from `bindings.artifacts` to Wrangler `artifacts`, with local/test behavior called out explicitly.
   - [Testing Artifacts](/docs/bindings/artifacts/testing) — Test Artifacts by choosing the local harness that matches the product boundary instead of reaching for Cloudflare by default.
-  - [Artifacts example](/docs/bindings/artifacts/example) — A compact Artifacts recipe with config, worker usage, and the matching first test lane.
+  - [Artifacts example](/docs/bindings/artifacts/example) — A compact Artifacts recipe with config and worker usage in one application path.
 
-- **Containers** — Cloudflare Containers config plus Devflare local Docker/Podman test helpers for explicit container tests.
+- **Containers** — Cloudflare Containers config plus a Worker route that hands requests to a container-backed Durable Object.
   - [Containers](/docs/bindings/containers) — Containers now has a first-class Devflare docs page with config, runtime usage, testing, local behavior, and remote boundaries in one repeatable shape.
   - [Containers internals](/docs/bindings/containers/internals) — Containers compiles from `containers` to Wrangler `containers`, with local/test behavior called out explicitly.
   - [Testing Containers](/docs/bindings/containers/testing) — Test Containers by choosing the local harness that matches the product boundary instead of reaching for Cloudflare by default.
-  - [Containers example](/docs/bindings/containers/example) — A compact Containers recipe with config, worker usage, and the matching first test lane.
+  - [Containers example](/docs/bindings/containers/example) — A compact Containers recipe with config and worker usage in one application path.
 
 ## Full documentation
 
@@ -321,6 +321,52 @@ The site and handbook outputs are different reading surfaces backed by one model
 >
 > Read the site by job to be done, and use the package-level `LLM.md` when you want the same material in one file.
 
+##### Example — Wire docs generation and drift checks into the repo scripts
+
+Use package scripts and CI to keep the authored site model, generated site exports, and packaged handbook moving together.
+
+###### File — package.json
+
+```json
+{
+	"scripts": {
+		"docs:generate": "bun run --cwd apps/documentation llm:generate && bun run --cwd packages/devflare llm:generate",
+		"docs:check": "bun run devflare:docs-integrity && bun run --cwd apps/documentation check"
+	}
+}
+```
+
+###### File — .github/workflows/docs-quality.yml
+
+```yaml
+name: Documentation quality
+
+on:
+  pull_request:
+    paths:
+      - "apps/documentation/**"
+      - "packages/devflare/LLM.md"
+      - "packages/devflare/tests/unit/docs/**"
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bun run docs:generate
+      - run: bun run docs:check
+```
+
+##### Example — Regenerate the handbook from the site model
+
+```bash
+bun run --cwd apps/documentation llm:generate
+bun run --cwd packages/devflare llm:generate
+bun run devflare:docs-integrity
+```
+
 #### A good docs drift check is small and specific
 
 ##### Key points
@@ -373,6 +419,74 @@ The docs are organized as recipes first: create a Worker, add a route, add a bin
 - **Route next** — Move from one `src/fetch.ts` file into `src/routes/**` without adding bindings yet. ([link](/docs/first-route-tree))
 - **Binding next** — Add one storage binding end to end before mixing in platform-heavy services. ([link](/docs/first-bindings))
 - **Deploy next** — Run `build`, dry-run, named preview, production, and cleanup as separate commands. ([link](/docs/deploy-command-recipes))
+
+##### Example — A route-tree path you can copy after the first worker runs
+
+This is the smallest practical next step: one config, one request-wide handler, one route leaf, and one test that exercises the route through the worker.
+
+###### File — devflare.config.ts
+
+```ts
+import { defineConfig } from 'devflare/config'
+
+export default defineConfig({
+	name: 'notes-api',
+	compatibilityDate: '2026-03-17',
+	files: {
+		fetch: 'src/fetch.ts',
+		routes: {
+			dir: 'src/routes',
+			prefix: '/api'
+		}
+	}
+})
+```
+
+###### File — src/fetch.ts
+
+```ts
+import { locals, sequence, type FetchEvent, type ResolveFetch } from 'devflare/runtime'
+
+async function requestId(event: FetchEvent, resolve: ResolveFetch): Promise<Response> {
+	locals.requestId = crypto.randomUUID()
+	return resolve(event)
+}
+
+export const handle = sequence(requestId)
+```
+
+###### File — src/routes/notes/[id].ts
+
+```ts
+import { getFetchEvent, locals } from 'devflare/runtime'
+
+export async function GET(): Promise<Response> {
+	const event = getFetchEvent()
+	const id = event.params.id
+
+	return Response.json({
+		id,
+		requestId: locals.requestId
+	})
+}
+```
+
+###### File — tests/worker.test.ts
+
+```ts
+import { afterAll, beforeAll, expect, test } from 'bun:test'
+import { cf, createTestContext, env } from 'devflare/test'
+
+beforeAll(() => createTestContext())
+afterAll(() => env.dispose())
+
+test('route tree responds through the worker', async () => {
+	const response = await cf.worker.get('/api/notes/first')
+
+	expect(response.status).toBe(200)
+	expect(await response.json()).toMatchObject({ id: 'first' })
+})
+```
 
 ---
 
@@ -882,7 +996,7 @@ export default defineConfig({
 ```ts
 import { sequence } from 'devflare/runtime'
 import type { FetchEvent, ResolveFetch } from 'devflare/runtime'
-import { rememberRequest } from './lib/request-context'
+import { rememberRequest } from '../lib/request-context'
 
 async function requestContext(event: FetchEvent, resolve: ResolveFetch): Promise<Response> {
 	rememberRequest()
@@ -1001,7 +1115,7 @@ export async function GET(): Promise<Response> {
 ###### File — src/transport.ts
 
 ```ts
-import { CounterValue } from './lib/counter-value'
+import { CounterValue } from '../lib/counter-value'
 
 export const transport = {
 	CounterValue: {
@@ -1233,6 +1347,53 @@ Pick one preview name such as `next` or `pr-123`. Then deploy with `--preview <n
 >
 > If the command says `--preview next`, you already know where it is going. That clarity is the whole reason the CLI insists on explicit deploy targets.
 
+##### Example — Preview-ready worker files before you deploy
+
+Keep the preview example anchored in the same application files a teammate would review, not only the deploy command.
+
+###### File — devflare.config.ts
+
+```ts
+import { defineConfig, preview } from 'devflare/config'
+
+const pv = preview.scope()
+
+export default defineConfig({
+	name: 'orders-api',
+	compatibilityDate: '2026-03-17',
+	files: {
+		fetch: 'src/fetch.ts'
+	},
+	bindings: {
+		kv: {
+			ORDERS_CACHE: pv('orders-cache')
+		}
+	}
+})
+```
+
+###### File — src/fetch.ts
+
+```ts
+import type { FetchEvent } from 'devflare/runtime'
+
+export async function fetch(event: FetchEvent): Promise<Response> {
+	const url = new URL(event.request.url)
+	const orderId = url.pathname.split('/').at(-1) ?? 'latest'
+	const cacheKey = 'order:' + orderId
+	const cached = await event.env.ORDERS_CACHE.get(cacheKey)
+
+	if (cached) {
+		return Response.json(JSON.parse(cached))
+	}
+
+	const order = { id: orderId, status: 'ready-for-preview' }
+	await event.env.ORDERS_CACHE.put(cacheKey, JSON.stringify(order), { expirationTtl: 300 })
+
+	return Response.json(order)
+}
+```
+
 ##### Example — Deploy the same starter worker as a named preview
 
 The active file is just the command transcript. The project tree is still the same small worker from the earlier quickstart pages.
@@ -1417,6 +1578,25 @@ When the job changes from building to operating, switch command families instead
 - Run `build` or `config print --format wrangler` when the compiled shape matters more than the dev server feeling healthy.
 - Keep preview and production intent explicit in the final deploy command instead of hiding it in a generic script name.
 - Use the nested help pages when a lifecycle command reaches `--apply`, account selection, rollback, or cleanup territory.
+
+##### Example — Map the everyday CLI loop into package scripts
+
+Keep scripts thin and explicit so local developers and CI both call the same Devflare command surface.
+
+###### File — package.json
+
+```json
+{
+	"scripts": {
+		"dev": "devflare dev",
+		"types": "devflare types",
+		"build": "devflare build --env staging",
+		"deploy:preview": "devflare deploy --preview next",
+		"deploy:prod": "devflare deploy --prod",
+		"doctor": "devflare doctor"
+	}
+}
+```
 
 ##### Example — A good everyday command loop
 
@@ -1896,6 +2076,57 @@ Link the bridge architecture doc only from advanced runtime, transport, or maint
 - You are debugging the bridge transport or local runtime startup.
 - You are changing how local RPC, Durable Objects, service bindings, or framework platform glue cross the worker boundary.
 - You need maintainer context, not first-run setup instructions.
+
+##### Example — A bridge-backed value that needs a transport file
+
+###### File — src/domain/Money.ts
+
+```ts
+export class Money {
+	constructor(
+		readonly amount: number,
+		readonly currency: string
+	) {}
+
+	format(): string {
+		return new Intl.NumberFormat('en-US', {
+			style: 'currency',
+			currency: this.currency
+		}).format(this.amount)
+	}
+}
+```
+
+###### File — src/transport.ts
+
+```ts
+import { Money } from './domain/Money'
+
+export const transport = {
+	Money: {
+		encode: (value: unknown) =>
+			value instanceof Money
+				? { amount: value.amount, currency: value.currency }
+				: false,
+		decode: (value: { amount: number; currency: string }) =>
+			new Money(value.amount, value.currency)
+	}
+}
+```
+
+###### File — src/do/invoices.ts
+
+```ts
+import { Money } from '../domain/Money'
+
+export class Invoices extends DurableObject {
+	async total(customerId: string): Promise<Money> {
+		const key = 'invoice:' + customerId + ':total'
+		const stored = await this.ctx.storage.get<number>(key)
+		return new Money(stored ?? 0, 'USD')
+	}
+}
+```
 
 ---
 
@@ -2637,8 +2868,8 @@ The result is usually a global `DevflareEnv` interface plus an exported `Entrypo
 // Generated by devflare - DO NOT EDIT
 // Run devflare types to regenerate
 
-import type { MathServiceInterface } from './src/math-service.types'
-import type { AdminEntrypointInterface } from './src/math-service.types'
+import type { MathServiceInterface } from '../src/math-service.types'
+import type { AdminEntrypointInterface } from '../src/math-service.types'
 
 declare global {
 	interface DevflareEnv {
@@ -3889,7 +4120,7 @@ export class DoubleableNumber {
 ###### File — src/transport.ts
 
 ```ts
-import { DoubleableNumber } from './DoubleableNumber'
+import { DoubleableNumber } from '../DoubleableNumber'
 
 export const transport = {
 	DoubleableNumber: {
@@ -3903,7 +4134,7 @@ export const transport = {
 ###### File — src/do.counter.ts
 
 ```ts
-import { DoubleableNumber } from './DoubleableNumber'
+import { DoubleableNumber } from '../DoubleableNumber'
 
 export class Counter {
 	private count = 0
@@ -5410,6 +5641,35 @@ The CLI page owns the broad command map. This page covers how those commands fit
 >
 > Open the CLI page when the question is what `types`, `build`, `config`, or `doctor` generally do. This page only covers how those commands fit the production release lane.
 
+##### Example — Production release workflow with an explicit target
+
+Keep the same local release lane visible in CI: generate types, build production output, dry-run the deploy, then push only with `--prod`.
+
+###### File — .github/workflows/production.yml
+
+```yaml
+name: Production
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bunx --bun devflare types
+      - run: bunx --bun devflare build --env production
+      - run: bunx --bun devflare deploy --prod --dry-run
+      - run: bunx --bun devflare deploy --prod
+```
+
 #### Production deploys are explicit
 
 Deploy requires an explicit target so production and preview stay unmistakable. Production is `--prod` or `--production`; preview is `--preview` or `--preview <name>`.
@@ -5496,6 +5756,50 @@ That means every deployable package should still keep its own `devflare.config.t
 The repo exposes root scripts for the core Devflare workflow so contributors and CI can validate without guessing at filters.
 
 These are validation and orchestration tools, not a replacement for package-local deploy commands.
+
+##### Example — Root scripts keep Turbo orchestration separate from package deploys
+
+Use root scripts for workspace validation and keep each app package responsible for the Devflare command that resolves its own config.
+
+###### File — package.json
+
+```json
+{
+	"scripts": {
+		"devflare:build": "turbo run build --filter=devflare --filter=documentation",
+		"devflare:test": "turbo run test --filter=...devflare",
+		"devflare:ci": "bun run devflare:build && bun run devflare:test"
+	}
+}
+```
+
+###### File — turbo.json
+
+```json
+{
+	"tasks": {
+		"build": {
+			"dependsOn": ["^build"],
+			"outputs": ["dist/**", ".svelte-kit/**"]
+		},
+		"test": {
+			"dependsOn": ["build"]
+		}
+	}
+}
+```
+
+###### File — apps/documentation/package.json
+
+```json
+{
+	"scripts": {
+		"deploy": "devflare deploy",
+		"deploy:preview": "devflare deploy --preview docs-preview",
+		"deploy:prod": "devflare deploy --prod"
+	}
+}
+```
 
 ##### Example — Repo-root validation lane
 
@@ -5693,6 +5997,31 @@ Not every command family resolves those lanes in the same order. Inventory-orien
 > Some command families consult those effective-account preferences directly, while others read a narrower lane first. That difference is why the docs call out the command family instead of pretending there is one universal resolution order.
 >
 > `devflare productions` is the strictest example here: if local config discovery turns up multiple configured account ids, it refuses to guess and asks for `--account`.
+
+##### Example — Fail an operator script when the expected account is not active
+
+Use the same account helpers as the CLI when automation needs a hard preflight instead of a human-readable inventory page.
+
+###### File — scripts/assert-account.ts
+
+```ts
+import { account } from 'devflare/cloudflare'
+
+const expectedAccountId = process.env.CLOUDFLARE_ACCOUNT_ID
+
+if (!expectedAccountId) {
+	throw new Error('Set CLOUDFLARE_ACCOUNT_ID before running operator automation')
+}
+
+const primary = await account.getPrimaryAccount()
+
+if (primary?.id !== expectedAccountId) {
+	throw new Error('Expected Cloudflare account ' + expectedAccountId + ', got ' + (primary?.id ?? 'none'))
+}
+
+const workers = await account.workers(expectedAccountId)
+console.log('Operating on ' + workers.length + ' workers in ' + expectedAccountId)
+```
 
 ##### Example — Get the account context visible first
 
@@ -5940,6 +6269,33 @@ Devflare creates and updates the registry as preview deploys happen, so `preview
 - Prefer explicit scope selectors when you know the target; reserve broad cleanup for when the whole fleet needs attention.
 - Without `--scope`, `cleanup` respects `DEVFLARE_PREVIEW_IDENTIFIER`, `DEVFLARE_PREVIEW_PR`, or `DEVFLARE_PREVIEW_BRANCH`, then falls back to the synthetic `preview` scope. Use `--all` for every discovered scope.
 
+##### Example — PR-close cleanup job for a named preview scope
+
+Turn the same cleanup command into reviewable automation so closed PR previews do not rely on memory.
+
+###### File — .github/workflows/preview-cleanup.yml
+
+```yaml
+name: Preview cleanup
+
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bunx --bun devflare previews bindings --scope pr-${{ github.event.pull_request.number }}
+      - run: bunx --bun devflare previews cleanup --scope pr-${{ github.event.pull_request.number }} --apply
+```
+
 ##### Example — Preview lifecycle commands
 
 ```bash
@@ -6122,6 +6478,27 @@ This is the maintainer checklist for keeping the docs from becoming a prose arch
 - Deploy path: `deploy-command-recipes` distinguishes build, dry-run, prod, preview, and cleanup.
 - Remote-boundary path: `feature-index` and binding pages make auth, Docker/Podman, paid services, and skips explicit.
 
+##### Example — Wire the docs gate into a CI job
+
+###### File — .github/workflows/docs.yml
+
+```yaml
+name: docs
+
+on:
+  pull_request:
+
+jobs:
+  verify-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bun run --cwd apps/documentation check
+      - run: bun run devflare:docs-integrity
+```
+
 ---
 
 ### Choose the Cloudflare binding by the job, then open the recipe page
@@ -6163,6 +6540,35 @@ The chooser is intentionally short. Once the job is clear, the binding page owns
 | Images or media transformations | Images or Media Transformations | Pure mocks prove call shape; remote checks prove product fidelity. | /docs/bindings/images |
 | Worker-to-worker composition | Services plus `ref()` | Make real worker boundaries visible in config and tests. | /docs/bindings/services |
 | Offline test without Miniflare | `createOfflineEnv()` or `createMockEnv()` | Use pure fixtures when runtime dispatch is not the thing under test. | /docs/test-helper-reference |
+
+##### Example — Turn the choice into one concrete config
+
+###### File — devflare.config.ts
+
+```ts
+import { defineConfig } from 'devflare/config'
+
+export default defineConfig({
+	name: 'orders-api',
+	files: {
+		fetch: 'src/fetch.ts',
+		queue: 'src/queue.ts'
+	},
+	bindings: {
+		d1: {
+			DB: 'orders-db'
+		},
+		kv: {
+			CACHE: 'orders-cache'
+		},
+		queues: {
+			producers: {
+				FULFILLMENT: 'orders-fulfillment'
+			}
+		}
+	}
+})
+```
 
 ---
 
@@ -6206,6 +6612,27 @@ Use the feature index when you already know the feature name and need to decide 
 | Vectorize | Remote-oriented | Requires Cloudflare account | `shouldSkip.vectorize` | Managed when scoped | /docs/bindings/vectorize |
 | Browser Rendering | Puppeteer-shaped local checks | Browser service is Cloudflare owned | `createTestContext` or focused mocks | No account resource cleanup | /docs/bindings/browser-rendering |
 | Containers | Docker/Podman-gated | Cloudflare Containers deployment is remote | `containers`, `shouldSkip.containers` | Product-owned | /docs/bindings/containers |
+
+##### Example — Use the matrix to pick a local proof lane
+
+###### File — tests/cache.test.ts
+
+```ts
+import { describe, expect, test } from 'bun:test'
+import { createOfflineEnv } from 'devflare/test'
+
+describe('feature support matrix choice', () => {
+	test('KV can be proven with an offline binding fixture', async () => {
+		const env = createOfflineEnv({
+			kv: ['CACHE']
+		})
+
+		await env.CACHE.put('feature:homepage', 'enabled')
+
+		expect(await env.CACHE.get('feature:homepage')).toBe('enabled')
+	})
+})
+```
 
 ---
 
@@ -6567,7 +6994,7 @@ export default defineConfig({
 ###### File — src/routes/+page.server.ts
 
 ```ts
-import type { PageServerLoad } from './$types'
+import type { PageServerLoad } from '../$types'
 
 export const load: PageServerLoad = async ({ platform }) => {
 	const message = await platform?.env.CACHE.get('home-message')
@@ -6736,6 +7163,33 @@ Each standalone `cases/case*` package should have a purpose, file map, run comma
 - **SvelteKit** — Framework platform glue with Devflare config. ([link](/cases/case18))
 - **Transport and DO RPC** — Custom class transport through object calls. ([link](/cases/case19))
 
+##### Example — Pin the case catalog into runnable workspace scripts
+
+Turn the cases you recommend to teammates into package scripts so the examples stay easy to run and review.
+
+###### File — package.json
+
+```json
+{
+	"scripts": {
+		"case:basic-worker": "bun --cwd cases/case1 test",
+		"case:queues": "bun --cwd cases/case6 test",
+		"case:sveltekit": "bun --cwd cases/case18 test",
+		"case:transport": "bun --cwd cases/case19 test"
+	}
+}
+```
+
+##### Example — Run a focused example case before reading its internals
+
+```bash
+cd cases/case6
+bun test
+
+# Open the config, handler, and tests together while the output is fresh.
+code devflare.config.ts src tests
+```
+
 ---
 
 ### Learn from stable tests when the docs recipe is not deep enough
@@ -6770,6 +7224,30 @@ Tests are not beginner docs, but they are excellent advanced reference when a fe
 | `packages/devflare/tests/integration/test-context/config-autodiscovery.test.ts` | How `createTestContext()` finds config and conventional handler files. | /docs/create-test-context |
 | `cases/case19/tests/counter.test.ts` | Transport-backed Durable Object RPC with custom class round trips. | /docs/bindings/durable-objects |
 | `cases/case12/tests/email.test.ts` | Inbound email helper coverage and the Email Routing ingress caveat. | /docs/bindings/send-email |
+
+##### Example — Read a real runtime-shaped test as an advanced example
+
+###### File — tests/worker-routing.test.ts
+
+```ts
+import { describe, expect, test } from 'bun:test'
+import { createTestContext } from 'devflare/test'
+
+describe('route dispatch', () => {
+	test('the worker serves a named route through the real harness', async () => {
+		const ctx = await createTestContext()
+
+		try {
+			const response = await ctx.cf.worker.get('/notes/123')
+
+			expect(response.status).toBe(200)
+			expect(await response.text()).toContain('123')
+		} finally {
+			await ctx.dispose()
+		}
+	})
+})
+```
 
 ---
 
@@ -7294,6 +7772,29 @@ export default defineConfig({
 })
 ```
 
+#### Use the binding from application code
+
+After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first KV path close to the route, handler, or service method that needs it.
+
+Keep this first path small enough that the binding contract stays visible during code review.
+
+##### Example — A tiny fetch handler that uses KV
+
+```ts
+import { env } from 'devflare/runtime'
+
+export async function fetch(request: Request): Promise<Response> {
+	const url = new URL(request.url)
+
+	if (url.pathname === '/write') {
+		await env.CACHE.put('hello', 'from-kv')
+		return new Response('stored')
+	}
+
+	return new Response((await env.CACHE.get('hello')) ?? 'missing')
+}
+```
+
 #### When this binding fits best
 
 ##### Key points
@@ -7484,7 +7985,7 @@ test('stores and reads a cache value', async () => {
 
 ---
 
-### A small KV example you can adapt quickly
+### Use KV in a real application path
 
 > This example keeps KV simple: one binding, one fetch handler, one assertion.
 
@@ -7493,7 +7994,7 @@ test('stores and reads a cache value', async () => {
 | Route | [`/docs/bindings/kv/example`](/docs/bindings/kv/example) |
 | Group | Bindings |
 | Navigation title | KV example |
-| Eyebrow | Starter example |
+| Eyebrow | Application example |
 
 The fastest way to trust a binding is to wire one small use case end to end before you hide it behind a bigger app.
 
@@ -7525,11 +8026,14 @@ export default defineConfig({
 })
 ```
 
-#### Then use it in one honest runtime path
+#### Build the application flow around the binding
+
+Treat this as the app-level KV path: the route, event handler, or service module receives a real request and uses the binding to do useful work.
+
+Keep product limits, remote ownership, and fallback behavior visible in the code around the binding instead of hiding everything behind a vague utility too early.
 
 ##### Key points
 
-- Run `devflare types` once the binding exists so `env.CACHE` is typed in both worker code and tests.
 - Prefer a tiny route like this before you wrap KV behind a helper or service layer.
 
 ##### Example — A tiny fetch handler that uses KV
@@ -7549,27 +8053,17 @@ export async function fetch(request: Request): Promise<Response> {
 }
 ```
 
-#### Lock in the behavior with one small test or smoke path
+#### Keep production boundaries visible
+
+##### Key points
+
+- Config focus: Stable namespace naming.
+- Runtime shape: Direct `put()` and `get()` calls in a fetch handler.
+- Best use: A tiny cache or session-marker flow.
 
 > **Note — Start with the boring shape**
 >
 > If the first KV example already feels abstract, it is probably hiding the actual binding semantics instead of teaching them.
-
-##### Example — One tiny test is enough to trust the first version
-
-```ts
-import { afterAll, beforeAll, expect, test } from 'bun:test'
-import { createTestContext, cf, env } from 'devflare/test'
-
-beforeAll(() => createTestContext())
-afterAll(() => env.dispose())
-
-test('writes and reads through the worker', async () => {
-	await cf.worker.get('/write')
-	const response = await cf.worker.get('/')
-	expect(await response.text()).toBe('from-kv')
-})
-```
 
 ---
 
@@ -7615,6 +8109,23 @@ export default defineConfig({
 		}
 	}
 })
+```
+
+#### Use the binding from application code
+
+After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first D1 path close to the route, handler, or service method that needs it.
+
+Keep this first path small enough that the binding contract stays visible during code review.
+
+##### Example — A tiny route that proves the binding works
+
+```ts
+import { env } from 'devflare/runtime'
+
+export async function fetch(): Promise<Response> {
+	const row = await env.DB.prepare('select 1 as ok').first<{ ok: number }>()
+	return Response.json({ ok: row?.ok === 1 })
+}
 ```
 
 #### When this binding fits best
@@ -7807,7 +8318,7 @@ test('D1 answers a simple health query', async () => {
 
 ---
 
-### A small D1 example you can adapt quickly
+### Use D1 in a real application path
 
 > This starter example keeps D1 focused on one job: answer a single query and prove the binding works locally.
 
@@ -7816,7 +8327,7 @@ test('D1 answers a simple health query', async () => {
 | Route | [`/docs/bindings/d1/example`](/docs/bindings/d1/example) |
 | Group | Bindings |
 | Navigation title | D1 example |
-| Eyebrow | Starter example |
+| Eyebrow | Application example |
 
 You do not need a giant ORM story to prove D1 is wired correctly. One table-shaped query is already enough to make the point.
 
@@ -7848,7 +8359,11 @@ export default defineConfig({
 })
 ```
 
-#### Then use it in one honest runtime path
+#### Build the application flow around the binding
+
+Treat this as the app-level D1 path: the route, event handler, or service module receives a real request and uses the binding to do useful work.
+
+Keep product limits, remote ownership, and fallback behavior visible in the code around the binding instead of hiding everything behind a vague utility too early.
 
 ##### Key points
 
@@ -7866,26 +8381,17 @@ export async function fetch(): Promise<Response> {
 }
 ```
 
-#### Lock in the behavior with one small test or smoke path
+#### Keep production boundaries visible
+
+##### Key points
+
+- Config focus: Stable database naming.
+- Runtime shape: Prepared statement query in a fetch handler.
+- Best use: Health checks, small lookup routes, and early schema experiments.
 
 > **Note — The first example does not need a migration epic**
 >
 > Prove the binding first. Add richer schema setup only after the worker already has one truthful D1 path.
-
-##### Example — A matching smoke test
-
-```ts
-import { afterAll, beforeAll, expect, test } from 'bun:test'
-import { createTestContext, cf, env } from 'devflare/test'
-
-beforeAll(() => createTestContext())
-afterAll(() => env.dispose())
-
-test('GET / returns a D1-backed health response', async () => {
-	const response = await cf.worker.get('/')
-	expect(await response.json()).toEqual({ ok: true })
-})
-```
 
 ---
 
@@ -7930,6 +8436,34 @@ export default defineConfig({
 		}
 	}
 })
+```
+
+#### Use the binding from application code
+
+After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first R2 path close to the route, handler, or service method that needs it.
+
+Keep this first path small enough that the binding contract stays visible during code review.
+
+##### Example — Serve an object through the worker
+
+```ts
+import { env } from 'devflare/runtime'
+
+export async function fetch(request: Request): Promise<Response> {
+	const url = new URL(request.url)
+	const key = url.pathname.replace(/^\/files\//, '')
+	const object = await env.FILES.get(key)
+
+	if (!object) {
+		return new Response('Not found', { status: 404 })
+	}
+
+	return new Response(object.body, {
+		headers: {
+			'content-type': object.httpMetadata?.contentType ?? 'application/octet-stream'
+		}
+	})
+}
 ```
 
 #### When this binding fits best
@@ -8122,7 +8656,7 @@ test('stores and reads an object', async () => {
 
 ---
 
-### A small R2 example you can adapt quickly
+### Use R2 in a real application path
 
 > This example uses one private bucket and one route, which is still the cleanest default shape for many real apps.
 
@@ -8131,7 +8665,7 @@ test('stores and reads an object', async () => {
 | Route | [`/docs/bindings/r2/example`](/docs/bindings/r2/example) |
 | Group | Bindings |
 | Navigation title | R2 example |
-| Eyebrow | Starter example |
+| Eyebrow | Application example |
 
 A good first R2 example teaches both the binding and the delivery boundary: the worker decides what the browser gets.
 
@@ -8163,7 +8697,11 @@ export default defineConfig({
 })
 ```
 
-#### Then use it in one honest runtime path
+#### Build the application flow around the binding
+
+Treat this as the app-level R2 path: the route, event handler, or service module receives a real request and uses the binding to do useful work.
+
+Keep product limits, remote ownership, and fallback behavior visible in the code around the binding instead of hiding everything behind a vague utility too early.
 
 ##### Key points
 
@@ -8192,27 +8730,17 @@ export async function fetch(request: Request): Promise<Response> {
 }
 ```
 
-#### Lock in the behavior with one small test or smoke path
+#### Keep production boundaries visible
+
+##### Key points
+
+- Config focus: Direct bucket naming.
+- Runtime shape: Get an object from R2 and stream it through a route.
+- Best use: Private file delivery or media endpoints.
 
 > **Note — A better first instinct than “just use the bucket URL”**
 >
 > Routing through the worker teaches the real boundary between stored objects and browser-facing responses.
-
-##### Example — A quick route-level check
-
-```ts
-import { afterAll, beforeAll, expect, test } from 'bun:test'
-import { createTestContext, cf, env } from 'devflare/test'
-
-beforeAll(() => createTestContext())
-afterAll(() => env.dispose())
-
-test('GET /files/hello.txt serves the stored object', async () => {
-	await env.FILES.put('hello.txt', 'hello from r2')
-	const response = await cf.worker.get('/files/hello.txt')
-	expect(await response.text()).toBe('hello from r2')
-})
-```
 
 ---
 
@@ -8265,6 +8793,50 @@ export default defineConfig({
 		}
 	]
 })
+```
+
+#### Use the binding from application code
+
+After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first Durable Objects path close to the route, handler, or service method that needs it.
+
+Keep this first path small enough that the binding contract stays visible during code review.
+
+##### Example — A tiny object and one worker path
+
+###### File — src/do.counter.ts
+
+```ts
+import { DurableObject } from 'cloudflare:workers'
+
+export class Counter extends DurableObject<DevflareEnv> {
+	async increment(amount = 1): Promise<number> {
+		const current = (await this.ctx.storage.get<number>('value')) ?? 0
+		const next = current + amount
+		await this.ctx.storage.put('value', next)
+		return next
+	}
+
+	async getValue(): Promise<number> {
+		return (await this.ctx.storage.get<number>('value')) ?? 0
+	}
+}
+```
+
+###### File — src/fetch.ts
+
+```ts
+import { env } from 'devflare/runtime'
+
+export async function fetch(request: Request): Promise<Response> {
+	const url = new URL(request.url)
+	const counter = env.COUNTER.getByName('main')
+
+	if (url.pathname === '/value') {
+		return Response.json({ value: await counter.getValue() })
+	}
+
+	return Response.json({ value: await counter.increment() })
+}
 ```
 
 #### When this binding fits best
@@ -8468,25 +9040,25 @@ test('the counter object increments', async () => {
 
 ---
 
-### A small Durable Objects example you can adapt quickly
+### Use Durable Objects in a real application path
 
-> This example shows the whole Durable Object story in the smallest useful shape: one auto-discovered object, one worker route, and one direct test.
+> A real Durable Objects application path with config and runtime code kept side by side.
 
 | Field | Value |
 | --- | --- |
 | Route | [`/docs/bindings/durable-objects/example`](/docs/bindings/durable-objects/example) |
 | Group | Bindings |
 | Navigation title | Durable Objects example |
-| Eyebrow | Starter example |
+| Eyebrow | Application example |
 
-A counter is enough to show why Devflare is valuable here: you do not need custom DO glue just to get a real local loop. The same `env.COUNTER` namespace works in the worker and in tests.
+Use this as the application-focused Durable Objects example before you add feature-specific abstractions around the binding.
 
 #### At a glance
 
 | Fact | Value |
 | --- | --- |
 | Config focus | Auto-discovered `do.*` file plus one DO binding |
-| Runtime shape | Direct namespace method calls from the worker and the test harness |
+| Runtime shape | Durable Objects calls from worker application code |
 | Best use | Counters, room state, and small single-identity coordination examples |
 
 #### Start by wiring the binding clearly in config
@@ -8518,7 +9090,11 @@ export default defineConfig({
 // durableObjects: '**/do.*.{ts,js}'
 ```
 
-#### Then use it in one honest runtime path
+#### Build the application flow around the binding
+
+Treat this as the app-level Durable Objects path: the route, event handler, or service module receives a real request and uses the binding to do useful work.
+
+Keep product limits, remote ownership, and fallback behavior visible in the code around the binding instead of hiding everything behind a vague utility too early.
 
 ##### Key points
 
@@ -8563,30 +9139,13 @@ export async function fetch(request: Request): Promise<Response> {
 }
 ```
 
-#### Lock in the behavior with one small test or smoke path
+#### Keep production boundaries visible
 
-> **Note — This is the valuable bit**
->
-> You do not need a chat app to feel the Devflare advantage. One counter already proves that DO files, env bindings, and tests stay part of one simple loop.
+##### Key points
 
-##### Example — A direct test that shows the Devflare payoff immediately
-
-```ts
-import { afterAll, beforeAll, expect, test } from 'bun:test'
-import { createTestContext, cf, env } from 'devflare/test'
-
-beforeAll(() => createTestContext())
-afterAll(() => env.dispose())
-
-test('the same counter works directly in tests and through the worker', async () => {
-	const counter = env.COUNTER.getByName('main')
-	expect(await counter.increment()).toBe(1)
-	expect(await counter.increment()).toBe(2)
-
-	const response = await cf.worker.get('/value')
-	expect(await response.json()).toEqual({ value: 2 })
-})
-```
+- Config focus: Auto-discovered `do.*` file plus one DO binding.
+- Runtime shape: Durable Objects calls from worker application code.
+- Best use: Counters, room state, and small single-identity coordination examples.
 
 ---
 
@@ -8639,6 +9198,31 @@ export default defineConfig({
 		}
 	}
 })
+```
+
+#### Use the binding from application code
+
+After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first Queues path close to the route, handler, or service method that needs it.
+
+Keep this first path small enough that the binding contract stays visible during code review.
+
+##### Example — One fetch path and one queue consumer
+
+```ts
+import { env } from 'devflare/runtime'
+import type { MessageBatch } from '@cloudflare/workers-types'
+
+export async function fetch(): Promise<Response> {
+	await env.JOBS.send({ id: 'job-1', createdAt: Date.now() })
+	return new Response('queued', { status: 202 })
+}
+
+export async function queue(batch: MessageBatch<{ id: string }>): Promise<void> {
+	for (const message of batch.messages) {
+		await env.RESULTS.put('job:' + message.body.id, 'done')
+		message.ack()
+	}
+}
 ```
 
 #### When this binding fits best
@@ -8849,7 +9433,7 @@ test('queue consumer stores a processed result', async () => {
 
 ---
 
-### A small Queues example you can adapt quickly
+### Use Queues in a real application path
 
 > This starter example wires one producer, one consumer, and one stored result so you can see the whole queue loop without ceremony.
 
@@ -8858,7 +9442,7 @@ test('queue consumer stores a processed result', async () => {
 | Route | [`/docs/bindings/queues/example`](/docs/bindings/queues/example) |
 | Group | Bindings |
 | Navigation title | Queues example |
-| Eyebrow | Starter example |
+| Eyebrow | Application example |
 
 A good queue example should prove three things quickly: the request can enqueue work, the consumer can process it, and some visible side effect confirms the work ran.
 
@@ -8897,7 +9481,11 @@ export default defineConfig({
 })
 ```
 
-#### Then use it in one honest runtime path
+#### Build the application flow around the binding
+
+Treat this as the app-level Queues path: the route, event handler, or service module receives a real request and uses the binding to do useful work.
+
+Keep product limits, remote ownership, and fallback behavior visible in the code around the binding instead of hiding everything behind a vague utility too early.
 
 ##### Key points
 
@@ -8923,26 +9511,17 @@ export async function queue(batch: MessageBatch<{ id: string }>): Promise<void> 
 }
 ```
 
-#### Lock in the behavior with one small test or smoke path
+#### Keep production boundaries visible
+
+##### Key points
+
+- Config focus: Explicit producer and consumer config.
+- Runtime shape: Request enqueues work, queue handler stores result.
+- Best use: Background jobs and post-request processing.
 
 > **Note — Keep the first side effect visible**
 >
 > Writing one result record is a better first example than a complex job pipeline you cannot see end to end.
-
-##### Example — A direct consumer test
-
-```ts
-import { afterAll, beforeAll, expect, test } from 'bun:test'
-import { createTestContext, cf, env } from 'devflare/test'
-
-beforeAll(() => createTestContext())
-afterAll(() => env.dispose())
-
-test('queue work writes a result record', async () => {
-	await cf.queue.trigger([{ id: 'msg-1', body: { id: 'job-1' } }])
-	expect(await env.RESULTS.get('job:job-1')).toBe('done')
-})
-```
 
 ---
 
@@ -8989,6 +9568,23 @@ export default defineConfig({
 		}
 	}
 })
+```
+
+#### Use the binding from application code
+
+After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first Services path close to the route, handler, or service method that needs it.
+
+Keep this first path small enough that the binding contract stays visible during code review.
+
+##### Example — Use the service in the gateway worker
+
+```ts
+import { env } from 'devflare/runtime'
+
+export async function fetch(): Promise<Response> {
+	const result = await env.MATH_SERVICE.add(4, 5)
+	return Response.json({ result })
+}
 ```
 
 #### When this binding fits best
@@ -9181,18 +9777,18 @@ test('service binding calls the default worker export', async () => {
 
 ---
 
-### A small Services example you can adapt quickly
+### Use Services in a real application path
 
-> This example shows the smallest useful service-binding loop: one `ref()`, one gateway route, and one local multi-worker test.
+> A real Services application path with config and runtime code kept side by side.
 
 | Field | Value |
 | --- | --- |
 | Route | [`/docs/bindings/services/example`](/docs/bindings/services/example) |
 | Group | Bindings |
 | Navigation title | Services example |
-| Eyebrow | Starter example |
+| Eyebrow | Application example |
 
-That is enough to show why Devflare helps here: the relationship stays explicit in config, typed in env, and testable without hand-assembling your own mini service mesh in the test file.
+Use this as the application-focused Services example before you add feature-specific abstractions around the binding.
 
 #### At a glance
 
@@ -9224,7 +9820,11 @@ export default defineConfig({
 })
 ```
 
-#### Then use it in one honest runtime path
+#### Build the application flow around the binding
+
+Treat this as the app-level Services path: the route, event handler, or service module receives a real request and uses the binding to do useful work.
+
+Keep product limits, remote ownership, and fallback behavior visible in the code around the binding instead of hiding everything behind a vague utility too early.
 
 ##### Key points
 
@@ -9242,26 +9842,13 @@ export async function fetch(): Promise<Response> {
 }
 ```
 
-#### Lock in the behavior with one small test or smoke path
+#### Keep production boundaries visible
 
-> **Important — This is the valuable bit**
->
-> You do not need a whole microservice fleet to feel the Devflare value. One gateway call already proves that config refs, env bindings, and local multi-worker tests stay part of one coherent loop.
+##### Key points
 
-##### Example — A single multi-worker test
-
-```ts
-import { afterAll, beforeAll, expect, test } from 'bun:test'
-import { createTestContext, cf, env } from 'devflare/test'
-
-beforeAll(() => createTestContext())
-afterAll(() => env.dispose())
-
-test('GET / calls the math service', async () => {
-	const response = await cf.worker.get('/')
-	expect(await response.json()).toEqual({ result: 9 })
-})
-```
+- Config focus: Explicit `ref()` wiring.
+- Runtime shape: One env service call from the gateway worker.
+- Best use: Internal APIs and worker-family boundaries.
 
 ---
 
@@ -9305,6 +9892,27 @@ export default defineConfig({
 		}
 	}
 })
+```
+
+#### Use the binding from application code
+
+After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first AI path close to the route, handler, or service method that needs it.
+
+Keep this first path small enough that the binding contract stays visible during code review.
+
+##### Example — A tiny inference endpoint
+
+```ts
+import { env } from 'devflare/runtime'
+
+export async function fetch(): Promise<Response> {
+	const result = await env.AI.run('@cf/meta/llama-3.2-1b-instruct', {
+		messages: [{ role: 'user', content: 'Reply with OK only.' }],
+		max_tokens: 4
+	})
+
+	return Response.json({ result })
+}
 ```
 
 #### When this binding fits best
@@ -9506,18 +10114,18 @@ describe.skipIf(skipAI)('AI binding', () => {
 
 ---
 
-### A small AI example you can adapt quickly
+### Use AI in a real application path
 
-> This example keeps the AI story honest and useful: one binding, one tiny inference route, and one skip-aware remote smoke test.
+> A real AI application path with config and runtime code kept side by side.
 
 | Field | Value |
 | --- | --- |
 | Route | [`/docs/bindings/ai/example`](/docs/bindings/ai/example) |
 | Group | Bindings |
 | Navigation title | AI example |
-| Eyebrow | Starter example |
+| Eyebrow | Application example |
 
-That is enough to show the Devflare value: config stays tiny, the worker code stays normal, and the test tells you clearly when remote AI was really available.
+Use this as the application-focused AI example before you add feature-specific abstractions around the binding.
 
 #### At a glance
 
@@ -9547,7 +10155,11 @@ export default defineConfig({
 })
 ```
 
-#### Then use it in one honest runtime path
+#### Build the application flow around the binding
+
+Treat this as the app-level AI path: the route, event handler, or service module receives a real request and uses the binding to do useful work.
+
+Keep product limits, remote ownership, and fallback behavior visible in the code around the binding instead of hiding everything behind a vague utility too early.
 
 ##### Key points
 
@@ -9569,33 +10181,17 @@ export async function fetch(): Promise<Response> {
 }
 ```
 
-#### Lock in the behavior with one small test or smoke path
+#### Keep production boundaries visible
+
+##### Key points
+
+- Config focus: Minimal binding declaration.
+- Runtime shape: Call `env.AI.run(...)` from the worker.
+- Best use: Small inference endpoints and smoke checks.
 
 > **Important — The Devflare win is the explicit remote gate**
 >
 > A clear skip condition is more trustworthy than a fake local AI emulator that never touched the real platform. That honesty is part of what makes the Devflare AI story usable.
-
-##### Example — A skip-aware remote smoke test
-
-```ts
-import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
-import { createTestContext, cf, env, shouldSkip } from 'devflare/test'
-
-beforeAll(() => createTestContext())
-afterAll(() => env.dispose())
-
-const skipAI = await shouldSkip.ai
-
-describe.skipIf(skipAI)('AI route', () => {
-	test('calls Workers AI through the worker boundary', async () => {
-		const response = await cf.worker.get('/')
-		expect(response.ok).toBe(true)
-
-		const body = await response.json()
-		expect(body.result).toBeDefined()
-	})
-})
-```
 
 ---
 
@@ -9641,6 +10237,33 @@ export default defineConfig({
 		}
 	}
 })
+```
+
+#### Use the binding from application code
+
+After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first Vectorize path close to the route, handler, or service method that needs it.
+
+Keep this first path small enough that the binding contract stays visible during code review.
+
+##### Example — A tiny write-and-query route
+
+```ts
+import { env } from 'devflare/runtime'
+
+export async function fetch(): Promise<Response> {
+	const vector = Array(32).fill(0.5)
+
+	await env.DOCUMENT_INDEX.upsert?.([
+		{ id: 'doc-1', values: vector, metadata: { title: 'Demo doc' } }
+	])
+
+	const result = await env.DOCUMENT_INDEX.query?.(vector, {
+		topK: 1,
+		returnMetadata: true
+	})
+
+	return Response.json({ result })
+}
 ```
 
 #### When this binding fits best
@@ -9842,16 +10465,16 @@ describe.skipIf(skipVectorize)('Vectorize binding', () => {
 
 ---
 
-### A small Vectorize example you can adapt quickly
+### Use Vectorize in a real application path
 
-> This example keeps Vectorize honest and usable: one index binding, one upsert-and-query route, and one skip-aware remote smoke test.
+> A real Vectorize application path with config and runtime code kept side by side.
 
 | Field | Value |
 | --- | --- |
 | Route | [`/docs/bindings/vectorize/example`](/docs/bindings/vectorize/example) |
 | Group | Bindings |
 | Navigation title | Vectorize example |
-| Eyebrow | Starter example |
+| Eyebrow | Application example |
 
 That is enough to show the binding shape, the worker contract, and the Devflare remote gate without dragging in a whole retrieval stack on page one.
 
@@ -9885,7 +10508,11 @@ export default defineConfig({
 })
 ```
 
-#### Then use it in one honest runtime path
+#### Build the application flow around the binding
+
+Treat this as the app-level Vectorize path: the route, event handler, or service module receives a real request and uses the binding to do useful work.
+
+Keep product limits, remote ownership, and fallback behavior visible in the code around the binding instead of hiding everything behind a vague utility too early.
 
 ##### Key points
 
@@ -9913,33 +10540,13 @@ export async function fetch(): Promise<Response> {
 }
 ```
 
-#### Lock in the behavior with one small test or smoke path
+#### Keep production boundaries visible
 
-> **Important — The Devflare win is honest lifecycle plus honest gating**
->
-> The named index still has to exist, but Devflare keeps that reality visible in config, preview naming, and skip-aware tests instead of hiding it behind fake local success.
+##### Key points
 
-##### Example — A skip-aware remote Vectorize smoke test
-
-```ts
-import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
-import { createTestContext, cf, env, shouldSkip } from 'devflare/test'
-
-beforeAll(() => createTestContext())
-afterAll(() => env.dispose())
-
-const skipVectorize = await shouldSkip.vectorize
-
-describe.skipIf(skipVectorize)('Vectorize route', () => {
-	test('hits the configured index through the worker boundary', async () => {
-		const response = await cf.worker.get('/')
-		expect(response.ok).toBe(true)
-
-		const body = await response.json()
-		expect(body.result).toBeDefined()
-	})
-})
-```
+- Config focus: Explicit index naming.
+- Runtime shape: Upsert one vector and query it back.
+- Best use: Search prototypes and embedding-backed retrieval endpoints.
 
 ---
 
@@ -9984,6 +10591,25 @@ export default defineConfig({
 		}
 	}
 })
+```
+
+#### Use the binding from application code
+
+After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first Hyperdrive path close to the route, handler, or service method that needs it.
+
+Keep this first path small enough that the binding contract stays visible during code review.
+
+##### Example — Expose the binding shape you will use later
+
+```ts
+import { env } from 'devflare/runtime'
+
+export async function fetch(): Promise<Response> {
+	return Response.json({
+		hasBinding: Boolean(env.DB),
+		hasConnectionString: Boolean(env.DB?.connectionString)
+	})
+}
 ```
 
 #### When this binding fits best
@@ -10175,7 +10801,7 @@ test('Hyperdrive binding exposes connection info', () => {
 
 ---
 
-### A small Hyperdrive example you can adapt quickly
+### Use Hyperdrive in a real application path
 
 > This example keeps Hyperdrive focused on one thing: prove the binding exists and expose the connection information your app will need next.
 
@@ -10184,7 +10810,7 @@ test('Hyperdrive binding exposes connection info', () => {
 | Route | [`/docs/bindings/hyperdrive/example`](/docs/bindings/hyperdrive/example) |
 | Group | Bindings |
 | Navigation title | Hyperdrive example |
-| Eyebrow | Starter example |
+| Eyebrow | Application example |
 
 That is a better first example than a giant database abstraction because it teaches the actual runtime contract the repo proves today.
 
@@ -10216,7 +10842,11 @@ export default defineConfig({
 })
 ```
 
-#### Then use it in one honest runtime path
+#### Build the application flow around the binding
+
+Treat this as the app-level Hyperdrive path: the route, event handler, or service module receives a real request and uses the binding to do useful work.
+
+Keep product limits, remote ownership, and fallback behavior visible in the code around the binding instead of hiding everything behind a vague utility too early.
 
 ##### Key points
 
@@ -10236,7 +10866,13 @@ export async function fetch(): Promise<Response> {
 }
 ```
 
-#### Keep the first version boring
+#### Keep production boundaries visible
+
+##### Key points
+
+- Config focus: Stable Hyperdrive naming.
+- Runtime shape: Read connection information from the binding.
+- Best use: Health checks and first integration wiring.
 
 > **Note — A smaller example is a more truthful example**
 >
@@ -10286,6 +10922,31 @@ export default defineConfig({
 		}
 	}
 })
+```
+
+#### Use the binding from application code
+
+After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first Browser Rendering path close to the route, handler, or service method that needs it.
+
+Keep this first path small enough that the binding contract stays visible during code review.
+
+##### Example — Read one page title with Puppeteer
+
+```ts
+import puppeteer from '@cloudflare/puppeteer'
+import { env } from 'devflare/runtime'
+
+export async function fetch(): Promise<Response> {
+	const browser = await puppeteer.launch(env.BROWSER as Parameters<typeof puppeteer.launch>[0])
+
+	try {
+		const page = await browser.newPage()
+		await page.goto('https://example.com/', { waitUntil: 'load' })
+		return Response.json({ title: await page.title() })
+	} finally {
+		await browser.close()
+	}
+}
 ```
 
 #### When this binding fits best
@@ -10479,7 +11140,7 @@ test('browser-backed route responds', async () => {
 
 ---
 
-### A small Browser Rendering example you can adapt quickly
+### Use Browser Rendering in a real application path
 
 > This example shows the real browser path people actually need: one binding, one title-read route, and one smoke check through the dev server.
 
@@ -10488,7 +11149,7 @@ test('browser-backed route responds', async () => {
 | Route | [`/docs/bindings/browser-rendering/example`](/docs/bindings/browser-rendering/example) |
 | Group | Bindings |
 | Navigation title | Browser Rendering example |
-| Eyebrow | Starter example |
+| Eyebrow | Application example |
 
 It is intentionally smaller than a full PDF pipeline, but it uses the same Devflare idea: a narrow worker route on top of a bridge-backed local browser lane.
 
@@ -10520,7 +11181,11 @@ export default defineConfig({
 })
 ```
 
-#### Then use it in one honest runtime path
+#### Build the application flow around the binding
+
+Treat this as the app-level Browser Rendering path: the route, event handler, or service module receives a real request and uses the binding to do useful work.
+
+Keep product limits, remote ownership, and fallback behavior visible in the code around the binding instead of hiding everything behind a vague utility too early.
 
 ##### Key points
 
@@ -10546,27 +11211,17 @@ export async function fetch(): Promise<Response> {
 }
 ```
 
-#### Lock in the behavior with one small test or smoke path
+#### Keep production boundaries visible
+
+##### Key points
+
+- Config focus: Single browser binding.
+- Runtime shape: Launch puppeteer with the Worker binding and close it cleanly.
+- Best use: Small screenshot, title-read, or PDF-generation entrypoints.
 
 > **Important — The Devflare value is the bridge-backed local lane**
 >
 > Browser work is still heavier than most bindings, but Devflare gives it a real local/dev story instead of forcing you to document only the production path. Keep the first route narrow enough that launch failures are easy to diagnose.
-
-##### Example — A dev-server smoke check for the browser route
-
-```ts
-import { expect, test } from 'bun:test'
-
-const baseUrl = process.env.DEVFLARE_TEST_URL ?? 'http://127.0.0.1:8787'
-
-test('browser route returns a title', async () => {
-	const response = await fetch(new URL('/', baseUrl))
-	expect(response.ok).toBe(true)
-
-	const body = await response.json()
-	expect(body.title).toBeTruthy()
-})
-```
 
 ---
 
@@ -10612,6 +11267,27 @@ export default defineConfig({
 		}
 	}
 })
+```
+
+#### Use the binding from application code
+
+After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first Analytics Engine path close to the route, handler, or service method that needs it.
+
+Keep this first path small enough that the binding contract stays visible during code review.
+
+##### Example — Write one analytics point in the worker
+
+```ts
+import { env } from 'devflare/runtime'
+
+export async function fetch(): Promise<Response> {
+	env.APP_ANALYTICS.writeDataPoint({
+		indexes: ['search'],
+		blobs: ['devflare query']
+	})
+
+	return new Response('recorded')
+}
 ```
 
 #### When this binding fits best
@@ -10807,7 +11483,7 @@ test('records an analytics point', () => {
 
 ---
 
-### A small Analytics Engine example you can adapt quickly
+### Use Analytics Engine in a real application path
 
 > This example writes one analytics event from one route, which is usually all you need to teach the binding shape clearly.
 
@@ -10816,7 +11492,7 @@ test('records an analytics point', () => {
 | Route | [`/docs/bindings/analytics-engine/example`](/docs/bindings/analytics-engine/example) |
 | Group | Bindings |
 | Navigation title | Analytics Engine example |
-| Eyebrow | Starter example |
+| Eyebrow | Application example |
 
 It keeps the dataset name visible, the event payload small, and the worker boundary obvious.
 
@@ -10850,7 +11526,11 @@ export default defineConfig({
 })
 ```
 
-#### Then use it in one honest runtime path
+#### Build the application flow around the binding
+
+Treat this as the app-level Analytics Engine path: the route, event handler, or service module receives a real request and uses the binding to do useful work.
+
+Keep product limits, remote ownership, and fallback behavior visible in the code around the binding instead of hiding everything behind a vague utility too early.
 
 ##### Key points
 
@@ -10872,7 +11552,13 @@ export async function fetch(): Promise<Response> {
 }
 ```
 
-#### Keep the first version boring
+#### Keep production boundaries visible
+
+##### Key points
+
+- Config focus: Explicit dataset naming.
+- Runtime shape: Call `writeDataPoint()` during a request.
+- Best use: Search analytics, request logging, and event emission.
 
 > **Note — A route can teach the whole binding**
 >
@@ -10926,6 +11612,29 @@ export default defineConfig({
 		}
 	}
 })
+```
+
+#### Use the binding from application code
+
+After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first Send Email path close to the route, handler, or service method that needs it.
+
+Keep this first path small enough that the binding contract stays visible during code review.
+
+##### Example — Send one email from the worker
+
+```ts
+import { env } from 'devflare/runtime'
+
+export async function fetch(): Promise<Response> {
+	await env.SUPPORT_EMAIL.send({
+		from: 'noreply@example.com',
+		to: 'support@example.com',
+		subject: 'New support request',
+		text: 'A customer asked for help.'
+	})
+
+	return new Response('sent')
+}
 ```
 
 #### When this binding fits best
@@ -11126,7 +11835,7 @@ test('sends an outbound transactional email', async () => {
 
 ---
 
-### A small Send Email example you can adapt quickly
+### Use Send Email in a real application path
 
 > This example keeps outbound email explicit: one binding, one recipient rule, one worker path that sends one message.
 
@@ -11135,7 +11844,7 @@ test('sends an outbound transactional email', async () => {
 | Route | [`/docs/bindings/send-email/example`](/docs/bindings/send-email/example) |
 | Group | Bindings |
 | Navigation title | Send Email example |
-| Eyebrow | Starter example |
+| Eyebrow | Application example |
 
 It is enough to teach the binding accurately without dragging inbound processing or full provider workflows into the very first page.
 
@@ -11169,7 +11878,11 @@ export default defineConfig({
 })
 ```
 
-#### Then use it in one honest runtime path
+#### Build the application flow around the binding
+
+Treat this as the app-level Send Email path: the route, event handler, or service module receives a real request and uses the binding to do useful work.
+
+Keep product limits, remote ownership, and fallback behavior visible in the code around the binding instead of hiding everything behind a vague utility too early.
 
 ##### Key points
 
@@ -11193,7 +11906,13 @@ export async function fetch(): Promise<Response> {
 }
 ```
 
-#### Keep the first version boring
+#### Keep production boundaries visible
+
+##### Key points
+
+- Config focus: Explicit destination rules.
+- Runtime shape: Call `send()` from a worker route.
+- Best use: Transactional or support notifications.
 
 > **Note — One message is enough to teach the binding**
 >
@@ -11247,6 +11966,29 @@ export default defineConfig({
 		}
 	}
 })
+```
+
+#### Use the binding from application code
+
+After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first Rate Limiting path close to the route, handler, or service method that needs it.
+
+Keep this first path small enough that the binding contract stays visible during code review.
+
+##### Example — Use the limiter in a request path
+
+```ts
+import { env } from 'devflare/runtime'
+
+export async function fetch(request: Request): Promise<Response> {
+	const key = request.headers.get('cf-connecting-ip') ?? 'local'
+	const outcome = await env.LOGIN_RATE_LIMIT.limit({ key })
+
+	if (!outcome.success) {
+		return new Response('slow down', { status: 429 })
+	}
+
+	return new Response('ok')
+}
 ```
 
 #### When this binding fits best
@@ -11442,16 +12184,16 @@ test('blocks the second call in the same window', async () => {
 
 ---
 
-### A small Rate Limiting example you can adapt quickly
+### Use Rate Limiting in a real application path
 
-> A compact Rate Limiting recipe with config, worker usage, and the matching first test lane.
+> A compact Rate Limiting recipe with config and worker usage in one application path.
 
 | Field | Value |
 | --- | --- |
 | Route | [`/docs/bindings/rate-limiting/example`](/docs/bindings/rate-limiting/example) |
 | Group | Bindings |
 | Navigation title | Rate Limiting example |
-| Eyebrow | Starter example |
+| Eyebrow | Application example |
 
 Use this as the copyable starter before threading the feature into a larger application.
 
@@ -11486,12 +12228,15 @@ export default defineConfig({
 })
 ```
 
-#### Then use it in one honest runtime path
+#### Build the application flow around the binding
+
+Treat this as the app-level Rate Limiting path: the route, event handler, or service module receives a real request and uses the binding to do useful work.
+
+Keep product limits, remote ownership, and fallback behavior visible in the code around the binding instead of hiding everything behind a vague utility too early.
 
 ##### Key points
 
 - Keep the first example short enough to paste into a new Worker.
-- Cloudflare owns account namespace ids and production enforcement, but the local limiter is useful for deterministic app tests.
 
 ##### Example — Use the limiter in a request path
 
@@ -11510,29 +12255,17 @@ export async function fetch(request: Request): Promise<Response> {
 }
 ```
 
-#### Lock in the behavior with one small test or smoke path
+#### Keep production boundaries visible
+
+##### Key points
+
+- Config focus: bindings.rateLimits.
+- Runtime shape: `RateLimit`.
+- Best use: login throttles, per-user limits, and API guardrails that can use Cloudflare fixed windows.
 
 > **Important — Thread this into the next recipe**
 >
-> Once this smallest path works, add routing, generated types, and one focused test before adding feature-specific abstraction.
-
-##### Example — Pure unit test for rate-limit branching
-
-```ts
-import { expect, test } from 'bun:test'
-import { createMockEnv } from 'devflare/test'
-
-test('blocks the second call in the same window', async () => {
-	const env = createMockEnv({
-		rateLimits: {
-			LOGIN_RATE_LIMIT: { limit: 1, period: 60 }
-		}
-	})
-
-	expect((await env.LOGIN_RATE_LIMIT.limit({ key: 'user-1' })).success).toBe(true)
-	expect((await env.LOGIN_RATE_LIMIT.limit({ key: 'user-1' })).success).toBe(false)
-})
-```
+> Once this smallest path works, add routing, generated types, and feature-specific abstraction in that order.
 
 ---
 
@@ -11576,6 +12309,25 @@ export default defineConfig({
 		}
 	}
 })
+```
+
+#### Use the binding from application code
+
+After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first Version Metadata path close to the route, handler, or service method that needs it.
+
+Keep this first path small enough that the binding contract stays visible during code review.
+
+##### Example — Return the current version tag
+
+```ts
+import { env } from 'devflare/runtime'
+
+export async function fetch(): Promise<Response> {
+	return Response.json({
+		tag: env.CF_VERSION_METADATA.tag,
+		id: env.CF_VERSION_METADATA.id
+	})
+}
 ```
 
 #### When this binding fits best
@@ -11760,16 +12512,16 @@ test('uses deterministic local version metadata', () => {
 
 ---
 
-### A small Version Metadata example you can adapt quickly
+### Use Version Metadata in a real application path
 
-> A compact Version Metadata recipe with config, worker usage, and the matching first test lane.
+> A compact Version Metadata recipe with config and worker usage in one application path.
 
 | Field | Value |
 | --- | --- |
 | Route | [`/docs/bindings/version-metadata/example`](/docs/bindings/version-metadata/example) |
 | Group | Bindings |
 | Navigation title | Version Metadata example |
-| Eyebrow | Starter example |
+| Eyebrow | Application example |
 
 Use this as the copyable starter before threading the feature into a larger application.
 
@@ -11798,12 +12550,15 @@ export default defineConfig({
 })
 ```
 
-#### Then use it in one honest runtime path
+#### Build the application flow around the binding
+
+Treat this as the app-level Version Metadata path: the route, event handler, or service module receives a real request and uses the binding to do useful work.
+
+Keep product limits, remote ownership, and fallback behavior visible in the code around the binding instead of hiding everything behind a vague utility too early.
 
 ##### Key points
 
 - Keep the first example short enough to paste into a new Worker.
-- Cloudflare supplies real deployment metadata; local tests should assert deterministic fallback behavior only.
 
 ##### Example — Return the current version tag
 
@@ -11818,24 +12573,17 @@ export async function fetch(): Promise<Response> {
 }
 ```
 
-#### Lock in the behavior with one small test or smoke path
+#### Keep production boundaries visible
+
+##### Key points
+
+- Config focus: bindings.versionMetadata.
+- Runtime shape: `WorkerVersionMetadata`.
+- Best use: responses, logs, and diagnostics that need the current Worker version id, tag, or timestamp.
 
 > **Important — Thread this into the next recipe**
 >
-> Once this smallest path works, add routing, generated types, and one focused test before adding feature-specific abstraction.
-
-##### Example — Assert deterministic local metadata
-
-```ts
-import { expect, test } from 'bun:test'
-import { createMockEnv } from 'devflare/test'
-
-test('uses deterministic local version metadata', () => {
-	const env = createMockEnv({ versionMetadata: 'CF_VERSION_METADATA' })
-
-	expect(env.CF_VERSION_METADATA.tag).toBe('local')
-})
-```
+> Once this smallest path works, add routing, generated types, and feature-specific abstraction in that order.
 
 ---
 
@@ -11879,6 +12627,30 @@ export default defineConfig({
 		}
 	}
 })
+```
+
+#### Use the binding from application code
+
+After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first Worker Loaders path close to the route, handler, or service method that needs it.
+
+Keep this first path small enough that the binding contract stays visible during code review.
+
+##### Example — Load an explicit Worker payload
+
+```ts
+import { env } from 'devflare/runtime'
+
+export async function fetch(request: Request): Promise<Response> {
+	const stub = env.LOADER.get('tenant-a', () => ({
+		compatibilityDate: '2026-04-26',
+		mainModule: 'index.js',
+		modules: {
+			'index.js': 'export default { fetch() { return new Response("ok") } }'
+		}
+	}))
+
+	return stub.fetch(request)
+}
 ```
 
 #### When this binding fits best
@@ -12068,16 +12840,16 @@ test('uses a supplied dynamic Worker stub', async () => {
 
 ---
 
-### A small Worker Loaders example you can adapt quickly
+### Use Worker Loaders in a real application path
 
-> A compact Worker Loaders recipe with config, worker usage, and the matching first test lane.
+> A compact Worker Loaders recipe with config and worker usage in one application path.
 
 | Field | Value |
 | --- | --- |
 | Route | [`/docs/bindings/worker-loaders/example`](/docs/bindings/worker-loaders/example) |
 | Group | Bindings |
 | Navigation title | Worker Loaders example |
-| Eyebrow | Starter example |
+| Eyebrow | Application example |
 
 Use this as the copyable starter before threading the feature into a larger application.
 
@@ -12106,7 +12878,11 @@ export default defineConfig({
 })
 ```
 
-#### Then use it in one honest runtime path
+#### Build the application flow around the binding
+
+Treat this as the app-level Worker Loaders path: the route, event handler, or service module receives a real request and uses the binding to do useful work.
+
+Keep product limits, remote ownership, and fallback behavior visible in the code around the binding instead of hiding everything behind a vague utility too early.
 
 ##### Key points
 
@@ -12131,29 +12907,17 @@ export async function fetch(request: Request): Promise<Response> {
 }
 ```
 
-#### Lock in the behavior with one small test or smoke path
+#### Keep production boundaries visible
+
+##### Key points
+
+- Config focus: bindings.workerLoaders.
+- Runtime shape: `WorkerLoader`.
+- Best use: Dynamic Workers where the app loads Worker code at runtime from an explicit source.
 
 > **Important — Thread this into the next recipe**
 >
-> Once this smallest path works, add routing, generated types, and one focused test before adding feature-specific abstraction.
-
-##### Example — Pure test with an explicit Worker stub
-
-```ts
-import { expect, test } from 'bun:test'
-import { createMockWorkerLoader } from 'devflare/test'
-
-test('uses a supplied dynamic Worker stub', async () => {
-	const loader = createMockWorkerLoader({
-		stub: {
-			fetch: async () => new Response('tenant-ok')
-		}
-	})
-
-	const stub = loader.get('tenant-a', () => ({ mainModule: 'index.js', modules: {} }))
-	expect(await (await stub.fetch('https://example.com')).text()).toBe('tenant-ok')
-})
-```
+> Once this smallest path works, add routing, generated types, and feature-specific abstraction in that order.
 
 ---
 
@@ -12200,6 +12964,23 @@ export default defineConfig({
 		}
 	}
 })
+```
+
+#### Use the binding from application code
+
+After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first Secrets Store path close to the route, handler, or service method that needs it.
+
+Keep this first path small enough that the binding contract stays visible during code review.
+
+##### Example — Read a Secrets Store value
+
+```ts
+import { env } from 'devflare/runtime'
+
+export async function fetch(): Promise<Response> {
+	const token = await env.API_TOKEN.get()
+	return new Response(token.length > 0 ? 'configured' : 'missing')
+}
 ```
 
 #### When this binding fits best
@@ -12392,16 +13173,16 @@ test('reads a fixed offline secret', async () => {
 
 ---
 
-### A small Secrets Store example you can adapt quickly
+### Use Secrets Store in a real application path
 
-> A compact Secrets Store recipe with config, worker usage, and the matching first test lane.
+> A compact Secrets Store recipe with config and worker usage in one application path.
 
 | Field | Value |
 | --- | --- |
 | Route | [`/docs/bindings/secrets-store/example`](/docs/bindings/secrets-store/example) |
 | Group | Bindings |
 | Navigation title | Secrets Store example |
-| Eyebrow | Starter example |
+| Eyebrow | Application example |
 
 Use this as the copyable starter before threading the feature into a larger application.
 
@@ -12433,12 +13214,15 @@ export default defineConfig({
 })
 ```
 
-#### Then use it in one honest runtime path
+#### Build the application flow around the binding
+
+Treat this as the app-level Secrets Store path: the route, event handler, or service module receives a real request and uses the binding to do useful work.
+
+Keep product limits, remote ownership, and fallback behavior visible in the code around the binding instead of hiding everything behind a vague utility too early.
 
 ##### Key points
 
 - Keep the first example short enough to paste into a new Worker.
-- Devflare does not read or provision secret values; tests must supply explicit fixtures.
 
 ##### Example — Read a Secrets Store value
 
@@ -12451,29 +13235,17 @@ export async function fetch(): Promise<Response> {
 }
 ```
 
-#### Lock in the behavior with one small test or smoke path
+#### Keep production boundaries visible
+
+##### Key points
+
+- Config focus: bindings.secretsStore.
+- Runtime shape: `SecretsStoreSecret`.
+- Best use: shared account secrets that should be referenced by store id and secret name instead of copied into config.
 
 > **Important — Thread this into the next recipe**
 >
-> Once this smallest path works, add routing, generated types, and one focused test before adding feature-specific abstraction.
-
-##### Example — Fixture a Secrets Store value offline
-
-```ts
-import { expect, test } from 'bun:test'
-import { createOfflineEnv } from 'devflare/test'
-import config from '../devflare.config'
-
-test('reads a fixed offline secret', async () => {
-	const env = createOfflineEnv(config, {
-		secretsStore: {
-			API_TOKEN: 'test-token'
-		}
-	})
-
-	expect(await env.API_TOKEN.get()).toBe('test-token')
-})
-```
+> Once this smallest path works, add routing, generated types, and feature-specific abstraction in that order.
 
 ---
 
@@ -12519,6 +13291,25 @@ export default defineConfig({
 		}
 	}
 })
+```
+
+#### Use the binding from application code
+
+After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first AI Search path close to the route, handler, or service method that needs it.
+
+Keep this first path small enough that the binding contract stays visible during code review.
+
+##### Example — Search one AI Search instance
+
+```ts
+import { env } from 'devflare/runtime'
+
+export async function fetch(request: Request): Promise<Response> {
+	const query = new URL(request.url).searchParams.get('q') ?? 'devflare'
+	const result = await env.DOCS_SEARCH.search({ query })
+
+	return Response.json(result.chunks)
+}
 ```
 
 #### When this binding fits best
@@ -12708,16 +13499,16 @@ test('finds fixture content', async () => {
 
 ---
 
-### A small AI Search example you can adapt quickly
+### Use AI Search in a real application path
 
-> A compact AI Search recipe with config, worker usage, and the matching first test lane.
+> A compact AI Search recipe with config and worker usage in one application path.
 
 | Field | Value |
 | --- | --- |
 | Route | [`/docs/bindings/ai-search/example`](/docs/bindings/ai-search/example) |
 | Group | Bindings |
 | Navigation title | AI Search example |
-| Eyebrow | Starter example |
+| Eyebrow | Application example |
 
 Use this as the copyable starter before threading the feature into a larger application.
 
@@ -12748,7 +13539,11 @@ export default defineConfig({
 })
 ```
 
-#### Then use it in one honest runtime path
+#### Build the application flow around the binding
+
+Treat this as the app-level AI Search path: the route, event handler, or service module receives a real request and uses the binding to do useful work.
+
+Keep product limits, remote ownership, and fallback behavior visible in the code around the binding instead of hiding everything behind a vague utility too early.
 
 ##### Key points
 
@@ -12768,27 +13563,17 @@ export async function fetch(request: Request): Promise<Response> {
 }
 ```
 
-#### Lock in the behavior with one small test or smoke path
+#### Keep production boundaries visible
+
+##### Key points
+
+- Config focus: bindings.aiSearch.
+- Runtime shape: `AiSearchInstance` or `AiSearchNamespace`.
+- Best use: search/chat flows where the app calls an AI Search instance or namespace from a Worker.
 
 > **Important — Thread this into the next recipe**
 >
-> Once this smallest path works, add routing, generated types, and one focused test before adding feature-specific abstraction.
-
-##### Example — Fixture AI Search results offline
-
-```ts
-import { expect, test } from 'bun:test'
-import { createMockAISearchInstance } from 'devflare/test'
-
-test('finds fixture content', async () => {
-	const search = createMockAISearchInstance({
-		items: [{ key: 'offline.md', content: 'Offline fixtures make tests deterministic' }]
-	})
-
-	const result = await search.search({ query: 'fixtures' })
-	expect(result.chunks.length).toBeGreaterThan(0)
-})
-```
+> Once this smallest path works, add routing, generated types, and feature-specific abstraction in that order.
 
 ---
 
@@ -12834,6 +13619,22 @@ export default defineConfig({
 		}
 	}
 })
+```
+
+#### Use the binding from application code
+
+After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first mTLS Certificates path close to the route, handler, or service method that needs it.
+
+Keep this first path small enough that the binding contract stays visible during code review.
+
+##### Example — Fetch through the mTLS binding
+
+```ts
+import { env } from 'devflare/runtime'
+
+export async function fetch(): Promise<Response> {
+	return env.CLIENT_CERT.fetch('https://origin.example/status')
+}
 ```
 
 #### When this binding fits best
@@ -13021,16 +13822,16 @@ test('uses a local mTLS Fetcher fixture', async () => {
 
 ---
 
-### A small mTLS Certificates example you can adapt quickly
+### Use mTLS Certificates in a real application path
 
-> A compact mTLS Certificates recipe with config, worker usage, and the matching first test lane.
+> A compact mTLS Certificates recipe with config and worker usage in one application path.
 
 | Field | Value |
 | --- | --- |
 | Route | [`/docs/bindings/mtls-certificates/example`](/docs/bindings/mtls-certificates/example) |
 | Group | Bindings |
 | Navigation title | mTLS Certificates example |
-| Eyebrow | Starter example |
+| Eyebrow | Application example |
 
 Use this as the copyable starter before threading the feature into a larger application.
 
@@ -13061,7 +13862,11 @@ export default defineConfig({
 })
 ```
 
-#### Then use it in one honest runtime path
+#### Build the application flow around the binding
+
+Treat this as the app-level mTLS Certificates path: the route, event handler, or service module receives a real request and uses the binding to do useful work.
+
+Keep product limits, remote ownership, and fallback behavior visible in the code around the binding instead of hiding everything behind a vague utility too early.
 
 ##### Key points
 
@@ -13078,25 +13883,17 @@ export async function fetch(): Promise<Response> {
 }
 ```
 
-#### Lock in the behavior with one small test or smoke path
+#### Keep production boundaries visible
+
+##### Key points
+
+- Config focus: bindings.mtlsCertificates.
+- Runtime shape: `Fetcher`.
+- Best use: calling origins that require a Cloudflare-uploaded client certificate.
 
 > **Important — Thread this into the next recipe**
 >
-> Once this smallest path works, add routing, generated types, and one focused test before adding feature-specific abstraction.
-
-##### Example — Fixture an mTLS Fetcher locally
-
-```ts
-import { expect, test } from 'bun:test'
-import { createMockMTLSCertificate } from 'devflare/test'
-
-test('uses a local mTLS Fetcher fixture', async () => {
-	const cert = createMockMTLSCertificate(async () => Response.json({ ok: true }))
-	const response = await cert.fetch('https://origin.example/status')
-
-	expect(await response.json()).toEqual({ ok: true })
-})
-```
+> Once this smallest path works, add routing, generated types, and feature-specific abstraction in that order.
 
 ---
 
@@ -13142,6 +13939,23 @@ export default defineConfig({
 		}
 	}
 })
+```
+
+#### Use the binding from application code
+
+After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first Dispatch Namespaces path close to the route, handler, or service method that needs it.
+
+Keep this first path small enough that the binding contract stays visible during code review.
+
+##### Example — Dispatch to one tenant Worker
+
+```ts
+import { env } from 'devflare/runtime'
+
+export async function fetch(request: Request): Promise<Response> {
+	const tenant = new URL(request.url).searchParams.get('tenant') ?? 'default'
+	return env.DISPATCHER.get(tenant).fetch(request)
+}
 ```
 
 #### When this binding fits best
@@ -13332,16 +14146,16 @@ test('dispatches to a configured tenant', async () => {
 
 ---
 
-### A small Dispatch Namespaces example you can adapt quickly
+### Use Dispatch Namespaces in a real application path
 
-> A compact Dispatch Namespaces recipe with config, worker usage, and the matching first test lane.
+> A compact Dispatch Namespaces recipe with config and worker usage in one application path.
 
 | Field | Value |
 | --- | --- |
 | Route | [`/docs/bindings/dispatch-namespaces/example`](/docs/bindings/dispatch-namespaces/example) |
 | Group | Bindings |
 | Navigation title | Dispatch Namespaces example |
-| Eyebrow | Starter example |
+| Eyebrow | Application example |
 
 Use this as the copyable starter before threading the feature into a larger application.
 
@@ -13372,7 +14186,11 @@ export default defineConfig({
 })
 ```
 
-#### Then use it in one honest runtime path
+#### Build the application flow around the binding
+
+Treat this as the app-level Dispatch Namespaces path: the route, event handler, or service module receives a real request and uses the binding to do useful work.
+
+Keep product limits, remote ownership, and fallback behavior visible in the code around the binding instead of hiding everything behind a vague utility too early.
 
 ##### Key points
 
@@ -13390,28 +14208,17 @@ export async function fetch(request: Request): Promise<Response> {
 }
 ```
 
-#### Lock in the behavior with one small test or smoke path
+#### Keep production boundaries visible
+
+##### Key points
+
+- Config focus: bindings.dispatchNamespaces.
+- Runtime shape: `DispatchNamespace`.
+- Best use: platform Workers that dispatch to tenant Workers by name.
 
 > **Important — Thread this into the next recipe**
 >
-> Once this smallest path works, add routing, generated types, and one focused test before adding feature-specific abstraction.
-
-##### Example — Fixture tenant dispatch locally
-
-```ts
-import { expect, test } from 'bun:test'
-import { createMockDispatchNamespace } from 'devflare/test'
-
-test('dispatches to a configured tenant', async () => {
-	const dispatcher = createMockDispatchNamespace({
-		workers: {
-			default: async () => new Response('tenant-ok')
-		}
-	})
-
-	expect(await (await dispatcher.get('default').fetch('https://example.com')).text()).toBe('tenant-ok')
-})
-```
+> Once this smallest path works, add routing, generated types, and feature-specific abstraction in that order.
 
 ---
 
@@ -13458,6 +14265,28 @@ export default defineConfig({
 		}
 	}
 })
+```
+
+#### Use the binding from application code
+
+After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first Workflows path close to the route, handler, or service method that needs it.
+
+Keep this first path small enough that the binding contract stays visible during code review.
+
+##### Example — Create one workflow instance
+
+```ts
+import { env } from 'devflare/runtime'
+
+export async function fetch(request: Request): Promise<Response> {
+	const orderId = new URL(request.url).searchParams.get('order') ?? 'demo'
+	const instance = await env.ORDER_WORKFLOW.create({
+		id: orderId,
+		params: { orderId }
+	})
+
+	return Response.json({ id: instance.id })
+}
 ```
 
 #### When this binding fits best
@@ -13646,16 +14475,16 @@ test('creates a workflow instance', async () => {
 
 ---
 
-### A small Workflows example you can adapt quickly
+### Use Workflows in a real application path
 
-> A compact Workflows recipe with config, worker usage, and the matching first test lane.
+> A compact Workflows recipe with config and worker usage in one application path.
 
 | Field | Value |
 | --- | --- |
 | Route | [`/docs/bindings/workflows/example`](/docs/bindings/workflows/example) |
 | Group | Bindings |
 | Navigation title | Workflows example |
-| Eyebrow | Starter example |
+| Eyebrow | Application example |
 
 Use this as the copyable starter before threading the feature into a larger application.
 
@@ -13687,7 +14516,11 @@ export default defineConfig({
 })
 ```
 
-#### Then use it in one honest runtime path
+#### Build the application flow around the binding
+
+Treat this as the app-level Workflows path: the route, event handler, or service module receives a real request and uses the binding to do useful work.
+
+Keep product limits, remote ownership, and fallback behavior visible in the code around the binding instead of hiding everything behind a vague utility too early.
 
 ##### Key points
 
@@ -13710,25 +14543,17 @@ export async function fetch(request: Request): Promise<Response> {
 }
 ```
 
-#### Lock in the behavior with one small test or smoke path
+#### Keep production boundaries visible
+
+##### Key points
+
+- Config focus: bindings.workflows.
+- Runtime shape: `Workflow`.
+- Best use: starting long-running workflow instances from a Worker path.
 
 > **Important — Thread this into the next recipe**
 >
-> Once this smallest path works, add routing, generated types, and one focused test before adding feature-specific abstraction.
-
-##### Example — Pure workflow call test
-
-```ts
-import { expect, test } from 'bun:test'
-import { createMockWorkflow } from 'devflare/test'
-
-test('creates a workflow instance', async () => {
-	const workflow = createMockWorkflow()
-	const instance = await workflow.create({ id: 'order-1', params: { orderId: 'order-1' } })
-
-	expect(instance.id).toBe('order-1')
-})
-```
+> Once this smallest path works, add routing, generated types, and feature-specific abstraction in that order.
 
 ---
 
@@ -13772,6 +14597,26 @@ export default defineConfig({
 		}
 	}
 })
+```
+
+#### Use the binding from application code
+
+After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first Pipelines path close to the route, handler, or service method that needs it.
+
+Keep this first path small enough that the binding contract stays visible during code review.
+
+##### Example — Send one record batch
+
+```ts
+import { env } from 'devflare/runtime'
+
+export async function fetch(): Promise<Response> {
+	await env.EVENTS.send([
+		{ timestamp: Date.now(), message: 'signup' }
+	])
+
+	return new Response('recorded')
+}
 ```
 
 #### When this binding fits best
@@ -13957,16 +14802,16 @@ test('records sent pipeline rows', async () => {
 
 ---
 
-### A small Pipelines example you can adapt quickly
+### Use Pipelines in a real application path
 
-> A compact Pipelines recipe with config, worker usage, and the matching first test lane.
+> A compact Pipelines recipe with config and worker usage in one application path.
 
 | Field | Value |
 | --- | --- |
 | Route | [`/docs/bindings/pipelines/example`](/docs/bindings/pipelines/example) |
 | Group | Bindings |
 | Navigation title | Pipelines example |
-| Eyebrow | Starter example |
+| Eyebrow | Application example |
 
 Use this as the copyable starter before threading the feature into a larger application.
 
@@ -13995,7 +14840,11 @@ export default defineConfig({
 })
 ```
 
-#### Then use it in one honest runtime path
+#### Build the application flow around the binding
+
+Treat this as the app-level Pipelines path: the route, event handler, or service module receives a real request and uses the binding to do useful work.
+
+Keep product limits, remote ownership, and fallback behavior visible in the code around the binding instead of hiding everything behind a vague utility too early.
 
 ##### Key points
 
@@ -14016,25 +14865,17 @@ export async function fetch(): Promise<Response> {
 }
 ```
 
-#### Lock in the behavior with one small test or smoke path
+#### Keep production boundaries visible
+
+##### Key points
+
+- Config focus: bindings.pipelines.
+- Runtime shape: `Pipeline`.
+- Best use: Worker-side event ingestion into Cloudflare Pipelines.
 
 > **Important — Thread this into the next recipe**
 >
-> Once this smallest path works, add routing, generated types, and one focused test before adding feature-specific abstraction.
-
-##### Example — Assert recorded Pipeline sends
-
-```ts
-import { expect, test } from 'bun:test'
-import { createMockPipeline } from 'devflare/test'
-
-test('records sent pipeline rows', async () => {
-	const pipeline = createMockPipeline()
-	await pipeline.send([{ message: 'signup' }])
-
-	expect(pipeline._getRecords()).toEqual([{ message: 'signup' }])
-})
-```
+> Once this smallest path works, add routing, generated types, and feature-specific abstraction in that order.
 
 ---
 
@@ -14078,6 +14919,29 @@ export default defineConfig({
 		}
 	}
 })
+```
+
+#### Use the binding from application code
+
+After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first Images path close to the route, handler, or service method that needs it.
+
+Keep this first path small enough that the binding contract stays visible during code review.
+
+##### Example — Transform uploaded image bytes
+
+```ts
+import { env } from 'devflare/runtime'
+
+export async function fetch(request: Request): Promise<Response> {
+	if (!request.body) {
+		return new Response('missing image', { status: 400 })
+	}
+
+	return env.IMAGES
+		.input(request.body)
+		.transform({ width: 320 })
+		.output({ format: 'image/jpeg' })
+}
 ```
 
 #### When this binding fits best
@@ -14263,16 +15127,16 @@ test('returns a deterministic image response', async () => {
 
 ---
 
-### A small Images example you can adapt quickly
+### Use Images in a real application path
 
-> A compact Images recipe with config, worker usage, and the matching first test lane.
+> A compact Images recipe with config and worker usage in one application path.
 
 | Field | Value |
 | --- | --- |
 | Route | [`/docs/bindings/images/example`](/docs/bindings/images/example) |
 | Group | Bindings |
 | Navigation title | Images example |
-| Eyebrow | Starter example |
+| Eyebrow | Application example |
 
 Use this as the copyable starter before threading the feature into a larger application.
 
@@ -14301,7 +15165,11 @@ export default defineConfig({
 })
 ```
 
-#### Then use it in one honest runtime path
+#### Build the application flow around the binding
+
+Treat this as the app-level Images path: the route, event handler, or service module receives a real request and uses the binding to do useful work.
+
+Keep product limits, remote ownership, and fallback behavior visible in the code around the binding instead of hiding everything behind a vague utility too early.
 
 ##### Key points
 
@@ -14325,25 +15193,17 @@ export async function fetch(request: Request): Promise<Response> {
 }
 ```
 
-#### Lock in the behavior with one small test or smoke path
+#### Keep production boundaries visible
+
+##### Key points
+
+- Config focus: bindings.images.
+- Runtime shape: `ImagesBinding`.
+- Best use: image transformation/upload paths where the Worker calls the Images binding.
 
 > **Important — Thread this into the next recipe**
 >
-> Once this smallest path works, add routing, generated types, and one focused test before adding feature-specific abstraction.
-
-##### Example — Pure Images chain-shape test
-
-```ts
-import { expect, test } from 'bun:test'
-import { createMockImagesBinding } from 'devflare/test'
-
-test('returns a deterministic image response', async () => {
-	const images = createMockImagesBinding()
-	const response = await images.input(new Blob(['image'])).transform({ width: 320 }).output()
-
-	expect(response.headers.get('content-type')).toBe('image/png')
-})
-```
+> Once this smallest path works, add routing, generated types, and feature-specific abstraction in that order.
 
 ---
 
@@ -14387,6 +15247,29 @@ export default defineConfig({
 		}
 	}
 })
+```
+
+#### Use the binding from application code
+
+After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first Media Transformations path close to the route, handler, or service method that needs it.
+
+Keep this first path small enough that the binding contract stays visible during code review.
+
+##### Example — Run one media transformation chain
+
+```ts
+import { env } from 'devflare/runtime'
+
+export async function fetch(request: Request): Promise<Response> {
+	if (!request.body) {
+		return new Response('missing media', { status: 400 })
+	}
+
+	return env.MEDIA
+		.input(request.body)
+		.transform({ width: 640 })
+		.output({ format: 'video/mp4' })
+}
 ```
 
 #### When this binding fits best
@@ -14572,16 +15455,16 @@ test('returns a deterministic media response', async () => {
 
 ---
 
-### A small Media Transformations example you can adapt quickly
+### Use Media Transformations in a real application path
 
-> A compact Media Transformations recipe with config, worker usage, and the matching first test lane.
+> A compact Media Transformations recipe with config and worker usage in one application path.
 
 | Field | Value |
 | --- | --- |
 | Route | [`/docs/bindings/media-transformations/example`](/docs/bindings/media-transformations/example) |
 | Group | Bindings |
 | Navigation title | Media Transformations example |
-| Eyebrow | Starter example |
+| Eyebrow | Application example |
 
 Use this as the copyable starter before threading the feature into a larger application.
 
@@ -14610,12 +15493,15 @@ export default defineConfig({
 })
 ```
 
-#### Then use it in one honest runtime path
+#### Build the application flow around the binding
+
+Treat this as the app-level Media Transformations path: the route, event handler, or service module receives a real request and uses the binding to do useful work.
+
+Keep product limits, remote ownership, and fallback behavior visible in the code around the binding instead of hiding everything behind a vague utility too early.
 
 ##### Key points
 
 - Keep the first example short enough to paste into a new Worker.
-- Cloudflare owns real media output, codecs, duration handling, and billing; local tests only prove call shape.
 
 ##### Example — Run one media transformation chain
 
@@ -14634,25 +15520,17 @@ export async function fetch(request: Request): Promise<Response> {
 }
 ```
 
-#### Lock in the behavior with one small test or smoke path
+#### Keep production boundaries visible
+
+##### Key points
+
+- Config focus: bindings.media.
+- Runtime shape: `MediaBinding`.
+- Best use: video/audio transformation paths where the Worker calls Cloudflare Media Transformations.
 
 > **Important — Thread this into the next recipe**
 >
-> Once this smallest path works, add routing, generated types, and one focused test before adding feature-specific abstraction.
-
-##### Example — Pure Media chain-shape test
-
-```ts
-import { expect, test } from 'bun:test'
-import { createMockMediaBinding } from 'devflare/test'
-
-test('returns a deterministic media response', async () => {
-	const media = createMockMediaBinding()
-	const response = await media.input(new Blob(['media'])).transform({ width: 640 }).output()
-
-	expect(response.headers.get('content-type')).toBe('video/mp4')
-})
-```
+> Once this smallest path works, add routing, generated types, and feature-specific abstraction in that order.
 
 ---
 
@@ -14696,6 +15574,26 @@ export default defineConfig({
 		}
 	}
 })
+```
+
+#### Use the binding from application code
+
+After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first Artifacts path close to the route, handler, or service method that needs it.
+
+Keep this first path small enough that the binding contract stays visible during code review.
+
+##### Example — Create one Artifacts repository
+
+```ts
+import { env } from 'devflare/runtime'
+
+export async function fetch(): Promise<Response> {
+	const repo = await env.ARTIFACTS.create('run-logs', {
+		description: 'CI run logs'
+	})
+
+	return Response.json({ remote: repo.remote })
+}
 ```
 
 #### When this binding fits best
@@ -14881,16 +15779,16 @@ test('creates an in-memory artifact repo', async () => {
 
 ---
 
-### A small Artifacts example you can adapt quickly
+### Use Artifacts in a real application path
 
-> A compact Artifacts recipe with config, worker usage, and the matching first test lane.
+> A compact Artifacts recipe with config and worker usage in one application path.
 
 | Field | Value |
 | --- | --- |
 | Route | [`/docs/bindings/artifacts/example`](/docs/bindings/artifacts/example) |
 | Group | Bindings |
 | Navigation title | Artifacts example |
-| Eyebrow | Starter example |
+| Eyebrow | Application example |
 
 Use this as the copyable starter before threading the feature into a larger application.
 
@@ -14919,7 +15817,11 @@ export default defineConfig({
 })
 ```
 
-#### Then use it in one honest runtime path
+#### Build the application flow around the binding
+
+Treat this as the app-level Artifacts path: the route, event handler, or service module receives a real request and uses the binding to do useful work.
+
+Keep product limits, remote ownership, and fallback behavior visible in the code around the binding instead of hiding everything behind a vague utility too early.
 
 ##### Key points
 
@@ -14940,25 +15842,17 @@ export async function fetch(): Promise<Response> {
 }
 ```
 
-#### Lock in the behavior with one small test or smoke path
+#### Keep production boundaries visible
+
+##### Key points
+
+- Config focus: bindings.artifacts.
+- Runtime shape: `Artifacts`.
+- Best use: Worker-managed repo metadata, temporary tokens, and artifact namespace workflows.
 
 > **Important — Thread this into the next recipe**
 >
-> Once this smallest path works, add routing, generated types, and one focused test before adding feature-specific abstraction.
-
-##### Example — Pure Artifacts repo test
-
-```ts
-import { expect, test } from 'bun:test'
-import { createMockArtifacts } from 'devflare/test'
-
-test('creates an in-memory artifact repo', async () => {
-	const artifacts = createMockArtifacts()
-	const repo = await artifacts.create('run-logs')
-
-	expect(repo.name).toBe('run-logs')
-})
-```
+> Once this smallest path works, add routing, generated types, and feature-specific abstraction in that order.
 
 ---
 
@@ -14973,7 +15867,7 @@ test('creates an in-memory artifact repo', async () => {
 | Navigation title | Containers |
 | Eyebrow | Binding reference |
 
-This page is intentionally recipe-first: copy the config, use the generated Container class config plus `devflare/test` container helpers binding, then pick the right local or remote test lane.
+This page is intentionally recipe-first: copy the config, use the generated Container class config plus a Durable Object container binding binding, then pick the right local or remote test lane.
 
 #### At a glance
 
@@ -14981,7 +15875,7 @@ This page is intentionally recipe-first: copy the config, use the generated Cont
 | --- | --- |
 | Config key | containers |
 | Authoring shape | Array<{ className; image; maxInstances?; instanceType?; imageBuildContext? }> |
-| Best for | explicit local interaction tests against a container image and deployed Cloudflare Containers config |
+| Best for | routing requests to a stateful container instance that runs code outside the Workers runtime |
 
 #### Author it in the simplest shape that still says what you mean
 
@@ -14996,21 +15890,64 @@ import { defineConfig } from 'devflare/config'
 
 export default defineConfig({
 	name: 'container-worker',
+	files: {
+		fetch: 'src/container.api.ts',
+		durableObjects: 'src/container.api.ts'
+	},
+	bindings: {
+		durableObjects: {
+			API_CONTAINER: {
+				className: 'ApiContainer'
+			}
+		}
+	},
 	containers: [
 		{
 			className: 'ApiContainer',
 			image: 'localhost/devflare-api:latest',
 			maxInstances: 1
 		}
+	],
+	migrations: [
+		{
+			tag: 'v1',
+			new_sqlite_classes: ['ApiContainer']
+		}
 	]
 })
+```
+
+#### Use the binding from application code
+
+After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first Containers path close to the route, handler, or service method that needs it.
+
+Keep this first path small enough that the binding contract stays visible during code review.
+
+##### Example — Proxy one application route to a container instance
+
+```ts
+import { Container, getContainer } from '@cloudflare/containers'
+import { env } from 'devflare/runtime'
+
+export class ApiContainer extends Container {
+	defaultPort = 8080
+	sleepAfter = '10m'
+}
+
+export async function fetch(request: Request): Promise<Response> {
+	const url = new URL(request.url)
+	const sessionId = url.searchParams.get('session') ?? 'public'
+	const container = getContainer(env.API_CONTAINER, sessionId)
+
+	return container.fetch(request)
+}
 ```
 
 #### When this binding fits best
 
 ##### Key points
 
-- Use Containers when explicit local interaction tests against a container image and deployed cloudflare containers config.
+- Use Containers when routing requests to a stateful container instance that runs code outside the workers runtime.
 - Keep binding names stable and uppercase in examples so generated Env declarations remain predictable.
 - Prefer Devflare native config while it covers the feature; use `wrangler.passthrough` only for unsupported Wrangler-only fields.
 
@@ -15090,11 +16027,28 @@ import { defineConfig } from 'devflare/config'
 
 export default defineConfig({
 	name: 'container-worker',
+	files: {
+		fetch: 'src/container.api.ts',
+		durableObjects: 'src/container.api.ts'
+	},
+	bindings: {
+		durableObjects: {
+			API_CONTAINER: {
+				className: 'ApiContainer'
+			}
+		}
+	},
 	containers: [
 		{
 			className: 'ApiContainer',
 			image: 'localhost/devflare-api:latest',
 			maxInstances: 1
+		}
+	],
+	migrations: [
+		{
+			tag: 'v1',
+			new_sqlite_classes: ['ApiContainer']
 		}
 	]
 })
@@ -15106,6 +16060,14 @@ export default defineConfig({
 {
 	"containers": [
 		{ "class_name": "ApiContainer", "image": "localhost/devflare-api:latest", "max_instances": 1 }
+	],
+	"durable_objects": {
+		"bindings": [
+			{ "name": "API_CONTAINER", "class_name": "ApiContainer" }
+		]
+	},
+	"migrations": [
+		{ "tag": "v1", "new_sqlite_classes": ["ApiContainer"] }
 	]
 }
 ```
@@ -15145,7 +16107,7 @@ The first test should prove application control flow. Escalate to Wrangler remot
 
 | Fact | Value |
 | --- | --- |
-| Best for | explicit local interaction tests against a container image and deployed Cloudflare Containers config |
+| Best for | routing requests to a stateful container instance that runs code outside the Workers runtime |
 | Default harness | `devflare/test` containers helpers guarded by `shouldSkip.containers` |
 | Escalate when | The assertion depends on Cloudflare-hosted product behavior rather than the app calling the binding correctly |
 
@@ -15189,16 +16151,16 @@ test('container engine detection is explicit', async () => {
 
 ---
 
-### A small Containers example you can adapt quickly
+### Use Containers in a real application path
 
-> A compact Containers recipe with config, worker usage, and the matching first test lane.
+> A compact Containers recipe with config and worker usage in one application path.
 
 | Field | Value |
 | --- | --- |
 | Route | [`/docs/bindings/containers/example`](/docs/bindings/containers/example) |
 | Group | Bindings |
 | Navigation title | Containers example |
-| Eyebrow | Starter example |
+| Eyebrow | Application example |
 
 Use this as the copyable starter before threading the feature into a larger application.
 
@@ -15207,8 +16169,8 @@ Use this as the copyable starter before threading the feature into a larger appl
 | Fact | Value |
 | --- | --- |
 | Config focus | containers |
-| Runtime shape | Container class config plus `devflare/test` container helpers |
-| Best use | explicit local interaction tests against a container image and deployed Cloudflare Containers config |
+| Runtime shape | Container class config plus a Durable Object container binding |
+| Best use | routing requests to a stateful container instance that runs code outside the Workers runtime |
 
 #### Start by wiring the binding clearly in config
 
@@ -15219,55 +16181,72 @@ import { defineConfig } from 'devflare/config'
 
 export default defineConfig({
 	name: 'container-worker',
+	files: {
+		fetch: 'src/container.api.ts',
+		durableObjects: 'src/container.api.ts'
+	},
+	bindings: {
+		durableObjects: {
+			API_CONTAINER: {
+				className: 'ApiContainer'
+			}
+		}
+	},
 	containers: [
 		{
 			className: 'ApiContainer',
 			image: 'localhost/devflare-api:latest',
 			maxInstances: 1
 		}
+	],
+	migrations: [
+		{
+			tag: 'v1',
+			new_sqlite_classes: ['ApiContainer']
+		}
 	]
 })
 ```
 
-#### Then use it in one honest runtime path
+#### Build the application flow around the binding
+
+Treat this as the app-level Containers path: the route, event handler, or service module receives a real request and uses the binding to do useful work.
+
+Keep product limits, remote ownership, and fallback behavior visible in the code around the binding instead of hiding everything behind a vague utility too early.
 
 ##### Key points
 
 - Keep the first example short enough to paste into a new Worker.
 - Cloudflare owns deployed container rollout, registry image availability, SSH, scaling, and the full Containers Durable Object runtime.
 
-##### Example — Gate an explicit local container test
+##### Example — Proxy one application route to a container instance
 
 ```ts
-import { expect, test } from 'bun:test'
-import { containers, shouldSkip } from 'devflare/test'
+import { Container, getContainer } from '@cloudflare/containers'
+import { env } from 'devflare/runtime'
 
-test.skipIf(await shouldSkip.containers())('container responds locally', async () => {
-	const app = await containers.start({
-		image: 'localhost/devflare-api:latest',
-		ports: [8080],
-		pull: false
-	})
+export class ApiContainer extends Container {
+	defaultPort = 8080
+	sleepAfter = '10m'
+}
 
-	const response = await fetch(app.url(8080, '/health'))
-	expect(response.status).toBe(200)
-})
+export async function fetch(request: Request): Promise<Response> {
+	const url = new URL(request.url)
+	const sessionId = url.searchParams.get('session') ?? 'public'
+	const container = getContainer(env.API_CONTAINER, sessionId)
+
+	return container.fetch(request)
+}
 ```
 
-#### Lock in the behavior with one small test or smoke path
+#### Keep production boundaries visible
+
+##### Key points
+
+- Config focus: containers.
+- Runtime shape: Container class config plus a Durable Object container binding.
+- Best use: routing requests to a stateful container instance that runs code outside the Workers runtime.
 
 > **Important — Thread this into the next recipe**
 >
-> Once this smallest path works, add routing, generated types, and one focused test before adding feature-specific abstraction.
-
-##### Example — Detect Docker or Podman before running container tests
-
-```ts
-import { expect, test } from 'bun:test'
-import { detectContainerEngine } from 'devflare/test'
-
-test('container engine detection is explicit', async () => {
-	const engine = await detectContainerEngine()
-	expect(['available', 'missing', 'unhealthy']).toContain(engine.status)
-})
-```
+> Once this smallest path works, add routing, generated types, and feature-specific abstraction in that order.

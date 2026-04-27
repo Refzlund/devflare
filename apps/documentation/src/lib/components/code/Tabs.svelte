@@ -1,20 +1,20 @@
 <script lang="ts">
-	import { tooltip } from '$lib/components/layout/Tooltip.svelte'
-	import type { NormalizedCodeFile } from './block'
+import { tooltip } from '$lib/components/layout/Tooltip.svelte'
+import type { NormalizedCodeFile } from './block'
 
-	let {
-		files,
-		activeFile,
-		onSelect
-	}: {
-		files: NormalizedCodeFile[]
-		activeFile: string
-		onSelect: (path: string) => void
-	} = $props()
+const {
+	files,
+	activeFile,
+	onSelect
+}: {
+	files: NormalizedCodeFile[]
+	activeFile: string
+	onSelect: (path: string) => void
+} = $props()
 
-	function preventMouseFocus(event: MouseEvent): void {
-		event.preventDefault()
-	}
+function preventMouseFocus(event: MouseEvent): void {
+	event.preventDefault()
+}
 </script>
 
 

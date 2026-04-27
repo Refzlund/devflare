@@ -1,86 +1,86 @@
 <script lang="ts">
-	import { tooltip } from '$lib/components/layout/Tooltip.svelte'
-	import type { NormalizedCodeSnippet } from './block'
+import { tooltip } from '$lib/components/layout/Tooltip.svelte'
+import type { NormalizedCodeSnippet } from './block'
 
-	let {
-		nodes,
-		activeFile,
-		onSelect
-	}: {
-		nodes: NormalizedCodeSnippet['structure']
-		activeFile: string
-		onSelect: (path: string) => void
-	} = $props()
+const {
+	nodes,
+	activeFile,
+	onSelect
+}: {
+	nodes: NormalizedCodeSnippet['structure']
+	activeFile: string
+	onSelect: (path: string) => void
+} = $props()
 
-	let openFolders = $state<Record<string, boolean>>({})
+let openFolders = $state<Record<string, boolean>>({})
 
-	const folderPaths = $derived(
-		nodes.filter((node) => node.kind === 'folder').map((node) => node.path)
-	)
+const folderPaths = $derived(
+	nodes.filter((node) => node.kind === 'folder').map((node) => node.path)
+)
 
-	const visibleNodes = $derived(
-		nodes.filter((node) => {
-			return getAncestorFolders(node.path).every((ancestor) => openFolders[ancestor] !== false)
-		})
-	)
-
-	$effect(() => {
-		const nextOpenFolders = { ...openFolders }
-		let changed = false
-
-		for (const path of folderPaths) {
-			if (!(path in nextOpenFolders)) {
-				nextOpenFolders[path] = true
-				changed = true
-			}
-		}
-
-		for (const path of Object.keys(nextOpenFolders)) {
-			if (!folderPaths.includes(path)) {
-				delete nextOpenFolders[path]
-				changed = true
-			}
-		}
-
-		for (const ancestor of getAncestorFolders(activeFile)) {
-			if (nextOpenFolders[ancestor] === false) {
-				nextOpenFolders[ancestor] = true
-				changed = true
-			}
-		}
-
-		if (changed) {
-			openFolders = nextOpenFolders
-		}
+const visibleNodes = $derived(
+	nodes.filter((node) => {
+		return getAncestorFolders(node.path).every((ancestor) => openFolders[ancestor] !== false)
 	})
+)
 
-	function getAncestorFolders(path: string): string[] {
-		const segments = path.split('/').filter(Boolean)
-		const ancestors: string[] = []
-		let currentPath = ''
+$effect(() => {
+	const nextOpenFolders = { ...openFolders }
+	let changed = false
 
-		for (const segment of segments.slice(0, -1)) {
-			currentPath = currentPath ? `${currentPath}/${segment}` : segment
-			ancestors.push(currentPath)
-		}
-
-		return ancestors
-	}
-
-	function isFolderOpen(path: string): boolean {
-		return openFolders[path] !== false
-	}
-
-	function toggleFolder(path: string): void {
-		openFolders = {
-			...openFolders,
-			[path]: !isFolderOpen(path)
+	for (const path of folderPaths) {
+		if (!(path in nextOpenFolders)) {
+			nextOpenFolders[path] = true
+			changed = true
 		}
 	}
 
-	function preventMouseFocus(event: MouseEvent): void {
-		event.preventDefault()
+	for (const path of Object.keys(nextOpenFolders)) {
+		if (!folderPaths.includes(path)) {
+			delete nextOpenFolders[path]
+			changed = true
+		}
 	}
+
+	for (const ancestor of getAncestorFolders(activeFile)) {
+		if (nextOpenFolders[ancestor] === false) {
+			nextOpenFolders[ancestor] = true
+			changed = true
+		}
+	}
+
+	if (changed) {
+		openFolders = nextOpenFolders
+	}
+})
+
+function getAncestorFolders(path: string): string[] {
+	const segments = path.split('/').filter(Boolean)
+	const ancestors: string[] = []
+	let currentPath = ''
+
+	for (const segment of segments.slice(0, -1)) {
+		currentPath = currentPath ? `${currentPath}/${segment}` : segment
+		ancestors.push(currentPath)
+	}
+
+	return ancestors
+}
+
+function isFolderOpen(path: string): boolean {
+	return openFolders[path] !== false
+}
+
+function toggleFolder(path: string): void {
+	openFolders = {
+		...openFolders,
+		[path]: !isFolderOpen(path)
+	}
+}
+
+function preventMouseFocus(event: MouseEvent): void {
+	event.preventDefault()
+}
 </script>
 
 <aside class="docs-code-tree docs-code-panel-border border-b px-3 py-3 lg:border-r lg:border-b-0 lg:px-4">

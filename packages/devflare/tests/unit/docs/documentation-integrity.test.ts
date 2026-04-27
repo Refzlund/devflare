@@ -270,6 +270,38 @@ function docsText(): string {
 	return JSON.stringify(docs)
 }
 
+function docText(slug: string): string {
+	const doc = docs.find((candidate) => candidate.slug === slug)
+	expect(doc, `Expected docs to include ${slug}`).toBeDefined()
+	return JSON.stringify(doc)
+}
+
+function bindingSlugsAt(index: number): string[] {
+	return bindingDocCategories.map((category) => category.slugs[index])
+}
+
+function bindingDocsMissingSection(index: number, sectionId: string): string[] {
+	return bindingSlugsAt(index).filter((slug) => {
+		const doc = docs.find((candidate) => candidate.slug === slug)
+		return !doc?.sections.some((section) => section.id === sectionId)
+	})
+}
+
+function bindingDocsMatching(index: number, pattern: RegExp): string[] {
+	return bindingSlugsAt(index).filter((slug) => pattern.test(docText(slug)))
+}
+
+function bindingSectionTexts(
+	index: number,
+	sectionId: string
+): Array<{ slug: string; text: string }> {
+	return bindingSlugsAt(index).map((slug) => {
+		const doc = docs.find((candidate) => candidate.slug === slug)
+		const section = doc?.sections.find((candidate) => candidate.id === sectionId)
+		return { slug, text: JSON.stringify(section) }
+	})
+}
+
 function snippetsWithBareDevflareEnvImports(): string[] {
 	return docs.flatMap((doc) => {
 		return doc.sections.flatMap((section) => {
@@ -293,10 +325,20 @@ function snippetsWithBareDevflareEnvImports(): string[] {
 	})
 }
 
-function isCommandSnippet(snippet: DocCodeSnippet): boolean {
+function isCommandLanguage(language: string | undefined): boolean {
 	return ['bash', 'console', 'powershell', 'ps1', 'shell', 'sh', 'zsh'].includes(
-		(snippet.language ?? '').toLowerCase()
+		(language ?? '').toLowerCase()
 	)
+}
+
+function isCommandSnippet(snippet: DocCodeSnippet): boolean {
+	const files = snippetFiles(snippet)
+
+	if (files.length > 0) {
+		return files.every((file) => isCommandLanguage(file.language ?? snippet.language))
+	}
+
+	return isCommandLanguage(snippet.language)
 }
 
 function hasInferredSnippetPath(snippet: DocCodeSnippet): boolean {
@@ -336,6 +378,116 @@ function snippetsWithoutProvenance(): string[] {
 
 				return hasInferredSnippetPath(snippet) ? [] : [`${doc.slug}/${section.id}/${snippet.title}`]
 			})
+		})
+	})
+}
+
+function snippetFiles(snippet: DocCodeSnippet): Array<{
+	path?: string
+	language?: string
+	code: string
+}> {
+	return (
+		snippet.files ??
+		(snippet.code
+			? [
+					{
+						path: snippet.filename,
+						language: snippet.language,
+						code: snippet.code
+					}
+				]
+			: [])
+	)
+}
+
+function isCopyPastableExample(snippet: DocCodeSnippet): boolean {
+	const files = snippetFiles(snippet)
+	if (files.length === 0 || files.some((file) => file.code.trim().length === 0)) {
+		return false
+	}
+
+	if (isCommandSnippet(snippet)) {
+		return files.some((file) =>
+			/\b(?:bun|npm|pnpm|devflare|wrangler|curl|docker|podman)\b/.test(file.code)
+		)
+	}
+
+	const hasConcreteLocation =
+		Boolean(snippet.filename) ||
+		files.some((file) => Boolean(file.path)) ||
+		hasInferredSnippetPath(snippet)
+	const exampleCode = files.map((file) => file.code).join('\n')
+
+	return (
+		hasConcreteLocation &&
+		/(?:\bdefineConfig\b|from ['"]devflare\/|import\s+.+\s+from\s+['"]|export\s+(?:async\s+)?function|export\s+class|const\s+\w+\s*=|async\s*\(|await\s+|fetch\s*\(|env\.|uses:|run:|steps:|jobs:)/.test(
+			exampleCode
+		)
+	)
+}
+
+function nonEmptyLineCount(files: Array<{ code: string }>): number {
+	return files.reduce((sum, file) => {
+		return sum + file.code.trim().split(/\r?\n/).filter(Boolean).length
+	}, 0)
+}
+
+function isProjectShapedExample(snippet: DocCodeSnippet): boolean {
+	const files = snippetFiles(snippet)
+
+	if (
+		files.length === 0 ||
+		isCommandSnippet(snippet) ||
+		nonEmptyLineCount(files) < 6 ||
+		!(
+			Boolean(snippet.filename) ||
+			Boolean(snippet.activeFile) ||
+			files.some((file) => Boolean(file.path)) ||
+			hasInferredSnippetPath(snippet)
+		)
+	) {
+		return false
+	}
+
+	const exampleCode = files.map((file) => file.code).join('\n')
+
+	return /(?:\bdefineConfig\b|from ['"]devflare\/|import\s+.+\s+from\s+['"]|export\s+(?:async\s+)?function|export\s+class|env\.|uses:|run:|jobs:|on:|scripts)/.test(
+		exampleCode
+	)
+}
+
+function pagesWithoutCopyPastableExamples(): string[] {
+	return docs
+		.filter((doc) => {
+			return !doc.sections.some((section) => {
+				return (section.snippets ?? []).some((snippet) => isCopyPastableExample(snippet))
+			})
+		})
+		.map((doc) => doc.slug)
+}
+
+function pagesWithoutProjectShapedExamples(): string[] {
+	return docs
+		.filter((doc) => {
+			return !doc.sections.some((section) => {
+				return (section.snippets ?? []).some((snippet) => isProjectShapedExample(snippet))
+			})
+		})
+		.map((doc) => doc.slug)
+}
+
+function docsWithDuplicateSourcePages(): string[] {
+	return docs.flatMap((doc) => {
+		const seen = new Set<string>()
+
+		return doc.sourcePages.flatMap((source) => {
+			if (seen.has(source)) {
+				return [`${doc.slug}: ${source}`]
+			}
+
+			seen.add(source)
+			return []
 		})
 	})
 }
@@ -380,6 +532,14 @@ describe('documentation integrity', () => {
 		})
 
 		expect(missingPaths).toEqual([])
+	})
+
+	test('docs app pages include copy-pastable real-world examples', () => {
+		expect(pagesWithoutCopyPastableExamples()).toEqual([])
+	})
+
+	test('docs app pages include at least one project-shaped non-command example', () => {
+		expect(pagesWithoutProjectShapedExamples()).toEqual([])
 	})
 
 	test('README quickstart install and first test are internally consistent', async () => {
@@ -456,6 +616,10 @@ describe('documentation integrity', () => {
 		expect(missingSources).toEqual([])
 	})
 
+	test('docs app source metadata does not list duplicate sources per page', () => {
+		expect(docsWithDuplicateSourcePages()).toEqual([])
+	})
+
 	test('docs app has binding categories for every native binding family', () => {
 		const documentedSlugs = new Set(bindingDocCategories.map((category) => category.slugs[0]))
 		const expectedSlugs = [
@@ -516,6 +680,46 @@ describe('documentation integrity', () => {
 		expect(Object.keys(schemaKeyToSlug).sort()).toEqual(bindingSchemaKeys().sort())
 
 		expect(expectedSlugs.filter((slug) => !documentedSlugs.has(slug))).toEqual([])
+	})
+
+	test('binding overview pages include application runtime usage', () => {
+		expect(bindingDocsMissingSection(0, 'runtime-usage')).toEqual([])
+		const runtimeSections = bindingSectionTexts(0, 'runtime-usage')
+		expect(
+			runtimeSections
+				.filter(({ text }) =>
+					/\b(?:bun:test|devflare\/test|createTestContext|createOfflineEnv|createMock[A-Z]|cf\.worker|env\.dispose|expect\s*\(|describe\s*\(|test\s*\()\b/.test(
+						text
+					)
+				)
+				.map(({ slug }) => slug)
+		).toEqual([])
+		expect(
+			runtimeSections
+				.filter(({ text }) => /devflare\/runtime/.test(text))
+				.map(({ slug }) => slug)
+				.sort()
+		).toEqual(bindingSlugsAt(0).sort())
+	})
+
+	test('binding example pages are real application examples without testing content', () => {
+		expect(bindingDocsMissingSection(3, 'application-flow')).toEqual([])
+		expect(
+			bindingDocsMatching(
+				3,
+				/\b(?:bun:test|devflare\/test|createTestContext|createOfflineEnv|createMock[A-Z]|cf\.worker|env\.dispose|expect\s*\(|describe\s*\(|test\s*\(|tests?|testing|assert)\b/i
+			)
+		).toEqual([])
+	})
+
+	test('binding testing pages own the testing guidance', () => {
+		expect(bindingDocsMissingSection(2, 'default-loop')).toEqual([])
+		expect(
+			bindingDocsMatching(
+				2,
+				/\b(?:bun:test|devflare\/test|createTestContext|createOfflineEnv|createMock[A-Z]|cf\.worker|env\.dispose|expect\s*\(|describe\s*\(|test\s*\()\b/
+			).sort()
+		).toEqual(bindingSlugsAt(2).sort())
 	})
 
 	test('README top-level config key list matches the root schema', async () => {

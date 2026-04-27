@@ -45,6 +45,7 @@ export const operationsDocs: DocPage[] = [
 			'src/cli/help-pages/pages/account.ts',
 			'src/cli/help-pages/pages/productions.ts',
 			'src/cli/help-pages/pages/misc.ts',
+			'src/cloudflare/index.ts',
 			'src/cli/command-utils.ts'
 		],
 		sections: [
@@ -57,6 +58,29 @@ export const operationsDocs: DocPage[] = [
 					'`login`, `account`, and the global or workspace account selectors exist for this reason. They make the account story explicit before the deeper command families start reading or mutating Cloudflare state.'
 				],
 				snippets: [
+					{
+						title: 'Fail an operator script when the expected account is not active',
+						description:
+							'Use the same account helpers as the CLI when automation needs a hard preflight instead of a human-readable inventory page.',
+						filename: 'scripts/assert-account.ts',
+						language: 'ts',
+						code: String.raw`import { account } from 'devflare/cloudflare'
+
+const expectedAccountId = process.env.CLOUDFLARE_ACCOUNT_ID
+
+if (!expectedAccountId) {
+	throw new Error('Set CLOUDFLARE_ACCOUNT_ID before running operator automation')
+}
+
+const primary = await account.getPrimaryAccount()
+
+if (primary?.id !== expectedAccountId) {
+	throw new Error('Expected Cloudflare account ' + expectedAccountId + ', got ' + (primary?.id ?? 'none'))
+}
+
+const workers = await account.workers(expectedAccountId)
+console.log('Operating on ' + workers.length + ' workers in ' + expectedAccountId)`
+					},
 					{
 						title: 'Get the account context visible first',
 						language: 'bash',

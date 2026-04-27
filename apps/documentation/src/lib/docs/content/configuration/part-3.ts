@@ -1,0 +1,212 @@
+import type { DocPage } from '../../types'
+import {
+	docsLink,
+	environmentOverlayCode,
+	fullConfigExampleCode,
+	generatedTypesOutputCode,
+	previewBindingsConfigCode,
+	previewBindingsLifecycleCode,
+	projectShapeConfigCode,
+	runtimeDeploySettingsCode,
+	workerSurfacesConfigCode
+} from './shared'
+
+export const configurationDocsPart3: DocPage[] = [
+	{
+		slug: 'runtime-deploy-settings',
+		group: 'Devflare',
+		navTitle: 'Runtime & deploy settings',
+		readTime: '7 min read',
+		eyebrow: 'Configuration',
+		title:
+			'Keep runtime posture and deployment shape in authored config instead of scattered deploy conventions',
+		summary:
+			'Use config for account context, compatibility posture, assets, deployment routes, WebSocket proxy rules, migrations, observability, limits, and preview cron behavior instead of rediscovering those settings in scripts later.',
+		description:
+			'Devflare exposes several config lanes that are not about file discovery at all. These keys shape runtime identity, Cloudflare compatibility, deployment routing, assets, release behavior, and operational posture, so they belong in authored config where the team can review them accurately.',
+		highlights: [
+			'`accountId` matters when remote bindings, name-based resource resolution, or account-aware operations should target one Cloudflare account explicitly.',
+			'`compatibilityDate` defaults to the current date, and Devflare always includes `nodejs_compat` plus `nodejs_als` in compatibility flags.',
+			'`assets`, `routes`, and `wsRoutes` shape delivery and dev behavior; they are not the same thing as app routing under `files.routes`.',
+			'`limits`, `observability`, `migrations`, and `previews.includeCrons` are source-controlled runtime and release knobs; in practice `previews.includeCrons` decides whether branch-scoped preview deploys keep cron triggers.'
+		],
+		facts: [
+			{
+				label: 'Best for',
+				value:
+					'Projects that need explicit runtime posture and delivery shape beyond the basic file surfaces'
+			},
+			{ label: 'Forced compatibility flags', value: '`nodejs_compat` and `nodejs_als`' },
+			{
+				label: 'Routing split',
+				value:
+					'`files.routes` is app routing, while top-level `routes` is Cloudflare deployment routing'
+			},
+			{ label: 'Preview cron default', value: '`previews.includeCrons` defaults to `false`' }
+		],
+		sourcePages: [
+			'src/config/schema.ts',
+			'src/config/schema-runtime.ts',
+			'src/config/schema-env.ts',
+			'src/dev-server/server.ts',
+			'src/vite/plugin.ts'
+		],
+		sections: [
+			{
+				id: 'identity-and-compat',
+				title: 'Set runtime identity and compatibility posture explicitly',
+				paragraphs: [
+					'Not every package needs the full advanced runtime section on day one, but once remote bindings, compatibility drift, or account-aware operations matter, these settings should move into config instead of living in loose scripts and remembered defaults.',
+					'The important habit is that runtime posture should be reviewable in source control. If a package relies on a specific compatibility date or a specific Cloudflare account, that fact should be obvious before the deploy step runs.'
+				],
+				table: {
+					headers: ['Key', 'Use it when', 'Important behavior'],
+					rows: [
+						[
+							'`accountId`',
+							'Remote bindings, name-based resource lookup, or account-aware commands should target one Cloudflare account explicitly.',
+							'Remote AI and Vectorize flows need a clear account, and config-level `accountId` becomes one resolution lane for account-aware operations and config-driven resource resolution.'
+						],
+						[
+							'`compatibilityDate`',
+							'The package should pin runtime behavior instead of inheriting date drift.',
+							'Devflare defaults it to the current date when you omit it, so explicit pinning is the safer choice once the package is real.'
+						],
+						[
+							'`compatibilityFlags`',
+							'You need extra Workers compatibility flags beyond the default posture.',
+							'Devflare always includes `nodejs_compat` and `nodejs_als`, so custom flags should be deliberate additions instead of copy-by-habit repetition.'
+						]
+					]
+				},
+				callouts: [
+					{
+						tone: 'info',
+						title: 'Do not restate the forced flags unless you are making a point',
+						body: [
+							'Devflare already includes `nodejs_compat` and `nodejs_als`. Keep `compatibilityFlags` focused on the extra posture your package actually needs.'
+						]
+					}
+				]
+			},
+			{
+				id: 'deploy-shape',
+				title: 'Keep deployment shape in config, not in app routing or shell scripts',
+				paragraphs: [
+					'Several config keys answer deployment questions rather than application-routing questions. Keeping those lanes separate is what stops app URLs, Cloudflare routes, and dev-only WebSocket proxy behavior from collapsing into one blurry story.',
+					'If the package serves static assets, mounts a custom domain, or proxies Durable Object WebSockets in development, that shape should live in config beside the rest of the deployment contract.'
+				],
+				table: {
+					headers: ['Key', 'What it controls', 'Common use'],
+					rows: [
+						[
+							'`assets`',
+							'Static asset directory plus optional binding name',
+							'Point Devflare at one static directory and keep asset delivery visible in source.'
+						],
+						[
+							'`routes`',
+							'Cloudflare deployment route patterns',
+							'Attach the Worker to host or zone patterns at deploy time.'
+						],
+						[
+							'`wsRoutes`',
+							'Dev-mode Durable Object WebSocket proxy patterns',
+							'Forward development WebSocket paths into Durable Object namespaces explicitly.'
+						]
+					]
+				},
+				snippets: [
+					{
+						title: 'One place for runtime posture and deployment-facing settings',
+						language: 'ts',
+						code: runtimeDeploySettingsCode
+					}
+				],
+				callouts: [
+					{
+						tone: 'warning',
+						title: 'Top-level `routes` is not the same thing as `files.routes`',
+						body: [
+							'`files.routes` controls your app route tree. Top-level `routes` controls Cloudflare deployment routing. Keep those ideas separate so the package stays reviewable.'
+						]
+					}
+				]
+			},
+			{
+				id: 'release-controls',
+				title: 'Put release and operational controls in source control too',
+				table: {
+					headers: ['Key', 'Why it exists'],
+					rows: [
+						[
+							'`previews.includeCrons`',
+							'Choose whether branch-scoped preview deploys keep cron triggers instead of omitting them to avoid shared-schedule conflicts.'
+						],
+						[
+							'`limits.cpu_ms`',
+							'Declare CPU expectations in config rather than treating them as after-the-fact deploy tuning.'
+						],
+						[
+							'`observability.enabled` / `head_sampling_rate`',
+							'Keep tracing or sampling posture explicit for the environments that need it.'
+						],
+						[
+							'`migrations`',
+							'Track Durable Object class lifecycle in the same source-controlled package that owns those classes.'
+						]
+					]
+				},
+				paragraphs: [
+					'Once a package has Durable Object history, production traffic expectations, or explicit preview behavior, the runtime contract is no longer just “what files exist?” It also includes how that package should be migrated, sampled, and limited at runtime.',
+					'These settings belong in the same config as the Worker surfaces. They are part of the deployable contract, not just garnish around it.'
+				],
+				callouts: [
+					{
+						tone: 'warning',
+						title: 'Durable Object migrations still deserve explicit release thinking',
+						body: [
+							'Keep migrations authored in config and remember that plain preview uploads do not apply Durable Object migrations. If the preview must exercise real Durable Object lifecycle changes, use the preview strategy that matches that reality.'
+						]
+					}
+				]
+			},
+			{
+				id: 'related-pages',
+				title: 'Open the neighboring page when the setting changes the larger deployment story',
+				cards: [
+					{
+						label: 'Configuration',
+						title: 'Need environment overlays?',
+						body: 'Use the environments page when these settings differ by preview, production, or another named lane.',
+						href: docsLink('config-environments')
+					},
+					{
+						label: 'Configuration',
+						title: 'Need preview-scoped bindings?',
+						body: 'Open the previews config page when preview deployments should own separate databases, buckets, or queues that can be cleaned up by scope later.',
+						href: docsLink('config-previews')
+					},
+					{
+						label: 'Ship & operate',
+						title: 'Need the production story?',
+						body: 'The production deploy page covers explicit deploy targets and the inspection tools that belong beside them.',
+						href: docsLink('production-deploys')
+					},
+					{
+						label: 'Ship & operate',
+						title: 'Need preview behavior?',
+						body: 'Preview strategy docs cover named preview scopes, same-worker uploads, and the Durable Object caveats around them.',
+						href: docsLink('preview-strategies')
+					},
+					{
+						label: 'Routing',
+						title: 'Need app-route shape?',
+						body: 'Open the routing page when the question is your route tree or request middleware, not Cloudflare deployment routes.',
+						href: docsLink('http-routing')
+					}
+				]
+			}
+		]
+	}
+]
