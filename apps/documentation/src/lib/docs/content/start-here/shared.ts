@@ -3,9 +3,9 @@ import type { DocCodeTreeEntry, DocPage } from '../../types'
 export const docsLink = (slug: string): string => `/docs/${slug}`
 
 export const supportCoverageTooltips = {
-	Full: 'Full — Devflare has a first-class config, local runtime, testing, docs, and workflow story for this surface.',
-	Partial:
-		'Partial — the surface is supported, but important behavior still depends on remote Cloudflare infrastructure or platform caveats.',
+	Full: 'Full — Devflare covers config, local runtime, testing, docs, and the everyday workflow for this surface.',
+	Remote:
+		'Remote — the surface works with Cloudflare, but full fidelity requires remote Cloudflare infrastructure or platform behavior.',
 	Limited:
 		'Limited — there is a real supported lane, but the contract is intentionally narrower today.',
 	None: 'None — Devflare does not model that surface yet, so reach for raw Cloudflare tooling or Wrangler passthrough instead.'

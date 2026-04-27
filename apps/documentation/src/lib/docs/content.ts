@@ -90,7 +90,6 @@ const docStructure: DocGroupDefinition[] = [
 					'Start with the mental model, the smallest safe worker, and one real test before you branch into app-specific setup.',
 				sidebarDisplay: 'links',
 				slugs: [
-					'docs-landing-paths',
 					'what-devflare-is',
 					'first-worker',
 					'first-unit-test',
@@ -239,11 +238,7 @@ const docStructure: DocGroupDefinition[] = [
 					'Choose the right architecture and product boundary first, then let the specific binding pages own the exact authoring and runtime mechanics.',
 				sidebarDisplay: 'links',
 				slugs: [
-					'binding-chooser',
 					'feature-index',
-					'recipe-packs',
-					'case-catalog',
-					'learn-from-real-tests',
 					'storage-bindings',
 					'r2-uploads-and-delivery',
 					'durable-objects-and-queues',

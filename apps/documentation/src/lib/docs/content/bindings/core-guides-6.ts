@@ -9,7 +9,7 @@ export const bindingGuidesPart6: BindingGuideDefinition[] = [
 		configKey: 'bindings.sendEmail',
 		authoringShape:
 			'Record<string, { destinationAddress?; allowedDestinationAddresses?; allowedSenderAddresses? }>',
-		localStory: 'First-class outbound local support; distinct from inbound email event testing',
+		localStory: 'Outbound local support; distinct from inbound email event testing',
 		sourcePages: [
 			'schema-bindings.ts',
 			'compiler.ts',

@@ -1,9 +1,9 @@
 <script lang="ts">
-import { onMount, tick } from 'svelte'
 import { docPath } from '$lib/docs/content'
 import type { DocPage } from '$lib/docs/types'
 import { m } from '$lib/paraglide/messages'
 import { localizeHref } from '$lib/paraglide/runtime'
+import { onMount, tick } from 'svelte'
 import FeatureCard from '../cards/FeatureCard.svelte'
 import LinkCard from '../cards/LinkCard.svelte'
 import Block from '../code/Block.svelte'
@@ -15,7 +15,7 @@ import Callout from './Callout.svelte'
 import FloatingToc from './FloatingToc.svelte'
 import StepList from './StepList.svelte'
 
-let {
+const {
 	doc,
 	previous,
 	next
@@ -135,10 +135,34 @@ $effect(() => {
 <article class="space-y-12">
 	<div class="space-y-12">
 	<Surface as="header" id={pageTopId} padding="lg" class="scroll-mt-24 space-y-7">
-		<div class="docs-meta docs-text-muted flex flex-wrap items-center gap-3">
-			<span><InlineText text={doc.eyebrow} /></span>
-			<span class="docs-accent-dot h-1 w-1 rounded-full"></span>
-			<span><InlineText text={doc.group} /></span>
+		<div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+			<div class="space-y-3">
+				<div class="docs-meta docs-text-muted flex flex-wrap items-center gap-3">
+					<span><InlineText text={doc.eyebrow} /></span>
+					<span class="docs-accent-dot h-1 w-1 rounded-full"></span>
+					<span><InlineText text={doc.group} /></span>
+				</div>
+
+				{#if doc.headerCloudflareDocs}
+					<p class="docs-copy-sm docs-text-muted max-w-3xl">
+						<InlineText text={doc.headerCloudflareDocs.summary} />
+					</p>
+				{/if}
+			</div>
+
+			{#if doc.headerCloudflareDocs}
+				<a
+					href={resolveHref(doc.headerCloudflareDocs.href)}
+					target="_blank"
+					rel="noopener noreferrer"
+					title={doc.headerCloudflareDocs.title}
+					aria-label={`Open ${doc.headerCloudflareDocs.title}`}
+					class="docs-focus-ring docs-border docs-hover-strong docs-surface-nav docs-text-strong inline-flex w-fit shrink-0 items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium transition"
+				>
+					<span>{doc.headerCloudflareDocs.label ?? 'Cloudflare Documentation'}</span>
+					<span aria-hidden="true" class="iconify fluent--open-16-regular size-4 shrink-0"></span>
+				</a>
+			{/if}
 		</div>
 
 		<div class="space-y-4">
@@ -209,25 +233,35 @@ $effect(() => {
 			{/if}
 
 			{#if section.table}
-				<div class="docs-surface-glass overflow-hidden rounded-xl">
-					<table class="docs-divide min-w-full">
-						<thead class="docs-table-head">
-							<tr>
-								{#each section.table.headers as header}
-									<th class="docs-label docs-text-muted px-4 py-3 text-left"><InlineText text={header} /></th>
-								{/each}
-							</tr>
-						</thead>
-						<tbody class="docs-divide">
-							{#each section.table.rows as row}
+				<div
+					class={`docs-table-shell docs-surface-glass rounded-xl ${section.table.layout === 'wide' ? 'docs-table-shell-wide' : ''}`}
+				>
+					<div
+						class="docs-table-scroll"
+						role="region"
+						aria-label={`${section.title} table`}
+					>
+						<table
+							class={`docs-table docs-divide ${section.table.layout === 'wide' ? 'docs-table-wide' : ''}`}
+						>
+							<thead class="docs-table-head">
 								<tr>
-									{#each row as cell}
-										<td class="docs-copy-sm docs-text-body px-4 py-4"><InlineText text={cell} /></td>
+									{#each section.table.headers as header}
+										<th class="docs-table-heading docs-label docs-text-muted px-4 py-3 text-left"><InlineText text={header} /></th>
 									{/each}
 								</tr>
-							{/each}
-						</tbody>
-					</table>
+							</thead>
+							<tbody class="docs-divide">
+								{#each section.table.rows as row}
+									<tr>
+										{#each row as cell}
+											<td class="docs-table-cell docs-copy-sm docs-text-body px-4 py-4"><InlineText text={cell} /></td>
+										{/each}
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
 				</div>
 			{/if}
 

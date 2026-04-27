@@ -8,7 +8,7 @@ export const bindingGuidesPart2: BindingGuideDefinition[] = [
 			'Stateful coordination primitives with strong local support, cross-worker wiring, and important preview caveats.',
 		configKey: 'bindings.durableObjects',
 		authoringShape: 'Record<string, string | { className: string; scriptName?: string }>',
-		localStory: 'First-class local runtime and tests, including cross-worker references',
+		localStory: 'Local runtime and tests, including cross-worker references',
 		sourcePages: [
 			'schema-bindings.ts',
 			'ref.ts',
@@ -289,7 +289,7 @@ export async function fetch(request: Request): Promise<Response> {
 			'Producer and consumer bindings for background work with a strong local trigger story.',
 		configKey: 'bindings.queues',
 		authoringShape: '{ producers?: Record<string, string>; consumers?: QueueConsumer[] }',
-		localStory: 'First-class local runtime and queue-trigger tests',
+		localStory: 'Local runtime and queue-trigger tests',
 		sourcePages: [
 			'schema-bindings.ts',
 			'compiler.ts',

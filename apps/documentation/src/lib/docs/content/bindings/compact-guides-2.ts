@@ -367,7 +367,11 @@ test('creates an in-memory artifact repo', async () => {
 			'packages/devflare/src/config/schema-runtime.ts',
 			'packages/devflare/src/config/compiler.ts',
 			'packages/devflare/src/test/containers.ts',
-			'packages/devflare/src/test/offline-bindings.ts'
+			'packages/devflare/src/test/offline-bindings.ts',
+			'https://developers.cloudflare.com/containers/get-started/',
+			'https://developers.cloudflare.com/containers/platform-details/image-management/',
+			'https://developers.cloudflare.com/containers/container-class/',
+			'https://developers.cloudflare.com/workers/wrangler/configuration/#containers'
 		],
 		compileTarget: 'Wrangler `containers`',
 		envType: 'Container class config plus a Durable Object container binding',
@@ -376,7 +380,7 @@ test('creates an in-memory artifact repo', async () => {
 		bestFor:
 			'routing requests to a stateful container instance that runs code outside the Workers runtime',
 		remoteBoundary:
-			'Cloudflare owns deployed container rollout, registry image availability, SSH, scaling, and the full Containers Durable Object runtime.',
+			'Cloudflare owns deployed container rollout, managed registry availability, SSH, scaling, and hosted platform behavior; Devflare owns the Docker/Podman local loop.',
 		configSnippet: {
 			title: 'Smallest Containers config',
 			language: 'ts',
@@ -399,6 +403,7 @@ export default defineConfig({
 		{
 			className: 'ApiContainer',
 			image: 'localhost/devflare-api:latest',
+			imageBuildContext: './containers/api',
 			maxInstances: 1
 		}
 	],
@@ -436,10 +441,107 @@ export async function fetch(request: Request): Promise<Response> {
 import { detectContainerEngine } from 'devflare/test'
 
 test('container engine detection is explicit', async () => {
-	const engine = await detectContainerEngine()
-	expect(['available', 'missing', 'unhealthy']).toContain(engine.status)
+	const status = await detectContainerEngine()
+	if (!status.available) {
+		expect(status.reason.length).toBeGreaterThan(0)
+		return
+	}
+
+	expect(['docker', 'podman']).toContain(status.engine)
 })`
 		},
+		overviewSections: [
+			{
+				id: 'container-image-workflow',
+				title: 'Build and reference the image deliberately',
+				paragraphs: [
+					'Devflare treats the `containers` entry as the contract between the Worker class and a real container image. For local work, point `image` at a tag that already exists in Docker or Podman, or point it at a local Dockerfile path that Devflare can build from files on disk.',
+					'Cloudflare uses the same container idea in the hosted lane: Wrangler accepts a Dockerfile path or an image reference. Dockerfile paths are built locally and pushed during deploy, while image references can come from the Cloudflare Registry, Docker Hub, or Amazon ECR.'
+				],
+				snippets: [
+					{
+						title: 'Build the local image with Docker or Podman',
+						language: 'bash',
+						code: String.raw`docker build -t localhost/devflare-api:latest ./containers/api
+docker image inspect localhost/devflare-api:latest
+
+podman build -t localhost/devflare-api:latest ./containers/api
+podman image inspect localhost/devflare-api:latest`
+					},
+					{
+						title: 'Reference that local image from Devflare config',
+						language: 'ts',
+						code: String.raw`import { defineConfig } from 'devflare/config'
+
+export default defineConfig({
+	name: 'container-worker',
+	containers: [
+		{
+			className: 'ApiContainer',
+			image: 'localhost/devflare-api:latest',
+			imageBuildContext: './containers/api',
+			maxInstances: 1
+		}
+	]
+})`
+					},
+					{
+						title: 'Use a Dockerfile or registry image for the Cloudflare lane',
+						language: 'bash',
+						code: String.raw`wrangler containers build ./containers/api -t devflare-api:latest
+wrangler containers push devflare-api:latest
+
+# Cloudflare can also reference registry images such as:
+# registry.cloudflare.com/<account-id>/devflare-api:latest
+# docker.io/library/nginx:alpine
+# <account>.dkr.ecr.<region>.amazonaws.com/devflare-api:latest`
+					}
+				],
+				bullets: [
+					'Use `image: "./containers/api/Dockerfile"` or `image: "./containers/api"` when you want Wrangler deploy to build and push from source.',
+					'Use `image: "localhost/devflare-api:latest"` for a local tag that Docker or Podman can inspect without a network pull.',
+					'Use `registry.cloudflare.com/<account-id>/<image>:<tag>` for Cloudflare Registry images, Docker Hub names such as `docker.io/library/nginx:alpine`, or Amazon ECR image references when the hosted deploy should pull a prebuilt image.',
+					'Use `wrangler containers registries configure` when the image lives in a private external registry.'
+				]
+			},
+			{
+				id: 'container-local-requirements',
+				title: 'Full local support requirements',
+				paragraphs: [
+					'Full local support means Devflare can build, launch, call, inspect, and clean up the container without Cloudflare when the local machine has a working Docker or Podman engine.',
+					'The offline-first default is strict: Dockerfile builds use cached base layers, and image references must already exist locally. Set `offline: false` only when the test is allowed to pull from a registry.'
+				],
+				snippets: [
+					{
+						title: 'Run a container-backed route test only when the engine is available',
+						language: 'ts',
+						code: String.raw`import { afterAll, expect, test } from 'bun:test'
+import { containers, shouldSkip } from 'devflare/test'
+
+const skipContainers = await shouldSkip.containers
+
+afterAll(() => containers.stopAll())
+
+test.skipIf(skipContainers)('proxies to the local API container', async () => {
+	const api = await containers.start('ApiContainer', {
+		configPath: 'devflare.config.ts',
+		port: 8080,
+		offline: true
+	})
+
+	const response = await api.fetch('/health')
+	expect(response.status).toBe(200)
+})`
+					}
+				],
+				bullets: [
+					'Install Docker or Podman and make sure `docker info` or `podman info` succeeds before running container tests.',
+					'Set `DEVFLARE_CONTAINER_TESTS=1` for test lanes that are allowed to start local containers.',
+					'Gate CI and hosted runners with `shouldSkip.containers` because GitHub Actions, Cloudflare runners, and preview workers may not expose a usable container engine.',
+					'Keep base images cached when running offline. A missing local tag or uncached base layer is a setup problem, not a reason to silently reach out to a registry.'
+				]
+			}
+		],
 		compileOutput: String.raw`{
 	"containers": [
 		{ "class_name": "ApiContainer", "image": "localhost/devflare-api:latest", "max_instances": 1 }

@@ -21,9 +21,9 @@ import {
 	routedWorkerConfigCode,
 	routedWorkerFetchCode,
 	routedWorkerIndexRouteCode,
-	routedWorkerStructure,
-	supportCoverageTooltips
+	routedWorkerStructure
 } from './shared'
+import { cloudflarePlatformSupportCards } from './support-coverage'
 
 export const startHereDocsPart1: DocPage[] = [
 	{
@@ -86,7 +86,12 @@ export const startHereDocsPart1: DocPage[] = [
 			'vite/plugin.ts',
 			'sveltekit/platform.ts',
 			'cli/commands/deploy.ts',
-			'cli/commands/previews.ts'
+			'cli/commands/previews.ts',
+			'schema-runtime.ts',
+			'packages/devflare/src/test/offline-bindings.ts',
+			'packages/devflare/src/test/containers.ts',
+			'packages/devflare/src/test/utilities.ts',
+			'apps/documentation/src/lib/docs/content/bindings/*'
 		],
 		sections: [
 			{
@@ -165,75 +170,10 @@ export const startHereDocsPart1: DocPage[] = [
 			},
 			{
 				id: 'support-coverage',
-				title: 'What Devflare already supports across a real application',
+				title: 'What Devflare supports across Cloudflare platform features',
 				description:
-					'Hover a label to see what it means for config, local runtime, tests, previews, and operational guidance.',
-				cards: [
-					{
-						label: 'Full',
-						labelTooltip: supportCoverageTooltips.Full,
-						meta: 'HTTP app core',
-						title: 'Fetch, routes, and middleware',
-						body: 'Worker fetch entrypoints, file routing, and `sequence(...)` middleware are first-class Devflare surfaces with strong local runtime support and clean request-scoped helpers.',
-						href: docsLink('http-routing')
-					},
-					{
-						label: 'Full',
-						labelTooltip: supportCoverageTooltips.Full,
-						meta: 'Storage',
-						title: 'KV, D1, and R2',
-						body: 'Devflare gives the main storage bindings a strong local-first story: readable config, generated env typing, local runtime behavior, and realistic tests without losing the Cloudflare shape.',
-						href: docsLink('storage-bindings')
-					},
-					{
-						label: 'Full',
-						labelTooltip: supportCoverageTooltips.Full,
-						meta: 'State and async',
-						title: 'Durable Objects and queues',
-						body: 'Stateful objects and deferred work are treated as real worker surfaces, with config discovery, local runtime wrappers, and test helpers that match the application boundary.',
-						href: docsLink('durable-objects-and-queues')
-					},
-					{
-						label: 'Full',
-						labelTooltip: supportCoverageTooltips.Full,
-						meta: 'Multi-worker',
-						title: 'Service bindings and worker composition',
-						body: 'Service bindings and `ref()` let worker-to-worker dependencies stay explicit enough for local multi-worker runtime, generated types, and real tests through the same env surface the app uses.',
-						href: docsLink('multi-workers')
-					},
-					{
-						label: 'Partial',
-						labelTooltip: supportCoverageTooltips.Partial,
-						meta: 'Remote database path',
-						title: 'Hyperdrive',
-						body: 'Hyperdrive is modeled cleanly in config and generated output, but the local and preview ergonomics are more constrained than KV, D1, or R2 because the real database and credentials stay remote.',
-						href: docsLink('bindings/hyperdrive')
-					},
-					{
-						label: 'Partial',
-						labelTooltip: supportCoverageTooltips.Partial,
-						meta: 'Remote platform service',
-						title: 'Workers AI',
-						body: 'The AI binding is supported in config, types, and deployment flows, but meaningful tests are remote-oriented because real inference still lives on Cloudflare infrastructure.',
-						href: docsLink('bindings/ai')
-					},
-					{
-						label: 'Partial',
-						labelTooltip: supportCoverageTooltips.Partial,
-						meta: 'Remote platform service',
-						title: 'Vectorize',
-						body: 'Vectorize is fully modeled in config and preview-aware naming, but real inserts and similarity queries still need remote infrastructure and honest remote-mode tests.',
-						href: docsLink('bindings/vectorize')
-					},
-					{
-						label: 'Full',
-						labelTooltip: supportCoverageTooltips.Full,
-						meta: 'Bridge-backed browser lane',
-						title: 'Browser Rendering',
-						body: "Browser Rendering is fully supported through Devflare's bridge-backed local dev story, config model, generated typing, and runtime integration. The main platform caveat is still the Cloudflare one: exactly one browser binding.",
-						href: docsLink('bindings/browser-rendering')
-					}
-				]
+					'Every native binding or platform lane in the binding docs is listed here with its current Devflare support level and a direct link to the page with config, examples, tests, and boundary notes. Hover a label to see what that support level means.',
+				cards: cloudflarePlatformSupportCards
 			},
 			{
 				id: 'devflare-enhancements',
@@ -250,7 +190,7 @@ export const startHereDocsPart1: DocPage[] = [
 					{
 						label: 'Runtime',
 						title: '`sequence(...)` middleware',
-						body: 'Request-wide middleware becomes a first-class pattern instead of something every app reinvents in a slightly different fetch wrapper.',
+						body: 'Request-wide middleware gets a named helper instead of forcing every app to reinvent the same fetch wrapper.',
 						href: docsLink('sequence-middleware')
 					},
 					{
@@ -668,7 +608,7 @@ bunx --bun devflare dev`
 					{
 						label: 'Bindings',
 						title: 'Need storage choices?',
-						body: 'Choose between KV, D1, R2, and Hyperdrive before you open the binding guide that owns the details.',
+						body: 'Choose between KV, D1, R2, and Hyperdrive before you open the binding guide with the config and examples.',
 						href: docsLink('storage-bindings')
 					},
 					{

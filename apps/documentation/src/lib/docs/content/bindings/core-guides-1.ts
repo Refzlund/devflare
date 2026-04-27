@@ -8,7 +8,7 @@ export const bindingGuidesPart1: BindingGuideDefinition[] = [
 			'Fast lookup state, cache-like reads, and lightweight shared data with strong local support.',
 		configKey: 'bindings.kv',
 		authoringShape: 'Record<string, string | { name: string } | { id: string }>',
-		localStory: 'First-class local runtime and tests',
+		localStory: 'Local runtime and tests',
 		sourcePages: [
 			'schema-bindings.ts',
 			'schema-normalization.ts',
@@ -20,7 +20,7 @@ export const bindingGuidesPart1: BindingGuideDefinition[] = [
 			readTime: '4 min read',
 			title: 'Use KV for fast lookup state without losing a real local loop',
 			summary:
-				'KV bindings are first-class in Devflare: author stable names in config, keep env typed, and run real get or put flows locally.',
+				'Author stable KV names in config, keep env typed, and run real get or put flows locally.',
 			description:
 				'Devflare lets you keep KV intent human-readable in `devflare.config.ts` and only resolve opaque namespace ids when build or deploy flows actually need them.',
 			highlights: [
@@ -223,7 +223,7 @@ export async function fetch(request: Request): Promise<Response> {
 			'SQLite-style relational queries with a strong local harness and id or name-based authoring.',
 		configKey: 'bindings.d1',
 		authoringShape: 'Record<string, string | { name: string } | { id: string }>',
-		localStory: 'First-class local runtime and tests',
+		localStory: 'Local runtime and tests',
 		sourcePages: [
 			'schema-bindings.ts',
 			'schema-normalization.ts',
@@ -247,7 +247,7 @@ export async function fetch(request: Request): Promise<Response> {
 			bestFor: 'Structured data, SQL queries, and cases where key-based lookup is not enough',
 			authoringParagraphs: [
 				'D1 follows the same stable-name instinct as KV: author by readable name unless you intentionally already have a database id you want to pin to.',
-				'That gives teams one repeatable review habit: look for human-meaningful names in source, then inspect generated or resolved output only when a deploy flow needs it.'
+				'In reviews, look for human-meaningful names in source. Inspect generated or resolved output only when a deploy flow needs it.'
 			],
 			authoringSnippet: {
 				title: 'D1 binding authoring',
@@ -434,7 +434,7 @@ export async function fetch(): Promise<Response> {
 			'Object storage bindings with strong local support and one important rule: do not assume a browser URL contract.',
 		configKey: 'bindings.r2',
 		authoringShape: 'Record<string, string>',
-		localStory: 'First-class local runtime and tests',
+		localStory: 'Local runtime and tests',
 		sourcePages: [
 			'schema-bindings.ts',
 			'compiler.ts',
@@ -448,7 +448,7 @@ export async function fetch(): Promise<Response> {
 			summary:
 				'R2 is straightforward in config and well-supported locally, but browser-facing delivery should usually go through a Worker route instead of assuming bucket URLs.',
 			description:
-				'Devflare treats R2 as a first-class binding in worker code and tests. The main discipline is deciding which files are public, which are private, and which paths should stay app-controlled.',
+				'R2 works in worker code and tests. The main discipline is deciding which files are public, which are private, and which paths should stay app-controlled.',
 			highlights: [
 				'R2 authoring is intentionally simple: binding name to bucket name.',
 				'Local runtime supports `head`, `get`, `put`, `delete`, and `list`.',

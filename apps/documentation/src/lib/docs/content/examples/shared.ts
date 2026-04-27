@@ -2,6 +2,8 @@ import type { DocPage } from '../../types'
 
 export const docsLink = (slug: string): string => `/docs/${slug}`
 
+export const docsTextLink = (label: string, slug: string): string => `[${label}](${docsLink(slug)})`
+
 export const caseLink = (name: string): string => `/cases/${name}`
 
 export const workerOnlyRecipeFiles = [
@@ -304,11 +306,13 @@ import { containers, shouldSkip, stopActiveContainers } from 'devflare/test'
 
 afterAll(() => stopActiveContainers())
 
-test.skipIf(await shouldSkip.containers())('container responds without pulling in CI', async () => {
-	const app = await containers.start({
+const skipContainers = await shouldSkip.containers
+
+test.skipIf(skipContainers)('container responds without pulling in CI', async () => {
+	const app = await containers.start('ApiContainer', {
 		image: 'devflare-fixture:local',
-		pull: false,
-		ports: [8080]
+		port: 8080,
+		offline: true
 	})
 
 	expect(await app.fetch('/health').then((response) => response.status)).toBe(200)
@@ -428,7 +432,7 @@ export const recipeRows = [
 	['Remote-boundary tests', '`shouldSkip.*` plus explicit Cloudflare auth lanes', 'case15'],
 	[
 		'Containers',
-		'Docker/Podman-gated local test with `pull: false` when offline',
+		'Docker/Podman-gated local test with `offline: true` when offline',
 		'container helper tests'
 	],
 	[
@@ -439,11 +443,18 @@ export const recipeRows = [
 ]
 
 export const featureRows = [
-	['Route tree', 'Full', 'N/A', '`cf.worker`', 'N/A', docsLink('first-route-tree')],
+	[
+		'Route tree',
+		'Full',
+		'No Cloudflare product boundary',
+		'`cf.worker`',
+		'N/A',
+		docsLink('first-route-tree')
+	],
 	[
 		'KV',
 		'Full',
-		'Wrangler deploy',
+		'Account limits and deployed namespace state',
 		'`createTestContext`, `createOfflineEnv`, `createMockKV`',
 		'Managed when scoped',
 		docsLink('bindings/kv')
@@ -451,62 +462,62 @@ export const featureRows = [
 	[
 		'D1',
 		'Full',
-		'Wrangler deploy',
+		'Account limits and deployed database state',
 		'`createTestContext`, `createOfflineEnv`, `createMockD1`',
 		'Managed when scoped',
 		docsLink('bindings/d1')
 	],
 	[
 		'R2',
-		'Full for API use',
-		'Delivery topology belongs to Cloudflare',
+		'Full',
+		'Public delivery topology is Cloudflare-owned',
 		'`createTestContext`, `createOfflineEnv`, `createMockR2`',
 		'Managed when scoped',
 		docsLink('bindings/r2')
 	],
 	[
 		'Durable Objects',
-		'Full local harness',
-		'Migrations and placement are Cloudflare owned',
+		'Full',
+		'Migrations and placement are Cloudflare-owned',
 		'`createTestContext`',
-		'Use branch-scoped isolation when needed',
+		'Branch-scoped isolation when needed',
 		docsLink('bindings/durable-objects')
 	],
 	[
 		'Queues',
-		'Full trigger helpers',
-		'Delivery/retry semantics are Cloudflare owned',
+		'Full',
+		'Delivery and retry semantics are Cloudflare-owned',
 		'`cf.queue`, `createMockQueue`',
 		'Managed when scoped',
 		docsLink('bindings/queues')
 	],
 	[
 		'Scheduled',
-		'Full trigger helper',
-		'Cron scheduling is Cloudflare owned',
+		'Full',
+		'Cron scheduling is Cloudflare-owned',
 		'`cf.scheduled`',
 		'Config-owned',
 		docsLink('create-test-context')
 	],
 	[
 		'Email',
-		'Outbound and handler helpers',
-		'Email Routing ingress remains Cloudflare owned',
+		'Full',
+		'Email Routing ingress remains Cloudflare-owned',
 		'`cf.email`, send-email binding tests',
 		'Address rules compile as authored',
 		docsLink('bindings/send-email')
 	],
 	[
 		'Tail Workers',
-		'`cf.tail.trigger()`',
-		'Live tail routing is Cloudflare owned',
+		'Full',
+		'Live tail routing is Cloudflare-owned',
 		'`cf.tail`',
 		'Handler code only',
 		docsLink('create-test-context')
 	],
 	[
 		'Workers AI',
-		'Remote-oriented',
+		'Remote',
 		'Requires Cloudflare account',
 		'`shouldSkip.ai`',
 		'Product-owned',
@@ -514,7 +525,7 @@ export const featureRows = [
 	],
 	[
 		'Vectorize',
-		'Remote-oriented',
+		'Remote',
 		'Requires Cloudflare account',
 		'`shouldSkip.vectorize`',
 		'Managed when scoped',
@@ -522,15 +533,15 @@ export const featureRows = [
 	],
 	[
 		'Browser Rendering',
-		'Puppeteer-shaped local checks',
-		'Browser service is Cloudflare owned',
+		'Remote',
+		'Hosted browser service fidelity is Cloudflare-owned',
 		'`createTestContext` or focused mocks',
 		'No account resource cleanup',
 		docsLink('bindings/browser-rendering')
 	],
 	[
 		'Containers',
-		'Docker/Podman-gated',
+		'Full',
 		'Cloudflare Containers deployment is remote',
 		'`containers`, `shouldSkip.containers`',
 		'Product-owned',

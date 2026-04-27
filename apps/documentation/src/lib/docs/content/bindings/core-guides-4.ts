@@ -93,7 +93,7 @@ export default defineConfig({
 			localRuntimeBullets: [
 				'`createTestContext()` can supply a remote Vectorize binding when remote mode is enabled.',
 				'The codebase uses `shouldSkip.vectorize` to make missing remote prerequisites explicit in tests.',
-				'The exhaustive smoke app also uses mocks for some integration checks, which is fine as long as the docs do not confuse that with first-class local emulation.'
+				'The exhaustive smoke app also uses mocks for some integration checks, which is fine as long as the docs do not confuse that with full local emulation.'
 			],
 			compileBullets: [
 				'Compile emits `index_name` into generated Wrangler-facing config.',

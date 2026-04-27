@@ -280,6 +280,51 @@ function bindingSlugsAt(index: number): string[] {
 	return bindingDocCategories.map((category) => category.slugs[index])
 }
 
+function bindingOverviewLinks(): string[] {
+	return bindingSlugsAt(0).map((slug) => `/docs/${slug}`)
+}
+
+const bindingSupportLevels = new Set(['Full', 'Remote', 'Limited'])
+
+function isInlineCodeFactValue(value: string): boolean {
+	return /^`[^`]+`$/.test(value)
+}
+
+function bindingOverviewSupportFailures(slug: string): string[] {
+	const doc = docs.find((candidate) => candidate.slug === slug)
+	const supportSection = doc?.sections.find((section) => section.id === 'local-and-remote-support')
+	const configKey = doc?.facts.find((fact) => fact.label === 'Config key')?.value ?? ''
+	const authoringShape = doc?.facts.find((fact) => fact.label === 'Authoring shape')?.value ?? ''
+	const failures: string[] = []
+
+	if (!supportSection) {
+		failures.push(`${slug}: missing Local and Remote Support section`)
+	}
+
+	if (supportSection?.title !== 'Local and Remote Support') {
+		failures.push(`${slug}: support section title is not stable`)
+	}
+
+	const supportLabel = supportSection?.cards?.[0]?.label
+	if (!supportLabel || !bindingSupportLevels.has(supportLabel)) {
+		failures.push(`${slug}: missing supported Full/Remote/Limited label`)
+	}
+
+	if (JSON.stringify(supportSection ?? {}).includes('Partial')) {
+		failures.push(`${slug}: support section still says Partial`)
+	}
+
+	if (!isInlineCodeFactValue(configKey)) {
+		failures.push(`${slug}: Config key is not inline code`)
+	}
+
+	if (!isInlineCodeFactValue(authoringShape)) {
+		failures.push(`${slug}: Authoring shape is not inline code`)
+	}
+
+	return failures
+}
+
 function bindingDocsMissingSection(index: number, sectionId: string): string[] {
 	return bindingSlugsAt(index).filter((slug) => {
 		const doc = docs.find((candidate) => candidate.slug === slug)
@@ -682,6 +727,94 @@ describe('documentation integrity', () => {
 		expect(expectedSlugs.filter((slug) => !documentedSlugs.has(slug))).toEqual([])
 	})
 
+	test('what-devflare-is links every binding page with a support level', () => {
+		const expectedSupportByLink: Record<string, string> = {
+			'/docs/bindings/kv': 'Full',
+			'/docs/bindings/d1': 'Full',
+			'/docs/bindings/r2': 'Full',
+			'/docs/bindings/durable-objects': 'Full',
+			'/docs/bindings/queues': 'Full',
+			'/docs/bindings/services': 'Full',
+			'/docs/bindings/ai': 'Remote',
+			'/docs/bindings/vectorize': 'Remote',
+			'/docs/bindings/hyperdrive': 'Remote',
+			'/docs/bindings/browser-rendering': 'Remote',
+			'/docs/bindings/analytics-engine': 'Remote',
+			'/docs/bindings/send-email': 'Full',
+			'/docs/bindings/rate-limiting': 'Full',
+			'/docs/bindings/version-metadata': 'Full',
+			'/docs/bindings/worker-loaders': 'Limited',
+			'/docs/bindings/secrets-store': 'Remote',
+			'/docs/bindings/ai-search': 'Remote',
+			'/docs/bindings/mtls-certificates': 'Remote',
+			'/docs/bindings/dispatch-namespaces': 'Remote',
+			'/docs/bindings/workflows': 'Remote',
+			'/docs/bindings/pipelines': 'Remote',
+			'/docs/bindings/images': 'Remote',
+			'/docs/bindings/media-transformations': 'Remote',
+			'/docs/bindings/artifacts': 'Remote',
+			'/docs/bindings/containers': 'Full'
+		}
+		const page = docs.find((doc) => doc.slug === 'what-devflare-is')
+		const cards = page?.sections.find((section) => section.id === 'support-coverage')?.cards ?? []
+		const cardsByHref = new Map(cards.map((card) => [card.href, card]))
+
+		expect(Object.keys(expectedSupportByLink).sort()).toEqual(bindingOverviewLinks().sort())
+		expect(
+			bindingOverviewLinks().filter((href) => {
+				const card = cardsByHref.get(href)
+				return (
+					!card ||
+					!card.labelTooltip ||
+					card.label !== expectedSupportByLink[href] ||
+					card.body.trim().length === 0
+				)
+			})
+		).toEqual([])
+	})
+
+	test('binding overview pages spell out support levels and code-formatted config facts', () => {
+		expect(bindingSlugsAt(0).flatMap(bindingOverviewSupportFailures)).toEqual([])
+	})
+
+	test('containers overview documents full local image workflow', () => {
+		const page = docs.find((doc) => doc.slug === 'bindings/containers')
+		const supportSection = page?.sections.find(
+			(section) => section.id === 'local-and-remote-support'
+		)
+		const imageSection = page?.sections.find((section) => section.id === 'container-image-workflow')
+		const overviewText = docText('bindings/containers')
+
+		expect(supportSection?.cards?.[0]?.label).toBe('Full')
+		expect(
+			imageSection,
+			'Expected Containers overview to include image workflow guidance'
+		).toBeDefined()
+		expect(overviewText).toContain('Dockerfile')
+		expect(overviewText).toContain('docker build')
+		expect(overviewText).toContain('podman build')
+		expect(overviewText).toContain('localhost/devflare-api:latest')
+		expect(overviewText).toContain('imageBuildContext')
+		expect(overviewText).toContain('registry.cloudflare.com')
+		expect(overviewText).toContain('Docker Hub')
+		expect(overviewText).toContain('Amazon ECR')
+		expect(overviewText).toContain('wrangler containers push')
+		expect(overviewText).toContain('@cloudflare/containers')
+		expect(overviewText).toContain('getContainer')
+		expect(overviewText).toContain('DEVFLARE_CONTAINER_TESTS=1')
+		expect(overviewText).toContain('shouldSkip.containers')
+		expect(overviewText).toContain('offline: true')
+	})
+
+	test('container docs use current offline-first helper options', async () => {
+		const text = `${docsText()}\n${await readPackageReadme()}`
+
+		expect(text).toContain('shouldSkip.containers')
+		expect(text).toContain('offline: true')
+		expect(text).not.toContain('shouldSkip.containers()')
+		expect(text).not.toContain('pull: false')
+	})
+
 	test('binding overview pages include application runtime usage', () => {
 		expect(bindingDocsMissingSection(0, 'runtime-usage')).toEqual([])
 		const runtimeSections = bindingSectionTexts(0, 'runtime-usage')
@@ -762,16 +895,11 @@ describe('documentation integrity', () => {
 
 	test('recipe-first docs architecture pages exist', () => {
 		const requiredSlugs = [
-			'docs-landing-paths',
 			'first-route-tree',
 			'first-unit-test',
 			'first-bindings',
 			'deploy-and-preview',
-			'binding-chooser',
 			'feature-index',
-			'recipe-packs',
-			'case-catalog',
-			'learn-from-real-tests',
 			'runtime-handler-styles',
 			'test-helper-reference',
 			'deploy-command-recipes',
@@ -782,12 +910,46 @@ describe('documentation integrity', () => {
 		expect(requiredSlugs.filter((slug) => !docs.some((doc) => doc.slug === slug))).toEqual([])
 	})
 
+	test('case catalog docs page is not published', () => {
+		expect(docs.some((doc) => doc.slug === 'case-catalog')).toBe(false)
+		expect(docs.some((doc) => doc.aliases?.includes('case-catalog'))).toBe(false)
+	})
+
+	test('recipe packs docs page is not published', () => {
+		expect(docs.some((doc) => doc.slug === 'recipe-packs')).toBe(false)
+		expect(docs.some((doc) => doc.aliases?.includes('recipe-packs'))).toBe(false)
+	})
+
+	test('binding chooser docs page is not published', () => {
+		expect(docs.some((doc) => doc.slug === 'binding-chooser')).toBe(false)
+		expect(docs.some((doc) => doc.aliases?.includes('binding-chooser'))).toBe(false)
+	})
+
+	test('learn from real tests docs page is not published', () => {
+		expect(docs.some((doc) => doc.slug === 'learn-from-real-tests')).toBe(false)
+		expect(docs.some((doc) => doc.aliases?.includes('learn-from-real-tests'))).toBe(false)
+	})
+
+	test('docs landing paths docs page is not published', () => {
+		expect(docs.some((doc) => doc.slug === 'docs-landing-paths')).toBe(false)
+		expect(docs.some((doc) => doc.aliases?.includes('docs-landing-paths'))).toBe(false)
+	})
+
 	test('feature support matrix snapshot covers the main local and remote support lanes', () => {
 		const featureIndex = docs.find((doc) => doc.slug === 'feature-index')
-		const matrixRows =
-			featureIndex?.sections.find((section) => section.id === 'matrix')?.table?.rows ?? []
+		const matrixTable = featureIndex?.sections.find((section) => section.id === 'matrix')?.table
+		const matrixRows = matrixTable?.rows ?? []
 		const rowLabels = matrixRows.map((row) => row[0]).sort()
 
+		expect(matrixTable?.layout).toBe('wide')
+		expect(matrixTable?.headers).toEqual([
+			'Feature',
+			'Support',
+			'Cloudflare boundary',
+			'Test helper',
+			'Preview lifecycle',
+			'Docs'
+		])
 		expect(rowLabels).toEqual(
 			[
 				'Browser Rendering',
@@ -806,6 +968,7 @@ describe('documentation integrity', () => {
 			].sort()
 		)
 		expect(matrixRows.every((row) => row.length === 6)).toBe(true)
+		expect([...new Set(matrixRows.map((row) => row[1]))].sort()).toEqual(['Full', 'Remote'])
 	})
 
 	test('devflare/test value exports are documented by exact name', async () => {

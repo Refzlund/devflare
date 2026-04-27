@@ -9,7 +9,7 @@ export const bindingGuidesPart3: BindingGuideDefinition[] = [
 		configKey: 'bindings.services',
 		authoringShape:
 			'Record<string, { service: string; environment?: string; entrypoint?: string }> | ref().worker(...)',
-		localStory: 'First-class local runtime and multi-worker tests',
+		localStory: 'Local runtime and multi-worker tests',
 		sourcePages: [
 			'schema-bindings.ts',
 			'ref.ts',

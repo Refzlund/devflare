@@ -210,13 +210,15 @@ storage, or Browser Run account-level product state.
 ### Containers local testing
 
 Devflare supports native top-level `containers` config and local container
-testing helpers. Devflare container tests are offline-first by default when the
-image already exists locally and the test sets `pull: false`. Set
+testing helpers. Containers have full local support when Docker or Podman is
+available: Devflare can build local Dockerfile paths, run prebuilt image tags,
+and interact with instances through fetch, logs, state, stop, and cleanup
+helpers. Devflare container tests are offline-first by default when the image
+already exists locally or the Dockerfile can build from cached layers. Set
 `DEVFLARE_CONTAINER_TESTS=1` for container lanes, and gate them with
-`shouldSkip.containers()` because GitHub Actions or Cloudflare runners may not
-have Docker/Podman. Devflare does not fully emulate the
-`@cloudflare/containers` Durable Object runtime or the deployed Containers
-control plane.
+`shouldSkip.containers` because GitHub Actions or Cloudflare runners may not
+have Docker/Podman. Cloudflare still owns the deployed Containers control plane,
+managed registry rollout, SSH, scaling, and hosted platform behavior.
 
 ### Cloudflare Builds stance
 
@@ -303,7 +305,8 @@ public stance guards:
 - `env.AI.gateway(id)` exposes `patchLog()`, `getLog()`, `getUrl()`, and `run()`.
 - Devflare does not manage Live View URLs, Human in the Loop handoff.
 - Set `DEVFLARE_CONTAINER_TESTS=1`.
-- Devflare does not fully emulate the `@cloudflare/containers` Durable Object runtime.
+- Containers have full local support when Docker or Podman is available.
+- Cloudflare still owns the deployed Containers control plane.
 - Devflare does not connect Git repositories, manage build hooks.
 - Devflare supports dispatch namespace bindings, not the tenant Worker control plane.
 - Devflare does not upload user Workers, manage Worker metadata.

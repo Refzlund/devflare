@@ -41,8 +41,9 @@ describe('documented Cloudflare product stances', () => {
 		expect(readme).toContain('Devflare container tests are offline-first by default')
 		expect(readme).toContain('Set `DEVFLARE_CONTAINER_TESTS=1`')
 		expect(readme).toContain(
-			'Devflare does not fully emulate the `@cloudflare/containers` Durable Object runtime'
+			'Containers have full local support when Docker or Podman is available'
 		)
+		expect(readme).toContain('Cloudflare still owns the deployed Containers control plane')
 	})
 
 	test('documents Cloudflare Builds as CI/CD orchestration', () => {

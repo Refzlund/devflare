@@ -116,7 +116,7 @@ export default defineConfig({
 			summary:
 				'Browser tests should usually be integration-flavored: either drive the worker in dev or exercise a thin smoke path that proves the binding can launch and fetch.',
 			description:
-				'That is more truthful than pretending there is a rich first-class browser helper surface identical to `cf.queue.trigger()` or `env.DB.prepare()`.',
+				'That is more truthful than pretending the browser binding has the same helper depth as `cf.queue.trigger()` or `env.DB.prepare()`.',
 			highlights: [
 				'Prefer integration or dev-server smoke paths for browser-heavy behavior.',
 				'A tiny dev-server, preview, or other integration-style smoke request is often enough for a binding smoke test.',
@@ -146,7 +146,7 @@ test('browser-backed route responds', async () => {
 			helperBullets: [
 				'Prefer one narrow worker route or DO method for browser tasks so the binding path stays testable.',
 				'Drive that route through the dev server, a preview URL, or another integration path when browser launch itself is the thing under test.',
-				'If you want Bun-only unit tests, stub above the browser boundary instead of expecting `createTestContext()` to conjure a first-class browser binding for you.',
+				'If you want Bun-only unit tests, stub above the browser boundary instead of expecting `createTestContext()` to create a browser binding for you.',
 				'Treat browser local checks as smoke tests unless the app really needs a heavier dedicated lane.'
 			],
 			caveatBullets: [
@@ -247,7 +247,7 @@ export async function fetch(): Promise<Response> {
 			title:
 				'Use Analytics Engine when the worker should write structured event points, not improvise log transport',
 			summary:
-				'Analytics Engine is modeled cleanly in Devflare config and generated types, but the repo evidence points to a lighter local story than the first-class storage bindings.',
+				'Analytics Engine is modeled cleanly in Devflare config and generated types, but the repo evidence points to a lighter local story than KV, D1, and R2.',
 			description:
 				'That usually means two good habits: keep the write path simple in the worker, and test the event-producing behavior through a thin boundary rather than by inventing a giant analytics simulation.',
 			highlights: [

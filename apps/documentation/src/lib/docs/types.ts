@@ -46,6 +46,7 @@ export interface DocCodeSnippet {
 export interface DocTable {
 	headers: string[]
 	rows: string[][]
+	layout?: 'default' | 'wide'
 }
 
 export interface DocCard {
@@ -60,6 +61,13 @@ export interface DocCard {
 export interface DocFact {
 	label: string
 	value: string
+}
+
+export interface DocHeaderCloudflareDocs {
+	label: string
+	title: string
+	href: string
+	summary: string
 }
 
 export interface DocSection {
@@ -88,6 +96,7 @@ export interface DocPage {
 	summaryHidden?: boolean
 	description: string
 	descriptionHidden?: boolean
+	headerCloudflareDocs?: DocHeaderCloudflareDocs
 	articleNavigationHidden?: boolean
 	highlights: string[]
 	facts: DocFact[]

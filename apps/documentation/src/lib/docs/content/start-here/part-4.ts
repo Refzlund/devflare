@@ -86,7 +86,7 @@ export const startHereDocsPart4: DocPage[] = [
 					]
 				},
 				paragraphs: [
-					'Devflare prefers a workspace-root `.env` when it finds a workspace ancestor; otherwise it falls back to the nearest ancestor `.env` before evaluating config. That is useful for config-time values, but it is not a promise of first-class `.dev.vars*` behavior for worker-only dev or tests.',
+					'Devflare prefers a workspace-root `.env` when it finds a workspace ancestor; otherwise it falls back to the nearest ancestor `.env` before evaluating config. That is useful for config-time values, but it does not make `.dev.vars*` the source of truth for worker-only dev or tests.',
 					'Stable infrastructure names belong in authored config. Do not hide them in secrets just because another tool happens to like environment variables.'
 				]
 			},

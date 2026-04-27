@@ -385,7 +385,7 @@ bunx --bun devflare productions versions`
 		summary:
 			'Use `sequence(...)` from `devflare/runtime` when broad HTTP concerns must wrap route resolution or another fetch handler in a clear top-to-bottom order.',
 		description:
-			'Devflare treats request-wide middleware as a first-class runtime primitive. `sequence(...)` composes `(event, resolve)` middleware for workers and keeps broad concerns readable without burying them in one monolithic fetch file.',
+			'`sequence(...)` composes `(event, resolve)` middleware for workers so broad concerns stay readable without burying them in one monolithic fetch file.',
 		highlights: [
 			'Import `sequence` from `devflare/runtime` for worker fetch middleware.',
 			'Keep global concerns like CORS, auth, request ids, and response shaping in the sequence chain, not in route leaves.',

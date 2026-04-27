@@ -291,7 +291,7 @@ export const workerStyle = markWorkerStyle((request, env) => {
 							'Keep the test skipped in local/CI, or enable remote mode in a dedicated lane.'
 						],
 						[
-							'`shouldSkip.containers()` is true',
+							'`shouldSkip.containers` is true',
 							'Docker/Podman is missing or not usable in this runner.',
 							'Install an engine or keep container tests in an optional integration job.'
 						]
@@ -526,7 +526,7 @@ jobs:
 				],
 				bullets: [
 					'New user path: `first-worker` -> `first-unit-test` -> `first-route-tree` works as a narrative.',
-					'Binding path: `binding-chooser` -> one binding page -> matching recipe or case link.',
+					'Binding path: `first-bindings` -> one binding page -> matching testing guide.',
 					'Test path: `test-helper-reference` names the smallest helper and cleanup pattern.',
 					'Deploy path: `deploy-command-recipes` distinguishes build, dry-run, prod, preview, and cleanup.',
 					'Remote-boundary path: `feature-index` and binding pages make auth, Docker/Podman, paid services, and skips explicit.'

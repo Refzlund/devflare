@@ -438,7 +438,7 @@ export const shipOperateDocsPart1: DocPage[] = [
 				bullets: [
 					'The preview scope is the source branch name.',
 					'Run `devflare-deploy-impact` before each deploy target so unchanged packages skip Cloudflare work.',
-					'Publish a GitHub deployment record for branch previews so the branch has a first-class environment trail.',
+					'Publish a GitHub deployment record for branch previews so reviewers can find the environment history.',
 					'Follow the deploy with app-specific verification, not just “the command exited”.'
 				],
 				cards: [

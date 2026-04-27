@@ -1,4 +1,18 @@
-﻿import type { DocCallout, DocCodeSnippet, DocPage, DocSection } from '../../types'
+import type { DocCallout, DocCodeSnippet, DocPage, DocSection } from '../../types'
+
+import {
+	createBindingHeaderCloudflareDocs,
+	getCloudflareBindingReference,
+	getCloudflareRuntimeComparison
+} from './cloudflare-reference'
+import { createBindingSupportSection } from './support'
+
+export {
+	createBindingHeaderCloudflareDocs,
+	getCloudflareBindingIntro,
+	getCloudflareBindingReference,
+	getCloudflareRuntimeComparison
+} from './cloudflare-reference'
 
 export const bindingReferenceGroup = 'Bindings'
 
@@ -18,6 +32,7 @@ export interface BindingOverviewDefinition {
 	fitBullets: string[]
 	caveatBullets: string[]
 	caveatCallout?: DocCallout
+	extraSections?: DocSection[]
 }
 
 export interface BindingInternalsDefinition {
@@ -291,6 +306,10 @@ export function bindingDocPath(slug: string): string {
 	return `/docs/${slug}`
 }
 
+export function inlineCodeFact(value: string): string {
+	return `\`${value.replaceAll('`', '')}\``
+}
+
 export function applicationSourcePages(sourcePages: string[]): string[] {
 	return sourcePages.filter(
 		(source) => !/(^|\/)(?:tests?|test|apps\/testing)(?:\/|$)/i.test(source)
@@ -356,140 +375,6 @@ export function applicationExampleCallouts(
 
 	const text = JSON.stringify(guide.example.callout)
 	return isApplicationOnlyText(text) ? [guide.example.callout] : undefined
-}
-
-export function getCloudflareBindingReference(guide: BindingGuideDefinition): {
-	title: string
-	href: string
-	description: string
-	citation: string
-} {
-	switch (guide.slugBase) {
-		case 'kv':
-			return {
-				title: 'Cloudflare Workers KV docs',
-				href: 'https://developers.cloudflare.com/kv/',
-				description:
-					'Platform reference for KV namespaces, binding APIs, limits, and Wrangler-facing setup.',
-				citation: 'Cloudflare Docs'
-			}
-
-		case 'd1':
-			return {
-				title: 'Cloudflare D1 docs',
-				href: 'https://developers.cloudflare.com/d1/',
-				description:
-					'Platform reference for D1 databases, Worker APIs, migrations, and database limits.',
-				citation: 'Cloudflare Docs'
-			}
-
-		case 'r2':
-			return {
-				title: 'Cloudflare R2 docs',
-				href: 'https://developers.cloudflare.com/r2/',
-				description:
-					'Platform reference for buckets, object APIs, public-versus-private delivery, and account features.',
-				citation: 'Cloudflare Docs'
-			}
-
-		case 'durable-object':
-			return {
-				title: 'Cloudflare Durable Objects docs',
-				href: 'https://developers.cloudflare.com/durable-objects/',
-				description:
-					'Platform reference for object identity, storage, alarms, migrations, and deployment caveats.',
-				citation: 'Cloudflare Docs'
-			}
-
-		case 'queue':
-			return {
-				title: 'Cloudflare Queues docs',
-				href: 'https://developers.cloudflare.com/queues/',
-				description:
-					'Platform reference for queue producers, consumers, delivery guarantees, retries, batching, and DLQs.',
-				citation: 'Cloudflare Docs'
-			}
-
-		case 'service':
-			return {
-				title: 'Cloudflare Service bindings docs',
-				href: 'https://developers.cloudflare.com/workers/runtime-apis/bindings/service-bindings/',
-				description:
-					'Platform reference for worker-to-worker bindings, service entrypoints, and the underlying runtime contract.',
-				citation: 'Cloudflare Docs'
-			}
-
-		case 'ai':
-			return {
-				title: 'Cloudflare Workers AI docs',
-				href: 'https://developers.cloudflare.com/workers-ai/',
-				description:
-					'Platform reference for model access, remote inference behavior, pricing, and account prerequisites.',
-				citation: 'Cloudflare Docs'
-			}
-
-		case 'vectorize':
-			return {
-				title: 'Cloudflare Vectorize docs',
-				href: 'https://developers.cloudflare.com/vectorize/',
-				description:
-					'Platform reference for indexes, embeddings, remote querying, and preview-aware index lifecycle.',
-				citation: 'Cloudflare Docs'
-			}
-
-		case 'hyperdrive':
-			return {
-				title: 'Cloudflare Hyperdrive docs',
-				href: 'https://developers.cloudflare.com/hyperdrive/',
-				description:
-					'Platform reference for database acceleration, connection strings, limits, and supported databases.',
-				citation: 'Cloudflare Docs'
-			}
-
-		case 'browser':
-			return {
-				title: 'Cloudflare Browser Rendering docs',
-				href: 'https://developers.cloudflare.com/browser-rendering/',
-				description:
-					'Platform reference for browser sessions, quick actions, automation limits, and integration methods.',
-				citation: 'Cloudflare Docs'
-			}
-
-		case 'analytics-engine':
-			return {
-				title: 'Cloudflare Workers Analytics Engine docs',
-				href: 'https://developers.cloudflare.com/analytics/analytics-engine/',
-				description:
-					'Platform reference for write APIs, SQL querying, analytics ingestion patterns, and product limits.',
-				citation: 'Cloudflare Docs'
-			}
-
-		case 'send-email':
-			return {
-				title: 'Cloudflare send_email binding docs',
-				href: 'https://developers.cloudflare.com/email-routing/email-workers/send-email-workers/',
-				description:
-					'Platform reference for send_email binding restrictions, verified destinations, and Email Workers setup.',
-				citation: 'Cloudflare Docs'
-			}
-
-		default:
-			return {
-				title: 'Cloudflare Workers bindings docs',
-				href: 'https://developers.cloudflare.com/workers/runtime-apis/bindings/',
-				description:
-					'Platform reference for the underlying binding contract on Cloudflare Workers.',
-				citation: 'Cloudflare Docs'
-			}
-	}
-}
-
-export function getCloudflareRuntimeComparison(guide: BindingGuideDefinition): string {
-	if (guide.localStory.toLowerCase().startsWith('remote-oriented')) {
-		return 'Cloudflare’s docs focus on the real remote product behavior, account requirements, and runtime constraints on the platform.'
-	}
-
-	return 'Cloudflare’s docs focus on the raw binding API, product semantics, and platform limits for the binding itself.'
 }
 
 export function createBindingReferenceSection(guide: BindingGuideDefinition): DocSection {
@@ -568,6 +453,7 @@ export function createBindingDeepDiveSection(guide: BindingGuideDefinition): Doc
 export function createBindingPages(guide: BindingGuideDefinition): DocPage[] {
 	const slugs = getBindingSlugs(guide)
 	const legacySlugs = getLegacyBindingSlugs(guide.slugBase)
+	const headerCloudflareDocs = createBindingHeaderCloudflareDocs(guide)
 
 	return [
 		{
@@ -581,10 +467,11 @@ export function createBindingPages(guide: BindingGuideDefinition): DocPage[] {
 			title: guide.overview.title,
 			summary: guide.overview.summary,
 			description: guide.overview.description,
+			headerCloudflareDocs,
 			highlights: guide.overview.highlights,
 			facts: [
-				{ label: 'Config key', value: guide.configKey },
-				{ label: 'Authoring shape', value: guide.authoringShape },
+				{ label: 'Config key', value: inlineCodeFact(guide.configKey) },
+				{ label: 'Authoring shape', value: inlineCodeFact(guide.authoringShape) },
 				{ label: 'Best for', value: guide.overview.bestFor }
 			],
 			sourcePages: guide.sourcePages,
@@ -604,6 +491,8 @@ export function createBindingPages(guide: BindingGuideDefinition): DocPage[] {
 					],
 					snippets: [guide.example.usageSnippet]
 				},
+				createBindingSupportSection(guide),
+				...(guide.overview.extraSections ?? []),
 				{
 					id: 'when-it-fits',
 					title: 'When this binding fits best',
@@ -630,6 +519,7 @@ export function createBindingPages(guide: BindingGuideDefinition): DocPage[] {
 			title: `How Devflare wires ${guide.label} from config to runtime`,
 			summary: guide.internals.summary,
 			description: guide.internals.description,
+			headerCloudflareDocs,
 			highlights: guide.internals.highlights,
 			facts: [
 				{ label: 'Normalization', value: guide.internals.normalizationFact },
@@ -668,6 +558,7 @@ export function createBindingPages(guide: BindingGuideDefinition): DocPage[] {
 			title: `Test ${guide.label} the way Devflare expects it to run`,
 			summary: guide.testing.summary,
 			description: guide.testing.description,
+			headerCloudflareDocs,
 			highlights: guide.testing.highlights,
 			facts: [
 				{ label: 'Best for', value: guide.testing.bestFor },
@@ -706,6 +597,7 @@ export function createBindingPages(guide: BindingGuideDefinition): DocPage[] {
 			title: `Use ${guide.label} in a real application path`,
 			summary: applicationExampleSummary(guide),
 			description: applicationExampleDescription(guide),
+			headerCloudflareDocs,
 			highlights: applicationExampleHighlights(guide),
 			facts: [
 				{ label: 'Config focus', value: guide.example.configFocus },
@@ -772,6 +664,7 @@ export interface CompactBindingGuideDefinition {
 	usageSnippet: ContentDocCodeSnippet
 	testSnippet?: ContentDocCodeSnippet
 	compileOutput: string
+	overviewSections?: DocSection[]
 }
 
 export function createCompactBindingGuide(
@@ -790,8 +683,9 @@ export function createCompactBindingGuide(
 		overview: {
 			readTime: '3 min read',
 			title: `Use ${definition.label} with the smallest config that states the binding contract`,
-			summary: `${definition.label} now has a first-class Devflare docs page with config, runtime usage, testing, local behavior, and remote boundaries in one repeatable shape.`,
-			description: `This page is intentionally recipe-first: copy the config, use the generated ${definition.envType} binding, then pick the right local or remote test lane.`,
+			summary: `Configure ${definition.label}, call the ${definition.envType} binding from worker code, and choose a test lane that matches the support level.`,
+			description:
+				'Start with the config, wire the binding into worker code, then use the support section to decide whether local tests or Cloudflare-backed tests fit.',
 			highlights: [
 				`Author the feature at \`${definition.configKey}\` instead of hiding it in ad-hoc Wrangler JSON.`,
 				`Generated Env types expose ${definition.envType}.`,
@@ -820,7 +714,8 @@ export function createCompactBindingGuide(
 				body: [
 					`The old docs often made developers infer whether ${definition.label} was local, remote, or fixture-backed. This page keeps that stance beside the first usable example.`
 				]
-			}
+			},
+			extraSections: definition.overviewSections
 		},
 		internals: {
 			readTime: '2 min read',

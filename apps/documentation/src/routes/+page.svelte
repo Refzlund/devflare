@@ -2,17 +2,13 @@
 import LinkCard from '$lib/components/cards/LinkCard.svelte'
 import InlineText from '$lib/components/content/InlineText.svelte'
 import SectionHeading from '$lib/components/content/SectionHeading.svelte'
+import HomeNext from '$lib/components/home/HomeNext.svelte'
 import MiniSnippet from '$lib/components/home/MiniSnippet.svelte'
 import Surface from '$lib/components/layout/Surface.svelte'
 import PillLink from '$lib/components/navigation/PillLink.svelte'
-import { docPath, getDoc } from '$lib/docs/content'
-import type { DocPage } from '$lib/docs/types'
+import { docPath } from '$lib/docs/content'
 import { m } from '$lib/paraglide/messages'
 import { localizeHref } from '$lib/paraglide/runtime'
-
-function pickDocs(slugs: string[]): DocPage[] {
-	return slugs.map((slug) => getDoc(slug)).filter((doc): doc is DocPage => Boolean(doc))
-}
 
 const heroHighlights = [
 	m.home_cta_highlight_no_framework(),
@@ -59,22 +55,11 @@ const libraryFeatures = [
 	}
 ]
 
-const nextActions = pickDocs([
-	'first-worker',
-	'first-bindings',
-	'first-unit-test',
-	'deploy-and-preview'
-])
-
 const starterSnippet = {
 	label: m.home_starter_snippet_label(),
 	title: m.home_starter_snippet_title(),
 	accent: 'cyan' as const,
-	lines: [
-		'bun add -d devflare',
-		'bunx --bun devflare types',
-		'bunx --bun devflare dev'
-	]
+	lines: ['bun add -d devflare', 'bunx --bun devflare types', 'bunx --bun devflare dev']
 }
 
 const firstWorkerHref = localizeHref(docPath('first-worker'))
@@ -157,24 +142,5 @@ const whyDevflareHref = localizeHref(docPath('what-devflare-is'))
 		</div>
 	</section>
 
-	<section class="space-y-5">
-		<SectionHeading
-			eyebrow={m.home_actions_eyebrow()}
-			title={m.home_actions_title()}
-			description={m.home_actions_description()}
-		/>
-
-		<div class="grid gap-4 md:grid-cols-2">
-			{#each nextActions as doc}
-				<LinkCard
-					href={localizeHref(docPath(doc.slug))}
-					label={doc.group}
-					labelTone="slate"
-					title={doc.navTitle}
-					description={doc.summary}
-					variant="compact"
-				/>
-			{/each}
-		</div>
-	</section>
+	<HomeNext />
 </div>

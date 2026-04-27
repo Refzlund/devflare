@@ -629,8 +629,10 @@ test('worker behavior uses the runtime-shaped harness', async () => {
 	expect(response.status).toBe(200)
 })
 
-test.skipIf(await shouldSkip.containers())('container tests are explicit opt-in lanes', async () => {
-	expect(await shouldSkip.containers()).toBe(false)
+const skipContainers = await shouldSkip.containers
+
+test.skipIf(skipContainers)('container tests are explicit opt-in lanes', async () => {
+	expect(skipContainers).toBe(false)
 })`
 					}
 				],
