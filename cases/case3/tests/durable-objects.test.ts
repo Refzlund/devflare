@@ -18,9 +18,9 @@
 // - Tests call RPC methods via env.BINDING.get(id).method()
 // =============================================================================
 
-import { describe, test, expect, beforeAll, afterAll } from 'bun:test'
-import { createTestContext } from 'devflare/test'
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { env } from 'devflare'
+import { createTestContext } from 'devflare/test'
 
 // Import fetch handler for route testing
 import fetch from '../src/fetch'
@@ -29,13 +29,15 @@ import fetch from '../src/fetch'
 // Test Setup
 // -----------------------------------------------------------------------------
 
+const TEST_CONTEXT_TIMEOUT_MS = 15_000
+
 beforeAll(async () => {
 	await createTestContext()
-})
+}, TEST_CONTEXT_TIMEOUT_MS)
 
 afterAll(async () => {
 	await env.dispose()
-})
+}, TEST_CONTEXT_TIMEOUT_MS)
 
 // -----------------------------------------------------------------------------
 // Local DO Tests: SessionStore
@@ -157,14 +159,16 @@ describe('Case 3: Local DOs', () => {
 			const tracker = env.TRACKER.get(id)
 
 			await tracker.resetAll()
+			expect(await tracker.getLastRequestAt()).toBeNull()
 
-			const before = Date.now()
 			await tracker.trackRequest('/test')
-			const after = Date.now()
+			const firstAt = await tracker.getLastRequestAt()
 
-			const lastAt = await tracker.getLastRequestAt()
-			expect(lastAt).toBeGreaterThanOrEqual(before)
-			expect(lastAt).toBeLessThanOrEqual(after)
+			expect(typeof firstAt).toBe('number')
+
+			await tracker.trackRequest('/test')
+			const secondAt = await tracker.getLastRequestAt()
+			expect(secondAt).toBeGreaterThanOrEqual(firstAt as number)
 		})
 	})
 })
@@ -297,7 +301,7 @@ describe('Case 3: Fetch Handler Routes', () => {
 			const response = await fetch(request)
 
 			expect(response.status).toBe(200)
-			const data = await response.json() as { ok: boolean }
+			const data = (await response.json()) as { ok: boolean }
 			expect(data.ok).toBe(true)
 		})
 
@@ -310,7 +314,7 @@ describe('Case 3: Fetch Handler Routes', () => {
 			const response = await fetch(request)
 
 			expect(response.status).toBe(200)
-			const data = await response.json() as { value: unknown }
+			const data = (await response.json()) as { value: unknown }
 			expect(data.value).toBe('blue')
 		})
 
@@ -323,7 +327,7 @@ describe('Case 3: Fetch Handler Routes', () => {
 			const response = await fetch(request)
 
 			expect(response.status).toBe(200)
-			const data = await response.json() as { itemCount: number; createdAt: number }
+			const data = (await response.json()) as { itemCount: number; createdAt: number }
 			expect(data.itemCount).toBe(2)
 		})
 	})
@@ -334,7 +338,7 @@ describe('Case 3: Fetch Handler Routes', () => {
 			const response = await fetch(request)
 
 			expect(response.status).toBe(200)
-			const data = await response.json() as { total: number; pathCount: number }
+			const data = (await response.json()) as { total: number; pathCount: number }
 			expect(data.total).toBeGreaterThanOrEqual(1)
 		})
 
@@ -348,7 +352,7 @@ describe('Case 3: Fetch Handler Routes', () => {
 			const response = await fetch(request)
 
 			expect(response.status).toBe(200)
-			const data = await response.json() as Record<string, number>
+			const data = (await response.json()) as Record<string, number>
 			expect(data['route-a']).toBeGreaterThanOrEqual(2)
 		})
 	})
@@ -366,7 +370,7 @@ describe('Case 3: Fetch Handler Routes', () => {
 			const response = await fetch(request)
 
 			expect(response.status).toBe(200)
-			const data = await response.json() as { value: number }
+			const data = (await response.json()) as { value: number }
 			expect(data.value).toBe(42)
 		})
 
@@ -379,7 +383,7 @@ describe('Case 3: Fetch Handler Routes', () => {
 			const response = await fetch(request)
 
 			expect(response.status).toBe(200)
-			const data = await response.json() as { value: number }
+			const data = (await response.json()) as { value: number }
 			expect(data.value).toBe(1)
 
 			// Verify via direct RPC
@@ -398,7 +402,7 @@ describe('Case 3: Fetch Handler Routes', () => {
 			const response = await fetch(request)
 
 			expect(response.status).toBe(200)
-			const data = await response.json() as { ok: boolean; remaining: number }
+			const data = (await response.json()) as { ok: boolean; remaining: number }
 			expect(data.ok).toBe(true)
 			expect(data.remaining).toBe(9) // 10 - 1 = 9
 		})

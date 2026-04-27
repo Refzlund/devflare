@@ -7,8 +7,14 @@ const accountId = (
 	}
 ).process?.env?.CLOUDFLARE_ACCOUNT_ID?.trim()
 const workerNames = resolveTestingWorkerNames()
-const authService = ref(workerNames.authServiceName, () => import('./workers/auth-service/devflare.config'))
-const searchService = ref(workerNames.searchServiceName, () => import('./workers/search-service/devflare.config'))
+const authService = ref(
+	workerNames.authServiceName,
+	() => import('./workers/auth-service/devflare.config')
+)
+const searchService = ref(
+	workerNames.searchServiceName,
+	() => import('./workers/search-service/devflare.config')
+)
 const pv = preview.scope()
 
 export default defineConfig({
@@ -150,6 +156,11 @@ export default defineConfig({
 				APP_NAME: 'testing-binding-matrix-production',
 				DEPLOYMENT_CHANNEL: 'production'
 			},
+			secrets: {
+				API_TOKEN: {
+					required: true
+				}
+			},
 			bindings: {
 				kv: {
 					// devflare-testing-cache-kv-production
@@ -163,7 +174,9 @@ export default defineConfig({
 	},
 
 	secrets: {
-		API_TOKEN: {},
+		API_TOKEN: {
+			required: false
+		},
 		SMOKE_KEY: {
 			required: false
 		},

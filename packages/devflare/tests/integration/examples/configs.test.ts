@@ -2,23 +2,26 @@ import { describe, expect, test } from 'bun:test'
 import { existsSync, readdirSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import { resolve } from 'pathe'
-import { createMockEnv } from '../../../src/test'
 import {
+	type DevflareConfig,
+	compileBuildConfig,
 	compileConfig,
 	isPreviewScopedName,
 	loadConfig,
-	resolveConfigForEnvironment,
-	type DevflareConfig
+	resolveConfigForEnvironment
 } from '../../../src/config'
+import { collectPreviewScopedResourcePlan } from '../../../src/config/preview-resources'
 import { brandAsLocalConfig } from '../../../src/config/resolve-phased'
 import { resolveConfigForLocalRuntime } from '../../../src/config/resource-resolution'
-import { collectPreviewScopedResourcePlan } from '../../../src/config/preview-resources'
+import { createMockEnv } from '../../../src/test'
 
 const repoRoot = resolve(import.meta.dirname, '../../../../../')
 const casesDir = resolve(repoRoot, 'cases')
 const testingAppDir = resolve(repoRoot, 'apps/testing')
 const documentationAppDir = resolve(repoRoot, 'apps/documentation')
-const documentationConfigModulePath = pathToFileURL(resolve(documentationAppDir, 'devflare.config.ts')).href
+const documentationConfigModulePath = pathToFileURL(
+	resolve(documentationAppDir, 'devflare.config.ts')
+).href
 const testingFetchModulePath = pathToFileURL(resolve(testingAppDir, 'src/fetch.ts')).href
 const testingQueueModulePath = pathToFileURL(resolve(testingAppDir, 'src/queue.ts')).href
 const testingScheduledModulePath = pathToFileURL(resolve(testingAppDir, 'src/scheduled.ts')).href
@@ -87,8 +90,8 @@ interface TestingExampleHarness {
 function createExecutionContext(): ExecutionContext {
 	return {
 		props: {},
-		waitUntil() { },
-		passThroughOnException() { }
+		waitUntil() {},
+		passThroughOnException() {}
 	} as unknown as ExecutionContext
 }
 
@@ -103,7 +106,10 @@ function createTestingExampleEnv(config: DevflareConfig): TestingExampleHarness 
 	let lockExpiresAt = 0
 
 	const searchVectors = new Map<string, { values: number[]; metadata?: Record<string, unknown> }>()
-	const documentVectors = new Map<string, { values: number[]; metadata?: Record<string, unknown> }>()
+	const documentVectors = new Map<
+		string,
+		{ values: number[]; metadata?: Record<string, unknown> }
+	>()
 
 	const durableObjectBindings = {
 		SESSION_ROOM: {
@@ -163,18 +169,20 @@ function createTestingExampleEnv(config: DevflareConfig): TestingExampleHarness 
 				async status() {
 					return lockOwner
 						? {
-							owner: lockOwner,
-							expiresAt: lockExpiresAt
-						}
+								owner: lockOwner,
+								expiresAt: lockExpiresAt
+							}
 						: null
 				}
 			})
 		}
 	}
 
-	const authServiceName = config.bindings?.services?.AUTH_SERVICE.service ?? 'devflare-testing-auth-service'
+	const authServiceName =
+		config.bindings?.services?.AUTH_SERVICE.service ?? 'devflare-testing-auth-service'
 	const adminServiceName = config.bindings?.services?.ADMIN_RPC.service ?? authServiceName
-	const searchServiceName = config.bindings?.services?.SEARCH_SERVICE.service ?? 'devflare-testing-search-service'
+	const searchServiceName =
+		config.bindings?.services?.SEARCH_SERVICE.service ?? 'devflare-testing-search-service'
 
 	const serviceBindings = {
 		AUTH_SERVICE: {
@@ -227,8 +235,10 @@ function createTestingExampleEnv(config: DevflareConfig): TestingExampleHarness 
 		}
 	}
 
-	const documentIndexName = config.bindings?.vectorize?.DOCUMENT_INDEX.indexName ?? 'devflare-testing-document-index'
-	const searchIndexName = config.bindings?.vectorize?.SEARCH_INDEX.indexName ?? 'devflare-testing-search-index'
+	const documentIndexName =
+		config.bindings?.vectorize?.DOCUMENT_INDEX.indexName ?? 'devflare-testing-document-index'
+	const searchIndexName =
+		config.bindings?.vectorize?.SEARCH_INDEX.indexName ?? 'devflare-testing-search-index'
 
 	const vectorizeBindings = {
 		DOCUMENT_INDEX: {
@@ -237,7 +247,9 @@ function createTestingExampleEnv(config: DevflareConfig): TestingExampleHarness 
 					name: documentIndexName
 				}
 			},
-			async upsert(vectors: Array<{ id: string; values: number[]; metadata?: Record<string, unknown> }>) {
+			async upsert(
+				vectors: Array<{ id: string; values: number[]; metadata?: Record<string, unknown> }>
+			) {
 				for (const vector of vectors) {
 					documentVectors.set(vector.id, {
 						values: vector.values,
@@ -257,7 +269,9 @@ function createTestingExampleEnv(config: DevflareConfig): TestingExampleHarness 
 					name: searchIndexName
 				}
 			},
-			async upsert(vectors: Array<{ id: string; values: number[]; metadata?: Record<string, unknown> }>) {
+			async upsert(
+				vectors: Array<{ id: string; values: number[]; metadata?: Record<string, unknown> }>
+			) {
 				for (const vector of vectors) {
 					searchVectors.set(vector.id, {
 						values: vector.values,
@@ -290,47 +304,56 @@ function createTestingExampleEnv(config: DevflareConfig): TestingExampleHarness 
 	}
 
 	const browserBindings = Object.fromEntries(
-		Object.keys(config.bindings?.browser ?? {}).map((name) => [name, {
-			fetch: async (request: Request) => {
-				browserRequests.push(`${name}:${new URL(request.url).pathname}`)
-				return new Response(`${name}-ok`, {
-					status: 200
-				})
+		Object.keys(config.bindings?.browser ?? {}).map((name) => [
+			name,
+			{
+				fetch: async (request: Request) => {
+					browserRequests.push(`${name}:${new URL(request.url).pathname}`)
+					return new Response(`${name}-ok`, {
+						status: 200
+					})
+				}
 			}
-		}])
+		])
 	)
 
 	const analyticsBindings = Object.fromEntries(
-		Object.keys(config.bindings?.analyticsEngine ?? {}).map((name) => [name, {
-			writeDataPoint: (point: unknown) => {
-				analyticsWrites.push({
-					binding: name,
-					point
-				})
+		Object.keys(config.bindings?.analyticsEngine ?? {}).map((name) => [
+			name,
+			{
+				writeDataPoint: (point: unknown) => {
+					analyticsWrites.push({
+						binding: name,
+						point
+					})
+				}
 			}
-		}])
+		])
 	)
 
 	const sendEmailBindings = Object.fromEntries(
-		Object.keys(config.bindings?.sendEmail ?? {}).map((name) => [name, {
-			send: async (message: unknown) => {
-				sentEmails.push({
-					binding: name,
-					message
-				})
+		Object.keys(config.bindings?.sendEmail ?? {}).map((name) => [
+			name,
+			{
+				send: async (message: unknown) => {
+					sentEmails.push({
+						binding: name,
+						message
+					})
+				}
 			}
-		}])
+		])
 	)
 
 	const aiBinding = config.bindings?.ai
 		? {
-			[config.bindings.ai.binding]: {
-				run: async (...args: unknown[]) => ({
-					ok: true,
-					argsLength: args.length
-				})
+				[config.bindings.ai.binding]: {
+					run: async (...args: unknown[]) => ({
+						ok: true,
+						argsLength: args.length
+					})
+				}
 			}
-		}
 		: {}
 
 	const baseEnv = createMockEnv({
@@ -345,7 +368,9 @@ function createTestingExampleEnv(config: DevflareConfig): TestingExampleHarness 
 	})
 
 	const jobsQueue = baseEnv.JOBS as { _getMessages(): Array<{ body: unknown; options?: unknown }> }
-	const emailsQueue = baseEnv.EMAILS as { _getMessages(): Array<{ body: unknown; options?: unknown }> }
+	const emailsQueue = baseEnv.EMAILS as {
+		_getMessages(): Array<{ body: unknown; options?: unknown }>
+	}
 
 	const env = createMockEnv({
 		custom: {
@@ -399,22 +424,34 @@ async function runTestingFetch(
 	init?: RequestInit,
 	harness = createTestingExampleEnv(config),
 	type: 'status' | 'smoke' | 'smoke-error' = 'status'
-): Promise<{ summary: TestingStatusSummary | TestingSmokeSummary | TestingSmokeErrorSummary; harness: TestingExampleHarness }> {
-	const { fetch } = await import(testingFetchModulePath) as {
+): Promise<{
+	summary: TestingStatusSummary | TestingSmokeSummary | TestingSmokeErrorSummary
+	harness: TestingExampleHarness
+}> {
+	const { fetch } = (await import(testingFetchModulePath)) as {
 		fetch(request: Request, env: Record<string, unknown>, ctx: ExecutionContext): Promise<Response>
 	}
 	const request = new Request(`https://example.com${path}`, init)
 	const response = await fetch(request, harness.env, createExecutionContext())
 
 	return {
-		summary: await response.json() as TestingStatusSummary | TestingSmokeSummary | TestingSmokeErrorSummary,
+		summary: (await response.json()) as
+			| TestingStatusSummary
+			| TestingSmokeSummary
+			| TestingSmokeErrorSummary,
 		harness
 	}
 }
 
-async function runTestingQueue(config: DevflareConfig, batch: { queue: string; messages: Array<{ body: unknown; ack?(): void }> }): Promise<TestingExampleHarness> {
-	const { queue } = await import(testingQueueModulePath) as {
-		queue(batch: { queue: string; messages: Array<{ body: unknown; ack?(): void }> }, env: Record<string, unknown>): Promise<void>
+async function runTestingQueue(
+	config: DevflareConfig,
+	batch: { queue: string; messages: Array<{ body: unknown; ack?(): void }> }
+): Promise<TestingExampleHarness> {
+	const { queue } = (await import(testingQueueModulePath)) as {
+		queue(
+			batch: { queue: string; messages: Array<{ body: unknown; ack?(): void }> },
+			env: Record<string, unknown>
+		): Promise<void>
 	}
 	const harness = createTestingExampleEnv(config)
 	await queue(batch, harness.env)
@@ -422,21 +459,28 @@ async function runTestingQueue(config: DevflareConfig, batch: { queue: string; m
 }
 
 async function runTestingScheduled(config: DevflareConfig): Promise<TestingExampleHarness> {
-	const { scheduled } = await import(testingScheduledModulePath) as {
-		scheduled(controller: { cron: string; scheduledTime?: number }, env: Record<string, unknown>): Promise<void>
+	const { scheduled } = (await import(testingScheduledModulePath)) as {
+		scheduled(
+			controller: { cron: string; scheduledTime?: number },
+			env: Record<string, unknown>
+		): Promise<void>
 	}
 	const harness = createTestingExampleEnv(config)
-	await scheduled({
-		cron: '0 */6 * * *',
-		scheduledTime: 1_700_000_000_000
-	}, harness.env)
+	await scheduled(
+		{
+			cron: '0 */6 * * *',
+			scheduledTime: 1_700_000_000_000
+		},
+		harness.env
+	)
 	return harness
 }
 
 describe('repo example app configs', () => {
 	test('case example roots do not keep stale generated wrangler configs', () => {
-		const caseDirectories = readdirSync(casesDir, { withFileTypes: true })
-			.filter((entry) => entry.isDirectory() && /^case\d+(?:-.*)?$/.test(entry.name))
+		const caseDirectories = readdirSync(casesDir, { withFileTypes: true }).filter(
+			(entry) => entry.isDirectory() && /^case\d+(?:-.*)?$/.test(entry.name)
+		)
 
 		const staleConfigFiles = caseDirectories.flatMap((entry) => {
 			return ['wrangler.json', 'wrangler.jsonc']
@@ -452,9 +496,15 @@ describe('repo example app configs', () => {
 		const preview = resolveConfigForEnvironment(config, 'preview')
 		const production = resolveConfigForEnvironment(config, 'production')
 		const compiled = compileConfig(resolveConfigForLocalRuntime(config))
+		const previewWrangler = compileBuildConfig(config, 'preview')
+		const productionWrangler = compileBuildConfig(config, 'production')
 
 		expect(Object.keys(config.bindings?.kv ?? {}).sort()).toEqual(['CACHE', 'SESSIONS'])
-		expect(Object.keys(config.bindings?.d1 ?? {}).sort()).toEqual(['AUDIT_DB', 'PRIMARY_DB', 'REPORTING_DB'])
+		expect(Object.keys(config.bindings?.d1 ?? {}).sort()).toEqual([
+			'AUDIT_DB',
+			'PRIMARY_DB',
+			'REPORTING_DB'
+		])
 		expect(Object.keys(config.bindings?.r2 ?? {}).sort()).toEqual(['ARCHIVE', 'ASSETS'])
 		expect(Object.keys(config.bindings?.durableObjects ?? {}).sort()).toEqual([
 			'COLLABORATION_STATE',
@@ -474,11 +524,16 @@ describe('repo example app configs', () => {
 		expect(isPreviewScopedName(config.bindings?.r2?.ASSETS)).toBe(true)
 		expect(isPreviewScopedName(config.bindings?.queues?.producers?.JOBS)).toBe(true)
 		expect(isPreviewScopedName(config.bindings?.vectorize?.DOCUMENT_INDEX.indexName)).toBe(true)
-		expect(isPreviewScopedName((config.bindings?.hyperdrive?.POSTGRES as { name: string }).name)).toBe(true)
+		expect(
+			isPreviewScopedName((config.bindings?.hyperdrive?.POSTGRES as { name: string }).name)
+		).toBe(true)
 		expect(isPreviewScopedName(config.bindings?.browser?.BROWSER)).toBe(true)
 		expect(isPreviewScopedName(config.bindings?.analyticsEngine?.APP_ANALYTICS.dataset)).toBe(true)
 		expect(config.bindings?.ai).toEqual({ binding: 'AI' })
-		expect(Object.keys(config.bindings?.vectorize ?? {}).sort()).toEqual(['DOCUMENT_INDEX', 'SEARCH_INDEX'])
+		expect(Object.keys(config.bindings?.vectorize ?? {}).sort()).toEqual([
+			'DOCUMENT_INDEX',
+			'SEARCH_INDEX'
+		])
 		expect(Object.keys(config.bindings?.hyperdrive ?? {})).toEqual(['POSTGRES'])
 		expect(config.compatibilityFlags).toEqual(expect.arrayContaining(['nodejs_compat']))
 		expect(config.previews?.includeCrons).toBe(false)
@@ -493,6 +548,8 @@ describe('repo example app configs', () => {
 
 		expect(preview.vars?.APP_NAME).toBe('testing-binding-matrix-preview')
 		expect(preview.vars?.DEPLOYMENT_CHANNEL).toBe('preview')
+		expect(preview.secrets?.API_TOKEN?.required).toBe(false)
+		expect(previewWrangler.secrets).toBeUndefined()
 		expect(preview.bindings?.kv?.CACHE).toBe('devflare-testing-cache-kv-preview')
 		expect(preview.bindings?.kv?.SESSIONS).toBe('devflare-testing-sessions-kv-preview')
 		expect(preview.bindings?.d1?.PRIMARY_DB).toBe('devflare-testing-primary-db-preview')
@@ -500,54 +557,74 @@ describe('repo example app configs', () => {
 		expect(preview.bindings?.r2?.ASSETS).toBe('devflare-testing-assets-bucket-preview')
 		expect(preview.bindings?.r2?.ARCHIVE).toBe('devflare-testing-archive-bucket-preview')
 		expect(preview.bindings?.queues?.producers?.JOBS).toBe('devflare-testing-jobs-queue-preview')
-		expect(preview.bindings?.queues?.producers?.EMAILS).toBe('devflare-testing-emails-queue-preview')
-		expect(preview.bindings?.queues?.consumers?.[0]?.queue).toBe('devflare-testing-jobs-queue-preview')
-		expect(preview.bindings?.queues?.consumers?.[0]?.deadLetterQueue).toBe('devflare-testing-jobs-dlq-preview')
-		expect(preview.bindings?.vectorize?.DOCUMENT_INDEX.indexName).toBe('devflare-testing-document-index-preview')
-		expect(preview.bindings?.vectorize?.SEARCH_INDEX.indexName).toBe('devflare-testing-search-index-preview')
+		expect(preview.bindings?.queues?.producers?.EMAILS).toBe(
+			'devflare-testing-emails-queue-preview'
+		)
+		expect(preview.bindings?.queues?.consumers?.[0]?.queue).toBe(
+			'devflare-testing-jobs-queue-preview'
+		)
+		expect(preview.bindings?.queues?.consumers?.[0]?.deadLetterQueue).toBe(
+			'devflare-testing-jobs-dlq-preview'
+		)
+		expect(preview.bindings?.vectorize?.DOCUMENT_INDEX.indexName).toBe(
+			'devflare-testing-document-index-preview'
+		)
+		expect(preview.bindings?.vectorize?.SEARCH_INDEX.indexName).toBe(
+			'devflare-testing-search-index-preview'
+		)
 		expect(preview.bindings?.hyperdrive?.POSTGRES).toEqual({
 			name: 'devflare-testing-preview',
 			previewFallback: 'base'
 		})
 		expect(preview.bindings?.browser?.BROWSER).toBe('devflare-testing-browser-preview')
-		expect(preview.bindings?.analyticsEngine?.APP_ANALYTICS.dataset).toBe('devflare-testing-app-analytics-preview')
+		expect(preview.bindings?.analyticsEngine?.APP_ANALYTICS.dataset).toBe(
+			'devflare-testing-app-analytics-preview'
+		)
 		expect(preview.triggers?.crons).toEqual(['0 */6 * * *'])
 		expect(compiled.queues?.consumers).toHaveLength(2)
 		expect(compiled.triggers?.crons).toEqual(['0 */6 * * *'])
-		expect(compiled.services).toEqual(expect.arrayContaining([
-			{
-				binding: 'AUTH_SERVICE',
-				service: 'devflare-testing-auth-service'
-			},
-			{
-				binding: 'ADMIN_RPC',
-				service: 'devflare-testing-auth-service',
-				entrypoint: 'AdminEntrypoint'
-			},
-			{
-				binding: 'SEARCH_SERVICE',
-				service: 'devflare-testing-search-service'
-			}
-		]))
-		expect(compiled.hyperdrive).toEqual([
-			{ binding: 'POSTGRES', id: 'devflare-testing' }
-		])
-		expect(compiled.r2_buckets).toEqual(expect.arrayContaining([
-			{ binding: 'ASSETS', bucket_name: 'devflare-testing-assets-bucket' },
-			{ binding: 'ARCHIVE', bucket_name: 'devflare-testing-archive-bucket' }
-		]))
-		expect(compiled.analytics_engine_datasets).toEqual(expect.arrayContaining([
-			{ binding: 'APP_ANALYTICS', dataset: 'devflare-testing-app-analytics' },
-			{ binding: 'SEARCH_ANALYTICS', dataset: 'devflare-testing-search-analytics' }
-		]))
+		expect(compiled.services).toEqual(
+			expect.arrayContaining([
+				{
+					binding: 'AUTH_SERVICE',
+					service: 'devflare-testing-auth-service'
+				},
+				{
+					binding: 'ADMIN_RPC',
+					service: 'devflare-testing-auth-service',
+					entrypoint: 'AdminEntrypoint'
+				},
+				{
+					binding: 'SEARCH_SERVICE',
+					service: 'devflare-testing-search-service'
+				}
+			])
+		)
+		expect(compiled.hyperdrive).toEqual([{ binding: 'POSTGRES', id: 'devflare-testing' }])
+		expect(compiled.r2_buckets).toEqual(
+			expect.arrayContaining([
+				{ binding: 'ASSETS', bucket_name: 'devflare-testing-assets-bucket' },
+				{ binding: 'ARCHIVE', bucket_name: 'devflare-testing-archive-bucket' }
+			])
+		)
+		expect(compiled.analytics_engine_datasets).toEqual(
+			expect.arrayContaining([
+				{ binding: 'APP_ANALYTICS', dataset: 'devflare-testing-app-analytics' },
+				{ binding: 'SEARCH_ANALYTICS', dataset: 'devflare-testing-search-analytics' }
+			])
+		)
 
 		expect(production.vars?.APP_NAME).toBe('testing-binding-matrix-production')
 		expect(production.vars?.DEPLOYMENT_CHANNEL).toBe('production')
+		expect(production.secrets?.API_TOKEN?.required).toBe(true)
+		expect(productionWrangler.secrets).toEqual({ required: ['API_TOKEN'] })
 		expect(production.bindings?.kv?.CACHE).toBe('devflare-testing-cache-kv-production')
 		expect(production.bindings?.kv?.SESSIONS).toBe('devflare-testing-sessions-kv')
 		expect(production.bindings?.r2?.ASSETS).toBe('devflare-testing-assets-bucket-production')
 		expect(production.bindings?.r2?.ARCHIVE).toBe('devflare-testing-archive-bucket')
-		expect(production.bindings?.vectorize?.DOCUMENT_INDEX.indexName).toBe('devflare-testing-document-index')
+		expect(production.bindings?.vectorize?.DOCUMENT_INDEX.indexName).toBe(
+			'devflare-testing-document-index'
+		)
 	})
 
 	test('apps/testing preview resource planning keeps stable base names while targeting a branch preview scope', async () => {
@@ -563,10 +640,12 @@ describe('repo example app configs', () => {
 				environment: 'preview'
 			})
 
-			expect(plan.kv.map((ref) => ({
-				baseName: ref.baseName,
-				previewName: ref.previewName
-			}))).toEqual([
+			expect(
+				plan.kv.map((ref) => ({
+					baseName: ref.baseName,
+					previewName: ref.previewName
+				}))
+			).toEqual([
 				{
 					baseName: 'devflare-testing-cache-kv',
 					previewName: 'devflare-testing-cache-kv-next'
@@ -587,10 +666,12 @@ describe('repo example app configs', () => {
 				'devflare-testing-jobs-dlq-next',
 				'devflare-testing-jobs-queue-next'
 			])
-			expect(plan.hyperdrive.map((ref) => ({
-				baseName: ref.baseName,
-				previewName: ref.previewName
-			}))).toEqual([
+			expect(
+				plan.hyperdrive.map((ref) => ({
+					baseName: ref.baseName,
+					previewName: ref.previewName
+				}))
+			).toEqual([
 				{
 					baseName: 'devflare-testing',
 					previewName: 'devflare-testing-next'
@@ -615,7 +696,13 @@ describe('repo example app configs', () => {
 		const config = await loadConfig({ cwd: testingAppDir })
 		const preview = resolveConfigForEnvironment(config, 'preview')
 
-		const previewRun = await runTestingFetch(preview, '/', undefined, createTestingExampleEnv(preview), 'status')
+		const previewRun = await runTestingFetch(
+			preview,
+			'/',
+			undefined,
+			createTestingExampleEnv(preview),
+			'status'
+		)
 		expect(previewRun.summary.appName).toBe('testing-binding-matrix-preview')
 		expect(previewRun.summary.deploymentChannel).toBe('preview')
 		expect(previewRun.summary.smokeEnabled).toBe(true)
@@ -636,9 +723,15 @@ describe('repo example app configs', () => {
 		expect('SESSION_ROOM' in previewRun.harness.env).toBe(true)
 		expect('POSTGRES' in previewRun.harness.env).toBe(true)
 
-		const unauthorizedRun = await runTestingFetch(preview, '/smoke', {
-			method: 'POST'
-		}, createTestingExampleEnv(preview), 'smoke-error')
+		const unauthorizedRun = await runTestingFetch(
+			preview,
+			'/smoke',
+			{
+				method: 'POST'
+			},
+			createTestingExampleEnv(preview),
+			'smoke-error'
+		)
 		expect(unauthorizedRun.summary.ok).toBe(false)
 		expect(unauthorizedRun.summary.error).toBe('Missing or invalid X-Devflare-Smoke-Key header')
 	})
@@ -647,12 +740,18 @@ describe('repo example app configs', () => {
 		const config = await loadConfig({ cwd: testingAppDir })
 		const preview = resolveConfigForEnvironment(config, 'preview')
 		const harness = createTestingExampleEnv(preview)
-		const smokeRun = await runTestingFetch(preview, '/smoke', {
-			method: 'POST',
-			headers: {
-				'X-Devflare-Smoke-Key': 'smoke_key-value'
-			}
-		}, harness, 'smoke')
+		const smokeRun = await runTestingFetch(
+			preview,
+			'/smoke',
+			{
+				method: 'POST',
+				headers: {
+					'X-Devflare-Smoke-Key': 'smoke_key-value'
+				}
+			},
+			harness,
+			'smoke'
+		)
 
 		expect(smokeRun.summary.appName).toBe('testing-binding-matrix-preview')
 		expect(smokeRun.summary.ok).toBe(true)
@@ -691,14 +790,19 @@ describe('repo example app configs', () => {
 		const preview = resolveConfigForEnvironment(config, 'preview')
 
 		const queueHarness = await runTestingQueue(preview, {
-			queue: preview.bindings?.queues?.consumers?.[0]?.queue ?? 'devflare-testing-jobs-queue-preview',
+			queue:
+				preview.bindings?.queues?.consumers?.[0]?.queue ?? 'devflare-testing-jobs-queue-preview',
 			messages: [{ body: { type: 'job-smoke' } }]
 		})
-		const queueState = await (queueHarness.env.SESSIONS as KVNamespace).get('testing:queue:jobs:last')
+		const queueState = await (queueHarness.env.SESSIONS as KVNamespace).get(
+			'testing:queue:jobs:last'
+		)
 		expect(queueState).not.toBeNull()
 
 		const scheduledHarness = await runTestingScheduled(preview)
-		const scheduledState = await (scheduledHarness.env.SESSIONS as KVNamespace).get('testing:scheduled:last-run')
+		const scheduledState = await (scheduledHarness.env.SESSIONS as KVNamespace).get(
+			'testing:scheduled:last-run'
+		)
 		expect(scheduledState).not.toBeNull()
 	})
 

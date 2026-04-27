@@ -1,18 +1,15 @@
-import { CloudflareAPIError, type APIClientOptions } from './api'
 import { queryD1Database } from './account-resources'
-import {
-	devflareDeploymentRecordSchema,
-	devflarePreviewScopeRecordSchema,
-	devflarePreviewRecordSchema,
-	type DevflareDeploymentRecord,
-	type DevflarePreviewScopeRecord,
-	type DevflarePreviewRecord
-} from './registry-schema'
+import { type APIClientOptions, CloudflareAPIError } from './api'
 import { toIsoString } from './preview-registry-records'
-import type {
-	PreviewRegistryContext,
-	StoredRecordRow
-} from './preview-registry-types'
+import type { PreviewRegistryContext, StoredRecordRow } from './preview-registry-types'
+import {
+	type DevflareDeploymentRecord,
+	type DevflarePreviewRecord,
+	type DevflarePreviewScopeRecord,
+	devflareDeploymentRecordSchema,
+	devflarePreviewRecordSchema,
+	devflarePreviewScopeRecordSchema
+} from './registry-schema'
 
 interface RegistryTableSchema {
 	name: string
@@ -223,7 +220,7 @@ async function readTableColumnNames(
 
 	return new Set(
 		rows
-			.map((row) => typeof row.name === 'string' ? row.name : undefined)
+			.map((row) => (typeof row.name === 'string' ? row.name : undefined))
 			.filter((value): value is string => Boolean(value))
 	)
 }
@@ -290,32 +287,58 @@ export function isMissingRegistrySchemaError(error: unknown): boolean {
 export function isUnavailableRegistryContextError(error: unknown): boolean {
 	if (error instanceof CloudflareAPIError) {
 		const message = error.message.toLowerCase()
-		return error.code === 404
-			|| ((message.includes('database') || message.includes('d1'))
-				&& (message.includes('not found')
-					|| message.includes('does not exist')
-					|| message.includes('unknown')))
+		return (
+			error.code === 404 ||
+			((message.includes('database') || message.includes('d1')) &&
+				(message.includes('not found') ||
+					message.includes('does not exist') ||
+					message.includes('unknown')))
+		)
 	}
 
 	if (error instanceof Error) {
 		const message = error.message.toLowerCase()
-		return (message.includes('database') || message.includes('d1'))
-			&& (message.includes('not found') || message.includes('does not exist'))
+		return (
+			(message.includes('database') || message.includes('d1')) &&
+			(message.includes('not found') || message.includes('does not exist'))
+		)
 	}
 
 	return false
 }
 
+function normalizeLegacyStoredRecordPayload(value: unknown): unknown {
+	if (!value || typeof value !== 'object' || Array.isArray(value)) {
+		return value
+	}
+
+	const { alias, aliasPreviewUrl, ...record } = value as Record<string, unknown>
+
+	if (record.scope === undefined && typeof alias === 'string') {
+		record.scope = alias
+	}
+
+	if (record.scopeUrl === undefined && typeof aliasPreviewUrl === 'string') {
+		record.scopeUrl = aliasPreviewUrl
+	}
+
+	return record
+}
+
+function parseStoredRecordPayload(row: StoredRecordRow): unknown {
+	return normalizeLegacyStoredRecordPayload(JSON.parse(row.payload_json))
+}
+
 function parseStoredPreviewRecord(row: StoredRecordRow): DevflarePreviewRecord {
-	return devflarePreviewRecordSchema.parse(JSON.parse(row.payload_json))
+	return devflarePreviewRecordSchema.parse(parseStoredRecordPayload(row))
 }
 
 function parseStoredPreviewScopeRecord(row: StoredRecordRow): DevflarePreviewScopeRecord {
-	return devflarePreviewScopeRecordSchema.parse(JSON.parse(row.payload_json))
+	return devflarePreviewScopeRecordSchema.parse(parseStoredRecordPayload(row))
 }
 
 function parseStoredDeploymentRecord(row: StoredRecordRow): DevflareDeploymentRecord {
-	return devflareDeploymentRecordSchema.parse(JSON.parse(row.payload_json))
+	return devflareDeploymentRecordSchema.parse(parseStoredRecordPayload(row))
 }
 
 export async function readPreviewRows(

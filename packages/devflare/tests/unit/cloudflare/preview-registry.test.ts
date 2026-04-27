@@ -10,8 +10,8 @@ import {
 	capturePreviewTestEnvironmentSnapshot,
 	createD1ResultsResponse,
 	createDeploymentRecordFixture,
-	createPreviewScopeRecordFixture,
 	createPreviewRecordFixture,
+	createPreviewScopeRecordFixture,
 	createRegistryDatabaseListResponse,
 	createRegistryDatabaseRecord,
 	createSerializedRegistryRecord,
@@ -33,24 +33,24 @@ const defaultReconcileRequest = {
 	source: 'cli' as const
 }
 
-function createPreviewRegistryFetch(options: {
-	recordedSql?: string[]
-	versionsItems?: Array<Record<string, unknown>>
-	versionDetail?: Record<string, unknown>
-	deployments?: Array<Record<string, unknown>>
-	previewRecords?: Array<Record<string, unknown>>
-	previewScopeRecords?: Array<Record<string, unknown>>
-	deploymentRecords?: Array<Record<string, unknown>>
-	recordedStatements?: Array<{ sql: string; params: unknown[] }>
-	tableColumnsByTable?: Record<string, string[]>
-} = {}): typeof fetch {
+function createPreviewRegistryFetch(
+	options: {
+		recordedSql?: string[]
+		versionsItems?: Array<Record<string, unknown>>
+		versionDetail?: Record<string, unknown>
+		deployments?: Array<Record<string, unknown>>
+		previewRecords?: Array<Record<string, unknown>>
+		previewScopeRecords?: Array<Record<string, unknown>>
+		deploymentRecords?: Array<Record<string, unknown>>
+		recordedStatements?: Array<{ sql: string; params: unknown[] }>
+		tableColumnsByTable?: Record<string, string[]>
+	} = {}
+): typeof fetch {
 	return mock(async (input: RequestInfo | URL, init?: RequestInit) => {
 		const url = String(input)
 
 		if (url.includes('/accounts/acc_123/d1/database?page=1&per_page=50')) {
-			return createRegistryDatabaseListResponse([
-				createRegistryDatabaseRecord({ fileSize: 4096 })
-			])
+			return createRegistryDatabaseListResponse([createRegistryDatabaseRecord({ fileSize: 4096 })])
 		}
 
 		if (url.endsWith('/accounts/acc_123/workers/subdomain')) {
@@ -59,13 +59,19 @@ function createPreviewRegistryFetch(options: {
 			})
 		}
 
-		if (url.includes('/accounts/acc_123/workers/scripts/demo-worker/versions?page=1&per_page=100')) {
+		if (
+			url.includes('/accounts/acc_123/workers/scripts/demo-worker/versions?page=1&per_page=100')
+		) {
 			return jsonResponse({
 				items: options.versionsItems ?? []
 			})
 		}
 
-		if (url.endsWith('/accounts/acc_123/workers/scripts/demo-worker/versions/5dba9570-33c4-4375-b784-e1b34ad01569')) {
+		if (
+			url.endsWith(
+				'/accounts/acc_123/workers/scripts/demo-worker/versions/5dba9570-33c4-4375-b784-e1b34ad01569'
+			)
+		) {
 			if (options.versionDetail) {
 				return jsonResponse(options.versionDetail)
 			}
@@ -98,15 +104,21 @@ function createPreviewRegistryFetch(options: {
 			}
 
 			if (sql.startsWith('SELECT payload_json FROM devflare_preview_records')) {
-				return createD1ResultsResponse((options.previewRecords ?? []).map(createSerializedRegistryRecord))
+				return createD1ResultsResponse(
+					(options.previewRecords ?? []).map(createSerializedRegistryRecord)
+				)
 			}
 
 			if (sql.startsWith('SELECT payload_json FROM devflare_preview_scope_records')) {
-				return createD1ResultsResponse((options.previewScopeRecords ?? []).map(createSerializedRegistryRecord))
+				return createD1ResultsResponse(
+					(options.previewScopeRecords ?? []).map(createSerializedRegistryRecord)
+				)
 			}
 
 			if (sql.startsWith('SELECT payload_json FROM devflare_deployment_records')) {
-				return createD1ResultsResponse((options.deploymentRecords ?? []).map(createSerializedRegistryRecord))
+				return createD1ResultsResponse(
+					(options.deploymentRecords ?? []).map(createSerializedRegistryRecord)
+				)
 			}
 
 			return createD1ResultsResponse()
@@ -117,9 +129,25 @@ function createPreviewRegistryFetch(options: {
 }
 
 function expectRegistryInsertStatements(recordedSql: string[]): void {
-	expect(recordedSql.some((sql) => sql.startsWith('INSERT INTO devflare_preview_records'))).toBe(true)
-	expect(recordedSql.some((sql) => sql.startsWith('INSERT INTO devflare_preview_scope_records'))).toBe(true)
-	expect(recordedSql.some((sql) => sql.startsWith('INSERT INTO devflare_deployment_records'))).toBe(true)
+	expect(recordedSql.some((sql) => sql.startsWith('INSERT INTO devflare_preview_records'))).toBe(
+		true
+	)
+	expect(
+		recordedSql.some((sql) => sql.startsWith('INSERT INTO devflare_preview_scope_records'))
+	).toBe(true)
+	expect(recordedSql.some((sql) => sql.startsWith('INSERT INTO devflare_deployment_records'))).toBe(
+		true
+	)
+}
+
+function toLegacyAliasRecord(record: Record<string, unknown>): Record<string, unknown> {
+	return {
+		...Object.fromEntries(
+			Object.entries(record).filter(([key]) => key !== 'scope' && key !== 'scopeUrl')
+		),
+		alias: defaultReconcileRequest.previewScope,
+		aliasPreviewUrl: defaultReconcileRequest.previewScopeUrl
+	}
 }
 
 afterEach(() => {
@@ -204,7 +232,9 @@ describe('preview registry', () => {
 		expect(result.previewScopes).toHaveLength(1)
 		expect(result.deployments).toHaveLength(2)
 		expect(result.previews[0].scope).toBe('feature-branch')
-		expect(result.previewScopes[0].scopeUrl).toBe('https://feature-branch-demo-worker.example-subdomain.workers.dev')
+		expect(result.previewScopes[0].scopeUrl).toBe(
+			'https://feature-branch-demo-worker.example-subdomain.workers.dev'
+		)
 		expect(result.deployments.some((record) => record.channel === 'preview')).toBe(true)
 		expect(result.deployments.some((record) => record.channel === 'production')).toBe(true)
 		expectRegistryInsertStatements(recordedSql)
@@ -236,7 +266,9 @@ describe('preview registry', () => {
 		expect(result.previewScopes).toHaveLength(1)
 		expect(result.deployments).toHaveLength(1)
 		expect(result.previews[0].versionId).toBe('5dba9570-33c4-4375-b784-e1b34ad01569')
-		expect(result.previews[0].previewUrl).toBe('https://5dba9570-demo-worker.example-subdomain.workers.dev')
+		expect(result.previews[0].previewUrl).toBe(
+			'https://5dba9570-demo-worker.example-subdomain.workers.dev'
+		)
 		expectRegistryInsertStatements(recordedSql)
 	})
 
@@ -286,9 +318,48 @@ describe('preview registry', () => {
 		expect(result.previews).toHaveLength(0)
 		expect(result.previewScopes).toHaveLength(0)
 		expect(result.deployments).toHaveLength(0)
-		expect(recordedSql.some((sql) => sql.startsWith('INSERT INTO devflare_preview_records'))).toBe(false)
-		expect(recordedSql.some((sql) => sql.startsWith('INSERT INTO devflare_preview_scope_records'))).toBe(false)
-		expect(recordedSql.some((sql) => sql.startsWith('INSERT INTO devflare_deployment_records'))).toBe(false)
+		expect(recordedSql.some((sql) => sql.startsWith('INSERT INTO devflare_preview_records'))).toBe(
+			false
+		)
+		expect(
+			recordedSql.some((sql) => sql.startsWith('INSERT INTO devflare_preview_scope_records'))
+		).toBe(false)
+		expect(
+			recordedSql.some((sql) => sql.startsWith('INSERT INTO devflare_deployment_records'))
+		).toBe(false)
+	})
+
+	test('normalizes legacy alias fields from stored registry payloads', async () => {
+		process.env.CLOUDFLARE_API_TOKEN = 'cf_test_token'
+		const previewRecord = createPreviewRecordFixture({
+			workerName: 'demo-worker',
+			versionId: defaultReconcileRequest.versionId,
+			previewUrl: defaultReconcileRequest.previewUrl,
+			branchName: defaultReconcileRequest.branchName
+		})
+		const previewScopeRecord = createPreviewScopeRecordFixture({
+			workerName: 'demo-worker',
+			scope: defaultReconcileRequest.previewScope,
+			scopeUrl: defaultReconcileRequest.previewScopeUrl,
+			versionId: defaultReconcileRequest.versionId,
+			branchName: defaultReconcileRequest.branchName
+		})
+
+		globalThis.fetch = createPreviewRegistryFetch({
+			versionsItems: [],
+			deployments: [],
+			previewRecords: [toLegacyAliasRecord(previewRecord)],
+			previewScopeRecords: [toLegacyAliasRecord(previewScopeRecord)]
+		})
+
+		const result = await reconcilePreviewRegistry({
+			accountId: 'acc_123',
+			workerName: 'demo-worker'
+		})
+
+		expect(result.previews).toHaveLength(0)
+		expect(result.previewScopes).toHaveLength(0)
+		expect(result.deployments).toHaveLength(0)
 	})
 
 	test('migrates missing preview registry columns before writing new records', async () => {
@@ -390,11 +461,21 @@ describe('preview registry', () => {
 		const result = await reconcilePreviewRegistry(defaultReconcileRequest)
 
 		expect(result.previews).toHaveLength(1)
-		expect(recordedSql).toContain('ALTER TABLE "devflare_preview_records" ADD COLUMN scope_url TEXT')
-		expect(recordedSql).toContain('ALTER TABLE "devflare_preview_records" ADD COLUMN deployment_id TEXT')
-		expect(recordedSql).toContain('ALTER TABLE "devflare_preview_scope_records" ADD COLUMN preview_id TEXT')
-		expect(recordedSql).toContain('ALTER TABLE "devflare_deployment_records" ADD COLUMN preview_id TEXT')
-		expect(recordedSql).toContain('ALTER TABLE "devflare_deployment_records" ADD COLUMN message TEXT')
+		expect(recordedSql).toContain(
+			'ALTER TABLE "devflare_preview_records" ADD COLUMN scope_url TEXT'
+		)
+		expect(recordedSql).toContain(
+			'ALTER TABLE "devflare_preview_records" ADD COLUMN deployment_id TEXT'
+		)
+		expect(recordedSql).toContain(
+			'ALTER TABLE "devflare_preview_scope_records" ADD COLUMN preview_id TEXT'
+		)
+		expect(recordedSql).toContain(
+			'ALTER TABLE "devflare_deployment_records" ADD COLUMN preview_id TEXT'
+		)
+		expect(recordedSql).toContain(
+			'ALTER TABLE "devflare_deployment_records" ADD COLUMN message TEXT'
+		)
 	})
 
 	test('retires a targeted preview, scope, and preview deployment without touching production records', async () => {
@@ -459,14 +540,18 @@ describe('preview registry', () => {
 		expect(result.candidates.deployments[0].channel).toBe('preview')
 		expect(
 			recordedStatements.some((statement) => {
-				return statement.sql.startsWith('INSERT INTO devflare_deployment_records')
-					&& statement.params.includes('preview:demo-worker:5dba9570-33c4-4375-b784-e1b34ad01569')
+				return (
+					statement.sql.startsWith('INSERT INTO devflare_deployment_records') &&
+					statement.params.includes('preview:demo-worker:5dba9570-33c4-4375-b784-e1b34ad01569')
+				)
 			})
 		).toBe(true)
 		expect(
 			recordedStatements.some((statement) => {
-				return statement.sql.startsWith('INSERT INTO devflare_deployment_records')
-					&& statement.params.includes('deployment_123')
+				return (
+					statement.sql.startsWith('INSERT INTO devflare_deployment_records') &&
+					statement.params.includes('deployment_123')
+				)
 			})
 		).toBe(false)
 	})

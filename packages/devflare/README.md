@@ -26,6 +26,13 @@ bun add -d devflare vite @cloudflare/vite-plugin
 Assumptions used by the examples: Wrangler 4, Miniflare 4,
 `@cloudflare/workers-types` 4, Bun 1.1+, and Node 20+.
 
+## Cloudflare toolchain support
+
+Devflare targets Wrangler 4, Miniflare 4, and @cloudflare/workers-types 4.
+Devflare does not support Wrangler 3 in new projects. The package manifest pins
+the exact ranges that scaffolds, local runtime behavior, and generated types
+are validated against in CI.
+
 ## Quick Start
 
 Create a config:
