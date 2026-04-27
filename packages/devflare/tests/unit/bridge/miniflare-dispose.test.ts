@@ -39,4 +39,14 @@ describe('Miniflare instance disposal', () => {
 			'Miniflare runtime does not expose getKVNamespace'
 		)
 	})
+
+	test('allows cleanup when the runtime does not expose dispose', async () => {
+		const handle = createMiniflareInstanceHandle({
+			async getBindings() {
+				return { API_TOKEN: 'secret' }
+			}
+		} as never)
+
+		await expect(handle.dispose()).resolves.toBeUndefined()
+	})
 })

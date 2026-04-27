@@ -618,8 +618,13 @@ export function createMiniflareInstanceHandle(mf: MiniflareType): MiniflareInsta
 		ready: Promise.resolve(),
 
 		async dispose() {
+			const dispose = (mf as { dispose?: unknown }).dispose
+			if (typeof dispose !== 'function') {
+				return
+			}
+
 			try {
-				await mf.dispose()
+				await dispose.call(mf)
 			} catch (error) {
 				if (!isIgnorableMiniflareDisposeError(error)) {
 					throw error
