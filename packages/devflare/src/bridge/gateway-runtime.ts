@@ -143,6 +143,7 @@ async function executeRpcMethod(method, params, env, _ctx) {
 		operation.indexOf('queue.') === 0 ||
 		operation.indexOf('email.') === 0 ||
 		operation.indexOf('ai.') === 0 ||
+		operation.indexOf('workflow.') === 0 ||
 		operation.indexOf('var.') === 0
 	if (!isNamespaced) {
 		throw new Error(
@@ -271,6 +272,32 @@ async function executeRpcMethod(method, params, env, _ctx) {
 		return { ok: true, simulated: true }
 	}
 
+	// Workflows
+	if (operation === 'workflow.create') {
+		return serializeWorkflowInstance(await binding.create(params[0]))
+	}
+	if (operation === 'workflow.get') {
+		return serializeWorkflowInstance(await binding.get(params[0]))
+	}
+	if (operation === 'workflow.status') {
+		return (await binding.get(params[0])).status()
+	}
+	if (operation === 'workflow.pause') {
+		return (await binding.get(params[0])).pause()
+	}
+	if (operation === 'workflow.resume') {
+		return (await binding.get(params[0])).resume()
+	}
+	if (operation === 'workflow.terminate') {
+		return (await binding.get(params[0])).terminate()
+	}
+	if (operation === 'workflow.restart') {
+		return (await binding.get(params[0])).restart()
+	}
+	if (operation === 'workflow.sendEvent') {
+		return (await binding.get(params[0])).sendEvent(params[1])
+	}
+
 	// AI / generic run()
 	if (operation === 'ai.run') {
 		if (typeof binding.run !== 'function') {
@@ -280,6 +307,13 @@ async function executeRpcMethod(method, params, env, _ctx) {
 	}
 
 	throw new Error('Unknown operation: ' + method)
+}
+
+function serializeWorkflowInstance(instance) {
+	return {
+		__type: 'WorkflowInstance',
+		id: instance.id
+	}
 }
 
 // ---------------------------------------------------------------------------

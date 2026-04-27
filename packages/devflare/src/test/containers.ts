@@ -534,7 +534,7 @@ class LocalDevflareContainer implements DevflareContainerInstance {
 	}
 
 	fetch(input: string | URL | Request, init?: RequestInit): Promise<Response> {
-		return this.fetchImpl(this.toLocalRequest(input, init))
+		return fetchWithStartupRetries(this.fetchImpl, this.toLocalRequest(input, init))
 	}
 
 	async logs(): Promise<string> {
@@ -611,6 +611,59 @@ class LocalDevflareContainer implements DevflareContainerInstance {
 		const localUrl = new URL(`${sourceUrl.pathname}${sourceUrl.search}`, base)
 		return new Request(localUrl, init)
 	}
+}
+
+async function fetchWithStartupRetries(
+	fetchImpl: typeof fetch,
+	request: Request
+): Promise<Response> {
+	if (!canRetryRequest(request)) {
+		return fetchImpl(request)
+	}
+
+	const deadline = Date.now() + 5_000
+	let lastError: unknown
+
+	while (Date.now() < deadline) {
+		try {
+			return await fetchImpl(request.clone())
+		} catch (error) {
+			if (!isTransientContainerFetchError(error)) {
+				throw error
+			}
+			lastError = error
+			await delay(100)
+		}
+	}
+
+	throw lastError
+}
+
+function canRetryRequest(request: Request): boolean {
+	return (request.method === 'GET' || request.method === 'HEAD') && request.body === null
+}
+
+function isTransientContainerFetchError(error: unknown): boolean {
+	const value = error as {
+		code?: unknown
+		errno?: unknown
+		cause?: { code?: unknown }
+		message?: string
+	}
+	const code = value.code ?? value.cause?.code
+	if (
+		code === 'ECONNRESET' ||
+		code === 'ECONNREFUSED' ||
+		code === 'EPIPE' ||
+		code === 'UND_ERR_SOCKET'
+	) {
+		return true
+	}
+
+	return typeof value.message === 'string' && (
+		value.message.includes('socket connection was closed') ||
+		value.message.includes('fetch failed')
+	)
 }
 
 async function waitForTcpPort(host: string, port: number, timeoutMs: number): Promise<void> {

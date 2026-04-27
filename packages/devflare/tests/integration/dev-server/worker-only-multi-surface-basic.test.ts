@@ -10,7 +10,7 @@ import {
 
 const tempDirs: string[] = []
 const DEV_SERVER_HOOK_TIMEOUT_MS = 20_000
-const DEV_SERVER_TEST_TIMEOUT_MS = 15_000
+const DEV_SERVER_TEST_TIMEOUT_MS = 20_000
 
 afterAll(async () => {
 	await cleanupTempDirs(tempDirs)

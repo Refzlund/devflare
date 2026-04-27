@@ -5,6 +5,7 @@ import { loadConfig, normalizeDOBinding, type DevflareConfig } from '../config'
 import { DEFAULT_DO_PATTERN, findFiles } from '../utils/glob'
 import { buildGatewayScript } from './simple-context-gateway-script'
 import { getBunRuntime } from './simple-context-paths'
+import { bundleWorkflowEntrypointScript } from '../workflows/local-workflow-entrypoints'
 
 /**
  * Find all exported class names in a TypeScript/JavaScript file.
@@ -238,18 +239,24 @@ export async function buildDurableObjectGateway(config: DevflareConfig, configDi
 	durableObjects?: Record<string, string>
 	script: string
 }> {
+	const workflowEntrypointScript = await bundleWorkflowEntrypointScript(config, configDir)
+
 	if (!config.bindings?.durableObjects) {
 		return {
-			script: buildGatewayScript('', '')
+			script: buildGatewayScript(workflowEntrypointScript, '')
 		}
 	}
 
 	const { doConfig, doInfos } = await resolveLocalDurableObjects(config, configDir)
 	const bundledCode = await bundleDurableObjectModules(configDir, doInfos, transportFile)
 	const wrapperCode = buildWrapperCode(doInfos)
+	const entrypointCode = [workflowEntrypointScript, bundledCode].filter(Boolean).join('\n\n')
+	const nativeRpcBindingNames = doInfos
+		.filter((info) => info.nativeRpc)
+		.map((info) => info.name)
 
 	return {
 		durableObjects: doConfig,
-		script: buildGatewayScript(bundledCode, wrapperCode)
+		script: buildGatewayScript(entrypointCode, wrapperCode, nativeRpcBindingNames)
 	}
 }

@@ -40,6 +40,7 @@ export interface DevServerState {
 	resolvedWorkerConfigPath: string | null
 	mainWorkerScriptPath: string | null
 	bundledMainWorkerScriptPath: string | null
+	workflowEntrypointScript: string
 	currentDoResult: DOBundleResult | null
 	mainWorkerRoutes: RouteDiscoveryResult | null
 	generatedViteConfigPath: string | null
@@ -74,6 +75,7 @@ export function createDevServerState(initial: {
 		resolvedWorkerConfigPath: null,
 		mainWorkerScriptPath: null,
 		bundledMainWorkerScriptPath: null,
+		workflowEntrypointScript: '',
 		currentDoResult: null,
 		mainWorkerRoutes: null,
 		generatedViteConfigPath: null

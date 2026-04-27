@@ -22,6 +22,7 @@ import {
 import type { DevflareConfig } from '../config'
 import { buildHyperdrivesConfig } from '../dev-server/miniflare-bindings'
 import { buildLocalSecretWrappedBindingConfig } from '../secrets/local-secrets'
+import { buildLocalBindingShimServiceConfig } from '../shims/local-media-bindings'
 
 export interface BuildInlineBridgeMfConfigOptions {
 	cwd?: string
@@ -39,11 +40,14 @@ export function buildInlineBridgeMfConfig(
 	const localSecretWrappedBindingConfig = options.cwd
 		? buildLocalSecretWrappedBindingConfig(config, options.cwd)
 		: undefined
+	const localBindingShimServiceConfig = buildLocalBindingShimServiceConfig(config)
 	const localSecretBindingNames = new Set(
 		localSecretWrappedBindingConfig?.localBindingNames ?? []
 	)
 	const mfConfig: any = {
-		modules: true
+		modules: true,
+		compatibilityDate: config.compatibilityDate ?? '2025-01-01',
+		...(config.compatibilityFlags && { compatibilityFlags: config.compatibilityFlags })
 	}
 
 	if (config.bindings?.kv) {
@@ -155,7 +159,7 @@ export function buildInlineBridgeMfConfig(
 		)
 	}
 
-	if (config.bindings?.images) {
+	if (config.bindings?.images && localBindingShimServiceConfig.localBindingNames.length === 0) {
 		const [entry] = Object.entries(config.bindings.images)
 		if (entry) {
 			const [bindingName, binding] = entry
@@ -166,7 +170,7 @@ export function buildInlineBridgeMfConfig(
 		}
 	}
 
-	if (config.bindings?.media) {
+	if (config.bindings?.media && localBindingShimServiceConfig.localBindingNames.length === 0) {
 		const [entry] = Object.entries(config.bindings.media)
 		if (entry) {
 			const [bindingName, binding] = entry
@@ -236,12 +240,27 @@ export function buildInlineBridgeMfConfig(
 		}
 	}
 
-	if (
-		localSecretWrappedBindingConfig
-		&& localSecretWrappedBindingConfig.localBindingNames.length > 0
-	) {
-		mfConfig.wrappedBindings = localSecretWrappedBindingConfig.wrappedBindings
-		mfConfig.__devflareLocalSecretWorkers = localSecretWrappedBindingConfig.workers
+	const wrappedBindings = {
+		...(localSecretWrappedBindingConfig?.wrappedBindings ?? {})
+	}
+	const localBindingWorkers = [
+		...(localSecretWrappedBindingConfig?.workers ?? []),
+		...localBindingShimServiceConfig.workers
+	]
+
+	if (Object.keys(wrappedBindings).length > 0) {
+		mfConfig.wrappedBindings = wrappedBindings
+	}
+
+	if (localBindingShimServiceConfig.localBindingNames.length > 0) {
+		mfConfig.serviceBindings = {
+			...(mfConfig.serviceBindings ?? {}),
+			...localBindingShimServiceConfig.serviceBindings
+		}
+	}
+
+	if (localBindingWorkers.length > 0) {
+		mfConfig.__devflareLocalBindingWorkers = localBindingWorkers
 	}
 
 	if (Object.keys(localWorkerBindings).length > 0) {

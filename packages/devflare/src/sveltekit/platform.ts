@@ -6,8 +6,10 @@
 // =============================================================================
 
 import { loadConfig, type DevflareConfig } from '../config'
-import { createEnvProxy, getClient, type BindingHints } from '../bridge'
+import { createEnvProxy, getClient, setBindingHints, type BindingHints } from '../bridge'
 import { extractBindingHints } from '../test/binding-hints'
+import { createFetchEvent, runWithEventContext } from '../runtime/context'
+import { buildSvelteKitLocalBindings, overlayLocalBindings } from './local-bindings'
 
 // -----------------------------------------------------------------------------
 // Types
@@ -40,6 +42,13 @@ export interface DevflarePlatformOptions {
 	 * Keys are binding names, values are binding types
 	 */
 	hints?: BindingHints
+
+	/**
+	 * Local Node-side binding shims to prefer over the bridge-backed env.
+	 * Used by the SvelteKit handle for bindings whose local API exposes
+	 * synchronous properties or rich transformation objects.
+	 */
+	localBindings?: Record<string, unknown>
 }
 
 // -----------------------------------------------------------------------------
@@ -63,6 +72,10 @@ function fingerprintHints(hints: BindingHints): string {
  */
 function getPlatformCacheKey(bridgeUrl: string, hints: BindingHints): string {
 	return `${bridgeUrl}\u0000${fingerprintHints(hints)}`
+}
+
+function shouldUseCachedPlatform(localBindings: Record<string, unknown>): boolean {
+	return Object.keys(localBindings).length === 0
 }
 
 /**
@@ -130,13 +143,14 @@ export async function createDevflarePlatform(
 ): Promise<Platform> {
 	const {
 		bridgeUrl = `ws://localhost:${process.env.DEVFLARE_BRIDGE_PORT ?? 8787}`,
-		hints = {}
+		hints = {},
+		localBindings = {}
 	} = options
 
 	const cacheKey = getPlatformCacheKey(bridgeUrl, hints)
 
 	// Return cached platform if exists for this bridgeUrl + hint fingerprint
-	if (platformCache?.key === cacheKey) {
+	if (shouldUseCachedPlatform(localBindings) && platformCache?.key === cacheKey) {
 		return platformCache.platform
 	}
 
@@ -147,7 +161,7 @@ export async function createDevflarePlatform(
 	await client.connect()
 
 	// Create env proxy with hints
-	const env = createEnvProxy({ client, hints })
+	const env = overlayLocalBindings(createEnvProxy({ client, hints }), localBindings)
 
 	// Create mock execution context that captures waitUntil rejections
 	const pendingErrors: unknown[] = []
@@ -175,7 +189,9 @@ export async function createDevflarePlatform(
 	}
 
 	const platform: Platform = { env, context, caches, cf, pendingErrors }
-	platformCache = { key: cacheKey, platform }
+	if (shouldUseCachedPlatform(localBindings)) {
+		platformCache = { key: cacheKey, platform }
+	}
 	return platform
 }
 
@@ -234,23 +250,28 @@ export function getBridgePort(): number {
 // Auto-discover Hints from Config
 // -----------------------------------------------------------------------------
 
-/** Cached config promise keyed by cwd */
-let configCache: { cwd: string; promise: Promise<DevflareConfig | null> } | null = null
+/** Cached config promise keyed by cwd + explicit config path */
+let configCache: {
+	cwd: string
+	configFile: string | undefined
+	promise: Promise<DevflareConfig | null>
+} | null = null
 
-/**
- * Load config and extract hints (cached by cwd)
- */
-async function loadHintsFromConfig(): Promise<BindingHints> {
+function getConfigFileFromEnv(): string | undefined {
+	return process.env.DEVFLARE_CONFIG_PATH
+}
+
+async function loadConfigFromCurrentCwd(): Promise<DevflareConfig | null> {
 	const cwd = process.cwd()
+	const configFile = getConfigFileFromEnv()
 
 	// Check if we have a cached promise for this cwd
-	if (configCache?.cwd === cwd) {
-		const config = await configCache.promise
-		return config ? extractBindingHints(config) : {}
+	if (configCache?.cwd === cwd && configCache.configFile === configFile) {
+		return configCache.promise
 	}
 
 	// Create new cache entry with promise (handles concurrent requests)
-	const promise = loadConfig({ cwd }).catch((err) => {
+	const promise = loadConfig({ cwd, configFile }).catch((err) => {
 		// Log error in debug mode
 		if (process.env.DEVFLARE_DEBUG) {
 			console.warn('[devflare] Failed to load config for hints:', err.message)
@@ -258,10 +279,67 @@ async function loadHintsFromConfig(): Promise<BindingHints> {
 		return null
 	})
 
-	configCache = { cwd, promise }
+	configCache = { cwd, configFile, promise }
 
-	const config = await promise
-	return config ? extractBindingHints(config) : {}
+	return promise
+}
+
+async function loadPlatformOptionsFromConfig(): Promise<Pick<DevflarePlatformOptions, 'hints' | 'localBindings'>> {
+	const cwd = process.cwd()
+	const config = await loadConfigFromCurrentCwd()
+	if (!config) {
+		return { hints: {}, localBindings: {} }
+	}
+
+	return {
+		hints: extractBindingHints(config),
+		localBindings: buildSvelteKitLocalBindings(config, cwd)
+	}
+}
+
+function resolveWithPlatformContext<
+	TEvent extends { platform?: unknown; request?: Request },
+	TResolve extends (event: unknown) => Response | Promise<Response>
+>(
+	event: TEvent,
+	resolve: TResolve,
+	platform: Platform
+): Response | Promise<Response> {
+	if (!(event.request instanceof Request)) {
+		return resolve(event)
+	}
+
+	const fetchEvent = createFetchEvent(event.request, platform.env, platform.context)
+	return runWithEventContext(fetchEvent, () => resolve(event))
+}
+
+async function createPlatformWithRequestContext<
+	TEvent extends { platform?: unknown; request?: Request },
+	TResolve extends (event: unknown) => Response | Promise<Response>
+>(
+	event: TEvent,
+	resolve: TResolve,
+	options: DevflarePlatformOptions
+): Promise<Response> {
+	const platform = await createDevflarePlatform(options)
+	event.platform = platform as typeof event.platform
+	return resolveWithPlatformContext(event, resolve, platform)
+}
+
+async function getAutoPlatformOptions(): Promise<DevflarePlatformOptions> {
+	const options = await loadPlatformOptionsFromConfig()
+	setBindingHints(options.hints ?? {})
+	return options
+}
+
+async function getCustomPlatformOptions(
+	options: DevflarePlatformOptions
+): Promise<DevflarePlatformOptions> {
+	if (options.hints) {
+		setBindingHints(options.hints)
+	}
+
+	return options
 }
 
 // -----------------------------------------------------------------------------
@@ -309,7 +387,7 @@ export interface CreateHandleOptions extends DevflarePlatformOptions {
  * export const handle = sequence(devflareHandle, authHandle)
  * ```
  */
-export function createHandle<T extends { event: { platform?: unknown }; resolve: (event: unknown) => Response | Promise<Response> }>(
+export function createHandle<T extends { event: { platform?: unknown; request?: Request }; resolve: (event: unknown) => Response | Promise<Response> }>(
 	options: CreateHandleOptions = {}
 ): (input: T) => Promise<Response> {
 	const { shouldEnable, ...platformOptions } = options
@@ -322,8 +400,11 @@ export function createHandle<T extends { event: { platform?: unknown }; resolve:
 
 		if (enabled) {
 			try {
-				const platform = await createDevflarePlatform(platformOptions)
-				event.platform = platform as typeof event.platform
+				return await createPlatformWithRequestContext(
+					event,
+					resolve,
+					await getCustomPlatformOptions(platformOptions)
+				)
 			} catch (error) {
 				console.error('[devflare] Failed to create platform:', error)
 				// Fall through to default platform
@@ -360,7 +441,7 @@ export function createHandle<T extends { event: { platform?: unknown }; resolve:
  * export const handle = sequence(devflareHandle, authHandle)
  * ```
  */
-export const handle = async <T extends { event: { platform?: unknown }; resolve: (event: unknown) => Response | Promise<Response> }>(
+export const handle = async <T extends { event: { platform?: unknown; request?: Request }; resolve: (event: unknown) => Response | Promise<Response> }>(
 	input: T
 ): Promise<Response> => {
 	const { event, resolve } = input
@@ -370,10 +451,11 @@ export const handle = async <T extends { event: { platform?: unknown }; resolve:
 
 	if (enabled) {
 		try {
-			// Auto-load hints from config
-			const hints = await loadHintsFromConfig()
-			const platform = await createDevflarePlatform({ hints })
-			event.platform = platform as typeof event.platform
+			return await createPlatformWithRequestContext(
+				event,
+				resolve,
+				await getAutoPlatformOptions()
+			)
 		} catch (error) {
 			console.error('[devflare] Failed to create platform:', error)
 			// Fall through to default platform

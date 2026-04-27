@@ -41,6 +41,18 @@ export interface ResolvedPluginContextState {
 	durableObjects: DODiscoveryResult | null
 }
 
+function removeDevflareHandledServeBindings(config: Record<string, unknown>): Record<string, unknown> {
+	const next = { ...config }
+
+	// Devflare supplies these locally through its own Miniflare gateway and
+	// SvelteKit platform shims. Passing them to @cloudflare/vite-plugin in
+	// serve mode only produces upstream remote/local-development warnings.
+	delete next.workflows
+	delete next.media
+
+	return next
+}
+
 /**
  * Compile a DevflareConfig into the bundle of artefacts the Vite plugin
  * exposes to consumers (wrangler config, cloudflare-plugin programmatic
@@ -66,14 +78,16 @@ export async function buildPluginContextState(
 		: compileConfig(effectiveConfig as ResolvedDevflareConfig)
 	const wranglerConfig = mode === 'build'
 		? isolateViteBuildOutputPaths(projectRoot, compiledWranglerConfig)
-		: compiledWranglerConfig
+		: removeDevflareHandledServeBindings(compiledWranglerConfig) as WranglerConfig
 	const cloudflareConfig = {
 		...(mode === 'build'
 			? isolateViteBuildOutputPaths(
 				projectRoot,
 				compileToProgrammaticConfig(effectiveConfig, environment, { preserveNamedBindings: true }) as WranglerConfig
 			)
-			: compileToProgrammaticConfig(effectiveConfig, environment))
+			: removeDevflareHandledServeBindings(
+				compileToProgrammaticConfig(effectiveConfig, environment)
+			))
 	}
 	const composedMainEntry = mode === 'build'
 		? null

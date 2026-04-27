@@ -4,6 +4,7 @@ import { waitForViteReady } from './vite-utils'
 
 export interface StartViteProcessOptions {
 	cwd: string
+	configPath?: string
 	vitePort: number
 	miniflarePort: number
 	generatedViteConfigPath: string | null
@@ -16,6 +17,7 @@ export interface StartViteProcessOptions {
 export async function startViteProcess(options: StartViteProcessOptions): Promise<ChildProcess> {
 	const {
 		cwd,
+		configPath,
 		vitePort,
 		miniflarePort,
 		generatedViteConfigPath,
@@ -35,6 +37,7 @@ export async function startViteProcess(options: StartViteProcessOptions): Promis
 			...process.env,
 			DEVFLARE_DEV: 'true',
 			DEVFLARE_BRIDGE_PORT: String(miniflarePort),
+			...(configPath ? { DEVFLARE_CONFIG_PATH: configPath } : {}),
 			FORCE_COLOR: '1'
 		}
 	})

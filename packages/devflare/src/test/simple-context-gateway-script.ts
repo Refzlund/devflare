@@ -1,10 +1,18 @@
-export function buildGatewayScript(bundledCode: string, wrappers: string): string {
+export function buildGatewayScript(
+	bundledCode: string,
+	wrappers: string,
+	nativeRpcBindingNames: string[] = []
+): string {
+	const nativeRpcBindingsLiteral = JSON.stringify(nativeRpcBindingNames)
+
 	return `
 // Bundled transport + DO classes
 ${bundledCode}
 
 // DO Wrappers with RPC
 ${wrappers}
+
+const __nativeRpcBindings = new Set(${nativeRpcBindingsLiteral})
 
 // Transport encoding helper
 const __transportEncoders = typeof transport !== 'undefined' ? transport : {}
@@ -126,7 +134,7 @@ async function executeRpc(env, method, params) {
 		const [, idSerialized, rpcMethod, rpcParams] = params
 		const stub = binding.get(binding.idFromString(idSerialized.hex))
 
-		if (typeof stub[rpcMethod] === 'function') {
+		if (__nativeRpcBindings.has(bindingName) && typeof stub[rpcMethod] === 'function') {
 			let result = await stub[rpcMethod](...(rpcParams || []))
 			result = __encodeTransport(result)
 			return result

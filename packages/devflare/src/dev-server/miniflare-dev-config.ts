@@ -42,6 +42,7 @@ import {
 } from './miniflare-worker-config'
 import { hasWorkerSurfacePaths, type WorkerSurfacePaths } from './worker-surface-paths'
 import { buildLocalSecretWrappedBindingConfig } from '../secrets/local-secrets'
+import { buildLocalBindingShimServiceConfig } from '../shims/local-media-bindings'
 
 const INTERNAL_APP_SERVICE_BINDING = '__DEVFLARE_APP'
 
@@ -56,6 +57,7 @@ export interface BuildMiniflareDevConfigInput {
 	mainWorkerRoutes: RouteDiscoveryResult | null
 	mainWorkerScriptPath: string | null
 	bundledMainWorkerScriptPath: string | null
+	workflowEntrypointScript: string
 	browserShimPort: number
 	doResult: DOBundleResult | null
 	logger?: ConsolaInstance
@@ -81,6 +83,7 @@ export function buildMiniflareDevConfig(input: BuildMiniflareDevConfigInput): an
 		mainWorkerRoutes,
 		mainWorkerScriptPath,
 		bundledMainWorkerScriptPath,
+		workflowEntrypointScript,
 		browserShimPort,
 		doResult,
 		logger
@@ -107,9 +110,13 @@ export function buildMiniflareDevConfig(input: BuildMiniflareDevConfigInput): an
 		imagesPersist: persist ? `${persistPath}/images` : undefined
 	}
 
+	const localBindingShimServiceConfig = buildLocalBindingShimServiceConfig(loadedConfig)
 	const createServiceBindings = (
 		extraBindings: Record<string, MiniflareServiceBinding> = {}
-	) => buildServiceBindings(bindings, extraBindings)
+	) => buildServiceBindings(bindings, {
+		...localBindingShimServiceConfig.serviceBindings,
+		...extraBindings
+	})
 
 	const sendEmailConfig = buildSendEmailConfig(bindings)
 	const rateLimitsConfig = buildRateLimitsConfig(bindings)
@@ -120,8 +127,8 @@ export function buildMiniflareDevConfig(input: BuildMiniflareDevConfigInput): an
 	const workflowsConfig = buildWorkflowsConfig(bindings)
 	const pipelinesConfig = buildPipelinesConfig(bindings)
 	const hyperdrivesConfig = buildHyperdrivesConfig(bindings)
-	const imagesConfig = buildImagesConfig(bindings)
-	const mediaConfig = buildMediaConfig(bindings)
+	const imagesConfig = bindings.images ? undefined : buildImagesConfig(bindings)
+	const mediaConfig = bindings.media ? undefined : buildMediaConfig(bindings)
 	const artifactsConfig = buildArtifactsConfig(bindings)
 	const aiSearchNamespacesConfig = buildAiSearchNamespacesConfig(bindings)
 	const aiSearchInstancesConfig = buildAiSearchInstancesConfig(bindings)
@@ -161,11 +168,14 @@ export function buildMiniflareDevConfig(input: BuildMiniflareDevConfigInput): an
 
 	const gatewayWorker = createWorkerConfig({
 		name: 'gateway',
-		script: getGatewayScript(
-			loadedConfig.wsRoutes,
-			debug,
-			shouldRunMainWorker ? INTERNAL_APP_SERVICE_BINDING : null
-		),
+		script: [
+			workflowEntrypointScript,
+			getGatewayScript(
+				loadedConfig.wsRoutes,
+				debug,
+				shouldRunMainWorker ? INTERNAL_APP_SERVICE_BINDING : null
+			)
+		].filter(Boolean).join('\n\n'),
 		serviceBindings: shouldRunMainWorker
 			? createServiceBindings({
 				[INTERNAL_APP_SERVICE_BINDING]: { name: appWorkerName }
@@ -264,6 +274,11 @@ export function buildMiniflareDevConfig(input: BuildMiniflareDevConfigInput): an
 
 	return {
 		...sharedOptions,
-		workers: [gatewayWorker, ...workers, ...localSecretWrappedBindingConfig.workers]
+		workers: [
+			gatewayWorker,
+			...workers,
+			...localSecretWrappedBindingConfig.workers,
+			...localBindingShimServiceConfig.workers
+		]
 	}
 }

@@ -67,6 +67,59 @@ class BridgeWsAdapter implements WebSocketLike {
 }
 
 const BRIDGE_CLIENT_CAPABILITIES = ['streams', 'ws-relay', 'http-transfer'] as const
+type WebSocketConstructor = new (url: string) => WebSocket
+let wsPackageConstructorPromise: Promise<WebSocketConstructor> | null = null
+
+async function importWsPackageConstructor(): Promise<WebSocketConstructor> {
+	if (!wsPackageConstructorPromise) {
+		wsPackageConstructorPromise = (async () => {
+			const dynamicImport = new Function(
+				'specifier',
+				['return ', 'import', '(specifier)'].join('')
+			) as (
+				specifier: string
+			) => Promise<{
+				WebSocket?: unknown
+				default?: unknown
+			}>
+			const wsModule = await dynamicImport('ws')
+			const defaultExport = wsModule.default as { WebSocket?: unknown } | unknown
+			const constructor =
+				wsModule.WebSocket ??
+				(typeof defaultExport === 'object' && defaultExport !== null
+					? (defaultExport as { WebSocket?: unknown }).WebSocket
+					: undefined) ??
+				defaultExport
+
+			if (typeof constructor !== 'function') {
+				throw new Error('Could not load a WebSocket client implementation from the ws package')
+			}
+
+			return constructor as WebSocketConstructor
+		})()
+	}
+
+	return wsPackageConstructorPromise
+}
+
+function getRuntimeWebSocketConstructor(
+	runtimeWebSocket: unknown = globalThis.WebSocket
+): WebSocketConstructor | null {
+	if (typeof runtimeWebSocket === 'function') {
+		return runtimeWebSocket as WebSocketConstructor
+	}
+
+	return null
+}
+
+export async function resolveBridgeWebSocketConstructor(
+	runtimeWebSocket: unknown = globalThis.WebSocket
+): Promise<WebSocketConstructor> {
+	const constructor = getRuntimeWebSocketConstructor(runtimeWebSocket)
+	if (constructor) return constructor
+
+	return importWsPackageConstructor()
+}
 
 // -----------------------------------------------------------------------------
 // Types
@@ -163,14 +216,34 @@ export class BridgeClient {
 		if (this.isConnected) return
 		if (this.connectPromise) return this.connectPromise
 
-		this.connectPromise = new Promise<void>((resolve, reject) => {
+		const WebSocketCtor = getRuntimeWebSocketConstructor()
+		const promise = WebSocketCtor
+			? this.openConnection(WebSocketCtor)
+			: this.openConnectionWithPackageFallback()
+		this.connectPromise = promise
+		promise.catch(() => {
+			if (this.connectPromise === promise) {
+				this.connectPromise = null
+			}
+		})
+
+		return promise
+	}
+
+	private async openConnectionWithPackageFallback(): Promise<void> {
+		const WebSocketCtor = await importWsPackageConstructor()
+		return this.openConnection(WebSocketCtor)
+	}
+
+	private openConnection(WebSocketCtor: WebSocketConstructor): Promise<void> {
+		return new Promise<void>((resolve, reject) => {
 			const timeout = setTimeout(() => {
 				reject(new Error(`Connection timeout: ${this.url}`))
 				this.ws?.close()
 			}, this.connectTimeout)
 
 			try {
-				this.ws = new WebSocket(this.url)
+				this.ws = new WebSocketCtor(this.url)
 				this.ws.binaryType = 'arraybuffer'
 
 				const adapter = new BridgeWsAdapter(this.ws)
@@ -220,8 +293,6 @@ export class BridgeClient {
 				reject(error)
 			}
 		})
-
-		return this.connectPromise
 	}
 
 	/** Disconnect from the bridge and tear down all pending state */

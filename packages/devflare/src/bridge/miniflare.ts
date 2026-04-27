@@ -25,6 +25,7 @@ import {
 	buildLocalSecretWrappedBindingConfig,
 	type LocalSecretWrappedBindingConfig
 } from '../secrets/local-secrets'
+import { buildLocalBindingShimServiceConfig } from '../shims/local-media-bindings'
 import { createMiniflareLog } from '../dev-server/miniflare-log'
 import { GATEWAY_RUNTIME_JS } from './gateway-runtime'
 
@@ -124,6 +125,8 @@ export interface MiniflareOptions {
 	>
 	/** Environment variables */
 	bindings?: Record<string, string>
+	/** Service bindings */
+	serviceBindings?: Record<string, { name: string; entrypoint?: string }>
 	/** Wrapped bindings to expose object-shaped local binding shims */
 	wrappedBindings?: LocalSecretWrappedBindingConfig['wrappedBindings']
 	/** Additional module workers needed by wrapped bindings */
@@ -176,6 +179,7 @@ type MfOptionsWithEmail = MfOptions & {
 	media?: MiniflareOptions['media']
 	artifacts?: MiniflareOptions['artifacts']
 	secretsStoreSecrets?: MiniflareOptions['secretsStore']
+	serviceBindings?: MiniflareOptions['serviceBindings']
 	wrappedBindings?: MiniflareOptions['wrappedBindings']
 	workers?: Array<Record<string, unknown>>
 	r2Buckets?: MiniflareOptions['r2Buckets']
@@ -516,6 +520,17 @@ function applySecretsStoreConfig(
 	config.secretsStoreSecrets = secretsStore
 }
 
+function applyServiceBindingsConfig(
+	config: MfOptionsWithEmail,
+	serviceBindings: MiniflareOptions['serviceBindings']
+): void {
+	if (!serviceBindings || Object.keys(serviceBindings).length === 0) {
+		return
+	}
+
+	config.serviceBindings = serviceBindings
+}
+
 function applyWrappedBindingsConfig(
 	config: MfOptionsWithEmail,
 	wrappedBindings: MiniflareOptions['wrappedBindings']
@@ -597,6 +612,7 @@ function createMiniflareConfig(
 	applyMediaConfig(config, options.media)
 	applyArtifactsConfig(config, options.artifacts)
 	applySecretsStoreConfig(config, options.secretsStore)
+	applyServiceBindingsConfig(config, options.serviceBindings)
 	applyWrappedBindingsConfig(config, options.wrappedBindings)
 
 	return createConfigWithAuxiliaryWorkers(config, options.auxiliaryWorkers)
@@ -705,6 +721,14 @@ export async function startMiniflareFromConfig(
 		? buildLocalSecretNodeBindings(runtimeConfig, options.cwd)
 		: undefined
 	const localSecretBindingNames = new Set(localSecretWrappedBindingConfig?.localBindingNames ?? [])
+	const localBindingShimServiceConfig = buildLocalBindingShimServiceConfig(runtimeConfig)
+	const wrappedBindings = {
+		...(localSecretWrappedBindingConfig?.wrappedBindings ?? {})
+	}
+	const auxiliaryWorkers = [
+		...(localSecretWrappedBindingConfig?.workers ?? []),
+		...localBindingShimServiceConfig.workers
+	]
 
 	// For Miniflare, pass the full mapping to ensure consistent namespace/database IDs
 	const mfOptions: MiniflareOptions = {
@@ -801,6 +825,7 @@ export async function startMiniflareFromConfig(
 			: undefined,
 		images: bindings.images
 			? (() => {
+					if (localBindingShimServiceConfig.localBindingNames.length > 0) return undefined
 					const [entry] = Object.entries(bindings.images ?? {})
 					if (!entry) return undefined
 					const [bindingName, binding] = entry
@@ -810,6 +835,7 @@ export async function startMiniflareFromConfig(
 			: undefined,
 		media: bindings.media
 			? (() => {
+					if (localBindingShimServiceConfig.localBindingNames.length > 0) return undefined
 					const [entry] = Object.entries(bindings.media ?? {})
 					if (!entry) return undefined
 					const [bindingName, binding] = entry
@@ -854,8 +880,12 @@ export async function startMiniflareFromConfig(
 			: undefined,
 		sendEmail: bindings.sendEmail ? bindings.sendEmail : undefined,
 		bindings: runtimeConfig.vars,
-		wrappedBindings: localSecretWrappedBindingConfig?.wrappedBindings,
-		auxiliaryWorkers: localSecretWrappedBindingConfig?.workers,
+		serviceBindings: {
+			...(options.serviceBindings ?? {}),
+			...localBindingShimServiceConfig.serviceBindings
+		},
+		wrappedBindings: Object.keys(wrappedBindings).length > 0 ? wrappedBindings : undefined,
+		auxiliaryWorkers: auxiliaryWorkers.length > 0 ? auxiliaryWorkers : undefined,
 		nodeBindingOverrides: localSecretNodeBindings,
 		durableObjects: bindings.durableObjects
 			? Object.fromEntries(

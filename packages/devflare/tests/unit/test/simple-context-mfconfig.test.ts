@@ -158,7 +158,7 @@ describe('buildInlineBridgeMfConfig', () => {
 				}
 			}
 		})
-		expect(mfConfig.__devflareLocalSecretWorkers).toHaveLength(1)
+		expect(mfConfig.__devflareLocalBindingWorkers).toHaveLength(1)
 	})
 
 	test('adds Miniflare Worker Loader bindings for createTestContext', () => {
@@ -272,7 +272,7 @@ describe('buildInlineBridgeMfConfig', () => {
 		})
 	})
 
-	test('adds Miniflare Images binding for createTestContext', () => {
+	test('adds a local Images service binding shim for createTestContext', () => {
 		const mfConfig = buildInlineBridgeMfConfig({
 			name: 'my-worker',
 			compatibilityDate: '2026-04-26',
@@ -286,12 +286,17 @@ describe('buildInlineBridgeMfConfig', () => {
 			}
 		})
 
-		expect(mfConfig.images).toEqual({
-			binding: 'IMAGES'
+		expect(mfConfig.images).toBeUndefined()
+		expect(mfConfig.serviceBindings).toEqual({
+			IMAGES: {
+				name: 'devflare-local-images-0-images',
+				entrypoint: 'LocalImagesBinding'
+			}
 		})
+		expect(mfConfig.__devflareLocalBindingWorkers).toHaveLength(1)
 	})
 
-	test('adds Miniflare Media Transformations binding for createTestContext', () => {
+	test('adds a local Media Transformations service binding shim for createTestContext', () => {
 		const mfConfig = buildInlineBridgeMfConfig({
 			name: 'my-worker',
 			compatibilityDate: '2026-04-26',
@@ -305,9 +310,14 @@ describe('buildInlineBridgeMfConfig', () => {
 			}
 		})
 
-		expect(mfConfig.media).toEqual({
-			binding: 'MEDIA'
+		expect(mfConfig.media).toBeUndefined()
+		expect(mfConfig.serviceBindings).toEqual({
+			MEDIA: {
+				name: 'devflare-local-media-0-media',
+				entrypoint: 'LocalMediaBinding'
+			}
 		})
+		expect(mfConfig.__devflareLocalBindingWorkers).toHaveLength(1)
 	})
 
 	test('adds Miniflare AI Search bindings for createTestContext', () => {

@@ -32,9 +32,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isSendEmailBinding(value: unknown): value is SendEmail {
-	return isRecord(value)
-		&& typeof value.send === 'function'
-		&& typeof value.sendBatch !== 'function'
+	if (!isRecord(value)) {
+		return false
+	}
+
+	try {
+		return typeof value.send === 'function'
+			&& typeof value.sendBatch !== 'function'
+	} catch {
+		return false
+	}
 }
 
 function isComposableSendEmailMessage(message: unknown): message is ComposedSendEmailMessage {

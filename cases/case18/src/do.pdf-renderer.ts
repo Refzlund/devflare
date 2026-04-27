@@ -10,7 +10,6 @@
 
 import { DurableObject } from 'cloudflare:workers'
 import type { DurableObjectNamespace, Fetcher } from '@cloudflare/workers-types'
-import puppeteer from '@cloudflare/puppeteer'
 import { PdfRequest, PdfResult, type PdfRequestData, type PdfResultData } from '$lib/models'
 
 interface CachedPdf {
@@ -182,6 +181,7 @@ export class PdfRenderer extends DurableObject<Env> {
 	 * This means JS-rendered content will not appear in the PDF.
 	 */
 	private async attemptGeneratePdf(request: PdfRequest): Promise<Uint8Array> {
+		const { default: puppeteer } = await import('@cloudflare/puppeteer')
 		// Launch browser via Browser Rendering binding
 		const browser = await puppeteer.launch(this.env.BROWSER as unknown as Parameters<typeof puppeteer.launch>[0])
 

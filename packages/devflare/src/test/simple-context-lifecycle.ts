@@ -20,6 +20,7 @@ import { resetScheduledState } from './scheduled'
 import { resetTailState } from './tail'
 import { resetWorkerState } from './worker'
 import { stopActiveContainers } from './containers'
+import { disposeLocalWorkerLoaderBindings } from '../shims/local-worker-loader'
 
 interface DisposeStateView {
 	client: BridgeClient | null
@@ -92,6 +93,7 @@ export function createDisposeContext(state: DisposeStateView): () => Promise<voi
 			await state.miniflare.dispose()
 			state.miniflare = null
 		}
+		await disposeLocalWorkerLoaderBindings()
 		await stopActiveContainers()
 		state.envProxy = null
 		state.transportDecode = null

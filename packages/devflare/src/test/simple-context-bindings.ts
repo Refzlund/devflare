@@ -13,6 +13,7 @@ import { createRemoteAI } from './remote-ai'
 import { createRemoteVectorize } from './remote-vectorize'
 import { createLocalSendEmailBinding } from '../utils/send-email'
 import { createMockVersionMetadata } from './utilities'
+import { createLocalWorkerLoaderBinding } from '../shims/local-worker-loader'
 
 /**
  * Build the initial remote/static binding map for a test context.
@@ -52,6 +53,12 @@ export function buildRemoteAndStaticBindings(config: DevflareConfig): Record<str
 	if (config.bindings?.sendEmail) {
 		for (const [name, binding] of Object.entries(config.bindings.sendEmail)) {
 			remoteBindings[name] = createLocalSendEmailBinding(binding)
+		}
+	}
+
+	if (config.bindings?.workerLoaders) {
+		for (const name of Object.keys(config.bindings.workerLoaders)) {
+			remoteBindings[name] = createLocalWorkerLoaderBinding()
 		}
 	}
 

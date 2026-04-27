@@ -501,12 +501,76 @@ function createSendEmailProxy(client: BridgeClient, bindingName: string): SendEm
 }
 
 // -----------------------------------------------------------------------------
+// Workflow Proxy
+// -----------------------------------------------------------------------------
+
+function createWorkflowInstanceProxy(
+	client: BridgeClient,
+	bindingName: string,
+	id: string
+): WorkflowInstance {
+	return {
+		id,
+		async pause(): Promise<void> {
+			await client.call(`${bindingName}.workflow.pause`, [id])
+		},
+		async resume(): Promise<void> {
+			await client.call(`${bindingName}.workflow.resume`, [id])
+		},
+		async terminate(): Promise<void> {
+			await client.call(`${bindingName}.workflow.terminate`, [id])
+		},
+		async restart(): Promise<void> {
+			await client.call(`${bindingName}.workflow.restart`, [id])
+		},
+		async status(): Promise<InstanceStatus> {
+			return client.call(`${bindingName}.workflow.status`, [id]) as Promise<InstanceStatus>
+		},
+		async sendEvent(event: { type: string; payload: unknown }): Promise<void> {
+			await client.call(`${bindingName}.workflow.sendEvent`, [id, event])
+		}
+	} as WorkflowInstance
+}
+
+function createWorkflowProxy(client: BridgeClient, bindingName: string): Workflow {
+	const toInstance = (value: unknown): WorkflowInstance => {
+		const id = (value as { id?: unknown })?.id
+		if (typeof id !== 'string') {
+			throw new Error(`Workflow ${bindingName} returned an instance without a string id.`)
+		}
+		return createWorkflowInstanceProxy(client, bindingName, id)
+	}
+
+	return {
+		async create(options?: WorkflowInstanceCreateOptions): Promise<WorkflowInstance> {
+			return toInstance(await client.call(`${bindingName}.workflow.create`, [options]))
+		},
+		async get(id: string): Promise<WorkflowInstance> {
+			return toInstance(await client.call(`${bindingName}.workflow.get`, [id]))
+		}
+	} as Workflow
+}
+
+// -----------------------------------------------------------------------------
 // Main Env Proxy
 // -----------------------------------------------------------------------------
 
 /** Binding type hints for better proxy creation */
+export type BindingHint =
+	| 'kv'
+	| 'r2'
+	| 'd1'
+	| 'do'
+	| 'queue'
+	| 'ai'
+	| 'service'
+	| 'sendEmail'
+	| 'workflow'
+	| 'secret'
+	| 'var'
+
 export interface BindingHints {
-	[key: string]: 'kv' | 'r2' | 'd1' | 'do' | 'queue' | 'ai' | 'service' | 'sendEmail' | 'secret' | 'var'
+	[key: string]: BindingHint
 }
 
 /** Module-level storage for binding hints */
@@ -557,6 +621,9 @@ export function createEnvProxy(options: EnvProxyOptions & { hints?: BindingHints
 					break
 				case 'sendEmail':
 					proxy = createSendEmailProxy(client, prop)
+					break
+				case 'workflow':
+					proxy = createWorkflowProxy(client, prop)
 					break
 				case 'secret':
 				case 'var':

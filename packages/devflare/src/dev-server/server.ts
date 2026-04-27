@@ -28,6 +28,7 @@ import {
 import { applyWatcherTargetDiff, startWorkerSourceWatcher as createWorkerSourceWatcher } from './worker-source-watcher'
 import { logMiniflareBindingDiagnostics, logMiniflareConfigDiagnostics, logRemoteBindingRequirements, logWorkerHandlerDetection, maybeStartBrowserShim, maybeStartDOBundler, resolveViteIntegration, resolveWorkerConfigWatchPath } from './server-startup-helpers'
 import { createDevServerState, disposeDevServerState, type DevServerState } from './dev-server-state'
+import { bundleWorkflowEntrypointScript } from '../workflows/local-workflow-entrypoints'
 
 // -----------------------------------------------------------------------------
 
@@ -132,8 +133,20 @@ export function createDevServer(options: DevServerOptions): DevServer {
 			mainWorkerRoutes: state.mainWorkerRoutes,
 			mainWorkerScriptPath: state.mainWorkerScriptPath,
 			bundledMainWorkerScriptPath: state.bundledMainWorkerScriptPath,
+			workflowEntrypointScript: state.workflowEntrypointScript,
 			browserShimPort: state.browserShimPort,
 			doResult,
+			logger
+		})
+	}
+
+	async function bundleWorkflowEntrypoints(): Promise<void> {
+		if (!state.config) {
+			state.workflowEntrypointScript = ''
+			return
+		}
+
+		state.workflowEntrypointScript = await bundleWorkflowEntrypointScript(state.config, cwd, {
 			logger
 		})
 	}
@@ -227,6 +240,7 @@ export function createDevServer(options: DevServerOptions): DevServer {
 			return
 		}
 		setLocalSendEmailBindings(state.config.bindings?.sendEmail ?? {})
+		await bundleWorkflowEntrypoints()
 		await refreshWorkerOnlySurfaceState()
 		await reloadMiniflare(state.currentDoResult)
 	}
@@ -276,6 +290,7 @@ export function createDevServer(options: DevServerOptions): DevServer {
 		}
 		setLocalSendEmailBindings(state.config.bindings?.sendEmail ?? {})
 		logger?.debug('Loaded config:', state.config.name)
+		await bundleWorkflowEntrypoints()
 		const viteIntegration = await resolveViteIntegration({
 			cwd,
 			configPath,
@@ -329,6 +344,7 @@ export function createDevServer(options: DevServerOptions): DevServer {
 		if (state.enableVite) {
 			state.viteProcess = await startViteProcess({
 				cwd,
+				configPath,
 				vitePort,
 				miniflarePort,
 				generatedViteConfigPath: state.generatedViteConfigPath,

@@ -162,7 +162,9 @@ export function makeMiniflareWorker(
 		? baseFlags
 		: [...baseFlags, 'nodejs_compat']
 	const workerBindings: Record<string, unknown> = loadedConfig.vars ?? {}
-	const localSecretWrappedBindings = localSecretWrappedBindingConfig?.wrappedBindings
+	const localWrappedBindings = {
+		...(localSecretWrappedBindingConfig?.wrappedBindings ?? {})
+	}
 
 	const workerConfig: any = {
 		name: options.name,
@@ -200,9 +202,7 @@ export function makeMiniflareWorker(
 		...(aiSearchNamespacesConfig && { aiSearchNamespaces: aiSearchNamespacesConfig }),
 		...(aiSearchInstancesConfig && { aiSearchInstances: aiSearchInstancesConfig }),
 		...(secretsStoreConfig && { secretsStoreSecrets: secretsStoreConfig }),
-		...(localSecretWrappedBindings
-			&& Object.keys(localSecretWrappedBindings).length > 0
-			&& { wrappedBindings: localSecretWrappedBindings }),
+		...(Object.keys(localWrappedBindings).length > 0 && { wrappedBindings: localWrappedBindings }),
 		...(queueProducers && { queueProducers }),
 		...(options.queueConsumers && { queueConsumers: options.queueConsumers }),
 		...(options.triggers && { triggers: options.triggers })

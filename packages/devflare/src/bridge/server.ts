@@ -261,6 +261,7 @@ export async function executeRpcMethod(
 		operation.startsWith('queue.') ||
 		operation.startsWith('email.') ||
 		operation.startsWith('ai.') ||
+		operation.startsWith('workflow.') ||
 		operation.startsWith('var.')
 	if (!isNamespaced) {
 		throw new Error(
@@ -351,6 +352,24 @@ export async function executeRpcMethod(
 		case 'email.send':
 			return executeSendEmail(binding as SendEmail, params[0])
 
+		// Workflows
+		case 'workflow.create':
+			return serializeWorkflowInstance(await (binding as Workflow).create(params[0] as any))
+		case 'workflow.get':
+			return serializeWorkflowInstance(await (binding as Workflow).get(params[0] as string))
+		case 'workflow.status':
+			return (await (binding as Workflow).get(params[0] as string)).status()
+		case 'workflow.pause':
+			return (await (binding as Workflow).get(params[0] as string)).pause()
+		case 'workflow.resume':
+			return (await (binding as Workflow).get(params[0] as string)).resume()
+		case 'workflow.terminate':
+			return (await (binding as Workflow).get(params[0] as string)).terminate()
+		case 'workflow.restart':
+			return (await (binding as Workflow).get(params[0] as string)).restart()
+		case 'workflow.sendEvent':
+			return (await (binding as Workflow).get(params[0] as string)).sendEvent(params[1] as any)
+
 		// Queue
 		case 'queue.send':
 			return (binding as Queue<unknown>).send(params[0], params[1] as any)
@@ -371,6 +390,13 @@ export async function executeRpcMethod(
 
 async function executeSendEmail(binding: SendEmail, message: unknown): Promise<EmailSendResult> {
 	return binding.send(normalizeSendEmailMessage(message))
+}
+
+function serializeWorkflowInstance(instance: WorkflowInstance): unknown {
+	return {
+		__type: 'WorkflowInstance',
+		id: instance.id
+	}
 }
 
 // -----------------------------------------------------------------------------

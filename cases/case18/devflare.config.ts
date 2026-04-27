@@ -23,13 +23,17 @@ export default defineConfig({
 
 	// File-based conventions
 	files: {
-		// SvelteKit build output - required for SvelteKit integration
-		fetch: '.svelte-kit/cloudflare/_worker.js',
+		// SvelteKit writes the Worker entry during build/dev, so Devflare should not compose it.
+		fetch: false,
 		// Auto-discover DO classes from src/do.*.ts files
 		durableObjects: 'src/do.*.ts',
+		// Auto-discover Workflow classes from src/wf.*.ts files
+		workflows: 'src/wf.*.ts',
 		// Transport for RPC serialization (SvelteKit signature)
 		transport: 'src/transport.ts'
 	},
+
+	secretsStoreId: 'case18-local-store',
 
 	bindings: {
 		// R2 bucket for image uploads
@@ -61,6 +65,48 @@ export default defineConfig({
 		// Browser Rendering for PDF generation
 		browser: {
 			binding: 'BROWSER'
+		},
+
+		// Hyperdrive local connection details for database-client code paths
+		hyperdrive: {
+			POSTGRES: {
+				id: 'case18-hyperdrive',
+				localConnectionString: 'postgres://case18:password@localhost:5432/case18'
+			}
+		},
+
+		// Dynamic Worker loading from explicit code payloads
+		workerLoaders: {
+			WORKER_LOADER: {}
+		},
+
+		// Workflow binding implemented by src/wf.order.ts
+		workflows: {
+			ORDER_WORKFLOW: {
+				name: 'case18-order-workflow',
+				className: 'OrderWorkflow'
+			}
+		},
+
+		// Images and Media Transformations local shims
+		images: {
+			IMAGES_SERVICE: true
+		},
+		media: {
+			MEDIA_SERVICE: true
+		},
+
+		// Secrets Store local values live in .devflare/secrets.local.json
+		secretsStore: {
+			API_TOKEN: 'api-token'
+		},
+
+		// Send Email local binding
+		sendEmail: {
+			EMAIL: {
+				destinationAddress: 'recipient@example.com',
+				allowedSenderAddresses: ['sender@example.com']
+			}
 		}
 	},
 
@@ -81,6 +127,12 @@ export default defineConfig({
 			idParam: 'roomId',
 			forwardPath: '/websocket'
 		}
-	]
+	],
+
+	wrangler: {
+		passthrough: {
+			main: '.svelte-kit/cloudflare/_worker.js'
+		}
+	}
 })
 

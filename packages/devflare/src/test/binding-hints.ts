@@ -58,6 +58,11 @@ export function extractBindingHints(config: DevflareConfig): BindingHints {
 			hints[name] = 'sendEmail'
 		}
 	}
+	if (config.bindings?.workflows) {
+		for (const name of Object.keys(config.bindings.workflows)) {
+			hints[name] = 'workflow'
+		}
+	}
 
 	return hints
 }

@@ -72,14 +72,18 @@ export async function connectBridgeClientWithRetry(url: string): Promise<BridgeC
 		: new Error('Bridge-backed test context could not connect to the WebSocket gateway.')
 }
 
-function expandLocalSecretWorkers(mfConfig: any): any {
-	const auxiliaryWorkers = mfConfig.__devflareLocalSecretWorkers
+function expandLocalBindingWorkers(mfConfig: any): any {
+	const auxiliaryWorkers = [
+		...(mfConfig.__devflareLocalSecretWorkers ?? []),
+		...(mfConfig.__devflareLocalBindingWorkers ?? [])
+	]
 	if (!Array.isArray(auxiliaryWorkers) || auxiliaryWorkers.length === 0) {
 		return mfConfig
 	}
 
 	const {
 		__devflareLocalSecretWorkers,
+		__devflareLocalBindingWorkers,
 		port,
 		host,
 		log,
@@ -124,7 +128,7 @@ export async function startBridgeBackedTestContext(mfConfig: any): Promise<Start
 		let client: BridgeClient | null = null
 
 		try {
-			miniflare = new Miniflare(expandLocalSecretWorkers({
+			miniflare = new Miniflare(expandLocalBindingWorkers({
 				...mfConfig,
 				port
 			}))
