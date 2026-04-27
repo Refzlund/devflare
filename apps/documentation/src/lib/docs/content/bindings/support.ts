@@ -1,4 +1,4 @@
-import type { DocSection } from '../../types'
+import type { DocHeaderSupport, DocSection } from '../../types'
 import { supportCoverageTooltips } from '../start-here/shared'
 import type { BindingGuideDefinition } from './shared'
 
@@ -13,21 +13,21 @@ const bindingSupportLevelsBySlugBase: Record<string, BindingSupportLevel> = {
 	service: 'Full',
 	ai: 'Remote',
 	vectorize: 'Remote',
-	hyperdrive: 'Remote',
-	browser: 'Remote',
+	hyperdrive: 'Full',
+	browser: 'Full',
 	'analytics-engine': 'Remote',
 	'send-email': 'Full',
 	'rate-limiting': 'Full',
 	'version-metadata': 'Full',
-	'worker-loaders': 'Limited',
-	'secrets-store': 'Remote',
+	'worker-loaders': 'Full',
+	'secrets-store': 'Full',
 	'ai-search': 'Remote',
 	'mtls-certificates': 'Remote',
 	'dispatch-namespaces': 'Remote',
-	workflows: 'Remote',
+	workflows: 'Full',
 	pipelines: 'Remote',
-	images: 'Remote',
-	'media-transformations': 'Remote',
+	images: 'Full',
+	'media-transformations': 'Full',
 	artifacts: 'Remote',
 	containers: 'Full'
 }
@@ -38,19 +38,37 @@ export function getBindingSupportLevel(
 	return bindingSupportLevelsBySlugBase[guide.slugBase] ?? 'Remote'
 }
 
+export function createBindingHeaderSupport(guide: BindingGuideDefinition): DocHeaderSupport {
+	const supportLevel = getBindingSupportLevel(guide)
+
+	const headerTooltips: Record<BindingSupportLevel, string> = {
+		Full:
+			'Full - Devflare can cover the ordinary local workflow for this surface without needing Cloudflare for the first development loop.',
+		Remote:
+			'Remote - Devflare can wire the surface locally, but full fidelity depends on Cloudflare infrastructure or platform behavior.',
+		Limited:
+			'Limited - Devflare has a supported lane here, but the local contract is intentionally narrower than Cloudflare.'
+	}
+
+	return {
+		label: supportLevel,
+		tooltip: headerTooltips[supportLevel]
+	}
+}
+
 function getBindingSupportSummary(
 	level: BindingSupportLevel,
 	guide: BindingGuideDefinition
 ): string {
 	switch (level) {
 		case 'Full':
-			return `Full local support means Devflare can run useful ${guide.label} application behavior locally for ordinary development and tests. Cloudflare still owns production limits, quotas, billing, and deployed account behavior.`
+			return `Devflare can run useful ${guide.label} application behavior locally for ordinary development and tests. Cloudflare still owns production limits, quotas, billing, and deployed account behavior.`
 
 		case 'Remote':
-			return 'Remote support means Devflare supports the config, generated env shape, docs, and local application-flow work, but full fidelity requires Cloudflare remote infrastructure. Use local shims or fixtures for code your app owns, then connect to Cloudflare when the product behavior is the assertion.'
+			return 'Devflare supports the config, generated env shape, docs, and local application-flow work, but full fidelity requires Cloudflare remote infrastructure. Use local shims or fixtures for code your app owns, then connect to Cloudflare when the product behavior is the assertion.'
 
 		case 'Limited':
-			return `Limited support means Devflare has a real lane for ${guide.label}, but the local contract is intentionally narrower than Cloudflare's hosted product. The docs call out the supported local path and the remote boundary separately.`
+			return `Devflare has a real lane for ${guide.label}, but the local contract is intentionally narrower than Cloudflare's hosted product. The docs call out the supported local path and the remote boundary separately.`
 	}
 }
 
@@ -94,30 +112,12 @@ export function createBindingSupportSection(guide: BindingGuideDefinition): DocS
 	return {
 		id: 'local-and-remote-support',
 		title: 'Local and Remote Support',
+		label: supportLevel,
+		labelTooltip: supportCoverageTooltips[supportLevel],
 		paragraphs: [
-			`Support level: \`${supportLevel}\`. ${getBindingSupportSummary(supportLevel, guide)}`,
-			`${guide.localStory}.`
-		],
-		cards: [
-			{
-				label: supportLevel,
-				labelTooltip: supportCoverageTooltips[supportLevel],
-				meta: 'Support level',
-				title: `${supportLevel} support`,
-				body: getBindingSupportSummary(supportLevel, guide)
-			},
-			{
-				label: 'Local',
-				meta: 'Local lane',
-				title: 'What works without Cloudflare',
-				body: getBindingLocalSupportBody(supportLevel, guide)
-			},
-			{
-				label: 'Remote',
-				meta: 'Cloudflare lane',
-				title: 'When to connect to Cloudflare',
-				body: getBindingRemoteSupportBody(supportLevel, guide)
-			}
+			getBindingSupportSummary(supportLevel, guide),
+			getBindingLocalSupportBody(supportLevel, guide),
+			getBindingRemoteSupportBody(supportLevel, guide)
 		]
 	}
 }

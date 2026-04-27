@@ -70,9 +70,16 @@ export interface DocHeaderCloudflareDocs {
 	summary: string
 }
 
+export interface DocHeaderSupport {
+	label: string
+	tooltip: string
+}
+
 export interface DocSection {
 	id: string
 	title: string
+	label?: string
+	labelTooltip?: string
 	description?: string
 	paragraphs?: string[]
 	bullets?: string[]
@@ -97,6 +104,7 @@ export interface DocPage {
 	description: string
 	descriptionHidden?: boolean
 	headerCloudflareDocs?: DocHeaderCloudflareDocs
+	headerSupport?: DocHeaderSupport
 	articleNavigationHidden?: boolean
 	highlights: string[]
 	facts: DocFact[]

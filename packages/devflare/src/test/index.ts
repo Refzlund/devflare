@@ -94,6 +94,7 @@ export {
 	createMockQueue,
 	createMockRateLimit,
 	createMockVersionMetadata,
+	createMockHyperdrive,
 	createMockWorkerLoader,
 	createMockMTLSCertificate,
 	createMockDispatchNamespace,

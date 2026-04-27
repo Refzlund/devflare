@@ -11,6 +11,7 @@ import {
 	createMockR2,
 	createMockRateLimit,
 	createMockVersionMetadata,
+	createMockHyperdrive,
 	createMockWorkerLoader,
 	createMockMTLSCertificate,
 	createMockDispatchNamespace,
@@ -359,6 +360,19 @@ describe('createMockSecretsStoreSecret', () => {
 	})
 })
 
+describe('createMockHyperdrive', () => {
+	test('returns connection details from a local database URL', () => {
+		const hyperdrive = createMockHyperdrive('postgres://user:pass@localhost:5432/app')
+
+		expect(hyperdrive.connectionString).toBe('postgres://user:pass@localhost:5432/app')
+		expect(hyperdrive.host).toBe('localhost')
+		expect(hyperdrive.port).toBe(5432)
+		expect(hyperdrive.user).toBe('user')
+		expect(hyperdrive.password).toBe('pass')
+		expect(hyperdrive.database).toBe('app')
+	})
+})
+
 describe('createMockEnv', () => {
 	test('creates env with KV bindings', () => {
 		const mockEnv = createMockEnv({
@@ -579,6 +593,16 @@ describe('createMockEnv', () => {
 		}) as { API_TOKEN: SecretsStoreSecret }
 
 		expect(await mockEnv.API_TOKEN.get()).toBe('super-secret')
+	})
+
+	test('creates env with Hyperdrive bindings', () => {
+		const mockEnv = createMockEnv({
+			hyperdrive: {
+				POSTGRES: 'postgres://user:pass@localhost:5432/app'
+			}
+		}) as { POSTGRES: Hyperdrive }
+
+		expect(mockEnv.POSTGRES.connectionString).toBe('postgres://user:pass@localhost:5432/app')
 	})
 
 	test('creates env with vars', () => {

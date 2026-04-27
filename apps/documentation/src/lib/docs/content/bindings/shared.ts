@@ -5,7 +5,7 @@ import {
 	getCloudflareBindingReference,
 	getCloudflareRuntimeComparison
 } from './cloudflare-reference'
-import { createBindingSupportSection } from './support'
+import { createBindingHeaderSupport, createBindingSupportSection } from './support'
 
 export {
 	createBindingHeaderCloudflareDocs,
@@ -157,9 +157,9 @@ export function createBindingInternalsSnippet(guide: BindingGuideDefinition): Do
 	)
 
 	return {
-		title: `${guide.label} from authored config to generated output`,
+		title: `${guide.label} config and emitted Wrangler output`,
 		description:
-			'Keep the binding readable in source, then inspect only the Wrangler-facing slice Devflare emits when the config is compiled.',
+			'Use this when you need to check how the Devflare config becomes Wrangler-compatible config.',
 		activeFile: 'devflare.config.ts',
 		structure: [
 			{ path: 'devflare.config.ts' },
@@ -384,7 +384,7 @@ export function createBindingReferenceSection(guide: BindingGuideDefinition): Do
 		id: 'cloudflare-reference',
 		title: 'Cloudflare docs vs the Devflare layer',
 		paragraphs: [
-			`${reference.title} is the platform reference. This page is the Devflare translation layer: keep \`${guide.configKey}\` readable in source, understand the typed env surface, and know which local, preview, or remote lane actually matches the binding.`
+			`${reference.title} is the platform reference. Use this internals page when you need to compare Cloudflare's product docs with Devflare config, generated env types, local support, and preview behavior for \`${guide.configKey}\`.`
 		],
 		cards: [
 			{
@@ -423,28 +423,28 @@ export function createBindingDeepDiveSection(guide: BindingGuideDefinition): Doc
 
 	return {
 		id: 'go-deeper',
-		title: 'Go deeper only if this one-page guide stops being enough',
+		title: 'Open the next page when you need it',
 		cards: [
 			{
 				href: bindingDocPath(slugs.internals),
 				label: 'Subpage',
 				meta: 'Internals',
 				title: `${guide.label} internals`,
-				body: `See normalization, ${guide.internals.compileTarget}, and the preview or runtime details behind the authored shape.`
+				body: `Check emitted ${guide.internals.compileTarget}, preview behavior, and Cloudflare-specific details.`
 			},
 			{
 				href: bindingDocPath(slugs.testing),
 				label: 'Subpage',
 				meta: 'Testing',
 				title: `Testing ${guide.label}`,
-				body: `Start from ${guide.testing.defaultHarness} and only escalate when the binding or deployment model genuinely needs it.`
+				body: `Pick the ${guide.testing.defaultHarness} path first, then move to remote checks only when the test needs them.`
 			},
 			{
 				href: bindingDocPath(slugs.example),
 				label: 'Subpage',
 				meta: 'Example',
 				title: `${guide.label} example`,
-				body: 'Adapt one small end-to-end path before you hide the binding behind a bigger abstraction.'
+				body: 'Copy a fuller application path when the quick example is too small.'
 			}
 		]
 	}
@@ -454,6 +454,7 @@ export function createBindingPages(guide: BindingGuideDefinition): DocPage[] {
 	const slugs = getBindingSlugs(guide)
 	const legacySlugs = getLegacyBindingSlugs(guide.slugBase)
 	const headerCloudflareDocs = createBindingHeaderCloudflareDocs(guide)
+	const headerSupport = createBindingHeaderSupport(guide)
 
 	return [
 		{
@@ -468,6 +469,7 @@ export function createBindingPages(guide: BindingGuideDefinition): DocPage[] {
 			summary: guide.overview.summary,
 			description: guide.overview.description,
 			headerCloudflareDocs,
+			headerSupport,
 			highlights: guide.overview.highlights,
 			facts: [
 				{ label: 'Config key', value: inlineCodeFact(guide.configKey) },
@@ -478,7 +480,7 @@ export function createBindingPages(guide: BindingGuideDefinition): DocPage[] {
 			sections: [
 				{
 					id: 'authoring-shape',
-					title: 'Author it in the simplest shape that still says what you mean',
+					title: 'Add the binding to config',
 					paragraphs: guide.overview.authoringParagraphs,
 					snippets: [guide.overview.authoringSnippet]
 				},
@@ -487,7 +489,7 @@ export function createBindingPages(guide: BindingGuideDefinition): DocPage[] {
 					title: 'Use the binding from application code',
 					paragraphs: [
 						`After Devflare generates the worker env, import \`env\` from \`devflare/runtime\` and keep the first ${guide.label} path close to the route, handler, or service method that needs it.`,
-						'Keep this first path small enough that the binding contract stays visible during code review.'
+						'Keep this first path small enough that the config, env binding, and user-visible behavior are easy to review together.'
 					],
 					snippets: [guide.example.usageSnippet]
 				},
@@ -500,11 +502,10 @@ export function createBindingPages(guide: BindingGuideDefinition): DocPage[] {
 				},
 				{
 					id: 'notes-that-matter',
-					title: 'Notes worth keeping visible',
+					title: 'Testing path',
 					bullets: guide.overview.caveatBullets,
 					callouts: guide.overview.caveatCallout ? [guide.overview.caveatCallout] : undefined
 				},
-				createBindingReferenceSection(guide),
 				createBindingDeepDiveSection(guide)
 			]
 		},
@@ -520,6 +521,7 @@ export function createBindingPages(guide: BindingGuideDefinition): DocPage[] {
 			summary: guide.internals.summary,
 			description: guide.internals.description,
 			headerCloudflareDocs,
+			headerSupport,
 			highlights: guide.internals.highlights,
 			facts: [
 				{ label: 'Normalization', value: guide.internals.normalizationFact },
@@ -530,13 +532,13 @@ export function createBindingPages(guide: BindingGuideDefinition): DocPage[] {
 			sections: [
 				{
 					id: 'normalization',
-					title: 'Devflare normalizes the authored shape before it does anything louder',
+					title: 'How authored config becomes Wrangler config',
 					paragraphs: guide.internals.normalizationParagraphs,
 					snippets: [createBindingInternalsSnippet(guide)]
 				},
 				{
 					id: 'local-runtime',
-					title: 'Local runtime support depends on what Devflare can model directly',
+					title: 'What local runtime support covers',
 					bullets: guide.internals.localRuntimeBullets
 				},
 				{
@@ -544,7 +546,8 @@ export function createBindingPages(guide: BindingGuideDefinition): DocPage[] {
 					title: 'Compile, preview, and cleanup behavior',
 					bullets: guide.internals.compileBullets,
 					callouts: guide.internals.callout ? [guide.internals.callout] : undefined
-				}
+				},
+				createBindingReferenceSection(guide)
 			]
 		},
 		{
@@ -559,6 +562,7 @@ export function createBindingPages(guide: BindingGuideDefinition): DocPage[] {
 			summary: guide.testing.summary,
 			description: guide.testing.description,
 			headerCloudflareDocs,
+			headerSupport,
 			highlights: guide.testing.highlights,
 			facts: [
 				{ label: 'Best for', value: guide.testing.bestFor },
@@ -598,6 +602,7 @@ export function createBindingPages(guide: BindingGuideDefinition): DocPage[] {
 			summary: applicationExampleSummary(guide),
 			description: applicationExampleDescription(guide),
 			headerCloudflareDocs,
+			headerSupport,
 			highlights: applicationExampleHighlights(guide),
 			facts: [
 				{ label: 'Config focus', value: guide.example.configFocus },
@@ -682,20 +687,20 @@ export function createCompactBindingGuide(
 		sourcePages: definition.sourcePages,
 		overview: {
 			readTime: '3 min read',
-			title: `Use ${definition.label} with the smallest config that states the binding contract`,
-			summary: `Configure ${definition.label}, call the ${definition.envType} binding from worker code, and choose a test lane that matches the support level.`,
+			title: `Use ${definition.label} in a Worker`,
+			summary: `Add the ${definition.label} config, call ${definition.envType} from worker code, and start with the local test path Devflare supports.`,
 			description:
 				'Start with the config, wire the binding into worker code, then use the support section to decide whether local tests or Cloudflare-backed tests fit.',
 			highlights: [
-				`Author the feature at \`${definition.configKey}\` instead of hiding it in ad-hoc Wrangler JSON.`,
-				`Generated Env types expose ${definition.envType}.`,
-				`${definition.localStory}.`,
-				definition.remoteBoundary
+				`Configure it with \`${definition.configKey}\`.`,
+				`Use ${definition.envType} from worker code.`,
+				`Start local with ${definition.defaultHarness}.`,
+				'Use Cloudflare-backed checks when the product behavior itself is what you need to prove.'
 			],
 			bestFor: definition.bestFor,
 			authoringParagraphs: [
-				`Start with the smallest readable \`${definition.configKey}\` shape. If the feature needs a Cloudflare-created id or namespace, keep that explicit in config so reviewers can see where the remote boundary begins.`,
-				'Use this page as the quick contract, then open the deeper internals/testing/example tabs only when the first recipe is not enough.'
+				`Add \`${definition.configKey}\` to \`devflare.config.ts\`, then use the generated env binding from Worker code.`,
+				'Keep the first version close to the route or handler that needs it; move to a helper only after the shape is obvious.'
 			],
 			authoringSnippet: definition.configSnippet,
 			fitBullets: [
@@ -704,24 +709,17 @@ export function createCompactBindingGuide(
 				'Prefer Devflare native config while it covers the feature; use `wrangler.passthrough` only for unsupported Wrangler-only fields.'
 			],
 			caveatBullets: [
-				definition.localStory,
-				definition.remoteBoundary,
-				`For tests, start with ${definition.defaultHarness}; reach for ${definition.testHelper} when you want a pure unit test without Miniflare or Cloudflare.`
+				`Start with ${definition.defaultHarness} for config-backed local worker tests.`,
+				`Use ${definition.testHelper} for small unit tests that only need deterministic application behavior.`,
+				'Use Cloudflare-backed tests when the assertion depends on hosted platform behavior, account state, limits, billing, or production routing.'
 			],
-			caveatCallout: {
-				tone: 'info',
-				title: 'Document the boundary at the same time as the recipe',
-				body: [
-					`The old docs often made developers infer whether ${definition.label} was local, remote, or fixture-backed. This page keeps that stance beside the first usable example.`
-				]
-			},
 			extraSections: definition.overviewSections
 		},
 		internals: {
 			readTime: '2 min read',
 			summary: `${definition.label} compiles from \`${definition.configKey}\` to ${definition.compileTarget}, with local/test behavior called out explicitly.`,
 			description:
-				'The internals page is deliberately short: it shows the authored config beside the Wrangler-facing output and names the exact places where Devflare stops pretending to be Cloudflare.',
+				'Use this page when you need emitted config, preview behavior, or Cloudflare-specific limits. The overview and example pages stay focused on everyday app code.',
 			highlights: [
 				`Compile target: ${definition.compileTarget}.`,
 				`Env type: ${definition.envType}.`,
@@ -732,7 +730,7 @@ export function createCompactBindingGuide(
 			previewNote: definition.remoteBoundary,
 			normalizationParagraphs: [
 				'The authored config stays camelCase and project-oriented. The compiler translates that into the Wrangler keys Cloudflare expects.',
-				'The generated output is intentionally shown so the docs can be checked against real compiler behavior instead of relying on memory.'
+				'The emitted output is shown here so the usage pages do not have to explain compiler details.'
 			],
 			localRuntimeBullets: [
 				definition.localStory,

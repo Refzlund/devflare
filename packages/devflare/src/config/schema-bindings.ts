@@ -117,15 +117,18 @@ export const workerLoaderBindingSchema = z.object({}).strict()
 
 /**
  * Secrets Store binding configuration.
- * Devflare uses camelCase authoring and compiles to Wrangler's
- * `secrets_store_secrets` array (`store_id`, `secret_name`).
+ * Devflare accepts object form for explicit per-binding store IDs and string
+ * shorthand when the worker sets a top-level `secretsStoreId`.
  */
-export const secretsStoreBindingSchema = z.object({
-	/** Secrets Store ID containing the account-level secret */
-	storeId: z.string().min(1),
-	/** Secret name within the store */
-	secretName: z.string().min(1)
-}).strict()
+export const secretsStoreBindingSchema = z.union([
+	z.string().min(1),
+	z.object({
+		/** Secrets Store ID containing the account-level secret */
+		storeId: z.string().min(1),
+		/** Secret name within the store */
+		secretName: z.string().min(1)
+	}).strict()
+])
 
 /**
  * Service binding schema.

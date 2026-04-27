@@ -91,7 +91,7 @@ function compileConfigInternal(
 	}
 
 	if (mergedConfig.bindings) {
-		compileBindings(mergedConfig.bindings, result, options)
+		compileBindings(mergedConfig.bindings, result, options, mergedConfig.secretsStoreId)
 	}
 
 	if (mergedConfig.triggers?.crons && mergedConfig.triggers.crons.length > 0) {

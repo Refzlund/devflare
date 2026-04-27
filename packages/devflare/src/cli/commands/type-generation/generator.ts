@@ -62,7 +62,7 @@ interface TypeGenerationConfig {
 			namespace?: string
 			remote?: boolean
 		}>
-		secretsStore?: Record<string, { storeId?: string; secretName?: string }>
+		secretsStore?: Record<string, string | { storeId?: string; secretName?: string }>
 		services?: Record<string, { service?: string }>
 		ai?: { binding?: string; remote?: boolean; staging?: boolean }
 		aiSearchNamespaces?: Record<string, { namespace?: string; remote?: boolean }>

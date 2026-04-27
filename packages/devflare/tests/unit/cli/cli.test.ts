@@ -121,6 +121,25 @@ describe('parseArgs', () => {
 		expect(result.options.roll).toBe('preview')
 	})
 
+	test('parses secrets command', () => {
+		const result = parseArgs([
+			'secrets',
+			'--local',
+			'--store',
+			'store-123',
+			'--name',
+			'api-token',
+			'--value',
+			'local-secret'
+		])
+
+		expect(result.command).toBe('secrets')
+		expect(result.options.local).toBe(true)
+		expect(result.options.store).toBe('store-123')
+		expect(result.options.name).toBe('api-token')
+		expect(result.options.value).toBe('local-secret')
+	})
+
 	test('parses login command', () => {
 		const result = parseArgs(['login', '--force'])
 		expect(result.command).toBe('login')
@@ -280,6 +299,7 @@ describe('runCli', () => {
 			{ argv: ['productions', '--help'], snippet: 'devflare productions Inspect and manage live production Workers and deployments' },
 			{ argv: ['worker', '--help'], snippet: 'devflare worker Rename and manage Worker control-plane operations' },
 			{ argv: ['tokens', '--help'], snippet: 'devflare tokens Manage Devflare-managed Cloudflare API tokens' },
+			{ argv: ['secrets', '--help'], snippet: 'devflare secrets Manage local Secrets Store values' },
 			{ argv: ['ai', '--help'], snippet: 'devflare ai Show Workers AI pricing information' },
 			{ argv: ['remote', '--help'], snippet: 'devflare remote Manage remote test mode for paid Cloudflare features' },
 			{ argv: ['help', 'help'], snippet: 'devflare help Show command overview or command-specific help' },

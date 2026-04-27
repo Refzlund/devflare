@@ -45,6 +45,40 @@ function getCurrentDate(): string {
 	return now.toISOString().split('T')[0]
 }
 
+function getSecretsStoreShorthandBindings(config: {
+	bindings?: {
+		secretsStore?: Record<string, unknown>
+	}
+}): string[] {
+	return Object.entries(config.bindings?.secretsStore ?? {})
+		.filter(([, binding]) => typeof binding === 'string')
+		.map(([bindingName]) => bindingName)
+}
+
+function addSecretsStoreShorthandIssues(
+	ctx: z.RefinementCtx,
+	config: {
+		secretsStoreId?: string
+		bindings?: {
+			secretsStore?: Record<string, unknown>
+		}
+	},
+	pathPrefix: Array<string | number> = []
+): void {
+	if (config.secretsStoreId) {
+		return
+	}
+
+	for (const bindingName of getSecretsStoreShorthandBindings(config)) {
+		ctx.addIssue({
+			code: z.ZodIssueCode.custom,
+			path: [...pathPrefix, 'bindings', 'secretsStore', bindingName],
+			message:
+				`Secrets Store binding "${bindingName}" uses shorthand and requires top-level secretsStoreId.`
+		})
+	}
+}
+
 /**
  * Raw Zod shape of the root devflare configuration (excluding the `env` field,
  * which references back into this shape via the environment override schema).
@@ -66,6 +100,12 @@ export const rootConfigShape = {
 	 * Required for remote bindings (AI, Vectorize, etc.).
 	 */
 	accountId: z.string().optional(),
+
+	/**
+	 * Default Cloudflare Secrets Store ID used by shorthand Secrets Store
+	 * bindings in `bindings.secretsStore`.
+	 */
+	secretsStoreId: z.string().min(1).optional(),
 
 	/**
 	 * Cloudflare Workers compatibility date.
@@ -156,9 +196,18 @@ const canonicalConfigSchema = z.object({
 	...rootConfigShape,
 	/** Environment-specific configuration overrides. */
 	env: z.record(z.string(), envConfigSchemaInner).optional()
+}).strict().superRefine((config, ctx) => {
+	addSecretsStoreShorthandIssues(ctx, config)
+
+	for (const [envName, envConfig] of Object.entries(config.env ?? {})) {
+		addSecretsStoreShorthandIssues(ctx, {
+			...envConfig,
+			secretsStoreId: envConfig.secretsStoreId ?? config.secretsStoreId
+		}, ['env', envName])
+	}
 })
 
-export const configSchema = canonicalConfigSchema.strict()
+export const configSchema = canonicalConfigSchema
 
 /** Output type after Zod validation and transforms */
 export type DevflareConfig = z.output<typeof configSchema>
@@ -201,7 +250,8 @@ export type {
 	NormalizedPipelineBinding,
 	NormalizedImagesBinding,
 	NormalizedMediaBinding,
-	NormalizedArtifactsBinding
+	NormalizedArtifactsBinding,
+	NormalizedSecretsStoreBinding
 } from './schema-normalization'
 export {
 	getLocalD1DatabaseIdentifier,
@@ -218,6 +268,7 @@ export {
 	normalizePipelineBinding,
 	normalizeImagesBinding,
 	normalizeMediaBinding,
+	normalizeSecretsStoreBinding,
 	normalizeArtifactsBinding
 } from './schema-normalization'
 export { browserBindingSchema, formatBrowserBindingLimitMessage } from './schema-bindings'

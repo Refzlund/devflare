@@ -16,9 +16,11 @@ import {
 	normalizeMediaBinding,
 	normalizeMtlsCertificateBinding,
 	normalizePipelineBinding,
+	normalizeSecretsStoreBinding,
 	normalizeWorkflowBinding
 } from '../config'
 import { applyLocalDevVarsToConfig } from '../config/local-dev-vars'
+import { seedMiniflareLocalSecrets } from '../secrets/local-secrets'
 import { GATEWAY_RUNTIME_JS } from './gateway-runtime'
 
 // -----------------------------------------------------------------------------
@@ -711,13 +713,20 @@ export async function startMiniflareFromConfig(
 			: undefined,
 		secretsStore: bindings.secretsStore
 			? Object.fromEntries(
-					Object.entries(bindings.secretsStore).map(([bindingName, binding]) => [
-						bindingName,
-						{
-							store_id: binding.storeId,
-							secret_name: binding.secretName
-						}
-					])
+					Object.entries(bindings.secretsStore).map(([bindingName, binding]) => {
+						const normalized = normalizeSecretsStoreBinding(
+							binding,
+							runtimeConfig.secretsStoreId,
+							bindingName
+						)
+						return [
+							bindingName,
+							{
+								store_id: normalized.storeId,
+								secret_name: normalized.secretName
+							}
+						]
+					})
 				)
 			: undefined,
 		sendEmail: bindings.sendEmail ? bindings.sendEmail : undefined,
@@ -738,7 +747,12 @@ export async function startMiniflareFromConfig(
 			: undefined
 	}
 
-	return startMiniflare(mfOptions)
+	const instance = await startMiniflare(mfOptions)
+	if (options.cwd) {
+		await seedMiniflareLocalSecrets(instance._mf, runtimeConfig, options.cwd)
+	}
+
+	return instance
 }
 
 // -----------------------------------------------------------------------------

@@ -1,5 +1,9 @@
-import { describe, expect, test } from 'bun:test'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { afterEach, describe, expect, test } from 'bun:test'
 import type { Pipeline } from 'cloudflare:pipelines'
+import { writeLocalSecret } from '../../../src/secrets/local-secrets'
 import {
 	createOfflineBindings,
 	createOfflineEnv,
@@ -7,14 +11,33 @@ import {
 	getOfflineSupportMatrix
 } from '../../../src/test'
 
+const tempDirs: string[] = []
+
+function createTempDir(): string {
+	const dir = mkdtempSync(join(tmpdir(), 'devflare-offline-secrets-'))
+	tempDirs.push(dir)
+	return dir
+}
+
+afterEach(() => {
+	while (tempDirs.length > 0) {
+		const dir = tempDirs.pop()
+		if (dir) {
+			rmSync(dir, { recursive: true, force: true })
+		}
+	}
+})
+
 describe('offline support matrix', () => {
 	test('classifies services by honest offline support tier', () => {
 		const matrix = getOfflineSupportMatrix()
 
 		expect(matrix.containers.tier).toBe('offline-native')
+		expect(matrix.hyperdrive.tier).toBe('offline-native')
+		expect(matrix.workerLoaders.tier).toBe('offline-native')
 		expect(matrix.workflows.tier).toBe('offline-native')
 		expect(matrix.aiSearch.tier).toBe('offline-fixture')
-		expect(matrix.media.tier).toBe('offline-fixture')
+		expect(matrix.media.tier).toBe('offline-native')
 		expect(matrix.mtlsCertificates.tier).toBe('offline-fixture')
 		expect(matrix.ai.tier).toBe('remote-boundary')
 		expect(matrix.vectorize.tier).toBe('remote-boundary')
@@ -61,6 +84,12 @@ describe('createOfflineBindings', () => {
 			},
 			versionMetadata: {
 				binding: 'CF_VERSION_METADATA'
+			},
+			hyperdrive: {
+				POSTGRES: {
+					id: 'hyperdrive-id',
+					localConnectionString: 'postgres://user:pass@localhost:5432/app'
+				}
 			},
 			workerLoaders: {
 				LOADER: {}
@@ -162,6 +191,9 @@ describe('createOfflineBindings', () => {
 
 		expect(result.env.PUBLIC_VALUE).toBe('local')
 		expect(await (result.env.API_TOKEN as SecretsStoreSecret).get()).toBe('offline-secret')
+		expect((result.env.POSTGRES as Hyperdrive).connectionString).toBe(
+			'postgres://user:pass@localhost:5432/app'
+		)
 		expect(await (await (result.env.API_CERT as Fetcher).fetch('https://example.com')).text()).toBe(
 			'cert fetch'
 		)
@@ -209,7 +241,7 @@ describe('createOfflineBindings', () => {
 				service: 'secretsStore',
 				binding: 'API_TOKEN',
 				reason:
-					'Secrets Store values are not present in config; pass fixtures.secretsStore.API_TOKEN for offline tests.'
+					'Secrets Store values are not present in fixtures or the local secret store; pass fixtures.secretsStore.API_TOKEN or run devflare secrets --local.'
 			}
 		])
 		await expect((result.env.API_TOKEN as SecretsStoreSecret).get()).rejects.toThrow(
@@ -230,5 +262,27 @@ describe('createOfflineBindings', () => {
 			tag: 'local',
 			timestamp: '1970-01-01T00:00:00.000Z'
 		})
+	})
+
+	test('loads Secrets Store values from the local secret store when cwd is provided', async () => {
+		const cwd = createTempDir()
+		writeLocalSecret({
+			cwd,
+			storeId: 'store-123',
+			name: 'api-token',
+			value: 'local-secret'
+		})
+
+		const env = createOfflineEnv({
+			name: 'offline-secret-worker',
+			secretsStoreId: 'store-123',
+			bindings: {
+				secretsStore: {
+					API_TOKEN: 'api-token'
+				}
+			}
+		}, {}, { cwd })
+
+		expect(await (env.API_TOKEN as SecretsStoreSecret).get()).toBe('local-secret')
 	})
 })

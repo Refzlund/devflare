@@ -44,7 +44,7 @@ export const devflareDocsPart3: DocPage[] = [
 		highlights: [
 			'The same authored config drives the app and the tests; there is no separate test-only binding schema to babysit.',
 			'The unified `env` proxy works inside request handlers, inside `createTestContext()` tests, and through the bridge when code needs to cross back into the worker world.',
-			'`cf.worker`, `cf.queue`, `cf.scheduled`, `cf.email`, and `cf.tail` run user code inside the same AsyncLocalStorage-backed event context the runtime helpers expect.',
+			'`cf.worker`, `cf.queue`, `cf.scheduled`, `cf.email`, and `cf.tail` run user code with the same runtime context helpers the app expects.',
 			'Durable Object methods can be called directly through `env.MY_DO.getByName(...).myMethod()` instead of forcing every stateful test through HTTP glue.',
 			'When a bridge-backed call returns a custom class, `src/transport.ts` can rebuild that class on the caller side instead of flattening it into plain JSON.'
 		],
@@ -116,7 +116,7 @@ export const devflareDocsPart3: DocPage[] = [
 				id: 'bridge-layers',
 				title: 'The bridge is the difference, but it is not the only layer doing useful work',
 				paragraphs: [
-					'The seamless part comes from several layers cooperating: config autodiscovery, the unified `env` proxy, runtime-shaped helper entrypoints, AsyncLocalStorage-backed event context, and bridge proxies that forward binding calls into the local worker world.',
+					'The seamless part comes from several user-visible pieces cooperating: config autodiscovery, the unified `env` proxy, runtime-shaped helper entrypoints, and bridge proxies that forward binding calls into the local worker world.',
 					'That is also why Devflare testing scales beyond one fetch route. The same system can cover direct binding calls, queue and scheduled helpers, Tail events, and bridge-backed Durable Object or service interactions without making you rewire the whole harness every time the package grows a new surface.'
 				],
 				table: {
@@ -134,7 +134,7 @@ export const devflareDocsPart3: DocPage[] = [
 						],
 						[
 							'`cf.*` helpers',
-							'Create runtime-shaped fetch, queue, scheduled, email, and tail events/controllers and install them into AsyncLocalStorage before user code runs.',
+							'Create runtime-shaped fetch, queue, scheduled, email, and tail events/controllers before user code runs.',
 							'Helpers such as `getFetchEvent()` and `locals` keep working in tests instead of only in real requests.'
 						],
 						[
@@ -223,7 +223,7 @@ export const devflareDocsPart3: DocPage[] = [
 						[
 							'Routes and fetch middleware',
 							'`cf.worker.get()` or `cf.worker.fetch()`',
-							'Request shape, route params, and AsyncLocalStorage-backed fetch context.'
+							'Request shape, route params, and runtime helper access.'
 						],
 						[
 							'Queue consumers',
@@ -401,9 +401,9 @@ test('GET /health proves the worker boots', async () => {
 					{
 						href: docsLink('runtime-context'),
 						label: 'Runtime',
-						meta: 'AsyncLocalStorage',
+						meta: 'Runtime helpers',
 						title: 'Runtime context',
-						body: 'Open this when missing-context errors, getters, or runtime proxies are making tests feel harder to trace than they should. It explains the AsyncLocalStorage-backed context model the helpers depend on.'
+						body: 'Open this when missing-context errors, getters, or runtime proxies are making tests feel harder to trace than they should.'
 					},
 					{
 						href: docsLink('transport-file'),
@@ -435,7 +435,7 @@ test('GET /health proves the worker boots', async () => {
 						[
 							'Why does Devflare testing feel smoother than the usual Worker setup?',
 							'`Why tests feel native`',
-							'It explains the unified env, bridge-backed bindings, AsyncLocalStorage-backed helper surfaces, and direct Durable Object story.'
+							'It explains the unified env, bridge-backed bindings, runtime helper surfaces, and direct Durable Object story.'
 						],
 						[
 							'How does the default runtime-shaped harness behave?',
@@ -450,7 +450,7 @@ test('GET /health proves the worker boots', async () => {
 						[
 							'Why are getters or proxies failing in a test?',
 							'`Runtime context`',
-							'The runtime-context page explains the AsyncLocalStorage-backed model underneath the helper APIs.'
+							'The runtime-context page explains when helper APIs can read the active request, env, ctx, event, and locals.'
 						],
 						[
 							'Why is a custom class not round-tripping in a test?',
@@ -478,8 +478,8 @@ test('GET /health proves the worker boots', async () => {
 				id: 'where-binding-guides-live',
 				title: 'Binding-specific testing pages already exist — they were just easy to miss',
 				paragraphs: [
-					'Each binding overview page already ends with a “Go deeper” section that links its hidden internals, testing, and example pages. That means the binding-specific testing content is already in the library, but it was discoverable mostly if you were already reading the right binding page.',
-					'Use the binding testing index when you know which binding changed and want the testing guide directly. Use the binding overview page first when you still need the authoring shape, runtime contract, or preview story before the tests make sense.'
+					'Each binding overview page already links its testing and example pages. That means the binding-specific testing content is already in the library, but it was discoverable mostly if you were already reading the right binding page.',
+					'Use the binding testing index when you know which binding changed and want the testing guide directly. Use the binding overview page first when you still need the config shape, runtime usage, or local support notes before the tests make sense.'
 				],
 				cards: [
 					{
@@ -511,7 +511,7 @@ test('GET /health proves the worker boots', async () => {
 		description:
 			'Binding testing is not one-size-fits-all. KV, D1, R2, Durable Objects, Queues, and several other bindings are strong local-first stories, while AI, Vectorize, and a few infrastructure-heavy bindings need more remote or higher-fidelity checks sooner. Use this page when you know the binding but do not want to hunt through the whole binding library first.',
 		highlights: [
-			'Every binding overview page ends with a “Go deeper” section that links its testing guide.',
+			'Every binding overview page links its testing guide.',
 			'Most bindings still start with `createTestContext()` plus the real binding or helper surface, not a hand-built fake.',
 			'Remote-oriented guides say so explicitly instead of pretending every binding has the same local story.',
 			'Open the binding overview page first when you need config or runtime shape; open the testing guide first when the binding already exists and the only question left is test design.'
@@ -520,7 +520,7 @@ test('GET /health proves the worker boots', async () => {
 			{ label: 'Best for', value: 'Jumping straight to the right binding-specific testing guide' },
 			{
 				label: 'Where the links also live',
-				value: 'At the bottom of each binding overview page in the “Go deeper” section'
+				value: 'At the bottom of each binding overview page'
 			},
 			{
 				label: 'Default pattern',

@@ -123,7 +123,7 @@ export const devflareDocsPart4: DocPage[] = [
 				id: 'tail-support',
 				title: 'Tail handlers are testable even before they become a public config lane',
 				paragraphs: [
-					'Tail support is already a real helper surface in the harness even though it still sits outside the public `files.*` config keys. When `createTestContext()` finds `src/tail.ts`, it wires `cf.tail.trigger()` automatically and runs the handler inside the same AsyncLocalStorage-backed event context as the other helpers.',
+					'Tail support is already a real helper surface in the harness even though it still sits outside the public `files.*` config keys. When `createTestContext()` finds `src/tail.ts`, it wires `cf.tail.trigger()` automatically and runs the handler with the same runtime helper access as the other test surfaces.',
 					'The handler can export a default function or a named `tail` function. The helper accepts either full trace items or smaller option objects through `cf.tail.create(...)`, then waits for the handler and any queued `waitUntil()` work before it returns.'
 				],
 				snippets: [
@@ -264,7 +264,7 @@ describe('worker runtime', () => {
 					{
 						href: docsLink('runtime-context'),
 						label: 'Runtime',
-						meta: 'AsyncLocalStorage',
+						meta: 'Runtime helpers',
 						title: 'Runtime context',
 						body: 'Read this when getter failures, missing context, or proxy behavior are making the test harness harder to trace than it should be.'
 					},

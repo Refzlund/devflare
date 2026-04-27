@@ -70,7 +70,7 @@ describe('documented Cloudflare product stances', () => {
 		const readme = readPackageReadme()
 
 		expect(readme).toContain('### Workflows local simulation stance')
-		expect(readme).toContain('Local Workflows are useful for handler-level tests')
+		expect(readme).toContain('Workflows have full local support through Miniflare wiring')
 		expect(readme).toContain(
 			'Use deployed or Wrangler-backed tests for production Workflow lifecycle behavior'
 		)
@@ -90,17 +90,17 @@ describe('documented Cloudflare product stances', () => {
 		const readme = readPackageReadme()
 
 		expect(readme).toContain('### Images transformation testability stance')
-		expect(readme).toContain('Images local tests can validate Worker integration code')
+		expect(readme).toContain('Images have full local support for Worker transformation flows')
 		expect(readme).toContain(
 			'Devflare does not provision hosted Images storage, variants, signed URLs, or custom delivery rules'
 		)
 	})
 
-	test('documents Media Transformations remote binding boundaries', () => {
+	test('documents Media Transformations local shim boundaries', () => {
 		const readme = readPackageReadme()
 
-		expect(readme).toContain('### Media Transformations remote binding stance')
-		expect(readme).toContain('Media Transformations local execution is remote-binding only')
+		expect(readme).toContain('### Media Transformations local shim stance')
+		expect(readme).toContain('Media Transformations have full local support for Worker call chains')
 		expect(readme).toContain(
 			'Devflare does not configure zone-level transformation enablement, source origins, signed URL policy, cache behavior, or billing controls'
 		)
@@ -163,10 +163,10 @@ describe('documented Cloudflare product stances', () => {
 		)
 		expect(readme).toContain('Remote-boundary means meaningful behavior lives in Cloudflare')
 		expect(readme).toContain(
-			'`shouldSkip.aiSearch`, `shouldSkip.aiGateway`, `shouldSkip.media`, `shouldSkip.mtlsCertificates`, `shouldSkip.artifacts`, and `shouldSkip.builds`'
+			'`shouldSkip.aiSearch`, `shouldSkip.aiGateway`, `shouldSkip.mtlsCertificates`, `shouldSkip.artifacts`, and `shouldSkip.builds`'
 		)
 		expect(readme).toContain(
-			'real Workers AI inference, Vectorize search semantics, AI Search indexing/ranking/crawling, Media Transformations output, mTLS certificate presentation, Artifacts Git remotes, Browser Run live/HITL/recordings, Cloudflare Builds, or the deployed Containers control plane'
+			'real Workers AI inference, Vectorize search semantics, AI Search indexing/ranking/crawling, final Media Transformations codec fidelity, mTLS certificate presentation, Artifacts Git remotes, Browser Run live/HITL/recordings, Cloudflare Builds, or the deployed Containers control plane'
 		)
 	})
 })

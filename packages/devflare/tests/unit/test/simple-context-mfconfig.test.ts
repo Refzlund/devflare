@@ -88,6 +88,27 @@ describe('buildInlineBridgeMfConfig', () => {
 		})
 	})
 
+	test('uses the default Secrets Store id for shorthand bindings in createTestContext', () => {
+		const mfConfig = buildInlineBridgeMfConfig({
+			name: 'my-worker',
+			compatibilityDate: '2026-04-26',
+			compatibilityFlags: [],
+			secretsStoreId: 'store-123',
+			bindings: {
+				secretsStore: {
+					API_TOKEN: 'api-token'
+				}
+			}
+		})
+
+		expect(mfConfig.secretsStoreSecrets).toEqual({
+			API_TOKEN: {
+				store_id: 'store-123',
+				secret_name: 'api-token'
+			}
+		})
+	})
+
 	test('adds Miniflare Worker Loader bindings for createTestContext', () => {
 		const mfConfig = buildInlineBridgeMfConfig({
 			name: 'my-worker',

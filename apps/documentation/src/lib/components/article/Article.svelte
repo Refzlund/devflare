@@ -10,6 +10,7 @@ import Block from '../code/Block.svelte'
 import InlineText from '../content/InlineText.svelte'
 import SectionHeading from '../content/SectionHeading.svelte'
 import Surface from '../layout/Surface.svelte'
+import { tooltip } from '../layout/Tooltip.svelte'
 import BulletList from './BulletList.svelte'
 import Callout from './Callout.svelte'
 import FloatingToc from './FloatingToc.svelte'
@@ -142,31 +143,45 @@ $effect(() => {
 					<span class="docs-accent-dot h-1 w-1 rounded-full"></span>
 					<span><InlineText text={doc.group} /></span>
 				</div>
-
-				{#if doc.headerCloudflareDocs}
-					<p class="docs-copy-sm docs-text-muted max-w-3xl">
-						<InlineText text={doc.headerCloudflareDocs.summary} />
-					</p>
-				{/if}
 			</div>
 
-			{#if doc.headerCloudflareDocs}
-				<a
-					href={resolveHref(doc.headerCloudflareDocs.href)}
-					target="_blank"
-					rel="noopener noreferrer"
-					title={doc.headerCloudflareDocs.title}
-					aria-label={`Open ${doc.headerCloudflareDocs.title}`}
-					class="docs-focus-ring docs-border docs-hover-strong docs-surface-nav docs-text-strong inline-flex w-fit shrink-0 items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium transition"
-				>
-					<span>{doc.headerCloudflareDocs.label ?? 'Cloudflare Documentation'}</span>
-					<span aria-hidden="true" class="iconify fluent--open-16-regular size-4 shrink-0"></span>
-				</a>
+			{#if doc.headerSupport || doc.headerCloudflareDocs}
+				<div class="flex flex-wrap items-center gap-2">
+					{#if doc.headerSupport}
+						<button
+							type="button"
+							use:tooltip={doc.headerSupport.tooltip}
+							aria-label={`Support: ${doc.headerSupport.label}. ${doc.headerSupport.tooltip}`}
+							class="docs-border docs-surface-nav docs-text-accent inline-flex w-fit shrink-0 items-center rounded-full border px-3 py-2 text-sm font-medium"
+						>
+							<InlineText text={doc.headerSupport.label} />
+						</button>
+					{/if}
+
+					{#if doc.headerCloudflareDocs}
+						<a
+							href={resolveHref(doc.headerCloudflareDocs.href)}
+							target="_blank"
+							rel="noopener noreferrer"
+							title={doc.headerCloudflareDocs.title}
+							aria-label={`Open ${doc.headerCloudflareDocs.title}`}
+							class="docs-focus-ring docs-border docs-hover-strong docs-surface-nav docs-text-strong inline-flex w-fit shrink-0 items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium transition"
+						>
+							<span>{doc.headerCloudflareDocs.label ?? 'Cloudflare Documentation'}</span>
+							<span aria-hidden="true" class="iconify fluent--open-16-regular size-4 shrink-0"></span>
+						</a>
+					{/if}
+				</div>
 			{/if}
 		</div>
 
 		<div class="space-y-4">
 			<h1 class="docs-title-xl docs-article-title docs-text-strong"><InlineText text={doc.title} /></h1>
+			{#if doc.headerCloudflareDocs}
+				<p class="docs-copy-sm docs-text-muted max-w-3xl">
+					<InlineText text={doc.headerCloudflareDocs.summary} />
+				</p>
+			{/if}
 			{#if !doc.summaryHidden}
 				<p class="docs-copy-lg docs-text-strong"><InlineText text={doc.summary} /></p>
 			{/if}
@@ -189,6 +204,8 @@ $effect(() => {
 		<section id={section.id} class={`scroll-mt-24 space-y-6 ${index === 0 ? '' : 'docs-border border-t pt-8'}`}>
 			<SectionHeading
 				title={section.title}
+				label={section.label}
+				labelTooltip={section.labelTooltip}
 				description={section.description}
 				class="space-y-3"
 				titleClass="docs-title-md docs-text-strong"

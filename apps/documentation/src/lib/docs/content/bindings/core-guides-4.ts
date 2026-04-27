@@ -240,10 +240,12 @@ export async function fetch(): Promise<Response> {
 		slugBase: 'hyperdrive',
 		label: 'Hyperdrive',
 		categoryDescription:
-			'PostgreSQL-oriented bindings with schema support, name resolution, and a narrower proven local story than D1 or KV.',
+			'PostgreSQL-oriented bindings with schema support, name resolution, and local connection strings for Miniflare.',
 		configKey: 'bindings.hyperdrive',
-		authoringShape: 'Record<string, string | { name: string } | { id: string }>',
-		localStory: 'Supported, but with a narrower proven local test story',
+		authoringShape:
+			'Record<string, string | { name; localConnectionString? } | { id; localConnectionString? }>',
+		localStory:
+			'Full local support when Devflare has a local database connection string for the binding',
 		sourcePages: [
 			'schema-bindings.ts',
 			'schema-normalization.ts',
@@ -256,19 +258,19 @@ export async function fetch(): Promise<Response> {
 			title:
 				'Use Hyperdrive when the worker needs a real PostgreSQL path behind Cloudflare’s pooling layer',
 			summary:
-				'Hyperdrive is modeled in Devflare config and compile flows like other name-based resources, but its tested local ergonomics are thinner than D1 or KV.',
+				'Hyperdrive is modeled in Devflare config, compile flows, local Miniflare wiring, and pure tests through explicit local connection strings.',
 			description:
-				'That is not a reason to avoid it — it is a reason to document it accurately. The binding is supported, yet the strongest evidence in the repo focuses on presence, connection info, and targeted integration rather than a giant local mock universe.',
+				'For local work, point the binding at a local or test PostgreSQL database. Cloudflare still owns the hosted pooling layer, placement, account credentials, and production routing.',
 			highlights: [
 				'String shorthand means a stable Hyperdrive configuration name.',
 				'Build and deploy can resolve names to Hyperdrive ids.',
-				'The local story is real but narrower than D1, KV, or R2.',
+				'Local dev and tests can use `localConnectionString` or the Hyperdrive local connection env var.',
 				'Preview handling is special because Hyperdrive configs cannot always be cloned automatically.'
 			],
 			bestFor: 'Workers that connect to PostgreSQL through Hyperdrive',
 			authoringParagraphs: [
 				'Hyperdrive follows the same stable-name instinct as KV and D1: author a readable name in source when you can, then let Devflare resolve ids later when a flow actually needs them.',
-				'The main difference is operational. Hyperdrive has credential and infrastructure constraints that make preview lifecycle trickier than storage bindings like KV or R2.'
+				'Add `localConnectionString` when local dev or tests should query a local database without contacting Cloudflare.'
 			],
 			authoringSnippet: {
 				title: 'Hyperdrive binding authoring',
@@ -279,7 +281,10 @@ export default defineConfig({
 	name: 'postgres-worker',
 	bindings: {
 		hyperdrive: {
-			DB: 'app-postgres',
+			DB: {
+				name: 'app-postgres',
+				localConnectionString: 'postgres://user:pass@localhost:5432/app'
+			},
 			ANALYTICS_DB: { id: 'hyperdrive-id' }
 		}
 	}
@@ -291,28 +296,28 @@ export default defineConfig({
 				'If your data is already a comfortable fit for D1, D1 may still be the simpler first choice.'
 			],
 			caveatBullets: [
-				'The repo evidence for local Hyperdrive ergonomics is thinner than the local stories for D1, KV, or R2.',
+				'Use `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_DB` to override the configured local connection string in CI or per-developer shells.',
 				'Preview-scoped Hyperdrive configs are not auto-cloned from the base configuration because stored credentials are not always available for that.',
 				'When a preview Hyperdrive config does not exist, Devflare may fall back to the base configuration and warn.'
 			],
 			caveatCallout: {
 				tone: 'warning',
-				title: 'Supported does not mean equally local-friendly',
+				title: 'Local and hosted responsibilities are different',
 				body: [
-					'Hyperdrive belongs in the binding library, but its test guidance should stay more conservative than the guidance for D1 or KV.'
+					'Devflare can wire the local database path. Cloudflare still owns hosted pooling, production credentials, placement, billing, and account state.'
 				]
 			}
 		},
 		internals: {
 			readTime: '3 min read',
 			summary:
-				'Hyperdrive uses the same normalize-and-resolve pattern as KV and D1, but preview lifecycle includes a fallback path instead of guaranteed preview cloning.',
+				'Hyperdrive uses the same normalize-and-resolve pattern as KV and D1, and local runtime config is driven by the binding connection string.',
 			description:
 				'That fallback behavior is worth documenting explicitly because it changes how you should think about preview isolation and cleanup for database-backed flows.',
 			highlights: [
 				'String shorthand means a stable Hyperdrive configuration name.',
 				'Compile emits Wrangler `hyperdrive` entries after resolution.',
-				'Preview resource code handles Hyperdrive more cautiously than KV, D1, or R2.',
+				'Local Miniflare config receives `hyperdrives` only when a local connection string is available.',
 				'Cleanup can remove preview Hyperdrives that actually exist, but cloning is not automatic.'
 			],
 			normalizationFact:
@@ -325,9 +330,9 @@ export default defineConfig({
 				'That part looks familiar if you already understand KV or D1. The unusual part is preview lifecycle, not the authored schema.'
 			],
 			localRuntimeBullets: [
-				'The repo shows Hyperdrive bindings exposing connection-oriented information such as `connectionString`, and some smoke paths also allow a `query()`-style helper.',
-				'The bridge-level local helper surface is thinner than D1, KV, or R2 — expect to lean on targeted integration tests for database behavior that matters.',
-				'The strongest proven local habit is to assert the binding exists and verify the connection string shape.'
+				'Devflare passes `bindings.hyperdrive.*.localConnectionString` into Miniflare `hyperdrives` so local Worker code can use the normal Hyperdrive binding shape.',
+				'`CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_<BINDING>` and the legacy `WRANGLER_HYPERDRIVE_LOCAL_CONNECTION_STRING_<BINDING>` override config for local runs.',
+				'Pure tests can use `createOfflineEnv()` or `createMockHyperdrive()` when the application code only needs the connection string.'
 			],
 			compileBullets: [
 				'Build and deploy resolve name-based Hyperdrive bindings to real configuration ids before generating output.',
@@ -345,21 +350,21 @@ export default defineConfig({
 		testing: {
 			readTime: '4 min read',
 			summary:
-				'Hyperdrive testing should start smaller and more cautiously than D1 testing: prove the binding exists, then add targeted integration where the real database path matters.',
+				'Hyperdrive testing should start with a local connection string, then add a focused query test against the database shape your app actually uses.',
 			description:
-				'The codebase shows enough evidence to document Hyperdrive as supported, but not enough to oversell it as a drop-in local-first database harness identical to D1.',
+				'Devflare can provide the binding locally. Your test database still has to exist, just like any other local Postgres dependency.',
 			highlights: [
-				'Start with binding presence and connection info.',
+				'Start with a deterministic local connection string.',
 				'Prefer targeted integration tests for the real PostgreSQL path.',
 				'Keep preview-fallback behavior visible in tests when preview isolation matters.',
-				'Do not pretend the local story is as rich as D1 unless your own app proved that separately.'
+				'Use Cloudflare only when hosted pooling, placement, or account lifecycle is the assertion.'
 			],
-			bestFor: 'Binding presence checks and targeted PostgreSQL integration paths',
-			defaultHarness: '`createTestContext()` plus small binding or smoke checks',
+			bestFor: 'Local PostgreSQL integration paths and connection-string-driven app code',
+			defaultHarness: '`createTestContext()` or `createOfflineEnv()` with `localConnectionString`',
 			escalation: 'The app depends on real preview isolation or actual Postgres query behavior',
 			paragraphs: [
-				'Start with one small assertion that the binding exists and exposes the connection information your code expects. That already tells you whether the config and runtime wiring are sane.',
-				'Then add focused integration tests against the actual database path instead of manufacturing a huge fake local contract that the repo itself does not clearly guarantee.'
+				'Start with one small assertion that the binding exposes the local connection string your database client expects.',
+				'Then add focused integration tests against the actual local database path instead of involving Cloudflare for application-owned SQL behavior.'
 			],
 			mainSnippet: {
 				title: 'A conservative Hyperdrive smoke test',
@@ -370,44 +375,45 @@ import { createTestContext, env } from 'devflare/test'
 beforeAll(() => createTestContext())
 afterAll(() => env.dispose())
 
-test('Hyperdrive binding exposes connection info', () => {
+test('Hyperdrive binding exposes local connection info', () => {
 	expect(env.DB).toBeDefined()
-	expect(Boolean(env.DB?.connectionString)).toBe(true)
+	expect(env.DB.connectionString).toContain('localhost')
 })`
 			},
 			helperBullets: [
-				'Use small binding-presence checks first instead of overpromising local query semantics.',
+				'Use `localConnectionString` in config when the test should run without Cloudflare.',
+				'Use `createMockHyperdrive` when a pure unit test needs a Hyperdrive-shaped binding without Miniflare.',
 				'Keep one higher-level integration path for the real database behavior you actually care about.',
 				'If preview isolation matters, test the fallback or dedicated preview strategy explicitly.'
 			],
 			caveatBullets: [
-				'Do not present Hyperdrive as if Devflare already gives it the same local comfort story as D1.',
+				'Do not run local Hyperdrive tests against a shared production database.',
 				'If the worker truly depends on live query behavior, prefer an integration test against a real database path.',
 				'Preview-specific Hyperdrive expectations deserve a dedicated test because automatic cloning is not guaranteed.'
 			],
 			callout: {
 				tone: 'warning',
-				title: 'Conservative is the honest test strategy',
+				title: 'Keep database ownership explicit',
 				body: [
-					'The goal is trustworthy docs, not pretending every binding has identical local ergonomics.'
+					'Devflare owns the binding wiring; the test suite owns the local database lifecycle and seed data.'
 				]
 			}
 		},
 		example: {
 			readTime: '3 min read',
 			summary:
-				'This example keeps Hyperdrive focused on one thing: prove the binding exists and expose the connection information your app will need next.',
+				'This example uses Hyperdrive in an application route that reads one product from PostgreSQL.',
 			description:
-				'That is a better first example than a giant database abstraction because it teaches the actual runtime contract the repo proves today.',
+				'Use the same route locally with a local Postgres connection string, then deploy with the Cloudflare Hyperdrive configuration id or name.',
 			highlights: [
 				'The config stays readable through a stable Hyperdrive name.',
-				'The runtime example does not pretend to be a full ORM.',
-				'The route can later grow into a real query path with a PostgreSQL driver.',
-				'This is intentionally a binding-first example, not a full database app.'
+				'The runtime example uses a real PostgreSQL client.',
+				'The route returns a concrete product record.',
+				'The production boundary stays visible next to the local connection string.'
 			],
 			configFocus: 'Stable Hyperdrive naming',
-			runtimeShape: 'Read connection information from the binding',
-			bestUse: 'Health checks and first integration wiring',
+			runtimeShape: 'Query through `env.DB.connectionString`',
+			bestUse: 'Product, order, account, or tenant data stored in PostgreSQL',
 			configSnippet: {
 				title: 'Minimal Hyperdrive config',
 				language: 'ts',
@@ -420,32 +426,42 @@ export default defineConfig({
 	},
 	bindings: {
 		hyperdrive: {
-			DB: 'app-postgres'
+			DB: {
+				name: 'app-postgres',
+				localConnectionString: 'postgres://user:pass@localhost:5432/app'
+			}
 		}
 	}
 })`
 			},
 			usageSnippet: {
-				title: 'Expose the binding shape you will use later',
+				title: 'Read one product through Hyperdrive',
 				language: 'ts',
-				code: String.raw`import { env } from 'devflare/runtime'
+				code: String.raw`import postgres from 'postgres'
+import { env, getFetchEvent } from 'devflare/runtime'
+
+const sql = postgres(env.DB.connectionString)
 
 export async function fetch(): Promise<Response> {
-	return Response.json({
-		hasBinding: Boolean(env.DB),
-		hasConnectionString: Boolean(env.DB?.connectionString)
-	})
+	const event = getFetchEvent()
+	const slug = new URL(event.request.url).searchParams.get('slug') ?? 'starter-kit'
+	const [product] = await sql.unsafe(
+		'select slug, name, price_cents from products where slug = $1 limit 1',
+		[slug]
+	)
+
+	return product ? Response.json(product) : new Response('not found', { status: 404 })
 }`
 			},
 			notes: [
-				'Once this route works, the next step is usually a targeted integration with the actual PostgreSQL driver and database path you plan to use.',
-				'This example is intentionally smaller than D1 because the repo evidence for Hyperdrive local ergonomics is also smaller.'
+				'Install the client with `bun add postgres` and point `localConnectionString` at a local or CI Postgres database.',
+				'Use Cloudflare-backed tests when the assertion depends on hosted pooling, placement, credentials, or deployed account behavior.'
 			],
 			callout: {
 				tone: 'info',
-				title: 'A smaller example is a more truthful example',
+				title: 'Use a real local database',
 				body: [
-					'The point here is to show the real binding contract the worker receives, not to imply more local guarantees than the repo currently proves.'
+					'Hyperdrive local support means Devflare can pass the connection path through the binding. It does not create or seed PostgreSQL for you.'
 				]
 			}
 		}

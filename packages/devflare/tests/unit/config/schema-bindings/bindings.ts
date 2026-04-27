@@ -547,6 +547,88 @@ describe('schema validation', () => {
 			}
 		})
 
+		test('accepts Secrets Store shorthand when a default store id is configured', () => {
+			const result = configSchema.safeParse({
+				name: 'my-worker',
+				compatibilityDate: '2025-01-07',
+				secretsStoreId: 'store-123',
+				bindings: {
+					secretsStore: {
+						API_TOKEN: 'api-token'
+					}
+				}
+			})
+
+			expect(result.success).toBe(true)
+			if (result.success) {
+				expect(result.data.secretsStoreId).toBe('store-123')
+				expect(result.data.bindings?.secretsStore?.API_TOKEN).toBe('api-token')
+			}
+		})
+
+		test('accepts environment Secrets Store shorthand inherited from the worker default store id', () => {
+			const result = configSchema.safeParse({
+				name: 'my-worker',
+				compatibilityDate: '2025-01-07',
+				secretsStoreId: 'store-123',
+				env: {
+					preview: {
+						bindings: {
+							secretsStore: {
+								API_TOKEN: 'preview-api-token'
+							}
+						}
+					}
+				}
+			})
+
+			expect(result.success).toBe(true)
+		})
+
+		test('rejects Secrets Store shorthand without a default store id', () => {
+			const result = configSchema.safeParse({
+				name: 'my-worker',
+				compatibilityDate: '2025-01-07',
+				bindings: {
+					secretsStore: {
+						API_TOKEN: 'api-token'
+					}
+				}
+			})
+
+			expect(result.success).toBe(false)
+			if (!result.success) {
+				expect(result.error.issues[0]?.message).toContain('secretsStoreId')
+			}
+		})
+
+		test('rejects environment Secrets Store shorthand without a default store id', () => {
+			const result = configSchema.safeParse({
+				name: 'my-worker',
+				compatibilityDate: '2025-01-07',
+				env: {
+					preview: {
+						bindings: {
+							secretsStore: {
+								API_TOKEN: 'preview-api-token'
+							}
+						}
+					}
+				}
+			})
+
+			expect(result.success).toBe(false)
+			if (!result.success) {
+				expect(result.error.issues[0]?.path).toEqual([
+					'env',
+					'preview',
+					'bindings',
+					'secretsStore',
+					'API_TOKEN'
+				])
+			}
+		})
+
 		test('rejects Secrets Store bindings without a store id', () => {
 			const result = configSchema.safeParse({
 				name: 'my-worker',

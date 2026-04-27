@@ -74,15 +74,8 @@ const docStructure: DocGroupDefinition[] = [
 	{
 		title: 'Quickstart',
 		description:
-			'See why Devflare exists, build the smallest safe first worker, and keep the documentation contract nearby before you branch into the deeper toolkit.',
+			'See why Devflare exists, build the smallest safe first worker, and move into routes, bindings, previews, and tests when the app needs them.',
 		categories: [
-			{
-				id: 'docs-contract',
-				title: 'Documentation contract',
-				description:
-					'See how the former split package handbook coverage now lives directly in the task-focused site pages and the published `packages/devflare/LLM.md` handbook.',
-				slugs: ['documentation-contract']
-			},
 			{
 				id: 'foundations',
 				title: 'Foundations',
@@ -117,7 +110,7 @@ const docStructure: DocGroupDefinition[] = [
 				id: 'project-architecture',
 				title: 'Project Architecture',
 				description:
-					'See how real Devflare packages are laid out on disk, which files are authored versus generated, and how the monorepo boundary stays explicit.',
+					'See how real Devflare packages are laid out on disk and which files you normally edit.',
 				sidebarDisplay: 'standalone',
 				slugs: ['project-architecture', 'bridge-architecture-internals']
 			},
@@ -149,9 +142,10 @@ const docStructure: DocGroupDefinition[] = [
 				id: 'runtime',
 				title: 'Runtime',
 				description:
-					'Keep the reusable runtime primitives nearby: AsyncLocalStorage-backed context, request-wide middleware composition, bridge transport, and other worker-wide helper surfaces belong here.',
+					'Use runtime helpers, request-wide middleware, transport hooks, and other worker-wide surfaces without turning every page into an internals guide.',
 				slugs: [
 					'runtime-context',
+					'runtime-context-internals',
 					'sequence-middleware',
 					'runtime-handler-styles',
 					'transport-file'

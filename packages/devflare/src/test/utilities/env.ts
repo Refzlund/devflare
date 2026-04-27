@@ -9,6 +9,7 @@ import {
 	type MockRateLimitOptions,
 	type MockWorkerLoaderOptions,
 	createMockDispatchNamespace,
+	createMockHyperdrive,
 	createMockMTLSCertificate,
 	createMockRateLimit,
 	createMockSecretsStoreSecret,
@@ -26,6 +27,7 @@ export interface MockEnvOptions {
 	queues?: string[]
 	rateLimits?: Record<string, MockRateLimitOptions>
 	versionMetadata?: string
+	hyperdrive?: Record<string, string | Hyperdrive>
 	workerLoaders?: string[] | Record<string, MockWorkerLoaderOptions>
 	mtlsCertificates?: string[] | Record<string, MockFetcherHandler>
 	dispatchNamespaces?: string[] | Record<string, MockDispatchNamespaceOptions>
@@ -98,6 +100,14 @@ export function createMockEnv(options: MockEnvOptions = {}): Record<string, unkn
 	// Add Version Metadata binding
 	if (options.versionMetadata) {
 		env[options.versionMetadata] = createMockVersionMetadata()
+	}
+
+	// Add Hyperdrive bindings
+	if (options.hyperdrive) {
+		for (const [name, binding] of Object.entries(options.hyperdrive)) {
+			env[name] =
+				typeof binding === 'string' ? createMockHyperdrive(binding) : binding
+		}
 	}
 
 	// Add Worker Loader bindings

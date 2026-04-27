@@ -514,6 +514,35 @@ describe('compileConfig', () => {
 			])
 		})
 
+		test('compiles Secrets Store shorthand with the worker default store id', () => {
+			const result = compileConfig({
+				...baseConfig,
+				secretsStoreId: 'store-123',
+				bindings: {
+					secretsStore: {
+						API_TOKEN: 'api-token',
+						ADMIN_TOKEN: {
+							storeId: 'store-admin',
+							secretName: 'admin-token'
+						}
+					}
+				}
+			})
+
+			expect(result.secrets_store_secrets).toEqual([
+				{
+					binding: 'API_TOKEN',
+					store_id: 'store-123',
+					secret_name: 'api-token'
+				},
+				{
+					binding: 'ADMIN_TOKEN',
+					store_id: 'store-admin',
+					secret_name: 'admin-token'
+				}
+			])
+		})
+
 		test('compiles Service bindings', () => {
 			const result = compileConfig({
 				...baseConfig,

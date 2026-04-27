@@ -36,7 +36,7 @@ export const startHereDocsPart1: DocPage[] = [
 		summary:
 			'Devflare gives you one clearer story for config, worker compilation, local development, runtime helpers, testing, and deploy flows so a Worker app can stay small at the start and still stay coherent as it grows.',
 		description:
-			'The goal is not to hide Cloudflare. The goal is to keep authored code split by responsibility, let generated output and Rolldown-backed worker compilation stay in their own lane, and give you a smoother path from one worker to routing, bindings, frameworks, previews, and automation.',
+			'The goal is not to hide Cloudflare. The goal is to keep the files you edit small and obvious, then give you a smoother path from one worker to routing, bindings, frameworks, previews, and automation.',
 		highlights: [
 			'Start with one config file, one dev command, generated types, and runtime-shaped tests instead of assembling each piece separately.',
 			'Keep the code surface split by job: `devflare/config`, `devflare/runtime`, `devflare/test`, and dedicated `vite` or `sveltekit` lanes instead of one giant catch-all entrypoint.',
@@ -52,8 +52,7 @@ export const startHereDocsPart1: DocPage[] = [
 			},
 			{
 				label: 'Architecture shape',
-				value:
-					'Config, runtime, tests, framework integration, and Cloudflare ops are separate by design'
+				value: 'Config, runtime, tests, framework integration, and Cloudflare ops stay separate'
 			},
 			{
 				label: 'Build lane',
@@ -179,12 +178,12 @@ export const startHereDocsPart1: DocPage[] = [
 				id: 'devflare-enhancements',
 				title: 'What Devflare adds on top of raw Cloudflare workflows',
 				description:
-					'These are the parts that feel distinctly like Devflare rather than just a thinner wrapper around Wrangler. They are implemented features in their own right, and each one has deeper docs when you want the full story.',
+					'These are the pieces you use while building an app, not concepts you need to memorize before the first route works.',
 				cards: [
 					{
 						label: 'Runtime',
-						title: 'AsyncLocalStorage-backed context',
-						body: 'Devflare stores the active event, env, ctx, request, and locals so helper code can recover the current Worker context without threading it through every function call.',
+						title: 'Runtime context helpers',
+						body: 'Helper code can read the active request, env, ctx, event, and `locals` without threading the event through every function call.',
 						href: docsLink('runtime-context')
 					},
 					{

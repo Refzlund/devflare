@@ -24,16 +24,16 @@ bun test --filter "case*"
 | 3 | [Durable Objects](#case-3-durable-objects) | DO config, RPC, WebSockets | `/docs/bindings/durable-objects` | Full local |
 | 5 | [Multi-Worker](#case-5-multi-worker) | Service bindings and `ref()` | `/docs/bindings/services`, `/docs/multi-workers` | Full local |
 | 6 | [Queues & Crons](#case-6-queues--crons) | Queue and scheduled triggers | `/docs/bindings/queues` | Full local |
-| 7 | [Edge Cases](#case-7-edge-cases) | Runtime edge coverage | `/docs/learn-from-real-tests` | Internal regression |
+| 7 | [Edge Cases](#case-7-edge-cases) | Runtime edge coverage | `/docs/docs-release-gates` | Internal regression |
 | 8 | [Route Modules](#case-8-route-modules) | Route file dispatch | `/docs/first-route-tree`, `/docs/http-routing` | Full local |
 | 9 | [Monorepo](#case-9-monorepo) | Workspace package boundaries | `/docs/monorepo-turborepo` | Full local |
 | 10 | [Path Aliases](#case-10-path-aliases) | TS path alias handling | `/docs/project-architecture` | Full local |
 | 11 | [Cross-Package DO](#case-11-cross-package-do) | DO binding across packages | `/docs/bindings/durable-objects` | Full local |
 | 12 | [Email Handlers](#case-12-email-handlers) | `cf.email.send()` and handler tests | `/docs/bindings/send-email` | Full helper coverage with ingress caveat |
 | 13 | [Tail Workers](#case-13-tail-workers) | `cf.tail.trigger()` | `/docs/create-test-context` | Full helper coverage |
-| 14 | [Hyperdrive](#case-14-hyperdrive) | Hyperdrive binding shape | `/docs/bindings/hyperdrive` | Local shape, remote DB caveat |
+| 14 | [Hyperdrive](#case-14-hyperdrive) | Hyperdrive local connection string and binding surface | `/docs/bindings/hyperdrive` | Full local with local DB connection string; hosted pooling caveat |
 | 15 | [Vectorize & AI](#case-15-vectorize--ai) | Remote-gated AI and Vectorize | `/docs/bindings/ai`, `/docs/bindings/vectorize` | Remote-gated |
-| 16 | [Workflows](#case-16-workflows) | Workflow classes and transport | `/docs/bindings/workflows` | Full local shape, remote lifecycle caveat |
+| 16 | [Workflows](#case-16-workflows) | Workflow classes and transport | `/docs/bindings/workflows` | Full local workflow class coverage; hosted lifecycle caveat |
 | 17 | [Plugin Namespace Example](#case-17-plugin-namespace-example) | Rolldown plugin namespace behavior | `/docs/project-architecture` | Internal regression |
 | 18 | [SvelteKit DO](#case-18-sveltekit-do) | SvelteKit platform plus DO binding | `/docs/sveltekit-with-devflare` | Full local |
 | 19 | [Transport & DO RPC](#case-19-transport--do-rpc) | Custom class transport over DO RPC | `/docs/transport-file`, `/docs/bindings/durable-objects` | Full local |
@@ -81,7 +81,7 @@ Generated Devflare and Wrangler outputs belong under `.devflare/` and
 - File map: `devflare.config.ts`, `src/fetch.ts`, `math-service/devflare.config.ts`, `math-service/worker.ts`, `math-service/ep.admin.ts`, `tests/**`.
 - Run command: `cd cases/case5 && bun test`.
 - What it proves: `ref()` and service binding RPC work through the local harness.
-- Docs links: `/docs/bindings/services`, `/docs/multi-workers`, `/docs/recipe-packs`.
+- Docs links: `/docs/bindings/services`, `/docs/multi-workers`.
 - Support status: full local example; still inspect generated Wrangler output for deployment-critical entrypoint names.
 
 ### Case 6: Queues & Crons
@@ -99,7 +99,7 @@ Generated Devflare and Wrangler outputs belong under `.devflare/` and
 - File map: `src/fetch.ts`, `tests/edge-cases.test.ts`.
 - Run command: `cd cases/case7 && bun test`.
 - What it proves: selected edge behavior stays covered while public docs stay recipe-first.
-- Docs links: `/docs/learn-from-real-tests`, `/docs/docs-release-gates`.
+- Docs links: `/docs/docs-release-gates`.
 - Support status: internal regression case.
 
 ### Case 8: Route Modules
@@ -158,12 +158,12 @@ Generated Devflare and Wrangler outputs belong under `.devflare/` and
 
 ### Case 14: Hyperdrive
 
-- Purpose: Hyperdrive binding shape and conservative local smoke coverage.
+- Purpose: Hyperdrive binding shape, local connection-string wiring, and conservative local smoke coverage.
 - File map: `src/fetch.ts`, `tests/hyperdrive.test.ts`.
 - Run command: `cd cases/case14 && bun test`.
-- What it proves: the binding is wired and exposes expected connection metadata.
+- What it proves: the binding is wired, exposes expected connection metadata, and can run against an explicit local database connection string.
 - Docs links: `/docs/bindings/hyperdrive`, `/docs/feature-index`.
-- Support status: local binding-shape coverage; real database acceleration remains remote/product-owned.
+- Support status: full local when a binding has a local database connection string; hosted pooling, placement, credentials, and production routing stay Cloudflare-owned.
 
 ### Case 15: Vectorize & AI
 
@@ -181,7 +181,7 @@ Generated Devflare and Wrangler outputs belong under `.devflare/` and
 - Run command: `cd cases/case16 && bun test`.
 - What it proves: Workflow-shaped local examples can exercise class shape and transport logic.
 - Docs links: `/docs/bindings/workflows`, `/docs/transport-file`.
-- Support status: full local shape coverage; deployed Workflow lifecycle remains Cloudflare-owned.
+- Support status: full local workflow class and trigger coverage; deployed durability, retries, scheduling, and instance history stay Cloudflare-owned.
 
 ### Case 17: Plugin Namespace Example
 
@@ -189,7 +189,7 @@ Generated Devflare and Wrangler outputs belong under `.devflare/` and
 - File map: `src/fetch.ts`, `tests/rolldown-plugin.test.ts`.
 - Run command: `cd cases/case17 && bun test`.
 - What it proves: plugin namespace handling keeps working in the Worker build path.
-- Docs links: `/docs/project-architecture`, `/docs/learn-from-real-tests`.
+- Docs links: `/docs/project-architecture`.
 - Support status: internal regression case.
 
 ### Case 18: SvelteKit DO
@@ -207,5 +207,5 @@ Generated Devflare and Wrangler outputs belong under `.devflare/` and
 - File map: `src/do.counter.ts`, `src/DoubleableNumber.ts`, `src/transport.ts`, `tests/counter.test.ts`.
 - Run command: `cd cases/case19 && bun test`.
 - What it proves: `src/transport.ts` can preserve custom classes across local DO method calls.
-- Docs links: `/docs/transport-file`, `/docs/bindings/durable-objects`, `/docs/learn-from-real-tests`.
+- Docs links: `/docs/transport-file`, `/docs/bindings/durable-objects`.
 - Support status: full local example.

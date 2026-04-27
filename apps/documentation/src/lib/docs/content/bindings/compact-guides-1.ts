@@ -158,7 +158,7 @@ test('uses deterministic local version metadata', () => {
 		configKey: 'bindings.workerLoaders',
 		authoringShape: 'Record<string, {}>',
 		localStory:
-			'Offline-fixture: the binding exists locally, but tests should supply a Worker stub when behavior matters',
+			'Full local support through Miniflare Worker Loader bindings and explicit pure-test Worker stubs',
 		sourcePages: [
 			'packages/devflare/src/config/schema-bindings.ts',
 			'packages/devflare/src/config/compiler.ts',
@@ -171,7 +171,7 @@ test('uses deterministic local version metadata', () => {
 		testHelper: '`createMockWorkerLoader()` / `createMockEnv({ workerLoaders })`',
 		bestFor: 'Dynamic Workers where the app loads Worker code at runtime from an explicit source',
 		remoteBoundary:
-			'Devflare wires the binding; it does not bundle, upload, discover, or provision dynamic Worker payloads for you.',
+			'Cloudflare owns dynamic Worker upload, discovery, and hosted lifecycle; local code should pass explicit payloads or stubs.',
 		configSnippet: {
 			title: 'Smallest Worker Loader config',
 			language: 'ts',
@@ -230,50 +230,57 @@ test('uses a supplied dynamic Worker stub', async () => {
 		slugBase: 'secrets-store',
 		label: 'Secrets Store',
 		categoryDescription:
-			'Account-level Secrets Store bindings with explicit fixture values for offline tests.',
+			'Account-level Secrets Store bindings with local read-only values for dev and tests.',
 		configKey: 'bindings.secretsStore',
-		authoringShape: 'Record<string, { storeId; secretName }>',
+		authoringShape: 'secretsStoreId + Record<string, string | { storeId; secretName }>',
 		localStory:
-			'Offline-native when tests provide fixture values; missing fixtures fail with a non-networked error',
+			'Full local support through Miniflare wiring, local `devflare secrets --local` values, and explicit fixture values for pure tests',
 		sourcePages: [
 			'packages/devflare/src/config/schema-bindings.ts',
 			'packages/devflare/src/config/compiler.ts',
+			'packages/devflare/src/secrets/local-secrets.ts',
+			'packages/devflare/src/cli/commands/secrets.ts',
 			'packages/devflare/src/test/utilities.ts',
 			'packages/devflare/src/test/offline-bindings.ts'
 		],
 		compileTarget: 'Wrangler `secrets_store_secrets`',
 		envType: '`SecretsStoreSecret`',
-		defaultHarness: '`createOfflineEnv()` with `fixtures.secretsStore`',
+		defaultHarness: '`createTestContext()` or `createOfflineEnv(config, fixtures, { cwd })`',
 		testHelper: '`createMockSecretsStoreSecret()` / `createMockEnv({ secretsStore })`',
 		bestFor:
 			'shared account secrets that should be referenced by store id and secret name instead of copied into config',
 		remoteBoundary:
-			'Devflare does not read or provision secret values; tests must supply explicit fixtures.',
+			'Cloudflare owns remote account secret provisioning and sync; Devflare reads only project-local secret values unless you deploy or test against Cloudflare.',
 		configSnippet: {
-			title: 'Smallest Secrets Store config',
+			title: 'Smallest Secrets Store config with one default store',
 			language: 'ts',
 			code: String.raw`import { defineConfig } from 'devflare/config'
 
 export default defineConfig({
 	name: 'secret-worker',
+	secretsStoreId: 'store-123',
 	bindings: {
 		secretsStore: {
-			API_TOKEN: {
-				storeId: 'store-123',
-				secretName: 'api-token'
-			}
+			API_TOKEN: 'api-token',
+			STRIPE_WEBHOOK_SECRET: 'stripe-webhook-secret'
 		}
 	}
 })`
 		},
 		usageSnippet: {
-			title: 'Read a Secrets Store value',
+			title: 'Protect an internal route with a shared API token',
 			language: 'ts',
 			code: String.raw`import { env } from 'devflare/runtime'
 
-export async function fetch(): Promise<Response> {
+export async function fetch(request: Request): Promise<Response> {
 	const token = await env.API_TOKEN.get()
-	return new Response(token.length > 0 ? 'configured' : 'missing')
+	const authorization = request.headers.get('authorization')
+
+	if (authorization !== 'Bearer ' + token) {
+		return new Response('unauthorized', { status: 401 })
+	}
+
+	return Response.json({ ok: true })
 }`
 		},
 		testSnippet: {
@@ -290,12 +297,35 @@ test('reads a fixed offline secret', async () => {
 		}
 	})
 
-	expect(await env.API_TOKEN.get()).toBe('test-token')
+expect(await env.API_TOKEN.get()).toBe('test-token')
 })`
 		},
+		overviewSections: [
+			{
+				id: 'local-secret-values',
+				title: 'Set local values without putting secrets in config',
+				paragraphs: [
+					'Keep `devflare.config.ts` limited to store IDs and secret names. Use the CLI to write local values into `.devflare/secrets.local.json`, then let dev, `createTestContext()`, and `createOfflineEnv(..., { cwd })` read those values locally.'
+				],
+				snippets: [
+					{
+						title: 'Create a local secret value',
+						language: 'bash',
+						code: String.raw`devflare secrets --local --store store-123 --name api-token --value local-token
+devflare secrets --local --store store-123 --list`
+					}
+				],
+				bullets: [
+					'The Worker sees a read-only `SecretsStoreSecret` binding.',
+					'CLI output lists `store/name` references; it does not print secret values.',
+					'Use explicit `{ storeId, secretName }` binding objects only when one Worker needs secrets from multiple stores.'
+				]
+			}
+		],
 		compileOutput: String.raw`{
 	"secrets_store_secrets": [
-		{ "binding": "API_TOKEN", "store_id": "store-123", "secret_name": "api-token" }
+		{ "binding": "API_TOKEN", "store_id": "store-123", "secret_name": "api-token" },
+		{ "binding": "STRIPE_WEBHOOK_SECRET", "store_id": "store-123", "secret_name": "stripe-webhook-secret" }
 	]
 }`
 	}),

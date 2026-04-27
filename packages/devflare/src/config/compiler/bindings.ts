@@ -15,6 +15,7 @@ import {
 	normalizeMediaBinding,
 	normalizeMtlsCertificateBinding,
 	normalizePipelineBinding,
+	normalizeSecretsStoreBinding,
 	normalizeWorkflowBinding
 } from '../schema'
 import type {
@@ -138,7 +139,8 @@ export function getWranglerBrowserBinding(
 export function compileBindings(
 	bindings: NonNullable<DevflareConfig['bindings']>,
 	result: WranglerConfig,
-	options: CompileConfigOptions = {}
+	options: CompileConfigOptions = {},
+	defaultSecretsStoreId?: string
 ): void {
 	// KV Namespaces
 	if (bindings.kv) {
@@ -323,11 +325,14 @@ export function compileBindings(
 	// Secrets Store
 	if (bindings.secretsStore) {
 		result.secrets_store_secrets = Object.entries(bindings.secretsStore).map(
-			([binding, config]) => ({
-				binding,
-				store_id: config.storeId,
-				secret_name: config.secretName
-			})
+			([binding, config]) => {
+				const normalized = normalizeSecretsStoreBinding(config, defaultSecretsStoreId, binding)
+				return {
+					binding,
+					store_id: normalized.storeId,
+					secret_name: normalized.secretName
+				}
+			}
 		)
 	}
 

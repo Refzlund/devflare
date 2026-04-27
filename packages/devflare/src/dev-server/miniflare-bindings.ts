@@ -15,6 +15,7 @@ import {
 	normalizeMediaBinding,
 	normalizeMtlsCertificateBinding,
 	normalizePipelineBinding,
+	normalizeSecretsStoreBinding,
 	normalizeWorkflowBinding,
 	type DevflareConfig
 } from '../config'
@@ -313,20 +314,24 @@ export function buildAiSearchInstancesConfig(
 }
 
 export function buildSecretsStoreConfig(
-	bindings: Bindings
+	bindings: Bindings,
+	defaultSecretsStoreId?: string
 ): Record<string, { store_id: string; secret_name: string }> | undefined {
 	if (!bindings.secretsStore) {
 		return undefined
 	}
 
 	return Object.fromEntries(
-		Object.entries(bindings.secretsStore).map(([bindingName, binding]) => [
-			bindingName,
-			{
-				store_id: binding.storeId,
-				secret_name: binding.secretName
-			}
-		])
+		Object.entries(bindings.secretsStore).map(([bindingName, binding]) => {
+			const normalized = normalizeSecretsStoreBinding(binding, defaultSecretsStoreId, bindingName)
+			return [
+				bindingName,
+				{
+					store_id: normalized.storeId,
+					secret_name: normalized.secretName
+				}
+			]
+		})
 	)
 }
 

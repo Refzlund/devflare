@@ -68,31 +68,31 @@ export const cloudflarePlatformSupportCards: DocCard[] = [
 		href: docsLink('bindings/vectorize')
 	}),
 	supportCard({
-		label: 'Remote',
-		meta: 'Remote database path',
+		label: 'Full',
+		meta: 'Database path',
 		title: 'Hyperdrive',
-		body: 'Config, generated output, name resolution, and smoke-level local checks are supported. Real PostgreSQL connectivity, pooling, and credentials remain remote infrastructure.',
+		body: 'Config, name resolution, local connection strings, and Miniflare-backed Hyperdrive bindings support ordinary app queries without Cloudflare. Hosted pooling, placement, credentials, and production routing remain Cloudflare behavior.',
 		href: docsLink('bindings/hyperdrive')
 	}),
 	supportCard({
-		label: 'Remote',
+		label: 'Full',
 		meta: 'Browser runtime',
 		title: 'Browser Rendering',
-		body: 'Native config and bridge-backed dev-server integration are supported, with generated typing and route examples. Dedicated test-helper fidelity is narrower, and Cloudflare allows one browser binding.',
+		body: 'Native config, generated typing, route examples, and bridge-backed dev-server support through the local browser-rendering shim. Cloudflare still owns hosted session limits, live/HITL behavior, recordings, and billing.',
 		href: docsLink('bindings/browser-rendering')
 	}),
 	supportCard({
 		label: 'Remote',
 		meta: 'Analytics',
 		title: 'Analytics Engine',
-		body: 'Dataset bindings are modeled in config and generated output, and app code can be thin-tested around `writeDataPoint()`. Production ingestion and analytics behavior remain hosted.',
+		body: 'Dataset bindings are configured in Devflare, and app code can be thin-tested around `writeDataPoint()`. Production ingestion and analytics behavior remain hosted.',
 		href: docsLink('bindings/analytics-engine')
 	}),
 	supportCard({
 		label: 'Full',
 		meta: 'Email',
 		title: 'Send Email',
-		body: 'Outbound email bindings have native config, generated output, local support, and test access through the env binding. Inbound email handlers are a separate Worker surface.',
+		body: 'Outbound email bindings have native config, local support, and test access through the env binding. Inbound email handlers are a separate Worker surface.',
 		href: docsLink('bindings/send-email')
 	}),
 	supportCard({
@@ -106,21 +106,21 @@ export const cloudflarePlatformSupportCards: DocCard[] = [
 		label: 'Full',
 		meta: 'Deployment metadata',
 		title: 'Version Metadata',
-		body: 'Native config, generated output, deterministic local metadata, and test helpers support version-aware responses and diagnostics without requiring Cloudflare state.',
+		body: 'Native config, deterministic local metadata, and test helpers support version-aware responses and diagnostics without requiring Cloudflare state.',
 		href: docsLink('bindings/version-metadata')
 	}),
 	supportCard({
-		label: 'Limited',
+		label: 'Full',
 		meta: 'Dynamic workers',
 		title: 'Worker Loaders',
-		body: 'Devflare models the binding and can test app flow when you supply explicit Worker payloads or stubs. It does not upload, discover, or lifecycle-manage dynamic Worker code.',
+		body: 'Devflare wires Worker Loader bindings through Miniflare and pure test stubs, so local apps can load explicit Worker payloads without Cloudflare. Upload, discovery, and hosted lifecycle stay on the platform.',
 		href: docsLink('bindings/worker-loaders')
 	}),
 	supportCard({
-		label: 'Remote',
+		label: 'Full',
 		meta: 'Secrets',
 		title: 'Secrets Store',
-		body: 'Native config and fixture-backed offline tests are supported. Devflare does not read, provision, or sync account secret values; tests must provide explicit fixture values.',
+		body: 'Native config, Miniflare wiring, and explicit local fixtures cover app code that reads Secrets Store values. Devflare still does not read, provision, or sync account secret values.',
 		href: docsLink('bindings/secrets-store')
 	}),
 	supportCard({
@@ -145,10 +145,10 @@ export const cloudflarePlatformSupportCards: DocCard[] = [
 		href: docsLink('bindings/dispatch-namespaces')
 	}),
 	supportCard({
-		label: 'Remote',
+		label: 'Full',
 		meta: 'Long-running work',
 		title: 'Workflows',
-		body: 'Native config and local application-level workflow calls are supported through Miniflare or deterministic mocks. Production workflow lifecycle and instance state are Cloudflare-owned.',
+		body: 'Native config, Miniflare workflow bindings, deterministic mocks, and real WorkflowEntrypoint examples cover the local app loop. Production lifecycle, durability, retries, and scheduling remain Cloudflare-owned.',
 		href: docsLink('bindings/workflows')
 	}),
 	supportCard({
@@ -159,17 +159,17 @@ export const cloudflarePlatformSupportCards: DocCard[] = [
 		href: docsLink('bindings/pipelines')
 	}),
 	supportCard({
-		label: 'Remote',
+		label: 'Full',
 		meta: 'Image processing',
 		title: 'Images',
-		body: 'Native singleton config and low-fidelity chain-shape mocks are supported. Hosted Images storage, variants, delivery rules, billing, and transform fidelity remain remote.',
+		body: 'Native singleton config, Miniflare image bindings, persisted local state, and deterministic pure mocks cover Worker image transform flows. Hosted storage, variants, delivery rules, billing, and final transform fidelity remain remote.',
 		href: docsLink('bindings/images')
 	}),
 	supportCard({
-		label: 'Remote',
+		label: 'Full',
 		meta: 'Media processing',
 		title: 'Media Transformations',
-		body: 'Native config and fixture-backed chain tests are supported. Real codecs, output fidelity, duration handling, cache behavior, and billing are hosted Cloudflare behavior.',
+		body: 'Native config, Miniflare media bindings, and deterministic pure mocks cover Worker media transform chains locally. Real codecs, output fidelity, duration handling, cache behavior, and billing remain hosted Cloudflare behavior.',
 		href: docsLink('bindings/media-transformations')
 	}),
 	supportCard({

@@ -207,6 +207,9 @@ export async function runCli(
 		case 'tokens':
 			return runToken(parsed, logger, options)
 
+		case 'secrets':
+			return runSecrets(parsed, logger, options)
+
 		case 'ai':
 			return runAI()
 
@@ -347,6 +350,15 @@ async function runToken(
 ): Promise<CliResult> {
 	const { runTokenCommand } = await import('./commands/token')
 	return runTokenCommand(parsed, logger, options)
+}
+
+async function runSecrets(
+	parsed: ParsedArgs,
+	logger: ConsolaInstance,
+	options: CliOptions
+): Promise<CliResult> {
+	const { runSecretsCommand } = await import('./commands/secrets')
+	return runSecretsCommand(parsed, logger, options)
 }
 
 async function runAI(): Promise<CliResult> {

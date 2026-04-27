@@ -6,7 +6,8 @@
 // =============================================================================
 
 import type { Pipeline } from 'cloudflare:pipelines'
-import type { DevflareConfig } from '../config'
+import { normalizeHyperdriveBinding, type DevflareConfig } from '../config'
+import { resolveLocalSecretValuesForBindings } from '../secrets/local-secrets'
 import {
 	type MockAISearchInstanceOptions,
 	type MockAISearchNamespaceOptions,
@@ -23,6 +24,7 @@ import {
 	type MockWorkflowOptions,
 	createMockArtifacts,
 	createMockDispatchNamespace,
+	createMockHyperdrive,
 	createMockImagesBinding,
 	createMockMTLSCertificate,
 	createMockMediaBinding,
@@ -69,6 +71,7 @@ export interface OfflineBindingFixtures {
 	aiSearch?: Record<string, MockAISearchInstanceOptions | AiSearchInstance>
 	aiSearchNamespaces?: Record<string, MockAISearchNamespaceOptions | AiSearchNamespace>
 	custom?: Record<string, unknown>
+	hyperdrive?: Record<string, string | Hyperdrive>
 }
 
 export interface OfflineBindingsResult {
@@ -76,6 +79,13 @@ export interface OfflineBindingsResult {
 	support: Record<string, OfflineSupportEntry>
 	remoteBoundaries: OfflineRemoteBoundary[]
 	missingFixtures: OfflineMissingFixture[]
+}
+
+export interface OfflineBindingOptions {
+	/** Project root containing `.devflare/secrets.local.json`. */
+	cwd?: string
+	/** Read `.devflare/secrets.local.json` when `cwd` is supplied. */
+	useLocalSecrets?: boolean
 }
 
 type OfflineConfig = Partial<DevflareConfig> & {
@@ -102,17 +112,25 @@ const SUPPORT_MATRIX: Record<string, OfflineSupportEntry> = {
 		service: 'secretsStore',
 		tier: 'offline-native',
 		reason:
-			'Secrets Store binding shape is local-testable when the test supplies fixed secret values.',
+			'Secrets Store binding shape is local-testable with local secret-store values or fixed fixtures.',
 		recommendation:
-			'Pass fixtures.secretsStore values; missing values produce explicit non-networked errors.'
+			'Use devflare secrets --local for dev/test values, or pass fixtures.secretsStore values for pure tests.'
+	},
+	hyperdrive: {
+		service: 'hyperdrive',
+		tier: 'offline-native',
+		reason:
+			'Hyperdrive can run locally through Miniflare when Devflare has a local connection string or test fixture for the target database.',
+		recommendation:
+			'Use bindings.hyperdrive.*.localConnectionString, CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_<BINDING>, or fixtures.hyperdrive for offline tests.'
 	},
 	workerLoaders: {
 		service: 'workerLoaders',
-		tier: 'offline-fixture',
+		tier: 'offline-native',
 		reason:
-			'Worker Loader bindings can be stubbed, but Devflare does not compile or provision dynamic Worker payloads for the test.',
+			'Worker Loader bindings run locally through Miniflare and can use explicit Worker stubs for pure tests.',
 		recommendation:
-			'Pass fixtures.workerLoaders with a WorkerStub when code needs entrypoints or Durable Object classes.'
+			'Use createTestContext() for local WorkerLoader execution; pass fixtures.workerLoaders with a WorkerStub for pure tests.'
 	},
 	mtlsCertificates: {
 		service: 'mtlsCertificates',
@@ -156,11 +174,11 @@ const SUPPORT_MATRIX: Record<string, OfflineSupportEntry> = {
 	},
 	media: {
 		service: 'media',
-		tier: 'offline-fixture',
+		tier: 'offline-native',
 		reason:
-			'Media Transformations has no local Cloudflare simulation, but the binding chain can be fixture-backed in unit tests.',
+			'Media Transformations can run through Miniflare wiring locally, and Devflare provides a deterministic pure mock for app-level chain tests.',
 		recommendation:
-			'Use createMockMediaBinding() for pure tests; use remote binding or deployed tests for real media output.'
+			'Use createTestContext() for local Worker binding tests and createMockMediaBinding() for pure tests; use Cloudflare for codec/output fidelity.'
 	},
 	artifacts: {
 		service: 'artifacts',
@@ -263,7 +281,7 @@ function createMissingSecret(binding: string): SecretsStoreSecret {
 	return {
 		async get(): Promise<string> {
 			throw new Error(
-				`Offline Secrets Store binding "${binding}" has no value. Pass fixtures.secretsStore.${binding} for offline tests.`
+				`Offline Secrets Store binding "${binding}" has no value. Pass fixtures.secretsStore.${binding} or write a local secret with devflare secrets --local.`
 			)
 		}
 	} as SecretsStoreSecret
@@ -281,6 +299,10 @@ function isImagesBinding(
 	value: MockImagesBindingOptions | ImagesBinding | undefined
 ): value is ImagesBinding {
 	return typeof (value as { input?: unknown } | undefined)?.input === 'function'
+}
+
+function isHyperdriveBinding(value: string | Hyperdrive | undefined): value is Hyperdrive {
+	return typeof (value as { connectionString?: unknown } | undefined)?.connectionString === 'string'
 }
 
 function isMediaBinding(
@@ -339,6 +361,52 @@ function addVersionMetadataBinding(
 ) {
 	if (bindings?.versionMetadata) {
 		env[bindings.versionMetadata.binding] = createMockVersionMetadata()
+	}
+}
+
+function getHyperdriveConnectionString(
+	name: string,
+	binding: NonNullable<NonNullable<OfflineConfig['bindings']>['hyperdrive']>[string],
+	fixture: string | Hyperdrive | undefined
+): string | undefined {
+	if (typeof fixture === 'string') {
+		return fixture
+	}
+
+	const envValue =
+		process.env[`CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_${name}`] ??
+		process.env[`WRANGLER_HYPERDRIVE_LOCAL_CONNECTION_STRING_${name}`]
+	if (envValue?.trim()) {
+		return envValue
+	}
+
+	return normalizeHyperdriveBinding(binding).localConnectionString
+}
+
+function addHyperdriveBindings(
+	env: Record<string, unknown>,
+	bindings: OfflineConfig['bindings'],
+	fixtures: OfflineBindingFixtures,
+	missingFixtures: OfflineMissingFixture[]
+) {
+	for (const [name, binding] of Object.entries(bindings?.hyperdrive ?? {})) {
+		const fixture = fixtures.hyperdrive?.[name]
+		if (isHyperdriveBinding(fixture)) {
+			env[name] = fixture
+			continue
+		}
+
+		const connectionString = getHyperdriveConnectionString(name, binding, fixture)
+		if (connectionString) {
+			env[name] = createMockHyperdrive(connectionString)
+			continue
+		}
+
+		missingFixtures.push({
+			service: 'hyperdrive',
+			binding: name,
+			reason: `Hyperdrive binding "${name}" has no local connection string. Configure bindings.hyperdrive.${name}.localConnectionString or pass fixtures.hyperdrive.${name}.`
+		})
 	}
 }
 
@@ -431,15 +499,16 @@ function addSecretsStoreBindings(
 	env: Record<string, unknown>,
 	bindings: OfflineConfig['bindings'],
 	fixtures: OfflineBindingFixtures,
+	localSecretValues: Record<string, string>,
 	missingFixtures: OfflineMissingFixture[]
 ) {
 	for (const name of Object.keys(bindings?.secretsStore ?? {})) {
-		const value = fixtures.secretsStore?.[name]
+		const value = fixtures.secretsStore?.[name] ?? localSecretValues[name]
 		if (value === undefined) {
 			missingFixtures.push({
 				service: 'secretsStore',
 				binding: name,
-				reason: `Secrets Store values are not present in config; pass fixtures.secretsStore.${name} for offline tests.`
+				reason: `Secrets Store values are not present in fixtures or the local secret store; pass fixtures.secretsStore.${name} or run devflare secrets --local.`
 			})
 			env[name] = createMissingSecret(name)
 		} else {
@@ -508,16 +577,21 @@ function addRemoteBoundaries(
  */
 export function createOfflineBindings(
 	config: OfflineConfig,
-	fixtures: OfflineBindingFixtures = {}
+	fixtures: OfflineBindingFixtures = {},
+	options: OfflineBindingOptions = {}
 ): OfflineBindingsResult {
 	const env: Record<string, unknown> = {}
 	const remoteBoundaries: OfflineRemoteBoundary[] = []
 	const missingFixtures: OfflineMissingFixture[] = []
 	const bindings = config.bindings
+	const localSecretValues = options.cwd && options.useLocalSecrets !== false
+		? resolveLocalSecretValuesForBindings(config, options.cwd)
+		: {}
 
 	addStaticBindings(env, config)
 	addRateLimitBindings(env, bindings)
 	addVersionMetadataBinding(env, bindings)
+	addHyperdriveBindings(env, bindings, fixtures, missingFixtures)
 	addWorkerLoaderBindings(env, bindings, fixtures)
 	addMTLSCertificateBindings(env, bindings, fixtures)
 	addDispatchNamespaceBindings(env, bindings, fixtures)
@@ -526,7 +600,7 @@ export function createOfflineBindings(
 	addImagesBindings(env, bindings, fixtures)
 	addMediaBindings(env, bindings, fixtures)
 	addArtifactsBindings(env, bindings, fixtures)
-	addSecretsStoreBindings(env, bindings, fixtures, missingFixtures)
+	addSecretsStoreBindings(env, bindings, fixtures, localSecretValues, missingFixtures)
 	addAISearchBindings(env, bindings, fixtures)
 	addAISearchNamespaceBindings(env, bindings, fixtures)
 	addRemoteBoundaries(remoteBoundaries, bindings)
@@ -548,7 +622,8 @@ export function createOfflineBindings(
  */
 export function createOfflineEnv(
 	config: OfflineConfig,
-	fixtures: OfflineBindingFixtures = {}
+	fixtures: OfflineBindingFixtures = {},
+	options: OfflineBindingOptions = {}
 ): Record<string, unknown> {
-	return createOfflineBindings(config, fixtures).env
+	return createOfflineBindings(config, fixtures, options).env
 }

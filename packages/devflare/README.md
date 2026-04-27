@@ -108,9 +108,9 @@ bun test tests/worker.test.ts
 | Import | Use |
 | --- | --- |
 | `devflare` | Node-side utilities: `defineConfig`, `preview`, `loadConfig`, `loadResolvedConfig`, `compileConfig`, `stringifyConfig`, `configSchema`, `ref()`, `workerName`, `env`, `durableObject`, `getDurableObjectOptions`, `runCli`, `parseArgs` |
-| `devflare/config` | Config and compiler utilities: `defineConfig`, `preview`, `ref`, `loadConfig`, `loadResolvedConfig`, `compileConfig`, `stringifyConfig`, `configSchema`, `resolveResources`, `writeWranglerConfig`, `readWranglerConfig`, `prepareConfigResourcesForDeploy`, `prepareMaterializedConfigResourcesForDeploy`, `resolveConfigPath`, `resolveConfigForEnvironment`, `resolvePreviewIdentifier`, `materializePreviewScopedConfig`, `materializePreviewScopedString`, `isPreviewScopedName`, `resolveMaterializedConfigResources`, `compileBuildConfig`, `validateServiceBindings`, `collectReferencedServiceNames`, `getLocalKVNamespaceIdentifier`, `getLocalD1DatabaseIdentifier`, `getLocalHyperdriveConfigIdentifier`, `getSingleBrowserBindingName`, `normalizeKVBinding`, `normalizeD1Binding`, `normalizeDOBinding`, `normalizeHyperdriveBinding`, `normalizeMtlsCertificateBinding`, `normalizeDispatchNamespaceBinding`, `normalizeWorkflowBinding`, `normalizePipelineBinding`, `normalizeImagesBinding`, `normalizeMediaBinding`, `normalizeArtifactsBinding` |
+| `devflare/config` | Config and compiler utilities: `defineConfig`, `preview`, `ref`, `loadConfig`, `loadResolvedConfig`, `compileConfig`, `stringifyConfig`, `configSchema`, `resolveResources`, `writeWranglerConfig`, `readWranglerConfig`, `prepareConfigResourcesForDeploy`, `prepareMaterializedConfigResourcesForDeploy`, `resolveConfigPath`, `resolveConfigForEnvironment`, `resolvePreviewIdentifier`, `materializePreviewScopedConfig`, `materializePreviewScopedString`, `isPreviewScopedName`, `resolveMaterializedConfigResources`, `compileBuildConfig`, `validateServiceBindings`, `collectReferencedServiceNames`, `getLocalKVNamespaceIdentifier`, `getLocalD1DatabaseIdentifier`, `getLocalHyperdriveConfigIdentifier`, `getSingleBrowserBindingName`, `normalizeKVBinding`, `normalizeD1Binding`, `normalizeDOBinding`, `normalizeHyperdriveBinding`, `normalizeMtlsCertificateBinding`, `normalizeDispatchNamespaceBinding`, `normalizeWorkflowBinding`, `normalizePipelineBinding`, `normalizeImagesBinding`, `normalizeMediaBinding`, `normalizeSecretsStoreBinding`, `normalizeArtifactsBinding` |
 | `devflare/runtime` | Worker-safe runtime helpers: `env`, `ctx`, `event`, `locals`, `sequence`, `defineFetchHandler`, `defineQueueHandler`, `defineScheduledHandler`, `markResolveStyle`, `markWorkerStyle`, `createResolveFetch`, `invokeFetchHandler`, `invokeFetchModule`, `matchFetchRoute`, `invokeRouteModules`, `createRouteResolve`, event creators and getters |
-| `devflare/test` | Testing helpers: `createTestContext`, `env`, `cf`, `worker`, `queue`, `scheduled`, `email`, `tail`, `shouldSkip`, `createOfflineEnv`, `createOfflineBindings`, `describeOfflineSupport`, `getOfflineSupportMatrix`, `containers`, `detectContainerEngine`, `getContainerSkipReason`, `stopActiveContainers`, `createMockEnv`, `createMockKV`, `createMockD1`, `createMockR2`, `createMockQueue`, `createMockRateLimit`, `createMockVersionMetadata`, `createMockWorkerLoader`, `createMockMTLSCertificate`, `createMockDispatchNamespace`, `createMockWorkflow`, `createMockPipeline`, `createMockImagesBinding`, `createMockMediaBinding`, `createMockArtifacts`, `createMockAISearchInstance`, `createMockAISearchNamespace`, `createMockTestContext`, `withTestContext`, `resolveServiceBindings`, `resolveDOBindings`, `clearBundleCache` |
+| `devflare/test` | Testing helpers: `createTestContext`, `env`, `cf`, `worker`, `queue`, `scheduled`, `email`, `tail`, `shouldSkip`, `createOfflineEnv`, `createOfflineBindings`, `describeOfflineSupport`, `getOfflineSupportMatrix`, `containers`, `detectContainerEngine`, `getContainerSkipReason`, `stopActiveContainers`, `createMockEnv`, `createMockKV`, `createMockD1`, `createMockR2`, `createMockQueue`, `createMockRateLimit`, `createMockVersionMetadata`, `createMockHyperdrive`, `createMockWorkerLoader`, `createMockMTLSCertificate`, `createMockDispatchNamespace`, `createMockWorkflow`, `createMockPipeline`, `createMockImagesBinding`, `createMockMediaBinding`, `createMockArtifacts`, `createMockAISearchInstance`, `createMockAISearchNamespace`, `createMockTestContext`, `withTestContext`, `resolveServiceBindings`, `resolveDOBindings`, `clearBundleCache` |
 | `devflare/vite` | Vite integration: `devflarePlugin`, `getCloudflareConfig`, `getDevflareConfigs`, `getPluginContext`, `hasInlineViteConfig`, `resolveEffectiveViteProject`, `resolveViteUserConfig`, `writeGeneratedViteConfig` |
 | `devflare/sveltekit` | SvelteKit integration: `createDevflarePlatform`, `createHandle`, `handle`, `getBridgePort`, `isDevflareDev`, `resetPlatform`, `resetConfigCache` |
 | `devflare/cloudflare` | Cloudflare account and preview registry helpers: `account`, `ensurePreviewRegistry`, `cleanupPreviewRegistry`, `getPreviewRegistryContext`, `listTrackedRegistryState`, `listTrackedPreviewRecords`, `listTrackedPreviewScopeRecords`, `listTrackedDeploymentRecords`, `reconcilePreviewRegistry`, `retirePreviewRegistry` |
@@ -148,6 +148,7 @@ The most important top-level keys are:
 - `routes`
 - `rules`
 - `secrets`
+- `secretsStoreId`
 - `tailConsumers`
 - `triggers`
 - `vars`
@@ -175,6 +176,7 @@ for examples with file paths.
 | `devflare previews` | inspect and clean preview scopes |
 | `devflare productions` | inspect or manage production Worker versions |
 | `devflare remote` | manage remote test mode |
+| `devflare secrets` | manage local Secrets Store values |
 | `devflare tokens` | create and manage Devflare-scoped API tokens |
 | `devflare types` | generate `env.d.ts` |
 | `devflare version` | print the installed version |
@@ -202,10 +204,10 @@ and `run()`.
 
 ### Browser Run product boundary
 
-Browser Run is the current product name for Browser Rendering. Devflare can
-wire the binding and test useful local integration code, but Devflare does not
-manage Live View URLs, Human in the Loop handoff, recordings, browser session
-storage, or Browser Run account-level product state.
+Browser Run is the current product name for Browser Rendering. Devflare runs a
+local browser-rendering shim for the ordinary dev and test loop, but Devflare
+does not manage Live View URLs, Human in the Loop handoff, recordings, browser
+session storage, or Browser Run account-level product state.
 
 ### Containers local testing
 
@@ -232,11 +234,36 @@ Devflare supports dispatch namespace bindings, not the tenant Worker control
 plane. Devflare does not upload user Workers, manage Worker metadata, own tenant
 routing policy, or provide the Workers for Platforms lifecycle API.
 
+### Hyperdrive local connection stance
+
+Hyperdrive has full local support when a binding has a local database connection
+string. Devflare passes `localConnectionString` or
+`CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_<BINDING>` into Miniflare and
+also exposes `createMockHyperdrive()` for pure tests. Cloudflare still owns
+hosted pooling, placement, production credentials, and account state.
+
+### Worker Loaders local payload stance
+
+Worker Loaders have full local support through Miniflare worker loader bindings
+and explicit pure-test stubs. Devflare does not upload, discover, or lifecycle
+manage hosted dynamic Worker payloads.
+
+### Secrets Store local values stance
+
+Secrets Store has full local support through Miniflare wiring, local
+`devflare secrets --local` values, and explicit fixture values in
+`createOfflineEnv()` or `createMockSecretsStoreSecret()`. The local runtime is
+read-only from Worker code: write values through the CLI, keep config to store
+IDs and secret names, and let dev/test runs seed Miniflare from
+`.devflare/secrets.local.json`. Devflare does not read, provision, or sync
+remote account secret values.
+
 ### Workflows local simulation stance
 
-Local Workflows are useful for handler-level tests, class shape, and
-transport-aware examples. Use deployed or Wrangler-backed tests for production
-Workflow lifecycle behavior, retries, durability, and platform scheduling.
+Workflows have full local support through Miniflare wiring, WorkflowEntrypoint
+examples, and deterministic pure mocks. Use deployed or Wrangler-backed tests
+for production Workflow lifecycle behavior, retries, durability, and platform
+scheduling.
 
 ### Pipelines source and sink lifecycle stance
 
@@ -246,15 +273,16 @@ deployed product lifecycle.
 
 ### Images transformation testability stance
 
-Images local tests can validate Worker integration code and deterministic call
-shape. Devflare does not provision hosted Images storage, variants, signed URLs,
-or custom delivery rules.
+Images have full local support for Worker transformation flows through
+Miniflare wiring and deterministic pure mocks. Devflare does not provision
+hosted Images storage, variants, signed URLs, or custom delivery rules.
 
-### Media Transformations remote binding stance
+### Media Transformations local shim stance
 
-Media Transformations local execution is remote-binding only. Devflare does not
-configure zone-level transformation enablement, source origins, signed URL
-policy, cache behavior, or billing controls.
+Media Transformations have full local support for Worker call chains through
+Miniflare wiring and deterministic pure mocks. Devflare does not configure
+zone-level transformation enablement, source origins, signed URL policy, cache
+behavior, or billing controls.
 
 ### Artifacts persistence and deployment stance
 
@@ -288,13 +316,13 @@ useful local simulator. Offline-fixture means Devflare provides an explicit
 in-memory or handler-backed mock. Remote-boundary means meaningful behavior
 lives in Cloudflare.
 
-Use `shouldSkip.aiSearch`, `shouldSkip.aiGateway`, `shouldSkip.media`,
+Use `shouldSkip.aiSearch`, `shouldSkip.aiGateway`,
 `shouldSkip.mtlsCertificates`, `shouldSkip.artifacts`, and `shouldSkip.builds`
 for remote-boundary lanes. Offline-first tests should not claim to cover real
 Workers AI inference, Vectorize search semantics, AI Search indexing/ranking/
-crawling, Media Transformations output, mTLS certificate presentation,
-Artifacts Git remotes, Browser Run live/HITL/recordings, Cloudflare Builds, or
-the deployed Containers control plane.
+crawling, final Media Transformations codec fidelity, mTLS certificate
+presentation, Artifacts Git remotes, Browser Run live/HITL/recordings,
+Cloudflare Builds, or the deployed Containers control plane.
 
 ## Machine-Checked Support Statements
 
@@ -310,9 +338,15 @@ public stance guards:
 - Devflare does not connect Git repositories, manage build hooks.
 - Devflare supports dispatch namespace bindings, not the tenant Worker control plane.
 - Devflare does not upload user Workers, manage Worker metadata.
+- Hyperdrive has full local support when a binding has a local database connection string.
+- Worker Loaders have full local support through Miniflare worker loader bindings.
+- Secrets Store has full local support through Miniflare wiring, local `devflare secrets --local` values, and explicit fixture values.
+- Workflows have full local support through Miniflare wiring.
 - Use deployed or Wrangler-backed tests for production Workflow lifecycle behavior.
 - Devflare does not create streams, pipelines, SQL transformations, sinks, or R2 buckets.
+- Images have full local support for Worker transformation flows.
 - Devflare does not provision hosted Images storage, variants, signed URLs, or custom delivery rules.
+- Media Transformations have full local support for Worker call chains.
 - Devflare does not configure zone-level transformation enablement, source origins, signed URL policy, cache behavior, or billing controls.
 - Devflare does not create Artifacts namespaces, persist local Git repositories, or emulate Git-over-HTTPS remotes.
 - Devflare preview provisioning is intentionally limited to KV, D1, R2, Queues, Vectorize, and the documented Hyperdrive reuse/resolve paths.
@@ -326,8 +360,8 @@ public stance guards:
 - Offline-native means Devflare or Miniflare can run a useful local simulator.
 - Offline-fixture means Devflare provides an explicit in-memory or handler-backed mock.
 - Remote-boundary means meaningful behavior lives in Cloudflare.
-- `shouldSkip.aiSearch`, `shouldSkip.aiGateway`, `shouldSkip.media`, `shouldSkip.mtlsCertificates`, `shouldSkip.artifacts`, and `shouldSkip.builds`.
-- real Workers AI inference, Vectorize search semantics, AI Search indexing/ranking/crawling, Media Transformations output, mTLS certificate presentation, Artifacts Git remotes, Browser Run live/HITL/recordings, Cloudflare Builds, or the deployed Containers control plane.
+- `shouldSkip.aiSearch`, `shouldSkip.aiGateway`, `shouldSkip.mtlsCertificates`, `shouldSkip.artifacts`, and `shouldSkip.builds`.
+- real Workers AI inference, Vectorize search semantics, AI Search indexing/ranking/crawling, final Media Transformations codec fidelity, mTLS certificate presentation, Artifacts Git remotes, Browser Run live/HITL/recordings, Cloudflare Builds, or the deployed Containers control plane.
 
 ## Verification
 

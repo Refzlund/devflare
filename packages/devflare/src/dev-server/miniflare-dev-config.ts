@@ -124,7 +124,7 @@ export function buildMiniflareDevConfig(input: BuildMiniflareDevConfigInput): an
 	const artifactsConfig = buildArtifactsConfig(bindings)
 	const aiSearchNamespacesConfig = buildAiSearchNamespacesConfig(bindings)
 	const aiSearchInstancesConfig = buildAiSearchInstancesConfig(bindings)
-	const secretsStoreConfig = buildSecretsStoreConfig(bindings)
+	const secretsStoreConfig = buildSecretsStoreConfig(bindings, loadedConfig.secretsStoreId)
 
 	const workerContext: MakeMiniflareWorkerContext = {
 		cwd,

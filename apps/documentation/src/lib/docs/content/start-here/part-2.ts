@@ -107,7 +107,7 @@ export const startHereDocsPart2: DocPage[] = [
 				bullets: [
 					'You can keep the same harness when the worker grows routes, queue consumers, scheduled handlers, or other runtime surfaces.',
 					'One request-level smoke test is still useful even after helpers and abstractions appear around the worker.',
-					'When you need the deeper test surface, open `/docs/create-test-context` for the full helper map.'
+					'When you need more test helpers, open `/docs/create-test-context` for the full helper map.'
 				],
 				callouts: [
 					{
@@ -156,7 +156,7 @@ export const startHereDocsPart2: DocPage[] = [
 					'The additive move after the first worker is not a different app. It is the same worker with one tiny fetch entry, one route tree, and one shared request helper.',
 				paragraphs: [
 					'Once the first worker responds and maybe already has one small test, the next step is to keep `src/fetch.ts` tiny. Let it do request-wide setup, then let `src/routes/**` own the individual URLs.',
-					"That shape also makes Devflare's AsyncLocalStorage-backed runtime helpful in a calm way: helper modules can read the active request path, route params, request body, or request id through `getFetchEvent()` and `locals` without turning every function signature into plumbing."
+					"That shape also lets helper modules read the active request path, route params, request body, or request id through `getFetchEvent()` and `locals` without turning every function signature into plumbing."
 				],
 				steps: [
 					'Keep `src/fetch.ts` for request-wide setup only.',
@@ -290,13 +290,13 @@ export const startHereDocsPart2: DocPage[] = [
 				description: 'Keep the same worker shape and let one route file own the bucket round-trip.',
 				paragraphs: [
 					'Here the route path becomes the obvious home for the binding: `src/routes/files/[name].ts` owns both the `PUT` and `GET` flow for one named object.',
-					'The shared helper still provides request-wide context, route params, and request reads through AsyncLocalStorage, while the route file keeps the bucket contract visible and local to the URL that needs it.'
+					'The shared helper still provides request-wide context, route params, and request reads through runtime helpers, while the route file keeps the bucket usage visible and local to the URL that needs it.'
 				],
 				snippets: [
 					{
 						title: 'Same worker, now add one file route and one bucket binding',
 						description:
-							'The global fetch file stays tiny. The new work lives in one route file under `src/routes/files/[name].ts`, while the helper module still reads the active request through AsyncLocalStorage-backed runtime helpers.',
+							'The global fetch file stays tiny. The new work lives in one route file under `src/routes/files/[name].ts`, while the helper module still reads the active request through runtime helpers.',
 						activeFile: 'src/routes/files/[name].ts',
 						structure: r2BindingsStructure,
 						files: [
@@ -367,8 +367,8 @@ export const startHereDocsPart2: DocPage[] = [
 				]
 			},
 			{
-				id: 'go-deeper',
-				title: 'Go deeper when the first quick win works',
+				id: 'next-pages',
+				title: 'Open the next page when the first quick win works',
 				description:
 					'Once one tiny example works locally, jump to the dedicated binding guides for the bigger caveats, testing patterns, and architecture choices.',
 				cards: [
@@ -381,7 +381,7 @@ export const startHereDocsPart2: DocPage[] = [
 					{
 						label: 'Bindings',
 						title: 'R2 guide',
-						body: 'Open the deeper R2 page for delivery boundaries, testing patterns, and storage architecture choices.',
+						body: 'Open the R2 page for delivery boundaries, testing patterns, and storage choices.',
 						href: docsLink('bindings/r2')
 					},
 					{
@@ -409,7 +409,7 @@ export const startHereDocsPart2: DocPage[] = [
 			'Deploys are explicit: preview always uses `--preview <name>`.',
 			'Use one memorable scope name like `next` or `pr-123` and reuse it consistently.',
 			'Deleting a preview should be just as explicit as creating it.',
-			'Once the first preview works, move on to the deeper production and workflow docs.'
+			'Once the first preview works, move on to production and workflow docs.'
 		],
 		facts: [
 			{ label: 'Best for', value: 'The first named preview deploy and cleanup loop' },
@@ -568,7 +568,7 @@ bunx --bun devflare deploy --preview next`
 				id: 'what-to-read-next',
 				title: 'What to read next',
 				description:
-					'Once the first preview loop works, jump to the deeper docs for production deploy rules and GitHub automation.',
+					'Once the first preview loop works, jump to production deploy rules and GitHub automation.',
 				paragraphs: [
 					'When this local preview loop is ready to leave your shell history and become reviewable automation, continue with `github-workflows`. That page maps the exact `.github/workflows/*.yml` files this repo uses for PR comments, branch previews, production deploys, and cleanup.'
 				],
@@ -576,7 +576,7 @@ bunx --bun devflare deploy --preview next`
 					{
 						label: 'Ship & operate',
 						title: 'Production deploys',
-						body: 'Read the deeper guide for explicit production targets, preflight checks, and deploy inspection habits.',
+						body: 'Read the production guide for explicit targets, preflight checks, and deploy inspection habits.',
 						href: docsLink('production-deploys')
 					},
 					{

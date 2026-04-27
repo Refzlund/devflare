@@ -12,6 +12,7 @@ import {
 	type MediaBinding,
 	type MtlsCertificateBinding,
 	type PipelineBinding,
+	type SecretsStoreBinding,
 	type WorkflowBinding
 } from './schema-bindings'
 
@@ -128,6 +129,13 @@ export interface NormalizedArtifactsBinding {
 	namespace: string
 	/** Wrangler local-development remote-binding preference */
 	remote?: boolean
+}
+
+export interface NormalizedSecretsStoreBinding {
+	/** Secrets Store ID containing the account-level secret */
+	storeId: string
+	/** Secret name within the store */
+	secretName: string
 }
 
 /**
@@ -359,6 +367,33 @@ export function normalizeArtifactsBinding(
 	return {
 		namespace: config.namespace,
 		...(config.remote !== undefined && { remote: config.remote })
+	}
+}
+
+/**
+ * Normalize a Secrets Store binding to its explicit store/name form.
+ */
+export function normalizeSecretsStoreBinding(
+	config: SecretsStoreBinding,
+	defaultStoreId?: string,
+	bindingName = 'unknown'
+): NormalizedSecretsStoreBinding {
+	if (typeof config === 'string') {
+		if (!defaultStoreId) {
+			throw new Error(
+				`Secrets Store binding "${bindingName}" uses shorthand and requires top-level secretsStoreId.`
+			)
+		}
+
+		return {
+			storeId: defaultStoreId,
+			secretName: config
+		}
+	}
+
+	return {
+		storeId: config.storeId,
+		secretName: config.secretName
 	}
 }
 

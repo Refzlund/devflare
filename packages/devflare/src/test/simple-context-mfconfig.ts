@@ -16,6 +16,7 @@ import {
 	normalizeMediaBinding,
 	normalizeMtlsCertificateBinding,
 	normalizePipelineBinding,
+	normalizeSecretsStoreBinding,
 	normalizeWorkflowBinding
 } from '../config'
 import type { DevflareConfig } from '../config'
@@ -200,13 +201,16 @@ export function buildInlineBridgeMfConfig(config: DevflareConfig): any {
 
 	if (config.bindings?.secretsStore) {
 		mfConfig.secretsStoreSecrets = Object.fromEntries(
-			Object.entries(config.bindings.secretsStore).map(([bindingName, binding]) => [
-				bindingName,
-				{
-					store_id: binding.storeId,
-					secret_name: binding.secretName
-				}
-			])
+			Object.entries(config.bindings.secretsStore).map(([bindingName, binding]) => {
+				const normalized = normalizeSecretsStoreBinding(binding, config.secretsStoreId, bindingName)
+				return [
+					bindingName,
+					{
+						store_id: normalized.storeId,
+						secret_name: normalized.secretName
+					}
+				]
+			})
 		)
 	}
 

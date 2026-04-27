@@ -60,6 +60,39 @@ export function createMockSecretsStoreSecret(value: string): SecretsStoreSecret 
 }
 
 // =============================================================================
+// Mock Hyperdrive
+// =============================================================================
+
+function defaultPortForDatabaseUrl(url: URL): number {
+	if (url.port) {
+		return Number(url.port)
+	}
+
+	return url.protocol === 'mysql:' ? 3306 : 5432
+}
+
+/**
+ * Creates a Hyperdrive binding around a local database connection string.
+ */
+export function createMockHyperdrive(connectionString: string): Hyperdrive {
+	const url = new URL(connectionString)
+
+	return {
+		connectionString,
+		host: url.hostname,
+		port: defaultPortForDatabaseUrl(url),
+		user: decodeURIComponent(url.username),
+		password: decodeURIComponent(url.password),
+		database: decodeURIComponent(url.pathname.replace(/^\//, '')),
+		connect(): Socket {
+			throw new Error(
+				'Mock Hyperdrive connect() is not implemented. Use connectionString with your database client, or run a Miniflare-backed test for socket behavior.'
+			)
+		}
+	} as Hyperdrive
+}
+
+// =============================================================================
 // Mock Worker Loader
 // =============================================================================
 

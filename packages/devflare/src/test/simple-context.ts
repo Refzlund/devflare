@@ -26,6 +26,7 @@ import { bootTestRuntime } from './simple-context-runtime'
 import { decodeTransportValue, loadTransportDecoders, type TransportDecoderMap } from './simple-context-transport'
 import { applyMultiWorkerConfig } from './simple-context-multi-worker'
 import { buildInlineBridgeMfConfig } from './simple-context-mfconfig'
+import { seedMiniflareLocalSecrets } from '../secrets/local-secrets'
 
 // Handler helper configuration
 // -----------------------------------------------------------------------------
@@ -114,6 +115,7 @@ export async function createTestContext(configPath?: string): Promise<void> {
 
 	const usesMultiWorker = Boolean(hasMultiWorkerServices || hasMultiWorkerDOs)
 	const runtime = await bootTestRuntime(mfConfig, usesMultiWorker)
+	await seedMiniflareLocalSecrets(runtime.miniflare, config, configDir)
 	const activePort = runtime.activePort
 	state.miniflare = runtime.miniflare
 	state.miniflareBindings = runtime.miniflareBindings

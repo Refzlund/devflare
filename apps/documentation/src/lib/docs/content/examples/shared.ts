@@ -532,12 +532,60 @@ export const featureRows = [
 		docsLink('bindings/vectorize')
 	],
 	[
+		'Hyperdrive',
+		'Full',
+		'Hosted pooling, placement, credentials, and production routing are Cloudflare-owned',
+		'`createTestContext`, `createOfflineEnv`',
+		'Reuse or resolve when scoped',
+		docsLink('bindings/hyperdrive')
+	],
+	[
 		'Browser Rendering',
-		'Remote',
+		'Full',
 		'Hosted browser service fidelity is Cloudflare-owned',
 		'`createTestContext` or focused mocks',
 		'No account resource cleanup',
 		docsLink('bindings/browser-rendering')
+	],
+	[
+		'Worker Loaders',
+		'Full',
+		'Dynamic Worker upload and hosted lifecycle are Cloudflare-owned',
+		'`createTestContext`, `createMockWorkerLoader`',
+		'Config-owned',
+		docsLink('bindings/worker-loaders')
+	],
+	[
+		'Secrets Store',
+		'Full',
+		'Account secret provisioning and sync are Cloudflare-owned',
+		'`createOfflineEnv`, `createMockSecretsStoreSecret`',
+		'Product-owned',
+		docsLink('bindings/secrets-store')
+	],
+	[
+		'Workflows',
+		'Full',
+		'Deployed durability, retries, scheduling, and instance history are Cloudflare-owned',
+		'`createTestContext`, `createMockWorkflow`',
+		'Product-owned',
+		docsLink('bindings/workflows')
+	],
+	[
+		'Images',
+		'Full',
+		'Hosted storage, variants, delivery rules, billing, and final transform fidelity are Cloudflare-owned',
+		'`createTestContext`, `createMockImagesBinding`',
+		'Product-owned',
+		docsLink('bindings/images')
+	],
+	[
+		'Media Transformations',
+		'Full',
+		'Real codecs, output fidelity, cache behavior, and billing are Cloudflare-owned',
+		'`createTestContext`, `createMockMediaBinding`',
+		'Product-owned',
+		docsLink('bindings/media-transformations')
 	],
 	[
 		'Containers',

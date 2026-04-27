@@ -32,24 +32,22 @@ export const startHereDocsPart3: DocPage[] = [
 		navTitle: 'Runtime context',
 		readTime: '8 min read',
 		eyebrow: 'Runtime helpers',
-		title:
-			'Think in events first, then let AsyncLocalStorage carry the active context through the handler trail',
+		title: 'Use runtime helpers without passing the event through every function',
 		summary:
-			'Devflare-managed entrypoints create a rich surface event, store `env`, `ctx`, `request`, `locals`, `type`, and the original event in `AsyncLocalStorage`, then expose that state through helpers such as `getFetchEvent()`, `getQueueEvent()`, `getContext()`, and the `env`, `ctx`, `event`, and `locals` runtime proxies inside the same handler trail.',
+			'Use explicit event parameters at handler boundaries, then use `getFetchEvent()`, `getQueueEvent()`, `getContext()`, `env`, `ctx`, `event`, and `locals` inside helper code that runs during the same request or job.',
 		description:
-			'The public story is still event-first, but this is also the page for the helper APIs that depend on that model: `getFetchEvent()`, `getQueueEvent()`, `getScheduledEvent()`, `getEmailEvent()`, `getTailEvent()`, `getContext()`, and the `env`, `ctx`, `event`, and `locals` exports from `devflare/runtime`. Your handler gets a rich event object, and Devflare stores a matching `RequestContext` in Node `AsyncLocalStorage` so those helpers can recover the active surface without threading the event through every layer.',
+			'The everyday rule is simple: accept the event in the handler, pass explicit data where it is clearer, and use runtime helpers when nested helper code needs the active request, env, context, event, or request-scoped `locals`.',
 		highlights: [
-			'If you came here because of `getFetchEvent()`, `getQueueEvent()`, `getContext()`, `env`, `ctx`, `event`, or `locals`, you are in the right place: all of them read the same AsyncLocalStorage-backed context.',
-			'Devflare stores a full `RequestContext` in `AsyncLocalStorage`, not just one `Request` reference.',
-			'Prefer explicit event parameters at the handler boundary and getters deeper in the same call trail.',
+			'If you came here because of `getFetchEvent()`, `getQueueEvent()`, `getContext()`, `env`, `ctx`, `event`, or `locals`, you are in the right place.',
+			'Prefer explicit event parameters at the handler boundary and getters inside helpers called by that handler.',
 			'`env`, `ctx`, and `event` from `devflare/runtime` are readonly proxies, while `locals` is mutable request-scoped storage.',
 			'Per-surface getters such as `getFetchEvent()` and `getQueueEvent()` also expose `.safe()` for nullable access.',
-			'`runWithEventContext()` and `runWithContext()` are advanced escape hatches, not the normal app-facing API.'
+			'Open runtime context internals only when you are debugging helper setup or changing runtime infrastructure.'
 		],
 		facts: [
 			{
-				label: 'Context carrier',
-				value: 'Node `AsyncLocalStorage` under Devflare-managed entrypoints'
+				label: 'Main rule',
+				value: 'Event at the boundary, helpers inside the same handler trail'
 			},
 			{
 				label: 'Main helpers',
@@ -58,7 +56,7 @@ export const startHereDocsPart3: DocPage[] = [
 			},
 			{
 				label: 'Stored shape',
-				value: '`env`, `ctx`, `request`, `locals`, `type`, and the original event object'
+				value: '`env`, `ctx`, `request`, `event`, and `locals` while a handler is active'
 			},
 			{ label: 'Mutable lane', value: '`locals` / `event.locals`' },
 			{
@@ -82,13 +80,13 @@ export const startHereDocsPart3: DocPage[] = [
 		sections: [
 			{
 				id: 'helper-map',
-				title: 'The AsyncLocalStorage-powered helpers are the whole point of this page',
+				title: 'Pick the helper that matches where your code is running',
 				paragraphs: [
-					'If you landed here because `getFetchEvent()` or `env.DB` worked in one place and exploded in another, this page should say that plainly: those APIs all depend on the same AsyncLocalStorage-backed `RequestContext`.',
-					'That includes the per-surface getters, the generic `getContext()` helper, and the runtime exports that feel global in app code but are really reading the active request or job context under the hood.'
+					'If `getFetchEvent()` or `env.DB` works in one helper and fails in another, first check whether that code still runs during the active request, job, or Durable Object call.',
+					'Use per-surface getters when the helper needs the current event, use `env` or `ctx` when a helper only needs active bindings or execution context, and use `locals` for request-scoped data shared across middleware and helper calls.'
 				],
 				table: {
-					headers: ['Helper family', 'Examples', 'What AsyncLocalStorage gives them'],
+					headers: ['Helper family', 'Examples', 'Use it for'],
 					rows: [
 						[
 							'Per-surface getters',
@@ -103,7 +101,7 @@ export const startHereDocsPart3: DocPage[] = [
 						[
 							'Readonly runtime proxies',
 							'`env`, `ctx`, `event`',
-							'Read the active environment bindings, execution context, or original event from the current AsyncLocalStorage store without parameter threading.'
+							'Read the active environment bindings, execution context, or current event without threading parameters through every helper.'
 						],
 						[
 							'Mutable runtime proxy',
@@ -126,8 +124,8 @@ export const startHereDocsPart3: DocPage[] = [
 				id: 'event-first',
 				title: 'Start with event-first handlers and let helpers discover the active event later',
 				paragraphs: [
-					'Event-first handlers keep runtime state explicit at the boundary and still let deeper helpers recover the current event later when plumbing it through every function call would be pure ceremony. That is the everyday job for helpers like `getFetchEvent()` and `locals`.',
-					'In normal application code you should not need to establish AsyncLocalStorage context manually. Devflare already does that for generated worker entrypoints, middleware, route dispatch, Durable Object wrappers, the dev server, and the built-in test helpers.'
+					'Event-first handlers keep runtime state explicit at the boundary and still let nested helpers recover the current event later when plumbing it through every function call would be pure ceremony. That is the everyday job for helpers like `getFetchEvent()` and `locals`.',
+					'In normal application code you should not need to establish runtime context manually. Devflare already does that for generated worker entrypoints, middleware, route dispatch, Durable Object wrappers, the dev server, and the built-in test helpers.'
 				],
 				snippets: [
 					{
@@ -174,76 +172,18 @@ export function currentPath(): string {
 				]
 			},
 			{
-				id: 'what-gets-stored',
-				title: 'Devflare stores a full `RequestContext`, not just one request reference',
+				id: 'runtime-context-internals-link',
+				title: 'Open internals only when helper setup is the problem',
 				paragraphs: [
-					'Under the hood, Devflare creates `AsyncLocalStorage<RequestContext>()`. The stored value is richer than “the current request”: it keeps the active environment bindings, the current execution context or Durable Object state, an optional request, mutable locals, the runtime surface type, and the original event object.',
-					'That design is why the higher-level runtime APIs can stay small. Per-surface getters return the stored event when the active surface matches. The generic proxies read the same store without caring whether the call trail came from fetch, queue, scheduled, email, tail, or Durable Objects.'
+					'The normal runtime-context page should help you write application code. Open the internals page only when you are changing runtime infrastructure, debugging helper setup, or checking how Devflare creates the active context.'
 				],
-				snippets: [
+				cards: [
 					{
-						title: 'Simplified shape of the value Devflare puts into AsyncLocalStorage',
-						filename: 'src/runtime/context.ts',
-						language: 'ts',
-						code: String.raw`type RequestContext = {
-	env: TEnv
-	ctx: ExecutionContext | DurableObjectState | null
-	request: Request | null
-	locals: Record<string, unknown>
-	type: RuntimeEventType
-	event: EventContext<TEnv>
-}`
-					}
-				],
-				callouts: [
-					{
-						tone: 'info',
-						title: 'The original event object is still preserved',
-						body: [
-							'Devflare does not discard the richer surface event after extracting a request or context. The original event stays on `context.event`, which is what the per-surface getters read later.'
-						]
-					}
-				]
-			},
-			{
-				id: 'how-devflare-establishes-context',
-				title:
-					'Devflare first creates a rich event, then runs the handler trail inside AsyncLocalStorage',
-				paragraphs: [
-					'For fetch, queue, scheduled, email, tail, and Durable Object surfaces, Devflare first creates a rich event object using helpers such as `createFetchEvent()`, `createQueueEvent()`, or the Durable Object event builders. It then builds a `RequestContext` from that event and runs the handler trail inside `storage.run(...)`.',
-					'The same mechanism is reused by generated worker entrypoints, request-wide middleware, route resolution, Durable Object wrappers, the dev server, and `createTestContext()` helpers such as `cf.worker`, `cf.queue`, `cf.scheduled`, `cf.email`, and `cf.tail`. That shared mechanism is why runtime helpers feel consistent in app code and test code.'
-				],
-				steps: [
-					'Devflare builds the rich event object for the active surface.',
-					'It creates a `RequestContext` from `event.env`, `event.ctx`, `event.request ?? null`, `event.locals`, `event.type`, and the original event object.',
-					'It runs middleware, route resolution, or the surface handler inside `AsyncLocalStorage` with that context.',
-					'Deeper helpers call getters or proxies, which read the current store instead of receiving the event manually.',
-					'When the handler trail ends, the strict runtime helpers stop pretending context still exists.'
-				],
-				snippets: [
-					{
-						title: 'The important part of `runWithEventContext()` is intentionally small',
-						filename: 'src/runtime/context.ts',
-						language: 'ts',
-						code: String.raw`const context = {
-	env: event.env,
-	ctx: event.ctx,
-	request: event.request ?? null,
-	locals: event.locals,
-	type: event.type,
-	event
-}
-
-return storage.run(context, fn)`
-					}
-				],
-				callouts: [
-					{
-						tone: 'success',
-						title: 'One store is what keeps runtime behavior consistent',
-						body: [
-							'If a helper works in the dev server but not in tests, or vice versa, that is a bug. Devflare intentionally drives both through the same AsyncLocalStorage-backed context model.'
-						]
+						href: docsLink('runtime-context-internals'),
+						label: 'Internals',
+						meta: 'Runtime context',
+						title: 'Runtime context internals',
+						body: 'Read the stored context shape, setup steps, and advanced helper details.'
 					}
 				]
 			},
@@ -267,7 +207,7 @@ return storage.run(context, fn)`
 						],
 						[
 							'`getContext()`',
-							'The full active `RequestContext` object from the current AsyncLocalStorage store.',
+							'The full active `RequestContext` object for the current handler trail.',
 							'Throws `ContextUnavailableError` outside an active handler trail.',
 							'Use this mostly for debugging or advanced infrastructure helpers.'
 						],
@@ -286,7 +226,7 @@ return storage.run(context, fn)`
 					]
 				},
 				paragraphs: [
-					'Pass the event explicitly at the top of the stack. Reach for getters or proxies only when you are deeper in the same handler trail and threading that event downward would make the code noisier than the value it adds.',
+					'Pass the event explicitly at the top of the stack. Reach for getters or proxies only when helper code is still running in the same handler trail and threading that event downward would make the code noisier than the value it adds.',
 					'This is also why strict runtime helpers throwing outside context is healthy: it stops top-level module code and random utility calls from pretending they are running inside a request when they are not.'
 				],
 				callouts: [
@@ -301,7 +241,7 @@ return storage.run(context, fn)`
 			},
 			{
 				id: 'surface-coverage',
-				title: 'The AsyncLocalStorage model covers more than fetch',
+				title: 'Runtime helpers cover more than fetch',
 				table: {
 					headers: ['Surface', 'Event shape', 'Getter'],
 					rows: [
@@ -371,7 +311,7 @@ export const handle = sequence(requestId)`
 					'Timer callbacks like `setTimeout()` and `setInterval()` are outside the normal Devflare-managed handler trail.',
 					'Per-surface getters and `getContext()` throw `ContextUnavailableError`, while proxy property access such as `env.DB` or `locals.userId` throws `ContextAccessError` naming the missing property.',
 					'If you are unsure whether the matching surface is active, prefer `.safe()` accessors such as `getFetchEvent.safe()` over catching thrown errors.',
-					'If runtime context access fails unexpectedly while bypassing Devflare-generated config or harnesses, verify that the Worker still includes the AsyncLocalStorage compatibility flags Devflare normally adds for you.'
+					'If runtime context access fails unexpectedly while bypassing Devflare-generated config or harnesses, open the runtime context internals page and verify the Worker still includes the compatibility flags Devflare normally adds for you.'
 				],
 				callouts: [
 					{
@@ -382,14 +322,129 @@ export const handle = sequence(requestId)`
 						]
 					}
 				]
+			}
+		]
+	},
+	{
+		slug: 'runtime-context-internals',
+		group: 'Devflare',
+		navTitle: 'Runtime internals',
+		sidebarHidden: true,
+		readTime: '4 min read',
+		eyebrow: 'Runtime internals',
+		title: 'How Devflare establishes runtime context',
+		summary:
+			'This page keeps the AsyncLocalStorage mechanics out of the normal usage guide while preserving them for maintainers and advanced debugging.',
+		description:
+			'Use this page when helpers work in one runtime lane but not another, when you are changing runtime infrastructure, or when you need to verify exactly what Devflare stores while a handler is active.',
+		highlights: [
+			'Devflare stores a full request or job context while user code runs.',
+			'Generated entrypoints, middleware, routes, Durable Object wrappers, the dev server, and test helpers use the same setup model.',
+			'`runWithEventContext()` and `runWithContext()` are infrastructure helpers, not the normal application API.'
+		],
+		facts: [
+			{ label: 'Audience', value: 'Maintainers and advanced runtime debugging' },
+			{ label: 'Normal app page', value: '`runtime-context`' },
+			{ label: 'Core primitive', value: '`AsyncLocalStorage<RequestContext>`' }
+		],
+		sourcePages: [
+			'packages/devflare/README.md',
+			'context.ts',
+			'context-events.ts',
+			'context-types.ts',
+			'exports.ts',
+			'validation.ts',
+			'context.test.ts',
+			'exports.test.ts',
+			'validation.test.ts',
+			'worker-only-multi-surface-events.test.ts',
+			'event-accessors.test.ts'
+		],
+		sections: [
+			{
+				id: 'what-gets-stored',
+				title: 'What Devflare stores while a handler is active',
+				paragraphs: [
+					'Devflare creates `AsyncLocalStorage<RequestContext>()` and stores more than the current request. The context includes environment bindings, execution context or Durable Object state, optional request, mutable locals, runtime surface type, and the original event object.',
+					'That is why the higher-level runtime APIs can stay small. Per-surface getters return the stored event when the active surface matches, and the runtime proxies read the same context without forcing every helper to receive the event manually.'
+				],
+				snippets: [
+					{
+						title: 'Simplified shape of the stored runtime context',
+						filename: 'src/runtime/context.ts',
+						language: 'ts',
+						code: String.raw`type RequestContext = {
+	env: TEnv
+	ctx: ExecutionContext | DurableObjectState | null
+	request: Request | null
+	locals: Record<string, unknown>
+	type: RuntimeEventType
+	event: EventContext<TEnv>
+}`
+					}
+				],
+				callouts: [
+					{
+						tone: 'info',
+						title: 'The original event object is preserved',
+						body: [
+							'Devflare does not discard the richer surface event after extracting a request or context. The original event stays on `context.event`, which is what the per-surface getters read later.'
+						]
+					}
+				]
+			},
+			{
+				id: 'how-devflare-establishes-context',
+				title: 'How Devflare creates and installs the context',
+				paragraphs: [
+					'For fetch, queue, scheduled, email, tail, and Durable Object surfaces, Devflare first creates a rich event object using helpers such as `createFetchEvent()`, `createQueueEvent()`, or the Durable Object event builders. It then builds a `RequestContext` from that event and runs the handler trail inside `storage.run(...)`.',
+					'The same mechanism is reused by generated worker entrypoints, request-wide middleware, route resolution, Durable Object wrappers, the dev server, and `createTestContext()` helpers such as `cf.worker`, `cf.queue`, `cf.scheduled`, `cf.email`, and `cf.tail`.'
+				],
+				steps: [
+					'Devflare builds the rich event object for the active surface.',
+					'It creates a `RequestContext` from `event.env`, `event.ctx`, `event.request ?? null`, `event.locals`, `event.type`, and the original event object.',
+					'It runs middleware, route resolution, or the surface handler inside `AsyncLocalStorage` with that context.',
+					'Helpers call getters or proxies, which read the current store instead of receiving the event manually.',
+					'When the handler trail ends, strict runtime helpers stop exposing context.'
+				],
+				snippets: [
+					{
+						title: 'The important part of `runWithEventContext()` is intentionally small',
+						filename: 'src/runtime/context.ts',
+						language: 'ts',
+						code: String.raw`const context = {
+	env: event.env,
+	ctx: event.ctx,
+	request: event.request ?? null,
+	locals: event.locals,
+	type: event.type,
+	event
+}
+
+return storage.run(context, fn)`
+					}
+				]
 			},
 			{
 				id: 'advanced-helpers',
-				title:
-					'`runWithEventContext()` and `runWithContext()` are advanced helpers, not normal app code',
+				title: '`runWithEventContext()` and `runWithContext()` are infrastructure helpers',
 				paragraphs: [
 					'By the time you are considering these helpers, the normal app-facing story should already be working: handlers, middleware, generated entrypoints, and `createTestContext()` establish context for you. These APIs exist for runtime and test infrastructure that must preserve or synthesize that context deliberately.',
-					'`runWithEventContext(event, fn)` preserves an existing rich event object. `runWithContext(env, ctx, request, fn, type)` is the lower-level compatibility helper: it creates fresh locals, synthesizes a default event with `createDefaultEvent()`, and then stores that event in AsyncLocalStorage before running your function.'
+					'`runWithEventContext(event, fn)` preserves an existing rich event object. `runWithContext(env, ctx, request, fn, type)` is the lower-level compatibility helper: it creates fresh locals, synthesizes a default event with `createDefaultEvent()`, and then stores that event before running your function.'
+				],
+				snippets: [
+					{
+						title: 'Wrap one infrastructure assertion with an existing event',
+						filename: 'src/test/runtime-context.ts',
+						language: 'ts',
+						code: String.raw`import { getFetchEvent, runWithEventContext, type FetchEvent } from 'devflare/runtime'
+
+export async function readPathInsideContext(event: FetchEvent): Promise<string> {
+	return runWithEventContext(event, async () => {
+		return getFetchEvent().url.pathname
+	})
+}`
+					}
 				],
 				callouts: [
 					{

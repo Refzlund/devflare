@@ -9,7 +9,7 @@ export const compactBindingGuidesPart2: BindingGuideDefinition[] = [
 		configKey: 'bindings.workflows',
 		authoringShape: 'Record<string, { name; className; scriptName?; limits? }>',
 		localStory:
-			'Offline-native for application-level calls through Miniflare or deterministic workflow mocks',
+			'Full local support through Miniflare workflow bindings and deterministic workflow mocks',
 		sourcePages: [
 			'packages/devflare/src/config/schema-bindings.ts',
 			'packages/devflare/src/config/compiler.ts',
@@ -23,7 +23,7 @@ export const compactBindingGuidesPart2: BindingGuideDefinition[] = [
 		testHelper: '`createMockWorkflow()` / `createMockEnv({ workflows })`',
 		bestFor: 'starting long-running workflow instances from a Worker path',
 		remoteBoundary:
-			'Devflare does not provision Workflow resources or inspect production instance state; Wrangler/Cloudflare own deployed lifecycle.',
+			'Cloudflare owns deployed Workflow durability, retries, scheduling, and production instance history.',
 		configSnippet: {
 			title: 'Smallest Workflow binding config',
 			language: 'ts',
@@ -42,15 +42,39 @@ export default defineConfig({
 })`
 		},
 		usageSnippet: {
-			title: 'Create one workflow instance',
+			title: 'Define and start one order workflow',
 			language: 'ts',
-			code: String.raw`import { env } from 'devflare/runtime'
+			code: String.raw`import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from 'cloudflare:workers'
+import { env } from 'devflare/runtime'
+
+type OrderWorkflowParams = {
+	orderId: string
+	email: string
+}
+
+export class OrderWorkflow extends WorkflowEntrypoint<DevflareEnv, OrderWorkflowParams> {
+	async run(event: WorkflowEvent<OrderWorkflowParams>, step: WorkflowStep): Promise<unknown> {
+		const invoice = await step.do('create invoice', async () => {
+			return { id: 'inv_' + event.payload.orderId, email: event.payload.email }
+		})
+
+		await step.do('send confirmation', async () => {
+			await fetch('https://api.example.com/confirmations', {
+				method: 'POST',
+				body: JSON.stringify(invoice)
+			})
+			return { queued: true }
+		})
+
+		return invoice
+	}
+}
 
 export async function fetch(request: Request): Promise<Response> {
 	const orderId = new URL(request.url).searchParams.get('order') ?? 'demo'
 	const instance = await env.ORDER_WORKFLOW.create({
 		id: orderId,
-		params: { orderId }
+		params: { orderId, email: 'customer@example.com' }
 	})
 
 	return Response.json({ id: instance.id })
@@ -151,7 +175,7 @@ test('records sent pipeline rows', async () => {
 		configKey: 'bindings.images',
 		authoringShape: 'Record<string, true | { remote? }>',
 		localStory:
-			'Offline-native for low-fidelity chain-shape tests; Wrangler currently supports one Images binding per Worker',
+			'Full local support through Miniflare image bindings, persisted local state, and deterministic pure mocks',
 		sourcePages: [
 			'packages/devflare/src/config/schema-bindings.ts',
 			'packages/devflare/src/config/compiler.ts',
@@ -164,7 +188,7 @@ test('records sent pipeline rows', async () => {
 		testHelper: '`createMockImagesBinding()` / `createMockEnv({ images })`',
 		bestFor: 'image transformation/upload paths where the Worker calls the Images binding',
 		remoteBoundary:
-			'The local mock proves call shape; Cloudflare owns hosted image APIs, transform fidelity, billing, and storage.',
+			'Cloudflare owns hosted image storage, variants, delivery rules, billing, and final transform fidelity.',
 		configSnippet: {
 			title: 'Smallest Images config',
 			language: 'ts',
@@ -203,9 +227,9 @@ import { createMockImagesBinding } from 'devflare/test'
 
 test('returns a deterministic image response', async () => {
 	const images = createMockImagesBinding()
-	const response = await images.input(new Blob(['image'])).transform({ width: 320 }).output()
+	const result = await images.input(new Blob(['image']).stream()).transform({ width: 320 }).output({ format: 'image/png' })
 
-	expect(response.headers.get('content-type')).toBe('image/png')
+	expect(result.response().headers.get('content-type')).toBe('image/png')
 })`
 		},
 		compileOutput: String.raw`{
@@ -218,11 +242,11 @@ test('returns a deterministic image response', async () => {
 		slugBase: 'media-transformations',
 		label: 'Media Transformations',
 		categoryDescription:
-			'Media Transformations binding docs with fixture-backed tests and clear remote fidelity boundaries.',
+			'Media Transformations binding docs with local transform-chain support and clear codec fidelity boundaries.',
 		configKey: 'bindings.media',
 		authoringShape: 'Record<string, true | { remote? }>',
 		localStory:
-			'Offline-fixture: pure tests can model the chain, but real media processing is hosted Cloudflare behavior',
+			'Full local support through Miniflare media bindings and deterministic pure mocks for transform chains',
 		sourcePages: [
 			'packages/devflare/src/config/schema-bindings.ts',
 			'packages/devflare/src/config/compiler.ts',
@@ -231,12 +255,12 @@ test('returns a deterministic image response', async () => {
 		],
 		compileTarget: 'Wrangler `media`',
 		envType: '`MediaBinding`',
-		defaultHarness: '`createOfflineEnv()` with media fixtures',
+		defaultHarness: '`createTestContext()` or `createOfflineEnv()` with media fixtures',
 		testHelper: '`createMockMediaBinding()` / `createMockEnv({ media })`',
 		bestFor:
 			'video/audio transformation paths where the Worker calls Cloudflare Media Transformations',
 		remoteBoundary:
-			'Cloudflare owns real media output, codecs, duration handling, and billing; local tests only prove call shape.',
+			'Cloudflare owns real codecs, output fidelity, duration handling, cache behavior, and billing.',
 		configSnippet: {
 			title: 'Smallest Media Transformations config',
 			language: 'ts',
@@ -275,7 +299,8 @@ import { createMockMediaBinding } from 'devflare/test'
 
 test('returns a deterministic media response', async () => {
 	const media = createMockMediaBinding()
-	const response = await media.input(new Blob(['media'])).transform({ width: 640 }).output()
+	const result = media.input(new Blob(['media']).stream()).transform({ width: 640 }).output({ mode: 'video' })
+	const response = await result.response()
 
 	expect(response.headers.get('content-type')).toBe('video/mp4')
 })`

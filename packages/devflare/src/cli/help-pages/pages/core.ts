@@ -26,6 +26,7 @@ export const CORE_HELP_PAGES: HelpPage[] = [
 			entry('productions', 'Inspect and manage live production Workers and deployments'),
 			entry('worker', 'Rename and manage Worker control-plane operations'),
 			entry('tokens', 'Manage Devflare-managed Cloudflare API tokens'),
+			entry('secrets', 'Manage local Secrets Store values'),
 			entry('ai', 'View Workers AI pricing information'),
 			entry('remote', 'Manage remote test mode for paid Cloudflare features'),
 			entry('help', 'Show command overview or a command-specific help page'),
@@ -39,6 +40,7 @@ export const CORE_HELP_PAGES: HelpPage[] = [
 			entry('devflare deploy --preview next', 'Deploy a named preview scope directly'),
 			entry('devflare previews cleanup --scope next --apply', 'Delete one dedicated preview scope and its preview-owned resources'),
 			entry('devflare productions', 'Inspect live production Workers and active deployments'),
+			entry('devflare secrets --local --store store-123 --name api-token --value local-token', 'Set a local Secrets Store value'),
 			entry('devflare help deploy', 'Show the detailed deploy help page')
 		],
 		notes: [
@@ -170,6 +172,36 @@ export const CORE_HELP_PAGES: HelpPage[] = [
 			'Named preview deploys automatically provision preview-scoped resources before building and deploying.',
 			'When a build artifact still contains name-based bindings, deploy resolves or provisions the concrete Cloudflare resources and rewrites the generated Wrangler config with the IDs Wrangler requires.',
 			'Plain `--preview` still uses Cloudflare preview uploads, so it cannot be the first-ever upload for a brand-new Worker, preview URLs remain limited for Workers that implement Durable Objects, and preview uploads do not apply Durable Object migrations.'
+		]
+	},
+	{
+		path: ['secrets'],
+		summary: 'Manage local Secrets Store values',
+		usage: [
+			'devflare secrets --local --store <id> --name <name> --value <value>',
+			'devflare secrets --local --store <id> --list',
+			'devflare secrets --local --store <id> --name <name> --delete'
+		],
+		description: [
+			'Writes, lists, and deletes local values for Secrets Store bindings used by dev, createTestContext(), and createOfflineEnv({ cwd }).',
+			'The runtime side is read-only: Workers can read configured local values through the Secrets Store binding, but application code cannot mutate this file.'
+		],
+		options: [
+			entry('--local', 'Use the project-local secret file instead of Cloudflare'),
+			entry('--store <id>', 'Secrets Store ID, matching the Cloudflare account store ID when you have one'),
+			entry('--name <name>', 'Secret name inside the store'),
+			entry('--value <value>', 'Secret value to write locally'),
+			entry('--list', 'List local secret names without printing values'),
+			entry('--delete', 'Delete one local secret value')
+		],
+		examples: [
+			entry('devflare secrets --local --store store-123 --name api-token --value local-token', 'Create or replace one local secret value'),
+			entry('devflare secrets --local --store store-123 --list', 'List names in one local store'),
+			entry('devflare secrets --local --store store-123 --name api-token --delete', 'Delete one local secret value')
+		],
+		notes: [
+			'Local values are stored in `.devflare/secrets.local.json`, which is ignored by the repository template.',
+			'Command output prints store/name references only; it does not echo secret values.'
 		]
 	},
 	{

@@ -16,10 +16,7 @@ It is meant to read like a proper markdown handbook rather than a second source 
 This export covers 146 pages across 5 top-level groups.
 
 ### Quickstart
-See why Devflare exists, build the smallest safe first worker, and keep the documentation contract nearby before you branch into the deeper toolkit.
-
-- **Documentation contract** — See how the former split package handbook coverage now lives directly in the task-focused site pages and the published `packages/devflare/LLM.md` handbook.
-  - [Contract map](/docs/documentation-contract) — The documentation site now owns the authored docs model, while `packages/devflare/LLM.md` remains the generated one-file export shipped with the package.
+See why Devflare exists, build the smallest safe first worker, and move into routes, bindings, previews, and tests when the app needs them.
 
 - **Foundations** — Start with the mental model, the smallest safe worker, and one real test before you branch into app-specific setup.
   - [Why Devflare](/docs/what-devflare-is) — Devflare gives you one clearer story for config, worker compilation, local development, runtime helpers, testing, and deploy flows so a Worker app can stay small at the start and still stay coherent as it grows.
@@ -46,8 +43,9 @@ Keep the day-to-day Devflare surfaces easy to scan: runtime model, HTTP split, a
   - [Previews](/docs/config-previews) — Use `preview.scope()` for bindings that should belong to one preview scope. Devflare materializes names like `notes-db-next`, provisions or reuses the preview-only resources it can manage, and lets you clean them up by the same scope later without touching production resources.
   - [Runtime & deploy settings](/docs/runtime-deploy-settings) — Use config for account context, compatibility posture, assets, deployment routes, WebSocket proxy rules, migrations, observability, limits, and preview cron behavior instead of rediscovering those settings in scripts later.
 
-- **Runtime** — Keep the reusable runtime primitives nearby: AsyncLocalStorage-backed context, request-wide middleware composition, bridge transport, and other worker-wide helper surfaces belong here.
-  - [Runtime context](/docs/runtime-context) — Devflare-managed entrypoints create a rich surface event, store `env`, `ctx`, `request`, `locals`, `type`, and the original event in `AsyncLocalStorage`, then expose that state through helpers such as `getFetchEvent()`, `getQueueEvent()`, `getContext()`, and the `env`, `ctx`, `event`, and `locals` runtime proxies inside the same handler trail.
+- **Runtime** — Use runtime helpers, request-wide middleware, transport hooks, and other worker-wide surfaces without turning every page into an internals guide.
+  - [Runtime context](/docs/runtime-context) — Use explicit event parameters at handler boundaries, then use `getFetchEvent()`, `getQueueEvent()`, `getContext()`, `env`, `ctx`, `event`, and `locals` inside helper code that runs during the same request or job.
+  - [Runtime internals](/docs/runtime-context-internals) — This page keeps the AsyncLocalStorage mechanics out of the normal usage guide while preserving them for maintainers and advanced debugging.
   - [sequence(...)](/docs/sequence-middleware) — Use `sequence(...)` from `devflare/runtime` when broad HTTP concerns must wrap route resolution or another fetch handler in a clear top-to-bottom order.
   - [Handler styles](/docs/runtime-handler-styles) — Devflare runtime supports event-first handlers, request-wide `sequence()` middleware, route method handlers, and explicit markers for ambiguous two-argument worker-style or resolve-style functions.
   - [transport.ts](/docs/transport-file) — Most workers do not need a transport file. Add one when Devflare’s local RPC-style bridge must encode and decode custom values, especially across Durable Object method calls in tests.
@@ -148,11 +146,11 @@ Use the per-binding guides for the exact authoring, runtime, testing, preview, a
   - [Testing Vectorize](/docs/bindings/vectorize/testing) — The right Vectorize tests are targeted remote checks: a small insert or query, a clear skip condition, and a real index behind the binding.
   - [Vectorize example](/docs/bindings/vectorize/example) — A real Vectorize application path with config and runtime code kept side by side.
 
-- **Hyperdrive** — PostgreSQL-oriented bindings with schema support, name resolution, and a narrower proven local story than D1 or KV.
-  - [Hyperdrive](/docs/bindings/hyperdrive) — Hyperdrive is modeled in Devflare config and compile flows like other name-based resources, but its tested local ergonomics are thinner than D1 or KV.
-  - [Hyperdrive internals](/docs/bindings/hyperdrive/internals) — Hyperdrive uses the same normalize-and-resolve pattern as KV and D1, but preview lifecycle includes a fallback path instead of guaranteed preview cloning.
-  - [Testing Hyperdrive](/docs/bindings/hyperdrive/testing) — Hyperdrive testing should start smaller and more cautiously than D1 testing: prove the binding exists, then add targeted integration where the real database path matters.
-  - [Hyperdrive example](/docs/bindings/hyperdrive/example) — This example keeps Hyperdrive focused on one thing: prove the binding exists and expose the connection information your app will need next.
+- **Hyperdrive** — PostgreSQL-oriented bindings with schema support, name resolution, and local connection strings for Miniflare.
+  - [Hyperdrive](/docs/bindings/hyperdrive) — Hyperdrive is modeled in Devflare config, compile flows, local Miniflare wiring, and pure tests through explicit local connection strings.
+  - [Hyperdrive internals](/docs/bindings/hyperdrive/internals) — Hyperdrive uses the same normalize-and-resolve pattern as KV and D1, and local runtime config is driven by the binding connection string.
+  - [Testing Hyperdrive](/docs/bindings/hyperdrive/testing) — Hyperdrive testing should start with a local connection string, then add a focused query test against the database shape your app actually uses.
+  - [Hyperdrive example](/docs/bindings/hyperdrive/example) — This example uses Hyperdrive in an application route that reads one product from PostgreSQL.
 
 - **Browser Rendering** — Headless browser support with an explicit single-binding limit and a stronger dev-server story than test-helper story.
   - [Browser Rendering](/docs/bindings/browser-rendering) — Browser Rendering shines in Devflare’s bridge-backed dev story: keep one browser binding, one narrow worker route, and one smoke path that proves launch works.
@@ -173,205 +171,84 @@ Use the per-binding guides for the exact authoring, runtime, testing, preview, a
   - [Send Email example](/docs/bindings/send-email/example) — This example keeps outbound email explicit: one binding, one recipient rule, one worker path that sends one message.
 
 - **Rate Limiting** — Fixed-window request limits with Miniflare-backed local behavior and a pure mock for unit tests.
-  - [Rate Limiting](/docs/bindings/rate-limiting) — Configure Rate Limiting, call the `RateLimit` binding from worker code, and choose a test lane that matches the support level.
+  - [Rate Limiting](/docs/bindings/rate-limiting) — Add the Rate Limiting config, call `RateLimit` from worker code, and start with the local test path Devflare supports.
   - [Rate Limiting internals](/docs/bindings/rate-limiting/internals) — Rate Limiting compiles from `bindings.rateLimits` to Wrangler `ratelimits`, with local/test behavior called out explicitly.
   - [Testing Rate Limiting](/docs/bindings/rate-limiting/testing) — Test Rate Limiting by choosing the local harness that matches the product boundary instead of reaching for Cloudflare by default.
   - [Rate Limiting example](/docs/bindings/rate-limiting/example) — A compact Rate Limiting recipe with config and worker usage in one application path.
 
 - **Version Metadata** — Version identity for deployed Workers, with deterministic metadata in local tests.
-  - [Version Metadata](/docs/bindings/version-metadata) — Configure Version Metadata, call the `WorkerVersionMetadata` binding from worker code, and choose a test lane that matches the support level.
+  - [Version Metadata](/docs/bindings/version-metadata) — Add the Version Metadata config, call `WorkerVersionMetadata` from worker code, and start with the local test path Devflare supports.
   - [Version Metadata internals](/docs/bindings/version-metadata/internals) — Version Metadata compiles from `bindings.versionMetadata` to Wrangler `version_metadata`, with local/test behavior called out explicitly.
   - [Testing Version Metadata](/docs/bindings/version-metadata/testing) — Test Version Metadata by choosing the local harness that matches the product boundary instead of reaching for Cloudflare by default.
   - [Version Metadata example](/docs/bindings/version-metadata/example) — A compact Version Metadata recipe with config and worker usage in one application path.
 
 - **Worker Loaders** — Dynamic Worker loader bindings for apps that explicitly supply or mock tenant Worker payloads.
-  - [Worker Loaders](/docs/bindings/worker-loaders) — Configure Worker Loaders, call the `WorkerLoader` binding from worker code, and choose a test lane that matches the support level.
+  - [Worker Loaders](/docs/bindings/worker-loaders) — Add the Worker Loaders config, call `WorkerLoader` from worker code, and start with the local test path Devflare supports.
   - [Worker Loaders internals](/docs/bindings/worker-loaders/internals) — Worker Loaders compiles from `bindings.workerLoaders` to Wrangler `worker_loaders`, with local/test behavior called out explicitly.
   - [Testing Worker Loaders](/docs/bindings/worker-loaders/testing) — Test Worker Loaders by choosing the local harness that matches the product boundary instead of reaching for Cloudflare by default.
   - [Worker Loaders example](/docs/bindings/worker-loaders/example) — A compact Worker Loaders recipe with config and worker usage in one application path.
 
-- **Secrets Store** — Account-level Secrets Store bindings with explicit fixture values for offline tests.
-  - [Secrets Store](/docs/bindings/secrets-store) — Configure Secrets Store, call the `SecretsStoreSecret` binding from worker code, and choose a test lane that matches the support level.
+- **Secrets Store** — Account-level Secrets Store bindings with local read-only values for dev and tests.
+  - [Secrets Store](/docs/bindings/secrets-store) — Add the Secrets Store config, call `SecretsStoreSecret` from worker code, and start with the local test path Devflare supports.
   - [Secrets Store internals](/docs/bindings/secrets-store/internals) — Secrets Store compiles from `bindings.secretsStore` to Wrangler `secrets_store_secrets`, with local/test behavior called out explicitly.
   - [Testing Secrets Store](/docs/bindings/secrets-store/testing) — Test Secrets Store by choosing the local harness that matches the product boundary instead of reaching for Cloudflare by default.
   - [Secrets Store example](/docs/bindings/secrets-store/example) — A compact Secrets Store recipe with config and worker usage in one application path.
 
 - **AI Search** — AI Search instance and namespace bindings with fixture-backed local tests and remote relevance boundaries.
-  - [AI Search](/docs/bindings/ai-search) — Configure AI Search, call the `AiSearchInstance` or `AiSearchNamespace` binding from worker code, and choose a test lane that matches the support level.
+  - [AI Search](/docs/bindings/ai-search) — Add the AI Search config, call `AiSearchInstance` or `AiSearchNamespace` from worker code, and start with the local test path Devflare supports.
   - [AI Search internals](/docs/bindings/ai-search/internals) — AI Search compiles from `bindings.aiSearch` to Wrangler `ai_search` / `ai_search_namespaces`, with local/test behavior called out explicitly.
   - [Testing AI Search](/docs/bindings/ai-search/testing) — Test AI Search by choosing the local harness that matches the product boundary instead of reaching for Cloudflare by default.
   - [AI Search example](/docs/bindings/ai-search/example) — A compact AI Search recipe with config and worker usage in one application path.
 
 - **mTLS Certificates** — mTLS certificate Fetcher bindings with local handler fixtures and remote certificate-presentation boundaries.
-  - [mTLS Certificates](/docs/bindings/mtls-certificates) — Configure mTLS Certificates, call the `Fetcher` binding from worker code, and choose a test lane that matches the support level.
+  - [mTLS Certificates](/docs/bindings/mtls-certificates) — Add the mTLS Certificates config, call `Fetcher` from worker code, and start with the local test path Devflare supports.
   - [mTLS Certificates internals](/docs/bindings/mtls-certificates/internals) — mTLS Certificates compiles from `bindings.mtlsCertificates` to Wrangler `mtls_certificates`, with local/test behavior called out explicitly.
   - [Testing mTLS Certificates](/docs/bindings/mtls-certificates/testing) — Test mTLS Certificates by choosing the local harness that matches the product boundary instead of reaching for Cloudflare by default.
   - [mTLS Certificates example](/docs/bindings/mtls-certificates/example) — A compact mTLS Certificates recipe with config and worker usage in one application path.
 
 - **Dispatch Namespaces** — Workers for Platforms dispatch bindings with explicit local tenant fetcher fixtures.
-  - [Dispatch Namespaces](/docs/bindings/dispatch-namespaces) — Configure Dispatch Namespaces, call the `DispatchNamespace` binding from worker code, and choose a test lane that matches the support level.
+  - [Dispatch Namespaces](/docs/bindings/dispatch-namespaces) — Add the Dispatch Namespaces config, call `DispatchNamespace` from worker code, and start with the local test path Devflare supports.
   - [Dispatch Namespaces internals](/docs/bindings/dispatch-namespaces/internals) — Dispatch Namespaces compiles from `bindings.dispatchNamespaces` to Wrangler `dispatch_namespaces`, with local/test behavior called out explicitly.
   - [Testing Dispatch Namespaces](/docs/bindings/dispatch-namespaces/testing) — Test Dispatch Namespaces by choosing the local harness that matches the product boundary instead of reaching for Cloudflare by default.
   - [Dispatch Namespaces example](/docs/bindings/dispatch-namespaces/example) — A compact Dispatch Namespaces recipe with config and worker usage in one application path.
 
 - **Workflows** — Workflow bindings for starting and inspecting workflow instances from Workers.
-  - [Workflows](/docs/bindings/workflows) — Configure Workflows, call the `Workflow` binding from worker code, and choose a test lane that matches the support level.
+  - [Workflows](/docs/bindings/workflows) — Add the Workflows config, call `Workflow` from worker code, and start with the local test path Devflare supports.
   - [Workflows internals](/docs/bindings/workflows/internals) — Workflows compiles from `bindings.workflows` to Wrangler `workflows`, with local/test behavior called out explicitly.
   - [Testing Workflows](/docs/bindings/workflows/testing) — Test Workflows by choosing the local harness that matches the product boundary instead of reaching for Cloudflare by default.
   - [Workflows example](/docs/bindings/workflows/example) — A compact Workflows recipe with config and worker usage in one application path.
 
 - **Pipelines** — Pipeline bindings for event ingestion, with local send recording and Cloudflare-managed sinks.
-  - [Pipelines](/docs/bindings/pipelines) — Configure Pipelines, call the `Pipeline` binding from worker code, and choose a test lane that matches the support level.
+  - [Pipelines](/docs/bindings/pipelines) — Add the Pipelines config, call `Pipeline` from worker code, and start with the local test path Devflare supports.
   - [Pipelines internals](/docs/bindings/pipelines/internals) — Pipelines compiles from `bindings.pipelines` to Wrangler `pipelines`, with local/test behavior called out explicitly.
   - [Testing Pipelines](/docs/bindings/pipelines/testing) — Test Pipelines by choosing the local harness that matches the product boundary instead of reaching for Cloudflare by default.
   - [Pipelines example](/docs/bindings/pipelines/example) — A compact Pipelines recipe with config and worker usage in one application path.
 
 - **Images** — Cloudflare Images binding docs with singleton config, local chain-shape tests, and hosted-image boundaries.
-  - [Images](/docs/bindings/images) — Configure Images, call the `ImagesBinding` binding from worker code, and choose a test lane that matches the support level.
+  - [Images](/docs/bindings/images) — Add the Images config, call `ImagesBinding` from worker code, and start with the local test path Devflare supports.
   - [Images internals](/docs/bindings/images/internals) — Images compiles from `bindings.images` to Wrangler `images`, with local/test behavior called out explicitly.
   - [Testing Images](/docs/bindings/images/testing) — Test Images by choosing the local harness that matches the product boundary instead of reaching for Cloudflare by default.
   - [Images example](/docs/bindings/images/example) — A compact Images recipe with config and worker usage in one application path.
 
-- **Media Transformations** — Media Transformations binding docs with fixture-backed tests and clear remote fidelity boundaries.
-  - [Media Transformations](/docs/bindings/media-transformations) — Configure Media Transformations, call the `MediaBinding` binding from worker code, and choose a test lane that matches the support level.
+- **Media Transformations** — Media Transformations binding docs with local transform-chain support and clear codec fidelity boundaries.
+  - [Media Transformations](/docs/bindings/media-transformations) — Add the Media Transformations config, call `MediaBinding` from worker code, and start with the local test path Devflare supports.
   - [Media Transformations internals](/docs/bindings/media-transformations/internals) — Media Transformations compiles from `bindings.media` to Wrangler `media`, with local/test behavior called out explicitly.
   - [Testing Media Transformations](/docs/bindings/media-transformations/testing) — Test Media Transformations by choosing the local harness that matches the product boundary instead of reaching for Cloudflare by default.
   - [Media Transformations example](/docs/bindings/media-transformations/example) — A compact Media Transformations recipe with config and worker usage in one application path.
 
 - **Artifacts** — Artifacts bindings for Git-compatible file storage, with in-memory repo/token tests.
-  - [Artifacts](/docs/bindings/artifacts) — Configure Artifacts, call the `Artifacts` binding from worker code, and choose a test lane that matches the support level.
+  - [Artifacts](/docs/bindings/artifacts) — Add the Artifacts config, call `Artifacts` from worker code, and start with the local test path Devflare supports.
   - [Artifacts internals](/docs/bindings/artifacts/internals) — Artifacts compiles from `bindings.artifacts` to Wrangler `artifacts`, with local/test behavior called out explicitly.
   - [Testing Artifacts](/docs/bindings/artifacts/testing) — Test Artifacts by choosing the local harness that matches the product boundary instead of reaching for Cloudflare by default.
   - [Artifacts example](/docs/bindings/artifacts/example) — A compact Artifacts recipe with config and worker usage in one application path.
 
 - **Containers** — Cloudflare Containers config plus a Worker route that hands requests to a container-backed Durable Object.
-  - [Containers](/docs/bindings/containers) — Configure Containers, call the Container class config plus a Durable Object container binding binding from worker code, and choose a test lane that matches the support level.
+  - [Containers](/docs/bindings/containers) — Add the Containers config, call Container class config plus a Durable Object container binding from worker code, and start with the local test path Devflare supports.
   - [Containers internals](/docs/bindings/containers/internals) — Containers compiles from `containers` to Wrangler `containers`, with local/test behavior called out explicitly.
   - [Testing Containers](/docs/bindings/containers/testing) — Test Containers by choosing the local harness that matches the product boundary instead of reaching for Cloudflare by default.
   - [Containers example](/docs/bindings/containers/example) — A compact Containers recipe with config and worker usage in one application path.
 
 ## Full documentation
-
-### See how the site model and published `LLM.md` stay aligned
-
-> The documentation site now owns the authored docs model, while `packages/devflare/LLM.md` remains the generated one-file export shipped with the package.
-
-| Field | Value |
-| --- | --- |
-| Route | [`/docs/documentation-contract`](/docs/documentation-contract) |
-| Group | Quickstart |
-| Navigation title | Contract map |
-| Eyebrow | Docs model |
-
-The older split handbook content has been folded into `apps/documentation/src/lib/docs/content*.ts`. The site now carries that material as smaller task-focused routes, and the published `packages/devflare/LLM.md` file is generated from the same model when you want one flattened handbook export.
-
-#### At a glance
-
-| Fact | Value |
-| --- | --- |
-| Authoritative authoring layer | `apps/documentation/src/lib/docs/content*.ts` |
-| Primary reading surfaces | Task-focused `/docs/*` routes plus `/llm.md` and `/llm.txt` exports |
-| Refresh commands | `bun run llm:generate` from `apps/documentation`, or the same command from `packages/devflare` when you also want the packaged copy refreshed |
-
-#### Know which layer is authoritative now
-
-The structured documentation model in `apps/documentation/src/lib/docs/content*.ts` is now the source of truth for the authored Devflare handbook. The older split package docs have been folded into that model so the site and exported handbook stay aligned.
-
-The site breaks that material into smaller task-focused routes, while the generated handbook turns the same model into one-file exports for search, review, and package shipping.
-
-The generated `/llm.md` export is the fuller one-file handbook, while `/llm.txt` is the stricter text-oriented subset from the same model and intentionally omits handbook-only sections such as the documentation contract. The published `packages/devflare/LLM.md` file is copied from `/llm.md` before packaging, and none of those exports are meant to be hand-edited source authoring.
-
-##### Highlights
-
-- **Structured docs model** — `apps/documentation/src/lib/docs/content*.ts` now holds the authored handbook copy, page structure, examples, and task-first route organization.
-- **Task-focused site routes** — The site favors smaller routes aimed at one job to be done instead of mirroring the old handbook structure page for page.
-- **Published handbook export** — Use `/llm.md` for the fuller generated handbook, `/llm.txt` for the stricter text-oriented subset, and remember that `packages/devflare/LLM.md` is copied from `/llm.md` before publish time.
-
-> **Important — The safest drift rule**
->
-> If handbook coverage changes, update the matching site pages first, then regenerate the package handbook. If `packages/devflare/LLM.md` says something the site model does not back up, fix the site model and regenerate instead of patching the handbook by hand.
-
-#### See where the same docs model shows up
-
-The site and handbook outputs are different reading surfaces backed by one model, not separate sources of truth.
-
-##### Reference table
-
-| Surface | Best when | Backed by |
-| --- | --- | --- |
-| /docs/* routes | You are reading one topic in the site and want navigation, context, and examples inline. | `apps/documentation/src/lib/docs/content*.ts` |
-| /llm.md and /llm.txt | You want the generated handbook as one file: `/llm.md` for the fuller export, `/llm.txt` for the stricter text-oriented subset that omits handbook-only sections such as the documentation contract. | Generated from the same docs model. |
-| `packages/devflare/LLM.md` | You want the published one-file handbook that ships with the package. | Copied from the generated docs export before packaging. |
-
-#### Use the site for tasks and the handbook for one-file reading
-
-##### Steps
-
-1. Start from the task-focused site page when you need to build, review, or debug one specific part of Devflare.
-2. Use `/llm.md` when you want the fullest one-file handbook, `/llm.txt` when you want the stricter text-oriented subset, or the published `packages/devflare/LLM.md` file when you want the package copy that ships.
-3. Run `bun run llm:generate` from `apps/documentation` when you are editing the site model, or from `packages/devflare` when you need the packaged `LLM.md` copy refreshed too.
-4. Let build and prepare hooks regenerate the handbook outputs instead of hand-editing `LLM.md`.
-
-> **Tip — The intended reading pattern**
->
-> Read the site by job to be done, and use the package-level `LLM.md` when you want the same material in one file.
-
-##### Example — Wire docs generation and drift checks into the repo scripts
-
-Use package scripts and CI to keep the authored site model, generated site exports, and packaged handbook moving together.
-
-###### File — package.json
-
-```json
-{
-	"scripts": {
-		"docs:generate": "bun run --cwd apps/documentation llm:generate && bun run --cwd packages/devflare llm:generate",
-		"docs:check": "bun run devflare:docs-integrity && bun run --cwd apps/documentation check"
-	}
-}
-```
-
-###### File — .github/workflows/docs-quality.yml
-
-```yaml
-name: Documentation quality
-
-on:
-  pull_request:
-    paths:
-      - "apps/documentation/**"
-      - "packages/devflare/LLM.md"
-      - "packages/devflare/tests/unit/docs/**"
-
-jobs:
-  docs:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
-      - run: bun install --frozen-lockfile
-      - run: bun run docs:generate
-      - run: bun run docs:check
-```
-
-##### Example — Regenerate the handbook from the site model
-
-```bash
-bun run --cwd apps/documentation llm:generate
-bun run --cwd packages/devflare llm:generate
-bun run devflare:docs-integrity
-```
-
-#### A good docs drift check is small and specific
-
-##### Key points
-
-- Update the site pages first, then regenerate the handbook outputs.
-- If the site and `packages/devflare/LLM.md` disagree, fix `apps/documentation/src/lib/docs/content*.ts` and regenerate instead of patching the export by hand.
-- If a concept stops fitting the current site structure, add or split a page instead of hiding the change in generated output.
-- Never hand-edit generated `packages/devflare/LLM.md`; regenerate it from the site model after you update the underlying docs.
-
----
 
 ### Why Devflare feels better than stitching Cloudflare Worker workflows together by hand
 
@@ -384,14 +261,14 @@ bun run devflare:docs-integrity
 | Navigation title | Why Devflare |
 | Eyebrow | Why it helps |
 
-The goal is not to hide Cloudflare. The goal is to keep authored code split by responsibility, let generated output and Rolldown-backed worker compilation stay in their own lane, and give you a smoother path from one worker to routing, bindings, frameworks, previews, and automation.
+The goal is not to hide Cloudflare. The goal is to keep the files you edit small and obvious, then give you a smoother path from one worker to routing, bindings, frameworks, previews, and automation.
 
 #### At a glance
 
 | Fact | Value |
 | --- | --- |
 | Best for | Teams that want Cloudflare power without accumulating setup glue |
-| Architecture shape | Config, runtime, tests, framework integration, and Cloudflare ops are separate by design |
+| Architecture shape | Config, runtime, tests, framework integration, and Cloudflare ops stay separate |
 | Build lane | Rolldown composes worker and Durable Object artifacts; Vite stays optional |
 | Still true | Cloudflare limits and Wrangler-compatible output still matter |
 
@@ -446,31 +323,31 @@ Every native binding or platform lane in the binding docs is listed here with it
 - **Services** — `ref()` service bindings, typed worker-to-worker env contracts, local multi-worker runtime, and tests that call the same service binding the app uses. ([link](/docs/bindings/services))
 - **AI** — Native config, generated types, deploy support, and AI Gateway method coverage are present. Real inference, model behavior, billing, and most meaningful tests remain Cloudflare remote behavior. ([link](/docs/bindings/ai))
 - **Vectorize** — Native config, generated types, preview-aware resource naming, and remote-mode tests are supported. Real index semantics and similarity results require Cloudflare. ([link](/docs/bindings/vectorize))
-- **Hyperdrive** — Config, generated output, name resolution, and smoke-level local checks are supported. Real PostgreSQL connectivity, pooling, and credentials remain remote infrastructure. ([link](/docs/bindings/hyperdrive))
-- **Browser Rendering** — Native config and bridge-backed dev-server integration are supported, with generated typing and route examples. Dedicated test-helper fidelity is narrower, and Cloudflare allows one browser binding. ([link](/docs/bindings/browser-rendering))
-- **Analytics Engine** — Dataset bindings are modeled in config and generated output, and app code can be thin-tested around `writeDataPoint()`. Production ingestion and analytics behavior remain hosted. ([link](/docs/bindings/analytics-engine))
-- **Send Email** — Outbound email bindings have native config, generated output, local support, and test access through the env binding. Inbound email handlers are a separate Worker surface. ([link](/docs/bindings/send-email))
+- **Hyperdrive** — Config, name resolution, local connection strings, and Miniflare-backed Hyperdrive bindings support ordinary app queries without Cloudflare. Hosted pooling, placement, credentials, and production routing remain Cloudflare behavior. ([link](/docs/bindings/hyperdrive))
+- **Browser Rendering** — Native config, generated typing, route examples, and bridge-backed dev-server support through the local browser-rendering shim. Cloudflare still owns hosted session limits, live/HITL behavior, recordings, and billing. ([link](/docs/bindings/browser-rendering))
+- **Analytics Engine** — Dataset bindings are configured in Devflare, and app code can be thin-tested around `writeDataPoint()`. Production ingestion and analytics behavior remain hosted. ([link](/docs/bindings/analytics-engine))
+- **Send Email** — Outbound email bindings have native config, local support, and test access through the env binding. Inbound email handlers are a separate Worker surface. ([link](/docs/bindings/send-email))
 - **Rate Limiting** — Native fixed-window config, Miniflare-backed local behavior, generated typing, and pure mocks support deterministic application-level rate-limit tests. ([link](/docs/bindings/rate-limiting))
-- **Version Metadata** — Native config, generated output, deterministic local metadata, and test helpers support version-aware responses and diagnostics without requiring Cloudflare state. ([link](/docs/bindings/version-metadata))
-- **Worker Loaders** — Devflare models the binding and can test app flow when you supply explicit Worker payloads or stubs. It does not upload, discover, or lifecycle-manage dynamic Worker code. ([link](/docs/bindings/worker-loaders))
-- **Secrets Store** — Native config and fixture-backed offline tests are supported. Devflare does not read, provision, or sync account secret values; tests must provide explicit fixture values. ([link](/docs/bindings/secrets-store))
+- **Version Metadata** — Native config, deterministic local metadata, and test helpers support version-aware responses and diagnostics without requiring Cloudflare state. ([link](/docs/bindings/version-metadata))
+- **Worker Loaders** — Devflare wires Worker Loader bindings through Miniflare and pure test stubs, so local apps can load explicit Worker payloads without Cloudflare. Upload, discovery, and hosted lifecycle stay on the platform. ([link](/docs/bindings/worker-loaders))
+- **Secrets Store** — Native config, Miniflare wiring, and explicit local fixtures cover app code that reads Secrets Store values. Devflare still does not read, provision, or sync account secret values. ([link](/docs/bindings/secrets-store))
 - **AI Search** — Native instance and namespace config plus deterministic fixtures can test application flow. Crawling, indexing, ranking, and hosted model behavior stay in Cloudflare. ([link](/docs/bindings/ai-search))
 - **mTLS Certificates** — Native config and Fetcher-shaped local fixtures are supported. Real client-certificate presentation and certificate lifecycle remain Wrangler and Cloudflare remote behavior. ([link](/docs/bindings/mtls-certificates))
 - **Dispatch Namespaces** — Native dispatch namespace bindings and tenant Fetcher fixtures are supported. Devflare does not upload tenant Workers or emulate the Workers for Platforms control plane. ([link](/docs/bindings/dispatch-namespaces))
-- **Workflows** — Native config and local application-level workflow calls are supported through Miniflare or deterministic mocks. Production workflow lifecycle and instance state are Cloudflare-owned. ([link](/docs/bindings/workflows))
+- **Workflows** — Native config, Miniflare workflow bindings, deterministic mocks, and real WorkflowEntrypoint examples cover the local app loop. Production lifecycle, durability, retries, and scheduling remain Cloudflare-owned. ([link](/docs/bindings/workflows))
 - **Pipelines** — Native config and local send-recording tests are supported for producer code. Pipeline creation, batching, transformations, sinks, and delivery are Cloudflare-managed. ([link](/docs/bindings/pipelines))
-- **Images** — Native singleton config and low-fidelity chain-shape mocks are supported. Hosted Images storage, variants, delivery rules, billing, and transform fidelity remain remote. ([link](/docs/bindings/images))
-- **Media Transformations** — Native config and fixture-backed chain tests are supported. Real codecs, output fidelity, duration handling, cache behavior, and billing are hosted Cloudflare behavior. ([link](/docs/bindings/media-transformations))
+- **Images** — Native singleton config, Miniflare image bindings, persisted local state, and deterministic pure mocks cover Worker image transform flows. Hosted storage, variants, delivery rules, billing, and final transform fidelity remain remote. ([link](/docs/bindings/images))
+- **Media Transformations** — Native config, Miniflare media bindings, and deterministic pure mocks cover Worker media transform chains locally. Real codecs, output fidelity, duration handling, cache behavior, and billing remain hosted Cloudflare behavior. ([link](/docs/bindings/media-transformations))
 - **Artifacts** — Native config and in-memory repo or token fixtures are supported for app flow. Durable storage, Git-over-HTTPS remotes, namespace creation, and permissions are Cloudflare-owned. ([link](/docs/bindings/artifacts))
 - **Containers** — Native top-level container config has full local support through Docker or Podman: Devflare can build Dockerfile paths offline-first, run prebuilt image tags, and interact with launched instances. Deployed rollout, registry availability, SSH, scaling, and hosted platform behavior remain Cloudflare-owned. ([link](/docs/bindings/containers))
 
 #### What Devflare adds on top of raw Cloudflare workflows
 
-These are the parts that feel distinctly like Devflare rather than just a thinner wrapper around Wrangler. They are implemented features in their own right, and each one has deeper docs when you want the full story.
+These are the pieces you use while building an app, not concepts you need to memorize before the first route works.
 
 ##### Highlights
 
-- **AsyncLocalStorage-backed context** — Devflare stores the active event, env, ctx, request, and locals so helper code can recover the current Worker context without threading it through every function call. ([link](/docs/runtime-context))
+- **Runtime context helpers** — Helper code can read the active request, env, ctx, event, and `locals` without threading the event through every function call. ([link](/docs/runtime-context))
 - **`sequence(...)` middleware** — Request-wide middleware gets a named helper instead of forcing every app to reinvent the same fetch wrapper. ([link](/docs/sequence-middleware))
 - **Runtime-shaped unit testing and the smart bridge** — The default test harness boots a real worker-shaped environment and uses the bridge so tests can talk to workers, bindings, queues, services, and other surfaces without inventing a second fake runtime. ([link](/docs/create-test-context))
 - **`transport.ts`** — Custom bridge-backed values can round-trip as real classes instead of collapsing into plain JSON when the worker boundary needs richer types. ([link](/docs/transport-file))
@@ -712,7 +589,7 @@ describe('hello-worker', () => {
 
 - You can keep the same harness when the worker grows routes, queue consumers, scheduled handlers, or other runtime surfaces.
 - One request-level smoke test is still useful even after helpers and abstractions appear around the worker.
-- When you need the deeper test surface, open `/docs/create-test-context` for the full helper map.
+- When you need more test helpers, open `/docs/create-test-context` for the full helper map.
 
 > **Note — The next docs page when tests grow up**
 >
@@ -850,7 +727,7 @@ The additive move after the first worker is not a different app. It is the same 
 
 Once the first worker responds and maybe already has one small test, the next step is to keep `src/fetch.ts` tiny. Let it do request-wide setup, then let `src/routes/**` own the individual URLs.
 
-That shape also makes Devflare's AsyncLocalStorage-backed runtime helpful in a calm way: helper modules can read the active request path, route params, request body, or request id through `getFetchEvent()` and `locals` without turning every function signature into plumbing.
+That shape also lets helper modules read the active request path, route params, request body, or request id through `getFetchEvent()` and `locals` without turning every function signature into plumbing.
 
 ##### Highlights
 
@@ -1063,7 +940,7 @@ Keep the same worker shape and let one route file own the bucket round-trip.
 
 Here the route path becomes the obvious home for the binding: `src/routes/files/[name].ts` owns both the `PUT` and `GET` flow for one named object.
 
-The shared helper still provides request-wide context, route params, and request reads through AsyncLocalStorage, while the route file keeps the bucket contract visible and local to the URL that needs it.
+The shared helper still provides request-wide context, route params, and request reads through runtime helpers, while the route file keeps the bucket usage visible and local to the URL that needs it.
 
 > **Important — Why this is a good first R2 route**
 >
@@ -1071,7 +948,7 @@ The shared helper still provides request-wide context, route params, and request
 
 ##### Example — Same worker, now add one file route and one bucket binding
 
-The global fetch file stays tiny. The new work lives in one route file under `src/routes/files/[name].ts`, while the helper module still reads the active request through AsyncLocalStorage-backed runtime helpers.
+The global fetch file stays tiny. The new work lives in one route file under `src/routes/files/[name].ts`, while the helper module still reads the active request through runtime helpers.
 
 ###### File — devflare.config.ts
 
@@ -1195,14 +1072,14 @@ export async function GET(): Promise<Response> {
 }
 ```
 
-#### Go deeper when the first quick win works
+#### Open the next page when the first quick win works
 
 Once one tiny example works locally, jump to the dedicated binding guides for the bigger caveats, testing patterns, and architecture choices.
 
 ##### Highlights
 
 - **Durable Objects guide** — Read the fuller guidance on stateful objects, migrations, previews, and local testing. ([link](/docs/bindings/durable-objects))
-- **R2 guide** — Open the deeper R2 page for delivery boundaries, testing patterns, and storage architecture choices. ([link](/docs/bindings/r2))
+- **R2 guide** — Open the R2 page for delivery boundaries, testing patterns, and storage choices. ([link](/docs/bindings/r2))
 - **Browser Rendering guide** — Open the browser guide when you need the single-binding caveat, dev-server details, or heavier browser workflows. ([link](/docs/bindings/browser-rendering))
 
 ---
@@ -1335,13 +1212,13 @@ bunx --bun devflare previews cleanup --scope next --apply
 
 #### What to read next
 
-Once the first preview loop works, jump to the deeper docs for production deploy rules and GitHub automation.
+Once the first preview loop works, jump to production deploy rules and GitHub automation.
 
 When this local preview loop is ready to leave your shell history and become reviewable automation, continue with `github-workflows`. That page maps the exact `.github/workflows/*.yml` files this repo uses for PR comments, branch previews, production deploys, and cleanup.
 
 ##### Highlights
 
-- **Production deploys** — Read the deeper guide for explicit production targets, preflight checks, and deploy inspection habits. ([link](/docs/production-deploys))
+- **Production deploys** — Read the production guide for explicit targets, preflight checks, and deploy inspection habits. ([link](/docs/production-deploys))
 - **GitHub workflows** — Continue with the repo-backed workflow guide when you want this preview loop to become PR comments, branch previews, production deploys, and cleanup jobs under `.github/workflows`. ([link](/docs/github-workflows))
 
 ---
@@ -3317,9 +3194,9 @@ These settings belong in the same config as the Worker surfaces. They are part o
 
 ---
 
-### Think in events first, then let AsyncLocalStorage carry the active context through the handler trail
+### Use runtime helpers without passing the event through every function
 
-> Devflare-managed entrypoints create a rich surface event, store `env`, `ctx`, `request`, `locals`, `type`, and the original event in `AsyncLocalStorage`, then expose that state through helpers such as `getFetchEvent()`, `getQueueEvent()`, `getContext()`, and the `env`, `ctx`, `event`, and `locals` runtime proxies inside the same handler trail.
+> Use explicit event parameters at handler boundaries, then use `getFetchEvent()`, `getQueueEvent()`, `getContext()`, `env`, `ctx`, `event`, and `locals` inside helper code that runs during the same request or job.
 
 | Field | Value |
 | --- | --- |
@@ -3328,31 +3205,31 @@ These settings belong in the same config as the Worker surfaces. They are part o
 | Navigation title | Runtime context |
 | Eyebrow | Runtime helpers |
 
-The public story is still event-first, but this is also the page for the helper APIs that depend on that model: `getFetchEvent()`, `getQueueEvent()`, `getScheduledEvent()`, `getEmailEvent()`, `getTailEvent()`, `getContext()`, and the `env`, `ctx`, `event`, and `locals` exports from `devflare/runtime`. Your handler gets a rich event object, and Devflare stores a matching `RequestContext` in Node `AsyncLocalStorage` so those helpers can recover the active surface without threading the event through every layer.
+The everyday rule is simple: accept the event in the handler, pass explicit data where it is clearer, and use runtime helpers when nested helper code needs the active request, env, context, event, or request-scoped `locals`.
 
 #### At a glance
 
 | Fact | Value |
 | --- | --- |
-| Context carrier | Node `AsyncLocalStorage` under Devflare-managed entrypoints |
+| Main rule | Event at the boundary, helpers inside the same handler trail |
 | Main helpers | `getFetchEvent()`, `getQueueEvent()`, `getContext()`, `env`, `ctx`, `event`, and `locals` |
-| Stored shape | `env`, `ctx`, `request`, `locals`, `type`, and the original event object |
+| Stored shape | `env`, `ctx`, `request`, `event`, and `locals` while a handler is active |
 | Mutable lane | `locals` / `event.locals` |
 | Failure mode | Strict runtime helpers throw outside an active handler trail |
 
-#### The AsyncLocalStorage-powered helpers are the whole point of this page
+#### Pick the helper that matches where your code is running
 
-If you landed here because `getFetchEvent()` or `env.DB` worked in one place and exploded in another, this page should say that plainly: those APIs all depend on the same AsyncLocalStorage-backed `RequestContext`.
+If `getFetchEvent()` or `env.DB` works in one helper and fails in another, first check whether that code still runs during the active request, job, or Durable Object call.
 
-That includes the per-surface getters, the generic `getContext()` helper, and the runtime exports that feel global in app code but are really reading the active request or job context under the hood.
+Use per-surface getters when the helper needs the current event, use `env` or `ctx` when a helper only needs active bindings or execution context, and use `locals` for request-scoped data shared across middleware and helper calls.
 
 ##### Reference table
 
-| Helper family | Examples | What AsyncLocalStorage gives them |
+| Helper family | Examples | Use it for |
 | --- | --- | --- |
 | Per-surface getters | `getFetchEvent()`, `getQueueEvent()`, `getScheduledEvent()`, `getEmailEvent()`, `getTailEvent()` | Return the current rich event after verifying the active surface type; `.safe()` returns `null` instead of throwing. |
 | Generic context getter | `getContext()` | Returns the active stored context shape when one exists and throws when code is running outside an active handler trail. |
-| Readonly runtime proxies | `env`, `ctx`, `event` | Read the active environment bindings, execution context, or original event from the current AsyncLocalStorage store without parameter threading. |
+| Readonly runtime proxies | `env`, `ctx`, `event` | Read the active environment bindings, execution context, or current event without threading parameters through every helper. |
 | Mutable runtime proxy | `locals` | Reads and writes the per-request or per-job mutable storage object attached to the active context. |
 
 > **Important — A practical reading guide**
@@ -3361,9 +3238,9 @@ That includes the per-surface getters, the generic `getContext()` helper, and th
 
 #### Start with event-first handlers and let helpers discover the active event later
 
-Event-first handlers keep runtime state explicit at the boundary and still let deeper helpers recover the current event later when plumbing it through every function call would be pure ceremony. That is the everyday job for helpers like `getFetchEvent()` and `locals`.
+Event-first handlers keep runtime state explicit at the boundary and still let nested helpers recover the current event later when plumbing it through every function call would be pure ceremony. That is the everyday job for helpers like `getFetchEvent()` and `locals`.
 
-In normal application code you should not need to establish AsyncLocalStorage context manually. Devflare already does that for generated worker entrypoints, middleware, route dispatch, Durable Object wrappers, the dev server, and the built-in test helpers.
+In normal application code you should not need to establish runtime context manually. Devflare already does that for generated worker entrypoints, middleware, route dispatch, Durable Object wrappers, the dev server, and the built-in test helpers.
 
 ##### Example — Use the explicit event at the boundary and a getter inside the helper
 
@@ -3396,69 +3273,17 @@ export function currentPath(): string {
 }
 ```
 
-#### Devflare stores a full `RequestContext`, not just one request reference
+#### Open internals only when helper setup is the problem
 
-Under the hood, Devflare creates `AsyncLocalStorage<RequestContext>()`. The stored value is richer than “the current request”: it keeps the active environment bindings, the current execution context or Durable Object state, an optional request, mutable locals, the runtime surface type, and the original event object.
+The normal runtime-context page should help you write application code. Open the internals page only when you are changing runtime infrastructure, debugging helper setup, or checking how Devflare creates the active context.
 
-That design is why the higher-level runtime APIs can stay small. Per-surface getters return the stored event when the active surface matches. The generic proxies read the same store without caring whether the call trail came from fetch, queue, scheduled, email, tail, or Durable Objects.
+##### Highlights
 
-> **Note — The original event object is still preserved**
->
-> Devflare does not discard the richer surface event after extracting a request or context. The original event stays on `context.event`, which is what the per-surface getters read later.
-
-##### Example — Simplified shape of the value Devflare puts into AsyncLocalStorage
-
-###### File — src/runtime/context.ts
-
-```ts
-type RequestContext = {
-	env: TEnv
-	ctx: ExecutionContext | DurableObjectState | null
-	request: Request | null
-	locals: Record<string, unknown>
-	type: RuntimeEventType
-	event: EventContext<TEnv>
-}
-```
-
-#### Devflare first creates a rich event, then runs the handler trail inside AsyncLocalStorage
-
-For fetch, queue, scheduled, email, tail, and Durable Object surfaces, Devflare first creates a rich event object using helpers such as `createFetchEvent()`, `createQueueEvent()`, or the Durable Object event builders. It then builds a `RequestContext` from that event and runs the handler trail inside `storage.run(...)`.
-
-The same mechanism is reused by generated worker entrypoints, request-wide middleware, route resolution, Durable Object wrappers, the dev server, and `createTestContext()` helpers such as `cf.worker`, `cf.queue`, `cf.scheduled`, `cf.email`, and `cf.tail`. That shared mechanism is why runtime helpers feel consistent in app code and test code.
-
-##### Steps
-
-1. Devflare builds the rich event object for the active surface.
-2. It creates a `RequestContext` from `event.env`, `event.ctx`, `event.request ?? null`, `event.locals`, `event.type`, and the original event object.
-3. It runs middleware, route resolution, or the surface handler inside `AsyncLocalStorage` with that context.
-4. Deeper helpers call getters or proxies, which read the current store instead of receiving the event manually.
-5. When the handler trail ends, the strict runtime helpers stop pretending context still exists.
-
-> **Tip — One store is what keeps runtime behavior consistent**
->
-> If a helper works in the dev server but not in tests, or vice versa, that is a bug. Devflare intentionally drives both through the same AsyncLocalStorage-backed context model.
-
-##### Example — The important part of `runWithEventContext()` is intentionally small
-
-###### File — src/runtime/context.ts
-
-```ts
-const context = {
-	env: event.env,
-	ctx: event.ctx,
-	request: event.request ?? null,
-	locals: event.locals,
-	type: event.type,
-	event
-}
-
-return storage.run(context, fn)
-```
+- **Runtime context internals** — Read the stored context shape, setup steps, and advanced helper details. ([link](/docs/runtime-context-internals))
 
 #### Getters and proxies are just different ways of reading the same store
 
-Pass the event explicitly at the top of the stack. Reach for getters or proxies only when you are deeper in the same handler trail and threading that event downward would make the code noisier than the value it adds.
+Pass the event explicitly at the top of the stack. Reach for getters or proxies only when helper code is still running in the same handler trail and threading that event downward would make the code noisier than the value it adds.
 
 This is also why strict runtime helpers throwing outside context is healthy: it stops top-level module code and random utility calls from pretending they are running inside a request when they are not.
 
@@ -3468,7 +3293,7 @@ This is also why strict runtime helpers throwing outside context is healthy: it 
 | --- | --- | --- | --- |
 | Handler parameters | The explicit event object Devflare passes to the handler boundary. | No lookup needed at the boundary. | `event.locals` is mutable. |
 | Per-surface getters like `getFetchEvent()` | The stored `context.event` after Devflare verifies the active surface type. | Throws `ContextUnavailableError`, while `.safe()` returns `null`. | Readonly event view. |
-| `getContext()` | The full active `RequestContext` object from the current AsyncLocalStorage store. | Throws `ContextUnavailableError` outside an active handler trail. | Use this mostly for debugging or advanced infrastructure helpers. |
+| `getContext()` | The full active `RequestContext` object for the current handler trail. | Throws `ContextUnavailableError` outside an active handler trail. | Use this mostly for debugging or advanced infrastructure helpers. |
 | `env`, `ctx`, `event` proxies | `getContextOrNull()` through readonly proxy wrappers. | Property access throws `ContextAccessError` outside an active handler trail. | Readonly. |
 | `locals` proxy | `getContextOrNull()?.locals` through the mutable context proxy. | Property access throws `ContextAccessError` outside an active handler trail. | Mutable and shared with `event.locals`. |
 
@@ -3476,7 +3301,7 @@ This is also why strict runtime helpers throwing outside context is healthy: it 
 >
 > Use explicit handler parameters first, getters second, proxies third, and mutable `locals` only for data that truly belongs to the current request or job.
 
-#### The AsyncLocalStorage model covers more than fetch
+#### Runtime helpers cover more than fetch
 
 Worker surfaces expose `event.ctx` as the current `ExecutionContext`. Durable Object surfaces expose `event.ctx` as the current `DurableObjectState`, and Devflare also aliases that same value as `event.state` for clarity.
 
@@ -3536,21 +3361,114 @@ export const handle = sequence(requestId)
 - Timer callbacks like `setTimeout()` and `setInterval()` are outside the normal Devflare-managed handler trail.
 - Per-surface getters and `getContext()` throw `ContextUnavailableError`, while proxy property access such as `env.DB` or `locals.userId` throws `ContextAccessError` naming the missing property.
 - If you are unsure whether the matching surface is active, prefer `.safe()` accessors such as `getFetchEvent.safe()` over catching thrown errors.
-- If runtime context access fails unexpectedly while bypassing Devflare-generated config or harnesses, verify that the Worker still includes the AsyncLocalStorage compatibility flags Devflare normally adds for you.
+- If runtime context access fails unexpectedly while bypassing Devflare-generated config or harnesses, open the runtime context internals page and verify the Worker still includes the compatibility flags Devflare normally adds for you.
 
 > **Note — The fix is usually simpler than the error feels**
 >
 > Move the context access inside the handler, middleware, or helper that is called from that handler trail. If there is no active trail, take explicit inputs instead of hoping context exists.
 
-#### `runWithEventContext()` and `runWithContext()` are advanced helpers, not normal app code
+---
+
+### How Devflare establishes runtime context
+
+> This page keeps the AsyncLocalStorage mechanics out of the normal usage guide while preserving them for maintainers and advanced debugging.
+
+| Field | Value |
+| --- | --- |
+| Route | [`/docs/runtime-context-internals`](/docs/runtime-context-internals) |
+| Group | Devflare |
+| Navigation title | Runtime internals |
+| Eyebrow | Runtime internals |
+
+Use this page when helpers work in one runtime lane but not another, when you are changing runtime infrastructure, or when you need to verify exactly what Devflare stores while a handler is active.
+
+#### At a glance
+
+| Fact | Value |
+| --- | --- |
+| Audience | Maintainers and advanced runtime debugging |
+| Normal app page | `runtime-context` |
+| Core primitive | `AsyncLocalStorage<RequestContext>` |
+
+#### What Devflare stores while a handler is active
+
+Devflare creates `AsyncLocalStorage<RequestContext>()` and stores more than the current request. The context includes environment bindings, execution context or Durable Object state, optional request, mutable locals, runtime surface type, and the original event object.
+
+That is why the higher-level runtime APIs can stay small. Per-surface getters return the stored event when the active surface matches, and the runtime proxies read the same context without forcing every helper to receive the event manually.
+
+> **Note — The original event object is preserved**
+>
+> Devflare does not discard the richer surface event after extracting a request or context. The original event stays on `context.event`, which is what the per-surface getters read later.
+
+##### Example — Simplified shape of the stored runtime context
+
+###### File — src/runtime/context.ts
+
+```ts
+type RequestContext = {
+	env: TEnv
+	ctx: ExecutionContext | DurableObjectState | null
+	request: Request | null
+	locals: Record<string, unknown>
+	type: RuntimeEventType
+	event: EventContext<TEnv>
+}
+```
+
+#### How Devflare creates and installs the context
+
+For fetch, queue, scheduled, email, tail, and Durable Object surfaces, Devflare first creates a rich event object using helpers such as `createFetchEvent()`, `createQueueEvent()`, or the Durable Object event builders. It then builds a `RequestContext` from that event and runs the handler trail inside `storage.run(...)`.
+
+The same mechanism is reused by generated worker entrypoints, request-wide middleware, route resolution, Durable Object wrappers, the dev server, and `createTestContext()` helpers such as `cf.worker`, `cf.queue`, `cf.scheduled`, `cf.email`, and `cf.tail`.
+
+##### Steps
+
+1. Devflare builds the rich event object for the active surface.
+2. It creates a `RequestContext` from `event.env`, `event.ctx`, `event.request ?? null`, `event.locals`, `event.type`, and the original event object.
+3. It runs middleware, route resolution, or the surface handler inside `AsyncLocalStorage` with that context.
+4. Helpers call getters or proxies, which read the current store instead of receiving the event manually.
+5. When the handler trail ends, strict runtime helpers stop exposing context.
+
+##### Example — The important part of `runWithEventContext()` is intentionally small
+
+###### File — src/runtime/context.ts
+
+```ts
+const context = {
+	env: event.env,
+	ctx: event.ctx,
+	request: event.request ?? null,
+	locals: event.locals,
+	type: event.type,
+	event
+}
+
+return storage.run(context, fn)
+```
+
+#### `runWithEventContext()` and `runWithContext()` are infrastructure helpers
 
 By the time you are considering these helpers, the normal app-facing story should already be working: handlers, middleware, generated entrypoints, and `createTestContext()` establish context for you. These APIs exist for runtime and test infrastructure that must preserve or synthesize that context deliberately.
 
-`runWithEventContext(event, fn)` preserves an existing rich event object. `runWithContext(env, ctx, request, fn, type)` is the lower-level compatibility helper: it creates fresh locals, synthesizes a default event with `createDefaultEvent()`, and then stores that event in AsyncLocalStorage before running your function.
+`runWithEventContext(event, fn)` preserves an existing rich event object. `runWithContext(env, ctx, request, fn, type)` is the lower-level compatibility helper: it creates fresh locals, synthesizes a default event with `createDefaultEvent()`, and then stores that event before running your function.
 
 > **Warning — Do not reach for the escape hatch by habit**
 >
 > If you are writing app code instead of runtime or test infrastructure, pass the event into your handler and let Devflare establish the context automatically.
+
+##### Example — Wrap one infrastructure assertion with an existing event
+
+###### File — src/test/runtime-context.ts
+
+```ts
+import { getFetchEvent, runWithEventContext, type FetchEvent } from 'devflare/runtime'
+
+export async function readPathInsideContext(event: FetchEvent): Promise<string> {
+	return runWithEventContext(event, async () => {
+		return getFetchEvent().url.pathname
+	})
+}
+```
 
 ---
 
@@ -3948,7 +3866,7 @@ Devflare tries to keep one authored story instead. The same config that boots th
 
 #### The bridge is the difference, but it is not the only layer doing useful work
 
-The seamless part comes from several layers cooperating: config autodiscovery, the unified `env` proxy, runtime-shaped helper entrypoints, AsyncLocalStorage-backed event context, and bridge proxies that forward binding calls into the local worker world.
+The seamless part comes from several user-visible pieces cooperating: config autodiscovery, the unified `env` proxy, runtime-shaped helper entrypoints, and bridge proxies that forward binding calls into the local worker world.
 
 That is also why Devflare testing scales beyond one fetch route. The same system can cover direct binding calls, queue and scheduled helpers, Tail events, and bridge-backed Durable Object or service interactions without making you rewire the whole harness every time the package grows a new surface.
 
@@ -3964,7 +3882,7 @@ That is also why Devflare testing scales beyond one fetch route. The same system
 | --- | --- | --- |
 | `createTestContext()` | Finds the nearest config, boots Miniflare, discovers worker surfaces, and prepares bindings from the same authored project shape. | The harness starts where the app starts instead of from a separate test-only setup story. |
 | Unified `env` proxy | Prefers request-scoped env, then test-context env, then bridge-backed env access. | One `import { env } from 'devflare'` can stay valid across app code, tests, and local bridge-backed flows. |
-| `cf.*` helpers | Create runtime-shaped fetch, queue, scheduled, email, and tail events/controllers and install them into AsyncLocalStorage before user code runs. | Helpers such as `getFetchEvent()` and `locals` keep working in tests instead of only in real requests. |
+| `cf.*` helpers | Create runtime-shaped fetch, queue, scheduled, email, and tail events/controllers before user code runs. | Helpers such as `getFetchEvent()` and `locals` keep working in tests instead of only in real requests. |
 | Bridge proxies | Route KV, D1, R2, Durable Object, queue, service, and send-email calls into the local worker world. | Bindings can be exercised through their real shapes instead of custom in-memory fakes. |
 | Transport hooks | Optionally encode and decode custom values for local RPC-style bridge calls. | A Durable Object method can return a real class again on the caller side when that behavior matters. |
 
@@ -4081,7 +3999,7 @@ When the package grows queues, schedules, email handlers, or Tail processing, th
 
 | Surface | What the test calls | What Devflare keeps aligned |
 | --- | --- | --- |
-| Routes and fetch middleware | `cf.worker.get()` or `cf.worker.fetch()` | Request shape, route params, and AsyncLocalStorage-backed fetch context. |
+| Routes and fetch middleware | `cf.worker.get()` or `cf.worker.fetch()` | Request shape, route params, and runtime helper access. |
 | Queue consumers | `cf.queue.trigger()` | Batch shape, retry or ack behavior, and queued `waitUntil()` work. |
 | Scheduled jobs | `cf.scheduled.trigger()` | Cron controller shape, scheduled context, and background work timing. |
 | Email and tail handlers | `cf.email.send()` and `cf.tail.trigger()` | Handler-style invocation with the right local helper semantics instead of custom throwaway scaffolding. |
@@ -4159,7 +4077,7 @@ test('GET /health proves the worker boots', async () => {
 - **Your first unit test** — Use this when the goal is simply to prove a worker boots, answers one request, and can be exercised through the real Devflare test harness. ([link](/docs/first-unit-test))
 - **createTestContext()** — Use this when you need the real worker-shaped harness, autodiscovered surfaces, helper timing rules, and the `cf.*` testing helpers. ([link](/docs/create-test-context))
 - **Binding testing guides** — Use this when the binding already exists and the open question is how to test KV, D1, R2, Queues, Durable Objects, AI, Vectorize, or another binding accurately. ([link](/docs/binding-testing-guides))
-- **Runtime context** — Open this when missing-context errors, getters, or runtime proxies are making tests feel harder to trace than they should. It explains the AsyncLocalStorage-backed context model the helpers depend on. ([link](/docs/runtime-context))
+- **Runtime context** — Open this when missing-context errors, getters, or runtime proxies are making tests feel harder to trace than they should. ([link](/docs/runtime-context))
 - **transport.ts** — Open this when a test needs a bridge-backed RPC call to return a real class instance instead of collapsing into plain JSON. ([link](/docs/transport-file))
 - **Testing & automation** — Use this page when the question changes from local test harness behavior to CI workflows, preview checks, and observable automation. ([link](/docs/testing-and-automation))
 
@@ -4170,10 +4088,10 @@ test('GET /health proves the worker boots', async () => {
 | If the question is... | Open this page first | Why |
 | --- | --- | --- |
 | Can I prove the worker answers one real request? | `Your first unit test` | It keeps the first check small and prevents the harness from becoming accidental ceremony. |
-| Why does Devflare testing feel smoother than the usual Worker setup? | `Why tests feel native` | It explains the unified env, bridge-backed bindings, AsyncLocalStorage-backed helper surfaces, and direct Durable Object story. |
+| Why does Devflare testing feel smoother than the usual Worker setup? | `Why tests feel native` | It explains the unified env, bridge-backed bindings, runtime helper surfaces, and direct Durable Object story. |
 | How does the default runtime-shaped harness behave? | `createTestContext()` | It documents autodiscovery, `cf.*`, helper timing, and when the harness waits for background work. |
 | How should I test this specific binding? | `Binding testing guides` | Each binding has its own testing page with the right default harness and escalation path. |
-| Why are getters or proxies failing in a test? | `Runtime context` | The runtime-context page explains the AsyncLocalStorage-backed model underneath the helper APIs. |
+| Why are getters or proxies failing in a test? | `Runtime context` | The runtime-context page explains when helper APIs can read the active request, env, ctx, event, and locals. |
 | Why is a custom class not round-tripping in a test? | `transport.ts` | Transport docs explain the extra serialization hook for bridge-backed calls. |
 | How should this fit into CI or preview validation? | `Testing & automation` | Automation guidance belongs on the CI-facing page, not in the local harness docs. |
 
@@ -4183,9 +4101,9 @@ test('GET /health proves the worker boots', async () => {
 
 #### Binding-specific testing pages already exist — they were just easy to miss
 
-Each binding overview page already ends with a “Go deeper” section that links its hidden internals, testing, and example pages. That means the binding-specific testing content is already in the library, but it was discoverable mostly if you were already reading the right binding page.
+Each binding overview page already links its testing and example pages. That means the binding-specific testing content is already in the library, but it was discoverable mostly if you were already reading the right binding page.
 
-Use the binding testing index when you know which binding changed and want the testing guide directly. Use the binding overview page first when you still need the authoring shape, runtime contract, or preview story before the tests make sense.
+Use the binding testing index when you know which binding changed and want the testing guide directly. Use the binding overview page first when you still need the config shape, runtime usage, or local support notes before the tests make sense.
 
 ##### Highlights
 
@@ -4253,7 +4171,7 @@ These helpers are runtime-shaped and context-accurate for handler logic, but the
 
 #### Tail handlers are testable even before they become a public config lane
 
-Tail support is already a real helper surface in the harness even though it still sits outside the public `files.*` config keys. When `createTestContext()` finds `src/tail.ts`, it wires `cf.tail.trigger()` automatically and runs the handler inside the same AsyncLocalStorage-backed event context as the other helpers.
+Tail support is already a real helper surface in the harness even though it still sits outside the public `files.*` config keys. When `createTestContext()` finds `src/tail.ts`, it wires `cf.tail.trigger()` automatically and runs the handler with the same runtime helper access as the other test surfaces.
 
 The handler can export a default function or a named `tail` function. The helper accepts either full trace items or smaller option objects through `cf.tail.create(...)`, then waits for the handler and any queued `waitUntil()` work before it returns.
 
@@ -4383,7 +4301,7 @@ Binding testing is not one-size-fits-all. KV, D1, R2, Durable Objects, Queues, a
 | Fact | Value |
 | --- | --- |
 | Best for | Jumping straight to the right binding-specific testing guide |
-| Where the links also live | At the bottom of each binding overview page in the “Go deeper” section |
+| Where the links also live | At the bottom of each binding overview page |
 | Default pattern | Usually `createTestContext()` plus the real binding or helper surface |
 | Notable exceptions | AI and Vectorize are remote-oriented, and some other bindings need higher-fidelity checks sooner |
 
@@ -4415,7 +4333,7 @@ That is great once you already opened the right binding page. This index is for 
 - **Testing Services** — Service bindings are one of the clearest Devflare wins in multi-worker apps: you can keep the real worker boundary and still prove it through the default local harness. Open the Services overview first when you need the full binding story, or jump straight here when the only open question is how to test it. ([link](/docs/bindings/services/testing))
 - **Testing AI** — The right AI test strategy is selective: use remote mode when you mean to test inference, and skip cleanly when the environment is not allowed to do that. Open the AI overview first when you need the full binding story, or jump straight here when the only open question is how to test it. ([link](/docs/bindings/ai/testing))
 - **Testing Vectorize** — The right Vectorize tests are targeted remote checks: a small insert or query, a clear skip condition, and a real index behind the binding. Open the Vectorize overview first when you need the full binding story, or jump straight here when the only open question is how to test it. ([link](/docs/bindings/vectorize/testing))
-- **Testing Hyperdrive** — Hyperdrive testing should start smaller and more cautiously than D1 testing: prove the binding exists, then add targeted integration where the real database path matters. Open the Hyperdrive overview first when you need the full binding story, or jump straight here when the only open question is how to test it. ([link](/docs/bindings/hyperdrive/testing))
+- **Testing Hyperdrive** — Hyperdrive testing should start with a local connection string, then add a focused query test against the database shape your app actually uses. Open the Hyperdrive overview first when you need the full binding story, or jump straight here when the only open question is how to test it. ([link](/docs/bindings/hyperdrive/testing))
 - **Testing Browser Rendering** — Browser tests should usually be integration-flavored: either drive the worker in dev or exercise a thin smoke path that proves the binding can launch and fetch. Open the Browser Rendering overview first when you need the full binding story, or jump straight here when the only open question is how to test it. ([link](/docs/bindings/browser-rendering/testing))
 - **Testing Analytics Engine** — Analytics Engine tests should stay thin: verify that the worker writes a data point, not that you can recreate Cloudflare analytics locally. Open the Analytics Engine overview first when you need the full binding story, or jump straight here when the only open question is how to test it. ([link](/docs/bindings/analytics-engine/testing))
 - **Testing Send Email** — Send Email is stronger locally than many platform-service bindings because outbound email can be exercised in the default harness, while inbound email has its own related helper surface. Open the Send Email overview first when you need the full binding story, or jump straight here when the only open question is how to test it. ([link](/docs/bindings/send-email/testing))
@@ -4447,21 +4365,21 @@ That is great once you already opened the right binding page. This index is for 
 | Services | Local runtime and multi-worker tests | `createTestContext()` plus `env.MY_SERVICE` |
 | AI | Remote-oriented; local tests require remote mode | `createTestContext()` after remote mode is enabled, plus `shouldSkip.ai` |
 | Vectorize | Remote-oriented; local tests require remote mode or explicit mocks | `createTestContext()` in remote mode plus `shouldSkip.vectorize` |
-| Hyperdrive | Supported, but with a narrower proven local test story | `createTestContext()` plus small binding or smoke checks |
+| Hyperdrive | Full local support when Devflare has a local database connection string for the binding | `createTestContext()` or `createOfflineEnv()` with `localConnectionString` |
 | Browser Rendering | Supported, but the strongest story is dev server and integration rather than a dedicated test helper | A narrow browser route exercised through the dev server, a preview URL, or another integration-style path |
 | Analytics Engine | Supported, but usually tested through integration or thin mocks | A thin worker test or explicit mock around `writeDataPoint()` |
 | Send Email | Outbound local support; distinct from inbound email event testing | `createTestContext()` plus `env.TRANSACTIONAL_EMAIL.send(...)` |
 | Rate Limiting | Offline-native: Miniflare and Devflare pure mocks can exercise application-level rate limit behavior | `createTestContext()` or `createOfflineEnv()` |
 | Version Metadata | Offline-native: Devflare can provide deterministic local metadata without Cloudflare state | `createTestContext()` or `createOfflineEnv()` |
-| Worker Loaders | Offline-fixture: the binding exists locally, but tests should supply a Worker stub when behavior matters | `createTestContext()` with explicit Worker payloads or a pure stub |
-| Secrets Store | Offline-native when tests provide fixture values; missing fixtures fail with a non-networked error | `createOfflineEnv()` with `fixtures.secretsStore` |
+| Worker Loaders | Full local support through Miniflare Worker Loader bindings and explicit pure-test Worker stubs | `createTestContext()` with explicit Worker payloads or a pure stub |
+| Secrets Store | Full local support through Miniflare wiring, local `devflare secrets --local` values, and explicit fixture values for pure tests | `createTestContext()` or `createOfflineEnv(config, fixtures, { cwd })` |
 | AI Search | Offline-fixture: deterministic in-memory instances can test application flow, not hosted relevance behavior | `createOfflineEnv()` with AI Search fixtures |
 | mTLS Certificates | Offline-fixture: local tests can model Fetcher behavior, but not real certificate presentation | `createOfflineEnv()` with `fixtures.mtlsCertificates` |
 | Dispatch Namespaces | Offline-fixture: tests can provide named tenant fetchers, but Devflare does not emulate tenant upload/lifecycle | `createOfflineEnv()` with `fixtures.dispatchNamespaces` |
-| Workflows | Offline-native for application-level calls through Miniflare or deterministic workflow mocks | `createTestContext()` or `createOfflineEnv()` |
+| Workflows | Full local support through Miniflare workflow bindings and deterministic workflow mocks | `createTestContext()` or `createOfflineEnv()` |
 | Pipelines | Offline-native for send-recording tests; Cloudflare owns production batching and sink delivery | `createTestContext()` or `createOfflineEnv()` |
-| Images | Offline-native for low-fidelity chain-shape tests; Wrangler currently supports one Images binding per Worker | `createTestContext()` or `createOfflineEnv()` |
-| Media Transformations | Offline-fixture: pure tests can model the chain, but real media processing is hosted Cloudflare behavior | `createOfflineEnv()` with media fixtures |
+| Images | Full local support through Miniflare image bindings, persisted local state, and deterministic pure mocks | `createTestContext()` or `createOfflineEnv()` |
+| Media Transformations | Full local support through Miniflare media bindings and deterministic pure mocks for transform chains | `createTestContext()` or `createOfflineEnv()` with media fixtures |
 | Artifacts | Offline-fixture: repo metadata and token flows can be modeled in memory, not as real Git remotes | `createOfflineEnv()` with artifact fixtures |
 | Containers | Offline-native only when an explicit Docker/Podman engine is available and the image can run without pulling | `devflare/test` containers helpers guarded by `shouldSkip.containers` |
 
@@ -6443,7 +6361,13 @@ Use the feature index when you already know the feature name and need to decide 
 | Tail Workers | Full | Live tail routing is Cloudflare-owned | `cf.tail` | Handler code only | /docs/create-test-context |
 | Workers AI | Remote | Requires Cloudflare account | `shouldSkip.ai` | Product-owned | /docs/bindings/ai |
 | Vectorize | Remote | Requires Cloudflare account | `shouldSkip.vectorize` | Managed when scoped | /docs/bindings/vectorize |
-| Browser Rendering | Remote | Hosted browser service fidelity is Cloudflare-owned | `createTestContext` or focused mocks | No account resource cleanup | /docs/bindings/browser-rendering |
+| Hyperdrive | Full | Hosted pooling, placement, credentials, and production routing are Cloudflare-owned | `createTestContext`, `createOfflineEnv` | Reuse or resolve when scoped | /docs/bindings/hyperdrive |
+| Browser Rendering | Full | Hosted browser service fidelity is Cloudflare-owned | `createTestContext` or focused mocks | No account resource cleanup | /docs/bindings/browser-rendering |
+| Worker Loaders | Full | Dynamic Worker upload and hosted lifecycle are Cloudflare-owned | `createTestContext`, `createMockWorkerLoader` | Config-owned | /docs/bindings/worker-loaders |
+| Secrets Store | Full | Account secret provisioning and sync are Cloudflare-owned | `createOfflineEnv`, `createMockSecretsStoreSecret` | Product-owned | /docs/bindings/secrets-store |
+| Workflows | Full | Deployed durability, retries, scheduling, and instance history are Cloudflare-owned | `createTestContext`, `createMockWorkflow` | Product-owned | /docs/bindings/workflows |
+| Images | Full | Hosted storage, variants, delivery rules, billing, and final transform fidelity are Cloudflare-owned | `createTestContext`, `createMockImagesBinding` | Product-owned | /docs/bindings/images |
+| Media Transformations | Full | Real codecs, output fidelity, cache behavior, and billing are Cloudflare-owned | `createTestContext`, `createMockMediaBinding` | Product-owned | /docs/bindings/media-transformations |
 | Containers | Full | Cloudflare Containers deployment is remote | `containers`, `shouldSkip.containers` | Product-owned | /docs/bindings/containers |
 
 ##### Example — Use the matrix to pick a local proof lane
@@ -6967,7 +6891,7 @@ Devflare lets you keep KV intent human-readable in `devflare.config.ts` and only
 | Authoring shape | `Record<string, string \| { name: string } \| { id: string }>` |
 | Best for | Cache-like lookups, sessions, feature flags, and lightweight request metadata |
 
-#### Author it in the simplest shape that still says what you mean
+#### Add the binding to config
 
 KV is happiest when you keep the namespace name stable in authored config and let Devflare resolve ids later. That keeps reviews readable and avoids hiding infrastructure intent in random environment variables.
 
@@ -6994,7 +6918,7 @@ export default defineConfig({
 
 After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first KV path close to the route, handler, or service method that needs it.
 
-Keep this first path small enough that the binding contract stays visible during code review.
+Keep this first path small enough that the config, env binding, and user-visible behavior are easy to review together.
 
 ##### Example — A tiny fetch handler that uses KV
 
@@ -7015,15 +6939,11 @@ export async function fetch(request: Request): Promise<Response> {
 
 #### Local and Remote Support
 
-Support level: `Full`. Full local support means Devflare can run useful KV application behavior locally for ordinary development and tests. Cloudflare still owns production limits, quotas, billing, and deployed account behavior.
+Devflare can run useful KV application behavior locally for ordinary development and tests. Cloudflare still owns production limits, quotas, billing, and deployed account behavior.
 
-Local runtime and tests.
+Local runtime and tests. Start locally with `createTestContext()` plus `env.CACHE` or `cf.worker.fetch()`; that lane should cover the normal KV application flow without requiring a Cloudflare connection.
 
-##### Highlights
-
-- **Full support** — Full local support means Devflare can run useful KV application behavior locally for ordinary development and tests. Cloudflare still owns production limits, quotas, billing, and deployed account behavior.
-- **What works without Cloudflare** — Local runtime and tests. Start locally with `createTestContext()` plus `env.CACHE` or `cf.worker.fetch()`; that lane should cover the normal KV application flow without requiring a Cloudflare connection.
-- **When to connect to Cloudflare** — Use Cloudflare when the assertion depends on deployed limits, account state, lifecycle behavior, billing, or other production-only KV details.
+Use Cloudflare when the assertion depends on deployed limits, account state, lifecycle behavior, billing, or other production-only KV details.
 
 #### When this binding fits best
 
@@ -7033,7 +6953,7 @@ Local runtime and tests.
 - It is a good home for feature flags, lightweight session markers, or cache records that are cheap to recompute.
 - If you need SQL, batch transactions, or richer query patterns, use D1 instead of forcing KV to act like a database.
 
-#### Notes worth keeping visible
+#### Testing path
 
 ##### Key points
 
@@ -7045,29 +6965,13 @@ Local runtime and tests.
 >
 > Prefer stable names in source and let Devflare resolve ids later. It keeps config readable without giving up deploy-ready output.
 
-#### Cloudflare docs vs the Devflare layer
-
-Cloudflare Workers KV docs is the platform reference. This page is the Devflare translation layer: keep `bindings.kv` readable in source, understand the typed env surface, and know which local, preview, or remote lane actually matches the binding.
+#### Open the next page when you need it
 
 ##### Highlights
 
-- **Cloudflare Workers KV docs** — Platform reference for KV namespaces, binding APIs, limits, and Wrangler-facing setup. ([link](https://developers.cloudflare.com/kv/))
-
-##### Reference table
-
-| Question | Cloudflare docs | This Devflare page |
-| --- | --- | --- |
-| Primary focus | Platform reference for KV namespaces, binding APIs, limits, and Wrangler-facing setup. | How to author `bindings.kv`, what the runtime surface looks like, and how KV fits a Devflare project. |
-| Testing and runtime lens | Cloudflare’s docs focus on the raw binding API, product semantics, and platform limits for the binding itself. | Local runtime and tests. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
-| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
-
-#### Go deeper only if this one-page guide stops being enough
-
-##### Highlights
-
-- **KV internals** — See normalization, Wrangler `kv_namespaces`, and the preview or runtime details behind the authored shape. ([link](/docs/bindings/kv/internals))
-- **Testing KV** — Start from `createTestContext()` plus `env.CACHE` or `cf.worker.fetch()` and only escalate when the binding or deployment model genuinely needs it. ([link](/docs/bindings/kv/testing))
-- **KV example** — Adapt one small end-to-end path before you hide the binding behind a bigger abstraction. ([link](/docs/bindings/kv/example))
+- **KV internals** — Check emitted Wrangler `kv_namespaces`, preview behavior, and Cloudflare-specific details. ([link](/docs/bindings/kv/internals))
+- **Testing KV** — Pick the `createTestContext()` plus `env.CACHE` or `cf.worker.fetch()` path first, then move to remote checks only when the test needs them. ([link](/docs/bindings/kv/testing))
+- **KV example** — Copy a fuller application path when the quick example is too small. ([link](/docs/bindings/kv/example))
 
 ---
 
@@ -7092,15 +6996,15 @@ The important detail is that Devflare does not force ids too early. It keeps sta
 | Compile target | Wrangler `kv_namespaces` |
 | Preview note | Preview-scoped KV namespaces can be provisioned and cleaned up automatically |
 
-#### Devflare normalizes the authored shape before it does anything louder
+#### How authored config becomes Wrangler config
 
 `bindings.kv` accepts a plain string, `{ name }`, or `{ id }`. Devflare normalizes those into one internal shape so later code can reason about them consistently.
 
 Authored config can stay human-readable without making compiler or deploy code guess what each record means at the last second.
 
-##### Example — KV from authored config to generated output
+##### Example — KV config and emitted Wrangler output
 
-Keep the binding readable in source, then inspect only the Wrangler-facing slice Devflare emits when the config is compiled.
+Use this when you need to check how the Devflare config becomes Wrangler-compatible config.
 
 ###### File — devflare.config.ts
 
@@ -7129,7 +7033,7 @@ export default defineConfig({
 }
 ```
 
-#### Local runtime support depends on what Devflare can model directly
+#### What local runtime support covers
 
 ##### Key points
 
@@ -7148,6 +7052,22 @@ export default defineConfig({
 > **Tip — Why the split matters**
 >
 > Authored config can stay stable and readable even though deploy output eventually needs concrete ids. That separation is a big part of why KV feels pleasant in Devflare.
+
+#### Cloudflare docs vs the Devflare layer
+
+Cloudflare Workers KV docs is the platform reference. Use this internals page when you need to compare Cloudflare's product docs with Devflare config, generated env types, local support, and preview behavior for `bindings.kv`.
+
+##### Highlights
+
+- **Cloudflare Workers KV docs** — Platform reference for KV namespaces, binding APIs, limits, and Wrangler-facing setup. ([link](https://developers.cloudflare.com/kv/))
+
+##### Reference table
+
+| Question | Cloudflare docs | This Devflare page |
+| --- | --- | --- |
+| Primary focus | Platform reference for KV namespaces, binding APIs, limits, and Wrangler-facing setup. | How to author `bindings.kv`, what the runtime surface looks like, and how KV fits a Devflare project. |
+| Testing and runtime lens | Cloudflare’s docs focus on the raw binding API, product semantics, and platform limits for the binding itself. | Local runtime and tests. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
+| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
 
 ---
 
@@ -7318,7 +7238,7 @@ Devflare keeps D1 readable in config and testable in local runtime, which means 
 | Authoring shape | `Record<string, string \| { name: string } \| { id: string }>` |
 | Best for | Structured data, SQL queries, and cases where key-based lookup is not enough |
 
-#### Author it in the simplest shape that still says what you mean
+#### Add the binding to config
 
 D1 follows the same stable-name instinct as KV: author by readable name unless you intentionally already have a database id you want to pin to.
 
@@ -7345,7 +7265,7 @@ export default defineConfig({
 
 After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first D1 path close to the route, handler, or service method that needs it.
 
-Keep this first path small enough that the binding contract stays visible during code review.
+Keep this first path small enough that the config, env binding, and user-visible behavior are easy to review together.
 
 ##### Example — A tiny route that proves the binding works
 
@@ -7360,15 +7280,11 @@ export async function fetch(): Promise<Response> {
 
 #### Local and Remote Support
 
-Support level: `Full`. Full local support means Devflare can run useful D1 application behavior locally for ordinary development and tests. Cloudflare still owns production limits, quotas, billing, and deployed account behavior.
+Devflare can run useful D1 application behavior locally for ordinary development and tests. Cloudflare still owns production limits, quotas, billing, and deployed account behavior.
 
-Local runtime and tests.
+Local runtime and tests. Start locally with `createTestContext()` with `env.DB` or `cf.worker.fetch()`; that lane should cover the normal D1 application flow without requiring a Cloudflare connection.
 
-##### Highlights
-
-- **Full support** — Full local support means Devflare can run useful D1 application behavior locally for ordinary development and tests. Cloudflare still owns production limits, quotas, billing, and deployed account behavior.
-- **What works without Cloudflare** — Local runtime and tests. Start locally with `createTestContext()` with `env.DB` or `cf.worker.fetch()`; that lane should cover the normal D1 application flow without requiring a Cloudflare connection.
-- **When to connect to Cloudflare** — Use Cloudflare when the assertion depends on deployed limits, account state, lifecycle behavior, billing, or other production-only D1 details.
+Use Cloudflare when the assertion depends on deployed limits, account state, lifecycle behavior, billing, or other production-only D1 details.
 
 #### When this binding fits best
 
@@ -7378,7 +7294,7 @@ Local runtime and tests.
 - It fits better than KV for records that need filtering, ordering, or transactional updates.
 - If the only operation is key lookup or a tiny cache record, KV usually stays simpler.
 
-#### Notes worth keeping visible
+#### Testing path
 
 ##### Key points
 
@@ -7390,29 +7306,13 @@ Local runtime and tests.
 >
 > The point of D1 docs is to keep SQL visible enough that reviewers can still understand what the worker is doing, not to hide every query behind framework glue.
 
-#### Cloudflare docs vs the Devflare layer
-
-Cloudflare D1 docs is the platform reference. This page is the Devflare translation layer: keep `bindings.d1` readable in source, understand the typed env surface, and know which local, preview, or remote lane actually matches the binding.
+#### Open the next page when you need it
 
 ##### Highlights
 
-- **Cloudflare D1 docs** — Platform reference for D1 databases, Worker APIs, migrations, and database limits. ([link](https://developers.cloudflare.com/d1/))
-
-##### Reference table
-
-| Question | Cloudflare docs | This Devflare page |
-| --- | --- | --- |
-| Primary focus | Platform reference for D1 databases, Worker APIs, migrations, and database limits. | How to author `bindings.d1`, what the runtime surface looks like, and how D1 fits a Devflare project. |
-| Testing and runtime lens | Cloudflare’s docs focus on the raw binding API, product semantics, and platform limits for the binding itself. | Local runtime and tests. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
-| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
-
-#### Go deeper only if this one-page guide stops being enough
-
-##### Highlights
-
-- **D1 internals** — See normalization, Wrangler `d1_databases`, and the preview or runtime details behind the authored shape. ([link](/docs/bindings/d1/internals))
-- **Testing D1** — Start from `createTestContext()` with `env.DB` or `cf.worker.fetch()` and only escalate when the binding or deployment model genuinely needs it. ([link](/docs/bindings/d1/testing))
-- **D1 example** — Adapt one small end-to-end path before you hide the binding behind a bigger abstraction. ([link](/docs/bindings/d1/example))
+- **D1 internals** — Check emitted Wrangler `d1_databases`, preview behavior, and Cloudflare-specific details. ([link](/docs/bindings/d1/internals))
+- **Testing D1** — Pick the `createTestContext()` with `env.DB` or `cf.worker.fetch()` path first, then move to remote checks only when the test needs them. ([link](/docs/bindings/d1/testing))
+- **D1 example** — Copy a fuller application path when the quick example is too small. ([link](/docs/bindings/d1/example))
 
 ---
 
@@ -7437,15 +7337,15 @@ The key implementation detail is that Devflare can keep a stable database name a
 | Compile target | Wrangler `d1_databases` |
 | Preview note | Preview-scoped D1 databases can be provisioned and cleaned up by Devflare |
 
-#### Devflare normalizes the authored shape before it does anything louder
+#### How authored config becomes Wrangler config
 
 Like KV, D1 bindings normalize into one internal shape so compiler and runtime code do not need to special-case string versus object authoring everywhere.
 
 That normalized form is what lets Devflare keep the friendly source-of-truth shape while still generating strict Wrangler-facing output later.
 
-##### Example — D1 from authored config to generated output
+##### Example — D1 config and emitted Wrangler output
 
-Keep the binding readable in source, then inspect only the Wrangler-facing slice Devflare emits when the config is compiled.
+Use this when you need to check how the Devflare config becomes Wrangler-compatible config.
 
 ###### File — devflare.config.ts
 
@@ -7474,7 +7374,7 @@ export default defineConfig({
 }
 ```
 
-#### Local runtime support depends on what Devflare can model directly
+#### What local runtime support covers
 
 ##### Key points
 
@@ -7493,6 +7393,22 @@ export default defineConfig({
 > **Tip — Same authoring rule, different runtime shape**
 >
 > The config story is close to KV, but the runtime story is SQL-shaped — as it should be.
+
+#### Cloudflare docs vs the Devflare layer
+
+Cloudflare D1 docs is the platform reference. Use this internals page when you need to compare Cloudflare's product docs with Devflare config, generated env types, local support, and preview behavior for `bindings.d1`.
+
+##### Highlights
+
+- **Cloudflare D1 docs** — Platform reference for D1 databases, Worker APIs, migrations, and database limits. ([link](https://developers.cloudflare.com/d1/))
+
+##### Reference table
+
+| Question | Cloudflare docs | This Devflare page |
+| --- | --- | --- |
+| Primary focus | Platform reference for D1 databases, Worker APIs, migrations, and database limits. | How to author `bindings.d1`, what the runtime surface looks like, and how D1 fits a Devflare project. |
+| Testing and runtime lens | Cloudflare’s docs focus on the raw binding API, product semantics, and platform limits for the binding itself. | Local runtime and tests. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
+| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
 
 ---
 
@@ -7658,7 +7574,7 @@ R2 works in worker code and tests. The main discipline is deciding which files a
 | Authoring shape | `Record<string, string>` |
 | Best for | Files, uploads, generated assets, and private object delivery through a Worker |
 
-#### Author it in the simplest shape that still says what you mean
+#### Add the binding to config
 
 R2 is the least ambiguous storage binding to author: you bind a name in env to a bucket name in config.
 
@@ -7684,7 +7600,7 @@ export default defineConfig({
 
 After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first R2 path close to the route, handler, or service method that needs it.
 
-Keep this first path small enough that the binding contract stays visible during code review.
+Keep this first path small enough that the config, env binding, and user-visible behavior are easy to review together.
 
 ##### Example — Serve an object through the worker
 
@@ -7710,15 +7626,11 @@ export async function fetch(request: Request): Promise<Response> {
 
 #### Local and Remote Support
 
-Support level: `Full`. Full local support means Devflare can run useful R2 application behavior locally for ordinary development and tests. Cloudflare still owns production limits, quotas, billing, and deployed account behavior.
+Devflare can run useful R2 application behavior locally for ordinary development and tests. Cloudflare still owns production limits, quotas, billing, and deployed account behavior.
 
-Local runtime and tests.
+Local runtime and tests. Start locally with `createTestContext()` with `env.ASSETS` or `cf.worker.fetch()`; that lane should cover the normal R2 application flow without requiring a Cloudflare connection.
 
-##### Highlights
-
-- **Full support** — Full local support means Devflare can run useful R2 application behavior locally for ordinary development and tests. Cloudflare still owns production limits, quotas, billing, and deployed account behavior.
-- **What works without Cloudflare** — Local runtime and tests. Start locally with `createTestContext()` with `env.ASSETS` or `cf.worker.fetch()`; that lane should cover the normal R2 application flow without requiring a Cloudflare connection.
-- **When to connect to Cloudflare** — Use Cloudflare when the assertion depends on deployed limits, account state, lifecycle behavior, billing, or other production-only R2 details.
+Use Cloudflare when the assertion depends on deployed limits, account state, lifecycle behavior, billing, or other production-only R2 details.
 
 #### When this binding fits best
 
@@ -7728,7 +7640,7 @@ Local runtime and tests.
 - Keep private file delivery in a Worker route so auth and response headers stay under your control.
 - If the browser needs a direct public asset origin, use a public bucket on a custom domain rather than by accident.
 
-#### Notes worth keeping visible
+#### Testing path
 
 ##### Key points
 
@@ -7740,29 +7652,13 @@ Local runtime and tests.
 >
 > If the browser needs the file in local dev, route through your worker unless you intentionally chose a public bucket contract.
 
-#### Cloudflare docs vs the Devflare layer
-
-Cloudflare R2 docs is the platform reference. This page is the Devflare translation layer: keep `bindings.r2` readable in source, understand the typed env surface, and know which local, preview, or remote lane actually matches the binding.
+#### Open the next page when you need it
 
 ##### Highlights
 
-- **Cloudflare R2 docs** — Platform reference for buckets, object APIs, public-versus-private delivery, and account features. ([link](https://developers.cloudflare.com/r2/))
-
-##### Reference table
-
-| Question | Cloudflare docs | This Devflare page |
-| --- | --- | --- |
-| Primary focus | Platform reference for buckets, object APIs, public-versus-private delivery, and account features. | How to author `bindings.r2`, what the runtime surface looks like, and how R2 fits a Devflare project. |
-| Testing and runtime lens | Cloudflare’s docs focus on the raw binding API, product semantics, and platform limits for the binding itself. | Local runtime and tests. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
-| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
-
-#### Go deeper only if this one-page guide stops being enough
-
-##### Highlights
-
-- **R2 internals** — See normalization, Wrangler `r2_buckets`, and the preview or runtime details behind the authored shape. ([link](/docs/bindings/r2/internals))
-- **Testing R2** — Start from `createTestContext()` with `env.ASSETS` or `cf.worker.fetch()` and only escalate when the binding or deployment model genuinely needs it. ([link](/docs/bindings/r2/testing))
-- **R2 example** — Adapt one small end-to-end path before you hide the binding behind a bigger abstraction. ([link](/docs/bindings/r2/example))
+- **R2 internals** — Check emitted Wrangler `r2_buckets`, preview behavior, and Cloudflare-specific details. ([link](/docs/bindings/r2/internals))
+- **Testing R2** — Pick the `createTestContext()` with `env.ASSETS` or `cf.worker.fetch()` path first, then move to remote checks only when the test needs them. ([link](/docs/bindings/r2/testing))
+- **R2 example** — Copy a fuller application path when the quick example is too small. ([link](/docs/bindings/r2/example))
 
 ---
 
@@ -7787,15 +7683,15 @@ That simplicity is part of why R2 feels predictable in Devflare. The runtime and
 | Compile target | Wrangler `r2_buckets` |
 | Preview note | Preview-scoped buckets can be provisioned and cleaned up by Devflare |
 
-#### Devflare normalizes the authored shape before it does anything louder
+#### How authored config becomes Wrangler config
 
 R2 is one of the cleanest bindings internally because the authored string is already the thing Wrangler expects later: the bucket name.
 
 That means Devflare mostly needs to preserve the mapping faithfully, generate output, and expose the runtime methods cleanly in local mode.
 
-##### Example — R2 from authored config to generated output
+##### Example — R2 config and emitted Wrangler output
 
-Keep the binding readable in source, then inspect only the Wrangler-facing slice Devflare emits when the config is compiled.
+Use this when you need to check how the Devflare config becomes Wrangler-compatible config.
 
 ###### File — devflare.config.ts
 
@@ -7823,7 +7719,7 @@ export default defineConfig({
 }
 ```
 
-#### Local runtime support depends on what Devflare can model directly
+#### What local runtime support covers
 
 ##### Key points
 
@@ -7842,6 +7738,22 @@ export default defineConfig({
 > **Note — Simple binding, nontrivial delivery choices**
 >
 > R2 config is easy. The interesting decisions are about how files flow through your app, not about how many nested objects the config needs.
+
+#### Cloudflare docs vs the Devflare layer
+
+Cloudflare R2 docs is the platform reference. Use this internals page when you need to compare Cloudflare's product docs with Devflare config, generated env types, local support, and preview behavior for `bindings.r2`.
+
+##### Highlights
+
+- **Cloudflare R2 docs** — Platform reference for buckets, object APIs, public-versus-private delivery, and account features. ([link](https://developers.cloudflare.com/r2/))
+
+##### Reference table
+
+| Question | Cloudflare docs | This Devflare page |
+| --- | --- | --- |
+| Primary focus | Platform reference for buckets, object APIs, public-versus-private delivery, and account features. | How to author `bindings.r2`, what the runtime surface looks like, and how R2 fits a Devflare project. |
+| Testing and runtime lens | Cloudflare’s docs focus on the raw binding API, product semantics, and platform limits for the binding itself. | Local runtime and tests. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
+| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
 
 ---
 
@@ -8019,7 +7931,7 @@ Devflare auto-discovers `**/do.*.{ts,js}` by default, wires the Durable Object b
 | Authoring shape | `Record<string, string \| { className: string; scriptName?: string }>` |
 | Best for | Stateful sessions, locks, room state, and coordination that should not be faked as random stateless requests |
 
-#### Author it in the simplest shape that still says what you mean
+#### Add the binding to config
 
 The easiest honest starting point is one local Durable Object class and one binding that points at it by class name.
 
@@ -8053,7 +7965,7 @@ export default defineConfig({
 
 After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first Durable Objects path close to the route, handler, or service method that needs it.
 
-Keep this first path small enough that the binding contract stays visible during code review.
+Keep this first path small enough that the config, env binding, and user-visible behavior are easy to review together.
 
 ##### Example — A tiny object and one worker path
 
@@ -8095,15 +8007,11 @@ export async function fetch(request: Request): Promise<Response> {
 
 #### Local and Remote Support
 
-Support level: `Full`. Full local support means Devflare can run useful Durable Objects application behavior locally for ordinary development and tests. Cloudflare still owns production limits, quotas, billing, and deployed account behavior.
+Devflare can run useful Durable Objects application behavior locally for ordinary development and tests. Cloudflare still owns production limits, quotas, billing, and deployed account behavior.
 
-Local runtime and tests, including cross-worker references.
+Local runtime and tests, including cross-worker references. Start locally with `createTestContext()` with the real DO namespace in `env`; that lane should cover the normal Durable Objects application flow without requiring a Cloudflare connection.
 
-##### Highlights
-
-- **Full support** — Full local support means Devflare can run useful Durable Objects application behavior locally for ordinary development and tests. Cloudflare still owns production limits, quotas, billing, and deployed account behavior.
-- **What works without Cloudflare** — Local runtime and tests, including cross-worker references. Start locally with `createTestContext()` with the real DO namespace in `env`; that lane should cover the normal Durable Objects application flow without requiring a Cloudflare connection.
-- **When to connect to Cloudflare** — Use Cloudflare when the assertion depends on deployed limits, account state, lifecycle behavior, billing, or other production-only Durable Objects details.
+Use Cloudflare when the assertion depends on deployed limits, account state, lifecycle behavior, billing, or other production-only Durable Objects details.
 
 #### When this binding fits best
 
@@ -8113,7 +8021,7 @@ Local runtime and tests, including cross-worker references.
 - They are a good fit for counters, rooms, distributed locks, and request serialization.
 - If the state is really just data you query, D1 or KV may stay simpler and easier to preview.
 
-#### Notes worth keeping visible
+#### Testing path
 
 ##### Key points
 
@@ -8125,29 +8033,13 @@ Local runtime and tests, including cross-worker references.
 >
 > If previews must exercise real Durable Object behavior, branch-scoped preview workers are often safer than hoping same-worker preview URLs will be enough.
 
-#### Cloudflare docs vs the Devflare layer
-
-Cloudflare Durable Objects docs is the platform reference. This page is the Devflare translation layer: keep `bindings.durableObjects` readable in source, understand the typed env surface, and know which local, preview, or remote lane actually matches the binding.
+#### Open the next page when you need it
 
 ##### Highlights
 
-- **Cloudflare Durable Objects docs** — Platform reference for object identity, storage, alarms, migrations, and deployment caveats. ([link](https://developers.cloudflare.com/durable-objects/))
-
-##### Reference table
-
-| Question | Cloudflare docs | This Devflare page |
-| --- | --- | --- |
-| Primary focus | Platform reference for object identity, storage, alarms, migrations, and deployment caveats. | How to author `bindings.durableObjects`, what the runtime surface looks like, and how Durable Objects fits a Devflare project. |
-| Testing and runtime lens | Cloudflare’s docs focus on the raw binding API, product semantics, and platform limits for the binding itself. | Local runtime and tests, including cross-worker references. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
-| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
-
-#### Go deeper only if this one-page guide stops being enough
-
-##### Highlights
-
-- **Durable Objects internals** — See normalization, Wrangler `durable_objects.bindings`, and the preview or runtime details behind the authored shape. ([link](/docs/bindings/durable-objects/internals))
-- **Testing Durable Objects** — Start from `createTestContext()` with the real DO namespace in `env` and only escalate when the binding or deployment model genuinely needs it. ([link](/docs/bindings/durable-objects/testing))
-- **Durable Objects example** — Adapt one small end-to-end path before you hide the binding behind a bigger abstraction. ([link](/docs/bindings/durable-objects/example))
+- **Durable Objects internals** — Check emitted Wrangler `durable_objects.bindings`, preview behavior, and Cloudflare-specific details. ([link](/docs/bindings/durable-objects/internals))
+- **Testing Durable Objects** — Pick the `createTestContext()` with the real DO namespace in `env` path first, then move to remote checks only when the test needs them. ([link](/docs/bindings/durable-objects/testing))
+- **Durable Objects example** — Copy a fuller application path when the quick example is too small. ([link](/docs/bindings/durable-objects/example))
 
 ---
 
@@ -8172,15 +8064,15 @@ This is one of the places where Devflare feels the most application-aware. It is
 | Compile target | Wrangler `durable_objects.bindings` |
 | Preview note | DO apps often need branch-scoped preview workers instead of same-worker preview URLs |
 
-#### Devflare normalizes the authored shape before it does anything louder
+#### How authored config becomes Wrangler config
 
 DO bindings accept a string, an explicit `{ className, scriptName? }` object, or a cross-worker reference produced by `ref()`. Devflare normalizes those into one internal shape before later steps inspect them.
 
 That normalized shape is what lets config, compiler, and test-context setup all speak the same language even when a DO comes from another worker package.
 
-##### Example — Durable Objects from authored config to generated output
+##### Example — Durable Objects config and emitted Wrangler output
 
-Keep the binding readable in source, then inspect only the Wrangler-facing slice Devflare emits when the config is compiled.
+Use this when you need to check how the Devflare config becomes Wrangler-compatible config.
 
 ###### File — devflare.config.ts
 
@@ -8218,7 +8110,7 @@ export default defineConfig({
 }
 ```
 
-#### Local runtime support depends on what Devflare can model directly
+#### What local runtime support covers
 
 ##### Key points
 
@@ -8237,6 +8129,22 @@ export default defineConfig({
 > **Important — This is where coherent tooling matters most**
 >
 > If a tool cannot keep DO authoring, local runtime, and test setup coherent, DO-heavy apps get painful fast. Devflare’s value is that these pieces stay part of one story.
+
+#### Cloudflare docs vs the Devflare layer
+
+Cloudflare Durable Objects docs is the platform reference. Use this internals page when you need to compare Cloudflare's product docs with Devflare config, generated env types, local support, and preview behavior for `bindings.durableObjects`.
+
+##### Highlights
+
+- **Cloudflare Durable Objects docs** — Platform reference for object identity, storage, alarms, migrations, and deployment caveats. ([link](https://developers.cloudflare.com/durable-objects/))
+
+##### Reference table
+
+| Question | Cloudflare docs | This Devflare page |
+| --- | --- | --- |
+| Primary focus | Platform reference for object identity, storage, alarms, migrations, and deployment caveats. | How to author `bindings.durableObjects`, what the runtime surface looks like, and how Durable Objects fits a Devflare project. |
+| Testing and runtime lens | Cloudflare’s docs focus on the raw binding API, product semantics, and platform limits for the binding itself. | Local runtime and tests, including cross-worker references. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
+| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
 
 ---
 
@@ -8436,7 +8344,7 @@ The config shape keeps the relationship visible: which bindings can enqueue work
 | Authoring shape | `{ producers?: Record<string, string>; consumers?: QueueConsumer[] }` |
 | Best for | Background jobs, async processing, fan-out work, and controlled retry behavior |
 
-#### Author it in the simplest shape that still says what you mean
+#### Add the binding to config
 
 Queues are easiest to understand when the producer names and consumer config live together in the same authored source of truth.
 
@@ -8470,7 +8378,7 @@ export default defineConfig({
 
 After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first Queues path close to the route, handler, or service method that needs it.
 
-Keep this first path small enough that the binding contract stays visible during code review.
+Keep this first path small enough that the config, env binding, and user-visible behavior are easy to review together.
 
 ##### Example — One fetch path and one queue consumer
 
@@ -8493,15 +8401,11 @@ export async function queue(batch: MessageBatch<{ id: string }>): Promise<void> 
 
 #### Local and Remote Support
 
-Support level: `Full`. Full local support means Devflare can run useful Queues application behavior locally for ordinary development and tests. Cloudflare still owns production limits, quotas, billing, and deployed account behavior.
+Devflare can run useful Queues application behavior locally for ordinary development and tests. Cloudflare still owns production limits, quotas, billing, and deployed account behavior.
 
-Local runtime and queue-trigger tests.
+Local runtime and queue-trigger tests. Start locally with `createTestContext()` plus `cf.queue.trigger()`; that lane should cover the normal Queues application flow without requiring a Cloudflare connection.
 
-##### Highlights
-
-- **Full support** — Full local support means Devflare can run useful Queues application behavior locally for ordinary development and tests. Cloudflare still owns production limits, quotas, billing, and deployed account behavior.
-- **What works without Cloudflare** — Local runtime and queue-trigger tests. Start locally with `createTestContext()` plus `cf.queue.trigger()`; that lane should cover the normal Queues application flow without requiring a Cloudflare connection.
-- **When to connect to Cloudflare** — Use Cloudflare when the assertion depends on deployed limits, account state, lifecycle behavior, billing, or other production-only Queues details.
+Use Cloudflare when the assertion depends on deployed limits, account state, lifecycle behavior, billing, or other production-only Queues details.
 
 #### When this binding fits best
 
@@ -8511,7 +8415,7 @@ Local runtime and queue-trigger tests.
 - They are a good fit for batch processing, notifications, post-request writes, and work that deserves retry control.
 - If the task must happen synchronously in the request path, a queue is probably the wrong tool.
 
-#### Notes worth keeping visible
+#### Testing path
 
 ##### Key points
 
@@ -8523,29 +8427,13 @@ Local runtime and queue-trigger tests.
 >
 > If a request can safely say “I accepted the work” before the work is complete, queues are a good candidate. If not, keep it in the request path.
 
-#### Cloudflare docs vs the Devflare layer
-
-Cloudflare Queues docs is the platform reference. This page is the Devflare translation layer: keep `bindings.queues` readable in source, understand the typed env surface, and know which local, preview, or remote lane actually matches the binding.
+#### Open the next page when you need it
 
 ##### Highlights
 
-- **Cloudflare Queues docs** — Platform reference for queue producers, consumers, delivery guarantees, retries, batching, and DLQs. ([link](https://developers.cloudflare.com/queues/))
-
-##### Reference table
-
-| Question | Cloudflare docs | This Devflare page |
-| --- | --- | --- |
-| Primary focus | Platform reference for queue producers, consumers, delivery guarantees, retries, batching, and DLQs. | How to author `bindings.queues`, what the runtime surface looks like, and how Queues fits a Devflare project. |
-| Testing and runtime lens | Cloudflare’s docs focus on the raw binding API, product semantics, and platform limits for the binding itself. | Local runtime and queue-trigger tests. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
-| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
-
-#### Go deeper only if this one-page guide stops being enough
-
-##### Highlights
-
-- **Queues internals** — See normalization, Wrangler `queues.producers` and `queues.consumers`, and the preview or runtime details behind the authored shape. ([link](/docs/bindings/queues/internals))
-- **Testing Queues** — Start from `createTestContext()` plus `cf.queue.trigger()` and only escalate when the binding or deployment model genuinely needs it. ([link](/docs/bindings/queues/testing))
-- **Queues example** — Adapt one small end-to-end path before you hide the binding behind a bigger abstraction. ([link](/docs/bindings/queues/example))
+- **Queues internals** — Check emitted Wrangler `queues.producers` and `queues.consumers`, preview behavior, and Cloudflare-specific details. ([link](/docs/bindings/queues/internals))
+- **Testing Queues** — Pick the `createTestContext()` plus `cf.queue.trigger()` path first, then move to remote checks only when the test needs them. ([link](/docs/bindings/queues/testing))
+- **Queues example** — Copy a fuller application path when the quick example is too small. ([link](/docs/bindings/queues/example))
 
 ---
 
@@ -8570,15 +8458,15 @@ This is one of the clearer compiler paths in Devflare: producers become env bind
 | Compile target | Wrangler `queues.producers` and `queues.consumers` |
 | Preview note | Preview queue names and DLQs can be provisioned and cleaned up when the preview owns them |
 
-#### Devflare normalizes the authored shape before it does anything louder
+#### How authored config becomes Wrangler config
 
 Devflare does not treat queue producers and queue consumers as unrelated configuration fragments. It keeps them in one coherent config namespace so later compile and preview code can see the whole story.
 
 Review and runtime stay aligned: the config already names the queue, the producer binding, the consumer, and the dead-letter relationship in one place.
 
-##### Example — Queues from authored config to generated output
+##### Example — Queues config and emitted Wrangler output
 
-Keep the binding readable in source, then inspect only the Wrangler-facing slice Devflare emits when the config is compiled.
+Use this when you need to check how the Devflare config becomes Wrangler-compatible config.
 
 ###### File — devflare.config.ts
 
@@ -8619,7 +8507,7 @@ export default defineConfig({
 }
 ```
 
-#### Local runtime support depends on what Devflare can model directly
+#### What local runtime support covers
 
 ##### Key points
 
@@ -8638,6 +8526,22 @@ export default defineConfig({
 > **Tip — Queues stay reviewable when the config stays explicit**
 >
 > The combination of producers, consumers, and dead-letter settings is much easier to trust when it lives in one visible authored shape.
+
+#### Cloudflare docs vs the Devflare layer
+
+Cloudflare Queues docs is the platform reference. Use this internals page when you need to compare Cloudflare's product docs with Devflare config, generated env types, local support, and preview behavior for `bindings.queues`.
+
+##### Highlights
+
+- **Cloudflare Queues docs** — Platform reference for queue producers, consumers, delivery guarantees, retries, batching, and DLQs. ([link](https://developers.cloudflare.com/queues/))
+
+##### Reference table
+
+| Question | Cloudflare docs | This Devflare page |
+| --- | --- | --- |
+| Primary focus | Platform reference for queue producers, consumers, delivery guarantees, retries, batching, and DLQs. | How to author `bindings.queues`, what the runtime surface looks like, and how Queues fits a Devflare project. |
+| Testing and runtime lens | Cloudflare’s docs focus on the raw binding API, product semantics, and platform limits for the binding itself. | Local runtime and queue-trigger tests. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
+| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
 
 ---
 
@@ -8824,7 +8728,7 @@ This is the clean lane for apps that genuinely need more than one worker. Devfla
 | Authoring shape | `Record<string, { service: string; environment?: string; entrypoint?: string }> \| ref().worker(...)` |
 | Best for | Multi-worker systems, internal RPC boundaries, and explicit service composition |
 
-#### Author it in the simplest shape that still says what you mean
+#### Add the binding to config
 
 The easiest honest starting point is one gateway worker, one referenced worker, and one service binding in config.
 
@@ -8852,7 +8756,7 @@ export default defineConfig({
 
 After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first Services path close to the route, handler, or service method that needs it.
 
-Keep this first path small enough that the binding contract stays visible during code review.
+Keep this first path small enough that the config, env binding, and user-visible behavior are easy to review together.
 
 ##### Example — Use the service in the gateway worker
 
@@ -8867,15 +8771,11 @@ export async function fetch(): Promise<Response> {
 
 #### Local and Remote Support
 
-Support level: `Full`. Full local support means Devflare can run useful Services application behavior locally for ordinary development and tests. Cloudflare still owns production limits, quotas, billing, and deployed account behavior.
+Devflare can run useful Services application behavior locally for ordinary development and tests. Cloudflare still owns production limits, quotas, billing, and deployed account behavior.
 
-Local runtime and multi-worker tests.
+Local runtime and multi-worker tests. Start locally with `createTestContext()` plus `env.MY_SERVICE`; that lane should cover the normal Services application flow without requiring a Cloudflare connection.
 
-##### Highlights
-
-- **Full support** — Full local support means Devflare can run useful Services application behavior locally for ordinary development and tests. Cloudflare still owns production limits, quotas, billing, and deployed account behavior.
-- **What works without Cloudflare** — Local runtime and multi-worker tests. Start locally with `createTestContext()` plus `env.MY_SERVICE`; that lane should cover the normal Services application flow without requiring a Cloudflare connection.
-- **When to connect to Cloudflare** — Use Cloudflare when the assertion depends on deployed limits, account state, lifecycle behavior, billing, or other production-only Services details.
+Use Cloudflare when the assertion depends on deployed limits, account state, lifecycle behavior, billing, or other production-only Services details.
 
 #### When this binding fits best
 
@@ -8885,7 +8785,7 @@ Local runtime and multi-worker tests.
 - They are a strong fit for internal APIs, admin surfaces, search workers, and explicit worker-family boundaries.
 - If the dependency is actually shared data rather than another service boundary, a direct binding like D1, KV, or DO may stay simpler.
 
-#### Notes worth keeping visible
+#### Testing path
 
 ##### Key points
 
@@ -8897,29 +8797,13 @@ Local runtime and multi-worker tests.
 >
 > Ask which worker names a preview will actually deploy before you assume the worker family is isolated.
 
-#### Cloudflare docs vs the Devflare layer
-
-Cloudflare Service bindings docs is the platform reference. This page is the Devflare translation layer: keep `bindings.services` readable in source, understand the typed env surface, and know which local, preview, or remote lane actually matches the binding.
+#### Open the next page when you need it
 
 ##### Highlights
 
-- **Cloudflare Service bindings docs** — Platform reference for worker-to-worker bindings, service entrypoints, and the underlying runtime contract. ([link](https://developers.cloudflare.com/workers/runtime-apis/bindings/service-bindings/))
-
-##### Reference table
-
-| Question | Cloudflare docs | This Devflare page |
-| --- | --- | --- |
-| Primary focus | Platform reference for worker-to-worker bindings, service entrypoints, and the underlying runtime contract. | How to author `bindings.services`, what the runtime surface looks like, and how Services fits a Devflare project. |
-| Testing and runtime lens | Cloudflare’s docs focus on the raw binding API, product semantics, and platform limits for the binding itself. | Local runtime and multi-worker tests. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
-| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
-
-#### Go deeper only if this one-page guide stops being enough
-
-##### Highlights
-
-- **Services internals** — See normalization, Wrangler `services`, and the preview or runtime details behind the authored shape. ([link](/docs/bindings/services/internals))
-- **Testing Services** — Start from `createTestContext()` plus `env.MY_SERVICE` and only escalate when the binding or deployment model genuinely needs it. ([link](/docs/bindings/services/testing))
-- **Services example** — Adapt one small end-to-end path before you hide the binding behind a bigger abstraction. ([link](/docs/bindings/services/example))
+- **Services internals** — Check emitted Wrangler `services`, preview behavior, and Cloudflare-specific details. ([link](/docs/bindings/services/internals))
+- **Testing Services** — Pick the `createTestContext()` plus `env.MY_SERVICE` path first, then move to remote checks only when the test needs them. ([link](/docs/bindings/services/testing))
+- **Services example** — Copy a fuller application path when the quick example is too small. ([link](/docs/bindings/services/example))
 
 ---
 
@@ -8944,15 +8828,15 @@ Service bindings feel more than cosmetic: the tooling follows the relationship f
 | Compile target | Wrangler `services` |
 | Preview note | Preview can rewrite service names, but service bindings are not preview-managed resources like KV or D1 |
 
-#### Devflare normalizes the authored shape before it does anything louder
+#### How authored config becomes Wrangler config
 
 Service bindings can be authored as plain binding objects or as `ref().worker(...)` results. Devflare normalizes those into one shape so compiler, type generation, and test setup can all reason about them consistently.
 
 When a binding comes from `ref()`, Devflare can follow the referenced config, discover the relevant worker surface, and keep that relationship visible in local tooling.
 
-##### Example — Services from authored config to generated output
+##### Example — Services config and emitted Wrangler output
 
-Keep the binding readable in source, then inspect only the Wrangler-facing slice Devflare emits when the config is compiled.
+Use this when you need to check how the Devflare config becomes Wrangler-compatible config.
 
 ###### File — devflare.config.ts
 
@@ -8982,7 +8866,7 @@ export default defineConfig({
 }
 ```
 
-#### Local runtime support depends on what Devflare can model directly
+#### What local runtime support covers
 
 ##### Key points
 
@@ -9001,6 +8885,22 @@ export default defineConfig({
 > **Tip — This is configuration as architecture, not just syntax**
 >
 > Service bindings work well in Devflare because the relationships are explicit enough for tooling to follow, type, and test.
+
+#### Cloudflare docs vs the Devflare layer
+
+Cloudflare Service bindings docs is the platform reference. Use this internals page when you need to compare Cloudflare's product docs with Devflare config, generated env types, local support, and preview behavior for `bindings.services`.
+
+##### Highlights
+
+- **Cloudflare Service bindings docs** — Platform reference for worker-to-worker bindings, service entrypoints, and the underlying runtime contract. ([link](https://developers.cloudflare.com/workers/runtime-apis/bindings/service-bindings/))
+
+##### Reference table
+
+| Question | Cloudflare docs | This Devflare page |
+| --- | --- | --- |
+| Primary focus | Platform reference for worker-to-worker bindings, service entrypoints, and the underlying runtime contract. | How to author `bindings.services`, what the runtime surface looks like, and how Services fits a Devflare project. |
+| Testing and runtime lens | Cloudflare’s docs focus on the raw binding API, product semantics, and platform limits for the binding itself. | Local runtime and multi-worker tests. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
+| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
 
 ---
 
@@ -9163,7 +9063,7 @@ AI is still remote-oriented, but the first useful path is simple: one worker rou
 | Authoring shape | `{ binding: string }` |
 | Best for | Real inference against Workers AI models |
 
-#### Author it in the simplest shape that still says what you mean
+#### Add the binding to config
 
 AI is a remote-oriented binding, but the first worker path should still be tiny and concrete: receive one request, call one model, return one JSON response.
 
@@ -9188,7 +9088,7 @@ export default defineConfig({
 
 After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first AI path close to the route, handler, or service method that needs it.
 
-Keep this first path small enough that the binding contract stays visible during code review.
+Keep this first path small enough that the config, env binding, and user-visible behavior are easy to review together.
 
 ##### Example — A tiny inference endpoint
 
@@ -9207,15 +9107,11 @@ export async function fetch(): Promise<Response> {
 
 #### Local and Remote Support
 
-Support level: `Remote`. Remote support means Devflare supports the config, generated env shape, docs, and local application-flow work, but full fidelity requires Cloudflare remote infrastructure. Use local shims or fixtures for code your app owns, then connect to Cloudflare when the product behavior is the assertion.
+Devflare supports the config, generated env shape, docs, and local application-flow work, but full fidelity requires Cloudflare remote infrastructure. Use local shims or fixtures for code your app owns, then connect to Cloudflare when the product behavior is the assertion.
 
-Remote-oriented; local tests require remote mode.
+Remote-oriented; local tests require remote mode. Keep local coverage focused on deterministic application flow through fixtures, mocks, shims, or Miniflare-backed wiring instead of pretending to reproduce Cloudflare-hosted product behavior.
 
-##### Highlights
-
-- **Remote support** — Remote support means Devflare supports the config, generated env shape, docs, and local application-flow work, but full fidelity requires Cloudflare remote infrastructure. Use local shims or fixtures for code your app owns, then connect to Cloudflare when the product behavior is the assertion.
-- **What works without Cloudflare** — Remote-oriented; local tests require remote mode. Keep local coverage focused on deterministic application flow through fixtures, mocks, shims, or Miniflare-backed wiring instead of pretending to reproduce Cloudflare-hosted product behavior.
-- **When to connect to Cloudflare** — Use Cloudflare when the ai call is expensive, flaky, or business-critical enough to need a separate release gate. This is the lane for full AI product fidelity, remote state, lifecycle behavior, and platform-specific limits.
+Use Cloudflare when the ai call is expensive, flaky, or business-critical enough to need a separate release gate. This is the lane for full AI product fidelity, remote state, lifecycle behavior, and platform-specific limits.
 
 #### When this binding fits best
 
@@ -9225,7 +9121,7 @@ Remote-oriented; local tests require remote mode.
 - Keep the binding dedicated to model work instead of pretending every route needs AI by default.
 - If the only goal is local happy-path UI wiring, use a normal fake at the app edge and reserve remote AI tests for the worker boundary.
 
-#### Notes worth keeping visible
+#### Testing path
 
 ##### Key points
 
@@ -9237,29 +9133,13 @@ Remote-oriented; local tests require remote mode.
 >
 > The honest story is that Devflare supports the binding cleanly, but real AI behavior still requires remote infrastructure.
 
-#### Cloudflare docs vs the Devflare layer
-
-Cloudflare Workers AI docs is the platform reference. This page is the Devflare translation layer: keep `bindings.ai` readable in source, understand the typed env surface, and know which local, preview, or remote lane actually matches the binding.
+#### Open the next page when you need it
 
 ##### Highlights
 
-- **Cloudflare Workers AI docs** — Platform reference for model access, remote inference behavior, pricing, and account prerequisites. ([link](https://developers.cloudflare.com/workers-ai/configuration/bindings/))
-
-##### Reference table
-
-| Question | Cloudflare docs | This Devflare page |
-| --- | --- | --- |
-| Primary focus | Platform reference for model access, remote inference behavior, pricing, and account prerequisites. | How to author `bindings.ai`, what the runtime surface looks like, and how AI fits a Devflare project. |
-| Testing and runtime lens | Cloudflare’s docs focus on the real remote product behavior, account requirements, and runtime constraints on the platform. | Remote-oriented; local tests require remote mode. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
-| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
-
-#### Go deeper only if this one-page guide stops being enough
-
-##### Highlights
-
-- **AI internals** — See normalization, Wrangler `ai` binding, and the preview or runtime details behind the authored shape. ([link](/docs/bindings/ai/internals))
-- **Testing AI** — Start from `createTestContext()` after remote mode is enabled, plus `shouldSkip.ai` and only escalate when the binding or deployment model genuinely needs it. ([link](/docs/bindings/ai/testing))
-- **AI example** — Adapt one small end-to-end path before you hide the binding behind a bigger abstraction. ([link](/docs/bindings/ai/example))
+- **AI internals** — Check emitted Wrangler `ai` binding, preview behavior, and Cloudflare-specific details. ([link](/docs/bindings/ai/internals))
+- **Testing AI** — Pick the `createTestContext()` after remote mode is enabled, plus `shouldSkip.ai` path first, then move to remote checks only when the test needs them. ([link](/docs/bindings/ai/testing))
+- **AI example** — Copy a fuller application path when the quick example is too small. ([link](/docs/bindings/ai/example))
 
 ---
 
@@ -9284,15 +9164,15 @@ Devflare does not invent a fake local AI runtime. It compiles the binding, check
 | Compile target | Wrangler `ai` binding |
 | Preview note | AI is remote-oriented; preview is less about provisioning and more about whether the worker path may call the model |
 
-#### Devflare normalizes the authored shape before it does anything louder
+#### How authored config becomes Wrangler config
 
 AI does not need the same name-versus-id resolution dance as KV or D1. The authored shape is basically “which env binding name should exist.”
 
 The heavier implementation work lives in auth checks and remote-test setup, because the value of the binding only appears once the worker can reach real Cloudflare AI services.
 
-##### Example — AI from authored config to generated output
+##### Example — AI config and emitted Wrangler output
 
-Keep the binding readable in source, then inspect only the Wrangler-facing slice Devflare emits when the config is compiled.
+Use this when you need to check how the Devflare config becomes Wrangler-compatible config.
 
 ###### File — devflare.config.ts
 
@@ -9319,7 +9199,7 @@ export default defineConfig({
 }
 ```
 
-#### Local runtime support depends on what Devflare can model directly
+#### What local runtime support covers
 
 ##### Key points
 
@@ -9339,6 +9219,22 @@ export default defineConfig({
 > **Note — Honest tooling beats fake local magic**
 >
 > Devflare makes AI explicit and testable, but it does not pretend local emulation is equivalent to real inference.
+
+#### Cloudflare docs vs the Devflare layer
+
+Cloudflare Workers AI docs is the platform reference. Use this internals page when you need to compare Cloudflare's product docs with Devflare config, generated env types, local support, and preview behavior for `bindings.ai`.
+
+##### Highlights
+
+- **Cloudflare Workers AI docs** — Platform reference for model access, remote inference behavior, pricing, and account prerequisites. ([link](https://developers.cloudflare.com/workers-ai/configuration/bindings/))
+
+##### Reference table
+
+| Question | Cloudflare docs | This Devflare page |
+| --- | --- | --- |
+| Primary focus | Platform reference for model access, remote inference behavior, pricing, and account prerequisites. | How to author `bindings.ai`, what the runtime surface looks like, and how AI fits a Devflare project. |
+| Testing and runtime lens | Cloudflare’s docs focus on the real remote product behavior, account requirements, and runtime constraints on the platform. | Remote-oriented; local tests require remote mode. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
+| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
 
 ---
 
@@ -9518,7 +9414,7 @@ The right first path is small: one binding, one tiny upsert-and-query route, and
 | Authoring shape | `Record<string, { indexName: string }>` |
 | Best for | Similarity search, embedding-backed lookup, and retrieval paths that belong in the worker |
 
-#### Author it in the simplest shape that still says what you mean
+#### Add the binding to config
 
 Vectorize authoring is simple in config, but the operational story matters: an index must exist, dimensions must match, and tests should acknowledge that they are calling a real remote system.
 
@@ -9545,7 +9441,7 @@ export default defineConfig({
 
 After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first Vectorize path close to the route, handler, or service method that needs it.
 
-Keep this first path small enough that the binding contract stays visible during code review.
+Keep this first path small enough that the config, env binding, and user-visible behavior are easy to review together.
 
 ##### Example — A tiny write-and-query route
 
@@ -9570,15 +9466,11 @@ export async function fetch(): Promise<Response> {
 
 #### Local and Remote Support
 
-Support level: `Remote`. Remote support means Devflare supports the config, generated env shape, docs, and local application-flow work, but full fidelity requires Cloudflare remote infrastructure. Use local shims or fixtures for code your app owns, then connect to Cloudflare when the product behavior is the assertion.
+Devflare supports the config, generated env shape, docs, and local application-flow work, but full fidelity requires Cloudflare remote infrastructure. Use local shims or fixtures for code your app owns, then connect to Cloudflare when the product behavior is the assertion.
 
-Remote-oriented; local tests require remote mode or explicit mocks.
+Remote-oriented; local tests require remote mode or explicit mocks. Keep local coverage focused on deterministic application flow through fixtures, mocks, shims, or Miniflare-backed wiring instead of pretending to reproduce Cloudflare-hosted product behavior.
 
-##### Highlights
-
-- **Remote support** — Remote support means Devflare supports the config, generated env shape, docs, and local application-flow work, but full fidelity requires Cloudflare remote infrastructure. Use local shims or fixtures for code your app owns, then connect to Cloudflare when the product behavior is the assertion.
-- **What works without Cloudflare** — Remote-oriented; local tests require remote mode or explicit mocks. Keep local coverage focused on deterministic application flow through fixtures, mocks, shims, or Miniflare-backed wiring instead of pretending to reproduce Cloudflare-hosted product behavior.
-- **When to connect to Cloudflare** — Use Cloudflare when the index contract is business-critical enough to need explicit ci or release gating. This is the lane for full Vectorize product fidelity, remote state, lifecycle behavior, and platform-specific limits.
+Use Cloudflare when the index contract is business-critical enough to need explicit ci or release gating. This is the lane for full Vectorize product fidelity, remote state, lifecycle behavior, and platform-specific limits.
 
 #### When this binding fits best
 
@@ -9588,7 +9480,7 @@ Remote-oriented; local tests require remote mode or explicit mocks.
 - It fits best when the worker is already producing or consuming embeddings as part of the application flow.
 - If the vector store is optional or external to the worker, keep the boundary explicit and do not force Vectorize into every local path.
 
-#### Notes worth keeping visible
+#### Testing path
 
 ##### Key points
 
@@ -9600,29 +9492,13 @@ Remote-oriented; local tests require remote mode or explicit mocks.
 >
 > A passing unit test with a fake array is not equivalent to a real Vectorize call against the configured index.
 
-#### Cloudflare docs vs the Devflare layer
-
-Cloudflare Vectorize docs is the platform reference. This page is the Devflare translation layer: keep `bindings.vectorize` readable in source, understand the typed env surface, and know which local, preview, or remote lane actually matches the binding.
+#### Open the next page when you need it
 
 ##### Highlights
 
-- **Cloudflare Vectorize docs** — Platform reference for indexes, embeddings, remote querying, and preview-aware index lifecycle. ([link](https://developers.cloudflare.com/vectorize/))
-
-##### Reference table
-
-| Question | Cloudflare docs | This Devflare page |
-| --- | --- | --- |
-| Primary focus | Platform reference for indexes, embeddings, remote querying, and preview-aware index lifecycle. | How to author `bindings.vectorize`, what the runtime surface looks like, and how Vectorize fits a Devflare project. |
-| Testing and runtime lens | Cloudflare’s docs focus on the real remote product behavior, account requirements, and runtime constraints on the platform. | Remote-oriented; local tests require remote mode or explicit mocks. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
-| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
-
-#### Go deeper only if this one-page guide stops being enough
-
-##### Highlights
-
-- **Vectorize internals** — See normalization, Wrangler `vectorize`, and the preview or runtime details behind the authored shape. ([link](/docs/bindings/vectorize/internals))
-- **Testing Vectorize** — Start from `createTestContext()` in remote mode plus `shouldSkip.vectorize` and only escalate when the binding or deployment model genuinely needs it. ([link](/docs/bindings/vectorize/testing))
-- **Vectorize example** — Adapt one small end-to-end path before you hide the binding behind a bigger abstraction. ([link](/docs/bindings/vectorize/example))
+- **Vectorize internals** — Check emitted Wrangler `vectorize`, preview behavior, and Cloudflare-specific details. ([link](/docs/bindings/vectorize/internals))
+- **Testing Vectorize** — Pick the `createTestContext()` in remote mode plus `shouldSkip.vectorize` path first, then move to remote checks only when the test needs them. ([link](/docs/bindings/vectorize/testing))
+- **Vectorize example** — Copy a fuller application path when the quick example is too small. ([link](/docs/bindings/vectorize/example))
 
 ---
 
@@ -9647,15 +9523,15 @@ The codebase treats Vectorize as supported but remote-oriented. Config and previ
 | Compile target | Wrangler `vectorize` |
 | Preview note | Preview-scoped Vectorize indexes are lifecycle-managed resources in Devflare |
 
-#### Devflare normalizes the authored shape before it does anything louder
+#### How authored config becomes Wrangler config
 
 Each Vectorize binding is a named env entry pointing to an explicit `indexName`. There is not much normalization complexity because the important value is already visible in source.
 
 The heavier internal story is around preview resource handling and remote test support, because that is where real index existence and lifecycle start to matter.
 
-##### Example — Vectorize from authored config to generated output
+##### Example — Vectorize config and emitted Wrangler output
 
-Keep the binding readable in source, then inspect only the Wrangler-facing slice Devflare emits when the config is compiled.
+Use this when you need to check how the Devflare config becomes Wrangler-compatible config.
 
 ###### File — devflare.config.ts
 
@@ -9684,7 +9560,7 @@ export default defineConfig({
 }
 ```
 
-#### Local runtime support depends on what Devflare can model directly
+#### What local runtime support covers
 
 ##### Key points
 
@@ -9703,6 +9579,22 @@ export default defineConfig({
 > **Note — Supported does not mean locally emulated**
 >
 > Vectorize is fully part of the config schema and preview story, but the meaningful runtime path still belongs to the remote platform.
+
+#### Cloudflare docs vs the Devflare layer
+
+Cloudflare Vectorize docs is the platform reference. Use this internals page when you need to compare Cloudflare's product docs with Devflare config, generated env types, local support, and preview behavior for `bindings.vectorize`.
+
+##### Highlights
+
+- **Cloudflare Vectorize docs** — Platform reference for indexes, embeddings, remote querying, and preview-aware index lifecycle. ([link](https://developers.cloudflare.com/vectorize/))
+
+##### Reference table
+
+| Question | Cloudflare docs | This Devflare page |
+| --- | --- | --- |
+| Primary focus | Platform reference for indexes, embeddings, remote querying, and preview-aware index lifecycle. | How to author `bindings.vectorize`, what the runtime surface looks like, and how Vectorize fits a Devflare project. |
+| Testing and runtime lens | Cloudflare’s docs focus on the real remote product behavior, account requirements, and runtime constraints on the platform. | Remote-oriented; local tests require remote mode or explicit mocks. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
+| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
 
 ---
 
@@ -9866,7 +9758,7 @@ export async function fetch(): Promise<Response> {
 
 ### Use Hyperdrive when the worker needs a real PostgreSQL path behind Cloudflare’s pooling layer
 
-> Hyperdrive is modeled in Devflare config and compile flows like other name-based resources, but its tested local ergonomics are thinner than D1 or KV.
+> Hyperdrive is modeled in Devflare config, compile flows, local Miniflare wiring, and pure tests through explicit local connection strings.
 
 | Field | Value |
 | --- | --- |
@@ -9875,21 +9767,21 @@ export async function fetch(): Promise<Response> {
 | Navigation title | Hyperdrive |
 | Eyebrow | Binding reference |
 
-That is not a reason to avoid it — it is a reason to document it accurately. The binding is supported, yet the strongest evidence in the repo focuses on presence, connection info, and targeted integration rather than a giant local mock universe.
+For local work, point the binding at a local or test PostgreSQL database. Cloudflare still owns the hosted pooling layer, placement, account credentials, and production routing.
 
 #### At a glance
 
 | Fact | Value |
 | --- | --- |
 | Config key | `bindings.hyperdrive` |
-| Authoring shape | `Record<string, string \| { name: string } \| { id: string }>` |
+| Authoring shape | `Record<string, string \| { name; localConnectionString? } \| { id; localConnectionString? }>` |
 | Best for | Workers that connect to PostgreSQL through Hyperdrive |
 
-#### Author it in the simplest shape that still says what you mean
+#### Add the binding to config
 
 Hyperdrive follows the same stable-name instinct as KV and D1: author a readable name in source when you can, then let Devflare resolve ids later when a flow actually needs them.
 
-The main difference is operational. Hyperdrive has credential and infrastructure constraints that make preview lifecycle trickier than storage bindings like KV or R2.
+Add `localConnectionString` when local dev or tests should query a local database without contacting Cloudflare.
 
 ##### Example — Hyperdrive binding authoring
 
@@ -9900,7 +9792,10 @@ export default defineConfig({
 	name: 'postgres-worker',
 	bindings: {
 		hyperdrive: {
-			DB: 'app-postgres',
+			DB: {
+				name: 'app-postgres',
+				localConnectionString: 'postgres://user:pass@localhost:5432/app'
+			},
 			ANALYTICS_DB: { id: 'hyperdrive-id' }
 		}
 	}
@@ -9911,32 +9806,35 @@ export default defineConfig({
 
 After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first Hyperdrive path close to the route, handler, or service method that needs it.
 
-Keep this first path small enough that the binding contract stays visible during code review.
+Keep this first path small enough that the config, env binding, and user-visible behavior are easy to review together.
 
-##### Example — Expose the binding shape you will use later
+##### Example — Read one product through Hyperdrive
 
 ```ts
-import { env } from 'devflare/runtime'
+import postgres from 'postgres'
+import { env, getFetchEvent } from 'devflare/runtime'
+
+const sql = postgres(env.DB.connectionString)
 
 export async function fetch(): Promise<Response> {
-	return Response.json({
-		hasBinding: Boolean(env.DB),
-		hasConnectionString: Boolean(env.DB?.connectionString)
-	})
+	const event = getFetchEvent()
+	const slug = new URL(event.request.url).searchParams.get('slug') ?? 'starter-kit'
+	const [product] = await sql.unsafe(
+		'select slug, name, price_cents from products where slug = $1 limit 1',
+		[slug]
+	)
+
+	return product ? Response.json(product) : new Response('not found', { status: 404 })
 }
 ```
 
 #### Local and Remote Support
 
-Support level: `Remote`. Remote support means Devflare supports the config, generated env shape, docs, and local application-flow work, but full fidelity requires Cloudflare remote infrastructure. Use local shims or fixtures for code your app owns, then connect to Cloudflare when the product behavior is the assertion.
+Devflare can run useful Hyperdrive application behavior locally for ordinary development and tests. Cloudflare still owns production limits, quotas, billing, and deployed account behavior.
 
-Supported, but with a narrower proven local test story.
+Full local support when Devflare has a local database connection string for the binding. Start locally with `createTestContext()` or `createOfflineEnv()` with `localConnectionString`; that lane should cover the normal Hyperdrive application flow without requiring a Cloudflare connection.
 
-##### Highlights
-
-- **Remote support** — Remote support means Devflare supports the config, generated env shape, docs, and local application-flow work, but full fidelity requires Cloudflare remote infrastructure. Use local shims or fixtures for code your app owns, then connect to Cloudflare when the product behavior is the assertion.
-- **What works without Cloudflare** — Supported, but with a narrower proven local test story. Keep local coverage focused on deterministic application flow through fixtures, mocks, shims, or Miniflare-backed wiring instead of pretending to reproduce Cloudflare-hosted product behavior.
-- **When to connect to Cloudflare** — Use Cloudflare when the app depends on real preview isolation or actual postgres query behavior. This is the lane for full Hyperdrive product fidelity, remote state, lifecycle behavior, and platform-specific limits.
+Use Cloudflare when the assertion depends on deployed limits, account state, lifecycle behavior, billing, or other production-only Hyperdrive details.
 
 #### When this binding fits best
 
@@ -9946,47 +9844,31 @@ Supported, but with a narrower proven local test story.
 - It fits best when a real Postgres database already exists and the worker boundary should speak to it deliberately.
 - If your data is already a comfortable fit for D1, D1 may still be the simpler first choice.
 
-#### Notes worth keeping visible
+#### Testing path
 
 ##### Key points
 
-- The repo evidence for local Hyperdrive ergonomics is thinner than the local stories for D1, KV, or R2.
+- Use `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_DB` to override the configured local connection string in CI or per-developer shells.
 - Preview-scoped Hyperdrive configs are not auto-cloned from the base configuration because stored credentials are not always available for that.
 - When a preview Hyperdrive config does not exist, Devflare may fall back to the base configuration and warn.
 
-> **Warning — Supported does not mean equally local-friendly**
+> **Warning — Local and hosted responsibilities are different**
 >
-> Hyperdrive belongs in the binding library, but its test guidance should stay more conservative than the guidance for D1 or KV.
+> Devflare can wire the local database path. Cloudflare still owns hosted pooling, production credentials, placement, billing, and account state.
 
-#### Cloudflare docs vs the Devflare layer
-
-Cloudflare Hyperdrive docs is the platform reference. This page is the Devflare translation layer: keep `bindings.hyperdrive` readable in source, understand the typed env surface, and know which local, preview, or remote lane actually matches the binding.
+#### Open the next page when you need it
 
 ##### Highlights
 
-- **Cloudflare Hyperdrive docs** — Platform reference for database acceleration, connection strings, limits, and supported databases. ([link](https://developers.cloudflare.com/hyperdrive/))
-
-##### Reference table
-
-| Question | Cloudflare docs | This Devflare page |
-| --- | --- | --- |
-| Primary focus | Platform reference for database acceleration, connection strings, limits, and supported databases. | How to author `bindings.hyperdrive`, what the runtime surface looks like, and how Hyperdrive fits a Devflare project. |
-| Testing and runtime lens | Cloudflare’s docs focus on the raw binding API, product semantics, and platform limits for the binding itself. | Supported, but with a narrower proven local test story. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
-| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
-
-#### Go deeper only if this one-page guide stops being enough
-
-##### Highlights
-
-- **Hyperdrive internals** — See normalization, Wrangler `hyperdrive`, and the preview or runtime details behind the authored shape. ([link](/docs/bindings/hyperdrive/internals))
-- **Testing Hyperdrive** — Start from `createTestContext()` plus small binding or smoke checks and only escalate when the binding or deployment model genuinely needs it. ([link](/docs/bindings/hyperdrive/testing))
-- **Hyperdrive example** — Adapt one small end-to-end path before you hide the binding behind a bigger abstraction. ([link](/docs/bindings/hyperdrive/example))
+- **Hyperdrive internals** — Check emitted Wrangler `hyperdrive`, preview behavior, and Cloudflare-specific details. ([link](/docs/bindings/hyperdrive/internals))
+- **Testing Hyperdrive** — Pick the `createTestContext()` or `createOfflineEnv()` with `localConnectionString` path first, then move to remote checks only when the test needs them. ([link](/docs/bindings/hyperdrive/testing))
+- **Hyperdrive example** — Copy a fuller application path when the quick example is too small. ([link](/docs/bindings/hyperdrive/example))
 
 ---
 
 ### How Devflare wires Hyperdrive from config to runtime
 
-> Hyperdrive uses the same normalize-and-resolve pattern as KV and D1, but preview lifecycle includes a fallback path instead of guaranteed preview cloning.
+> Hyperdrive uses the same normalize-and-resolve pattern as KV and D1, and local runtime config is driven by the binding connection string.
 
 | Field | Value |
 | --- | --- |
@@ -10005,15 +9887,15 @@ That fallback behavior is worth documenting explicitly because it changes how yo
 | Compile target | Wrangler `hyperdrive` |
 | Preview note | Preview Hyperdrive configs may fall back to the base config when a preview clone cannot be materialized |
 
-#### Devflare normalizes the authored shape before it does anything louder
+#### How authored config becomes Wrangler config
 
 Hyperdrive authoring accepts a string, `{ name }`, or `{ id }`, and Devflare normalizes those into one internal binding shape so later code can treat them consistently.
 
 That part looks familiar if you already understand KV or D1. The unusual part is preview lifecycle, not the authored schema.
 
-##### Example — Hyperdrive from authored config to generated output
+##### Example — Hyperdrive config and emitted Wrangler output
 
-Keep the binding readable in source, then inspect only the Wrangler-facing slice Devflare emits when the config is compiled.
+Use this when you need to check how the Devflare config becomes Wrangler-compatible config.
 
 ###### File — devflare.config.ts
 
@@ -10024,7 +9906,10 @@ export default defineConfig({
 	name: 'postgres-worker',
 	bindings: {
 		hyperdrive: {
-			DB: 'app-postgres',
+			DB: {
+				name: 'app-postgres',
+				localConnectionString: 'postgres://user:pass@localhost:5432/app'
+			},
 			ANALYTICS_DB: { id: 'hyperdrive-id' }
 		}
 	}
@@ -10041,13 +9926,13 @@ export default defineConfig({
 }
 ```
 
-#### Local runtime support depends on what Devflare can model directly
+#### What local runtime support covers
 
 ##### Key points
 
-- The repo shows Hyperdrive bindings exposing connection-oriented information such as `connectionString`, and some smoke paths also allow a `query()`-style helper.
-- The bridge-level local helper surface is thinner than D1, KV, or R2 — expect to lean on targeted integration tests for database behavior that matters.
-- The strongest proven local habit is to assert the binding exists and verify the connection string shape.
+- Devflare passes `bindings.hyperdrive.*.localConnectionString` into Miniflare `hyperdrives` so local Worker code can use the normal Hyperdrive binding shape.
+- `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_<BINDING>` and the legacy `WRANGLER_HYPERDRIVE_LOCAL_CONNECTION_STRING_<BINDING>` override config for local runs.
+- Pure tests can use `createOfflineEnv()` or `createMockHyperdrive()` when the application code only needs the connection string.
 
 #### Compile, preview, and cleanup behavior
 
@@ -10061,11 +9946,27 @@ export default defineConfig({
 >
 > The config shape is straightforward. The reason Hyperdrive needs extra documentation is the preview and credential story, not the authoring syntax.
 
+#### Cloudflare docs vs the Devflare layer
+
+Cloudflare Hyperdrive docs is the platform reference. Use this internals page when you need to compare Cloudflare's product docs with Devflare config, generated env types, local support, and preview behavior for `bindings.hyperdrive`.
+
+##### Highlights
+
+- **Cloudflare Hyperdrive docs** — Platform reference for database acceleration, connection strings, limits, and supported databases. ([link](https://developers.cloudflare.com/hyperdrive/))
+
+##### Reference table
+
+| Question | Cloudflare docs | This Devflare page |
+| --- | --- | --- |
+| Primary focus | Platform reference for database acceleration, connection strings, limits, and supported databases. | How to author `bindings.hyperdrive`, what the runtime surface looks like, and how Hyperdrive fits a Devflare project. |
+| Testing and runtime lens | Cloudflare’s docs focus on the raw binding API, product semantics, and platform limits for the binding itself. | Full local support when Devflare has a local database connection string for the binding. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
+| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
+
 ---
 
 ### Test Hyperdrive the way Devflare expects it to run
 
-> Hyperdrive testing should start smaller and more cautiously than D1 testing: prove the binding exists, then add targeted integration where the real database path matters.
+> Hyperdrive testing should start with a local connection string, then add a focused query test against the database shape your app actually uses.
 
 | Field | Value |
 | --- | --- |
@@ -10074,21 +9975,21 @@ export default defineConfig({
 | Navigation title | Testing Hyperdrive |
 | Eyebrow | Testing |
 
-The codebase shows enough evidence to document Hyperdrive as supported, but not enough to oversell it as a drop-in local-first database harness identical to D1.
+Devflare can provide the binding locally. Your test database still has to exist, just like any other local Postgres dependency.
 
 #### At a glance
 
 | Fact | Value |
 | --- | --- |
-| Best for | Binding presence checks and targeted PostgreSQL integration paths |
-| Default harness | `createTestContext()` plus small binding or smoke checks |
+| Best for | Local PostgreSQL integration paths and connection-string-driven app code |
+| Default harness | `createTestContext()` or `createOfflineEnv()` with `localConnectionString` |
 | Escalate when | The app depends on real preview isolation or actual Postgres query behavior |
 
 #### Start with the default test loop
 
-Start with one small assertion that the binding exists and exposes the connection information your code expects. That already tells you whether the config and runtime wiring are sane.
+Start with one small assertion that the binding exposes the local connection string your database client expects.
 
-Then add focused integration tests against the actual database path instead of manufacturing a huge fake local contract that the repo itself does not clearly guarantee.
+Then add focused integration tests against the actual local database path instead of involving Cloudflare for application-owned SQL behavior.
 
 ##### Example — A conservative Hyperdrive smoke test
 
@@ -10099,9 +10000,9 @@ import { createTestContext, env } from 'devflare/test'
 beforeAll(() => createTestContext())
 afterAll(() => env.dispose())
 
-test('Hyperdrive binding exposes connection info', () => {
+test('Hyperdrive binding exposes local connection info', () => {
 	expect(env.DB).toBeDefined()
-	expect(Boolean(env.DB?.connectionString)).toBe(true)
+	expect(env.DB.connectionString).toContain('localhost')
 })
 ```
 
@@ -10109,7 +10010,8 @@ test('Hyperdrive binding exposes connection info', () => {
 
 ##### Key points
 
-- Use small binding-presence checks first instead of overpromising local query semantics.
+- Use `localConnectionString` in config when the test should run without Cloudflare.
+- Use `createMockHyperdrive` when a pure unit test needs a Hyperdrive-shaped binding without Miniflare.
 - Keep one higher-level integration path for the real database behavior you actually care about.
 - If preview isolation matters, test the fallback or dedicated preview strategy explicitly.
 
@@ -10117,19 +10019,19 @@ test('Hyperdrive binding exposes connection info', () => {
 
 ##### Key points
 
-- Do not present Hyperdrive as if Devflare already gives it the same local comfort story as D1.
+- Do not run local Hyperdrive tests against a shared production database.
 - If the worker truly depends on live query behavior, prefer an integration test against a real database path.
 - Preview-specific Hyperdrive expectations deserve a dedicated test because automatic cloning is not guaranteed.
 
-> **Warning — Conservative is the honest test strategy**
+> **Warning — Keep database ownership explicit**
 >
-> The goal is trustworthy docs, not pretending every binding has identical local ergonomics.
+> Devflare owns the binding wiring; the test suite owns the local database lifecycle and seed data.
 
 ---
 
 ### Use Hyperdrive in a real application path
 
-> This example keeps Hyperdrive focused on one thing: prove the binding exists and expose the connection information your app will need next.
+> This example uses Hyperdrive in an application route that reads one product from PostgreSQL.
 
 | Field | Value |
 | --- | --- |
@@ -10138,15 +10040,15 @@ test('Hyperdrive binding exposes connection info', () => {
 | Navigation title | Hyperdrive example |
 | Eyebrow | Application example |
 
-That is a better first example than a giant database abstraction because it teaches the actual runtime contract the repo proves today.
+Use the same route locally with a local Postgres connection string, then deploy with the Cloudflare Hyperdrive configuration id or name.
 
 #### At a glance
 
 | Fact | Value |
 | --- | --- |
 | Config focus | Stable Hyperdrive naming |
-| Runtime shape | Read connection information from the binding |
-| Best use | Health checks and first integration wiring |
+| Runtime shape | Query through `env.DB.connectionString` |
+| Best use | Product, order, account, or tenant data stored in PostgreSQL |
 
 #### Start by wiring the binding clearly in config
 
@@ -10162,7 +10064,10 @@ export default defineConfig({
 	},
 	bindings: {
 		hyperdrive: {
-			DB: 'app-postgres'
+			DB: {
+				name: 'app-postgres',
+				localConnectionString: 'postgres://user:pass@localhost:5432/app'
+			}
 		}
 	}
 })
@@ -10176,19 +10081,25 @@ Keep product limits, remote ownership, and fallback behavior visible in the code
 
 ##### Key points
 
-- Once this route works, the next step is usually a targeted integration with the actual PostgreSQL driver and database path you plan to use.
-- This example is intentionally smaller than D1 because the repo evidence for Hyperdrive local ergonomics is also smaller.
+- Install the client with `bun add postgres` and point `localConnectionString` at a local or CI Postgres database.
 
-##### Example — Expose the binding shape you will use later
+##### Example — Read one product through Hyperdrive
 
 ```ts
-import { env } from 'devflare/runtime'
+import postgres from 'postgres'
+import { env, getFetchEvent } from 'devflare/runtime'
+
+const sql = postgres(env.DB.connectionString)
 
 export async function fetch(): Promise<Response> {
-	return Response.json({
-		hasBinding: Boolean(env.DB),
-		hasConnectionString: Boolean(env.DB?.connectionString)
-	})
+	const event = getFetchEvent()
+	const slug = new URL(event.request.url).searchParams.get('slug') ?? 'starter-kit'
+	const [product] = await sql.unsafe(
+		'select slug, name, price_cents from products where slug = $1 limit 1',
+		[slug]
+	)
+
+	return product ? Response.json(product) : new Response('not found', { status: 404 })
 }
 ```
 
@@ -10197,12 +10108,12 @@ export async function fetch(): Promise<Response> {
 ##### Key points
 
 - Config focus: Stable Hyperdrive naming.
-- Runtime shape: Read connection information from the binding.
-- Best use: Health checks and first integration wiring.
+- Runtime shape: Query through `env.DB.connectionString`.
+- Best use: Product, order, account, or tenant data stored in PostgreSQL.
 
-> **Note — A smaller example is a more truthful example**
+> **Note — Use a real local database**
 >
-> The point here is to show the real binding contract the worker receives, not to imply more local guarantees than the repo currently proves.
+> Hyperdrive local support means Devflare can pass the connection path through the binding. It does not create or seed PostgreSQL for you.
 
 ---
 
@@ -10227,7 +10138,7 @@ The platform limit is still real — exactly one browser binding — but Devflar
 | Authoring shape | `Record<string, string> with exactly one entry` |
 | Best for | PDF generation, screenshots, and other worker-side headless browser tasks |
 
-#### Author it in the simplest shape that still says what you mean
+#### Add the binding to config
 
 Browser Rendering looks a little unusual in config because the current contract is a named map with exactly one entry. The env key matters more than the configured string value that appears beside it.
 
@@ -10254,7 +10165,7 @@ export default defineConfig({
 
 After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first Browser Rendering path close to the route, handler, or service method that needs it.
 
-Keep this first path small enough that the binding contract stays visible during code review.
+Keep this first path small enough that the config, env binding, and user-visible behavior are easy to review together.
 
 ##### Example — Read one page title with Puppeteer
 
@@ -10277,15 +10188,11 @@ export async function fetch(): Promise<Response> {
 
 #### Local and Remote Support
 
-Support level: `Remote`. Remote support means Devflare supports the config, generated env shape, docs, and local application-flow work, but full fidelity requires Cloudflare remote infrastructure. Use local shims or fixtures for code your app owns, then connect to Cloudflare when the product behavior is the assertion.
+Devflare can run useful Browser Rendering application behavior locally for ordinary development and tests. Cloudflare still owns production limits, quotas, billing, and deployed account behavior.
 
-Supported, but the strongest story is dev server and integration rather than a dedicated test helper.
+Local support is the Devflare browser-rendering shim: the dev server starts a loopback-only browser bridge and binding worker that browser libraries can call during local development. Treat it as a practical local/dev path, then use Cloudflare for hosted Browser Rendering limits, session behavior, and product fidelity.
 
-##### Highlights
-
-- **Remote support** — Remote support means Devflare supports the config, generated env shape, docs, and local application-flow work, but full fidelity requires Cloudflare remote infrastructure. Use local shims or fixtures for code your app owns, then connect to Cloudflare when the product behavior is the assertion.
-- **What works without Cloudflare** — Local support is the Devflare browser-rendering shim: the dev server starts a loopback-only browser bridge and binding worker that browser libraries can call during local development. Treat it as a practical local/dev path, then use Cloudflare for hosted Browser Rendering limits, session behavior, and product fidelity.
-- **When to connect to Cloudflare** — Use Cloudflare when a real browser workflow is mission-critical or too heavy for ordinary test runs. This is the lane for full Browser Rendering product fidelity, remote state, lifecycle behavior, and platform-specific limits.
+Use Cloudflare when the assertion depends on deployed limits, account state, lifecycle behavior, billing, or other production-only Browser Rendering details.
 
 #### When this binding fits best
 
@@ -10295,7 +10202,7 @@ Supported, but the strongest story is dev server and integration rather than a d
 - Keep browser usage narrow and explicit because browser work is usually heavier than normal request handling.
 - If a feature can be expressed as a plain fetch or HTML transform, it probably should be.
 
-#### Notes worth keeping visible
+#### Testing path
 
 ##### Key points
 
@@ -10307,29 +10214,13 @@ Supported, but the strongest story is dev server and integration rather than a d
 >
 > If you configure more than one browser binding, schema validation rejects it because the underlying Wrangler contract only supports one.
 
-#### Cloudflare docs vs the Devflare layer
-
-Cloudflare Browser Rendering docs is the platform reference. This page is the Devflare translation layer: keep `bindings.browser` readable in source, understand the typed env surface, and know which local, preview, or remote lane actually matches the binding.
+#### Open the next page when you need it
 
 ##### Highlights
 
-- **Cloudflare Browser Rendering docs** — Platform reference for browser sessions, quick actions, automation limits, and integration methods. ([link](https://developers.cloudflare.com/browser-rendering/workers-bindings/))
-
-##### Reference table
-
-| Question | Cloudflare docs | This Devflare page |
-| --- | --- | --- |
-| Primary focus | Platform reference for browser sessions, quick actions, automation limits, and integration methods. | How to author `bindings.browser`, what the runtime surface looks like, and how Browser Rendering fits a Devflare project. |
-| Testing and runtime lens | Cloudflare’s docs focus on the raw binding API, product semantics, and platform limits for the binding itself. | Supported, but the strongest story is dev server and integration rather than a dedicated test helper. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
-| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
-
-#### Go deeper only if this one-page guide stops being enough
-
-##### Highlights
-
-- **Browser Rendering internals** — See normalization, Wrangler `browser` binding, and the preview or runtime details behind the authored shape. ([link](/docs/bindings/browser-rendering/internals))
-- **Testing Browser Rendering** — Start from A narrow browser route exercised through the dev server, a preview URL, or another integration-style path and only escalate when the binding or deployment model genuinely needs it. ([link](/docs/bindings/browser-rendering/testing))
-- **Browser Rendering example** — Adapt one small end-to-end path before you hide the binding behind a bigger abstraction. ([link](/docs/bindings/browser-rendering/example))
+- **Browser Rendering internals** — Check emitted Wrangler `browser` binding, preview behavior, and Cloudflare-specific details. ([link](/docs/bindings/browser-rendering/internals))
+- **Testing Browser Rendering** — Pick the A narrow browser route exercised through the dev server, a preview URL, or another integration-style path path first, then move to remote checks only when the test needs them. ([link](/docs/bindings/browser-rendering/testing))
+- **Browser Rendering example** — Copy a fuller application path when the quick example is too small. ([link](/docs/bindings/browser-rendering/example))
 
 ---
 
@@ -10354,15 +10245,15 @@ That implementation detail is why the binding belongs in the docs library even t
 | Compile target | Wrangler `browser` binding |
 | Preview note | Preview can materialize the binding name, but browser resources are not lifecycle-managed account resources |
 
-#### Devflare normalizes the authored shape before it does anything louder
+#### How authored config becomes Wrangler config
 
 The browser binding schema accepts a record but then validates that only one key exists. Devflare treats that key as the meaningful env binding name and compiles it into the single `browser.binding` entry Wrangler expects.
 
 Emphasize the env key and the single-binding limit rather than implying the string value behaves like a normal bucket or namespace resource.
 
-##### Example — Browser Rendering from authored config to generated output
+##### Example — Browser Rendering config and emitted Wrangler output
 
-Keep the binding readable in source, then inspect only the Wrangler-facing slice Devflare emits when the config is compiled.
+Use this when you need to check how the Devflare config becomes Wrangler-compatible config.
 
 ###### File — devflare.config.ts
 
@@ -10389,7 +10280,7 @@ export default defineConfig({
 }
 ```
 
-#### Local runtime support depends on what Devflare can model directly
+#### What local runtime support covers
 
 ##### Key points
 
@@ -10411,6 +10302,22 @@ export default defineConfig({
 > The dev-side endpoint Devflare exposes for `@cloudflare/puppeteer` is the **local browser-rendering shim**. It accepts only loopback browser origins (e.g. `http://127.0.0.1:*`, `http://localhost:*`) plus origin-less tool traffic such as Puppeteer or curl.
 >
 > This loopback-only posture is the security model of the shim itself — it is devflare’s protected helper endpoint for the local Browser Rendering binding. It is **not** a policy applied to your normal worker routes; user app routes still follow whatever request and CORS rules the worker code itself defines.
+
+#### Cloudflare docs vs the Devflare layer
+
+Cloudflare Browser Rendering docs is the platform reference. Use this internals page when you need to compare Cloudflare's product docs with Devflare config, generated env types, local support, and preview behavior for `bindings.browser`.
+
+##### Highlights
+
+- **Cloudflare Browser Rendering docs** — Platform reference for browser sessions, quick actions, automation limits, and integration methods. ([link](https://developers.cloudflare.com/browser-rendering/workers-bindings/))
+
+##### Reference table
+
+| Question | Cloudflare docs | This Devflare page |
+| --- | --- | --- |
+| Primary focus | Platform reference for browser sessions, quick actions, automation limits, and integration methods. | How to author `bindings.browser`, what the runtime surface looks like, and how Browser Rendering fits a Devflare project. |
+| Testing and runtime lens | Cloudflare’s docs focus on the raw binding API, product semantics, and platform limits for the binding itself. | Supported, but the strongest story is dev server and integration rather than a dedicated test helper. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
+| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
 
 ---
 
@@ -10584,7 +10491,7 @@ That usually means two good habits: keep the write path simple in the worker, an
 | Authoring shape | `Record<string, { dataset: string }>` |
 | Best for | Structured analytics or event logging inside worker code |
 
-#### Author it in the simplest shape that still says what you mean
+#### Add the binding to config
 
 The Analytics Engine binding is conceptually simple: pick a dataset name and write data points to it from the worker path that owns the event.
 
@@ -10611,7 +10518,7 @@ export default defineConfig({
 
 After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first Analytics Engine path close to the route, handler, or service method that needs it.
 
-Keep this first path small enough that the binding contract stays visible during code review.
+Keep this first path small enough that the config, env binding, and user-visible behavior are easy to review together.
 
 ##### Example — Write one analytics point in the worker
 
@@ -10630,15 +10537,11 @@ export async function fetch(): Promise<Response> {
 
 #### Local and Remote Support
 
-Support level: `Remote`. Remote support means Devflare supports the config, generated env shape, docs, and local application-flow work, but full fidelity requires Cloudflare remote infrastructure. Use local shims or fixtures for code your app owns, then connect to Cloudflare when the product behavior is the assertion.
+Devflare supports the config, generated env shape, docs, and local application-flow work, but full fidelity requires Cloudflare remote infrastructure. Use local shims or fixtures for code your app owns, then connect to Cloudflare when the product behavior is the assertion.
 
-Supported, but usually tested through integration or thin mocks.
+Supported, but usually tested through integration or thin mocks. Keep local coverage focused on deterministic application flow through fixtures, mocks, shims, or Miniflare-backed wiring instead of pretending to reproduce Cloudflare-hosted product behavior.
 
-##### Highlights
-
-- **Remote support** — Remote support means Devflare supports the config, generated env shape, docs, and local application-flow work, but full fidelity requires Cloudflare remote infrastructure. Use local shims or fixtures for code your app owns, then connect to Cloudflare when the product behavior is the assertion.
-- **What works without Cloudflare** — Supported, but usually tested through integration or thin mocks. Keep local coverage focused on deterministic application flow through fixtures, mocks, shims, or Miniflare-backed wiring instead of pretending to reproduce Cloudflare-hosted product behavior.
-- **When to connect to Cloudflare** — Use Cloudflare when analytics delivery itself is a release-critical guarantee. This is the lane for full Analytics Engine product fidelity, remote state, lifecycle behavior, and platform-specific limits.
+Use Cloudflare when analytics delivery itself is a release-critical guarantee. This is the lane for full Analytics Engine product fidelity, remote state, lifecycle behavior, and platform-specific limits.
 
 #### When this binding fits best
 
@@ -10648,7 +10551,7 @@ Supported, but usually tested through integration or thin mocks.
 - Keep analytics writes narrow and explicit so they stay easy to review.
 - If the data is really application state, it probably belongs in D1 or another durable store instead of analytics.
 
-#### Notes worth keeping visible
+#### Testing path
 
 ##### Key points
 
@@ -10660,29 +10563,13 @@ Supported, but usually tested through integration or thin mocks.
 >
 > Document the write contract clearly and keep the testing story light. That is more useful than inventing an elaborate fake dataset universe.
 
-#### Cloudflare docs vs the Devflare layer
-
-Cloudflare Workers Analytics Engine docs is the platform reference. This page is the Devflare translation layer: keep `bindings.analyticsEngine` readable in source, understand the typed env surface, and know which local, preview, or remote lane actually matches the binding.
+#### Open the next page when you need it
 
 ##### Highlights
 
-- **Cloudflare Workers Analytics Engine docs** — Platform reference for write APIs, SQL querying, analytics ingestion patterns, and product limits. ([link](https://developers.cloudflare.com/analytics/analytics-engine/))
-
-##### Reference table
-
-| Question | Cloudflare docs | This Devflare page |
-| --- | --- | --- |
-| Primary focus | Platform reference for write APIs, SQL querying, analytics ingestion patterns, and product limits. | How to author `bindings.analyticsEngine`, what the runtime surface looks like, and how Analytics Engine fits a Devflare project. |
-| Testing and runtime lens | Cloudflare’s docs focus on the raw binding API, product semantics, and platform limits for the binding itself. | Supported, but usually tested through integration or thin mocks. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
-| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
-
-#### Go deeper only if this one-page guide stops being enough
-
-##### Highlights
-
-- **Analytics Engine internals** — See normalization, Wrangler `analytics_engine_datasets`, and the preview or runtime details behind the authored shape. ([link](/docs/bindings/analytics-engine/internals))
-- **Testing Analytics Engine** — Start from A thin worker test or explicit mock around `writeDataPoint()` and only escalate when the binding or deployment model genuinely needs it. ([link](/docs/bindings/analytics-engine/testing))
-- **Analytics Engine example** — Adapt one small end-to-end path before you hide the binding behind a bigger abstraction. ([link](/docs/bindings/analytics-engine/example))
+- **Analytics Engine internals** — Check emitted Wrangler `analytics_engine_datasets`, preview behavior, and Cloudflare-specific details. ([link](/docs/bindings/analytics-engine/internals))
+- **Testing Analytics Engine** — Pick the A thin worker test or explicit mock around `writeDataPoint()` path first, then move to remote checks only when the test needs them. ([link](/docs/bindings/analytics-engine/testing))
+- **Analytics Engine example** — Copy a fuller application path when the quick example is too small. ([link](/docs/bindings/analytics-engine/example))
 
 ---
 
@@ -10707,15 +10594,15 @@ That is the core reason the docs should separate it from storage bindings: the w
 | Compile target | Wrangler `analytics_engine_datasets` |
 | Preview note | Preview names can change, but Devflare does not provision or delete Analytics Engine datasets for you |
 
-#### Devflare normalizes the authored shape before it does anything louder
+#### How authored config becomes Wrangler config
 
 Analytics Engine bindings are a small schema surface: a binding name maps to a dataset name. That keeps authored config simple and predictable.
 
 The more important implementation detail is that datasets are not managed like KV namespaces or buckets. They come to life on write, so preview lifecycle support looks different.
 
-##### Example — Analytics Engine from authored config to generated output
+##### Example — Analytics Engine config and emitted Wrangler output
 
-Keep the binding readable in source, then inspect only the Wrangler-facing slice Devflare emits when the config is compiled.
+Use this when you need to check how the Devflare config becomes Wrangler-compatible config.
 
 ###### File — devflare.config.ts
 
@@ -10744,7 +10631,7 @@ export default defineConfig({
 }
 ```
 
-#### Local runtime support depends on what Devflare can model directly
+#### What local runtime support covers
 
 ##### Key points
 
@@ -10763,6 +10650,22 @@ export default defineConfig({
 > **Warning — Name changes do not imply resource management**
 >
 > Preview-scoped naming is useful, but it does not mean Devflare owns the full dataset lifecycle the way it can for KV, D1, or queues.
+
+#### Cloudflare docs vs the Devflare layer
+
+Cloudflare Workers Analytics Engine docs is the platform reference. Use this internals page when you need to compare Cloudflare's product docs with Devflare config, generated env types, local support, and preview behavior for `bindings.analyticsEngine`.
+
+##### Highlights
+
+- **Cloudflare Workers Analytics Engine docs** — Platform reference for write APIs, SQL querying, analytics ingestion patterns, and product limits. ([link](https://developers.cloudflare.com/analytics/analytics-engine/))
+
+##### Reference table
+
+| Question | Cloudflare docs | This Devflare page |
+| --- | --- | --- |
+| Primary focus | Platform reference for write APIs, SQL querying, analytics ingestion patterns, and product limits. | How to author `bindings.analyticsEngine`, what the runtime surface looks like, and how Analytics Engine fits a Devflare project. |
+| Testing and runtime lens | Cloudflare’s docs focus on the raw binding API, product semantics, and platform limits for the binding itself. | Supported, but usually tested through integration or thin mocks. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
+| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
 
 ---
 
@@ -10937,7 +10840,7 @@ That distinction matters because outbound email is a binding you call from worke
 | Authoring shape | `Record<string, { destinationAddress?; allowedDestinationAddresses?; allowedSenderAddresses? }>` |
 | Best for | Outbound notification email and controlled email-sending paths from worker code |
 
-#### Author it in the simplest shape that still says what you mean
+#### Add the binding to config
 
 Send Email bindings are easiest to trust when the allowed addresses are visible in config rather than buried in some last-minute secret or helper wrapper.
 
@@ -10968,7 +10871,7 @@ export default defineConfig({
 
 After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first Send Email path close to the route, handler, or service method that needs it.
 
-Keep this first path small enough that the binding contract stays visible during code review.
+Keep this first path small enough that the config, env binding, and user-visible behavior are easy to review together.
 
 ##### Example — Send one email from the worker
 
@@ -10989,15 +10892,11 @@ export async function fetch(): Promise<Response> {
 
 #### Local and Remote Support
 
-Support level: `Full`. Full local support means Devflare can run useful Send Email application behavior locally for ordinary development and tests. Cloudflare still owns production limits, quotas, billing, and deployed account behavior.
+Devflare can run useful Send Email application behavior locally for ordinary development and tests. Cloudflare still owns production limits, quotas, billing, and deployed account behavior.
 
-Outbound local support; distinct from inbound email event testing.
+Outbound local support; distinct from inbound email event testing. Start locally with `createTestContext()` plus `env.TRANSACTIONAL_EMAIL.send(...)`; that lane should cover the normal Send Email application flow without requiring a Cloudflare connection.
 
-##### Highlights
-
-- **Full support** — Full local support means Devflare can run useful Send Email application behavior locally for ordinary development and tests. Cloudflare still owns production limits, quotas, billing, and deployed account behavior.
-- **What works without Cloudflare** — Outbound local support; distinct from inbound email event testing. Start locally with `createTestContext()` plus `env.TRANSACTIONAL_EMAIL.send(...)`; that lane should cover the normal Send Email application flow without requiring a Cloudflare connection.
-- **When to connect to Cloudflare** — Use Cloudflare when the assertion depends on deployed limits, account state, lifecycle behavior, billing, or other production-only Send Email details.
+Use Cloudflare when the assertion depends on deployed limits, account state, lifecycle behavior, billing, or other production-only Send Email details.
 
 #### When this binding fits best
 
@@ -11007,7 +10906,7 @@ Outbound local support; distinct from inbound email event testing.
 - Keep address restrictions explicit so the worker cannot quietly send anywhere it pleases.
 - Do not confuse outbound send-email bindings with inbound email processing handlers.
 
-#### Notes worth keeping visible
+#### Testing path
 
 ##### Key points
 
@@ -11019,29 +10918,13 @@ Outbound local support; distinct from inbound email event testing.
 >
 > `env.TRANSACTIONAL_EMAIL.send(...)` and `src/email.ts` handler tests are connected by the domain, but they are different contracts and should be documented that way.
 
-#### Cloudflare docs vs the Devflare layer
-
-Cloudflare send_email binding docs is the platform reference. This page is the Devflare translation layer: keep `bindings.sendEmail` readable in source, understand the typed env surface, and know which local, preview, or remote lane actually matches the binding.
+#### Open the next page when you need it
 
 ##### Highlights
 
-- **Cloudflare send_email binding docs** — Platform reference for send_email binding restrictions, verified destinations, and Email Workers setup. ([link](https://developers.cloudflare.com/email-routing/email-workers/send-email-workers/))
-
-##### Reference table
-
-| Question | Cloudflare docs | This Devflare page |
-| --- | --- | --- |
-| Primary focus | Platform reference for send_email binding restrictions, verified destinations, and Email Workers setup. | How to author `bindings.sendEmail`, what the runtime surface looks like, and how Send Email fits a Devflare project. |
-| Testing and runtime lens | Cloudflare’s docs focus on the raw binding API, product semantics, and platform limits for the binding itself. | Outbound local support; distinct from inbound email event testing. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
-| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
-
-#### Go deeper only if this one-page guide stops being enough
-
-##### Highlights
-
-- **Send Email internals** — See normalization, Wrangler `send_email`, and the preview or runtime details behind the authored shape. ([link](/docs/bindings/send-email/internals))
-- **Testing Send Email** — Start from `createTestContext()` plus `env.TRANSACTIONAL_EMAIL.send(...)` and only escalate when the binding or deployment model genuinely needs it. ([link](/docs/bindings/send-email/testing))
-- **Send Email example** — Adapt one small end-to-end path before you hide the binding behind a bigger abstraction. ([link](/docs/bindings/send-email/example))
+- **Send Email internals** — Check emitted Wrangler `send_email`, preview behavior, and Cloudflare-specific details. ([link](/docs/bindings/send-email/internals))
+- **Testing Send Email** — Pick the `createTestContext()` plus `env.TRANSACTIONAL_EMAIL.send(...)` path first, then move to remote checks only when the test needs them. ([link](/docs/bindings/send-email/testing))
+- **Send Email example** — Copy a fuller application path when the quick example is too small. ([link](/docs/bindings/send-email/example))
 
 ---
 
@@ -11066,15 +10949,15 @@ That runtime normalization is worth calling out because it lets worker code send
 | Compile target | Wrangler `send_email` |
 | Preview note | Address rules compile as authored; there is no separate preview resource lifecycle for email destinations |
 
-#### Devflare normalizes the authored shape before it does anything louder
+#### How authored config becomes Wrangler config
 
 The schema work here is less about ids and more about safety rules: which addresses are permitted and which combinations are invalid.
 
 At runtime, Devflare can normalize higher-level email message shapes into raw MIME-backed delivery when the outbound path needs it.
 
-##### Example — Send Email from authored config to generated output
+##### Example — Send Email config and emitted Wrangler output
 
-Keep the binding readable in source, then inspect only the Wrangler-facing slice Devflare emits when the config is compiled.
+Use this when you need to check how the Devflare config becomes Wrangler-compatible config.
 
 ###### File — devflare.config.ts
 
@@ -11107,7 +10990,7 @@ export default defineConfig({
 }
 ```
 
-#### Local runtime support depends on what Devflare can model directly
+#### What local runtime support covers
 
 ##### Key points
 
@@ -11126,6 +11009,22 @@ export default defineConfig({
 > **Note — Safety rules are part of the binding**
 >
 > The point of the schema is not only to make email possible. It is also to keep where the worker may send email visible and reviewable.
+
+#### Cloudflare docs vs the Devflare layer
+
+Cloudflare send_email binding docs is the platform reference. Use this internals page when you need to compare Cloudflare's product docs with Devflare config, generated env types, local support, and preview behavior for `bindings.sendEmail`.
+
+##### Highlights
+
+- **Cloudflare send_email binding docs** — Platform reference for send_email binding restrictions, verified destinations, and Email Workers setup. ([link](https://developers.cloudflare.com/email-routing/email-workers/send-email-workers/))
+
+##### Reference table
+
+| Question | Cloudflare docs | This Devflare page |
+| --- | --- | --- |
+| Primary focus | Platform reference for send_email binding restrictions, verified destinations, and Email Workers setup. | How to author `bindings.sendEmail`, what the runtime surface looks like, and how Send Email fits a Devflare project. |
+| Testing and runtime lens | Cloudflare’s docs focus on the raw binding API, product semantics, and platform limits for the binding itself. | Outbound local support; distinct from inbound email event testing. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
+| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
 
 ---
 
@@ -11282,9 +11181,9 @@ export async function fetch(): Promise<Response> {
 
 ---
 
-### Use Rate Limiting with the smallest config that states the binding contract
+### Use Rate Limiting in a Worker
 
-> Configure Rate Limiting, call the `RateLimit` binding from worker code, and choose a test lane that matches the support level.
+> Add the Rate Limiting config, call `RateLimit` from worker code, and start with the local test path Devflare supports.
 
 | Field | Value |
 | --- | --- |
@@ -11303,11 +11202,11 @@ Start with the config, wire the binding into worker code, then use the support s
 | Authoring shape | `Record<string, { namespaceId; simple: { limit; period } }>` |
 | Best for | login throttles, per-user limits, and API guardrails that can use Cloudflare fixed windows |
 
-#### Author it in the simplest shape that still says what you mean
+#### Add the binding to config
 
-Start with the smallest readable `bindings.rateLimits` shape. If the feature needs a Cloudflare-created id or namespace, keep that explicit in config so reviewers can see where the remote boundary begins.
+Add `bindings.rateLimits` to `devflare.config.ts`, then use the generated env binding from Worker code.
 
-Use this page as the quick contract, then open the deeper internals/testing/example tabs only when the first recipe is not enough.
+Keep the first version close to the route or handler that needs it; move to a helper only after the shape is obvious.
 
 ##### Example — Smallest Rate Limiting config
 
@@ -11334,7 +11233,7 @@ export default defineConfig({
 
 After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first Rate Limiting path close to the route, handler, or service method that needs it.
 
-Keep this first path small enough that the binding contract stays visible during code review.
+Keep this first path small enough that the config, env binding, and user-visible behavior are easy to review together.
 
 ##### Example — Use the limiter in a request path
 
@@ -11355,15 +11254,11 @@ export async function fetch(request: Request): Promise<Response> {
 
 #### Local and Remote Support
 
-Support level: `Full`. Full local support means Devflare can run useful Rate Limiting application behavior locally for ordinary development and tests. Cloudflare still owns production limits, quotas, billing, and deployed account behavior.
+Devflare can run useful Rate Limiting application behavior locally for ordinary development and tests. Cloudflare still owns production limits, quotas, billing, and deployed account behavior.
 
-Offline-native: Miniflare and Devflare pure mocks can exercise application-level rate limit behavior.
+Offline-native: Miniflare and Devflare pure mocks can exercise application-level rate limit behavior. Start locally with `createTestContext()` or `createOfflineEnv()`; that lane should cover the normal Rate Limiting application flow without requiring a Cloudflare connection.
 
-##### Highlights
-
-- **Full support** — Full local support means Devflare can run useful Rate Limiting application behavior locally for ordinary development and tests. Cloudflare still owns production limits, quotas, billing, and deployed account behavior.
-- **What works without Cloudflare** — Offline-native: Miniflare and Devflare pure mocks can exercise application-level rate limit behavior. Start locally with `createTestContext()` or `createOfflineEnv()`; that lane should cover the normal Rate Limiting application flow without requiring a Cloudflare connection.
-- **When to connect to Cloudflare** — Use Cloudflare when the assertion depends on deployed limits, account state, lifecycle behavior, billing, or other production-only Rate Limiting details.
+Use Cloudflare when the assertion depends on deployed limits, account state, lifecycle behavior, billing, or other production-only Rate Limiting details.
 
 #### When this binding fits best
 
@@ -11373,41 +11268,21 @@ Offline-native: Miniflare and Devflare pure mocks can exercise application-level
 - Keep binding names stable and uppercase in examples so generated Env declarations remain predictable.
 - Prefer Devflare native config while it covers the feature; use `wrangler.passthrough` only for unsupported Wrangler-only fields.
 
-#### Notes worth keeping visible
+#### Testing path
 
 ##### Key points
 
-- Offline-native: Miniflare and Devflare pure mocks can exercise application-level rate limit behavior
-- Cloudflare owns account namespace ids and production enforcement, but the local limiter is useful for deterministic app tests.
-- For tests, start with `createTestContext()` or `createOfflineEnv()`; reach for `createMockRateLimit()` / `createMockEnv({ rateLimits })` when you want a pure unit test without Miniflare or Cloudflare.
+- Start with `createTestContext()` or `createOfflineEnv()` for config-backed local worker tests.
+- Use `createMockRateLimit()` / `createMockEnv({ rateLimits })` for small unit tests that only need deterministic application behavior.
+- Use Cloudflare-backed tests when the assertion depends on hosted platform behavior, account state, limits, billing, or production routing.
 
-> **Note — Document the boundary at the same time as the recipe**
->
-> The old docs often made developers infer whether Rate Limiting was local, remote, or fixture-backed. This page keeps that stance beside the first usable example.
-
-#### Cloudflare docs vs the Devflare layer
-
-Cloudflare Rate Limiting docs is the platform reference. This page is the Devflare translation layer: keep `bindings.rateLimits` readable in source, understand the typed env surface, and know which local, preview, or remote lane actually matches the binding.
+#### Open the next page when you need it
 
 ##### Highlights
 
-- **Cloudflare Rate Limiting docs** — Platform reference for rate limiting binding configuration, `limit()` calls, locality, and limits. ([link](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/))
-
-##### Reference table
-
-| Question | Cloudflare docs | This Devflare page |
-| --- | --- | --- |
-| Primary focus | Platform reference for rate limiting binding configuration, `limit()` calls, locality, and limits. | How to author `bindings.rateLimits`, what the runtime surface looks like, and how Rate Limiting fits a Devflare project. |
-| Testing and runtime lens | Cloudflare’s docs focus on the raw binding API, product semantics, and platform limits for the binding itself. | Offline-native: Miniflare and Devflare pure mocks can exercise application-level rate limit behavior. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
-| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
-
-#### Go deeper only if this one-page guide stops being enough
-
-##### Highlights
-
-- **Rate Limiting internals** — See normalization, Wrangler `ratelimits`, and the preview or runtime details behind the authored shape. ([link](/docs/bindings/rate-limiting/internals))
-- **Testing Rate Limiting** — Start from `createTestContext()` or `createOfflineEnv()` and only escalate when the binding or deployment model genuinely needs it. ([link](/docs/bindings/rate-limiting/testing))
-- **Rate Limiting example** — Adapt one small end-to-end path before you hide the binding behind a bigger abstraction. ([link](/docs/bindings/rate-limiting/example))
+- **Rate Limiting internals** — Check emitted Wrangler `ratelimits`, preview behavior, and Cloudflare-specific details. ([link](/docs/bindings/rate-limiting/internals))
+- **Testing Rate Limiting** — Pick the `createTestContext()` or `createOfflineEnv()` path first, then move to remote checks only when the test needs them. ([link](/docs/bindings/rate-limiting/testing))
+- **Rate Limiting example** — Copy a fuller application path when the quick example is too small. ([link](/docs/bindings/rate-limiting/example))
 
 ---
 
@@ -11422,7 +11297,7 @@ Cloudflare Rate Limiting docs is the platform reference. This page is the Devfla
 | Navigation title | Rate Limiting internals |
 | Eyebrow | Under the hood |
 
-The internals page is deliberately short: it shows the authored config beside the Wrangler-facing output and names the exact places where Devflare stops pretending to be Cloudflare.
+Use this page when you need emitted config, preview behavior, or Cloudflare-specific limits. The overview and example pages stay focused on everyday app code.
 
 #### At a glance
 
@@ -11432,15 +11307,15 @@ The internals page is deliberately short: it shows the authored config beside th
 | Compile target | Wrangler `ratelimits` |
 | Preview note | Cloudflare owns account namespace ids and production enforcement, but the local limiter is useful for deterministic app tests. |
 
-#### Devflare normalizes the authored shape before it does anything louder
+#### How authored config becomes Wrangler config
 
 The authored config stays camelCase and project-oriented. The compiler translates that into the Wrangler keys Cloudflare expects.
 
-The generated output is intentionally shown so the docs can be checked against real compiler behavior instead of relying on memory.
+The emitted output is shown here so the usage pages do not have to explain compiler details.
 
-##### Example — Rate Limiting from authored config to generated output
+##### Example — Rate Limiting config and emitted Wrangler output
 
-Keep the binding readable in source, then inspect only the Wrangler-facing slice Devflare emits when the config is compiled.
+Use this when you need to check how the Devflare config becomes Wrangler-compatible config.
 
 ###### File — devflare.config.ts
 
@@ -11473,7 +11348,7 @@ export default defineConfig({
 }
 ```
 
-#### Local runtime support depends on what Devflare can model directly
+#### What local runtime support covers
 
 ##### Key points
 
@@ -11488,6 +11363,22 @@ export default defineConfig({
 - Devflare emits Wrangler `ratelimits` from the native config surface.
 - Preview and deployment lifecycle stay feature-specific; do not assume all Cloudflare products can be created, cloned, or cleaned up the same way.
 - Cloudflare owns account namespace ids and production enforcement, but the local limiter is useful for deterministic app tests.
+
+#### Cloudflare docs vs the Devflare layer
+
+Cloudflare Rate Limiting docs is the platform reference. Use this internals page when you need to compare Cloudflare's product docs with Devflare config, generated env types, local support, and preview behavior for `bindings.rateLimits`.
+
+##### Highlights
+
+- **Cloudflare Rate Limiting docs** — Platform reference for rate limiting binding configuration, `limit()` calls, locality, and limits. ([link](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/))
+
+##### Reference table
+
+| Question | Cloudflare docs | This Devflare page |
+| --- | --- | --- |
+| Primary focus | Platform reference for rate limiting binding configuration, `limit()` calls, locality, and limits. | How to author `bindings.rateLimits`, what the runtime surface looks like, and how Rate Limiting fits a Devflare project. |
+| Testing and runtime lens | Cloudflare’s docs focus on the raw binding API, product semantics, and platform limits for the binding itself. | Offline-native: Miniflare and Devflare pure mocks can exercise application-level rate limit behavior. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
+| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
 
 ---
 
@@ -11643,9 +11534,9 @@ export async function fetch(request: Request): Promise<Response> {
 
 ---
 
-### Use Version Metadata with the smallest config that states the binding contract
+### Use Version Metadata in a Worker
 
-> Configure Version Metadata, call the `WorkerVersionMetadata` binding from worker code, and choose a test lane that matches the support level.
+> Add the Version Metadata config, call `WorkerVersionMetadata` from worker code, and start with the local test path Devflare supports.
 
 | Field | Value |
 | --- | --- |
@@ -11664,11 +11555,11 @@ Start with the config, wire the binding into worker code, then use the support s
 | Authoring shape | `{ binding: string }` |
 | Best for | responses, logs, and diagnostics that need the current Worker version id, tag, or timestamp |
 
-#### Author it in the simplest shape that still says what you mean
+#### Add the binding to config
 
-Start with the smallest readable `bindings.versionMetadata` shape. If the feature needs a Cloudflare-created id or namespace, keep that explicit in config so reviewers can see where the remote boundary begins.
+Add `bindings.versionMetadata` to `devflare.config.ts`, then use the generated env binding from Worker code.
 
-Use this page as the quick contract, then open the deeper internals/testing/example tabs only when the first recipe is not enough.
+Keep the first version close to the route or handler that needs it; move to a helper only after the shape is obvious.
 
 ##### Example — Smallest Version Metadata config
 
@@ -11689,7 +11580,7 @@ export default defineConfig({
 
 After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first Version Metadata path close to the route, handler, or service method that needs it.
 
-Keep this first path small enough that the binding contract stays visible during code review.
+Keep this first path small enough that the config, env binding, and user-visible behavior are easy to review together.
 
 ##### Example — Return the current version tag
 
@@ -11706,15 +11597,11 @@ export async function fetch(): Promise<Response> {
 
 #### Local and Remote Support
 
-Support level: `Full`. Full local support means Devflare can run useful Version Metadata application behavior locally for ordinary development and tests. Cloudflare still owns production limits, quotas, billing, and deployed account behavior.
+Devflare can run useful Version Metadata application behavior locally for ordinary development and tests. Cloudflare still owns production limits, quotas, billing, and deployed account behavior.
 
-Offline-native: Devflare can provide deterministic local metadata without Cloudflare state.
+Offline-native: Devflare can provide deterministic local metadata without Cloudflare state. Start locally with `createTestContext()` or `createOfflineEnv()`; that lane should cover the normal Version Metadata application flow without requiring a Cloudflare connection.
 
-##### Highlights
-
-- **Full support** — Full local support means Devflare can run useful Version Metadata application behavior locally for ordinary development and tests. Cloudflare still owns production limits, quotas, billing, and deployed account behavior.
-- **What works without Cloudflare** — Offline-native: Devflare can provide deterministic local metadata without Cloudflare state. Start locally with `createTestContext()` or `createOfflineEnv()`; that lane should cover the normal Version Metadata application flow without requiring a Cloudflare connection.
-- **When to connect to Cloudflare** — Use Cloudflare when the assertion depends on deployed limits, account state, lifecycle behavior, billing, or other production-only Version Metadata details.
+Use Cloudflare when the assertion depends on deployed limits, account state, lifecycle behavior, billing, or other production-only Version Metadata details.
 
 #### When this binding fits best
 
@@ -11724,41 +11611,21 @@ Offline-native: Devflare can provide deterministic local metadata without Cloudf
 - Keep binding names stable and uppercase in examples so generated Env declarations remain predictable.
 - Prefer Devflare native config while it covers the feature; use `wrangler.passthrough` only for unsupported Wrangler-only fields.
 
-#### Notes worth keeping visible
+#### Testing path
 
 ##### Key points
 
-- Offline-native: Devflare can provide deterministic local metadata without Cloudflare state
-- Cloudflare supplies real deployment metadata; local tests should assert deterministic fallback behavior only.
-- For tests, start with `createTestContext()` or `createOfflineEnv()`; reach for `createMockVersionMetadata()` / `createMockEnv({ versionMetadata })` when you want a pure unit test without Miniflare or Cloudflare.
+- Start with `createTestContext()` or `createOfflineEnv()` for config-backed local worker tests.
+- Use `createMockVersionMetadata()` / `createMockEnv({ versionMetadata })` for small unit tests that only need deterministic application behavior.
+- Use Cloudflare-backed tests when the assertion depends on hosted platform behavior, account state, limits, billing, or production routing.
 
-> **Note — Document the boundary at the same time as the recipe**
->
-> The old docs often made developers infer whether Version Metadata was local, remote, or fixture-backed. This page keeps that stance beside the first usable example.
-
-#### Cloudflare docs vs the Devflare layer
-
-Cloudflare Version Metadata docs is the platform reference. This page is the Devflare translation layer: keep `bindings.versionMetadata` readable in source, understand the typed env surface, and know which local, preview, or remote lane actually matches the binding.
+#### Open the next page when you need it
 
 ##### Highlights
 
-- **Cloudflare Version Metadata docs** — Platform reference for Worker version id, version tag, and version timestamp bindings. ([link](https://developers.cloudflare.com/workers/runtime-apis/bindings/version-metadata/))
-
-##### Reference table
-
-| Question | Cloudflare docs | This Devflare page |
-| --- | --- | --- |
-| Primary focus | Platform reference for Worker version id, version tag, and version timestamp bindings. | How to author `bindings.versionMetadata`, what the runtime surface looks like, and how Version Metadata fits a Devflare project. |
-| Testing and runtime lens | Cloudflare’s docs focus on the raw binding API, product semantics, and platform limits for the binding itself. | Offline-native: Devflare can provide deterministic local metadata without Cloudflare state. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
-| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
-
-#### Go deeper only if this one-page guide stops being enough
-
-##### Highlights
-
-- **Version Metadata internals** — See normalization, Wrangler `version_metadata`, and the preview or runtime details behind the authored shape. ([link](/docs/bindings/version-metadata/internals))
-- **Testing Version Metadata** — Start from `createTestContext()` or `createOfflineEnv()` and only escalate when the binding or deployment model genuinely needs it. ([link](/docs/bindings/version-metadata/testing))
-- **Version Metadata example** — Adapt one small end-to-end path before you hide the binding behind a bigger abstraction. ([link](/docs/bindings/version-metadata/example))
+- **Version Metadata internals** — Check emitted Wrangler `version_metadata`, preview behavior, and Cloudflare-specific details. ([link](/docs/bindings/version-metadata/internals))
+- **Testing Version Metadata** — Pick the `createTestContext()` or `createOfflineEnv()` path first, then move to remote checks only when the test needs them. ([link](/docs/bindings/version-metadata/testing))
+- **Version Metadata example** — Copy a fuller application path when the quick example is too small. ([link](/docs/bindings/version-metadata/example))
 
 ---
 
@@ -11773,7 +11640,7 @@ Cloudflare Version Metadata docs is the platform reference. This page is the Dev
 | Navigation title | Version Metadata internals |
 | Eyebrow | Under the hood |
 
-The internals page is deliberately short: it shows the authored config beside the Wrangler-facing output and names the exact places where Devflare stops pretending to be Cloudflare.
+Use this page when you need emitted config, preview behavior, or Cloudflare-specific limits. The overview and example pages stay focused on everyday app code.
 
 #### At a glance
 
@@ -11783,15 +11650,15 @@ The internals page is deliberately short: it shows the authored config beside th
 | Compile target | Wrangler `version_metadata` |
 | Preview note | Cloudflare supplies real deployment metadata; local tests should assert deterministic fallback behavior only. |
 
-#### Devflare normalizes the authored shape before it does anything louder
+#### How authored config becomes Wrangler config
 
 The authored config stays camelCase and project-oriented. The compiler translates that into the Wrangler keys Cloudflare expects.
 
-The generated output is intentionally shown so the docs can be checked against real compiler behavior instead of relying on memory.
+The emitted output is shown here so the usage pages do not have to explain compiler details.
 
-##### Example — Version Metadata from authored config to generated output
+##### Example — Version Metadata config and emitted Wrangler output
 
-Keep the binding readable in source, then inspect only the Wrangler-facing slice Devflare emits when the config is compiled.
+Use this when you need to check how the Devflare config becomes Wrangler-compatible config.
 
 ###### File — devflare.config.ts
 
@@ -11818,7 +11685,7 @@ export default defineConfig({
 }
 ```
 
-#### Local runtime support depends on what Devflare can model directly
+#### What local runtime support covers
 
 ##### Key points
 
@@ -11833,6 +11700,22 @@ export default defineConfig({
 - Devflare emits Wrangler `version_metadata` from the native config surface.
 - Preview and deployment lifecycle stay feature-specific; do not assume all Cloudflare products can be created, cloned, or cleaned up the same way.
 - Cloudflare supplies real deployment metadata; local tests should assert deterministic fallback behavior only.
+
+#### Cloudflare docs vs the Devflare layer
+
+Cloudflare Version Metadata docs is the platform reference. Use this internals page when you need to compare Cloudflare's product docs with Devflare config, generated env types, local support, and preview behavior for `bindings.versionMetadata`.
+
+##### Highlights
+
+- **Cloudflare Version Metadata docs** — Platform reference for Worker version id, version tag, and version timestamp bindings. ([link](https://developers.cloudflare.com/workers/runtime-apis/bindings/version-metadata/))
+
+##### Reference table
+
+| Question | Cloudflare docs | This Devflare page |
+| --- | --- | --- |
+| Primary focus | Platform reference for Worker version id, version tag, and version timestamp bindings. | How to author `bindings.versionMetadata`, what the runtime surface looks like, and how Version Metadata fits a Devflare project. |
+| Testing and runtime lens | Cloudflare’s docs focus on the raw binding API, product semantics, and platform limits for the binding itself. | Offline-native: Devflare can provide deterministic local metadata without Cloudflare state. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
+| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
 
 ---
 
@@ -11973,9 +11856,9 @@ export async function fetch(): Promise<Response> {
 
 ---
 
-### Use Worker Loaders with the smallest config that states the binding contract
+### Use Worker Loaders in a Worker
 
-> Configure Worker Loaders, call the `WorkerLoader` binding from worker code, and choose a test lane that matches the support level.
+> Add the Worker Loaders config, call `WorkerLoader` from worker code, and start with the local test path Devflare supports.
 
 | Field | Value |
 | --- | --- |
@@ -11994,11 +11877,11 @@ Start with the config, wire the binding into worker code, then use the support s
 | Authoring shape | `Record<string, {}>` |
 | Best for | Dynamic Workers where the app loads Worker code at runtime from an explicit source |
 
-#### Author it in the simplest shape that still says what you mean
+#### Add the binding to config
 
-Start with the smallest readable `bindings.workerLoaders` shape. If the feature needs a Cloudflare-created id or namespace, keep that explicit in config so reviewers can see where the remote boundary begins.
+Add `bindings.workerLoaders` to `devflare.config.ts`, then use the generated env binding from Worker code.
 
-Use this page as the quick contract, then open the deeper internals/testing/example tabs only when the first recipe is not enough.
+Keep the first version close to the route or handler that needs it; move to a helper only after the shape is obvious.
 
 ##### Example — Smallest Worker Loader config
 
@@ -12019,7 +11902,7 @@ export default defineConfig({
 
 After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first Worker Loaders path close to the route, handler, or service method that needs it.
 
-Keep this first path small enough that the binding contract stays visible during code review.
+Keep this first path small enough that the config, env binding, and user-visible behavior are easy to review together.
 
 ##### Example — Load an explicit Worker payload
 
@@ -12041,15 +11924,11 @@ export async function fetch(request: Request): Promise<Response> {
 
 #### Local and Remote Support
 
-Support level: `Limited`. Limited support means Devflare has a real lane for Worker Loaders, but the local contract is intentionally narrower than Cloudflare's hosted product. The docs call out the supported local path and the remote boundary separately.
+Devflare can run useful Worker Loaders application behavior locally for ordinary development and tests. Cloudflare still owns production limits, quotas, billing, and deployed account behavior.
 
-Offline-fixture: the binding exists locally, but tests should supply a Worker stub when behavior matters.
+Full local support through Miniflare Worker Loader bindings and explicit pure-test Worker stubs. Start locally with `createTestContext()` with explicit Worker payloads or a pure stub; that lane should cover the normal Worker Loaders application flow without requiring a Cloudflare connection.
 
-##### Highlights
-
-- **Limited support** — Limited support means Devflare has a real lane for Worker Loaders, but the local contract is intentionally narrower than Cloudflare's hosted product. The docs call out the supported local path and the remote boundary separately.
-- **What works without Cloudflare** — Offline-fixture: the binding exists locally, but tests should supply a Worker stub when behavior matters. Use the documented local lane only for the behavior Devflare explicitly models, and keep the narrower boundary visible in code review.
-- **When to connect to Cloudflare** — Use Cloudflare when the assertion depends on cloudflare-hosted product behavior rather than the app calling the binding correctly. This is the lane for full Worker Loaders product fidelity, remote state, lifecycle behavior, and platform-specific limits.
+Use Cloudflare when the assertion depends on deployed limits, account state, lifecycle behavior, billing, or other production-only Worker Loaders details.
 
 #### When this binding fits best
 
@@ -12059,41 +11938,21 @@ Offline-fixture: the binding exists locally, but tests should supply a Worker st
 - Keep binding names stable and uppercase in examples so generated Env declarations remain predictable.
 - Prefer Devflare native config while it covers the feature; use `wrangler.passthrough` only for unsupported Wrangler-only fields.
 
-#### Notes worth keeping visible
+#### Testing path
 
 ##### Key points
 
-- Offline-fixture: the binding exists locally, but tests should supply a Worker stub when behavior matters
-- Devflare wires the binding; it does not bundle, upload, discover, or provision dynamic Worker payloads for you.
-- For tests, start with `createTestContext()` with explicit Worker payloads or a pure stub; reach for `createMockWorkerLoader()` / `createMockEnv({ workerLoaders })` when you want a pure unit test without Miniflare or Cloudflare.
+- Start with `createTestContext()` with explicit Worker payloads or a pure stub for config-backed local worker tests.
+- Use `createMockWorkerLoader()` / `createMockEnv({ workerLoaders })` for small unit tests that only need deterministic application behavior.
+- Use Cloudflare-backed tests when the assertion depends on hosted platform behavior, account state, limits, billing, or production routing.
 
-> **Note — Document the boundary at the same time as the recipe**
->
-> The old docs often made developers infer whether Worker Loaders was local, remote, or fixture-backed. This page keeps that stance beside the first usable example.
-
-#### Cloudflare docs vs the Devflare layer
-
-Cloudflare Dynamic Worker Loaders docs is the platform reference. This page is the Devflare translation layer: keep `bindings.workerLoaders` readable in source, understand the typed env surface, and know which local, preview, or remote lane actually matches the binding.
+#### Open the next page when you need it
 
 ##### Highlights
 
-- **Cloudflare Dynamic Worker Loaders docs** — Platform reference for loading dynamic Workers and arbitrary Worker code at runtime. ([link](https://developers.cloudflare.com/workers/runtime-apis/bindings/worker-loader/))
-
-##### Reference table
-
-| Question | Cloudflare docs | This Devflare page |
-| --- | --- | --- |
-| Primary focus | Platform reference for loading dynamic Workers and arbitrary Worker code at runtime. | How to author `bindings.workerLoaders`, what the runtime surface looks like, and how Worker Loaders fits a Devflare project. |
-| Testing and runtime lens | Cloudflare’s docs focus on the raw binding API, product semantics, and platform limits for the binding itself. | Offline-fixture: the binding exists locally, but tests should supply a Worker stub when behavior matters. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
-| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
-
-#### Go deeper only if this one-page guide stops being enough
-
-##### Highlights
-
-- **Worker Loaders internals** — See normalization, Wrangler `worker_loaders`, and the preview or runtime details behind the authored shape. ([link](/docs/bindings/worker-loaders/internals))
-- **Testing Worker Loaders** — Start from `createTestContext()` with explicit Worker payloads or a pure stub and only escalate when the binding or deployment model genuinely needs it. ([link](/docs/bindings/worker-loaders/testing))
-- **Worker Loaders example** — Adapt one small end-to-end path before you hide the binding behind a bigger abstraction. ([link](/docs/bindings/worker-loaders/example))
+- **Worker Loaders internals** — Check emitted Wrangler `worker_loaders`, preview behavior, and Cloudflare-specific details. ([link](/docs/bindings/worker-loaders/internals))
+- **Testing Worker Loaders** — Pick the `createTestContext()` with explicit Worker payloads or a pure stub path first, then move to remote checks only when the test needs them. ([link](/docs/bindings/worker-loaders/testing))
+- **Worker Loaders example** — Copy a fuller application path when the quick example is too small. ([link](/docs/bindings/worker-loaders/example))
 
 ---
 
@@ -12108,7 +11967,7 @@ Cloudflare Dynamic Worker Loaders docs is the platform reference. This page is t
 | Navigation title | Worker Loaders internals |
 | Eyebrow | Under the hood |
 
-The internals page is deliberately short: it shows the authored config beside the Wrangler-facing output and names the exact places where Devflare stops pretending to be Cloudflare.
+Use this page when you need emitted config, preview behavior, or Cloudflare-specific limits. The overview and example pages stay focused on everyday app code.
 
 #### At a glance
 
@@ -12116,17 +11975,17 @@ The internals page is deliberately short: it shows the authored config beside th
 | --- | --- |
 | Normalization | Devflare normalizes `bindings.workerLoaders` before emitting Wrangler `worker_loaders` |
 | Compile target | Wrangler `worker_loaders` |
-| Preview note | Devflare wires the binding; it does not bundle, upload, discover, or provision dynamic Worker payloads for you. |
+| Preview note | Cloudflare owns dynamic Worker upload, discovery, and hosted lifecycle; local code should pass explicit payloads or stubs. |
 
-#### Devflare normalizes the authored shape before it does anything louder
+#### How authored config becomes Wrangler config
 
 The authored config stays camelCase and project-oriented. The compiler translates that into the Wrangler keys Cloudflare expects.
 
-The generated output is intentionally shown so the docs can be checked against real compiler behavior instead of relying on memory.
+The emitted output is shown here so the usage pages do not have to explain compiler details.
 
-##### Example — Worker Loaders from authored config to generated output
+##### Example — Worker Loaders config and emitted Wrangler output
 
-Keep the binding readable in source, then inspect only the Wrangler-facing slice Devflare emits when the config is compiled.
+Use this when you need to check how the Devflare config becomes Wrangler-compatible config.
 
 ###### File — devflare.config.ts
 
@@ -12153,11 +12012,11 @@ export default defineConfig({
 }
 ```
 
-#### Local runtime support depends on what Devflare can model directly
+#### What local runtime support covers
 
 ##### Key points
 
-- Offline-fixture: the binding exists locally, but tests should supply a Worker stub when behavior matters
+- Full local support through Miniflare Worker Loader bindings and explicit pure-test Worker stubs
 - The default docs recipe uses `createTestContext()` with explicit Worker payloads or a pure stub.
 - Pure unit tests can use `createMockWorkerLoader()` / `createMockEnv({ workerLoaders })` when the test only needs deterministic application behavior.
 
@@ -12167,7 +12026,23 @@ export default defineConfig({
 
 - Devflare emits Wrangler `worker_loaders` from the native config surface.
 - Preview and deployment lifecycle stay feature-specific; do not assume all Cloudflare products can be created, cloned, or cleaned up the same way.
-- Devflare wires the binding; it does not bundle, upload, discover, or provision dynamic Worker payloads for you.
+- Cloudflare owns dynamic Worker upload, discovery, and hosted lifecycle; local code should pass explicit payloads or stubs.
+
+#### Cloudflare docs vs the Devflare layer
+
+Cloudflare Dynamic Worker Loaders docs is the platform reference. Use this internals page when you need to compare Cloudflare's product docs with Devflare config, generated env types, local support, and preview behavior for `bindings.workerLoaders`.
+
+##### Highlights
+
+- **Cloudflare Dynamic Worker Loaders docs** — Platform reference for loading dynamic Workers and arbitrary Worker code at runtime. ([link](https://developers.cloudflare.com/workers/runtime-apis/bindings/worker-loader/))
+
+##### Reference table
+
+| Question | Cloudflare docs | This Devflare page |
+| --- | --- | --- |
+| Primary focus | Platform reference for loading dynamic Workers and arbitrary Worker code at runtime. | How to author `bindings.workerLoaders`, what the runtime surface looks like, and how Worker Loaders fits a Devflare project. |
+| Testing and runtime lens | Cloudflare’s docs focus on the raw binding API, product semantics, and platform limits for the binding itself. | Full local support through Miniflare Worker Loader bindings and explicit pure-test Worker stubs. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
+| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
 
 ---
 
@@ -12228,7 +12103,7 @@ test('uses a supplied dynamic Worker stub', async () => {
 
 ##### Key points
 
-- Devflare wires the binding; it does not bundle, upload, discover, or provision dynamic Worker payloads for you.
+- Cloudflare owns dynamic Worker upload, discovery, and hosted lifecycle; local code should pass explicit payloads or stubs.
 - Do not let a low-fidelity mock become product documentation. Keep mocks framed as application-flow tools.
 - If a test would mutate paid or remote Cloudflare state, gate it separately from ordinary unit tests.
 
@@ -12285,7 +12160,7 @@ Keep product limits, remote ownership, and fallback behavior visible in the code
 ##### Key points
 
 - Keep the first example short enough to paste into a new Worker.
-- Devflare wires the binding; it does not bundle, upload, discover, or provision dynamic Worker payloads for you.
+- Cloudflare owns dynamic Worker upload, discovery, and hosted lifecycle; local code should pass explicit payloads or stubs.
 
 ##### Example — Load an explicit Worker payload
 
@@ -12319,9 +12194,9 @@ export async function fetch(request: Request): Promise<Response> {
 
 ---
 
-### Use Secrets Store with the smallest config that states the binding contract
+### Use Secrets Store in a Worker
 
-> Configure Secrets Store, call the `SecretsStoreSecret` binding from worker code, and choose a test lane that matches the support level.
+> Add the Secrets Store config, call `SecretsStoreSecret` from worker code, and start with the local test path Devflare supports.
 
 | Field | Value |
 | --- | --- |
@@ -12337,28 +12212,27 @@ Start with the config, wire the binding into worker code, then use the support s
 | Fact | Value |
 | --- | --- |
 | Config key | `bindings.secretsStore` |
-| Authoring shape | `Record<string, { storeId; secretName }>` |
+| Authoring shape | `secretsStoreId + Record<string, string \| { storeId; secretName }>` |
 | Best for | shared account secrets that should be referenced by store id and secret name instead of copied into config |
 
-#### Author it in the simplest shape that still says what you mean
+#### Add the binding to config
 
-Start with the smallest readable `bindings.secretsStore` shape. If the feature needs a Cloudflare-created id or namespace, keep that explicit in config so reviewers can see where the remote boundary begins.
+Add `bindings.secretsStore` to `devflare.config.ts`, then use the generated env binding from Worker code.
 
-Use this page as the quick contract, then open the deeper internals/testing/example tabs only when the first recipe is not enough.
+Keep the first version close to the route or handler that needs it; move to a helper only after the shape is obvious.
 
-##### Example — Smallest Secrets Store config
+##### Example — Smallest Secrets Store config with one default store
 
 ```ts
 import { defineConfig } from 'devflare/config'
 
 export default defineConfig({
 	name: 'secret-worker',
+	secretsStoreId: 'store-123',
 	bindings: {
 		secretsStore: {
-			API_TOKEN: {
-				storeId: 'store-123',
-				secretName: 'api-token'
-			}
+			API_TOKEN: 'api-token',
+			STRIPE_WEBHOOK_SECRET: 'stripe-webhook-secret'
 		}
 	}
 })
@@ -12368,30 +12242,49 @@ export default defineConfig({
 
 After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first Secrets Store path close to the route, handler, or service method that needs it.
 
-Keep this first path small enough that the binding contract stays visible during code review.
+Keep this first path small enough that the config, env binding, and user-visible behavior are easy to review together.
 
-##### Example — Read a Secrets Store value
+##### Example — Protect an internal route with a shared API token
 
 ```ts
 import { env } from 'devflare/runtime'
 
-export async function fetch(): Promise<Response> {
+export async function fetch(request: Request): Promise<Response> {
 	const token = await env.API_TOKEN.get()
-	return new Response(token.length > 0 ? 'configured' : 'missing')
+	const authorization = request.headers.get('authorization')
+
+	if (authorization !== 'Bearer ' + token) {
+		return new Response('unauthorized', { status: 401 })
+	}
+
+	return Response.json({ ok: true })
 }
 ```
 
 #### Local and Remote Support
 
-Support level: `Remote`. Remote support means Devflare supports the config, generated env shape, docs, and local application-flow work, but full fidelity requires Cloudflare remote infrastructure. Use local shims or fixtures for code your app owns, then connect to Cloudflare when the product behavior is the assertion.
+Devflare can run useful Secrets Store application behavior locally for ordinary development and tests. Cloudflare still owns production limits, quotas, billing, and deployed account behavior.
 
-Offline-native when tests provide fixture values; missing fixtures fail with a non-networked error.
+Full local support through Miniflare wiring, local `devflare secrets --local` values, and explicit fixture values for pure tests. Start locally with `createTestContext()` or `createOfflineEnv(config, fixtures, { cwd })`; that lane should cover the normal Secrets Store application flow without requiring a Cloudflare connection.
 
-##### Highlights
+Use Cloudflare when the assertion depends on deployed limits, account state, lifecycle behavior, billing, or other production-only Secrets Store details.
 
-- **Remote support** — Remote support means Devflare supports the config, generated env shape, docs, and local application-flow work, but full fidelity requires Cloudflare remote infrastructure. Use local shims or fixtures for code your app owns, then connect to Cloudflare when the product behavior is the assertion.
-- **What works without Cloudflare** — Offline-native when tests provide fixture values; missing fixtures fail with a non-networked error. Keep local coverage focused on deterministic application flow through fixtures, mocks, shims, or Miniflare-backed wiring instead of pretending to reproduce Cloudflare-hosted product behavior.
-- **When to connect to Cloudflare** — Use Cloudflare when the assertion depends on cloudflare-hosted product behavior rather than the app calling the binding correctly. This is the lane for full Secrets Store product fidelity, remote state, lifecycle behavior, and platform-specific limits.
+#### Set local values without putting secrets in config
+
+Keep `devflare.config.ts` limited to store IDs and secret names. Use the CLI to write local values into `.devflare/secrets.local.json`, then let dev, `createTestContext()`, and `createOfflineEnv(..., { cwd })` read those values locally.
+
+##### Key points
+
+- The Worker sees a read-only `SecretsStoreSecret` binding.
+- CLI output lists `store/name` references; it does not print secret values.
+- Use explicit `{ storeId, secretName }` binding objects only when one Worker needs secrets from multiple stores.
+
+##### Example — Create a local secret value
+
+```bash
+devflare secrets --local --store store-123 --name api-token --value local-token
+devflare secrets --local --store store-123 --list
+```
 
 #### When this binding fits best
 
@@ -12401,41 +12294,21 @@ Offline-native when tests provide fixture values; missing fixtures fail with a n
 - Keep binding names stable and uppercase in examples so generated Env declarations remain predictable.
 - Prefer Devflare native config while it covers the feature; use `wrangler.passthrough` only for unsupported Wrangler-only fields.
 
-#### Notes worth keeping visible
+#### Testing path
 
 ##### Key points
 
-- Offline-native when tests provide fixture values; missing fixtures fail with a non-networked error
-- Devflare does not read or provision secret values; tests must supply explicit fixtures.
-- For tests, start with `createOfflineEnv()` with `fixtures.secretsStore`; reach for `createMockSecretsStoreSecret()` / `createMockEnv({ secretsStore })` when you want a pure unit test without Miniflare or Cloudflare.
+- Start with `createTestContext()` or `createOfflineEnv(config, fixtures, { cwd })` for config-backed local worker tests.
+- Use `createMockSecretsStoreSecret()` / `createMockEnv({ secretsStore })` for small unit tests that only need deterministic application behavior.
+- Use Cloudflare-backed tests when the assertion depends on hosted platform behavior, account state, limits, billing, or production routing.
 
-> **Note — Document the boundary at the same time as the recipe**
->
-> The old docs often made developers infer whether Secrets Store was local, remote, or fixture-backed. This page keeps that stance beside the first usable example.
-
-#### Cloudflare docs vs the Devflare layer
-
-Cloudflare Secrets Store docs is the platform reference. This page is the Devflare translation layer: keep `bindings.secretsStore` readable in source, understand the typed env surface, and know which local, preview, or remote lane actually matches the binding.
+#### Open the next page when you need it
 
 ##### Highlights
 
-- **Cloudflare Secrets Store docs** — Platform reference for secrets, account-level Secrets Store bindings, and secure Worker access. ([link](https://developers.cloudflare.com/workers/configuration/secrets/))
-
-##### Reference table
-
-| Question | Cloudflare docs | This Devflare page |
-| --- | --- | --- |
-| Primary focus | Platform reference for secrets, account-level Secrets Store bindings, and secure Worker access. | How to author `bindings.secretsStore`, what the runtime surface looks like, and how Secrets Store fits a Devflare project. |
-| Testing and runtime lens | Cloudflare’s docs focus on the raw binding API, product semantics, and platform limits for the binding itself. | Offline-native when tests provide fixture values; missing fixtures fail with a non-networked error. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
-| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
-
-#### Go deeper only if this one-page guide stops being enough
-
-##### Highlights
-
-- **Secrets Store internals** — See normalization, Wrangler `secrets_store_secrets`, and the preview or runtime details behind the authored shape. ([link](/docs/bindings/secrets-store/internals))
-- **Testing Secrets Store** — Start from `createOfflineEnv()` with `fixtures.secretsStore` and only escalate when the binding or deployment model genuinely needs it. ([link](/docs/bindings/secrets-store/testing))
-- **Secrets Store example** — Adapt one small end-to-end path before you hide the binding behind a bigger abstraction. ([link](/docs/bindings/secrets-store/example))
+- **Secrets Store internals** — Check emitted Wrangler `secrets_store_secrets`, preview behavior, and Cloudflare-specific details. ([link](/docs/bindings/secrets-store/internals))
+- **Testing Secrets Store** — Pick the `createTestContext()` or `createOfflineEnv(config, fixtures, { cwd })` path first, then move to remote checks only when the test needs them. ([link](/docs/bindings/secrets-store/testing))
+- **Secrets Store example** — Copy a fuller application path when the quick example is too small. ([link](/docs/bindings/secrets-store/example))
 
 ---
 
@@ -12450,7 +12323,7 @@ Cloudflare Secrets Store docs is the platform reference. This page is the Devfla
 | Navigation title | Secrets Store internals |
 | Eyebrow | Under the hood |
 
-The internals page is deliberately short: it shows the authored config beside the Wrangler-facing output and names the exact places where Devflare stops pretending to be Cloudflare.
+Use this page when you need emitted config, preview behavior, or Cloudflare-specific limits. The overview and example pages stay focused on everyday app code.
 
 #### At a glance
 
@@ -12458,17 +12331,17 @@ The internals page is deliberately short: it shows the authored config beside th
 | --- | --- |
 | Normalization | Devflare normalizes `bindings.secretsStore` before emitting Wrangler `secrets_store_secrets` |
 | Compile target | Wrangler `secrets_store_secrets` |
-| Preview note | Devflare does not read or provision secret values; tests must supply explicit fixtures. |
+| Preview note | Cloudflare owns remote account secret provisioning and sync; Devflare reads only project-local secret values unless you deploy or test against Cloudflare. |
 
-#### Devflare normalizes the authored shape before it does anything louder
+#### How authored config becomes Wrangler config
 
 The authored config stays camelCase and project-oriented. The compiler translates that into the Wrangler keys Cloudflare expects.
 
-The generated output is intentionally shown so the docs can be checked against real compiler behavior instead of relying on memory.
+The emitted output is shown here so the usage pages do not have to explain compiler details.
 
-##### Example — Secrets Store from authored config to generated output
+##### Example — Secrets Store config and emitted Wrangler output
 
-Keep the binding readable in source, then inspect only the Wrangler-facing slice Devflare emits when the config is compiled.
+Use this when you need to check how the Devflare config becomes Wrangler-compatible config.
 
 ###### File — devflare.config.ts
 
@@ -12477,12 +12350,11 @@ import { defineConfig } from 'devflare/config'
 
 export default defineConfig({
 	name: 'secret-worker',
+	secretsStoreId: 'store-123',
 	bindings: {
 		secretsStore: {
-			API_TOKEN: {
-				storeId: 'store-123',
-				secretName: 'api-token'
-			}
+			API_TOKEN: 'api-token',
+			STRIPE_WEBHOOK_SECRET: 'stripe-webhook-secret'
 		}
 	}
 })
@@ -12493,17 +12365,18 @@ export default defineConfig({
 ```json
 {
 	"secrets_store_secrets": [
-		{ "binding": "API_TOKEN", "store_id": "store-123", "secret_name": "api-token" }
+		{ "binding": "API_TOKEN", "store_id": "store-123", "secret_name": "api-token" },
+		{ "binding": "STRIPE_WEBHOOK_SECRET", "store_id": "store-123", "secret_name": "stripe-webhook-secret" }
 	]
 }
 ```
 
-#### Local runtime support depends on what Devflare can model directly
+#### What local runtime support covers
 
 ##### Key points
 
-- Offline-native when tests provide fixture values; missing fixtures fail with a non-networked error
-- The default docs recipe uses `createOfflineEnv()` with `fixtures.secretsStore`.
+- Full local support through Miniflare wiring, local `devflare secrets --local` values, and explicit fixture values for pure tests
+- The default docs recipe uses `createTestContext()` or `createOfflineEnv(config, fixtures, { cwd })`.
 - Pure unit tests can use `createMockSecretsStoreSecret()` / `createMockEnv({ secretsStore })` when the test only needs deterministic application behavior.
 
 #### Compile, preview, and cleanup behavior
@@ -12512,7 +12385,23 @@ export default defineConfig({
 
 - Devflare emits Wrangler `secrets_store_secrets` from the native config surface.
 - Preview and deployment lifecycle stay feature-specific; do not assume all Cloudflare products can be created, cloned, or cleaned up the same way.
-- Devflare does not read or provision secret values; tests must supply explicit fixtures.
+- Cloudflare owns remote account secret provisioning and sync; Devflare reads only project-local secret values unless you deploy or test against Cloudflare.
+
+#### Cloudflare docs vs the Devflare layer
+
+Cloudflare Secrets Store docs is the platform reference. Use this internals page when you need to compare Cloudflare's product docs with Devflare config, generated env types, local support, and preview behavior for `bindings.secretsStore`.
+
+##### Highlights
+
+- **Cloudflare Secrets Store docs** — Platform reference for secrets, account-level Secrets Store bindings, and secure Worker access. ([link](https://developers.cloudflare.com/workers/configuration/secrets/))
+
+##### Reference table
+
+| Question | Cloudflare docs | This Devflare page |
+| --- | --- | --- |
+| Primary focus | Platform reference for secrets, account-level Secrets Store bindings, and secure Worker access. | How to author `bindings.secretsStore`, what the runtime surface looks like, and how Secrets Store fits a Devflare project. |
+| Testing and runtime lens | Cloudflare’s docs focus on the raw binding API, product semantics, and platform limits for the binding itself. | Full local support through Miniflare wiring, local `devflare secrets --local` values, and explicit fixture values for pure tests. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
+| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
 
 ---
 
@@ -12534,7 +12423,7 @@ The first test should prove application control flow. Escalate to Wrangler remot
 | Fact | Value |
 | --- | --- |
 | Best for | shared account secrets that should be referenced by store id and secret name instead of copied into config |
-| Default harness | `createOfflineEnv()` with `fixtures.secretsStore` |
+| Default harness | `createTestContext()` or `createOfflineEnv(config, fixtures, { cwd })` |
 | Escalate when | The assertion depends on Cloudflare-hosted product behavior rather than the app calling the binding correctly |
 
 #### Start with the default test loop
@@ -12557,7 +12446,7 @@ test('reads a fixed offline secret', async () => {
 		}
 	})
 
-	expect(await env.API_TOKEN.get()).toBe('test-token')
+expect(await env.API_TOKEN.get()).toBe('test-token')
 })
 ```
 
@@ -12565,7 +12454,7 @@ test('reads a fixed offline secret', async () => {
 
 ##### Key points
 
-- Use `createOfflineEnv()` with `fixtures.secretsStore` for config-backed local worker tests.
+- Use `createTestContext()` or `createOfflineEnv(config, fixtures, { cwd })` for config-backed local worker tests.
 - Use `createMockSecretsStoreSecret()` / `createMockEnv({ secretsStore })` for pure unit tests.
 - Use `shouldSkip` or an explicit integration lane when the test needs Cloudflare credentials or a local Docker/Podman engine.
 
@@ -12573,7 +12462,7 @@ test('reads a fixed offline secret', async () => {
 
 ##### Key points
 
-- Devflare does not read or provision secret values; tests must supply explicit fixtures.
+- Cloudflare owns remote account secret provisioning and sync; Devflare reads only project-local secret values unless you deploy or test against Cloudflare.
 - Do not let a low-fidelity mock become product documentation. Keep mocks framed as application-flow tools.
 - If a test would mutate paid or remote Cloudflare state, gate it separately from ordinary unit tests.
 
@@ -12606,19 +12495,18 @@ Use this as the copyable starter before threading the feature into a larger appl
 
 #### Start by wiring the binding clearly in config
 
-##### Example — Smallest Secrets Store config
+##### Example — Smallest Secrets Store config with one default store
 
 ```ts
 import { defineConfig } from 'devflare/config'
 
 export default defineConfig({
 	name: 'secret-worker',
+	secretsStoreId: 'store-123',
 	bindings: {
 		secretsStore: {
-			API_TOKEN: {
-				storeId: 'store-123',
-				secretName: 'api-token'
-			}
+			API_TOKEN: 'api-token',
+			STRIPE_WEBHOOK_SECRET: 'stripe-webhook-secret'
 		}
 	}
 })
@@ -12634,14 +12522,20 @@ Keep product limits, remote ownership, and fallback behavior visible in the code
 
 - Keep the first example short enough to paste into a new Worker.
 
-##### Example — Read a Secrets Store value
+##### Example — Protect an internal route with a shared API token
 
 ```ts
 import { env } from 'devflare/runtime'
 
-export async function fetch(): Promise<Response> {
+export async function fetch(request: Request): Promise<Response> {
 	const token = await env.API_TOKEN.get()
-	return new Response(token.length > 0 ? 'configured' : 'missing')
+	const authorization = request.headers.get('authorization')
+
+	if (authorization !== 'Bearer ' + token) {
+		return new Response('unauthorized', { status: 401 })
+	}
+
+	return Response.json({ ok: true })
 }
 ```
 
@@ -12659,9 +12553,9 @@ export async function fetch(): Promise<Response> {
 
 ---
 
-### Use AI Search with the smallest config that states the binding contract
+### Use AI Search in a Worker
 
-> Configure AI Search, call the `AiSearchInstance` or `AiSearchNamespace` binding from worker code, and choose a test lane that matches the support level.
+> Add the AI Search config, call `AiSearchInstance` or `AiSearchNamespace` from worker code, and start with the local test path Devflare supports.
 
 | Field | Value |
 | --- | --- |
@@ -12680,11 +12574,11 @@ Start with the config, wire the binding into worker code, then use the support s
 | Authoring shape | `Record<string, { instanceName; remote? }> plus aiSearchNamespaces for namespace access` |
 | Best for | search/chat flows where the app calls an AI Search instance or namespace from a Worker |
 
-#### Author it in the simplest shape that still says what you mean
+#### Add the binding to config
 
-Start with the smallest readable `bindings.aiSearch` shape. If the feature needs a Cloudflare-created id or namespace, keep that explicit in config so reviewers can see where the remote boundary begins.
+Add `bindings.aiSearch` to `devflare.config.ts`, then use the generated env binding from Worker code.
 
-Use this page as the quick contract, then open the deeper internals/testing/example tabs only when the first recipe is not enough.
+Keep the first version close to the route or handler that needs it; move to a helper only after the shape is obvious.
 
 ##### Example — Smallest AI Search config
 
@@ -12707,7 +12601,7 @@ export default defineConfig({
 
 After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first AI Search path close to the route, handler, or service method that needs it.
 
-Keep this first path small enough that the binding contract stays visible during code review.
+Keep this first path small enough that the config, env binding, and user-visible behavior are easy to review together.
 
 ##### Example — Search one AI Search instance
 
@@ -12724,15 +12618,11 @@ export async function fetch(request: Request): Promise<Response> {
 
 #### Local and Remote Support
 
-Support level: `Remote`. Remote support means Devflare supports the config, generated env shape, docs, and local application-flow work, but full fidelity requires Cloudflare remote infrastructure. Use local shims or fixtures for code your app owns, then connect to Cloudflare when the product behavior is the assertion.
+Devflare supports the config, generated env shape, docs, and local application-flow work, but full fidelity requires Cloudflare remote infrastructure. Use local shims or fixtures for code your app owns, then connect to Cloudflare when the product behavior is the assertion.
 
-Offline-fixture: deterministic in-memory instances can test application flow, not hosted relevance behavior.
+Offline-fixture: deterministic in-memory instances can test application flow, not hosted relevance behavior. Keep local coverage focused on deterministic application flow through fixtures, mocks, shims, or Miniflare-backed wiring instead of pretending to reproduce Cloudflare-hosted product behavior.
 
-##### Highlights
-
-- **Remote support** — Remote support means Devflare supports the config, generated env shape, docs, and local application-flow work, but full fidelity requires Cloudflare remote infrastructure. Use local shims or fixtures for code your app owns, then connect to Cloudflare when the product behavior is the assertion.
-- **What works without Cloudflare** — Offline-fixture: deterministic in-memory instances can test application flow, not hosted relevance behavior. Keep local coverage focused on deterministic application flow through fixtures, mocks, shims, or Miniflare-backed wiring instead of pretending to reproduce Cloudflare-hosted product behavior.
-- **When to connect to Cloudflare** — Use Cloudflare when the assertion depends on cloudflare-hosted product behavior rather than the app calling the binding correctly. This is the lane for full AI Search product fidelity, remote state, lifecycle behavior, and platform-specific limits.
+Use Cloudflare when the assertion depends on cloudflare-hosted product behavior rather than the app calling the binding correctly. This is the lane for full AI Search product fidelity, remote state, lifecycle behavior, and platform-specific limits.
 
 #### When this binding fits best
 
@@ -12742,41 +12632,21 @@ Offline-fixture: deterministic in-memory instances can test application flow, no
 - Keep binding names stable and uppercase in examples so generated Env declarations remain predictable.
 - Prefer Devflare native config while it covers the feature; use `wrangler.passthrough` only for unsupported Wrangler-only fields.
 
-#### Notes worth keeping visible
+#### Testing path
 
 ##### Key points
 
-- Offline-fixture: deterministic in-memory instances can test application flow, not hosted relevance behavior
-- Cloudflare owns crawling, indexing, ranking, and hosted model behavior; local mocks only prove app control flow.
-- For tests, start with `createOfflineEnv()` with AI Search fixtures; reach for `createMockAISearchInstance()` / `createMockAISearchNamespace()` when you want a pure unit test without Miniflare or Cloudflare.
+- Start with `createOfflineEnv()` with AI Search fixtures for config-backed local worker tests.
+- Use `createMockAISearchInstance()` / `createMockAISearchNamespace()` for small unit tests that only need deterministic application behavior.
+- Use Cloudflare-backed tests when the assertion depends on hosted platform behavior, account state, limits, billing, or production routing.
 
-> **Note — Document the boundary at the same time as the recipe**
->
-> The old docs often made developers infer whether AI Search was local, remote, or fixture-backed. This page keeps that stance beside the first usable example.
-
-#### Cloudflare docs vs the Devflare layer
-
-Cloudflare AI Search docs is the platform reference. This page is the Devflare translation layer: keep `bindings.aiSearch` readable in source, understand the typed env surface, and know which local, preview, or remote lane actually matches the binding.
+#### Open the next page when you need it
 
 ##### Highlights
 
-- **Cloudflare AI Search docs** — Platform reference for AI Search instance and namespace bindings from Workers. ([link](https://developers.cloudflare.com/ai-search/api/search/workers-binding/))
-
-##### Reference table
-
-| Question | Cloudflare docs | This Devflare page |
-| --- | --- | --- |
-| Primary focus | Platform reference for AI Search instance and namespace bindings from Workers. | How to author `bindings.aiSearch`, what the runtime surface looks like, and how AI Search fits a Devflare project. |
-| Testing and runtime lens | Cloudflare’s docs focus on the raw binding API, product semantics, and platform limits for the binding itself. | Offline-fixture: deterministic in-memory instances can test application flow, not hosted relevance behavior. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
-| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
-
-#### Go deeper only if this one-page guide stops being enough
-
-##### Highlights
-
-- **AI Search internals** — See normalization, Wrangler `ai_search` / `ai_search_namespaces`, and the preview or runtime details behind the authored shape. ([link](/docs/bindings/ai-search/internals))
-- **Testing AI Search** — Start from `createOfflineEnv()` with AI Search fixtures and only escalate when the binding or deployment model genuinely needs it. ([link](/docs/bindings/ai-search/testing))
-- **AI Search example** — Adapt one small end-to-end path before you hide the binding behind a bigger abstraction. ([link](/docs/bindings/ai-search/example))
+- **AI Search internals** — Check emitted Wrangler `ai_search` / `ai_search_namespaces`, preview behavior, and Cloudflare-specific details. ([link](/docs/bindings/ai-search/internals))
+- **Testing AI Search** — Pick the `createOfflineEnv()` with AI Search fixtures path first, then move to remote checks only when the test needs them. ([link](/docs/bindings/ai-search/testing))
+- **AI Search example** — Copy a fuller application path when the quick example is too small. ([link](/docs/bindings/ai-search/example))
 
 ---
 
@@ -12791,7 +12661,7 @@ Cloudflare AI Search docs is the platform reference. This page is the Devflare t
 | Navigation title | AI Search internals |
 | Eyebrow | Under the hood |
 
-The internals page is deliberately short: it shows the authored config beside the Wrangler-facing output and names the exact places where Devflare stops pretending to be Cloudflare.
+Use this page when you need emitted config, preview behavior, or Cloudflare-specific limits. The overview and example pages stay focused on everyday app code.
 
 #### At a glance
 
@@ -12801,15 +12671,15 @@ The internals page is deliberately short: it shows the authored config beside th
 | Compile target | Wrangler `ai_search` / `ai_search_namespaces` |
 | Preview note | Cloudflare owns crawling, indexing, ranking, and hosted model behavior; local mocks only prove app control flow. |
 
-#### Devflare normalizes the authored shape before it does anything louder
+#### How authored config becomes Wrangler config
 
 The authored config stays camelCase and project-oriented. The compiler translates that into the Wrangler keys Cloudflare expects.
 
-The generated output is intentionally shown so the docs can be checked against real compiler behavior instead of relying on memory.
+The emitted output is shown here so the usage pages do not have to explain compiler details.
 
-##### Example — AI Search from authored config to generated output
+##### Example — AI Search config and emitted Wrangler output
 
-Keep the binding readable in source, then inspect only the Wrangler-facing slice Devflare emits when the config is compiled.
+Use this when you need to check how the Devflare config becomes Wrangler-compatible config.
 
 ###### File — devflare.config.ts
 
@@ -12838,7 +12708,7 @@ export default defineConfig({
 }
 ```
 
-#### Local runtime support depends on what Devflare can model directly
+#### What local runtime support covers
 
 ##### Key points
 
@@ -12853,6 +12723,22 @@ export default defineConfig({
 - Devflare emits Wrangler `ai_search` / `ai_search_namespaces` from the native config surface.
 - Preview and deployment lifecycle stay feature-specific; do not assume all Cloudflare products can be created, cloned, or cleaned up the same way.
 - Cloudflare owns crawling, indexing, ranking, and hosted model behavior; local mocks only prove app control flow.
+
+#### Cloudflare docs vs the Devflare layer
+
+Cloudflare AI Search docs is the platform reference. Use this internals page when you need to compare Cloudflare's product docs with Devflare config, generated env types, local support, and preview behavior for `bindings.aiSearch`.
+
+##### Highlights
+
+- **Cloudflare AI Search docs** — Platform reference for AI Search instance and namespace bindings from Workers. ([link](https://developers.cloudflare.com/ai-search/api/search/workers-binding/))
+
+##### Reference table
+
+| Question | Cloudflare docs | This Devflare page |
+| --- | --- | --- |
+| Primary focus | Platform reference for AI Search instance and namespace bindings from Workers. | How to author `bindings.aiSearch`, what the runtime surface looks like, and how AI Search fits a Devflare project. |
+| Testing and runtime lens | Cloudflare’s docs focus on the raw binding API, product semantics, and platform limits for the binding itself. | Offline-fixture: deterministic in-memory instances can test application flow, not hosted relevance behavior. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
+| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
 
 ---
 
@@ -12999,9 +12885,9 @@ export async function fetch(request: Request): Promise<Response> {
 
 ---
 
-### Use mTLS Certificates with the smallest config that states the binding contract
+### Use mTLS Certificates in a Worker
 
-> Configure mTLS Certificates, call the `Fetcher` binding from worker code, and choose a test lane that matches the support level.
+> Add the mTLS Certificates config, call `Fetcher` from worker code, and start with the local test path Devflare supports.
 
 | Field | Value |
 | --- | --- |
@@ -13020,11 +12906,11 @@ Start with the config, wire the binding into worker code, then use the support s
 | Authoring shape | `Record<string, string \| { certificateId; remote? }>` |
 | Best for | calling origins that require a Cloudflare-uploaded client certificate |
 
-#### Author it in the simplest shape that still says what you mean
+#### Add the binding to config
 
-Start with the smallest readable `bindings.mtlsCertificates` shape. If the feature needs a Cloudflare-created id or namespace, keep that explicit in config so reviewers can see where the remote boundary begins.
+Add `bindings.mtlsCertificates` to `devflare.config.ts`, then use the generated env binding from Worker code.
 
-Use this page as the quick contract, then open the deeper internals/testing/example tabs only when the first recipe is not enough.
+Keep the first version close to the route or handler that needs it; move to a helper only after the shape is obvious.
 
 ##### Example — Smallest mTLS Certificate config
 
@@ -13047,7 +12933,7 @@ export default defineConfig({
 
 After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first mTLS Certificates path close to the route, handler, or service method that needs it.
 
-Keep this first path small enough that the binding contract stays visible during code review.
+Keep this first path small enough that the config, env binding, and user-visible behavior are easy to review together.
 
 ##### Example — Fetch through the mTLS binding
 
@@ -13061,15 +12947,11 @@ export async function fetch(): Promise<Response> {
 
 #### Local and Remote Support
 
-Support level: `Remote`. Remote support means Devflare supports the config, generated env shape, docs, and local application-flow work, but full fidelity requires Cloudflare remote infrastructure. Use local shims or fixtures for code your app owns, then connect to Cloudflare when the product behavior is the assertion.
+Devflare supports the config, generated env shape, docs, and local application-flow work, but full fidelity requires Cloudflare remote infrastructure. Use local shims or fixtures for code your app owns, then connect to Cloudflare when the product behavior is the assertion.
 
-Offline-fixture: local tests can model Fetcher behavior, but not real certificate presentation.
+Offline-fixture: local tests can model Fetcher behavior, but not real certificate presentation. Keep local coverage focused on deterministic application flow through fixtures, mocks, shims, or Miniflare-backed wiring instead of pretending to reproduce Cloudflare-hosted product behavior.
 
-##### Highlights
-
-- **Remote support** — Remote support means Devflare supports the config, generated env shape, docs, and local application-flow work, but full fidelity requires Cloudflare remote infrastructure. Use local shims or fixtures for code your app owns, then connect to Cloudflare when the product behavior is the assertion.
-- **What works without Cloudflare** — Offline-fixture: local tests can model Fetcher behavior, but not real certificate presentation. Keep local coverage focused on deterministic application flow through fixtures, mocks, shims, or Miniflare-backed wiring instead of pretending to reproduce Cloudflare-hosted product behavior.
-- **When to connect to Cloudflare** — Use Cloudflare when the assertion depends on cloudflare-hosted product behavior rather than the app calling the binding correctly. This is the lane for full mTLS Certificates product fidelity, remote state, lifecycle behavior, and platform-specific limits.
+Use Cloudflare when the assertion depends on cloudflare-hosted product behavior rather than the app calling the binding correctly. This is the lane for full mTLS Certificates product fidelity, remote state, lifecycle behavior, and platform-specific limits.
 
 #### When this binding fits best
 
@@ -13079,41 +12961,21 @@ Offline-fixture: local tests can model Fetcher behavior, but not real certificat
 - Keep binding names stable and uppercase in examples so generated Env declarations remain predictable.
 - Prefer Devflare native config while it covers the feature; use `wrangler.passthrough` only for unsupported Wrangler-only fields.
 
-#### Notes worth keeping visible
+#### Testing path
 
 ##### Key points
 
-- Offline-fixture: local tests can model Fetcher behavior, but not real certificate presentation
-- Real TLS client-certificate presentation is Cloudflare/Wrangler remote behavior.
-- For tests, start with `createOfflineEnv()` with `fixtures.mtlsCertificates`; reach for `createMockMTLSCertificate()` / `createMockEnv({ mtlsCertificates })` when you want a pure unit test without Miniflare or Cloudflare.
+- Start with `createOfflineEnv()` with `fixtures.mtlsCertificates` for config-backed local worker tests.
+- Use `createMockMTLSCertificate()` / `createMockEnv({ mtlsCertificates })` for small unit tests that only need deterministic application behavior.
+- Use Cloudflare-backed tests when the assertion depends on hosted platform behavior, account state, limits, billing, or production routing.
 
-> **Note — Document the boundary at the same time as the recipe**
->
-> The old docs often made developers infer whether mTLS Certificates was local, remote, or fixture-backed. This page keeps that stance beside the first usable example.
-
-#### Cloudflare docs vs the Devflare layer
-
-Cloudflare mTLS docs is the platform reference. This page is the Devflare translation layer: keep `bindings.mtlsCertificates` readable in source, understand the typed env surface, and know which local, preview, or remote lane actually matches the binding.
+#### Open the next page when you need it
 
 ##### Highlights
 
-- **Cloudflare mTLS docs** — Platform reference for mTLS certificate bindings and certificate-backed outbound fetches. ([link](https://developers.cloudflare.com/workers/runtime-apis/bindings/mtls/))
-
-##### Reference table
-
-| Question | Cloudflare docs | This Devflare page |
-| --- | --- | --- |
-| Primary focus | Platform reference for mTLS certificate bindings and certificate-backed outbound fetches. | How to author `bindings.mtlsCertificates`, what the runtime surface looks like, and how mTLS Certificates fits a Devflare project. |
-| Testing and runtime lens | Cloudflare’s docs focus on the raw binding API, product semantics, and platform limits for the binding itself. | Offline-fixture: local tests can model Fetcher behavior, but not real certificate presentation. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
-| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
-
-#### Go deeper only if this one-page guide stops being enough
-
-##### Highlights
-
-- **mTLS Certificates internals** — See normalization, Wrangler `mtls_certificates`, and the preview or runtime details behind the authored shape. ([link](/docs/bindings/mtls-certificates/internals))
-- **Testing mTLS Certificates** — Start from `createOfflineEnv()` with `fixtures.mtlsCertificates` and only escalate when the binding or deployment model genuinely needs it. ([link](/docs/bindings/mtls-certificates/testing))
-- **mTLS Certificates example** — Adapt one small end-to-end path before you hide the binding behind a bigger abstraction. ([link](/docs/bindings/mtls-certificates/example))
+- **mTLS Certificates internals** — Check emitted Wrangler `mtls_certificates`, preview behavior, and Cloudflare-specific details. ([link](/docs/bindings/mtls-certificates/internals))
+- **Testing mTLS Certificates** — Pick the `createOfflineEnv()` with `fixtures.mtlsCertificates` path first, then move to remote checks only when the test needs them. ([link](/docs/bindings/mtls-certificates/testing))
+- **mTLS Certificates example** — Copy a fuller application path when the quick example is too small. ([link](/docs/bindings/mtls-certificates/example))
 
 ---
 
@@ -13128,7 +12990,7 @@ Cloudflare mTLS docs is the platform reference. This page is the Devflare transl
 | Navigation title | mTLS Certificates internals |
 | Eyebrow | Under the hood |
 
-The internals page is deliberately short: it shows the authored config beside the Wrangler-facing output and names the exact places where Devflare stops pretending to be Cloudflare.
+Use this page when you need emitted config, preview behavior, or Cloudflare-specific limits. The overview and example pages stay focused on everyday app code.
 
 #### At a glance
 
@@ -13138,15 +13000,15 @@ The internals page is deliberately short: it shows the authored config beside th
 | Compile target | Wrangler `mtls_certificates` |
 | Preview note | Real TLS client-certificate presentation is Cloudflare/Wrangler remote behavior. |
 
-#### Devflare normalizes the authored shape before it does anything louder
+#### How authored config becomes Wrangler config
 
 The authored config stays camelCase and project-oriented. The compiler translates that into the Wrangler keys Cloudflare expects.
 
-The generated output is intentionally shown so the docs can be checked against real compiler behavior instead of relying on memory.
+The emitted output is shown here so the usage pages do not have to explain compiler details.
 
-##### Example — mTLS Certificates from authored config to generated output
+##### Example — mTLS Certificates config and emitted Wrangler output
 
-Keep the binding readable in source, then inspect only the Wrangler-facing slice Devflare emits when the config is compiled.
+Use this when you need to check how the Devflare config becomes Wrangler-compatible config.
 
 ###### File — devflare.config.ts
 
@@ -13175,7 +13037,7 @@ export default defineConfig({
 }
 ```
 
-#### Local runtime support depends on what Devflare can model directly
+#### What local runtime support covers
 
 ##### Key points
 
@@ -13190,6 +13052,22 @@ export default defineConfig({
 - Devflare emits Wrangler `mtls_certificates` from the native config surface.
 - Preview and deployment lifecycle stay feature-specific; do not assume all Cloudflare products can be created, cloned, or cleaned up the same way.
 - Real TLS client-certificate presentation is Cloudflare/Wrangler remote behavior.
+
+#### Cloudflare docs vs the Devflare layer
+
+Cloudflare mTLS docs is the platform reference. Use this internals page when you need to compare Cloudflare's product docs with Devflare config, generated env types, local support, and preview behavior for `bindings.mtlsCertificates`.
+
+##### Highlights
+
+- **Cloudflare mTLS docs** — Platform reference for mTLS certificate bindings and certificate-backed outbound fetches. ([link](https://developers.cloudflare.com/workers/runtime-apis/bindings/mtls/))
+
+##### Reference table
+
+| Question | Cloudflare docs | This Devflare page |
+| --- | --- | --- |
+| Primary focus | Platform reference for mTLS certificate bindings and certificate-backed outbound fetches. | How to author `bindings.mtlsCertificates`, what the runtime surface looks like, and how mTLS Certificates fits a Devflare project. |
+| Testing and runtime lens | Cloudflare’s docs focus on the raw binding API, product semantics, and platform limits for the binding itself. | Offline-fixture: local tests can model Fetcher behavior, but not real certificate presentation. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
+| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
 
 ---
 
@@ -13331,9 +13209,9 @@ export async function fetch(): Promise<Response> {
 
 ---
 
-### Use Dispatch Namespaces with the smallest config that states the binding contract
+### Use Dispatch Namespaces in a Worker
 
-> Configure Dispatch Namespaces, call the `DispatchNamespace` binding from worker code, and choose a test lane that matches the support level.
+> Add the Dispatch Namespaces config, call `DispatchNamespace` from worker code, and start with the local test path Devflare supports.
 
 | Field | Value |
 | --- | --- |
@@ -13352,11 +13230,11 @@ Start with the config, wire the binding into worker code, then use the support s
 | Authoring shape | `Record<string, string \| { namespace; outbound?; remote? }>` |
 | Best for | platform Workers that dispatch to tenant Workers by name |
 
-#### Author it in the simplest shape that still says what you mean
+#### Add the binding to config
 
-Start with the smallest readable `bindings.dispatchNamespaces` shape. If the feature needs a Cloudflare-created id or namespace, keep that explicit in config so reviewers can see where the remote boundary begins.
+Add `bindings.dispatchNamespaces` to `devflare.config.ts`, then use the generated env binding from Worker code.
 
-Use this page as the quick contract, then open the deeper internals/testing/example tabs only when the first recipe is not enough.
+Keep the first version close to the route or handler that needs it; move to a helper only after the shape is obvious.
 
 ##### Example — Smallest Dispatch Namespace config
 
@@ -13379,7 +13257,7 @@ export default defineConfig({
 
 After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first Dispatch Namespaces path close to the route, handler, or service method that needs it.
 
-Keep this first path small enough that the binding contract stays visible during code review.
+Keep this first path small enough that the config, env binding, and user-visible behavior are easy to review together.
 
 ##### Example — Dispatch to one tenant Worker
 
@@ -13394,15 +13272,11 @@ export async function fetch(request: Request): Promise<Response> {
 
 #### Local and Remote Support
 
-Support level: `Remote`. Remote support means Devflare supports the config, generated env shape, docs, and local application-flow work, but full fidelity requires Cloudflare remote infrastructure. Use local shims or fixtures for code your app owns, then connect to Cloudflare when the product behavior is the assertion.
+Devflare supports the config, generated env shape, docs, and local application-flow work, but full fidelity requires Cloudflare remote infrastructure. Use local shims or fixtures for code your app owns, then connect to Cloudflare when the product behavior is the assertion.
 
-Offline-fixture: tests can provide named tenant fetchers, but Devflare does not emulate tenant upload/lifecycle.
+Offline-fixture: tests can provide named tenant fetchers, but Devflare does not emulate tenant upload/lifecycle. Keep local coverage focused on deterministic application flow through fixtures, mocks, shims, or Miniflare-backed wiring instead of pretending to reproduce Cloudflare-hosted product behavior.
 
-##### Highlights
-
-- **Remote support** — Remote support means Devflare supports the config, generated env shape, docs, and local application-flow work, but full fidelity requires Cloudflare remote infrastructure. Use local shims or fixtures for code your app owns, then connect to Cloudflare when the product behavior is the assertion.
-- **What works without Cloudflare** — Offline-fixture: tests can provide named tenant fetchers, but Devflare does not emulate tenant upload/lifecycle. Keep local coverage focused on deterministic application flow through fixtures, mocks, shims, or Miniflare-backed wiring instead of pretending to reproduce Cloudflare-hosted product behavior.
-- **When to connect to Cloudflare** — Use Cloudflare when the assertion depends on cloudflare-hosted product behavior rather than the app calling the binding correctly. This is the lane for full Dispatch Namespaces product fidelity, remote state, lifecycle behavior, and platform-specific limits.
+Use Cloudflare when the assertion depends on cloudflare-hosted product behavior rather than the app calling the binding correctly. This is the lane for full Dispatch Namespaces product fidelity, remote state, lifecycle behavior, and platform-specific limits.
 
 #### When this binding fits best
 
@@ -13412,41 +13286,21 @@ Offline-fixture: tests can provide named tenant fetchers, but Devflare does not 
 - Keep binding names stable and uppercase in examples so generated Env declarations remain predictable.
 - Prefer Devflare native config while it covers the feature; use `wrangler.passthrough` only for unsupported Wrangler-only fields.
 
-#### Notes worth keeping visible
+#### Testing path
 
 ##### Key points
 
-- Offline-fixture: tests can provide named tenant fetchers, but Devflare does not emulate tenant upload/lifecycle
-- Cloudflare owns dispatch namespace creation, tenant uploads, Worker metadata, and production routing.
-- For tests, start with `createOfflineEnv()` with `fixtures.dispatchNamespaces`; reach for `createMockDispatchNamespace()` / `createMockEnv({ dispatchNamespaces })` when you want a pure unit test without Miniflare or Cloudflare.
+- Start with `createOfflineEnv()` with `fixtures.dispatchNamespaces` for config-backed local worker tests.
+- Use `createMockDispatchNamespace()` / `createMockEnv({ dispatchNamespaces })` for small unit tests that only need deterministic application behavior.
+- Use Cloudflare-backed tests when the assertion depends on hosted platform behavior, account state, limits, billing, or production routing.
 
-> **Note — Document the boundary at the same time as the recipe**
->
-> The old docs often made developers infer whether Dispatch Namespaces was local, remote, or fixture-backed. This page keeps that stance beside the first usable example.
-
-#### Cloudflare docs vs the Devflare layer
-
-Cloudflare Workers for Platforms docs is the platform reference. This page is the Devflare translation layer: keep `bindings.dispatchNamespaces` readable in source, understand the typed env surface, and know which local, preview, or remote lane actually matches the binding.
+#### Open the next page when you need it
 
 ##### Highlights
 
-- **Cloudflare Workers for Platforms docs** — Platform reference for dispatch namespaces, dynamic dispatch Workers, and tenant Worker routing. ([link](https://developers.cloudflare.com/cloudflare-for-platforms/workers-for-platforms/configuration/dynamic-dispatch/))
-
-##### Reference table
-
-| Question | Cloudflare docs | This Devflare page |
-| --- | --- | --- |
-| Primary focus | Platform reference for dispatch namespaces, dynamic dispatch Workers, and tenant Worker routing. | How to author `bindings.dispatchNamespaces`, what the runtime surface looks like, and how Dispatch Namespaces fits a Devflare project. |
-| Testing and runtime lens | Cloudflare’s docs focus on the raw binding API, product semantics, and platform limits for the binding itself. | Offline-fixture: tests can provide named tenant fetchers, but Devflare does not emulate tenant upload/lifecycle. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
-| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
-
-#### Go deeper only if this one-page guide stops being enough
-
-##### Highlights
-
-- **Dispatch Namespaces internals** — See normalization, Wrangler `dispatch_namespaces`, and the preview or runtime details behind the authored shape. ([link](/docs/bindings/dispatch-namespaces/internals))
-- **Testing Dispatch Namespaces** — Start from `createOfflineEnv()` with `fixtures.dispatchNamespaces` and only escalate when the binding or deployment model genuinely needs it. ([link](/docs/bindings/dispatch-namespaces/testing))
-- **Dispatch Namespaces example** — Adapt one small end-to-end path before you hide the binding behind a bigger abstraction. ([link](/docs/bindings/dispatch-namespaces/example))
+- **Dispatch Namespaces internals** — Check emitted Wrangler `dispatch_namespaces`, preview behavior, and Cloudflare-specific details. ([link](/docs/bindings/dispatch-namespaces/internals))
+- **Testing Dispatch Namespaces** — Pick the `createOfflineEnv()` with `fixtures.dispatchNamespaces` path first, then move to remote checks only when the test needs them. ([link](/docs/bindings/dispatch-namespaces/testing))
+- **Dispatch Namespaces example** — Copy a fuller application path when the quick example is too small. ([link](/docs/bindings/dispatch-namespaces/example))
 
 ---
 
@@ -13461,7 +13315,7 @@ Cloudflare Workers for Platforms docs is the platform reference. This page is th
 | Navigation title | Dispatch Namespaces internals |
 | Eyebrow | Under the hood |
 
-The internals page is deliberately short: it shows the authored config beside the Wrangler-facing output and names the exact places where Devflare stops pretending to be Cloudflare.
+Use this page when you need emitted config, preview behavior, or Cloudflare-specific limits. The overview and example pages stay focused on everyday app code.
 
 #### At a glance
 
@@ -13471,15 +13325,15 @@ The internals page is deliberately short: it shows the authored config beside th
 | Compile target | Wrangler `dispatch_namespaces` |
 | Preview note | Cloudflare owns dispatch namespace creation, tenant uploads, Worker metadata, and production routing. |
 
-#### Devflare normalizes the authored shape before it does anything louder
+#### How authored config becomes Wrangler config
 
 The authored config stays camelCase and project-oriented. The compiler translates that into the Wrangler keys Cloudflare expects.
 
-The generated output is intentionally shown so the docs can be checked against real compiler behavior instead of relying on memory.
+The emitted output is shown here so the usage pages do not have to explain compiler details.
 
-##### Example — Dispatch Namespaces from authored config to generated output
+##### Example — Dispatch Namespaces config and emitted Wrangler output
 
-Keep the binding readable in source, then inspect only the Wrangler-facing slice Devflare emits when the config is compiled.
+Use this when you need to check how the Devflare config becomes Wrangler-compatible config.
 
 ###### File — devflare.config.ts
 
@@ -13508,7 +13362,7 @@ export default defineConfig({
 }
 ```
 
-#### Local runtime support depends on what Devflare can model directly
+#### What local runtime support covers
 
 ##### Key points
 
@@ -13523,6 +13377,22 @@ export default defineConfig({
 - Devflare emits Wrangler `dispatch_namespaces` from the native config surface.
 - Preview and deployment lifecycle stay feature-specific; do not assume all Cloudflare products can be created, cloned, or cleaned up the same way.
 - Cloudflare owns dispatch namespace creation, tenant uploads, Worker metadata, and production routing.
+
+#### Cloudflare docs vs the Devflare layer
+
+Cloudflare Workers for Platforms docs is the platform reference. Use this internals page when you need to compare Cloudflare's product docs with Devflare config, generated env types, local support, and preview behavior for `bindings.dispatchNamespaces`.
+
+##### Highlights
+
+- **Cloudflare Workers for Platforms docs** — Platform reference for dispatch namespaces, dynamic dispatch Workers, and tenant Worker routing. ([link](https://developers.cloudflare.com/cloudflare-for-platforms/workers-for-platforms/configuration/dynamic-dispatch/))
+
+##### Reference table
+
+| Question | Cloudflare docs | This Devflare page |
+| --- | --- | --- |
+| Primary focus | Platform reference for dispatch namespaces, dynamic dispatch Workers, and tenant Worker routing. | How to author `bindings.dispatchNamespaces`, what the runtime surface looks like, and how Dispatch Namespaces fits a Devflare project. |
+| Testing and runtime lens | Cloudflare’s docs focus on the raw binding API, product semantics, and platform limits for the binding itself. | Offline-fixture: tests can provide named tenant fetchers, but Devflare does not emulate tenant upload/lifecycle. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
+| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
 
 ---
 
@@ -13668,9 +13538,9 @@ export async function fetch(request: Request): Promise<Response> {
 
 ---
 
-### Use Workflows with the smallest config that states the binding contract
+### Use Workflows in a Worker
 
-> Configure Workflows, call the `Workflow` binding from worker code, and choose a test lane that matches the support level.
+> Add the Workflows config, call `Workflow` from worker code, and start with the local test path Devflare supports.
 
 | Field | Value |
 | --- | --- |
@@ -13689,11 +13559,11 @@ Start with the config, wire the binding into worker code, then use the support s
 | Authoring shape | `Record<string, { name; className; scriptName?; limits? }>` |
 | Best for | starting long-running workflow instances from a Worker path |
 
-#### Author it in the simplest shape that still says what you mean
+#### Add the binding to config
 
-Start with the smallest readable `bindings.workflows` shape. If the feature needs a Cloudflare-created id or namespace, keep that explicit in config so reviewers can see where the remote boundary begins.
+Add `bindings.workflows` to `devflare.config.ts`, then use the generated env binding from Worker code.
 
-Use this page as the quick contract, then open the deeper internals/testing/example tabs only when the first recipe is not enough.
+Keep the first version close to the route or handler that needs it; move to a helper only after the shape is obvious.
 
 ##### Example — Smallest Workflow binding config
 
@@ -13717,18 +13587,42 @@ export default defineConfig({
 
 After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first Workflows path close to the route, handler, or service method that needs it.
 
-Keep this first path small enough that the binding contract stays visible during code review.
+Keep this first path small enough that the config, env binding, and user-visible behavior are easy to review together.
 
-##### Example — Create one workflow instance
+##### Example — Define and start one order workflow
 
 ```ts
+import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from 'cloudflare:workers'
 import { env } from 'devflare/runtime'
+
+type OrderWorkflowParams = {
+	orderId: string
+	email: string
+}
+
+export class OrderWorkflow extends WorkflowEntrypoint<DevflareEnv, OrderWorkflowParams> {
+	async run(event: WorkflowEvent<OrderWorkflowParams>, step: WorkflowStep): Promise<unknown> {
+		const invoice = await step.do('create invoice', async () => {
+			return { id: 'inv_' + event.payload.orderId, email: event.payload.email }
+		})
+
+		await step.do('send confirmation', async () => {
+			await fetch('https://api.example.com/confirmations', {
+				method: 'POST',
+				body: JSON.stringify(invoice)
+			})
+			return { queued: true }
+		})
+
+		return invoice
+	}
+}
 
 export async function fetch(request: Request): Promise<Response> {
 	const orderId = new URL(request.url).searchParams.get('order') ?? 'demo'
 	const instance = await env.ORDER_WORKFLOW.create({
 		id: orderId,
-		params: { orderId }
+		params: { orderId, email: 'customer@example.com' }
 	})
 
 	return Response.json({ id: instance.id })
@@ -13737,15 +13631,11 @@ export async function fetch(request: Request): Promise<Response> {
 
 #### Local and Remote Support
 
-Support level: `Remote`. Remote support means Devflare supports the config, generated env shape, docs, and local application-flow work, but full fidelity requires Cloudflare remote infrastructure. Use local shims or fixtures for code your app owns, then connect to Cloudflare when the product behavior is the assertion.
+Devflare can run useful Workflows application behavior locally for ordinary development and tests. Cloudflare still owns production limits, quotas, billing, and deployed account behavior.
 
-Offline-native for application-level calls through Miniflare or deterministic workflow mocks.
+Full local support through Miniflare workflow bindings and deterministic workflow mocks. Start locally with `createTestContext()` or `createOfflineEnv()`; that lane should cover the normal Workflows application flow without requiring a Cloudflare connection.
 
-##### Highlights
-
-- **Remote support** — Remote support means Devflare supports the config, generated env shape, docs, and local application-flow work, but full fidelity requires Cloudflare remote infrastructure. Use local shims or fixtures for code your app owns, then connect to Cloudflare when the product behavior is the assertion.
-- **What works without Cloudflare** — Offline-native for application-level calls through Miniflare or deterministic workflow mocks. Keep local coverage focused on deterministic application flow through fixtures, mocks, shims, or Miniflare-backed wiring instead of pretending to reproduce Cloudflare-hosted product behavior.
-- **When to connect to Cloudflare** — Use Cloudflare when the assertion depends on cloudflare-hosted product behavior rather than the app calling the binding correctly. This is the lane for full Workflows product fidelity, remote state, lifecycle behavior, and platform-specific limits.
+Use Cloudflare when the assertion depends on deployed limits, account state, lifecycle behavior, billing, or other production-only Workflows details.
 
 #### When this binding fits best
 
@@ -13755,41 +13645,21 @@ Offline-native for application-level calls through Miniflare or deterministic wo
 - Keep binding names stable and uppercase in examples so generated Env declarations remain predictable.
 - Prefer Devflare native config while it covers the feature; use `wrangler.passthrough` only for unsupported Wrangler-only fields.
 
-#### Notes worth keeping visible
+#### Testing path
 
 ##### Key points
 
-- Offline-native for application-level calls through Miniflare or deterministic workflow mocks
-- Devflare does not provision Workflow resources or inspect production instance state; Wrangler/Cloudflare own deployed lifecycle.
-- For tests, start with `createTestContext()` or `createOfflineEnv()`; reach for `createMockWorkflow()` / `createMockEnv({ workflows })` when you want a pure unit test without Miniflare or Cloudflare.
+- Start with `createTestContext()` or `createOfflineEnv()` for config-backed local worker tests.
+- Use `createMockWorkflow()` / `createMockEnv({ workflows })` for small unit tests that only need deterministic application behavior.
+- Use Cloudflare-backed tests when the assertion depends on hosted platform behavior, account state, limits, billing, or production routing.
 
-> **Note — Document the boundary at the same time as the recipe**
->
-> The old docs often made developers infer whether Workflows was local, remote, or fixture-backed. This page keeps that stance beside the first usable example.
-
-#### Cloudflare docs vs the Devflare layer
-
-Cloudflare Workflows docs is the platform reference. This page is the Devflare translation layer: keep `bindings.workflows` readable in source, understand the typed env surface, and know which local, preview, or remote lane actually matches the binding.
+#### Open the next page when you need it
 
 ##### Highlights
 
-- **Cloudflare Workflows docs** — Platform reference for creating Workflow bindings and triggering Workflow instances from Workers. ([link](https://developers.cloudflare.com/workflows/build/trigger-workflows/))
-
-##### Reference table
-
-| Question | Cloudflare docs | This Devflare page |
-| --- | --- | --- |
-| Primary focus | Platform reference for creating Workflow bindings and triggering Workflow instances from Workers. | How to author `bindings.workflows`, what the runtime surface looks like, and how Workflows fits a Devflare project. |
-| Testing and runtime lens | Cloudflare’s docs focus on the raw binding API, product semantics, and platform limits for the binding itself. | Offline-native for application-level calls through Miniflare or deterministic workflow mocks. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
-| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
-
-#### Go deeper only if this one-page guide stops being enough
-
-##### Highlights
-
-- **Workflows internals** — See normalization, Wrangler `workflows`, and the preview or runtime details behind the authored shape. ([link](/docs/bindings/workflows/internals))
-- **Testing Workflows** — Start from `createTestContext()` or `createOfflineEnv()` and only escalate when the binding or deployment model genuinely needs it. ([link](/docs/bindings/workflows/testing))
-- **Workflows example** — Adapt one small end-to-end path before you hide the binding behind a bigger abstraction. ([link](/docs/bindings/workflows/example))
+- **Workflows internals** — Check emitted Wrangler `workflows`, preview behavior, and Cloudflare-specific details. ([link](/docs/bindings/workflows/internals))
+- **Testing Workflows** — Pick the `createTestContext()` or `createOfflineEnv()` path first, then move to remote checks only when the test needs them. ([link](/docs/bindings/workflows/testing))
+- **Workflows example** — Copy a fuller application path when the quick example is too small. ([link](/docs/bindings/workflows/example))
 
 ---
 
@@ -13804,7 +13674,7 @@ Cloudflare Workflows docs is the platform reference. This page is the Devflare t
 | Navigation title | Workflows internals |
 | Eyebrow | Under the hood |
 
-The internals page is deliberately short: it shows the authored config beside the Wrangler-facing output and names the exact places where Devflare stops pretending to be Cloudflare.
+Use this page when you need emitted config, preview behavior, or Cloudflare-specific limits. The overview and example pages stay focused on everyday app code.
 
 #### At a glance
 
@@ -13812,17 +13682,17 @@ The internals page is deliberately short: it shows the authored config beside th
 | --- | --- |
 | Normalization | Devflare normalizes `bindings.workflows` before emitting Wrangler `workflows` |
 | Compile target | Wrangler `workflows` |
-| Preview note | Devflare does not provision Workflow resources or inspect production instance state; Wrangler/Cloudflare own deployed lifecycle. |
+| Preview note | Cloudflare owns deployed Workflow durability, retries, scheduling, and production instance history. |
 
-#### Devflare normalizes the authored shape before it does anything louder
+#### How authored config becomes Wrangler config
 
 The authored config stays camelCase and project-oriented. The compiler translates that into the Wrangler keys Cloudflare expects.
 
-The generated output is intentionally shown so the docs can be checked against real compiler behavior instead of relying on memory.
+The emitted output is shown here so the usage pages do not have to explain compiler details.
 
-##### Example — Workflows from authored config to generated output
+##### Example — Workflows config and emitted Wrangler output
 
-Keep the binding readable in source, then inspect only the Wrangler-facing slice Devflare emits when the config is compiled.
+Use this when you need to check how the Devflare config becomes Wrangler-compatible config.
 
 ###### File — devflare.config.ts
 
@@ -13852,11 +13722,11 @@ export default defineConfig({
 }
 ```
 
-#### Local runtime support depends on what Devflare can model directly
+#### What local runtime support covers
 
 ##### Key points
 
-- Offline-native for application-level calls through Miniflare or deterministic workflow mocks
+- Full local support through Miniflare workflow bindings and deterministic workflow mocks
 - The default docs recipe uses `createTestContext()` or `createOfflineEnv()`.
 - Pure unit tests can use `createMockWorkflow()` / `createMockEnv({ workflows })` when the test only needs deterministic application behavior.
 
@@ -13866,7 +13736,23 @@ export default defineConfig({
 
 - Devflare emits Wrangler `workflows` from the native config surface.
 - Preview and deployment lifecycle stay feature-specific; do not assume all Cloudflare products can be created, cloned, or cleaned up the same way.
-- Devflare does not provision Workflow resources or inspect production instance state; Wrangler/Cloudflare own deployed lifecycle.
+- Cloudflare owns deployed Workflow durability, retries, scheduling, and production instance history.
+
+#### Cloudflare docs vs the Devflare layer
+
+Cloudflare Workflows docs is the platform reference. Use this internals page when you need to compare Cloudflare's product docs with Devflare config, generated env types, local support, and preview behavior for `bindings.workflows`.
+
+##### Highlights
+
+- **Cloudflare Workflows docs** — Platform reference for creating Workflow bindings and triggering Workflow instances from Workers. ([link](https://developers.cloudflare.com/workflows/build/trigger-workflows/))
+
+##### Reference table
+
+| Question | Cloudflare docs | This Devflare page |
+| --- | --- | --- |
+| Primary focus | Platform reference for creating Workflow bindings and triggering Workflow instances from Workers. | How to author `bindings.workflows`, what the runtime surface looks like, and how Workflows fits a Devflare project. |
+| Testing and runtime lens | Cloudflare’s docs focus on the raw binding API, product semantics, and platform limits for the binding itself. | Full local support through Miniflare workflow bindings and deterministic workflow mocks. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
+| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
 
 ---
 
@@ -13923,7 +13809,7 @@ test('creates a workflow instance', async () => {
 
 ##### Key points
 
-- Devflare does not provision Workflow resources or inspect production instance state; Wrangler/Cloudflare own deployed lifecycle.
+- Cloudflare owns deployed Workflow durability, retries, scheduling, and production instance history.
 - Do not let a low-fidelity mock become product documentation. Keep mocks framed as application-flow tools.
 - If a test would mutate paid or remote Cloudflare state, gate it separately from ordinary unit tests.
 
@@ -13983,18 +13869,42 @@ Keep product limits, remote ownership, and fallback behavior visible in the code
 ##### Key points
 
 - Keep the first example short enough to paste into a new Worker.
-- Devflare does not provision Workflow resources or inspect production instance state; Wrangler/Cloudflare own deployed lifecycle.
+- Cloudflare owns deployed Workflow durability, retries, scheduling, and production instance history.
 
-##### Example — Create one workflow instance
+##### Example — Define and start one order workflow
 
 ```ts
+import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from 'cloudflare:workers'
 import { env } from 'devflare/runtime'
+
+type OrderWorkflowParams = {
+	orderId: string
+	email: string
+}
+
+export class OrderWorkflow extends WorkflowEntrypoint<DevflareEnv, OrderWorkflowParams> {
+	async run(event: WorkflowEvent<OrderWorkflowParams>, step: WorkflowStep): Promise<unknown> {
+		const invoice = await step.do('create invoice', async () => {
+			return { id: 'inv_' + event.payload.orderId, email: event.payload.email }
+		})
+
+		await step.do('send confirmation', async () => {
+			await fetch('https://api.example.com/confirmations', {
+				method: 'POST',
+				body: JSON.stringify(invoice)
+			})
+			return { queued: true }
+		})
+
+		return invoice
+	}
+}
 
 export async function fetch(request: Request): Promise<Response> {
 	const orderId = new URL(request.url).searchParams.get('order') ?? 'demo'
 	const instance = await env.ORDER_WORKFLOW.create({
 		id: orderId,
-		params: { orderId }
+		params: { orderId, email: 'customer@example.com' }
 	})
 
 	return Response.json({ id: instance.id })
@@ -14015,9 +13925,9 @@ export async function fetch(request: Request): Promise<Response> {
 
 ---
 
-### Use Pipelines with the smallest config that states the binding contract
+### Use Pipelines in a Worker
 
-> Configure Pipelines, call the `Pipeline` binding from worker code, and choose a test lane that matches the support level.
+> Add the Pipelines config, call `Pipeline` from worker code, and start with the local test path Devflare supports.
 
 | Field | Value |
 | --- | --- |
@@ -14036,11 +13946,11 @@ Start with the config, wire the binding into worker code, then use the support s
 | Authoring shape | `Record<string, string \| { pipeline; remote? }>` |
 | Best for | Worker-side event ingestion into Cloudflare Pipelines |
 
-#### Author it in the simplest shape that still says what you mean
+#### Add the binding to config
 
-Start with the smallest readable `bindings.pipelines` shape. If the feature needs a Cloudflare-created id or namespace, keep that explicit in config so reviewers can see where the remote boundary begins.
+Add `bindings.pipelines` to `devflare.config.ts`, then use the generated env binding from Worker code.
 
-Use this page as the quick contract, then open the deeper internals/testing/example tabs only when the first recipe is not enough.
+Keep the first version close to the route or handler that needs it; move to a helper only after the shape is obvious.
 
 ##### Example — Smallest Pipeline config
 
@@ -14061,7 +13971,7 @@ export default defineConfig({
 
 After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first Pipelines path close to the route, handler, or service method that needs it.
 
-Keep this first path small enough that the binding contract stays visible during code review.
+Keep this first path small enough that the config, env binding, and user-visible behavior are easy to review together.
 
 ##### Example — Send one record batch
 
@@ -14079,15 +13989,11 @@ export async function fetch(): Promise<Response> {
 
 #### Local and Remote Support
 
-Support level: `Remote`. Remote support means Devflare supports the config, generated env shape, docs, and local application-flow work, but full fidelity requires Cloudflare remote infrastructure. Use local shims or fixtures for code your app owns, then connect to Cloudflare when the product behavior is the assertion.
+Devflare supports the config, generated env shape, docs, and local application-flow work, but full fidelity requires Cloudflare remote infrastructure. Use local shims or fixtures for code your app owns, then connect to Cloudflare when the product behavior is the assertion.
 
-Offline-native for send-recording tests; Cloudflare owns production batching and sink delivery.
+Offline-native for send-recording tests; Cloudflare owns production batching and sink delivery. Keep local coverage focused on deterministic application flow through fixtures, mocks, shims, or Miniflare-backed wiring instead of pretending to reproduce Cloudflare-hosted product behavior.
 
-##### Highlights
-
-- **Remote support** — Remote support means Devflare supports the config, generated env shape, docs, and local application-flow work, but full fidelity requires Cloudflare remote infrastructure. Use local shims or fixtures for code your app owns, then connect to Cloudflare when the product behavior is the assertion.
-- **What works without Cloudflare** — Offline-native for send-recording tests; Cloudflare owns production batching and sink delivery. Keep local coverage focused on deterministic application flow through fixtures, mocks, shims, or Miniflare-backed wiring instead of pretending to reproduce Cloudflare-hosted product behavior.
-- **When to connect to Cloudflare** — Use Cloudflare when the assertion depends on cloudflare-hosted product behavior rather than the app calling the binding correctly. This is the lane for full Pipelines product fidelity, remote state, lifecycle behavior, and platform-specific limits.
+Use Cloudflare when the assertion depends on cloudflare-hosted product behavior rather than the app calling the binding correctly. This is the lane for full Pipelines product fidelity, remote state, lifecycle behavior, and platform-specific limits.
 
 #### When this binding fits best
 
@@ -14097,41 +14003,21 @@ Offline-native for send-recording tests; Cloudflare owns production batching and
 - Keep binding names stable and uppercase in examples so generated Env declarations remain predictable.
 - Prefer Devflare native config while it covers the feature; use `wrangler.passthrough` only for unsupported Wrangler-only fields.
 
-#### Notes worth keeping visible
+#### Testing path
 
 ##### Key points
 
-- Offline-native for send-recording tests; Cloudflare owns production batching and sink delivery
-- Devflare records local sends but does not create pipelines, manage R2 sinks, or emulate production batching.
-- For tests, start with `createTestContext()` or `createOfflineEnv()`; reach for `createMockPipeline()` / `createMockEnv({ pipelines })` when you want a pure unit test without Miniflare or Cloudflare.
+- Start with `createTestContext()` or `createOfflineEnv()` for config-backed local worker tests.
+- Use `createMockPipeline()` / `createMockEnv({ pipelines })` for small unit tests that only need deterministic application behavior.
+- Use Cloudflare-backed tests when the assertion depends on hosted platform behavior, account state, limits, billing, or production routing.
 
-> **Note — Document the boundary at the same time as the recipe**
->
-> The old docs often made developers infer whether Pipelines was local, remote, or fixture-backed. This page keeps that stance beside the first usable example.
-
-#### Cloudflare docs vs the Devflare layer
-
-Cloudflare Pipelines docs is the platform reference. This page is the Devflare translation layer: keep `bindings.pipelines` readable in source, understand the typed env surface, and know which local, preview, or remote lane actually matches the binding.
+#### Open the next page when you need it
 
 ##### Highlights
 
-- **Cloudflare Pipelines docs** — Platform reference for sending records from Workers into Cloudflare Pipelines. ([link](https://developers.cloudflare.com/pipelines/build-with-pipelines/sources/workers-apis/))
-
-##### Reference table
-
-| Question | Cloudflare docs | This Devflare page |
-| --- | --- | --- |
-| Primary focus | Platform reference for sending records from Workers into Cloudflare Pipelines. | How to author `bindings.pipelines`, what the runtime surface looks like, and how Pipelines fits a Devflare project. |
-| Testing and runtime lens | Cloudflare’s docs focus on the raw binding API, product semantics, and platform limits for the binding itself. | Offline-native for send-recording tests; Cloudflare owns production batching and sink delivery. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
-| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
-
-#### Go deeper only if this one-page guide stops being enough
-
-##### Highlights
-
-- **Pipelines internals** — See normalization, Wrangler `pipelines`, and the preview or runtime details behind the authored shape. ([link](/docs/bindings/pipelines/internals))
-- **Testing Pipelines** — Start from `createTestContext()` or `createOfflineEnv()` and only escalate when the binding or deployment model genuinely needs it. ([link](/docs/bindings/pipelines/testing))
-- **Pipelines example** — Adapt one small end-to-end path before you hide the binding behind a bigger abstraction. ([link](/docs/bindings/pipelines/example))
+- **Pipelines internals** — Check emitted Wrangler `pipelines`, preview behavior, and Cloudflare-specific details. ([link](/docs/bindings/pipelines/internals))
+- **Testing Pipelines** — Pick the `createTestContext()` or `createOfflineEnv()` path first, then move to remote checks only when the test needs them. ([link](/docs/bindings/pipelines/testing))
+- **Pipelines example** — Copy a fuller application path when the quick example is too small. ([link](/docs/bindings/pipelines/example))
 
 ---
 
@@ -14146,7 +14032,7 @@ Cloudflare Pipelines docs is the platform reference. This page is the Devflare t
 | Navigation title | Pipelines internals |
 | Eyebrow | Under the hood |
 
-The internals page is deliberately short: it shows the authored config beside the Wrangler-facing output and names the exact places where Devflare stops pretending to be Cloudflare.
+Use this page when you need emitted config, preview behavior, or Cloudflare-specific limits. The overview and example pages stay focused on everyday app code.
 
 #### At a glance
 
@@ -14156,15 +14042,15 @@ The internals page is deliberately short: it shows the authored config beside th
 | Compile target | Wrangler `pipelines` |
 | Preview note | Devflare records local sends but does not create pipelines, manage R2 sinks, or emulate production batching. |
 
-#### Devflare normalizes the authored shape before it does anything louder
+#### How authored config becomes Wrangler config
 
 The authored config stays camelCase and project-oriented. The compiler translates that into the Wrangler keys Cloudflare expects.
 
-The generated output is intentionally shown so the docs can be checked against real compiler behavior instead of relying on memory.
+The emitted output is shown here so the usage pages do not have to explain compiler details.
 
-##### Example — Pipelines from authored config to generated output
+##### Example — Pipelines config and emitted Wrangler output
 
-Keep the binding readable in source, then inspect only the Wrangler-facing slice Devflare emits when the config is compiled.
+Use this when you need to check how the Devflare config becomes Wrangler-compatible config.
 
 ###### File — devflare.config.ts
 
@@ -14191,7 +14077,7 @@ export default defineConfig({
 }
 ```
 
-#### Local runtime support depends on what Devflare can model directly
+#### What local runtime support covers
 
 ##### Key points
 
@@ -14206,6 +14092,22 @@ export default defineConfig({
 - Devflare emits Wrangler `pipelines` from the native config surface.
 - Preview and deployment lifecycle stay feature-specific; do not assume all Cloudflare products can be created, cloned, or cleaned up the same way.
 - Devflare records local sends but does not create pipelines, manage R2 sinks, or emulate production batching.
+
+#### Cloudflare docs vs the Devflare layer
+
+Cloudflare Pipelines docs is the platform reference. Use this internals page when you need to compare Cloudflare's product docs with Devflare config, generated env types, local support, and preview behavior for `bindings.pipelines`.
+
+##### Highlights
+
+- **Cloudflare Pipelines docs** — Platform reference for sending records from Workers into Cloudflare Pipelines. ([link](https://developers.cloudflare.com/pipelines/build-with-pipelines/sources/workers-apis/))
+
+##### Reference table
+
+| Question | Cloudflare docs | This Devflare page |
+| --- | --- | --- |
+| Primary focus | Platform reference for sending records from Workers into Cloudflare Pipelines. | How to author `bindings.pipelines`, what the runtime surface looks like, and how Pipelines fits a Devflare project. |
+| Testing and runtime lens | Cloudflare’s docs focus on the raw binding API, product semantics, and platform limits for the binding itself. | Offline-native for send-recording tests; Cloudflare owns production batching and sink delivery. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
+| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
 
 ---
 
@@ -14349,9 +14251,9 @@ export async function fetch(): Promise<Response> {
 
 ---
 
-### Use Images with the smallest config that states the binding contract
+### Use Images in a Worker
 
-> Configure Images, call the `ImagesBinding` binding from worker code, and choose a test lane that matches the support level.
+> Add the Images config, call `ImagesBinding` from worker code, and start with the local test path Devflare supports.
 
 | Field | Value |
 | --- | --- |
@@ -14370,11 +14272,11 @@ Start with the config, wire the binding into worker code, then use the support s
 | Authoring shape | `Record<string, true \| { remote? }>` |
 | Best for | image transformation/upload paths where the Worker calls the Images binding |
 
-#### Author it in the simplest shape that still says what you mean
+#### Add the binding to config
 
-Start with the smallest readable `bindings.images` shape. If the feature needs a Cloudflare-created id or namespace, keep that explicit in config so reviewers can see where the remote boundary begins.
+Add `bindings.images` to `devflare.config.ts`, then use the generated env binding from Worker code.
 
-Use this page as the quick contract, then open the deeper internals/testing/example tabs only when the first recipe is not enough.
+Keep the first version close to the route or handler that needs it; move to a helper only after the shape is obvious.
 
 ##### Example — Smallest Images config
 
@@ -14395,7 +14297,7 @@ export default defineConfig({
 
 After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first Images path close to the route, handler, or service method that needs it.
 
-Keep this first path small enough that the binding contract stays visible during code review.
+Keep this first path small enough that the config, env binding, and user-visible behavior are easy to review together.
 
 ##### Example — Transform uploaded image bytes
 
@@ -14416,15 +14318,11 @@ export async function fetch(request: Request): Promise<Response> {
 
 #### Local and Remote Support
 
-Support level: `Remote`. Remote support means Devflare supports the config, generated env shape, docs, and local application-flow work, but full fidelity requires Cloudflare remote infrastructure. Use local shims or fixtures for code your app owns, then connect to Cloudflare when the product behavior is the assertion.
+Devflare can run useful Images application behavior locally for ordinary development and tests. Cloudflare still owns production limits, quotas, billing, and deployed account behavior.
 
-Offline-native for low-fidelity chain-shape tests; Wrangler currently supports one Images binding per Worker.
+Full local support through Miniflare image bindings, persisted local state, and deterministic pure mocks. Start locally with `createTestContext()` or `createOfflineEnv()`; that lane should cover the normal Images application flow without requiring a Cloudflare connection.
 
-##### Highlights
-
-- **Remote support** — Remote support means Devflare supports the config, generated env shape, docs, and local application-flow work, but full fidelity requires Cloudflare remote infrastructure. Use local shims or fixtures for code your app owns, then connect to Cloudflare when the product behavior is the assertion.
-- **What works without Cloudflare** — Offline-native for low-fidelity chain-shape tests; Wrangler currently supports one Images binding per Worker. Keep local coverage focused on deterministic application flow through fixtures, mocks, shims, or Miniflare-backed wiring instead of pretending to reproduce Cloudflare-hosted product behavior.
-- **When to connect to Cloudflare** — Use Cloudflare when the assertion depends on cloudflare-hosted product behavior rather than the app calling the binding correctly. This is the lane for full Images product fidelity, remote state, lifecycle behavior, and platform-specific limits.
+Use Cloudflare when the assertion depends on deployed limits, account state, lifecycle behavior, billing, or other production-only Images details.
 
 #### When this binding fits best
 
@@ -14434,41 +14332,21 @@ Offline-native for low-fidelity chain-shape tests; Wrangler currently supports o
 - Keep binding names stable and uppercase in examples so generated Env declarations remain predictable.
 - Prefer Devflare native config while it covers the feature; use `wrangler.passthrough` only for unsupported Wrangler-only fields.
 
-#### Notes worth keeping visible
+#### Testing path
 
 ##### Key points
 
-- Offline-native for low-fidelity chain-shape tests; Wrangler currently supports one Images binding per Worker
-- The local mock proves call shape; Cloudflare owns hosted image APIs, transform fidelity, billing, and storage.
-- For tests, start with `createTestContext()` or `createOfflineEnv()`; reach for `createMockImagesBinding()` / `createMockEnv({ images })` when you want a pure unit test without Miniflare or Cloudflare.
+- Start with `createTestContext()` or `createOfflineEnv()` for config-backed local worker tests.
+- Use `createMockImagesBinding()` / `createMockEnv({ images })` for small unit tests that only need deterministic application behavior.
+- Use Cloudflare-backed tests when the assertion depends on hosted platform behavior, account state, limits, billing, or production routing.
 
-> **Note — Document the boundary at the same time as the recipe**
->
-> The old docs often made developers infer whether Images was local, remote, or fixture-backed. This page keeps that stance beside the first usable example.
-
-#### Cloudflare docs vs the Devflare layer
-
-Cloudflare Images docs is the platform reference. This page is the Devflare translation layer: keep `bindings.images` readable in source, understand the typed env surface, and know which local, preview, or remote lane actually matches the binding.
+#### Open the next page when you need it
 
 ##### Highlights
 
-- **Cloudflare Images docs** — Platform reference for Images bindings, transformations, billing, and Workers API setup. ([link](https://developers.cloudflare.com/images/transform-images/bindings/))
-
-##### Reference table
-
-| Question | Cloudflare docs | This Devflare page |
-| --- | --- | --- |
-| Primary focus | Platform reference for Images bindings, transformations, billing, and Workers API setup. | How to author `bindings.images`, what the runtime surface looks like, and how Images fits a Devflare project. |
-| Testing and runtime lens | Cloudflare’s docs focus on the raw binding API, product semantics, and platform limits for the binding itself. | Offline-native for low-fidelity chain-shape tests; Wrangler currently supports one Images binding per Worker. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
-| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
-
-#### Go deeper only if this one-page guide stops being enough
-
-##### Highlights
-
-- **Images internals** — See normalization, Wrangler `images`, and the preview or runtime details behind the authored shape. ([link](/docs/bindings/images/internals))
-- **Testing Images** — Start from `createTestContext()` or `createOfflineEnv()` and only escalate when the binding or deployment model genuinely needs it. ([link](/docs/bindings/images/testing))
-- **Images example** — Adapt one small end-to-end path before you hide the binding behind a bigger abstraction. ([link](/docs/bindings/images/example))
+- **Images internals** — Check emitted Wrangler `images`, preview behavior, and Cloudflare-specific details. ([link](/docs/bindings/images/internals))
+- **Testing Images** — Pick the `createTestContext()` or `createOfflineEnv()` path first, then move to remote checks only when the test needs them. ([link](/docs/bindings/images/testing))
+- **Images example** — Copy a fuller application path when the quick example is too small. ([link](/docs/bindings/images/example))
 
 ---
 
@@ -14483,7 +14361,7 @@ Cloudflare Images docs is the platform reference. This page is the Devflare tran
 | Navigation title | Images internals |
 | Eyebrow | Under the hood |
 
-The internals page is deliberately short: it shows the authored config beside the Wrangler-facing output and names the exact places where Devflare stops pretending to be Cloudflare.
+Use this page when you need emitted config, preview behavior, or Cloudflare-specific limits. The overview and example pages stay focused on everyday app code.
 
 #### At a glance
 
@@ -14491,17 +14369,17 @@ The internals page is deliberately short: it shows the authored config beside th
 | --- | --- |
 | Normalization | Devflare normalizes `bindings.images` before emitting Wrangler `images` |
 | Compile target | Wrangler `images` |
-| Preview note | The local mock proves call shape; Cloudflare owns hosted image APIs, transform fidelity, billing, and storage. |
+| Preview note | Cloudflare owns hosted image storage, variants, delivery rules, billing, and final transform fidelity. |
 
-#### Devflare normalizes the authored shape before it does anything louder
+#### How authored config becomes Wrangler config
 
 The authored config stays camelCase and project-oriented. The compiler translates that into the Wrangler keys Cloudflare expects.
 
-The generated output is intentionally shown so the docs can be checked against real compiler behavior instead of relying on memory.
+The emitted output is shown here so the usage pages do not have to explain compiler details.
 
-##### Example — Images from authored config to generated output
+##### Example — Images config and emitted Wrangler output
 
-Keep the binding readable in source, then inspect only the Wrangler-facing slice Devflare emits when the config is compiled.
+Use this when you need to check how the Devflare config becomes Wrangler-compatible config.
 
 ###### File — devflare.config.ts
 
@@ -14528,11 +14406,11 @@ export default defineConfig({
 }
 ```
 
-#### Local runtime support depends on what Devflare can model directly
+#### What local runtime support covers
 
 ##### Key points
 
-- Offline-native for low-fidelity chain-shape tests; Wrangler currently supports one Images binding per Worker
+- Full local support through Miniflare image bindings, persisted local state, and deterministic pure mocks
 - The default docs recipe uses `createTestContext()` or `createOfflineEnv()`.
 - Pure unit tests can use `createMockImagesBinding()` / `createMockEnv({ images })` when the test only needs deterministic application behavior.
 
@@ -14542,7 +14420,23 @@ export default defineConfig({
 
 - Devflare emits Wrangler `images` from the native config surface.
 - Preview and deployment lifecycle stay feature-specific; do not assume all Cloudflare products can be created, cloned, or cleaned up the same way.
-- The local mock proves call shape; Cloudflare owns hosted image APIs, transform fidelity, billing, and storage.
+- Cloudflare owns hosted image storage, variants, delivery rules, billing, and final transform fidelity.
+
+#### Cloudflare docs vs the Devflare layer
+
+Cloudflare Images docs is the platform reference. Use this internals page when you need to compare Cloudflare's product docs with Devflare config, generated env types, local support, and preview behavior for `bindings.images`.
+
+##### Highlights
+
+- **Cloudflare Images docs** — Platform reference for Images bindings, transformations, billing, and Workers API setup. ([link](https://developers.cloudflare.com/images/transform-images/bindings/))
+
+##### Reference table
+
+| Question | Cloudflare docs | This Devflare page |
+| --- | --- | --- |
+| Primary focus | Platform reference for Images bindings, transformations, billing, and Workers API setup. | How to author `bindings.images`, what the runtime surface looks like, and how Images fits a Devflare project. |
+| Testing and runtime lens | Cloudflare’s docs focus on the raw binding API, product semantics, and platform limits for the binding itself. | Full local support through Miniflare image bindings, persisted local state, and deterministic pure mocks. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
+| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
 
 ---
 
@@ -14581,9 +14475,9 @@ import { createMockImagesBinding } from 'devflare/test'
 
 test('returns a deterministic image response', async () => {
 	const images = createMockImagesBinding()
-	const response = await images.input(new Blob(['image'])).transform({ width: 320 }).output()
+	const result = await images.input(new Blob(['image']).stream()).transform({ width: 320 }).output({ format: 'image/png' })
 
-	expect(response.headers.get('content-type')).toBe('image/png')
+	expect(result.response().headers.get('content-type')).toBe('image/png')
 })
 ```
 
@@ -14599,7 +14493,7 @@ test('returns a deterministic image response', async () => {
 
 ##### Key points
 
-- The local mock proves call shape; Cloudflare owns hosted image APIs, transform fidelity, billing, and storage.
+- Cloudflare owns hosted image storage, variants, delivery rules, billing, and final transform fidelity.
 - Do not let a low-fidelity mock become product documentation. Keep mocks framed as application-flow tools.
 - If a test would mutate paid or remote Cloudflare state, gate it separately from ordinary unit tests.
 
@@ -14656,7 +14550,7 @@ Keep product limits, remote ownership, and fallback behavior visible in the code
 ##### Key points
 
 - Keep the first example short enough to paste into a new Worker.
-- The local mock proves call shape; Cloudflare owns hosted image APIs, transform fidelity, billing, and storage.
+- Cloudflare owns hosted image storage, variants, delivery rules, billing, and final transform fidelity.
 
 ##### Example — Transform uploaded image bytes
 
@@ -14689,9 +14583,9 @@ export async function fetch(request: Request): Promise<Response> {
 
 ---
 
-### Use Media Transformations with the smallest config that states the binding contract
+### Use Media Transformations in a Worker
 
-> Configure Media Transformations, call the `MediaBinding` binding from worker code, and choose a test lane that matches the support level.
+> Add the Media Transformations config, call `MediaBinding` from worker code, and start with the local test path Devflare supports.
 
 | Field | Value |
 | --- | --- |
@@ -14710,11 +14604,11 @@ Start with the config, wire the binding into worker code, then use the support s
 | Authoring shape | `Record<string, true \| { remote? }>` |
 | Best for | video/audio transformation paths where the Worker calls Cloudflare Media Transformations |
 
-#### Author it in the simplest shape that still says what you mean
+#### Add the binding to config
 
-Start with the smallest readable `bindings.media` shape. If the feature needs a Cloudflare-created id or namespace, keep that explicit in config so reviewers can see where the remote boundary begins.
+Add `bindings.media` to `devflare.config.ts`, then use the generated env binding from Worker code.
 
-Use this page as the quick contract, then open the deeper internals/testing/example tabs only when the first recipe is not enough.
+Keep the first version close to the route or handler that needs it; move to a helper only after the shape is obvious.
 
 ##### Example — Smallest Media Transformations config
 
@@ -14735,7 +14629,7 @@ export default defineConfig({
 
 After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first Media Transformations path close to the route, handler, or service method that needs it.
 
-Keep this first path small enough that the binding contract stays visible during code review.
+Keep this first path small enough that the config, env binding, and user-visible behavior are easy to review together.
 
 ##### Example — Run one media transformation chain
 
@@ -14756,15 +14650,11 @@ export async function fetch(request: Request): Promise<Response> {
 
 #### Local and Remote Support
 
-Support level: `Remote`. Remote support means Devflare supports the config, generated env shape, docs, and local application-flow work, but full fidelity requires Cloudflare remote infrastructure. Use local shims or fixtures for code your app owns, then connect to Cloudflare when the product behavior is the assertion.
+Devflare can run useful Media Transformations application behavior locally for ordinary development and tests. Cloudflare still owns production limits, quotas, billing, and deployed account behavior.
 
-Offline-fixture: pure tests can model the chain, but real media processing is hosted Cloudflare behavior.
+Full local support through Miniflare media bindings and deterministic pure mocks for transform chains. Start locally with `createTestContext()` or `createOfflineEnv()` with media fixtures; that lane should cover the normal Media Transformations application flow without requiring a Cloudflare connection.
 
-##### Highlights
-
-- **Remote support** — Remote support means Devflare supports the config, generated env shape, docs, and local application-flow work, but full fidelity requires Cloudflare remote infrastructure. Use local shims or fixtures for code your app owns, then connect to Cloudflare when the product behavior is the assertion.
-- **What works without Cloudflare** — Offline-fixture: pure tests can model the chain, but real media processing is hosted Cloudflare behavior. Keep local coverage focused on deterministic application flow through fixtures, mocks, shims, or Miniflare-backed wiring instead of pretending to reproduce Cloudflare-hosted product behavior.
-- **When to connect to Cloudflare** — Use Cloudflare when the assertion depends on cloudflare-hosted product behavior rather than the app calling the binding correctly. This is the lane for full Media Transformations product fidelity, remote state, lifecycle behavior, and platform-specific limits.
+Use Cloudflare when the assertion depends on deployed limits, account state, lifecycle behavior, billing, or other production-only Media Transformations details.
 
 #### When this binding fits best
 
@@ -14774,41 +14664,21 @@ Offline-fixture: pure tests can model the chain, but real media processing is ho
 - Keep binding names stable and uppercase in examples so generated Env declarations remain predictable.
 - Prefer Devflare native config while it covers the feature; use `wrangler.passthrough` only for unsupported Wrangler-only fields.
 
-#### Notes worth keeping visible
+#### Testing path
 
 ##### Key points
 
-- Offline-fixture: pure tests can model the chain, but real media processing is hosted Cloudflare behavior
-- Cloudflare owns real media output, codecs, duration handling, and billing; local tests only prove call shape.
-- For tests, start with `createOfflineEnv()` with media fixtures; reach for `createMockMediaBinding()` / `createMockEnv({ media })` when you want a pure unit test without Miniflare or Cloudflare.
+- Start with `createTestContext()` or `createOfflineEnv()` with media fixtures for config-backed local worker tests.
+- Use `createMockMediaBinding()` / `createMockEnv({ media })` for small unit tests that only need deterministic application behavior.
+- Use Cloudflare-backed tests when the assertion depends on hosted platform behavior, account state, limits, billing, or production routing.
 
-> **Note — Document the boundary at the same time as the recipe**
->
-> The old docs often made developers infer whether Media Transformations was local, remote, or fixture-backed. This page keeps that stance beside the first usable example.
-
-#### Cloudflare docs vs the Devflare layer
-
-Cloudflare Media Transformations docs is the platform reference. This page is the Devflare translation layer: keep `bindings.media` readable in source, understand the typed env surface, and know which local, preview, or remote lane actually matches the binding.
+#### Open the next page when you need it
 
 ##### Highlights
 
-- **Cloudflare Media Transformations docs** — Platform reference for Media Transformations bindings, beta limits, and Workers API setup. ([link](https://developers.cloudflare.com/stream/transform-videos/bindings/))
-
-##### Reference table
-
-| Question | Cloudflare docs | This Devflare page |
-| --- | --- | --- |
-| Primary focus | Platform reference for Media Transformations bindings, beta limits, and Workers API setup. | How to author `bindings.media`, what the runtime surface looks like, and how Media Transformations fits a Devflare project. |
-| Testing and runtime lens | Cloudflare’s docs focus on the raw binding API, product semantics, and platform limits for the binding itself. | Offline-fixture: pure tests can model the chain, but real media processing is hosted Cloudflare behavior. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
-| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
-
-#### Go deeper only if this one-page guide stops being enough
-
-##### Highlights
-
-- **Media Transformations internals** — See normalization, Wrangler `media`, and the preview or runtime details behind the authored shape. ([link](/docs/bindings/media-transformations/internals))
-- **Testing Media Transformations** — Start from `createOfflineEnv()` with media fixtures and only escalate when the binding or deployment model genuinely needs it. ([link](/docs/bindings/media-transformations/testing))
-- **Media Transformations example** — Adapt one small end-to-end path before you hide the binding behind a bigger abstraction. ([link](/docs/bindings/media-transformations/example))
+- **Media Transformations internals** — Check emitted Wrangler `media`, preview behavior, and Cloudflare-specific details. ([link](/docs/bindings/media-transformations/internals))
+- **Testing Media Transformations** — Pick the `createTestContext()` or `createOfflineEnv()` with media fixtures path first, then move to remote checks only when the test needs them. ([link](/docs/bindings/media-transformations/testing))
+- **Media Transformations example** — Copy a fuller application path when the quick example is too small. ([link](/docs/bindings/media-transformations/example))
 
 ---
 
@@ -14823,7 +14693,7 @@ Cloudflare Media Transformations docs is the platform reference. This page is th
 | Navigation title | Media Transformations internals |
 | Eyebrow | Under the hood |
 
-The internals page is deliberately short: it shows the authored config beside the Wrangler-facing output and names the exact places where Devflare stops pretending to be Cloudflare.
+Use this page when you need emitted config, preview behavior, or Cloudflare-specific limits. The overview and example pages stay focused on everyday app code.
 
 #### At a glance
 
@@ -14831,17 +14701,17 @@ The internals page is deliberately short: it shows the authored config beside th
 | --- | --- |
 | Normalization | Devflare normalizes `bindings.media` before emitting Wrangler `media` |
 | Compile target | Wrangler `media` |
-| Preview note | Cloudflare owns real media output, codecs, duration handling, and billing; local tests only prove call shape. |
+| Preview note | Cloudflare owns real codecs, output fidelity, duration handling, cache behavior, and billing. |
 
-#### Devflare normalizes the authored shape before it does anything louder
+#### How authored config becomes Wrangler config
 
 The authored config stays camelCase and project-oriented. The compiler translates that into the Wrangler keys Cloudflare expects.
 
-The generated output is intentionally shown so the docs can be checked against real compiler behavior instead of relying on memory.
+The emitted output is shown here so the usage pages do not have to explain compiler details.
 
-##### Example — Media Transformations from authored config to generated output
+##### Example — Media Transformations config and emitted Wrangler output
 
-Keep the binding readable in source, then inspect only the Wrangler-facing slice Devflare emits when the config is compiled.
+Use this when you need to check how the Devflare config becomes Wrangler-compatible config.
 
 ###### File — devflare.config.ts
 
@@ -14868,12 +14738,12 @@ export default defineConfig({
 }
 ```
 
-#### Local runtime support depends on what Devflare can model directly
+#### What local runtime support covers
 
 ##### Key points
 
-- Offline-fixture: pure tests can model the chain, but real media processing is hosted Cloudflare behavior
-- The default docs recipe uses `createOfflineEnv()` with media fixtures.
+- Full local support through Miniflare media bindings and deterministic pure mocks for transform chains
+- The default docs recipe uses `createTestContext()` or `createOfflineEnv()` with media fixtures.
 - Pure unit tests can use `createMockMediaBinding()` / `createMockEnv({ media })` when the test only needs deterministic application behavior.
 
 #### Compile, preview, and cleanup behavior
@@ -14882,7 +14752,23 @@ export default defineConfig({
 
 - Devflare emits Wrangler `media` from the native config surface.
 - Preview and deployment lifecycle stay feature-specific; do not assume all Cloudflare products can be created, cloned, or cleaned up the same way.
-- Cloudflare owns real media output, codecs, duration handling, and billing; local tests only prove call shape.
+- Cloudflare owns real codecs, output fidelity, duration handling, cache behavior, and billing.
+
+#### Cloudflare docs vs the Devflare layer
+
+Cloudflare Media Transformations docs is the platform reference. Use this internals page when you need to compare Cloudflare's product docs with Devflare config, generated env types, local support, and preview behavior for `bindings.media`.
+
+##### Highlights
+
+- **Cloudflare Media Transformations docs** — Platform reference for Media Transformations bindings, beta limits, and Workers API setup. ([link](https://developers.cloudflare.com/stream/transform-videos/bindings/))
+
+##### Reference table
+
+| Question | Cloudflare docs | This Devflare page |
+| --- | --- | --- |
+| Primary focus | Platform reference for Media Transformations bindings, beta limits, and Workers API setup. | How to author `bindings.media`, what the runtime surface looks like, and how Media Transformations fits a Devflare project. |
+| Testing and runtime lens | Cloudflare’s docs focus on the raw binding API, product semantics, and platform limits for the binding itself. | Full local support through Miniflare media bindings and deterministic pure mocks for transform chains. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
+| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
 
 ---
 
@@ -14904,7 +14790,7 @@ The first test should prove application control flow. Escalate to Wrangler remot
 | Fact | Value |
 | --- | --- |
 | Best for | video/audio transformation paths where the Worker calls Cloudflare Media Transformations |
-| Default harness | `createOfflineEnv()` with media fixtures |
+| Default harness | `createTestContext()` or `createOfflineEnv()` with media fixtures |
 | Escalate when | The assertion depends on Cloudflare-hosted product behavior rather than the app calling the binding correctly |
 
 #### Start with the default test loop
@@ -14921,7 +14807,8 @@ import { createMockMediaBinding } from 'devflare/test'
 
 test('returns a deterministic media response', async () => {
 	const media = createMockMediaBinding()
-	const response = await media.input(new Blob(['media'])).transform({ width: 640 }).output()
+	const result = media.input(new Blob(['media']).stream()).transform({ width: 640 }).output({ mode: 'video' })
+	const response = await result.response()
 
 	expect(response.headers.get('content-type')).toBe('video/mp4')
 })
@@ -14931,7 +14818,7 @@ test('returns a deterministic media response', async () => {
 
 ##### Key points
 
-- Use `createOfflineEnv()` with media fixtures for config-backed local worker tests.
+- Use `createTestContext()` or `createOfflineEnv()` with media fixtures for config-backed local worker tests.
 - Use `createMockMediaBinding()` / `createMockEnv({ media })` for pure unit tests.
 - Use `shouldSkip` or an explicit integration lane when the test needs Cloudflare credentials or a local Docker/Podman engine.
 
@@ -14939,7 +14826,7 @@ test('returns a deterministic media response', async () => {
 
 ##### Key points
 
-- Cloudflare owns real media output, codecs, duration handling, and billing; local tests only prove call shape.
+- Cloudflare owns real codecs, output fidelity, duration handling, cache behavior, and billing.
 - Do not let a low-fidelity mock become product documentation. Keep mocks framed as application-flow tools.
 - If a test would mutate paid or remote Cloudflare state, gate it separately from ordinary unit tests.
 
@@ -14996,6 +14883,7 @@ Keep product limits, remote ownership, and fallback behavior visible in the code
 ##### Key points
 
 - Keep the first example short enough to paste into a new Worker.
+- Cloudflare owns real codecs, output fidelity, duration handling, cache behavior, and billing.
 
 ##### Example — Run one media transformation chain
 
@@ -15028,9 +14916,9 @@ export async function fetch(request: Request): Promise<Response> {
 
 ---
 
-### Use Artifacts with the smallest config that states the binding contract
+### Use Artifacts in a Worker
 
-> Configure Artifacts, call the `Artifacts` binding from worker code, and choose a test lane that matches the support level.
+> Add the Artifacts config, call `Artifacts` from worker code, and start with the local test path Devflare supports.
 
 | Field | Value |
 | --- | --- |
@@ -15049,11 +14937,11 @@ Start with the config, wire the binding into worker code, then use the support s
 | Authoring shape | `Record<string, string \| { namespace; remote? }>` |
 | Best for | Worker-managed repo metadata, temporary tokens, and artifact namespace workflows |
 
-#### Author it in the simplest shape that still says what you mean
+#### Add the binding to config
 
-Start with the smallest readable `bindings.artifacts` shape. If the feature needs a Cloudflare-created id or namespace, keep that explicit in config so reviewers can see where the remote boundary begins.
+Add `bindings.artifacts` to `devflare.config.ts`, then use the generated env binding from Worker code.
 
-Use this page as the quick contract, then open the deeper internals/testing/example tabs only when the first recipe is not enough.
+Keep the first version close to the route or handler that needs it; move to a helper only after the shape is obvious.
 
 ##### Example — Smallest Artifacts config
 
@@ -15074,7 +14962,7 @@ export default defineConfig({
 
 After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first Artifacts path close to the route, handler, or service method that needs it.
 
-Keep this first path small enough that the binding contract stays visible during code review.
+Keep this first path small enough that the config, env binding, and user-visible behavior are easy to review together.
 
 ##### Example — Create one Artifacts repository
 
@@ -15092,15 +14980,11 @@ export async function fetch(): Promise<Response> {
 
 #### Local and Remote Support
 
-Support level: `Remote`. Remote support means Devflare supports the config, generated env shape, docs, and local application-flow work, but full fidelity requires Cloudflare remote infrastructure. Use local shims or fixtures for code your app owns, then connect to Cloudflare when the product behavior is the assertion.
+Devflare supports the config, generated env shape, docs, and local application-flow work, but full fidelity requires Cloudflare remote infrastructure. Use local shims or fixtures for code your app owns, then connect to Cloudflare when the product behavior is the assertion.
 
-Offline-fixture: repo metadata and token flows can be modeled in memory, not as real Git remotes.
+Offline-fixture: repo metadata and token flows can be modeled in memory, not as real Git remotes. Keep local coverage focused on deterministic application flow through fixtures, mocks, shims, or Miniflare-backed wiring instead of pretending to reproduce Cloudflare-hosted product behavior.
 
-##### Highlights
-
-- **Remote support** — Remote support means Devflare supports the config, generated env shape, docs, and local application-flow work, but full fidelity requires Cloudflare remote infrastructure. Use local shims or fixtures for code your app owns, then connect to Cloudflare when the product behavior is the assertion.
-- **What works without Cloudflare** — Offline-fixture: repo metadata and token flows can be modeled in memory, not as real Git remotes. Keep local coverage focused on deterministic application flow through fixtures, mocks, shims, or Miniflare-backed wiring instead of pretending to reproduce Cloudflare-hosted product behavior.
-- **When to connect to Cloudflare** — Use Cloudflare when the assertion depends on cloudflare-hosted product behavior rather than the app calling the binding correctly. This is the lane for full Artifacts product fidelity, remote state, lifecycle behavior, and platform-specific limits.
+Use Cloudflare when the assertion depends on cloudflare-hosted product behavior rather than the app calling the binding correctly. This is the lane for full Artifacts product fidelity, remote state, lifecycle behavior, and platform-specific limits.
 
 #### When this binding fits best
 
@@ -15110,41 +14994,21 @@ Offline-fixture: repo metadata and token flows can be modeled in memory, not as 
 - Keep binding names stable and uppercase in examples so generated Env declarations remain predictable.
 - Prefer Devflare native config while it covers the feature; use `wrangler.passthrough` only for unsupported Wrangler-only fields.
 
-#### Notes worth keeping visible
+#### Testing path
 
 ##### Key points
 
-- Offline-fixture: repo metadata and token flows can be modeled in memory, not as real Git remotes
-- Cloudflare owns real Git protocol, durable namespace storage, permissions, and remote URLs.
-- For tests, start with `createOfflineEnv()` with artifact fixtures; reach for `createMockArtifacts()` / `createMockEnv({ artifacts })` when you want a pure unit test without Miniflare or Cloudflare.
+- Start with `createOfflineEnv()` with artifact fixtures for config-backed local worker tests.
+- Use `createMockArtifacts()` / `createMockEnv({ artifacts })` for small unit tests that only need deterministic application behavior.
+- Use Cloudflare-backed tests when the assertion depends on hosted platform behavior, account state, limits, billing, or production routing.
 
-> **Note — Document the boundary at the same time as the recipe**
->
-> The old docs often made developers infer whether Artifacts was local, remote, or fixture-backed. This page keeps that stance beside the first usable example.
-
-#### Cloudflare docs vs the Devflare layer
-
-Cloudflare Artifacts docs is the platform reference. This page is the Devflare translation layer: keep `bindings.artifacts` readable in source, understand the typed env surface, and know which local, preview, or remote lane actually matches the binding.
+#### Open the next page when you need it
 
 ##### Highlights
 
-- **Cloudflare Artifacts docs** — Platform reference for Artifacts Workers bindings, repos, tokens, and namespace methods. ([link](https://developers.cloudflare.com/artifacts/api/workers-binding/))
-
-##### Reference table
-
-| Question | Cloudflare docs | This Devflare page |
-| --- | --- | --- |
-| Primary focus | Platform reference for Artifacts Workers bindings, repos, tokens, and namespace methods. | How to author `bindings.artifacts`, what the runtime surface looks like, and how Artifacts fits a Devflare project. |
-| Testing and runtime lens | Cloudflare’s docs focus on the raw binding API, product semantics, and platform limits for the binding itself. | Offline-fixture: repo metadata and token flows can be modeled in memory, not as real Git remotes. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
-| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
-
-#### Go deeper only if this one-page guide stops being enough
-
-##### Highlights
-
-- **Artifacts internals** — See normalization, Wrangler `artifacts`, and the preview or runtime details behind the authored shape. ([link](/docs/bindings/artifacts/internals))
-- **Testing Artifacts** — Start from `createOfflineEnv()` with artifact fixtures and only escalate when the binding or deployment model genuinely needs it. ([link](/docs/bindings/artifacts/testing))
-- **Artifacts example** — Adapt one small end-to-end path before you hide the binding behind a bigger abstraction. ([link](/docs/bindings/artifacts/example))
+- **Artifacts internals** — Check emitted Wrangler `artifacts`, preview behavior, and Cloudflare-specific details. ([link](/docs/bindings/artifacts/internals))
+- **Testing Artifacts** — Pick the `createOfflineEnv()` with artifact fixtures path first, then move to remote checks only when the test needs them. ([link](/docs/bindings/artifacts/testing))
+- **Artifacts example** — Copy a fuller application path when the quick example is too small. ([link](/docs/bindings/artifacts/example))
 
 ---
 
@@ -15159,7 +15023,7 @@ Cloudflare Artifacts docs is the platform reference. This page is the Devflare t
 | Navigation title | Artifacts internals |
 | Eyebrow | Under the hood |
 
-The internals page is deliberately short: it shows the authored config beside the Wrangler-facing output and names the exact places where Devflare stops pretending to be Cloudflare.
+Use this page when you need emitted config, preview behavior, or Cloudflare-specific limits. The overview and example pages stay focused on everyday app code.
 
 #### At a glance
 
@@ -15169,15 +15033,15 @@ The internals page is deliberately short: it shows the authored config beside th
 | Compile target | Wrangler `artifacts` |
 | Preview note | Cloudflare owns real Git protocol, durable namespace storage, permissions, and remote URLs. |
 
-#### Devflare normalizes the authored shape before it does anything louder
+#### How authored config becomes Wrangler config
 
 The authored config stays camelCase and project-oriented. The compiler translates that into the Wrangler keys Cloudflare expects.
 
-The generated output is intentionally shown so the docs can be checked against real compiler behavior instead of relying on memory.
+The emitted output is shown here so the usage pages do not have to explain compiler details.
 
-##### Example — Artifacts from authored config to generated output
+##### Example — Artifacts config and emitted Wrangler output
 
-Keep the binding readable in source, then inspect only the Wrangler-facing slice Devflare emits when the config is compiled.
+Use this when you need to check how the Devflare config becomes Wrangler-compatible config.
 
 ###### File — devflare.config.ts
 
@@ -15204,7 +15068,7 @@ export default defineConfig({
 }
 ```
 
-#### Local runtime support depends on what Devflare can model directly
+#### What local runtime support covers
 
 ##### Key points
 
@@ -15219,6 +15083,22 @@ export default defineConfig({
 - Devflare emits Wrangler `artifacts` from the native config surface.
 - Preview and deployment lifecycle stay feature-specific; do not assume all Cloudflare products can be created, cloned, or cleaned up the same way.
 - Cloudflare owns real Git protocol, durable namespace storage, permissions, and remote URLs.
+
+#### Cloudflare docs vs the Devflare layer
+
+Cloudflare Artifacts docs is the platform reference. Use this internals page when you need to compare Cloudflare's product docs with Devflare config, generated env types, local support, and preview behavior for `bindings.artifacts`.
+
+##### Highlights
+
+- **Cloudflare Artifacts docs** — Platform reference for Artifacts Workers bindings, repos, tokens, and namespace methods. ([link](https://developers.cloudflare.com/artifacts/api/workers-binding/))
+
+##### Reference table
+
+| Question | Cloudflare docs | This Devflare page |
+| --- | --- | --- |
+| Primary focus | Platform reference for Artifacts Workers bindings, repos, tokens, and namespace methods. | How to author `bindings.artifacts`, what the runtime surface looks like, and how Artifacts fits a Devflare project. |
+| Testing and runtime lens | Cloudflare’s docs focus on the raw binding API, product semantics, and platform limits for the binding itself. | Offline-fixture: repo metadata and token flows can be modeled in memory, not as real Git remotes. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
+| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
 
 ---
 
@@ -15362,9 +15242,9 @@ export async function fetch(): Promise<Response> {
 
 ---
 
-### Use Containers with the smallest config that states the binding contract
+### Use Containers in a Worker
 
-> Configure Containers, call the Container class config plus a Durable Object container binding binding from worker code, and choose a test lane that matches the support level.
+> Add the Containers config, call Container class config plus a Durable Object container binding from worker code, and start with the local test path Devflare supports.
 
 | Field | Value |
 | --- | --- |
@@ -15383,11 +15263,11 @@ Start with the config, wire the binding into worker code, then use the support s
 | Authoring shape | `Array<{ className; image; maxInstances?; instanceType?; imageBuildContext? }>` |
 | Best for | routing requests to a stateful container instance that runs code outside the Workers runtime |
 
-#### Author it in the simplest shape that still says what you mean
+#### Add the binding to config
 
-Start with the smallest readable `containers` shape. If the feature needs a Cloudflare-created id or namespace, keep that explicit in config so reviewers can see where the remote boundary begins.
+Add `containers` to `devflare.config.ts`, then use the generated env binding from Worker code.
 
-Use this page as the quick contract, then open the deeper internals/testing/example tabs only when the first recipe is not enough.
+Keep the first version close to the route or handler that needs it; move to a helper only after the shape is obvious.
 
 ##### Example — Smallest Containers config
 
@@ -15428,7 +15308,7 @@ export default defineConfig({
 
 After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first Containers path close to the route, handler, or service method that needs it.
 
-Keep this first path small enough that the binding contract stays visible during code review.
+Keep this first path small enough that the config, env binding, and user-visible behavior are easy to review together.
 
 ##### Example — Proxy one application route to a container instance
 
@@ -15452,15 +15332,11 @@ export async function fetch(request: Request): Promise<Response> {
 
 #### Local and Remote Support
 
-Support level: `Full`. Full local support means Devflare can run useful Containers application behavior locally for ordinary development and tests. Cloudflare still owns production limits, quotas, billing, and deployed account behavior.
+Devflare can run useful Containers application behavior locally for ordinary development and tests. Cloudflare still owns production limits, quotas, billing, and deployed account behavior.
 
-Offline-native only when an explicit Docker/Podman engine is available and the image can run without pulling.
+Containers have full local support when Docker or Podman is reachable and the image can be built or inspected without Cloudflare. Devflare builds Dockerfile paths offline-first, runs the container on loopback, and exposes fetch, logs, state, stop, and destroy helpers. Cloudflare still owns deployed rollout, registry availability, SSH, scaling, and hosted platform behavior.
 
-##### Highlights
-
-- **Full support** — Full local support means Devflare can run useful Containers application behavior locally for ordinary development and tests. Cloudflare still owns production limits, quotas, billing, and deployed account behavior.
-- **What works without Cloudflare** — Containers have full local support when Docker or Podman is reachable and the image can be built or inspected without Cloudflare. Devflare builds Dockerfile paths offline-first, runs the container on loopback, and exposes fetch, logs, state, stop, and destroy helpers. Cloudflare still owns deployed rollout, registry availability, SSH, scaling, and hosted platform behavior.
-- **When to connect to Cloudflare** — Use Cloudflare when the assertion depends on deployed limits, account state, lifecycle behavior, billing, or other production-only Containers details.
+Use Cloudflare when the assertion depends on deployed limits, account state, lifecycle behavior, billing, or other production-only Containers details.
 
 #### Build and reference the image deliberately
 
@@ -15558,41 +15434,21 @@ test.skipIf(skipContainers)('proxies to the local API container', async () => {
 - Keep binding names stable and uppercase in examples so generated Env declarations remain predictable.
 - Prefer Devflare native config while it covers the feature; use `wrangler.passthrough` only for unsupported Wrangler-only fields.
 
-#### Notes worth keeping visible
+#### Testing path
 
 ##### Key points
 
-- Offline-native only when an explicit Docker/Podman engine is available and the image can run without pulling
-- Cloudflare owns deployed container rollout, managed registry availability, SSH, scaling, and hosted platform behavior; Devflare owns the Docker/Podman local loop.
-- For tests, start with `devflare/test` containers helpers guarded by `shouldSkip.containers`; reach for `detectContainerEngine()` / `createContainerManager()` / `containers` when you want a pure unit test without Miniflare or Cloudflare.
+- Start with `devflare/test` containers helpers guarded by `shouldSkip.containers` for config-backed local worker tests.
+- Use `detectContainerEngine()` / `createContainerManager()` / `containers` for small unit tests that only need deterministic application behavior.
+- Use Cloudflare-backed tests when the assertion depends on hosted platform behavior, account state, limits, billing, or production routing.
 
-> **Note — Document the boundary at the same time as the recipe**
->
-> The old docs often made developers infer whether Containers was local, remote, or fixture-backed. This page keeps that stance beside the first usable example.
-
-#### Cloudflare docs vs the Devflare layer
-
-Cloudflare Containers docs is the platform reference. This page is the Devflare translation layer: keep `containers` readable in source, understand the typed env surface, and know which local, preview, or remote lane actually matches the binding.
+#### Open the next page when you need it
 
 ##### Highlights
 
-- **Cloudflare Containers docs** — Platform reference for the Container class, container instances, and Worker interaction helpers. ([link](https://developers.cloudflare.com/containers/container-class/))
-
-##### Reference table
-
-| Question | Cloudflare docs | This Devflare page |
-| --- | --- | --- |
-| Primary focus | Platform reference for the Container class, container instances, and Worker interaction helpers. | How to author `containers`, what the runtime surface looks like, and how Containers fits a Devflare project. |
-| Testing and runtime lens | Cloudflare’s docs focus on the raw binding API, product semantics, and platform limits for the binding itself. | Offline-native only when an explicit Docker/Podman engine is available and the image can run without pulling. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
-| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
-
-#### Go deeper only if this one-page guide stops being enough
-
-##### Highlights
-
-- **Containers internals** — See normalization, Wrangler `containers`, and the preview or runtime details behind the authored shape. ([link](/docs/bindings/containers/internals))
-- **Testing Containers** — Start from `devflare/test` containers helpers guarded by `shouldSkip.containers` and only escalate when the binding or deployment model genuinely needs it. ([link](/docs/bindings/containers/testing))
-- **Containers example** — Adapt one small end-to-end path before you hide the binding behind a bigger abstraction. ([link](/docs/bindings/containers/example))
+- **Containers internals** — Check emitted Wrangler `containers`, preview behavior, and Cloudflare-specific details. ([link](/docs/bindings/containers/internals))
+- **Testing Containers** — Pick the `devflare/test` containers helpers guarded by `shouldSkip.containers` path first, then move to remote checks only when the test needs them. ([link](/docs/bindings/containers/testing))
+- **Containers example** — Copy a fuller application path when the quick example is too small. ([link](/docs/bindings/containers/example))
 
 ---
 
@@ -15607,7 +15463,7 @@ Cloudflare Containers docs is the platform reference. This page is the Devflare 
 | Navigation title | Containers internals |
 | Eyebrow | Under the hood |
 
-The internals page is deliberately short: it shows the authored config beside the Wrangler-facing output and names the exact places where Devflare stops pretending to be Cloudflare.
+Use this page when you need emitted config, preview behavior, or Cloudflare-specific limits. The overview and example pages stay focused on everyday app code.
 
 #### At a glance
 
@@ -15617,15 +15473,15 @@ The internals page is deliberately short: it shows the authored config beside th
 | Compile target | Wrangler `containers` |
 | Preview note | Cloudflare owns deployed container rollout, managed registry availability, SSH, scaling, and hosted platform behavior; Devflare owns the Docker/Podman local loop. |
 
-#### Devflare normalizes the authored shape before it does anything louder
+#### How authored config becomes Wrangler config
 
 The authored config stays camelCase and project-oriented. The compiler translates that into the Wrangler keys Cloudflare expects.
 
-The generated output is intentionally shown so the docs can be checked against real compiler behavior instead of relying on memory.
+The emitted output is shown here so the usage pages do not have to explain compiler details.
 
-##### Example — Containers from authored config to generated output
+##### Example — Containers config and emitted Wrangler output
 
-Keep the binding readable in source, then inspect only the Wrangler-facing slice Devflare emits when the config is compiled.
+Use this when you need to check how the Devflare config becomes Wrangler-compatible config.
 
 ###### File — devflare.config.ts
 
@@ -15680,7 +15536,7 @@ export default defineConfig({
 }
 ```
 
-#### Local runtime support depends on what Devflare can model directly
+#### What local runtime support covers
 
 ##### Key points
 
@@ -15695,6 +15551,22 @@ export default defineConfig({
 - Devflare emits Wrangler `containers` from the native config surface.
 - Preview and deployment lifecycle stay feature-specific; do not assume all Cloudflare products can be created, cloned, or cleaned up the same way.
 - Cloudflare owns deployed container rollout, managed registry availability, SSH, scaling, and hosted platform behavior; Devflare owns the Docker/Podman local loop.
+
+#### Cloudflare docs vs the Devflare layer
+
+Cloudflare Containers docs is the platform reference. Use this internals page when you need to compare Cloudflare's product docs with Devflare config, generated env types, local support, and preview behavior for `containers`.
+
+##### Highlights
+
+- **Cloudflare Containers docs** — Platform reference for the Container class, container instances, and Worker interaction helpers. ([link](https://developers.cloudflare.com/containers/container-class/))
+
+##### Reference table
+
+| Question | Cloudflare docs | This Devflare page |
+| --- | --- | --- |
+| Primary focus | Platform reference for the Container class, container instances, and Worker interaction helpers. | How to author `containers`, what the runtime surface looks like, and how Containers fits a Devflare project. |
+| Testing and runtime lens | Cloudflare’s docs focus on the raw binding API, product semantics, and platform limits for the binding itself. | Offline-native only when an explicit Docker/Podman engine is available and the image can run without pulling. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
+| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
 
 ---
 

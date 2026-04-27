@@ -1,6 +1,6 @@
 import type { HelpEntry, HelpPage } from './types'
 
-export const COMMANDS = ['init', 'dev', 'build', 'deploy', 'types', 'doctor', 'config', 'account', 'login', 'previews', 'productions', 'worker', 'tokens', 'ai', 'remote', 'help', 'version'] as const
+export const COMMANDS = ['init', 'dev', 'build', 'deploy', 'types', 'doctor', 'config', 'account', 'login', 'previews', 'productions', 'worker', 'tokens', 'secrets', 'ai', 'remote', 'help', 'version'] as const
 export type Command = typeof COMMANDS[number]
 
 export const COMMAND_ALIASES: Record<string, string> = {}
