@@ -21,10 +21,7 @@ import {
 } from '../config'
 import { applyLocalDevVarsToConfig } from '../config/local-dev-vars'
 import { seedMiniflareLocalSecrets } from '../secrets/local-secrets'
-import {
-	createCompatibilityAwareMiniflareLog,
-	resolveMiniflareLogLevel
-} from '../dev-server/miniflare-log'
+import { createMiniflareLog } from '../dev-server/miniflare-log'
 import { GATEWAY_RUNTIME_JS } from './gateway-runtime'
 
 // -----------------------------------------------------------------------------
@@ -257,18 +254,25 @@ function createBaseMiniflareConfig(
 	options: MiniflareOptions,
 	runtime: MiniflareRuntime
 ): MfOptionsWithEmail {
-	return {
+	const config: MfOptionsWithEmail = {
 		modules: true,
 		script: generateGatewayScript(),
 		port: options.port ?? 8787,
 		host: '127.0.0.1',
-		log: createCompatibilityAwareMiniflareLog(
-			runtime.Log,
-			resolveMiniflareLogLevel(runtime.LogLevel, options.verbose ? 'DEBUG' : 'WARN')
-		),
 		compatibilityDate: options.compatibilityDate ?? '2024-01-01',
 		compatibilityFlags: options.compatibilityFlags ?? []
 	}
+
+	const log = createMiniflareLog(
+		runtime.Log,
+		runtime.LogLevel,
+		options.verbose ? 'DEBUG' : 'WARN'
+	)
+	if (log) {
+		config.log = log as MfOptionsWithEmail['log']
+	}
+
+	return config
 }
 
 function applyKVNamespaceConfig(

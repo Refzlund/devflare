@@ -16,7 +16,7 @@ import { prepareComposedWorkerEntrypoint } from '../worker-entry/composed-worker
 import { discoverRoutes } from '../worker-entry/routes'
 import { runD1Migrations } from './d1-migrations'
 import { seedMiniflareLocalSecrets } from '../secrets/local-secrets'
-import { createCompatibilityAwareMiniflareLog, resolveMiniflareLogLevel } from './miniflare-log'
+import { createMiniflareLog } from './miniflare-log'
 import { buildMiniflareDevConfig } from './miniflare-dev-config'
 import { createRuntimeStdioForwarder } from './runtime-stdio'
 import { startViteProcess } from './vite-process'
@@ -88,11 +88,10 @@ export function createDevServer(options: DevServerOptions): DevServer {
 			const { Log, LogLevel } = await import('miniflare')
 			const mfConfig = buildMiniflareConfig(state.currentDoResult)
 			// Always enable debug logging to see worker load errors
-			mfConfig.log = createCompatibilityAwareMiniflareLog(
-				Log,
-				resolveMiniflareLogLevel(LogLevel, 'DEBUG'),
-				logger
-			)
+			const log = createMiniflareLog(Log, LogLevel, 'DEBUG', logger)
+			if (log) {
+				mfConfig.log = log as typeof mfConfig.log
+			}
 			mfConfig.handleRuntimeStdio = createRuntimeStdioForwarder(logger)
 
 			logger?.info('Reloading Miniflare...')
@@ -150,11 +149,10 @@ export function createDevServer(options: DevServerOptions): DevServer {
 		const { Miniflare, Log, LogLevel } = await import('miniflare')
 
 		const mfConfig = buildMiniflareConfig(doResult)
-		mfConfig.log = createCompatibilityAwareMiniflareLog(
-			Log,
-			resolveMiniflareLogLevel(LogLevel, 'DEBUG'),
-			logger
-		)
+		const log = createMiniflareLog(Log, LogLevel, 'DEBUG', logger)
+		if (log) {
+			mfConfig.log = log as typeof mfConfig.log
+		}
 		mfConfig.handleRuntimeStdio = createRuntimeStdioForwarder(logger)
 		const shouldLogMiniflareDiagnostics = verbose || debug
 

@@ -1,6 +1,7 @@
 import { describe, expect, mock, test } from 'bun:test'
 import {
 	createCompatibilityAwareMiniflareLog,
+	createMiniflareLog,
 	formatCompatibilityDateFallbackNotice,
 	resolveMiniflareLogLevel
 } from '../../../src/dev-server/miniflare-log'
@@ -80,5 +81,11 @@ describe('resolveMiniflareLogLevel', () => {
 	test('falls back to Miniflare numeric log levels when the enum export is unavailable', () => {
 		expect(resolveMiniflareLogLevel(undefined, 'WARN')).toBe(2)
 		expect(resolveMiniflareLogLevel(undefined, 'DEBUG')).toBe(4)
+	})
+})
+
+describe('createMiniflareLog', () => {
+	test('omits the custom logger when Miniflare does not export the Log constructor', () => {
+		expect(createMiniflareLog(undefined, undefined, 'WARN')).toBeUndefined()
 	})
 })

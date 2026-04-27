@@ -46,6 +46,23 @@ export function resolveMiniflareLogLevel(
 	return logLevel?.[levelName] ?? MINIFLARE_LOG_LEVEL_FALLBACKS[levelName]
 }
 
+export function createMiniflareLog<TBase extends MiniflareLogConstructor>(
+	BaseLog: TBase | undefined,
+	logLevel: MiniflareLogLevelExport,
+	levelName: MiniflareLogLevelName,
+	logger?: MiniflareCompatibilityLogger
+): InstanceType<TBase> | undefined {
+	if (!BaseLog) {
+		return undefined
+	}
+
+	return createCompatibilityAwareMiniflareLog(
+		BaseLog,
+		resolveMiniflareLogLevel(logLevel, levelName),
+		logger
+	)
+}
+
 export function createCompatibilityAwareMiniflareLog<TBase extends MiniflareLogConstructor>(
 	BaseLog: TBase,
 	level: number,
