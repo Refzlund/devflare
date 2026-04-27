@@ -1,5 +1,23 @@
-import { describe, expect, test } from 'bun:test'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { afterEach, describe, expect, test } from 'bun:test'
 import { buildInlineBridgeMfConfig } from '../../../src/test/simple-context-mfconfig'
+import { writeLocalSecret } from '../../../src/secrets/local-secrets'
+
+const tempDirs: string[] = []
+
+function createTempDir(): string {
+	const dir = mkdtempSync(join(tmpdir(), 'devflare-simple-context-secrets-'))
+	tempDirs.push(dir)
+	return dir
+}
+
+afterEach(() => {
+	for (const dir of tempDirs.splice(0)) {
+		rmSync(dir, { recursive: true, force: true })
+	}
+})
 
 describe('buildInlineBridgeMfConfig', () => {
 	test('adds Miniflare Rate Limiting bindings for createTestContext', () => {
@@ -107,6 +125,40 @@ describe('buildInlineBridgeMfConfig', () => {
 				secret_name: 'api-token'
 			}
 		})
+	})
+
+	test('uses wrapped bindings for createTestContext local Secrets Store values', () => {
+		const cwd = createTempDir()
+		writeLocalSecret({ cwd, storeId: 'store-123', name: 'api-token', value: 'local-secret' })
+
+		const mfConfig = buildInlineBridgeMfConfig({
+			name: 'my-worker',
+			compatibilityDate: '2026-04-26',
+			compatibilityFlags: [],
+			secretsStoreId: 'store-123',
+			bindings: {
+				secretsStore: {
+					API_TOKEN: 'api-token',
+					REMOTE_ONLY: 'remote-only'
+				}
+			}
+		}, { cwd })
+
+		expect(mfConfig.secretsStoreSecrets).toEqual({
+			REMOTE_ONLY: {
+				store_id: 'store-123',
+				secret_name: 'remote-only'
+			}
+		})
+		expect(mfConfig.wrappedBindings).toEqual({
+			API_TOKEN: {
+				scriptName: 'devflare-local-secret-0-api-token',
+				bindings: {
+					value: 'local-secret'
+				}
+			}
+		})
+		expect(mfConfig.__devflareLocalSecretWorkers).toHaveLength(1)
 	})
 
 	test('adds Miniflare Worker Loader bindings for createTestContext', () => {

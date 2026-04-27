@@ -21,13 +21,27 @@ import {
 } from '../config'
 import type { DevflareConfig } from '../config'
 import { buildHyperdrivesConfig } from '../dev-server/miniflare-bindings'
+import { buildLocalSecretWrappedBindingConfig } from '../secrets/local-secrets'
+
+export interface BuildInlineBridgeMfConfigOptions {
+	cwd?: string
+}
 
 /**
  * Build the seed Miniflare config for an inline (single-worker) bridge.
  * Pure: no I/O, no closures.
  */
-export function buildInlineBridgeMfConfig(config: DevflareConfig): any {
+export function buildInlineBridgeMfConfig(
+	config: DevflareConfig,
+	options: BuildInlineBridgeMfConfigOptions = {}
+): any {
 	const localWorkerBindings: Record<string, unknown> = config.vars ?? {}
+	const localSecretWrappedBindingConfig = options.cwd
+		? buildLocalSecretWrappedBindingConfig(config, options.cwd)
+		: undefined
+	const localSecretBindingNames = new Set(
+		localSecretWrappedBindingConfig?.localBindingNames ?? []
+	)
 	const mfConfig: any = {
 		modules: true
 	}
@@ -200,18 +214,34 @@ export function buildInlineBridgeMfConfig(config: DevflareConfig): any {
 	}
 
 	if (config.bindings?.secretsStore) {
-		mfConfig.secretsStoreSecrets = Object.fromEntries(
-			Object.entries(config.bindings.secretsStore).map(([bindingName, binding]) => {
+		const secretsStoreEntries = Object.entries(config.bindings.secretsStore).flatMap(
+			([bindingName, binding]) => {
+				if (localSecretBindingNames.has(bindingName)) {
+					return []
+				}
+
 				const normalized = normalizeSecretsStoreBinding(binding, config.secretsStoreId, bindingName)
-				return [
+				return [[
 					bindingName,
 					{
 						store_id: normalized.storeId,
 						secret_name: normalized.secretName
 					}
-				]
-			})
+				]]
+			}
 		)
+
+		if (secretsStoreEntries.length > 0) {
+			mfConfig.secretsStoreSecrets = Object.fromEntries(secretsStoreEntries)
+		}
+	}
+
+	if (
+		localSecretWrappedBindingConfig
+		&& localSecretWrappedBindingConfig.localBindingNames.length > 0
+	) {
+		mfConfig.wrappedBindings = localSecretWrappedBindingConfig.wrappedBindings
+		mfConfig.__devflareLocalSecretWorkers = localSecretWrappedBindingConfig.workers
 	}
 
 	if (Object.keys(localWorkerBindings).length > 0) {

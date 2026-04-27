@@ -54,6 +54,7 @@ export function applyMultiWorkerConfig(
 		...(mfConfig.media && { media: mfConfig.media }),
 		...(mfConfig.artifacts && { artifacts: mfConfig.artifacts }),
 		...(mfConfig.secretsStoreSecrets && { secretsStoreSecrets: mfConfig.secretsStoreSecrets }),
+		...(mfConfig.wrappedBindings && { wrappedBindings: mfConfig.wrappedBindings }),
 		...(mfConfig.email && { email: mfConfig.email }),
 		...(Object.keys(primaryDurableObjects).length > 0 && { durableObjects: primaryDurableObjects }),
 		...(serviceBindingResolution?.primaryServiceBindings && {
@@ -63,7 +64,8 @@ export function applyMultiWorkerConfig(
 
 	const additionalWorkers = [
 		...(serviceBindingResolution?.workers || []),
-		...(doBindingResolution?.workers || [])
+		...(doBindingResolution?.workers || []),
+		...(mfConfig.__devflareLocalSecretWorkers || [])
 	]
 	const workersByName = new Map<string, typeof additionalWorkers[0]>()
 
@@ -99,6 +101,8 @@ export function applyMultiWorkerConfig(
 	delete mfConfig.media
 	delete mfConfig.artifacts
 	delete mfConfig.secretsStoreSecrets
+	delete mfConfig.wrappedBindings
+	delete mfConfig.__devflareLocalSecretWorkers
 	delete mfConfig.durableObjects
 	mfConfig.workers = workers
 }

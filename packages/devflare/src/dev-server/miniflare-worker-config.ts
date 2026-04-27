@@ -26,6 +26,7 @@ import type {
 	buildAiSearchNamespacesConfig,
 	buildAiSearchInstancesConfig
 } from './miniflare-bindings'
+import type { LocalSecretWrappedBindingConfig } from '../secrets/local-secrets'
 
 type Bindings = NonNullable<DevflareConfig['bindings']>
 type SendEmailConfig = ReturnType<typeof buildSendEmailConfig>
@@ -121,6 +122,7 @@ export interface MakeMiniflareWorkerContext {
 	aiSearchNamespacesConfig: AiSearchNamespacesConfig
 	aiSearchInstancesConfig: AiSearchInstancesConfig
 	secretsStoreConfig: SecretsStoreConfig
+	localSecretWrappedBindingConfig?: LocalSecretWrappedBindingConfig
 	queueProducers: Record<string, { queueName: string }> | undefined
 }
 
@@ -151,6 +153,7 @@ export function makeMiniflareWorker(
 		aiSearchNamespacesConfig,
 		aiSearchInstancesConfig,
 		secretsStoreConfig,
+		localSecretWrappedBindingConfig,
 		queueProducers
 	} = context
 
@@ -159,6 +162,7 @@ export function makeMiniflareWorker(
 		? baseFlags
 		: [...baseFlags, 'nodejs_compat']
 	const workerBindings: Record<string, unknown> = loadedConfig.vars ?? {}
+	const localSecretWrappedBindings = localSecretWrappedBindingConfig?.wrappedBindings
 
 	const workerConfig: any = {
 		name: options.name,
@@ -196,6 +200,9 @@ export function makeMiniflareWorker(
 		...(aiSearchNamespacesConfig && { aiSearchNamespaces: aiSearchNamespacesConfig }),
 		...(aiSearchInstancesConfig && { aiSearchInstances: aiSearchInstancesConfig }),
 		...(secretsStoreConfig && { secretsStoreSecrets: secretsStoreConfig }),
+		...(localSecretWrappedBindings
+			&& Object.keys(localSecretWrappedBindings).length > 0
+			&& { wrappedBindings: localSecretWrappedBindings }),
 		...(queueProducers && { queueProducers }),
 		...(options.queueConsumers && { queueConsumers: options.queueConsumers }),
 		...(options.triggers && { triggers: options.triggers })

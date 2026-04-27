@@ -315,24 +315,29 @@ export function buildAiSearchInstancesConfig(
 
 export function buildSecretsStoreConfig(
 	bindings: Bindings,
-	defaultSecretsStoreId?: string
+	defaultSecretsStoreId?: string,
+	excludedBindingNames: Set<string> = new Set()
 ): Record<string, { store_id: string; secret_name: string }> | undefined {
 	if (!bindings.secretsStore) {
 		return undefined
 	}
 
-	return Object.fromEntries(
-		Object.entries(bindings.secretsStore).map(([bindingName, binding]) => {
+	const entries = Object.entries(bindings.secretsStore).flatMap(([bindingName, binding]) => {
+		if (excludedBindingNames.has(bindingName)) {
+			return []
+		}
+
 			const normalized = normalizeSecretsStoreBinding(binding, defaultSecretsStoreId, bindingName)
-			return [
+			return [[
 				bindingName,
 				{
 					store_id: normalized.storeId,
 					secret_name: normalized.secretName
 				}
-			]
+			]]
 		})
-	)
+
+	return entries.length > 0 ? Object.fromEntries(entries) : undefined
 }
 
 export function buildSendEmailConfig(

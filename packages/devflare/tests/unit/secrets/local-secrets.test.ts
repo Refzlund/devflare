@@ -6,6 +6,7 @@ import { afterEach, describe, expect, test } from 'bun:test'
 import {
 	deleteLocalSecret,
 	listLocalSecrets,
+	buildLocalSecretWrappedBindingConfig,
 	readLocalSecret,
 	resolveLocalSecretValuesForBindings,
 	seedMiniflareLocalSecrets,
@@ -109,6 +110,59 @@ describe('local Secrets Store file', () => {
 		)
 
 		expect(created).toEqual(['local-secret'])
+	})
+
+	test('skips Miniflare Secrets Store seeding when the runtime has no admin API', async () => {
+		const cwd = createTempDir()
+		writeLocalSecret({ cwd, storeId: 'store-123', name: 'api-token', value: 'local-secret' })
+
+		const config = {
+			name: 'secret-worker',
+			compatibilityDate: '2026-04-27',
+			compatibilityFlags: [],
+			secretsStoreId: 'store-123',
+			bindings: {
+				secretsStore: {
+					API_TOKEN: 'api-token'
+				}
+			}
+		} satisfies DevflareConfig
+
+		await expect(seedMiniflareLocalSecrets({}, config, cwd)).resolves.toBeUndefined()
+	})
+
+	test('builds wrapped binding workers for locally stored Secrets Store values', async () => {
+		const cwd = createTempDir()
+		writeLocalSecret({ cwd, storeId: 'store-123', name: 'api-token', value: 'local-secret' })
+
+		const config = {
+			name: 'secret-worker',
+			compatibilityDate: '2026-04-27',
+			compatibilityFlags: [],
+			secretsStoreId: 'store-123',
+			bindings: {
+				secretsStore: {
+					API_TOKEN: 'api-token',
+					REMOTE_ONLY: 'remote-only'
+				}
+			}
+		} satisfies DevflareConfig
+
+		const wrapped = buildLocalSecretWrappedBindingConfig(config, cwd)
+
+		expect(wrapped.localBindingNames).toEqual(['API_TOKEN'])
+		expect(wrapped.wrappedBindings.API_TOKEN).toEqual({
+			scriptName: 'devflare-local-secret-0-api-token',
+			bindings: {
+				value: 'local-secret'
+			}
+		})
+		expect(wrapped.workers).toHaveLength(1)
+		expect(wrapped.workers[0]).toMatchObject({
+			name: 'devflare-local-secret-0-api-token',
+			modules: true
+		})
+		expect(wrapped.workers[0]?.script).toContain('async get()')
 	})
 
 	test('seeds an actual Miniflare Secrets Store binding from local values', async () => {

@@ -41,6 +41,7 @@ import {
 	type MiniflareServiceBinding
 } from './miniflare-worker-config'
 import { hasWorkerSurfacePaths, type WorkerSurfacePaths } from './worker-surface-paths'
+import { buildLocalSecretWrappedBindingConfig } from '../secrets/local-secrets'
 
 const INTERNAL_APP_SERVICE_BINDING = '__DEVFLARE_APP'
 
@@ -124,7 +125,13 @@ export function buildMiniflareDevConfig(input: BuildMiniflareDevConfigInput): an
 	const artifactsConfig = buildArtifactsConfig(bindings)
 	const aiSearchNamespacesConfig = buildAiSearchNamespacesConfig(bindings)
 	const aiSearchInstancesConfig = buildAiSearchInstancesConfig(bindings)
-	const secretsStoreConfig = buildSecretsStoreConfig(bindings, loadedConfig.secretsStoreId)
+	const localSecretWrappedBindingConfig = buildLocalSecretWrappedBindingConfig(loadedConfig, cwd)
+	const localSecretBindingNames = new Set(localSecretWrappedBindingConfig.localBindingNames)
+	const secretsStoreConfig = buildSecretsStoreConfig(
+		bindings,
+		loadedConfig.secretsStoreId,
+		localSecretBindingNames
+	)
 
 	const workerContext: MakeMiniflareWorkerContext = {
 		cwd,
@@ -145,6 +152,7 @@ export function buildMiniflareDevConfig(input: BuildMiniflareDevConfigInput): an
 		aiSearchNamespacesConfig,
 		aiSearchInstancesConfig,
 		secretsStoreConfig,
+		localSecretWrappedBindingConfig,
 		queueProducers
 	}
 
@@ -256,6 +264,6 @@ export function buildMiniflareDevConfig(input: BuildMiniflareDevConfigInput): an
 
 	return {
 		...sharedOptions,
-		workers: [gatewayWorker, ...workers]
+		workers: [gatewayWorker, ...workers, ...localSecretWrappedBindingConfig.workers]
 	}
 }

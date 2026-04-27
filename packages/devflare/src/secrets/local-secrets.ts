@@ -49,6 +49,28 @@ interface MiniflareSecretsStoreSeeder {
 	): Promise<SecretsStoreSecretAdmin | (() => SecretsStoreSecretAdmin)>
 }
 
+export interface LocalSecretWrappedBindingConfig {
+	localBindingNames: string[]
+	wrappedBindings: Record<string, { scriptName: string; bindings: { value: string } }>
+	workers: Array<{ name: string; modules: true; script: string }>
+}
+
+const LOCAL_SECRET_WRAPPED_BINDING_SCRIPT = `
+class LocalSecretsStoreSecret {
+	constructor(env) {
+		this.value = env.value
+	}
+
+	async get() {
+		return this.value
+	}
+}
+
+export default function makeBinding(env) {
+	return new LocalSecretsStoreSecret(env)
+}
+`
+
 function createEmptyLocalSecretsFile(): LocalSecretsFile {
 	return {
 		version: 1,
@@ -155,6 +177,48 @@ export function resolveLocalSecretValuesForBindings(
 	return values
 }
 
+function toLocalSecretWorkerName(bindingName: string, index: number): string {
+	const slug = bindingName
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, '-')
+		.replace(/^-+|-+$/g, '') || 'secret'
+
+	return `devflare-local-secret-${index}-${slug}`
+}
+
+export function buildLocalSecretWrappedBindingConfig(
+	config: Pick<DevflareConfig, 'bindings' | 'secretsStoreId'>,
+	cwd: string
+): LocalSecretWrappedBindingConfig {
+	const values = resolveLocalSecretValuesForBindings(config, cwd)
+	const entries = Object.entries(values)
+
+	return {
+		localBindingNames: entries.map(([bindingName]) => bindingName),
+		wrappedBindings: Object.fromEntries(
+			entries.map(([bindingName, value], index) => {
+				const scriptName = toLocalSecretWorkerName(bindingName, index)
+				return [
+					bindingName,
+					{
+						scriptName,
+						bindings: { value }
+					}
+				]
+			})
+		),
+		workers: entries.map(([bindingName], index) => ({
+			name: toLocalSecretWorkerName(bindingName, index),
+			modules: true,
+			script: LOCAL_SECRET_WRAPPED_BINDING_SCRIPT
+		}))
+	}
+}
+
+function hasSecretsStoreAdminApi(value: unknown): value is MiniflareSecretsStoreSeeder {
+	return typeof (value as { getSecretsStoreSecretAPI?: unknown }).getSecretsStoreSecretAPI === 'function'
+}
+
 async function getSecretAdmin(
 	miniflare: MiniflareSecretsStoreSeeder,
 	bindingName: string
@@ -180,10 +244,14 @@ async function upsertMiniflareSecret(
 }
 
 export async function seedMiniflareLocalSecrets(
-	miniflare: MiniflareSecretsStoreSeeder,
+	miniflare: unknown,
 	config: Pick<DevflareConfig, 'bindings' | 'secretsStoreId'>,
 	cwd: string
 ): Promise<void> {
+	if (!hasSecretsStoreAdminApi(miniflare)) {
+		return
+	}
+
 	const values = resolveLocalSecretValuesForBindings(config, cwd)
 
 	for (const [bindingName, value] of Object.entries(values)) {

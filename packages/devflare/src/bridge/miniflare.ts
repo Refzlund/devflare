@@ -20,7 +20,10 @@ import {
 	normalizeWorkflowBinding
 } from '../config'
 import { applyLocalDevVarsToConfig } from '../config/local-dev-vars'
-import { seedMiniflareLocalSecrets } from '../secrets/local-secrets'
+import {
+	buildLocalSecretWrappedBindingConfig,
+	type LocalSecretWrappedBindingConfig
+} from '../secrets/local-secrets'
 import { createMiniflareLog } from '../dev-server/miniflare-log'
 import { GATEWAY_RUNTIME_JS } from './gateway-runtime'
 
@@ -120,6 +123,10 @@ export interface MiniflareOptions {
 	>
 	/** Environment variables */
 	bindings?: Record<string, string>
+	/** Wrapped bindings to expose object-shaped local binding shims */
+	wrappedBindings?: LocalSecretWrappedBindingConfig['wrappedBindings']
+	/** Additional module workers needed by wrapped bindings */
+	auxiliaryWorkers?: LocalSecretWrappedBindingConfig['workers']
 	/** Project root used to load `.dev.vars`/`.env*` for config-based Miniflare */
 	cwd?: string
 	/** Config file path used as the anchor for `.dev.vars`/`.env*` */
@@ -166,6 +173,8 @@ type MfOptionsWithEmail = MfOptions & {
 	media?: MiniflareOptions['media']
 	artifacts?: MiniflareOptions['artifacts']
 	secretsStoreSecrets?: MiniflareOptions['secretsStore']
+	wrappedBindings?: MiniflareOptions['wrappedBindings']
+	workers?: Array<Record<string, unknown>>
 	r2Buckets?: MiniflareOptions['r2Buckets']
 	r2Persist?: string
 }
@@ -504,6 +513,62 @@ function applySecretsStoreConfig(
 	config.secretsStoreSecrets = secretsStore
 }
 
+function applyWrappedBindingsConfig(
+	config: MfOptionsWithEmail,
+	wrappedBindings: MiniflareOptions['wrappedBindings']
+): void {
+	if (!wrappedBindings || Object.keys(wrappedBindings).length === 0) {
+		return
+	}
+
+	config.wrappedBindings = wrappedBindings
+}
+
+function createConfigWithAuxiliaryWorkers(
+	config: MfOptionsWithEmail,
+	auxiliaryWorkers: MiniflareOptions['auxiliaryWorkers']
+): MfOptionsWithEmail {
+	if (!auxiliaryWorkers || auxiliaryWorkers.length === 0) {
+		return config
+	}
+
+	const {
+		port,
+		host,
+		log,
+		kvPersist,
+		r2Persist,
+		d1Persist,
+		durableObjectsPersist,
+		workflowsPersist,
+		imagesPersist,
+		...primaryWorker
+	} = config
+	const primaryWorkerRecord = primaryWorker as Record<string, unknown>
+	const primaryWorkerName = typeof primaryWorkerRecord.name === 'string'
+		? primaryWorkerRecord.name
+		: 'devflare-gateway'
+
+	return {
+		...(port !== undefined && { port }),
+		...(host && { host }),
+		...(log && { log }),
+		...(kvPersist && { kvPersist }),
+		...(r2Persist && { r2Persist }),
+		...(d1Persist && { d1Persist }),
+		...(durableObjectsPersist && { durableObjectsPersist }),
+		...(workflowsPersist && { workflowsPersist }),
+		...(imagesPersist && { imagesPersist }),
+		workers: [
+			{
+				...primaryWorkerRecord,
+				name: primaryWorkerName
+			},
+			...auxiliaryWorkers
+		]
+	} as unknown as MfOptionsWithEmail
+}
+
 function createMiniflareConfig(
 	options: MiniflareOptions,
 	runtime: MiniflareRuntime
@@ -529,8 +594,9 @@ function createMiniflareConfig(
 	applyMediaConfig(config, options.media)
 	applyArtifactsConfig(config, options.artifacts)
 	applySecretsStoreConfig(config, options.secretsStore)
+	applyWrappedBindingsConfig(config, options.wrappedBindings)
 
-	return config
+	return createConfigWithAuxiliaryWorkers(config, options.auxiliaryWorkers)
 }
 
 function bindMiniflareMethod<TMethodName extends keyof MiniflareType>(
@@ -609,6 +675,10 @@ export async function startMiniflareFromConfig(
 			})
 		: config
 	const bindings = runtimeConfig.bindings ?? {}
+	const localSecretWrappedBindingConfig = options.cwd
+		? buildLocalSecretWrappedBindingConfig(runtimeConfig, options.cwd)
+		: undefined
+	const localSecretBindingNames = new Set(localSecretWrappedBindingConfig?.localBindingNames ?? [])
 
 	// For Miniflare, pass the full mapping to ensure consistent namespace/database IDs
 	const mfOptions: MiniflareOptions = {
@@ -736,24 +806,30 @@ export async function startMiniflareFromConfig(
 			: undefined,
 		secretsStore: bindings.secretsStore
 			? Object.fromEntries(
-					Object.entries(bindings.secretsStore).map(([bindingName, binding]) => {
+					Object.entries(bindings.secretsStore).flatMap(([bindingName, binding]) => {
+						if (localSecretBindingNames.has(bindingName)) {
+							return []
+						}
+
 						const normalized = normalizeSecretsStoreBinding(
 							binding,
 							runtimeConfig.secretsStoreId,
 							bindingName
 						)
-						return [
+						return [[
 							bindingName,
 							{
 								store_id: normalized.storeId,
 								secret_name: normalized.secretName
 							}
-						]
+						]]
 					})
 				)
 			: undefined,
 		sendEmail: bindings.sendEmail ? bindings.sendEmail : undefined,
 		bindings: runtimeConfig.vars,
+		wrappedBindings: localSecretWrappedBindingConfig?.wrappedBindings,
+		auxiliaryWorkers: localSecretWrappedBindingConfig?.workers,
 		durableObjects: bindings.durableObjects
 			? Object.fromEntries(
 					Object.entries(bindings.durableObjects).map(([bindingName, doConfig]) => {
@@ -770,12 +846,7 @@ export async function startMiniflareFromConfig(
 			: undefined
 	}
 
-	const instance = await startMiniflare(mfOptions)
-	if (options.cwd) {
-		await seedMiniflareLocalSecrets(instance._mf, runtimeConfig, options.cwd)
-	}
-
-	return instance
+	return await startMiniflare(mfOptions)
 }
 
 // -----------------------------------------------------------------------------

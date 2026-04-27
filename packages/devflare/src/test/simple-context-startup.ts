@@ -72,6 +72,49 @@ export async function connectBridgeClientWithRetry(url: string): Promise<BridgeC
 		: new Error('Bridge-backed test context could not connect to the WebSocket gateway.')
 }
 
+function expandLocalSecretWorkers(mfConfig: any): any {
+	const auxiliaryWorkers = mfConfig.__devflareLocalSecretWorkers
+	if (!Array.isArray(auxiliaryWorkers) || auxiliaryWorkers.length === 0) {
+		return mfConfig
+	}
+
+	const {
+		__devflareLocalSecretWorkers,
+		port,
+		host,
+		log,
+		kvPersist,
+		r2Persist,
+		d1Persist,
+		durableObjectsPersist,
+		workflowsPersist,
+		imagesPersist,
+		...primaryWorker
+	} = mfConfig
+	const primaryWorkerName = typeof primaryWorker.name === 'string'
+		? primaryWorker.name
+		: 'primary'
+
+	return {
+		...(port !== undefined && { port }),
+		...(host && { host }),
+		...(log && { log }),
+		...(kvPersist && { kvPersist }),
+		...(r2Persist && { r2Persist }),
+		...(d1Persist && { d1Persist }),
+		...(durableObjectsPersist && { durableObjectsPersist }),
+		...(workflowsPersist && { workflowsPersist }),
+		...(imagesPersist && { imagesPersist }),
+		workers: [
+			{
+				...primaryWorker,
+				name: primaryWorkerName
+			},
+			...auxiliaryWorkers
+		]
+	}
+}
+
 export async function startBridgeBackedTestContext(mfConfig: any): Promise<StartedBridgeBackedTestContext> {
 	const { Miniflare } = await import('miniflare')
 
@@ -81,10 +124,10 @@ export async function startBridgeBackedTestContext(mfConfig: any): Promise<Start
 		let client: BridgeClient | null = null
 
 		try {
-			miniflare = new Miniflare({
+			miniflare = new Miniflare(expandLocalSecretWorkers({
 				...mfConfig,
 				port
-			})
+			}))
 			await miniflare.ready
 
 			const miniflareBindings = wrapEnvSendEmailBindings(await miniflare.getBindings())

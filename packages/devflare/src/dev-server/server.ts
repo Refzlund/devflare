@@ -15,7 +15,6 @@ import { setLocalSendEmailBindings } from '../utils/send-email'
 import { prepareComposedWorkerEntrypoint } from '../worker-entry/composed-worker'
 import { discoverRoutes } from '../worker-entry/routes'
 import { runD1Migrations } from './d1-migrations'
-import { seedMiniflareLocalSecrets } from '../secrets/local-secrets'
 import { createMiniflareLog } from './miniflare-log'
 import { buildMiniflareDevConfig } from './miniflare-dev-config'
 import { createRuntimeStdioForwarder } from './runtime-stdio'
@@ -96,9 +95,6 @@ export function createDevServer(options: DevServerOptions): DevServer {
 
 			logger?.info('Reloading Miniflare...')
 			await state.miniflare.setOptions(mfConfig)
-			if (state.config) {
-				await seedMiniflareLocalSecrets(state.miniflare, state.config, cwd)
-			}
 			logger?.success('Miniflare reloaded')
 		},
 		logger
@@ -162,9 +158,6 @@ export function createDevServer(options: DevServerOptions): DevServer {
 
 		state.miniflare = new Miniflare(mfConfig)
 		await state.miniflare.ready
-		if (state.config) {
-			await seedMiniflareLocalSecrets(state.miniflare, state.config, cwd)
-		}
 
 		logger?.success(`Miniflare ready on http://localhost:${miniflarePort}`)
 
