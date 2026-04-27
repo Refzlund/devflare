@@ -42,7 +42,7 @@ const eyebrowToneClasses: Record<EyebrowTone, string> = {
 	{#if eyebrow}
 		<p class={`docs-kicker ${eyebrowToneClasses[eyebrowTone]}`}><InlineText text={eyebrow} /></p>
 	{/if}
-	<div class="flex flex-wrap items-center gap-3">
+	<div class="flex flex-wrap items-end gap-3">
 		<svelte:element this={titleTag} class={titleClass}><InlineText text={title} /></svelte:element>
 		{#if label}
 			{#if labelTooltip}
