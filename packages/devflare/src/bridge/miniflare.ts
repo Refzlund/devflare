@@ -533,7 +533,21 @@ function createMiniflareConfig(
 	return config
 }
 
-function createMiniflareInstanceHandle(mf: MiniflareType): MiniflareInstance {
+function bindMiniflareMethod<TMethodName extends keyof MiniflareType>(
+	mf: MiniflareType,
+	methodName: TMethodName
+): MiniflareType[TMethodName] {
+	const method = mf[methodName]
+	if (typeof method === 'function') {
+		return method.bind(mf) as MiniflareType[TMethodName]
+	}
+
+	return (async () => {
+		throw new Error(`Miniflare runtime does not expose ${String(methodName)}`)
+	}) as unknown as MiniflareType[TMethodName]
+}
+
+export function createMiniflareInstanceHandle(mf: MiniflareType): MiniflareInstance {
 	return {
 		ready: Promise.resolve(),
 
@@ -551,11 +565,11 @@ function createMiniflareInstanceHandle(mf: MiniflareType): MiniflareInstance {
 			return mf.getBindings()
 		},
 
-		getKVNamespace: mf.getKVNamespace.bind(mf),
-		getR2Bucket: mf.getR2Bucket.bind(mf),
-		getD1Database: mf.getD1Database.bind(mf),
-		getDurableObjectNamespace: mf.getDurableObjectNamespace.bind(mf),
-		dispatchFetch: mf.dispatchFetch.bind(mf),
+		getKVNamespace: bindMiniflareMethod(mf, 'getKVNamespace'),
+		getR2Bucket: bindMiniflareMethod(mf, 'getR2Bucket'),
+		getD1Database: bindMiniflareMethod(mf, 'getD1Database'),
+		getDurableObjectNamespace: bindMiniflareMethod(mf, 'getDurableObjectNamespace'),
+		dispatchFetch: bindMiniflareMethod(mf, 'dispatchFetch'),
 
 		_mf: mf
 	}
