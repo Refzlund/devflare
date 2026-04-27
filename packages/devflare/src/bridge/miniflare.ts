@@ -613,7 +613,16 @@ function bindMiniflareMethod<TMethodName extends keyof MiniflareType>(
 	}) as unknown as MiniflareType[TMethodName]
 }
 
-export function createMiniflareInstanceHandle(mf: MiniflareType): MiniflareInstance {
+function getPrimaryWorkerName(config: MfOptionsWithEmail): string | undefined {
+	const [primaryWorker] = config.workers ?? []
+	const name = primaryWorker?.name
+	return typeof name === 'string' ? name : undefined
+}
+
+export function createMiniflareInstanceHandle(
+	mf: MiniflareType,
+	primaryWorkerName?: string
+): MiniflareInstance {
 	return {
 		ready: Promise.resolve(),
 
@@ -633,7 +642,7 @@ export function createMiniflareInstanceHandle(mf: MiniflareType): MiniflareInsta
 		},
 
 		async getBindings() {
-			return mf.getBindings()
+			return primaryWorkerName ? mf.getBindings(primaryWorkerName) : mf.getBindings()
 		},
 
 		getKVNamespace: bindMiniflareMethod(mf, 'getKVNamespace'),
@@ -655,10 +664,11 @@ export function createMiniflareInstanceHandle(mf: MiniflareType): MiniflareInsta
  */
 export async function startMiniflare(options: MiniflareOptions = {}): Promise<MiniflareInstance> {
 	const runtime = await loadMiniflareRuntime()
-	const mf = new runtime.Miniflare(createMiniflareConfig(options, runtime) as MfOptions)
+	const mfConfig = createMiniflareConfig(options, runtime)
+	const mf = new runtime.Miniflare(mfConfig as MfOptions)
 	await mf.ready
 
-	return createMiniflareInstanceHandle(mf)
+	return createMiniflareInstanceHandle(mf, getPrimaryWorkerName(mfConfig))
 }
 
 // -----------------------------------------------------------------------------

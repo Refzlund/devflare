@@ -49,4 +49,18 @@ describe('Miniflare instance disposal', () => {
 
 		await expect(handle.dispose()).resolves.toBeUndefined()
 	})
+
+	test('reads bindings from the named primary worker when one is known', async () => {
+		let requestedWorkerName: string | undefined
+		const handle = createMiniflareInstanceHandle({
+			async dispose() { },
+			async getBindings(workerName?: string) {
+				requestedWorkerName = workerName
+				return { API_TOKEN: 'secret' }
+			}
+		} as never, 'devflare-gateway')
+
+		await expect(handle.getBindings()).resolves.toEqual({ API_TOKEN: 'secret' })
+		expect(requestedWorkerName).toBe('devflare-gateway')
+	})
 })
