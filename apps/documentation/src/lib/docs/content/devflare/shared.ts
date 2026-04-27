@@ -235,7 +235,7 @@ export const projectArchitectureHostedAppStructure: DocCodeTreeEntry[] = [
 	{ path: 'apps/documentation/src/routes', kind: 'folder' },
 	{ path: 'apps/documentation/src/routes/+layout.svelte' },
 	{ path: 'apps/documentation/static', kind: 'folder' },
-	{ path: 'apps/documentation/static/devflare.png' },
+	{ path: 'apps/documentation/static/devflare-logo.svg' },
 	{ path: 'apps/documentation/.adapter-cloudflare/_worker.js', muted: true },
 	{ path: 'apps/documentation/.devflare/wrangler.jsonc', muted: true }
 ]

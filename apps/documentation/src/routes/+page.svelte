@@ -66,14 +66,6 @@ const firstWorkerHref = localizeHref(docPath('first-worker'))
 const whyDevflareHref = localizeHref(docPath('what-devflare-is'))
 </script>
 
-<svelte:head>
-	<title>{m.home_title()}</title>
-	<meta
-		name="description"
-		content={m.home_meta_description()}
-	/>
-</svelte:head>
-
 <div class="space-y-12">
 	<Surface as="header" padding="lg">
 		<div class="grid gap-8 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] xl:items-start">

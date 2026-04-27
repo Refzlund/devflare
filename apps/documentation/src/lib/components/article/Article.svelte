@@ -127,12 +127,6 @@ $effect(() => {
 })
 </script>
 
-<svelte:head>
-	<title>{m.article_page_title({ title: doc.title })}</title>
-	<meta name="description" content={doc.description} />
-</svelte:head>
-
-
 <article class="space-y-12">
 	<div class="space-y-12">
 	<Surface as="header" id={pageTopId} padding="lg" class="scroll-mt-24 space-y-7">

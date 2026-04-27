@@ -1,12 +1,22 @@
 <script lang="ts">
 	import { base } from '$app/paths'
 	import { afterNavigate } from '$app/navigation'
+	import { page } from '$app/state'
 	import { onMount } from 'svelte'
 	import Tooltip from '$lib/components/layout/Tooltip.svelte'
 	import IntellisenseTooltip from '$lib/intellisense/IntellisenseTooltip.svelte'
 	import Sidebar from '$lib/components/navigation/Sidebar.svelte'
+	import type { DocPage } from '$lib/docs/types'
 	import { m } from '$lib/paraglide/messages'
 	import { localizeHref } from '$lib/paraglide/runtime'
+	import {
+		BRAND_COLOR,
+		SOCIAL_CARD_PATH,
+		SOCIAL_IMAGE_ALT,
+		getSocialDescription,
+		getSocialTitle,
+		toAbsoluteUrl
+	} from '$lib/site/social'
 	import './layout.css'
 
 	type ThemeMode = 'light' | 'dark'
@@ -41,11 +51,17 @@
 		}
 	] as const
 
-	const brandLogoPath = `${base}/devflare-fav.png`
+	const brandLogoPath = `${base}/devflare-logo.svg`
+	const socialCardPath = `${base}${SOCIAL_CARD_PATH}`
 
 	let { children } = $props()
 	let sidebarOpen = $state(false)
 	let theme = $state<ThemeMode>('light')
+	const currentDoc = $derived(page.data.doc as DocPage | undefined)
+	const socialTitle = $derived(getSocialTitle(currentDoc))
+	const socialDescription = $derived(getSocialDescription(currentDoc))
+	const socialUrl = $derived(toAbsoluteUrl(page.url.origin, page.url.pathname))
+	const socialImageUrl = $derived(toAbsoluteUrl(page.url.origin, socialCardPath))
 
 	function getStoredTheme(): ThemeMode | undefined {
 		if (typeof window === 'undefined') {
@@ -154,8 +170,27 @@
 			document.documentElement.style.colorScheme = theme
 		})()
 	</script>
-	<link rel="icon" type="image/png" href={brandLogoPath} />
-	<meta name="theme-color" content="#f5f3ef" />
+	<title>{socialTitle}</title>
+	<link rel="canonical" href={socialUrl} />
+	<link rel="icon" type="image/svg+xml" href={brandLogoPath} />
+	<meta name="description" content={socialDescription} />
+	<meta name="theme-color" content={BRAND_COLOR} />
+	<meta property="og:type" content="website" />
+	<meta property="og:site_name" content="Devflare" />
+	<meta property="og:title" content={socialTitle} />
+	<meta property="og:description" content={socialDescription} />
+	<meta property="og:url" content={socialUrl} />
+	<meta property="og:image" content={socialImageUrl} />
+	<meta property="og:image:secure_url" content={socialImageUrl} />
+	<meta property="og:image:type" content="image/png" />
+	<meta property="og:image:width" content="1200" />
+	<meta property="og:image:height" content="630" />
+	<meta property="og:image:alt" content={SOCIAL_IMAGE_ALT} />
+	<meta name="twitter:card" content="summary_large_image" />
+	<meta name="twitter:title" content={socialTitle} />
+	<meta name="twitter:description" content={socialDescription} />
+	<meta name="twitter:image" content={socialImageUrl} />
+	<meta name="twitter:image:alt" content={SOCIAL_IMAGE_ALT} />
 </svelte:head>
 
 {#if sidebarOpen}
@@ -176,7 +211,7 @@
 			<img
 				src={brandLogoPath}
 				alt=""
-				class="size-10 shrink-0 object-contain"
+				class="h-8 w-[4.5rem] shrink-0 object-contain"
 				decoding="async"
 			/>
 			<a href={localizeHref('/')} class="docs-text-strong text-[0.9rem] font-semibold tracking-tight">{m.site_title()}</a>
@@ -294,7 +329,7 @@
 				<img
 					src={brandLogoPath}
 					alt=""
-					class="h-6 w-6 shrink-0 object-contain"
+					class="h-6 w-14 shrink-0 object-contain"
 					decoding="async"
 				/>
 				<span>{m.site_title()}</span>
