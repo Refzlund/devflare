@@ -63,4 +63,23 @@ describe('Miniflare instance disposal', () => {
 		await expect(handle.getBindings()).resolves.toEqual({ API_TOKEN: 'secret' })
 		expect(requestedWorkerName).toBe('devflare-gateway')
 	})
+
+	test('merges node-side binding overrides into getBindings results', async () => {
+		const handle = createMiniflareInstanceHandle({
+			async dispose() { },
+			async getBindings() {
+				return { EXISTING: 'value' }
+			}
+		} as never, undefined, {
+			API_TOKEN: {
+				async get() {
+					return 'local-secret'
+				}
+			}
+		})
+
+		const bindings = await handle.getBindings()
+		expect(bindings.EXISTING).toBe('value')
+		expect(await (bindings.API_TOKEN as { get(): Promise<string> }).get()).toBe('local-secret')
+	})
 })

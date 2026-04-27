@@ -21,6 +21,7 @@ import {
 } from '../config'
 import { applyLocalDevVarsToConfig } from '../config/local-dev-vars'
 import {
+	buildLocalSecretNodeBindings,
 	buildLocalSecretWrappedBindingConfig,
 	type LocalSecretWrappedBindingConfig
 } from '../secrets/local-secrets'
@@ -127,6 +128,8 @@ export interface MiniflareOptions {
 	wrappedBindings?: LocalSecretWrappedBindingConfig['wrappedBindings']
 	/** Additional module workers needed by wrapped bindings */
 	auxiliaryWorkers?: LocalSecretWrappedBindingConfig['workers']
+	/** Node-side binding shims merged into `getBindings()` results */
+	nodeBindingOverrides?: Record<string, unknown>
 	/** Project root used to load `.dev.vars`/`.env*` for config-based Miniflare */
 	cwd?: string
 	/** Config file path used as the anchor for `.dev.vars`/`.env*` */
@@ -621,7 +624,8 @@ function getPrimaryWorkerName(config: MfOptionsWithEmail): string | undefined {
 
 export function createMiniflareInstanceHandle(
 	mf: MiniflareType,
-	primaryWorkerName?: string
+	primaryWorkerName?: string,
+	nodeBindingOverrides: Record<string, unknown> = {}
 ): MiniflareInstance {
 	return {
 		ready: Promise.resolve(),
@@ -642,7 +646,11 @@ export function createMiniflareInstanceHandle(
 		},
 
 		async getBindings() {
-			return primaryWorkerName ? mf.getBindings(primaryWorkerName) : mf.getBindings()
+			const bindings = primaryWorkerName ? await mf.getBindings(primaryWorkerName) : await mf.getBindings()
+			return {
+				...bindings,
+				...nodeBindingOverrides
+			}
 		},
 
 		getKVNamespace: bindMiniflareMethod(mf, 'getKVNamespace'),
@@ -668,7 +676,7 @@ export async function startMiniflare(options: MiniflareOptions = {}): Promise<Mi
 	const mf = new runtime.Miniflare(mfConfig as MfOptions)
 	await mf.ready
 
-	return createMiniflareInstanceHandle(mf, getPrimaryWorkerName(mfConfig))
+	return createMiniflareInstanceHandle(mf, getPrimaryWorkerName(mfConfig), options.nodeBindingOverrides)
 }
 
 // -----------------------------------------------------------------------------
@@ -692,6 +700,9 @@ export async function startMiniflareFromConfig(
 	const bindings = runtimeConfig.bindings ?? {}
 	const localSecretWrappedBindingConfig = options.cwd
 		? buildLocalSecretWrappedBindingConfig(runtimeConfig, options.cwd)
+		: undefined
+	const localSecretNodeBindings = options.cwd
+		? buildLocalSecretNodeBindings(runtimeConfig, options.cwd)
 		: undefined
 	const localSecretBindingNames = new Set(localSecretWrappedBindingConfig?.localBindingNames ?? [])
 
@@ -845,6 +856,7 @@ export async function startMiniflareFromConfig(
 		bindings: runtimeConfig.vars,
 		wrappedBindings: localSecretWrappedBindingConfig?.wrappedBindings,
 		auxiliaryWorkers: localSecretWrappedBindingConfig?.workers,
+		nodeBindingOverrides: localSecretNodeBindings,
 		durableObjects: bindings.durableObjects
 			? Object.fromEntries(
 					Object.entries(bindings.durableObjects).map(([bindingName, doConfig]) => {

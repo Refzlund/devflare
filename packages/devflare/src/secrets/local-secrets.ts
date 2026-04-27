@@ -55,6 +55,10 @@ export interface LocalSecretWrappedBindingConfig {
 	workers: Array<{ name: string; modules: true; script: string }>
 }
 
+export interface LocalSecretsStoreSecretBinding {
+	get(): Promise<string>
+}
+
 const LOCAL_SECRET_WRAPPED_BINDING_SCRIPT = `
 class LocalSecretsStoreSecret {
 	constructor(env) {
@@ -213,6 +217,24 @@ export function buildLocalSecretWrappedBindingConfig(
 			script: LOCAL_SECRET_WRAPPED_BINDING_SCRIPT
 		}))
 	}
+}
+
+export function buildLocalSecretNodeBindings(
+	config: Pick<DevflareConfig, 'bindings' | 'secretsStoreId'>,
+	cwd: string
+): Record<string, LocalSecretsStoreSecretBinding> {
+	const values = resolveLocalSecretValuesForBindings(config, cwd)
+
+	return Object.fromEntries(
+		Object.entries(values).map(([bindingName, value]) => [
+			bindingName,
+			{
+				async get() {
+					return value
+				}
+			}
+		])
+	)
 }
 
 function hasSecretsStoreAdminApi(value: unknown): value is MiniflareSecretsStoreSeeder {
