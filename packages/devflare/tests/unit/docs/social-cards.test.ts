@@ -77,6 +77,15 @@ describe('documentation social cards', () => {
 		expect(html).not.toContain('lengthAdjust')
 	})
 
+	test('uses a standalone Svelte compiler config for social cards', async () => {
+		const source = await readFile(
+			new URL('../../../../../apps/documentation/scripts/social-cards.ts', import.meta.url),
+			'utf8'
+		)
+
+		expect(source).toContain('configFile: false')
+	})
+
 	test('generates crawlable 1200x630 png files into the requested output directory', async () => {
 		const outputDir = await mkdtemp(join(tmpdir(), 'devflare-social-cards-'))
 		const pngBytes = Buffer.from(

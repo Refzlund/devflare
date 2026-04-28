@@ -163,10 +163,12 @@ async function createSocialCardTemplateRenderer(
 		logLevel: 'error',
 		root: getDocumentationAppDir(),
 		server: {
+			hmr: false,
 			middlewareMode: true
 		},
 		plugins: [
 			svelte({
+				configFile: false,
 				compilerOptions: {
 					dev: false
 				}
