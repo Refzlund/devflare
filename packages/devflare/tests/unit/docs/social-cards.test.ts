@@ -132,4 +132,77 @@ describe('documentation social cards', () => {
 			await rm(outputDir, { recursive: true, force: true })
 		}
 	})
+
+	test('reuses generated cards when inputs have not changed', async () => {
+		const outputDir = await mkdtemp(join(tmpdir(), 'devflare-social-cards-cache-'))
+		let renderCount = 0
+		const page = {
+			path: '/social-cards/docs/what-devflare-is.png',
+			title: 'Why Devflare - Devflare Docs',
+			description: 'A concise page-specific preview.'
+		}
+
+		try {
+			await generateSocialCards({
+				logoSvg: transparentLogoSvg,
+				outputDir,
+				pages: [page],
+				renderPng: async ({ outputPath }) => {
+					renderCount += 1
+					await Bun.write(outputPath, 'png placeholder')
+				}
+			})
+
+			await generateSocialCards({
+				logoSvg: transparentLogoSvg,
+				outputDir,
+				pages: [page],
+				renderPng: async () => {
+					renderCount += 1
+					throw new Error('cached social card should not render again')
+				}
+			})
+
+			expect(renderCount).toBe(1)
+		} finally {
+			await rm(outputDir, { recursive: true, force: true })
+		}
+	})
+
+	test('can force social card regeneration when cached inputs match', async () => {
+		const outputDir = await mkdtemp(join(tmpdir(), 'devflare-social-cards-force-'))
+		let renderCount = 0
+		const page = {
+			path: '/social-cards/docs/what-devflare-is.png',
+			title: 'Why Devflare - Devflare Docs',
+			description: 'A concise page-specific preview.'
+		}
+
+		try {
+			await generateSocialCards({
+				logoSvg: transparentLogoSvg,
+				outputDir,
+				pages: [page],
+				renderPng: async ({ outputPath }) => {
+					renderCount += 1
+					await Bun.write(outputPath, 'png placeholder')
+				}
+			})
+
+			await generateSocialCards({
+				force: true,
+				logoSvg: transparentLogoSvg,
+				outputDir,
+				pages: [page],
+				renderPng: async ({ outputPath }) => {
+					renderCount += 1
+					await Bun.write(outputPath, 'png placeholder')
+				}
+			})
+
+			expect(renderCount).toBe(2)
+		} finally {
+			await rm(outputDir, { recursive: true, force: true })
+		}
+	})
 })

@@ -1,5 +1,6 @@
 import { svelte } from '@sveltejs/vite-plugin-svelte'
 import puppeteer, { type Browser } from 'puppeteer-core'
+import { createHash } from 'node:crypto'
 import { access, mkdir, readFile, readdir, rm } from 'node:fs/promises'
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -33,6 +34,7 @@ export interface RenderSocialCardPngInput {
 export type RenderSocialCardPng = (input: RenderSocialCardPngInput) => Promise<void>
 
 export interface GenerateSocialCardsOptions extends SocialCardAssets {
+	force?: boolean
 	outputDir?: string
 	pages?: readonly SocialCardPage[]
 	renderPng?: RenderSocialCardPng
@@ -66,6 +68,7 @@ interface SocialCardTemplateRenderer {
 
 const CARD_WIDTH = 1200
 const CARD_HEIGHT = 630
+const MANIFEST_FILENAME = '.manifest.json'
 const SOCIAL_CARD_COMPONENT_PATH = '/src/lib/social-card/SocialCard.svelte'
 
 function randomBetween(min: number, max: number): number {
@@ -124,6 +127,10 @@ export function getNpmLogoAssetPath(): string {
 	return resolve(getScriptDir(), 'assets/npmjs-logo.png')
 }
 
+function getSocialCardsManifestPath(outputDir: string): string {
+	return resolve(outputDir, MANIFEST_FILENAME)
+}
+
 function toDataUrl(mimeType: string, bytes: string | Buffer): string {
 	return `data:${mimeType};base64,${Buffer.from(bytes).toString('base64')}`
 }
@@ -139,6 +146,62 @@ function toCardOutputPath(outputDir: string, cardPath: string): string {
 	}
 
 	return outputPath
+}
+
+function hashContent(content: string | Buffer): string {
+	return createHash('sha256').update(content).digest('hex')
+}
+
+async function createSocialCardsFingerprint(
+	pages: readonly SocialCardPage[],
+	assets: ResolvedSocialCardAssets
+): Promise<string> {
+	const [scriptSource, componentSource] = await Promise.all([
+		readFile(fileURLToPath(import.meta.url), 'utf8'),
+		readFile(resolve(getDocumentationAppDir(), 'src/lib/social-card/SocialCard.svelte'), 'utf8')
+	])
+
+	return hashContent(
+		JSON.stringify({
+			version: 2,
+			cardSize: [CARD_WIDTH, CARD_HEIGHT],
+			pages,
+			logoDataUrlHash: hashContent(assets.logoDataUrl),
+			npmLogoDataUrlHash: hashContent(assets.npmLogoDataUrl),
+			scriptSourceHash: hashContent(scriptSource),
+			componentSourceHash: hashContent(componentSource)
+		})
+	)
+}
+
+async function readManifestFingerprint(outputDir: string): Promise<string | undefined> {
+	try {
+		const manifest = JSON.parse(await readFile(getSocialCardsManifestPath(outputDir), 'utf8'))
+
+		return typeof manifest?.fingerprint === 'string' ? manifest.fingerprint : undefined
+	} catch {
+		return undefined
+	}
+}
+
+async function writeManifest(outputDir: string, fingerprint: string): Promise<void> {
+	await Bun.write(
+		getSocialCardsManifestPath(outputDir),
+		`${JSON.stringify(
+			{
+				fingerprint,
+				generatedAt: new Date().toISOString()
+			},
+			null,
+			2
+		)}\n`
+	)
+}
+
+async function allFilesExist(paths: readonly string[]): Promise<boolean> {
+	const checks = await Promise.all(paths.map((path) => pathExists(path)))
+
+	return checks.every(Boolean)
 }
 
 async function resolveSocialCardAssets(
@@ -362,35 +425,32 @@ async function createBrowserPngRenderer(): Promise<{
 		headless: true,
 		args: ['--no-sandbox', '--disable-setuid-sandbox']
 	})
+	const page = await browser.newPage()
+
+	await page.setViewport({
+		width: CARD_WIDTH,
+		height: CARD_HEIGHT,
+		deviceScaleFactor: 1
+	})
 
 	return {
 		async renderPng({ html, outputPath }) {
-			const page = await browser.newPage()
-
-			try {
-				await page.setViewport({
+			await page.setContent(html, { waitUntil: 'load' })
+			await page.evaluate(() => document.fonts.ready)
+			await page.screenshot({
+				path: outputPath,
+				type: 'png',
+				clip: {
+					x: 0,
+					y: 0,
 					width: CARD_WIDTH,
-					height: CARD_HEIGHT,
-					deviceScaleFactor: 1
-				})
-				await page.setContent(html, { waitUntil: 'networkidle0' })
-				await page.evaluate(() => document.fonts.ready)
-				await page.screenshot({
-					path: outputPath,
-					type: 'png',
-					clip: {
-						x: 0,
-						y: 0,
-						width: CARD_WIDTH,
-						height: CARD_HEIGHT
-					}
-				})
-			} finally {
-				await page.close()
-			}
+					height: CARD_HEIGHT
+				}
+			})
 		},
-		close() {
-			return browser.close()
+		async close() {
+			await page.close()
+			await browser.close()
 		}
 	}
 }
@@ -401,10 +461,21 @@ export async function generateSocialCards(
 	const outputDir = options.outputDir ?? getSocialCardsOutputDir()
 	const pages = options.pages ?? createSocialCardPages()
 	const assets = await resolveSocialCardAssets(options)
+	const outputFiles = pages.map((page) => toCardOutputPath(outputDir, page.path))
+	const fingerprint = await createSocialCardsFingerprint(pages, assets)
+	const force = options.force ?? process.env.DEVFLARE_SOCIAL_CARDS_FORCE === '1'
+
+	if (!force && (await readManifestFingerprint(outputDir)) === fingerprint && (await allFilesExist(outputFiles))) {
+		return {
+			outputDir,
+			outputFiles,
+			pages
+		}
+	}
+
 	const templateRenderer = await createSocialCardTemplateRenderer(assets)
 	const browserRenderer = options.renderPng ? undefined : await createBrowserPngRenderer()
 	const renderPng = options.renderPng ?? browserRenderer?.renderPng
-	const outputFiles: string[] = []
 
 	if (!renderPng) {
 		throw new Error('Social card renderer was not configured.')
@@ -413,14 +484,14 @@ export async function generateSocialCards(
 	await rm(outputDir, { recursive: true, force: true })
 
 	try {
-		for (const page of pages) {
-			const outputPath = toCardOutputPath(outputDir, page.path)
+		for (const [index, page] of pages.entries()) {
+			const outputPath = outputFiles[index]
 			const html = templateRenderer.renderHtml(page)
 
 			await mkdir(dirname(outputPath), { recursive: true })
 			await renderPng({ html, outputPath, page })
-			outputFiles.push(outputPath)
 		}
+		await writeManifest(outputDir, fingerprint)
 	} finally {
 		await Promise.all([templateRenderer.close(), browserRenderer?.close()])
 	}
