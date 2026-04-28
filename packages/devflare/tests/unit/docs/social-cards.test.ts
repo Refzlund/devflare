@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { mkdtemp, readFile, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import documentationPackageJson from '../../../../../apps/documentation/package.json'
 import { docs } from '../../../../../apps/documentation/src/lib/docs/content'
 import {
 	DEFAULT_SOCIAL_DESCRIPTION,
@@ -84,6 +85,16 @@ describe('documentation social cards', () => {
 		)
 
 		expect(source).toContain('configFile: false')
+	})
+
+	test('generates social cards in docs runtime workflows without slowing dependency install', () => {
+		const scripts = documentationPackageJson.scripts
+
+		for (const scriptName of ['dev', 'build', 'deploy', 'deploy:preview', 'check', 'check:watch']) {
+			expect(scripts[scriptName as keyof typeof scripts]).toContain('social:generate')
+		}
+
+		expect(scripts.prepare).not.toContain('social:generate')
 	})
 
 	test('generates crawlable 1200x630 png files into the requested output directory', async () => {
