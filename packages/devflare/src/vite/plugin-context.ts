@@ -31,6 +31,8 @@ import {
 	type AuxiliaryWorkerConfig,
 	type DODiscoveryResult
 } from './plugin-durable-objects'
+import { resolveServiceBindings } from '../test/resolve-service-bindings'
+import { createAuxiliaryServiceWorkerConfigs } from './plugin-service-bindings'
 
 const CONFIG_DIR = '.devflare'
 
@@ -38,6 +40,8 @@ export interface ResolvedPluginContextState {
 	wranglerConfig: WranglerConfig
 	cloudflareConfig: Record<string, unknown>
 	auxiliaryWorkerConfig: AuxiliaryWorkerConfig | null
+	auxiliaryWorkerConfigs: AuxiliaryWorkerConfig[]
+	serviceWorkerVirtualModules: Map<string, string>
 	durableObjects: DODiscoveryResult | null
 }
 
@@ -68,7 +72,8 @@ export async function buildPluginContextState(
 	projectRoot: string,
 	devflareConfig: DevflareConfig,
 	environment?: string,
-	mode: 'serve' | 'build' = 'serve'
+	mode: 'serve' | 'build' = 'serve',
+	configDir: string = projectRoot
 ): Promise<ResolvedPluginContextState> {
 	const effectiveConfig = mode === 'build'
 		? await resolveResources(devflareConfig, { phase: 'build', environment })
@@ -100,6 +105,8 @@ export async function buildPluginContextState(
 
 	let durableObjects: DODiscoveryResult | null = null
 	let auxiliaryWorkerConfig: AuxiliaryWorkerConfig | null = null
+	let serviceWorkerVirtualModules = new Map<string, string>()
+	let serviceAuxiliaryWorkerConfigs: AuxiliaryWorkerConfig[] = []
 
 	const doPatternConfig = effectiveConfig.files?.durableObjects
 	const doPattern = typeof doPatternConfig === 'string' ? doPatternConfig : DEFAULT_DO_PATTERN
@@ -126,9 +133,23 @@ export async function buildPluginContextState(
 		}
 	}
 
+	if (mode === 'serve' && effectiveConfig.bindings?.services) {
+		const serviceBindingResolution = await resolveServiceBindings(effectiveConfig, configDir)
+		const serviceWorkers = createAuxiliaryServiceWorkerConfigs(serviceBindingResolution)
+		serviceAuxiliaryWorkerConfigs = serviceWorkers.auxiliaryWorkers
+		serviceWorkerVirtualModules = serviceWorkers.virtualModules
+	}
+
+	const auxiliaryWorkerConfigs = [
+		...(auxiliaryWorkerConfig ? [auxiliaryWorkerConfig] : []),
+		...serviceAuxiliaryWorkerConfigs
+	]
+
 	return {
 		wranglerConfig,
 		cloudflareConfig,
+		auxiliaryWorkerConfigs,
+		serviceWorkerVirtualModules,
 		durableObjects,
 		auxiliaryWorkerConfig
 	}

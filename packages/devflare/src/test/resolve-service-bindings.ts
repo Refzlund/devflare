@@ -7,13 +7,39 @@
 
 import { dirname, join, resolve } from 'path'
 import { existsSync, readFileSync } from 'fs'
-import { normalizeDOBinding, type DevflareConfig, type DurableObjectBinding, type DOBindingRef } from '../config'
+import {
+	getLocalD1DatabaseIdentifier,
+	getLocalKVNamespaceIdentifier,
+	normalizeDOBinding,
+	configSchema,
+	type DevflareConfig,
+	type DurableObjectBinding,
+	type DOBindingRef
+} from '../config'
 import type { RefResult, WorkerBinding } from '../config/ref'
 import { transformWorkerEntrypoint } from '../transform/worker-entrypoint'
 import { discoverEntrypointsSync } from '../utils/entrypoint-discovery'
 import { findDurableObjectClasses } from '../transform/durable-object'
 import { findFilesSync, DEFAULT_DO_PATTERN } from '../utils/glob'
 import { resolvePackageSpecifier } from '../utils/resolve-package'
+import {
+	buildAiSearchInstancesConfig,
+	buildAiSearchNamespacesConfig,
+	buildArtifactsConfig,
+	buildDispatchNamespacesConfig,
+	buildHyperdrivesConfig,
+	buildMediaConfig,
+	buildMtlsCertificatesConfig,
+	buildPipelinesConfig,
+	buildQueueConsumers,
+	buildQueueProducers,
+	buildRateLimitsConfig,
+	buildSecretsStoreConfig,
+	buildSendEmailConfig,
+	buildVersionMetadataConfig,
+	buildWorkerLoadersConfig,
+	buildWorkflowsConfig
+} from '../dev-server/miniflare-bindings'
 
 // -----------------------------------------------------------------------------
 // Bun Runtime Detection
@@ -50,11 +76,11 @@ function getBunRuntime(): {
  * Uses the same glob pattern as the rest of the codebase for consistency.
  * Returns map of className -> filePath
  */
-function discoverDOFilesSync(dir: string): Map<string, string> {
+function discoverDOFilesSync(dir: string, pattern: string = DEFAULT_DO_PATTERN): Map<string, string> {
 	const classToPath = new Map<string, string>()
 
 	try {
-		const files = findFilesSync(DEFAULT_DO_PATTERN, { cwd: dir })
+		const files = findFilesSync(pattern, { cwd: dir })
 
 		for (const filePath of files) {
 			try {
@@ -110,10 +136,43 @@ export interface ResolvedWorker {
 	modules: boolean
 	/** Compatibility date */
 	compatibilityDate: string
+	compatibilityFlags?: string[]
+	bindings?: Record<string, string>
+	kvNamespaces?: Record<string, string>
+	r2Buckets?: Record<string, string>
+	d1Databases?: Record<string, string>
+	queueProducers?: Record<string, { queueName: string }>
+	queueConsumers?: Record<string, Record<string, unknown>>
 	/** Service bindings to other workers */
 	serviceBindings?: Record<string, { name: string; entrypoint?: string }>
-	/** Durable Object bindings (className → wrapperClassName) */
-	durableObjects?: Record<string, string>
+	/** Durable Object bindings for classes hosted by this worker or another script */
+	durableObjects?: Record<string, string | { className: string; scriptName: string }>
+	ratelimits?: Record<string, { simple: { limit: number; period: 10 | 60 } }>
+	versionMetadata?: string
+	workerLoaders?: Record<string, Record<string, never>>
+	mtlsCertificates?: Record<string, { certificate_id: string }>
+	dispatchNamespaces?: Record<string, { namespace: string }>
+	workflows?: Record<string, {
+		name: string
+		className: string
+		scriptName?: string
+		stepLimit?: number
+	}>
+	pipelines?: Record<string, string | { pipeline: string }>
+	hyperdrives?: Record<string, string>
+	media?: { binding: string }
+	artifacts?: Record<string, { namespace: string }>
+	aiSearchNamespaces?: Record<string, { namespace: string }>
+	aiSearchInstances?: Record<string, { instance_name: string }>
+	secretsStoreSecrets?: Record<string, { store_id: string; secret_name: string }>
+	email?: {
+		send_email: Array<{
+			name: string
+			destination_address?: string
+			allowed_destination_addresses?: string[]
+			allowed_sender_addresses?: string[]
+		}>
+	}
 }
 
 /**
@@ -137,6 +196,176 @@ function findDefaultServiceWorkerEntrypoint(refConfigDir: string): string | null
 	return null
 }
 
+function buildRawServiceBindings(
+	services: NonNullable<NonNullable<DevflareConfig['bindings']>['services']> | undefined
+): Record<string, { name: string; entrypoint?: string }> | undefined {
+	if (!services || Object.keys(services).length === 0) {
+		return undefined
+	}
+
+	return Object.fromEntries(
+		Object.entries(services).map(([bindingName, binding]) => [
+			bindingName,
+			{
+				name: binding.service,
+				...(binding.entrypoint && { entrypoint: binding.entrypoint })
+			}
+		])
+	)
+}
+
+function buildReferencedWorkerRuntimeConfig(config: DevflareConfig): Partial<ResolvedWorker> {
+	const bindings = (config.bindings ?? {}) as NonNullable<DevflareConfig['bindings']>
+	const queueProducers = buildQueueProducers(bindings)
+	const queueConsumers = buildQueueConsumers(bindings)
+	const rateLimits = buildRateLimitsConfig(bindings)
+	const versionMetadata = buildVersionMetadataConfig(bindings)
+	const workerLoaders = buildWorkerLoadersConfig(bindings)
+	const mtlsCertificates = buildMtlsCertificatesConfig(bindings)
+	const dispatchNamespaces = buildDispatchNamespacesConfig(bindings)
+	const workflows = buildWorkflowsConfig(bindings)
+	const pipelines = buildPipelinesConfig(bindings)
+	const hyperdrives = buildHyperdrivesConfig(bindings)
+	const media = buildMediaConfig(bindings)
+	const artifacts = buildArtifactsConfig(bindings)
+	const aiSearchNamespaces = buildAiSearchNamespacesConfig(bindings)
+	const aiSearchInstances = buildAiSearchInstancesConfig(bindings)
+	const secretsStoreSecrets = buildSecretsStoreConfig(bindings, config.secretsStoreId)
+	const email = buildSendEmailConfig(bindings)
+	const serviceBindings = buildRawServiceBindings(bindings.services)
+
+	return {
+		...(config.compatibilityFlags && { compatibilityFlags: config.compatibilityFlags }),
+		...(config.vars && { bindings: config.vars }),
+		...(bindings.kv && {
+			kvNamespaces: Object.fromEntries(
+				Object.entries(bindings.kv).map(([bindingName, bindingConfig]) => [
+					bindingName,
+					getLocalKVNamespaceIdentifier(bindingConfig)
+				])
+			)
+		}),
+		...(bindings.r2 && { r2Buckets: bindings.r2 }),
+		...(bindings.d1 && {
+			d1Databases: Object.fromEntries(
+				Object.entries(bindings.d1).map(([bindingName, bindingConfig]) => [
+					bindingName,
+					getLocalD1DatabaseIdentifier(bindingConfig)
+				])
+			)
+		}),
+		...(queueProducers && { queueProducers }),
+		...(queueConsumers && { queueConsumers }),
+		...(rateLimits && { ratelimits: rateLimits }),
+		...(versionMetadata && { versionMetadata }),
+		...(workerLoaders && { workerLoaders }),
+		...(mtlsCertificates && { mtlsCertificates }),
+		...(dispatchNamespaces && { dispatchNamespaces }),
+		...(workflows && { workflows }),
+		...(pipelines && { pipelines }),
+		...(hyperdrives && { hyperdrives }),
+		...(media && { media }),
+		...(artifacts && { artifacts }),
+		...(aiSearchNamespaces && { aiSearchNamespaces }),
+		...(aiSearchInstances && { aiSearchInstances }),
+		...(secretsStoreSecrets && { secretsStoreSecrets }),
+		...(email && { email }),
+		...(serviceBindings && { serviceBindings })
+	}
+}
+
+function normalizeReferencedConfig(config: RefResult['config']): DevflareConfig {
+	return configSchema.parse(config)
+}
+
+function resolveReferencedConfigDir(ref: RefResult, parentConfigDir: string): string | null {
+	const configPath = ref.configPath
+	if (!configPath || configPath === '<resolved>') {
+		return null
+	}
+
+	return dirname(resolvePackageSpecifier(configPath, parentConfigDir))
+}
+
+interface ReferencedDurableObjectResolution {
+	workers: ResolvedWorker[]
+	bindings: Record<string, { className: string; scriptName: string }>
+}
+
+async function resolveReferencedLocalDurableObjects(
+	config: DevflareConfig,
+	configDir: string,
+	workerName: string,
+	serviceBindings: Record<string, { name: string; entrypoint?: string }> = {}
+): Promise<ReferencedDurableObjectResolution> {
+	const doPattern = config.files?.durableObjects
+	const dosConfig = config.bindings?.durableObjects
+
+	if (typeof doPattern !== 'string' || !dosConfig || Object.keys(dosConfig).length === 0) {
+		return { workers: [], bindings: {} }
+	}
+
+	const discoveredDOs = discoverDOFilesSync(configDir, doPattern)
+	const doClasses: Array<{ bindingName: string; className: string; scriptPath: string }> = []
+
+	for (const [bindingName, rawDoConfig] of Object.entries(dosConfig)) {
+		const doConfig = normalizeDOBinding(rawDoConfig as DurableObjectBinding)
+		if (doConfig.kind !== 'local') {
+			continue
+		}
+
+		const scriptPath = discoveredDOs.get(doConfig.className)
+		if (!scriptPath) {
+			console.warn(`[devflare] DO "${bindingName}" (class: ${doConfig.className}) not found in files.durableObjects for "${workerName}"`)
+			continue
+		}
+
+		doClasses.push({ bindingName, className: doConfig.className, scriptPath })
+	}
+
+	if (doClasses.length === 0) {
+		return { workers: [], bindings: {} }
+	}
+
+	const doWorkerName = `${workerName}-durable-objects`
+	const script = await bundleDOClasses(doClasses, doWorkerName)
+	if (!script) {
+		return { workers: [], bindings: {} }
+	}
+
+	const durableObjects = Object.fromEntries(
+		doClasses.map((do_) => [do_.bindingName, do_.className])
+	)
+	const runtimeConfig = buildReferencedWorkerRuntimeConfig(config)
+	const mergedServiceBindings = {
+		...(runtimeConfig.serviceBindings ?? {}),
+		...serviceBindings
+	}
+
+	return {
+		workers: [{
+			name: doWorkerName,
+			script,
+			modules: true,
+			compatibilityDate: config.compatibilityDate,
+			...runtimeConfig,
+			...(Object.keys(mergedServiceBindings).length > 0 && {
+				serviceBindings: mergedServiceBindings
+			}),
+			durableObjects
+		}],
+		bindings: Object.fromEntries(
+			doClasses.map((do_) => [
+				do_.bindingName,
+				{
+					className: do_.className,
+					scriptName: doWorkerName
+				}
+			])
+		)
+	}
+}
+
 // -----------------------------------------------------------------------------
 // Main API
 // -----------------------------------------------------------------------------
@@ -156,7 +385,8 @@ export function hasServiceBindings(config: DevflareConfig): boolean {
  */
 export async function resolveServiceBindings(
 	config: DevflareConfig,
-	configDir: string
+	configDir: string,
+	seenWorkers: Set<string> = new Set()
 ): Promise<ServiceBindingResolution> {
 	const services = config.bindings?.services
 	if (!services) {
@@ -183,9 +413,43 @@ export async function resolveServiceBindings(
 			// Only resolve worker once per unique worker name
 			// bundleAllEntrypoints will include the default worker entrypoint plus
 			// all named entrypoints discovered from files.entrypoints.
-			if (!workersByName.has(workerName)) {
-				const worker = await resolveRefWorker(ref, entrypoint, configDir)
+			if (!workersByName.has(workerName) && !seenWorkers.has(workerName)) {
+				const refConfig = normalizeReferencedConfig(ref.config)
+				const worker = await resolveRefWorker(ref, entrypoint, configDir, refConfig)
 				if (worker) {
+					const refConfigDir = resolveReferencedConfigDir(ref, configDir)
+					if (ref.config && refConfigDir) {
+						const nested = await resolveServiceBindings(
+							refConfig,
+							refConfigDir,
+							new Set([...seenWorkers, workerName])
+						)
+						worker.serviceBindings = {
+							...(worker.serviceBindings ?? {}),
+							...nested.primaryServiceBindings
+						}
+						for (const nestedWorker of nested.workers) {
+							if (!workersByName.has(nestedWorker.name)) {
+								workersByName.set(nestedWorker.name, nestedWorker)
+							}
+						}
+
+						const localDOs = await resolveReferencedLocalDurableObjects(
+							refConfig,
+							refConfigDir,
+							workerName,
+							nested.primaryServiceBindings
+						)
+						worker.durableObjects = {
+							...(worker.durableObjects ?? {}),
+							...localDOs.bindings
+						}
+						for (const doWorker of localDOs.workers) {
+							if (!workersByName.has(doWorker.name)) {
+								workersByName.set(doWorker.name, doWorker)
+							}
+						}
+					}
 					workersByName.set(workerName, worker)
 				}
 			}
@@ -218,20 +482,17 @@ export async function resolveServiceBindings(
 async function resolveRefWorker(
 	ref: RefResult,
 	_entrypoint: string | undefined, // Ignored - we bundle all entrypoints
-	parentConfigDir: string
+	parentConfigDir: string,
+	resolvedConfig?: DevflareConfig
 ): Promise<ResolvedWorker | null> {
-	const config = ref.config
+	const config = resolvedConfig ?? normalizeReferencedConfig(ref.config)
 	if (!config) return null
 
-	// Resolve the config path relative to parent config
-	const configPath = ref.configPath
-	if (!configPath || configPath === '<resolved>') {
+	const refConfigDir = resolveReferencedConfigDir(ref, parentConfigDir)
+	if (!refConfigDir) {
 		console.warn(`[devflare] Cannot resolve worker "${ref.name}" - configPath not available`)
 		return null
 	}
-
-	// Resolve the config directory
-	const refConfigDir = resolve(parentConfigDir, dirname(configPath))
 
 	// Collect all entrypoints to bundle
 	const entrypoints: Array<{ path: string; className: string; isWorkerTs: boolean }> = []
@@ -278,7 +539,8 @@ async function resolveRefWorker(
 		name: ref.name,
 		script,
 		modules: true,
-		compatibilityDate: config.compatibilityDate ?? '2025-01-01'
+		compatibilityDate: config.compatibilityDate ?? '2025-01-01',
+		...buildReferencedWorkerRuntimeConfig(config)
 	}
 }
 

@@ -76,15 +76,18 @@ export const CORE_HELP_PAGES: HelpPage[] = [
 		path: ['dev'],
 		summary: 'Start the development server',
 		usage: [
-			'devflare dev [--config <path>] [--port <port>] [--persist] [--verbose] [--debug] [--log | --log-temp]'
+			'devflare dev [--config <path>] [--port <port>] [--runtime-port <port>] [--bridge-port <port>] [--persist] [--verbose] [--debug] [--log | --log-temp]'
 		],
 		description: [
 			'Starts a worker-only Miniflare server by default, and automatically enables Vite when the current package has an effective local Vite setup.',
-			'Also watches Worker and Durable Object source files, rebuilding and hot-reloading them as they change.'
+			'Also watches Worker and Durable Object source files, rebuilding and hot-reloading them as they change.',
+			'Referenced service bindings declared with `ref()` are started in the same local Miniflare runtime so full-stack packages can call their local API workers.'
 		],
 		options: [
 			entry('--config <path>', 'Use a specific devflare config file'),
 			entry('--port <port>', 'Preferred Vite dev server port (defaults to 5173 when Vite is enabled)'),
+			entry('--runtime-port <port>', 'Preferred local Miniflare runtime/bridge port (defaults to 8787)'),
+			entry('--bridge-port <port>', 'Alias for --runtime-port; also honored via DEVFLARE_BRIDGE_PORT'),
 			entry('--persist', 'Persist Miniflare storage between restarts'),
 			entry('--verbose', 'Increase logging verbosity'),
 			entry('--debug', 'Enable extra debug logging and stack traces'),
@@ -94,10 +97,12 @@ export const CORE_HELP_PAGES: HelpPage[] = [
 		examples: [
 			entry('devflare dev', 'Start local development with automatic Vite detection'),
 			entry('devflare dev --port 3000', 'Use a custom Vite port when Vite is enabled'),
+			entry('devflare dev --runtime-port 8788', 'Use a custom local runtime port when another project owns 8787'),
 			entry('devflare dev --persist --log-temp', 'Keep Miniflare state and overwrite `.log` on each run')
 		],
 		notes: [
 			'Worker-only mode is the default when no effective local `vite.config.*` is present.',
+			'When no CLI port option is provided, Devflare reads DEVFLARE_RUNTIME_PORT and then DEVFLARE_BRIDGE_PORT before falling back to 8787.',
 			'`--log` and `--log-temp` still print to the terminal; they add a file mirror instead of redirecting output away.'
 		]
 	},
@@ -232,33 +237,37 @@ export const CORE_HELP_PAGES: HelpPage[] = [
 		path: ['doctor'],
 		summary: 'Check project configuration',
 		usage: [
-			'devflare doctor [--config <path>]'
+			'devflare doctor [--config <path>] [--scope <all|local|deploy>]'
 		],
 		description: [
 			'Checks for a loadable devflare config, package.json, TypeScript config, Vite integration, and generated Wrangler artifacts.',
 			'Useful when a project feels cursed but not cursed enough to throw a clear error yet.'
 		],
 		options: [
-			entry('--config <path>', 'Check a specific config path instead of the default resolution path')
+			entry('--config <path>', 'Check a specific config path instead of the default resolution path'),
+			entry('--scope <all|local|deploy>', 'Choose local-only checks, deploy-readiness checks, or both (defaults to all)')
 		],
 		examples: [
 			entry('devflare doctor', 'Run diagnostics for the current package'),
+			entry('devflare doctor --scope local', 'Skip deploy artifact readiness checks during local-only development'),
 			entry('devflare doctor --config apps/docs/devflare.config.ts', 'Check a specific config file')
 		],
 		notes: [
 			'Warnings still return exit code 0; hard failures return exit code 1.',
-			'The command reports whether generated `.devflare` and `.wrangler/deploy` artifacts already exist.'
+			'The command reports whether generated `.devflare` and `.wrangler/deploy` artifacts already exist.',
+			'`@cloudflare/vite-plugin` is optional for Devflare Vite/SvelteKit projects unless your own Vite config calls that plugin directly.'
 		]
 	},
 	{
 		path: ['config'],
 		summary: 'Print resolved Devflare or Wrangler config',
 		usage: [
-			'devflare config [print] [--config <path>] [--env <name>] [--format <devflare|wrangler>]'
+			'devflare config [print] [--config <path>] [--env <name>] [--phase <build|local|deploy>] [--local] [--format <devflare|wrangler>]'
 		],
 		description: [
 			'Loads the effective config and prints it as JSON.',
-			'Use `--format wrangler` when you want to inspect the exact Wrangler-compatible config Devflare will emit.'
+			'Use `--format wrangler` when you want to inspect the exact Wrangler-compatible config Devflare will emit.',
+			'Use `--phase local` or `--local` for offline local-runtime inspection without resolving Cloudflare account resource names.'
 		],
 		subcommands: [
 			entry('print', 'Print the resolved config (default subcommand)')
@@ -266,22 +275,26 @@ export const CORE_HELP_PAGES: HelpPage[] = [
 		options: [
 			entry('--config <path>', 'Use a specific devflare config file'),
 			entry('--env <name>', 'Resolve `config.env[name]` before printing'),
+			entry('--phase <build|local|deploy>', 'Choose build/offline, local-runtime, or deploy resource resolution (defaults to deploy)'),
+			entry('--local', 'Shortcut for --phase local'),
 			entry('--format <devflare|wrangler>', 'Choose whether to print raw Devflare config or compiled Wrangler JSON')
 		],
 		examples: [
 			entry('devflare config', 'Print the resolved Devflare config as JSON'),
+			entry('devflare config --phase local --format wrangler', 'Print local-runtime Wrangler JSON without Cloudflare account lookups'),
 			entry('devflare config --env preview', 'Print the preview environment config'),
 			entry('devflare config print --format wrangler', 'Print the compiled Wrangler config JSON')
 		],
 		notes: [
-			'`print` is the default subcommand, so `devflare config` and `devflare config print` behave the same.'
+			'`print` is the default subcommand, so `devflare config` and `devflare config print` behave the same.',
+			'Deploy phase remains the default for backwards compatibility; local and build phases are offline-friendly inspection modes.'
 		]
 	},
 	{
 		path: ['config', 'print'],
 		summary: 'Print the resolved config',
 		usage: [
-			'devflare config print [--config <path>] [--env <name>] [--format <devflare|wrangler>]'
+			'devflare config print [--config <path>] [--env <name>] [--phase <build|local|deploy>] [--local] [--format <devflare|wrangler>]'
 		],
 		description: [
 			'Equivalent to `devflare config`, but spelled out explicitly when you want the subcommand in scripts or docs.'
@@ -289,10 +302,13 @@ export const CORE_HELP_PAGES: HelpPage[] = [
 		options: [
 			entry('--config <path>', 'Use a specific devflare config file'),
 			entry('--env <name>', 'Resolve `config.env[name]` before printing'),
+			entry('--phase <build|local|deploy>', 'Choose build/offline, local-runtime, or deploy resource resolution (defaults to deploy)'),
+			entry('--local', 'Shortcut for --phase local'),
 			entry('--format <devflare|wrangler>', 'Choose Devflare JSON or compiled Wrangler JSON output')
 		],
 		examples: [
-			entry('devflare config print --format wrangler', 'Print the compiled Wrangler config')
+			entry('devflare config print --format wrangler', 'Print the compiled Wrangler config'),
+			entry('devflare config print --local --format wrangler', 'Print the local-runtime Wrangler config without account lookups')
 		]
 	},
 	{

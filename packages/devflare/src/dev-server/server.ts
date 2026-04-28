@@ -6,7 +6,7 @@
 
 import type { ConsolaInstance } from 'consola'
 import type { Miniflare as MiniflareType } from 'miniflare'
-import { resolve } from 'pathe'
+import { dirname, resolve } from 'pathe'
 import { loadConfig } from '../config/loader'
 import { applyLocalDevVarsToConfig } from '../config/local-dev-vars'
 import { bundleWorkerEntry, type DOBundleResult } from '../bundler'
@@ -29,6 +29,7 @@ import { applyWatcherTargetDiff, startWorkerSourceWatcher as createWorkerSourceW
 import { logMiniflareBindingDiagnostics, logMiniflareConfigDiagnostics, logRemoteBindingRequirements, logWorkerHandlerDetection, maybeStartBrowserShim, maybeStartDOBundler, resolveViteIntegration, resolveWorkerConfigWatchPath } from './server-startup-helpers'
 import { createDevServerState, disposeDevServerState, type DevServerState } from './dev-server-state'
 import { bundleWorkflowEntrypointScript } from '../workflows/local-workflow-entrypoints'
+import { resolveServiceBindings } from '../test/resolve-service-bindings'
 
 // -----------------------------------------------------------------------------
 
@@ -136,6 +137,7 @@ export function createDevServer(options: DevServerOptions): DevServer {
 			workflowEntrypointScript: state.workflowEntrypointScript,
 			browserShimPort: state.browserShimPort,
 			doResult,
+			serviceBindingResolution: state.serviceBindingResolution,
 			logger
 		})
 	}
@@ -252,6 +254,12 @@ export function createDevServer(options: DevServerOptions): DevServer {
 			cwd,
 			configPath: state.resolvedWorkerConfigPath ?? undefined
 		})
+		state.serviceBindingResolution = state.config.bindings?.services
+			? await resolveServiceBindings(
+					state.config,
+					state.resolvedWorkerConfigPath ? dirname(state.resolvedWorkerConfigPath) : cwd
+				)
+			: null
 	}
 
 	async function startWorkerSourceWatcher(): Promise<void> {

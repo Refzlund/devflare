@@ -13,7 +13,7 @@
 // - auxiliaryWorkers config passed to @cloudflare/vite-plugin
 // =============================================================================
 
-import { resolve } from 'pathe'
+import { dirname, resolve } from 'pathe'
 import type { Plugin, ResolvedConfig, ViteDevServer } from 'vite'
 import { loadConfig } from '../config/loader'
 import type { DevflareConfig } from '../config/schema'
@@ -26,6 +26,10 @@ import {
 	type AuxiliaryWorkerConfig,
 	type DODiscoveryResult
 } from './plugin-durable-objects'
+import {
+	RESOLVED_VIRTUAL_SERVICE_WORKER_PREFIX,
+	VIRTUAL_SERVICE_WORKER_PREFIX
+} from './plugin-service-bindings'
 import {
 	buildPluginContextState,
 	resolvePluginConfigPath,
@@ -102,6 +106,8 @@ export interface DevflarePluginContext {
 	 * Pass to @cloudflare/vite-plugin's auxiliaryWorkers option
 	 */
 	auxiliaryWorkerConfig: AuxiliaryWorkerConfig | null
+	auxiliaryWorkerConfigs: AuxiliaryWorkerConfig[]
+	serviceWorkerVirtualModules: Map<string, string>
 
 	/**
 	 * Discovered DO files and their classes
@@ -123,6 +129,8 @@ function createPluginState(): PluginInstanceState {
 			cloudflareConfig: null,
 			projectRoot: process.cwd(),
 			auxiliaryWorkerConfig: null,
+			auxiliaryWorkerConfigs: [],
+			serviceWorkerVirtualModules: new Map(),
 			durableObjects: null
 		},
 		projectRoot: process.cwd(),
@@ -152,7 +160,8 @@ async function loadAndApplyConfig(
 		state.projectRoot,
 		state.devflareConfig,
 		options.environment,
-		mode
+		mode,
+		state.resolvedPluginConfigPath ? dirname(state.resolvedPluginConfigPath) : state.projectRoot
 	)
 	Object.assign(state.context, {
 		projectRoot: state.projectRoot,
@@ -203,8 +212,8 @@ export function getPluginContext(): DevflarePluginContext {
  *       // Access context after configResolved
  *       cloudflare({
  *         config: getPluginContext().cloudflareConfig,
- *         auxiliaryWorkers: getPluginContext().auxiliaryWorkerConfig
- *           ? [getPluginContext().auxiliaryWorkerConfig]
+ *         auxiliaryWorkers: getPluginContext().auxiliaryWorkerConfigs.length > 0
+ *           ? getPluginContext().auxiliaryWorkerConfigs
  *           : undefined
  *       })
  *     ]
@@ -247,6 +256,9 @@ export function devflarePlugin(options: DevflarePluginOptions = {}): Plugin {
 			if (id === VIRTUAL_DO_ENTRY) {
 				return RESOLVED_VIRTUAL_DO_ENTRY
 			}
+			if (id.startsWith(VIRTUAL_SERVICE_WORKER_PREFIX)) {
+				return '\0' + id
+			}
 			return null
 		},
 
@@ -257,6 +269,9 @@ export function devflarePlugin(options: DevflarePluginOptions = {}): Plugin {
 					return '// No Durable Objects configured\nexport default { fetch: () => new Response("No DOs") }'
 				}
 				return generateVirtualDOEntry(state.context.durableObjects)
+			}
+			if (id.startsWith(RESOLVED_VIRTUAL_SERVICE_WORKER_PREFIX)) {
+				return state.context.serviceWorkerVirtualModules.get(id) ?? null
 			}
 			return null
 		},

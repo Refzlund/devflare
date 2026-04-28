@@ -17,10 +17,11 @@ For a worker-only project, install only Devflare:
 bun add -d devflare
 ```
 
-For Vite-backed apps, add Vite and the Cloudflare Vite plugin:
+For Vite-backed apps, add Vite. Add the Cloudflare Vite plugin only when your
+own `vite.config.*` calls it directly:
 
 ```bash
-bun add -d devflare vite @cloudflare/vite-plugin
+bun add -d devflare vite
 ```
 
 Assumptions used by the examples: Wrangler 4, Miniflare 4,
@@ -181,6 +182,13 @@ for examples with file paths.
 | `devflare types` | generate `env.d.ts` |
 | `devflare version` | print the installed version |
 | `devflare worker` | run Worker control-plane helpers |
+
+Useful local-first switches:
+
+- `devflare dev --runtime-port 8788` or `DEVFLARE_RUNTIME_PORT=8788` moves the local Miniflare runtime/bridge off the default `127.0.0.1:8787`. `--bridge-port` and `DEVFLARE_BRIDGE_PORT` are aliases for the same runtime port.
+- `devflare doctor --scope local` skips deploy-readiness artifact warnings during a local-only loop.
+- `devflare config --phase local --format wrangler` prints the local-runtime Wrangler shape without Cloudflare account resource lookups.
+- `devflare dev` and `devflare/vite` start `ref()` service-binding workers inside the same local runtime, including their local KV, D1, R2, Queue producer/consumer, vars, Durable Objects, and other Miniflare-backed bindings.
 
 ## Support Stance Index
 

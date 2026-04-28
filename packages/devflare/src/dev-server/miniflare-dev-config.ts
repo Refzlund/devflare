@@ -43,8 +43,10 @@ import {
 import { hasWorkerSurfacePaths, type WorkerSurfacePaths } from './worker-surface-paths'
 import { buildLocalSecretWrappedBindingConfig } from '../secrets/local-secrets'
 import { buildLocalBindingShimServiceConfig } from '../shims/local-media-bindings'
+import type { resolveServiceBindings } from '../test/resolve-service-bindings'
 
 const INTERNAL_APP_SERVICE_BINDING = '__DEVFLARE_APP'
+type ServiceBindingResolution = Awaited<ReturnType<typeof resolveServiceBindings>>
 
 export interface BuildMiniflareDevConfigInput {
 	config: DevflareConfig
@@ -60,6 +62,7 @@ export interface BuildMiniflareDevConfigInput {
 	workflowEntrypointScript: string
 	browserShimPort: number
 	doResult: DOBundleResult | null
+	serviceBindingResolution?: ServiceBindingResolution | null
 	logger?: ConsolaInstance
 }
 
@@ -86,6 +89,7 @@ export function buildMiniflareDevConfig(input: BuildMiniflareDevConfigInput): an
 		workflowEntrypointScript,
 		browserShimPort,
 		doResult,
+		serviceBindingResolution,
 		logger
 	} = input
 
@@ -114,6 +118,7 @@ export function buildMiniflareDevConfig(input: BuildMiniflareDevConfigInput): an
 	const createServiceBindings = (
 		extraBindings: Record<string, MiniflareServiceBinding> = {}
 	) => buildServiceBindings(bindings, {
+		...(serviceBindingResolution?.primaryServiceBindings ?? {}),
 		...localBindingShimServiceConfig.serviceBindings,
 		...extraBindings
 	})
@@ -277,6 +282,7 @@ export function buildMiniflareDevConfig(input: BuildMiniflareDevConfigInput): an
 		workers: [
 			gatewayWorker,
 			...workers,
+			...(serviceBindingResolution?.workers ?? []),
 			...localSecretWrappedBindingConfig.workers,
 			...localBindingShimServiceConfig.workers
 		]

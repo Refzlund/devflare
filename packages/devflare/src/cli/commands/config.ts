@@ -1,10 +1,46 @@
 import { type ConsolaInstance } from 'consola'
-import { loadResolvedConfig } from '../../config'
-import { compileConfig } from '../../config/compiler'
+import {
+	ConfigResourceResolutionError,
+	loadConfig,
+	loadResolvedConfig,
+	resolveResources,
+	type DevflareConfig
+} from '../../config'
+import { compileBuildConfig, compileConfig } from '../../config/compiler'
 import type { ParsedArgs, CliOptions, CliResult } from '../index'
 
 function isSupportedFormat(value: string): value is 'devflare' | 'wrangler' {
 	return value === 'devflare' || value === 'wrangler'
+}
+
+type ConfigPhase = 'build' | 'local' | 'deploy'
+
+function isSupportedPhase(value: string): value is ConfigPhase {
+	return value === 'build' || value === 'local' || value === 'deploy'
+}
+
+async function loadConfigForPhase(options: {
+	cwd: string
+	configPath: string | undefined
+	environment: string | undefined
+	phase: ConfigPhase
+}): Promise<DevflareConfig> {
+	if (options.phase === 'deploy') {
+		return await loadResolvedConfig({
+			cwd: options.cwd,
+			configFile: options.configPath,
+			environment: options.environment
+		})
+	}
+
+	const config = await loadConfig({
+		cwd: options.cwd,
+		configFile: options.configPath
+	})
+	return await resolveResources(config, {
+		phase: options.phase,
+		environment: options.environment
+	})
 }
 
 export async function runConfigCommand(
@@ -18,6 +54,9 @@ export async function runConfigCommand(
 	const subcommand = parsed.args[0] ?? 'print'
 	const formatOption = parsed.options.format as string | undefined
 	const format = formatOption ?? 'devflare'
+	const phaseOption = parsed.options.local === true
+		? 'local'
+		: (parsed.options.phase as string | undefined) ?? 'deploy'
 
 	if (subcommand !== 'print') {
 		logger.error(`Unknown config subcommand: ${subcommand}`)
@@ -31,14 +70,23 @@ export async function runConfigCommand(
 		return { exitCode: 1 }
 	}
 
+	if (!isSupportedPhase(phaseOption)) {
+		logger.error(`Unsupported config phase: ${phaseOption}`)
+		logger.info('Supported phases: build, local, deploy')
+		return { exitCode: 1 }
+	}
+
 	try {
-		const resolvedConfig = await loadResolvedConfig({
+		const resolvedConfig = await loadConfigForPhase({
 			cwd,
-			configFile: configPath,
-			environment
+			configPath,
+			environment,
+			phase: phaseOption
 		})
 		const output = format === 'wrangler'
-			? compileConfig(resolvedConfig)
+			? phaseOption === 'build'
+				? compileBuildConfig(resolvedConfig, undefined, { alreadyResolved: true })
+				: compileConfig(resolvedConfig as Parameters<typeof compileConfig>[0])
 			: resolvedConfig
 		const text = JSON.stringify(output, null, '\t')
 
@@ -53,6 +101,9 @@ export async function runConfigCommand(
 	} catch (error) {
 		if (error instanceof Error) {
 			logger.error('Config command failed:', error.message)
+			if (error instanceof ConfigResourceResolutionError) {
+				logger.info('For offline inspection, run `devflare config --phase local` or `devflare config --phase build --format wrangler`.')
+			}
 		}
 		return { exitCode: 1 }
 	}

@@ -10,6 +10,7 @@ import { getDependencies } from '../dependencies'
 import { getGeneratedArtifactPaths } from '../generated-artifacts'
 import { detectViteProject } from '../../dev-server/vite-utils'
 import { formatSupportedConfigFilenames, resolveConfigCandidatePath } from '../config-path'
+import { getPackageVersion } from '../package-metadata'
 import { bold, createCliTheme, dim, green, logLine, red, yellow } from '../ui'
 
 interface CheckResult {
@@ -26,6 +27,13 @@ export async function runDoctorCommand(
 	const cwd = options.cwd || process.cwd()
 	const theme = createCliTheme(parsed.options)
 	const requestedConfigOption = parsed.options.config as string | undefined
+	const scope = (parsed.options.scope as string | undefined) ?? 'all'
+	if (!['all', 'local', 'deploy'].includes(scope)) {
+		logger.error(`Unsupported doctor scope: ${scope}`)
+		logger.info('Supported scopes: all, local, deploy')
+		return { exitCode: 1 }
+	}
+
 	const requestedConfigPath = requestedConfigOption
 		? resolve(cwd, requestedConfigOption)
 		: cwd
@@ -91,10 +99,11 @@ export async function runDoctorCommand(
 		const deps = { ...pkg.dependencies, ...pkg.devDependencies }
 
 		if (deps.devflare) {
+			const resolvedVersion = await getPackageVersion()
 			checks.push({
 				name: 'devflare dep',
 				status: 'pass',
-				message: `Version: ${deps.devflare}`
+				message: `package.json: ${deps.devflare}, resolved: ${resolvedVersion}`
 			})
 		} else {
 			checks.push({
@@ -141,8 +150,8 @@ export async function runDoctorCommand(
 		} else {
 			checks.push({
 				name: '@cloudflare/vite-plugin',
-				status: 'warn',
-				message: 'Not declared in this package.json'
+				status: 'pass',
+				message: 'Optional: not declared in this package.json. Install it only when your Vite config calls the Cloudflare Vite plugin directly.'
 			})
 		}
 
@@ -186,49 +195,53 @@ export async function runDoctorCommand(
 	// Check 5: generated Wrangler config artifacts
 	const artifactPaths = getGeneratedArtifactPaths(cwd)
 
-	try {
-		await fs.access(artifactPaths.devWranglerConfigPath)
-		checks.push({
-			name: 'Generated dev config',
-			status: 'pass',
-			message: `Found: ${relative(cwd, artifactPaths.devWranglerConfigPath)}`
-		})
-	} catch {
-		checks.push({
-			name: 'Generated dev config',
-			status: 'warn',
-			message: 'Not found. Run `devflare build`, `devflare deploy`, or start `devflare/vite` to populate `.devflare/wrangler.jsonc`.'
-		})
+	if (scope === 'all' || scope === 'local') {
+		try {
+			await fs.access(artifactPaths.devWranglerConfigPath)
+			checks.push({
+				name: 'Generated dev config',
+				status: 'pass',
+				message: `Found: ${relative(cwd, artifactPaths.devWranglerConfigPath)}`
+			})
+		} catch {
+			checks.push({
+				name: 'Generated dev config',
+				status: 'warn',
+				message: 'Local readiness: not found. Run `devflare dev` or start `devflare/vite` to populate `.devflare/wrangler.jsonc`.'
+			})
+		}
 	}
 
-	try {
-		await fs.access(artifactPaths.buildWranglerConfigPath)
-		checks.push({
-			name: 'Generated deploy config',
-			status: 'pass',
-			message: `Found: ${relative(cwd, artifactPaths.buildWranglerConfigPath)}`
-		})
-	} catch {
-		checks.push({
-			name: 'Generated deploy config',
-			status: 'warn',
-			message: 'Not found. Run `devflare build` or `devflare deploy` to generate `.devflare/build/wrangler.jsonc`.'
-		})
-	}
+	if (scope === 'all' || scope === 'deploy') {
+		try {
+			await fs.access(artifactPaths.buildWranglerConfigPath)
+			checks.push({
+				name: 'Generated deploy config',
+				status: 'pass',
+				message: `Found: ${relative(cwd, artifactPaths.buildWranglerConfigPath)}`
+			})
+		} catch {
+			checks.push({
+				name: 'Generated deploy config',
+				status: 'warn',
+				message: 'Deploy readiness: not found. Run `devflare build` or `devflare deploy` to generate `.devflare/build/wrangler.jsonc`.'
+			})
+		}
 
-	try {
-		await fs.access(artifactPaths.deployRedirectPath)
-		checks.push({
-			name: 'Wrangler deploy redirect',
-			status: 'pass',
-			message: `Found: ${relative(cwd, artifactPaths.deployRedirectPath)}`
-		})
-	} catch {
-		checks.push({
-			name: 'Wrangler deploy redirect',
-			status: 'warn',
-			message: 'Not found. Run `devflare build` or `devflare deploy` to generate `.wrangler/deploy/config.json`.'
-		})
+		try {
+			await fs.access(artifactPaths.deployRedirectPath)
+			checks.push({
+				name: 'Wrangler deploy redirect',
+				status: 'pass',
+				message: `Found: ${relative(cwd, artifactPaths.deployRedirectPath)}`
+			})
+		} catch {
+			checks.push({
+				name: 'Wrangler deploy redirect',
+				status: 'warn',
+				message: 'Deploy readiness: not found. Run `devflare build` or `devflare deploy` to generate `.wrangler/deploy/config.json`.'
+			})
+		}
 	}
 
 	// Output results

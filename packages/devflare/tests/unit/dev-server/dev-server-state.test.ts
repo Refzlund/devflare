@@ -20,6 +20,7 @@ describe('createDevServerState', () => {
 		expect(state.workerWatchTargets).toEqual([])
 		expect(state.viteProcess).toBeNull()
 		expect(state.config).toBeNull()
+		expect(state.serviceBindingResolution).toBeNull()
 		expect(state.browserShim).toBeNull()
 		expect(state.browserShimPort).toBe(8788)
 		expect(state.mainWorkerSurfacePaths).toEqual({

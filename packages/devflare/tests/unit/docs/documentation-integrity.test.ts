@@ -646,7 +646,8 @@ describe('documentation integrity', () => {
 
 		expect(readme).toContain('bun add -d devflare\n')
 		expect(readme).toContain('For a worker-only project, install only Devflare')
-		expect(readme).toContain('For Vite-backed apps, add Vite and the Cloudflare Vite plugin')
+		expect(readme).toContain('For Vite-backed apps, add Vite')
+		expect(readme).toContain('Add the Cloudflare Vite plugin only when')
 		expect(fetchSnippet.code).toContain("return new Response('Hello from Devflare')")
 		expect(testSnippet.code).toContain("expect(await response.text()).toBe('Hello from Devflare')")
 	})

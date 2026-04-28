@@ -114,7 +114,7 @@ bunx --bun devflare productions rollback --help`
 						[
 							'`dev`',
 							'Start local development.',
-							'Worker-only defaults, Vite auto-detection, logging, and persistence.'
+							'Worker-only defaults, Vite auto-detection, `ref()` service workers, runtime-port selection, logging, and persistence.'
 						],
 						[
 							'`build`',
@@ -134,12 +134,12 @@ bunx --bun devflare productions rollback --help`
 						[
 							'`doctor`',
 							'Check local project health.',
-							'Config, package, TypeScript, Vite, and generated artifact diagnostics.'
+							'Config, package, TypeScript, Vite, scope-aware local/deploy artifact diagnostics, and optional plugin guidance.'
 						],
 						[
 							'`config`',
 							'Print resolved config.',
-							'`print`, raw Devflare JSON, or compiled Wrangler JSON.'
+							'`print`, raw Devflare JSON, compiled Wrangler JSON, and build/local/deploy resolution phases.'
 						],
 						[
 							'`account`',
@@ -333,14 +333,19 @@ bunx --bun devflare deploy --prod`
 						title: 'When the setup feels suspicious, inspect before you improvise',
 						language: 'bash',
 						code: String.raw`bunx --bun devflare config print --format wrangler
-bunx --bun devflare doctor
+bunx --bun devflare config --phase local --format wrangler
+bunx --bun devflare doctor --scope local
 bunx --bun devflare previews bindings --scope next
 bunx --bun devflare productions versions`
 					}
 				],
 				bullets: [
 					'Run `types` after binding or entrypoint changes so `env.d.ts` stays honest.',
+					'Use `dev --runtime-port <port>` or `DEVFLARE_RUNTIME_PORT` when another local project already owns the default 8787 runtime port.',
+					'Use `config --phase local --format wrangler` when you want local config inspection without Cloudflare account lookups.',
+					'Use `ref()` service bindings for local full-stack packages; Devflare starts those referenced workers in CLI dev and exposes them as Vite auxiliary workers for framework dev.',
 					'Run `build` or `config print --format wrangler` when the compiled shape matters more than the dev server feeling healthy.',
+					'Use `doctor --scope local` when generated deploy artifacts are intentionally absent during a local-only loop.',
 					'Keep preview and production intent explicit in the final deploy command instead of hiding it in a generic script name.',
 					'Use the nested help pages when a lifecycle command reaches `--apply`, account selection, rollback, or cleanup territory.'
 				]

@@ -522,6 +522,130 @@ export default {
 				await rm(secondProjectDir, { recursive: true, force: true })
 			}
 		})
+
+		test('exposes ref service bindings as auxiliary workers in serve mode', async () => {
+			const projectDir = await mkdtemp(join(tmpdir(), 'devflare-vite-ref-services-'))
+
+			try {
+				await mkdir(join(projectDir, 'src'), { recursive: true })
+				await mkdir(join(projectDir, 'api', 'src'), { recursive: true })
+				await writeFile(join(projectDir, 'package.json'), JSON.stringify({
+					name: 'vite-ref-services-test',
+					private: true,
+					type: 'module'
+				}, null, 2))
+				await writeFile(join(projectDir, 'api', 'src', 'ep.api.ts'), `
+import { WorkerEntrypoint } from 'cloudflare:workers'
+
+export class ApiEntrypoint extends WorkerEntrypoint {
+	async ping(): Promise<string> {
+		return 'PONG'
+	}
+}
+`.trim())
+				await writeFile(join(projectDir, 'api', 'src', 'do.counter.ts'), `
+import { DurableObject } from 'cloudflare:workers'
+
+export class Counter extends DurableObject {
+	async ping(): Promise<string> {
+		return 'DO_PONG'
+	}
+}
+`.trim())
+				await writeFile(join(projectDir, 'src', 'fetch.ts'), `export async function fetch(): Promise<Response> { return new Response('ok') }`)
+				await writeFile(join(projectDir, 'devflare.config.ts'), `
+const apiConfig = {
+	name: 'api-worker',
+	compatibilityDate: '2026-04-28',
+	files: {
+		fetch: false,
+		entrypoints: 'src/ep.*.ts',
+		durableObjects: 'src/do.*.ts'
+	},
+	bindings: {
+		d1: {
+			DB: { name: 'api-db' }
+		},
+		durableObjects: {
+			COUNTER: 'Counter'
+		}
+	}
+}
+
+const resolved = {
+	name: apiConfig.name,
+	config: apiConfig,
+	configPath: './api/devflare.config.ts'
+}
+
+const apiRef = {
+	get name() {
+		return resolved.name
+	},
+	get config() {
+		return resolved.config
+	},
+	get configPath() {
+		return resolved.configPath
+	},
+	__import: async () => ({ default: apiConfig }),
+	resolve: async () => resolved
+}
+
+export default {
+	name: 'site-worker',
+	compatibilityDate: '2026-04-28',
+	files: {
+		fetch: 'src/fetch.ts'
+	},
+	bindings: {
+		services: {
+			API: {
+				service: 'api-worker',
+				entrypoint: 'ApiEntrypoint',
+				__ref: apiRef
+			}
+		}
+	}
+}
+`.trim())
+
+				const plugin = devflarePlugin()
+				if (!plugin.configResolved || !plugin.resolveId || !plugin.load) {
+					throw new Error('Expected devflare Vite plugin to expose configResolved(), resolveId(), and load()')
+				}
+
+				await (plugin.configResolved as any)({
+					root: projectDir,
+					command: 'serve'
+				} as any)
+
+				const pluginContext = getPluginContext()
+				const auxiliaryConfigs = pluginContext.auxiliaryWorkerConfigs.map((worker) => worker.config)
+				const apiWorkerConfig = auxiliaryConfigs.find((config) => config.name === 'api-worker') as Record<string, any>
+				const doWorkerConfig = auxiliaryConfigs.find((config) => config.name === 'api-worker-durable-objects') as Record<string, any>
+
+				expect(apiWorkerConfig).toBeDefined()
+				expect(doWorkerConfig).toBeDefined()
+				expect(apiWorkerConfig.services).toEqual(undefined)
+				expect(apiWorkerConfig.d1_databases?.[0]?.database_id).toBe('api-db')
+				expect(apiWorkerConfig.durable_objects?.bindings).toEqual([{
+					name: 'COUNTER',
+					class_name: 'Counter',
+					script_name: 'api-worker-durable-objects'
+				}])
+				expect(doWorkerConfig.durable_objects?.bindings).toEqual([{
+					name: 'COUNTER',
+					class_name: 'Counter'
+				}])
+
+				const resolvedId = await (plugin.resolveId as any)(apiWorkerConfig.main)
+				const source = await (plugin.load as any)(resolvedId)
+				expect(source).toContain('ApiEntrypoint')
+			} finally {
+				await rm(projectDir, { recursive: true, force: true })
+			}
+		})
 	})
 
 	describe('plugin configureServer config watching', () => {

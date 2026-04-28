@@ -1278,12 +1278,12 @@ bunx --bun devflare productions rollback --help
 | Command | Primary job | What the deeper help covers |
 | --- | --- | --- |
 | `init` | Scaffold a new package. | Template choice and generated starter scripts. |
-| `dev` | Start local development. | Worker-only defaults, Vite auto-detection, logging, and persistence. |
+| `dev` | Start local development. | Worker-only defaults, Vite auto-detection, `ref()` service workers, runtime-port selection, logging, and persistence. |
 | `build` | Compile deploy-ready artifacts. | Environment resolution and Wrangler-facing output. |
 | `deploy` | Ship explicitly to production or preview. | Target selection, dry runs, preview naming, messages, and tags. |
 | `types` | Generate `env.d.ts` and typed bindings. | Custom output paths plus entrypoint and Durable Object discovery. |
-| `doctor` | Check local project health. | Config, package, TypeScript, Vite, and generated artifact diagnostics. |
-| `config` | Print resolved config. | `print`, raw Devflare JSON, or compiled Wrangler JSON. |
+| `doctor` | Check local project health. | Config, package, TypeScript, Vite, scope-aware local/deploy artifact diagnostics, and optional plugin guidance. |
+| `config` | Print resolved config. | `print`, raw Devflare JSON, compiled Wrangler JSON, and build/local/deploy resolution phases. |
 | `account` | Inspect Cloudflare account inventories and limits. | Resource lists, usage limits, and interactive global/workspace selection. |
 | `login` | Authenticate with Cloudflare via Wrangler. | `--force` behavior and reuse of existing sessions. |
 | `previews` | Operate on preview lifecycle state. | `list`, `bindings`, and `cleanup`. |
@@ -1352,7 +1352,11 @@ When the job changes from building to operating, switch command families instead
 ##### Key points
 
 - Run `types` after binding or entrypoint changes so `env.d.ts` stays honest.
+- Use `dev --runtime-port <port>` or `DEVFLARE_RUNTIME_PORT` when another local project already owns the default 8787 runtime port.
+- Use `config --phase local --format wrangler` when you want local config inspection without Cloudflare account lookups.
+- Use `ref()` service bindings for local full-stack packages; Devflare starts those referenced workers in CLI dev and exposes them as Vite auxiliary workers for framework dev.
 - Run `build` or `config print --format wrangler` when the compiled shape matters more than the dev server feeling healthy.
+- Use `doctor --scope local` when generated deploy artifacts are intentionally absent during a local-only loop.
 - Keep preview and production intent explicit in the final deploy command instead of hiding it in a generic script name.
 - Use the nested help pages when a lifecycle command reaches `--apply`, account selection, rollback, or cleanup territory.
 
@@ -1389,7 +1393,8 @@ bunx --bun devflare deploy --prod
 
 ```bash
 bunx --bun devflare config print --format wrangler
-bunx --bun devflare doctor
+bunx --bun devflare config --phase local --format wrangler
+bunx --bun devflare doctor --scope local
 bunx --bun devflare previews bindings --scope next
 bunx --bun devflare productions versions
 ```

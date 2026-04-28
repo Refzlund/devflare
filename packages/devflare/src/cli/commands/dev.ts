@@ -38,6 +38,50 @@ interface LogWriter {
 	close: () => void
 }
 
+function readStringOption(value: string | boolean | undefined): string | undefined {
+	return typeof value === 'string' ? value : undefined
+}
+
+function parsePort(value: string, source: string): number {
+	const port = Number(value)
+	if (!Number.isInteger(port) || port <= 0 || port > 65535) {
+		throw new Error(`${source} must be an integer between 1 and 65535`)
+	}
+	return port
+}
+
+function resolveSinglePort(
+	runtimePort: string | undefined,
+	bridgePort: string | undefined,
+	source: string
+): number | undefined {
+	if (runtimePort && bridgePort && runtimePort !== bridgePort) {
+		throw new Error(
+			`Conflicting Devflare runtime ports: ${source} runtime port is ${runtimePort}, but bridge port is ${bridgePort}. Use one value for both.`
+		)
+	}
+
+	const value = runtimePort ?? bridgePort
+	return value ? parsePort(value, source) : undefined
+}
+
+export function resolveDevRuntimePort(
+	options: Record<string, string | boolean>,
+	env: NodeJS.ProcessEnv = process.env
+): number {
+	return resolveSinglePort(
+		readStringOption(options['runtime-port']),
+		readStringOption(options['bridge-port']),
+		'CLI'
+	)
+		?? resolveSinglePort(
+			env.DEVFLARE_RUNTIME_PORT,
+			env.DEVFLARE_BRIDGE_PORT,
+			'environment'
+		)
+		?? 8787
+}
+
 /**
  * Create a log writer that writes to both terminal and file
  */
@@ -104,6 +148,15 @@ export async function runDevCommand(
 	const debugEnabled = parsed.options.debug === true || process.env.DEVFLARE_DEBUG === 'true'
 	const verbose = parsed.options.verbose === true || debugEnabled
 	const theme = createCliTheme(parsed.options)
+	let miniflarePort: number
+
+	try {
+		miniflarePort = resolveDevRuntimePort(parsed.options)
+	} catch (error) {
+		logger.error(error instanceof Error ? error.message : String(error))
+		return { exitCode: 1 }
+	}
+
 	const config = await loadConfig({ cwd, configFile: configPath })
 	const viteProject = resolveEffectiveViteProject(
 		await detectViteProject(cwd),
@@ -173,7 +226,7 @@ export async function runDevCommand(
 			cwd,
 			configPath,
 			vitePort: port ? parseInt(port, 10) : 5173,
-			miniflarePort: 8787,
+			miniflarePort,
 			enableVite: viteProject.shouldStartVite,
 			persist: persistEnabled,
 			logger: devLogger,

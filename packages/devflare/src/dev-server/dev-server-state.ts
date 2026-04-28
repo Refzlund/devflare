@@ -12,6 +12,7 @@ import type { BrowserShim } from '../browser-shim'
 import { isIgnorableMiniflareDisposeError } from '../bridge/miniflare'
 import type { DOBundler, DOBundleResult } from '../bundler'
 import type { DevflareConfig } from '../config'
+import type { resolveServiceBindings } from '../test/resolve-service-bindings'
 import type { RouteDiscoveryResult } from '../worker-entry/routes'
 import type { Miniflare as MiniflareType } from 'miniflare'
 import { clearLocalSendEmailBindings } from '../utils/send-email'
@@ -34,6 +35,7 @@ export interface DevServerState {
 	workerWatchTargets: string[]
 	viteProcess: import('node:child_process').ChildProcess | null
 	config: DevflareConfig | null
+	serviceBindingResolution: Awaited<ReturnType<typeof resolveServiceBindings>> | null
 	browserShim: BrowserShim | null
 	browserShimPort: number
 	mainWorkerSurfacePaths: WorkerSurfacePaths
@@ -63,6 +65,7 @@ export function createDevServerState(initial: {
 		workerWatchTargets: [],
 		viteProcess: null,
 		config: null,
+		serviceBindingResolution: null,
 		browserShim: null,
 		browserShimPort: initial.browserShimPort ?? 8788,
 		mainWorkerSurfacePaths: {

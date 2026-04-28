@@ -98,6 +98,75 @@ describe('runDoctorCommand', () => {
 		expect(renderedMessages.some((message) => message.includes('No vite.config found'))).toBe(true)
 	})
 
+	test('describes @cloudflare/vite-plugin as optional when a Vite package omits it', async () => {
+		await writeProjectFiles(projectDir, {
+			name: 'sveltekit-project',
+			private: true,
+			devDependencies: {
+				devflare: '^1.0.0',
+				vite: '^6.0.0'
+			}
+		}, true)
+
+		const logger = createLogger()
+		const result = await runDoctorCommand(
+			{ command: 'doctor', args: [], options: {} },
+			logger as any,
+			{ cwd: projectDir }
+		)
+		const renderedMessages = renderMessages(logger)
+
+		expect(result.exitCode).toBe(0)
+		expect(renderedMessages.some((message) =>
+			message.includes('@cloudflare/vite-plugin') && message.includes('Optional')
+		)).toBe(true)
+	})
+
+	test('reports package.json and resolved devflare versions', async () => {
+		await writeProjectFiles(projectDir, {
+			name: 'version-project',
+			private: true,
+			devDependencies: {
+				devflare: 'next'
+			}
+		})
+
+		const logger = createLogger()
+		const result = await runDoctorCommand(
+			{ command: 'doctor', args: [], options: {} },
+			logger as any,
+			{ cwd: projectDir }
+		)
+		const renderedMessages = renderMessages(logger)
+
+		expect(result.exitCode).toBe(0)
+		expect(renderedMessages.some((message) =>
+			message.includes('package.json: next') && message.includes('resolved:')
+		)).toBe(true)
+	})
+
+	test('scope local omits deploy artifact readiness warnings', async () => {
+		await writeProjectFiles(projectDir, {
+			name: 'local-project',
+			private: true,
+			devDependencies: {
+				devflare: '^1.0.0'
+			}
+		})
+
+		const logger = createLogger()
+		const result = await runDoctorCommand(
+			{ command: 'doctor', args: [], options: { scope: 'local' } },
+			logger as any,
+			{ cwd: projectDir }
+		)
+		const renderedMessages = renderMessages(logger)
+
+		expect(result.exitCode).toBe(0)
+		expect(renderedMessages.some((message) => message.includes('Generated deploy config'))).toBe(false)
+		expect(renderedMessages.some((message) => message.includes('Wrangler deploy redirect'))).toBe(false)
+	})
+
 	test('accepts .devflare/wrangler.jsonc as generated config output', async () => {
 		await writeProjectFiles(projectDir, {
 			name: 'vite-project',

@@ -20,6 +20,8 @@ import {
 	discoverDurableObjects,
 	type AuxiliaryWorkerConfig
 } from './plugin-durable-objects'
+import { resolveServiceBindings } from '../test/resolve-service-bindings'
+import { createAuxiliaryServiceWorkerConfigs } from './plugin-service-bindings'
 
 interface ProgrammaticConfigOptions {
 	cwd?: string
@@ -102,6 +104,13 @@ async function buildProgrammaticArtifacts(
 			}
 			auxiliaryWorkers.push(createAuxiliaryWorkerConfig(wranglerConfig, discovery))
 		}
+	}
+
+	if (devflareConfig.bindings?.services) {
+		const serviceBindingResolution = await resolveServiceBindings(devflareConfig, cwd)
+		auxiliaryWorkers.push(
+			...createAuxiliaryServiceWorkerConfigs(serviceBindingResolution).auxiliaryWorkers
+		)
 	}
 
 	return { cwd, devflareConfig, composedMainEntry, wranglerConfig, cloudflareConfig, auxiliaryWorkers }

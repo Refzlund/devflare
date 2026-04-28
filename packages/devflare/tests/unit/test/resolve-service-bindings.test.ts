@@ -168,4 +168,137 @@ export async function fetch(): Promise<Response> {
 		expect(result.workers[0]?.script).toContain('WORKER_RPC_SENTINEL')
 		expect(result.workers[0]?.script).not.toContain('FETCH_FILE_SHOULD_NOT_BE_BUNDLED')
 	})
+
+	test('carries local runtime bindings onto referenced service workers', async () => {
+		const projectDir = await mkdtemp(join(tmpdir(), 'devflare-service-bindings-runtime-'))
+		tempDirs.push(projectDir)
+
+		const workerDir = join(projectDir, 'workers', 'api')
+		await mkdir(join(workerDir, 'src'), { recursive: true })
+
+		await writeFile(join(workerDir, 'src', 'worker.ts'), `
+export async function ping(): Promise<string> {
+	return 'PONG'
+}
+`.trim())
+
+		const referencedConfig = {
+			name: 'api-worker',
+			compatibilityDate: '2026-04-28',
+			compatibilityFlags: ['nodejs_compat'],
+			vars: {
+				FEATURE_FLAG: 'enabled'
+			},
+			bindings: {
+				kv: {
+					CACHE: { name: 'api-cache' }
+				},
+				d1: {
+					DB: { name: 'api-db' }
+				},
+				r2: {
+					ASSETS: 'api-assets'
+				},
+				queues: {
+					producers: {
+						JOBS: 'api-jobs'
+					}
+				}
+			}
+		} as DevflareConfig
+
+		const ref = createResolvedRef(referencedConfig, './workers/api/devflare.config.ts')
+		const primaryConfig = {
+			name: 'site-worker',
+			compatibilityDate: '2026-04-28',
+			bindings: {
+				services: {
+					API: {
+						service: 'api-worker',
+						__ref: ref
+					}
+				}
+			}
+		} as DevflareConfig
+
+		const result = await resolveServiceBindings(primaryConfig, projectDir)
+		const worker = result.workers[0] as any
+
+		expect(worker.kvNamespaces).toEqual({ CACHE: 'api-cache' })
+		expect(worker.d1Databases).toEqual({ DB: 'api-db' })
+		expect(worker.r2Buckets).toEqual({ ASSETS: 'api-assets' })
+		expect(worker.queueProducers).toEqual({ JOBS: { queueName: 'api-jobs' } })
+		expect(worker.bindings).toEqual({ FEATURE_FLAG: 'enabled' })
+	})
+
+	test('wires local Durable Objects owned by referenced service workers', async () => {
+		const projectDir = await mkdtemp(join(tmpdir(), 'devflare-service-bindings-do-'))
+		tempDirs.push(projectDir)
+
+		const workerDir = join(projectDir, 'workers', 'api')
+		await mkdir(join(workerDir, 'src'), { recursive: true })
+
+		await writeFile(join(workerDir, 'src', 'ep.api.ts'), `
+import { WorkerEntrypoint } from 'cloudflare:workers'
+
+export class ApiEntrypoint extends WorkerEntrypoint {
+	async ping(): Promise<string> {
+		return 'PONG'
+	}
+}
+`.trim())
+
+		await writeFile(join(workerDir, 'src', 'do.counter.ts'), `
+import { DurableObject } from 'cloudflare:workers'
+
+export class Counter extends DurableObject {
+	async ping(): Promise<string> {
+		return 'DO_PONG'
+	}
+}
+`.trim())
+
+		const referencedConfig = {
+			name: 'api-worker',
+			compatibilityDate: '2026-04-28',
+			compatibilityFlags: ['nodejs_compat'],
+			files: {
+				entrypoints: 'src/ep.*.ts',
+				durableObjects: 'src/do.*.ts'
+			},
+			bindings: {
+				durableObjects: {
+					COUNTER: 'Counter'
+				}
+			}
+		} as DevflareConfig
+
+		const ref = createResolvedRef(referencedConfig, './workers/api/devflare.config.ts')
+		const primaryConfig = {
+			name: 'site-worker',
+			compatibilityDate: '2026-04-28',
+			bindings: {
+				services: {
+					API: {
+						service: 'api-worker',
+						entrypoint: 'ApiEntrypoint',
+						__ref: ref
+					}
+				}
+			}
+		} as DevflareConfig
+
+		const result = await resolveServiceBindings(primaryConfig, projectDir)
+		const apiWorker = result.workers.find((worker) => worker.name === 'api-worker')
+		const doWorker = result.workers.find((worker) => worker.name === 'api-worker-durable-objects')
+
+		expect(apiWorker?.durableObjects).toEqual({
+			COUNTER: {
+				className: 'Counter',
+				scriptName: 'api-worker-durable-objects'
+			}
+		})
+		expect(doWorker?.durableObjects).toEqual({ COUNTER: 'Counter' })
+		expect(doWorker?.script).toContain('DO_PONG')
+	})
 })

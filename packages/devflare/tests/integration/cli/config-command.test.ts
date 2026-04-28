@@ -58,4 +58,30 @@ export default {
 		expect(result.output).toContain('r2_buckets')
 		expect(result.output).toContain('existing-d1-id')
 	})
+
+	test('prints local wrangler config without Cloudflare account resource resolution', async () => {
+		await writeFile(join(projectDir, 'devflare.config.ts'), `
+export default {
+	name: 'local-config-worker',
+	compatibilityDate: '2025-01-07',
+	bindings: {
+		d1: {
+			DB: { name: 'local-database' }
+		}
+	}
+}
+		`.trim())
+
+		const logger = createLogger({ includeLog: false })
+		const result = await runConfigCommand(
+			{ command: 'config', args: ['print'], options: { format: 'wrangler', phase: 'local', json: true } },
+			logger as any,
+			{ cwd: projectDir, silent: true }
+		)
+
+		expect(result.exitCode).toBe(0)
+		expect(result.output).toContain('local-config-worker')
+		expect(result.output).toContain('d1_databases')
+		expect(result.output).toContain('local-database')
+	})
 })
