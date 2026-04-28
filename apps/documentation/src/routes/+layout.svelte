@@ -11,9 +11,9 @@
 	import { localizeHref } from '$lib/paraglide/runtime'
 	import {
 		BRAND_COLOR,
-		SOCIAL_CARD_PATH,
-		SOCIAL_IMAGE_ALT,
+		getSocialCardPath,
 		getSocialDescription,
+		getSocialImageAlt,
 		getSocialTitle,
 		toAbsoluteUrl
 	} from '$lib/site/social'
@@ -52,7 +52,6 @@
 	] as const
 
 	const brandLogoPath = `${base}/devflare-logo.svg`
-	const socialCardPath = `${base}${SOCIAL_CARD_PATH}`
 
 	let { children } = $props()
 	let sidebarOpen = $state(false)
@@ -60,6 +59,8 @@
 	const currentDoc = $derived(page.data.doc as DocPage | undefined)
 	const socialTitle = $derived(getSocialTitle(currentDoc))
 	const socialDescription = $derived(getSocialDescription(currentDoc))
+	const socialImageAlt = $derived(getSocialImageAlt(currentDoc))
+	const socialCardPath = $derived(`${base}${getSocialCardPath(currentDoc)}`)
 	const socialUrl = $derived(toAbsoluteUrl(page.url.origin, page.url.pathname))
 	const socialImageUrl = $derived(toAbsoluteUrl(page.url.origin, socialCardPath))
 
@@ -185,12 +186,12 @@
 	<meta property="og:image:type" content="image/png" />
 	<meta property="og:image:width" content="1200" />
 	<meta property="og:image:height" content="630" />
-	<meta property="og:image:alt" content={SOCIAL_IMAGE_ALT} />
+	<meta property="og:image:alt" content={socialImageAlt} />
 	<meta name="twitter:card" content="summary_large_image" />
 	<meta name="twitter:title" content={socialTitle} />
 	<meta name="twitter:description" content={socialDescription} />
 	<meta name="twitter:image" content={socialImageUrl} />
-	<meta name="twitter:image:alt" content={SOCIAL_IMAGE_ALT} />
+	<meta name="twitter:image:alt" content={socialImageAlt} />
 </svelte:head>
 
 {#if sidebarOpen}
@@ -207,14 +208,14 @@
 	<aside
 		class="docs-sidebar-panel docs-surface-transition fixed inset-y-0 left-0 z-50 flex w-64 shrink-0 flex-col border-r transition-transform duration-200 lg:sticky lg:top-0 lg:z-auto lg:h-screen lg:translate-x-0 {sidebarOpen ? 'translate-x-0' : '-translate-x-full'}"
 	>
-		<div class="docs-border flex h-14 shrink-0 items-center gap-2.5 border-b px-5">
+		<div class="docs-border flex h-14 shrink-0 items-center gap-4 border-b px-5">
 			<img
 				src={brandLogoPath}
 				alt=""
 				class="h-8 w-[4.5rem] shrink-0 object-contain"
 				decoding="async"
 			/>
-			<a href={localizeHref('/')} class="docs-text-strong text-[0.9rem] font-semibold tracking-tight">{m.site_title()}</a>
+			<a href={localizeHref('/')} class="docs-text-strong text-1 font-semibold tracking-tight docs-text-accent">{m.site_title()}</a>
 		</div>
 
 		<div class="docs-border shrink-0 border-b px-5 py-4 lg:hidden">
