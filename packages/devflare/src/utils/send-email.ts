@@ -305,10 +305,11 @@ export function wrapEnvSendEmailBindings<TEnv>(env: TEnv): TEnv {
 
 	const wrapped = new Proxy(env, {
 		get(target, prop, receiver) {
-			const value = Reflect.get(target, prop, receiver)
-			if (value === undefined && typeof prop === 'string') {
+			if (typeof prop === 'string' && localSendEmailBindings.has(prop)) {
 				return localSendEmailBindings.get(prop)
 			}
+
+			const value = Reflect.get(target, prop, receiver)
 			return isSendEmailBinding(value) ? wrapSendEmailBinding(value) : value
 		},
 		has(target, prop) {
@@ -322,11 +323,6 @@ export function wrapEnvSendEmailBindings<TEnv>(env: TEnv): TEnv {
 			]))
 		},
 		getOwnPropertyDescriptor(target, prop) {
-			const descriptor = Reflect.getOwnPropertyDescriptor(target, prop)
-			if (descriptor) {
-				return descriptor
-			}
-
 			if (typeof prop === 'string' && localSendEmailBindings.has(prop)) {
 				return {
 					configurable: true,
@@ -334,6 +330,11 @@ export function wrapEnvSendEmailBindings<TEnv>(env: TEnv): TEnv {
 					writable: false,
 					value: localSendEmailBindings.get(prop)
 				}
+			}
+
+			const descriptor = Reflect.getOwnPropertyDescriptor(target, prop)
+			if (descriptor) {
+				return descriptor
 			}
 
 			return undefined

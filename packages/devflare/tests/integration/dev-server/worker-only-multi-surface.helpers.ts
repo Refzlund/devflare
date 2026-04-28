@@ -1,7 +1,13 @@
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'pathe'
-import { cleanupTempDirs, getAvailablePort, installBuiltDevflare, waitForText } from '../helpers/built-devflare.helpers'
+import {
+	cleanupTempDirs,
+	fetchTextWithTimeout,
+	getAvailablePort,
+	installBuiltDevflare,
+	waitForText
+} from '../helpers/built-devflare.helpers'
 
 export { cleanupTempDirs, getAvailablePort, waitForText } from '../helpers/built-devflare.helpers'
 
@@ -60,8 +66,7 @@ export async function createProject(
 }
 
 export async function readWorkerText(url: string): Promise<string> {
-	const response = await fetch(url)
-	return await response.text()
+	return await fetchTextWithTimeout(url)
 }
 
 function formatLogValue(value: unknown): string {

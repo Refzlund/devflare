@@ -164,15 +164,27 @@ export async function waitForText(
 	throw new Error(`Timed out waiting for "${expectedText}". Last value: "${lastText}"`)
 }
 
+export async function fetchTextWithTimeout(url: string, timeoutMs = 1000): Promise<string> {
+	const controller = new AbortController()
+	const timeout = setTimeout(() => controller.abort(), timeoutMs)
+	try {
+		const response = await fetch(url, { signal: controller.signal })
+		return await response.text()
+	} finally {
+		clearTimeout(timeout)
+	}
+}
+
 export async function waitForResponseText(
 	url: string,
 	expectedText: string,
 	timeoutMs = 8000
 ): Promise<string> {
+	const requestTimeoutMs = Math.min(1000, timeoutMs)
+
 	return await waitForText(
 		async () => {
-			const response = await fetch(url)
-			return await response.text()
+			return await fetchTextWithTimeout(url, requestTimeoutMs)
 		},
 		expectedText,
 		timeoutMs
