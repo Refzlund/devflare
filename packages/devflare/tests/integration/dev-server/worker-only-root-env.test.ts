@@ -6,7 +6,8 @@ import { createDevServer, type DevServer } from '../../../src/dev-server'
 import {
 	cleanupTempDirs,
 	getAvailablePort,
-	installBuiltDevflare
+	installBuiltDevflare,
+	waitForResponseText
 } from '../helpers/built-devflare.helpers'
 
 const tempDirs: string[] = []
@@ -96,9 +97,7 @@ export default {
 
 			await devServer.start()
 
-			const response = await fetch(workerUrl)
-			expect(response.status).toBe(200)
-			expect(await response.text()).toBe('ok')
+			expect(await waitForResponseText(workerUrl, 'ok')).toBe('ok')
 		} finally {
 			if (devServer) {
 				await devServer.stop()
@@ -196,9 +195,7 @@ export default {
 
 			await devServer.start()
 
-			const response = await fetch(workerUrl)
-			expect(response.status).toBe(200)
-			expect(await response.text()).toBe('sent')
+			expect(await waitForResponseText(workerUrl, 'sent')).toBe('sent')
 		} finally {
 			if (devServer) {
 				await devServer.stop()
