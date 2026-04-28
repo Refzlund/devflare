@@ -23,10 +23,12 @@ import {
 import {
 	serializeValue,
 	deserializeValue,
+	deserializeRequest,
 	serializeDOId,
 	deserializeDOId,
 	base64Decode,
 	base64Encode,
+	type SerializedRequest,
 	type StreamRef
 } from './v2/value-serialization'
 import { normalizeSendEmailMessage } from '../utils/send-email'
@@ -252,23 +254,20 @@ export async function executeRpcMethod(
 	// Strict namespacing — bare verbs (e.g. `get`, `put`) and the older
 	// `stmt.*` / `stub.*` sub-prefixes are no longer accepted. All operations
 	// must be prefixed with a binding kind: `kv.`, `r2.`, `d1.`, `do.`,
-	// `queue.`, `email.`, `ai.`, or `var.`.
+	// `service.`, `queue.`, `email.`, `ai.`, or `var.`.
 	const isNamespaced =
 		operation.startsWith('kv.') ||
 		operation.startsWith('r2.') ||
 		operation.startsWith('d1.') ||
 		operation.startsWith('do.') ||
+		operation.startsWith('service.') ||
 		operation.startsWith('queue.') ||
 		operation.startsWith('email.') ||
 		operation.startsWith('ai.') ||
 		operation.startsWith('workflow.') ||
 		operation.startsWith('var.')
 	if (!isNamespaced) {
-		throw new Error(
-			`[devflare][bridge] Unsupported bridge operation '${operation}' for binding '${bindingName}'. `
-			+ 'Bare verbs and the legacy `stmt.*` / `stub.*` sub-prefixes were removed in B3-final; '
-			+ 'use the namespaced form (e.g. `kv.get`, `r2.put`, `d1.stmt.first`, `do.fetch`).'
-		)
+		throw createUnsupportedBridgeOperationError(bindingName, operation)
 	}
 
 	// Handle different binding types (namespaced operations)
@@ -348,6 +347,12 @@ export async function executeRpcMethod(
 			// params = [bindingName, serializedId, methodName, methodArgs]
 			return executeDoRpc(env, params[0] as string, params[1] as any, params[2] as string, params[3] as unknown[])
 
+		// Service Bindings
+		case 'service.fetch':
+			return executeServiceFetch(bindingName, binding, params[0] as SerializedRequest)
+		case 'service.rpc':
+			return executeServiceRpc(bindingName, binding, params[0], params[1])
+
 		// Email
 		case 'email.send':
 			return executeSendEmail(binding as SendEmail, params[0])
@@ -386,6 +391,64 @@ export async function executeRpcMethod(
 		default:
 			throw new Error(`Unknown operation: ${method}`)
 	}
+}
+
+function createUnsupportedBridgeOperationError(bindingName: string, operation: string): Error {
+	const base =
+		`[devflare][bridge] Unsupported bridge operation '${operation}' for binding '${bindingName}'.`
+
+	if (operation === 'fetch') {
+		return new Error(
+			`${base} Devflare could not dispatch fetch() for this binding through the local bridge. `
+			+ `Expected Cloudflare API: env.${bindingName}.fetch(request). `
+			+ 'If this came from SvelteKit platform.env, make sure the binding is declared as a service binding; '
+			+ 'this is a Devflare local bridge issue when service bindings fall back to a bare fetch operation.'
+		)
+	}
+
+	if (operation === 'toString') {
+		return new Error(
+			`${base} A platform.env value was coerced to a string through the bridge. `
+			+ 'For SvelteKit local dev, declared vars should be plain string values and missing env names should read as undefined.'
+		)
+	}
+
+	return new Error(
+		`${base} Bare verbs and the legacy \`stmt.*\` / \`stub.*\` sub-prefixes are not supported; `
+		+ 'use the namespaced form (e.g. `kv.get`, `r2.put`, `d1.stmt.first`, `do.fetch`, `service.fetch`).'
+	)
+}
+
+async function executeServiceFetch(
+	bindingName: string,
+	binding: unknown,
+	requestSerialized: SerializedRequest
+): Promise<Response> {
+	if (!binding || typeof (binding as { fetch?: unknown }).fetch !== 'function') {
+		throw new Error(`Service binding ${bindingName} does not support fetch()`)
+	}
+
+	const request = deserializeRequest(requestSerialized)
+	return (binding as Fetcher).fetch(request)
+}
+
+async function executeServiceRpc(
+	bindingName: string,
+	binding: unknown,
+	methodName: unknown,
+	methodArgs: unknown
+): Promise<unknown> {
+	if (typeof methodName !== 'string') {
+		throw new Error(`Service binding ${bindingName} RPC method name must be a string`)
+	}
+
+	const args = Array.isArray(methodArgs) ? methodArgs : []
+	const method = (binding as Record<string, unknown> | null | undefined)?.[methodName]
+	if (typeof method !== 'function') {
+		throw new Error(`Service binding ${bindingName} does not support ${methodName}()`)
+	}
+
+	return method.apply(binding, args)
 }
 
 async function executeSendEmail(binding: SendEmail, message: unknown): Promise<EmailSendResult> {

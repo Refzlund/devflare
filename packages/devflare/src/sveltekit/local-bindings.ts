@@ -54,6 +54,7 @@ export function buildSvelteKitLocalBindings(
 	cwd: string
 ): Record<string, unknown> {
 	const bindings: Record<string, unknown> = {
+		...(config.vars ?? {}),
 		...buildLocalHyperdriveBindings(config),
 		...buildLocalSecretNodeBindings(config, cwd)
 	}

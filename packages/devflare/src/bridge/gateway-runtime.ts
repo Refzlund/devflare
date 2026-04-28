@@ -98,6 +98,17 @@ async function serializeResponse(response) {
 	}
 }
 
+function deserializeRequest(serializedReq) {
+	return new Request(serializedReq.url, {
+		method: serializedReq.method,
+		headers: serializedReq.headers,
+		body: serializedReq.body?.type === 'bytes'
+			? base64ToArrayBuffer(serializedReq.body.data)
+			: undefined,
+		redirect: serializedReq.redirect
+	})
+}
+
 function createEmailMessageRaw(raw) {
 	if (typeof raw === 'string' || raw instanceof ReadableStream) {
 		return raw
@@ -120,7 +131,7 @@ function isDurableObjectNamespace(binding) {
  *
  * Method format: "binding.operation". Operations must be namespaced by
  * binding kind (e.g. "kv.get", "r2.head", "d1.stmt.first", "do.fetch",
- * "queue.send", "email.send", "ai.run"). Bare verbs and the legacy
+ * "service.fetch", "queue.send", "email.send", "ai.run"). Bare verbs and the legacy
  * "stmt.*" / "stub.*" sub-prefixes were removed in B3-final and now throw.
  * Method vocabulary must stay in sync with the canonical server in
  * src/bridge/server.ts.
@@ -140,17 +151,14 @@ async function executeRpcMethod(method, params, env, _ctx) {
 		operation.indexOf('r2.') === 0 ||
 		operation.indexOf('d1.') === 0 ||
 		operation.indexOf('do.') === 0 ||
+		operation.indexOf('service.') === 0 ||
 		operation.indexOf('queue.') === 0 ||
 		operation.indexOf('email.') === 0 ||
 		operation.indexOf('ai.') === 0 ||
 		operation.indexOf('workflow.') === 0 ||
 		operation.indexOf('var.') === 0
 	if (!isNamespaced) {
-		throw new Error(
-			"[devflare][bridge] Unsupported bridge operation '" + operation + "' for binding '" + bindingName + "'. "
-			+ "Bare verbs and the legacy stmt.*/stub.* sub-prefixes were removed in B3-final; "
-			+ "use the namespaced form (e.g. kv.get, r2.put, d1.stmt.first, do.fetch)."
-		)
+		throw new Error(createUnsupportedBridgeOperationErrorMessage(bindingName, operation))
 	}
 
 	// KV
@@ -252,6 +260,27 @@ async function executeRpcMethod(method, params, env, _ctx) {
 		return result.result
 	}
 
+	// Service Bindings
+	if (operation === 'service.fetch') {
+		if (!binding || typeof binding.fetch !== 'function') {
+			throw new Error('Service binding ' + bindingName + ' does not support fetch()')
+		}
+		const response = await binding.fetch(deserializeRequest(params[0]))
+		return serializeResponse(response)
+	}
+	if (operation === 'service.rpc') {
+		const methodName = params[0]
+		if (typeof methodName !== 'string') {
+			throw new Error('Service binding ' + bindingName + ' RPC method name must be a string')
+		}
+		const args = Array.isArray(params[1]) ? params[1] : []
+		const method = binding && binding[methodName]
+		if (typeof method !== 'function') {
+			throw new Error('Service binding ' + bindingName + ' does not support ' + methodName + '()')
+		}
+		return method.apply(binding, args)
+	}
+
 	// Queues
 	if (operation === 'queue.send') return binding.send(params[0], params[1])
 	if (operation === 'queue.sendBatch') return binding.sendBatch(params[0], params[1])
@@ -307,6 +336,22 @@ async function executeRpcMethod(method, params, env, _ctx) {
 	}
 
 	throw new Error('Unknown operation: ' + method)
+}
+
+function createUnsupportedBridgeOperationErrorMessage(bindingName, operation) {
+	const base = "[devflare][bridge] Unsupported bridge operation '" + operation + "' for binding '" + bindingName + "'."
+	if (operation === 'fetch') {
+		return base + ' Devflare could not dispatch fetch() for this binding through the local bridge. '
+			+ 'Expected Cloudflare API: env.' + bindingName + '.fetch(request). '
+			+ 'If this came from SvelteKit platform.env, make sure the binding is declared as a service binding; '
+			+ 'this is a Devflare local bridge issue when service bindings fall back to a bare fetch operation.'
+	}
+	if (operation === 'toString') {
+		return base + ' A platform.env value was coerced to a string through the bridge. '
+			+ 'For SvelteKit local dev, declared vars should be plain string values and missing env names should read as undefined.'
+	}
+	return base + ' Bare verbs and the legacy stmt.*/stub.* sub-prefixes are not supported; '
+		+ 'use the namespaced form (e.g. kv.get, r2.put, d1.stmt.first, do.fetch, service.fetch).'
 }
 
 function serializeWorkflowInstance(instance) {

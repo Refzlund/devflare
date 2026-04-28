@@ -161,7 +161,7 @@ export async function createDevflarePlatform(
 	await client.connect()
 
 	// Create env proxy with hints
-	const env = overlayLocalBindings(createEnvProxy({ client, hints }), localBindings)
+	const env = overlayLocalBindings(createEnvProxy({ client, hints, strict: true }), localBindings)
 
 	// Create mock execution context that captures waitUntil rejections
 	const pendingErrors: unknown[] = []

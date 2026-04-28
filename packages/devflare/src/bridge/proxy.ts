@@ -22,6 +22,8 @@ export interface EnvProxyOptions {
 	client?: BridgeClient
 	/** Lazily connect on first access */
 	lazy?: boolean
+	/** Return undefined for names that are not present in binding hints */
+	strict?: boolean
 	/** Transform results before returning (e.g., for transport decoding) */
 	transformResult?: (result: unknown) => unknown
 }
@@ -425,6 +427,68 @@ function createDOStubProxy(
 }
 
 // -----------------------------------------------------------------------------
+// Service Binding Proxy
+// -----------------------------------------------------------------------------
+
+interface ServiceProxyOptions {
+	transformResult?: (result: unknown) => unknown
+}
+
+function isResponseLike(value: unknown): value is Response {
+	return value instanceof Response
+}
+
+function createServiceProxy(
+	client: BridgeClient,
+	bindingName: string,
+	proxyOptions: ServiceProxyOptions = {}
+): Fetcher {
+	const { transformResult } = proxyOptions
+
+	const serviceBase = {
+		async fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+			const request = input instanceof Request ? input : new Request(input, init)
+			const { serialized } = await serializeRequest(request)
+			const result = await client.call(`${bindingName}.service.fetch`, [serialized])
+
+			if (isResponseLike(result)) {
+				return result
+			}
+
+			return deserializeResponse(result as SerializedResponse)
+		}
+	}
+
+	return new Proxy(serviceBase, {
+		get(target, prop: string | symbol) {
+			if (typeof prop !== 'string') {
+				return undefined
+			}
+
+			if (prop in target) {
+				return (target as Record<string, unknown>)[prop]
+			}
+
+			if (prop === 'then' || prop === 'catch' || prop === 'finally') {
+				return undefined
+			}
+
+			if (prop === 'toString') {
+				return () => `[DevflareServiceBinding ${bindingName}]`
+			}
+
+			return async (...args: unknown[]) => {
+				let result = await client.call(`${bindingName}.service.rpc`, [prop, args])
+				if (transformResult) {
+					result = transformResult(result)
+				}
+				return result
+			}
+		}
+	}) as unknown as Fetcher
+}
+
+// -----------------------------------------------------------------------------
 // Queue Proxy
 // -----------------------------------------------------------------------------
 
@@ -583,6 +647,8 @@ export function createEnvProxy(options: EnvProxyOptions & { hints?: BindingHints
 	const client = options.client ?? getClient()
 	const bindingProxies = new Map<string, unknown>()
 	const doProxyOptions: DOProxyOptions = { transformResult: options.transformResult }
+	const serviceProxyOptions: ServiceProxyOptions = { transformResult: options.transformResult }
+	const strict = options.strict === true
 
 	// Merge provided hints with global hints (provided takes precedence)
 	const hints: BindingHints = { ...globalBindingHints, ...options.hints }
@@ -598,6 +664,10 @@ export function createEnvProxy(options: EnvProxyOptions & { hints?: BindingHints
 
 			// Create proxy based on hint or default behavior
 			const hint = hints[prop]
+			if (!hint && strict) {
+				return undefined
+			}
+
 			let proxy: unknown
 
 			switch (hint) {
@@ -618,6 +688,9 @@ export function createEnvProxy(options: EnvProxyOptions & { hints?: BindingHints
 					break
 				case 'ai':
 					proxy = createAIProxy(client, prop)
+					break
+				case 'service':
+					proxy = createServiceProxy(client, prop, serviceProxyOptions)
 					break
 				case 'sendEmail':
 					proxy = createSendEmailProxy(client, prop)
@@ -640,8 +713,7 @@ export function createEnvProxy(options: EnvProxyOptions & { hints?: BindingHints
 		},
 
 		has(target, prop: string | symbol) {
-			// Allow any string property
-			return typeof prop === 'string'
+			return typeof prop === 'string' && (!strict || prop in hints)
 		},
 
 		ownKeys() {
@@ -649,7 +721,7 @@ export function createEnvProxy(options: EnvProxyOptions & { hints?: BindingHints
 		},
 
 		getOwnPropertyDescriptor(target, prop) {
-			if (typeof prop === 'string') {
+			if (typeof prop === 'string' && (!strict || prop in hints)) {
 				return { configurable: true, enumerable: true, writable: false }
 			}
 			return undefined

@@ -147,4 +147,28 @@ describe('case18 SvelteKit local binding matrix', () => {
 		})
 		expect(payload.email).toBe('sent')
 	}, TEST_TIMEOUT_MS)
+
+	test('submits a SvelteKit server action that calls a ref service binding fetch', async () => {
+		const response = await fetch(`http://localhost:${vitePort}/service-action`, {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/x-www-form-urlencoded'
+			},
+			body: new URLSearchParams({
+				email: 'creator@example.com'
+			}),
+			redirect: 'manual'
+		})
+		const body = await response.text()
+
+		expect(response.status).toBe(200)
+		expect(response.headers.get('set-cookie')).toContain(
+			'case18-service-action=creator%40example.com'
+		)
+		expect(body).toContain('creator@example.com')
+		expect(body).toContain('case18-api')
+		expect(body).toContain('service-fetch')
+		expect(body).toContain('case18-var-value')
+		expect(body).toContain('undefined')
+	}, TEST_TIMEOUT_MS)
 })

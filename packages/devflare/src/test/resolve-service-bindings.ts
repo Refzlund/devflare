@@ -337,6 +337,8 @@ async function resolveReferencedLocalDurableObjects(
 		doClasses.map((do_) => [do_.bindingName, do_.className])
 	)
 	const runtimeConfig = buildReferencedWorkerRuntimeConfig(config)
+	const doRuntimeConfig = { ...runtimeConfig }
+	delete doRuntimeConfig.queueConsumers
 	const mergedServiceBindings = {
 		...(runtimeConfig.serviceBindings ?? {}),
 		...serviceBindings
@@ -348,7 +350,7 @@ async function resolveReferencedLocalDurableObjects(
 			script,
 			modules: true,
 			compatibilityDate: config.compatibilityDate,
-			...runtimeConfig,
+			...doRuntimeConfig,
 			...(Object.keys(mergedServiceBindings).length > 0 && {
 				serviceBindings: mergedServiceBindings
 			}),

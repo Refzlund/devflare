@@ -1,4 +1,6 @@
-import { defineConfig } from 'devflare/config'
+import { defineConfig, ref } from 'devflare/config'
+
+const apiWorker = ref('case18-service-api', () => import('./devflare.service-api.config'))
 
 export default defineConfig({
 	name: 'case18-sveltekit-local-bindings',
@@ -8,8 +10,14 @@ export default defineConfig({
 		workflows: 'src/wf.*.ts',
 		transport: 'src/transport.ts'
 	},
+	vars: {
+		CASE18_STRING_VAR: 'case18-var-value'
+	},
 	secretsStoreId: 'case18-local-store',
 	bindings: {
+		services: {
+			CASE18_API: apiWorker.worker('Case18Api')
+		},
 		hyperdrive: {
 			POSTGRES: {
 				id: 'case18-hyperdrive',

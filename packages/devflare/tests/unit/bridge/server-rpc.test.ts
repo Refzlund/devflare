@@ -5,6 +5,7 @@
 import { describe, test, expect } from 'bun:test'
 import { executeRpcMethod } from '../../../src/bridge/server'
 import type { GatewayEnv } from '../../../src/bridge/server'
+import { serializeRequest } from '../../../src/bridge/v2/value-serialization'
 
 const noopCtx = {
 	waitUntil: () => { },
@@ -73,6 +74,28 @@ describe('executeRpcMethod — namespaced dispatch', () => {
 			executeRpcMethod('AI.ai.run', ['@cf/x', {}], env, noopCtx)
 		).rejects.toThrow(/does not support run/)
 	})
+
+	test('service.fetch dispatches to Cloudflare service binding fetch', async () => {
+		const service = {
+			async fetch(request: Request) {
+				return new Response(`service:${request.method}:${await request.text()}`, {
+					status: 202,
+					headers: { 'x-service': 'ok' }
+				})
+			}
+		}
+		const env = { API: service } as unknown as GatewayEnv
+		const { serialized } = await serializeRequest(new Request('https://api.local/action', {
+			method: 'POST',
+			body: 'payload'
+		}))
+
+		const result = await executeRpcMethod('API.service.fetch', [serialized], env, noopCtx) as Response
+
+		expect(result.status).toBe(202)
+		expect(result.headers.get('x-service')).toBe('ok')
+		expect(await result.text()).toBe('service:POST:payload')
+	})
 })
 
 describe('executeRpcMethod — B3-final: bare verbs and legacy sub-prefixes throw', () => {
@@ -116,6 +139,12 @@ describe('executeRpcMethod — B3-final: bare verbs and legacy sub-prefixes thro
 		await expect(
 			executeRpcMethod('X.get', ['k'], env, noopCtx)
 		).rejects.toThrow(/Unsupported bridge operation 'get'/)
+	})
+
+	test('bare fetch on a service-shaped binding explains the SvelteKit service-binding path', async () => {
+		await expect(
+			executeRpcMethod('X.fetch', [new Request('https://api.local/')], env, noopCtx)
+		).rejects.toThrow(/Expected Cloudflare API: env\.X\.fetch\(request\)/)
 	})
 
 	test('legacy stmt.first prefix throws (use d1.stmt.first)', async () => {

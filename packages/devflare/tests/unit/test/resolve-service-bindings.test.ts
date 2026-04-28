@@ -301,4 +301,91 @@ export class Counter extends DurableObject {
 		expect(doWorker?.durableObjects).toEqual({ COUNTER: 'Counter' })
 		expect(doWorker?.script).toContain('DO_PONG')
 	})
+
+	test('does not duplicate queue consumers onto auxiliary durable object workers', async () => {
+		const projectDir = await mkdtemp(join(tmpdir(), 'devflare-service-bindings-surfaces-'))
+		tempDirs.push(projectDir)
+
+		const workerDir = join(projectDir, 'workers', 'api')
+		await mkdir(join(workerDir, 'src'), { recursive: true })
+
+		await writeFile(join(workerDir, 'src', 'ep.api.ts'), `
+import { WorkerEntrypoint } from 'cloudflare:workers'
+
+export class ApiEntrypoint extends WorkerEntrypoint {
+	async fetch(): Promise<Response> {
+		return new Response('API_OK')
+	}
+}
+`.trim())
+
+		await writeFile(join(workerDir, 'src', 'do.counter.ts'), `
+import { DurableObject } from 'cloudflare:workers'
+
+export class Counter extends DurableObject {
+	async fetch(): Promise<Response> {
+		return new Response('DO_OK')
+	}
+}
+`.trim())
+
+		const referencedConfig = {
+			name: 'api-worker',
+			compatibilityDate: '2026-04-28',
+			files: {
+				entrypoints: 'src/ep.*.ts',
+				durableObjects: 'src/do.*.ts'
+			},
+			bindings: {
+				durableObjects: {
+					COUNTER: 'Counter'
+				},
+				queues: {
+					producers: {
+						EMAIL_QUEUE: 'email-local',
+						TTS_QUEUE: 'tts-local'
+					},
+					consumers: [
+						{ queue: 'email-local', deadLetterQueue: 'email-dlq-local' },
+						{ queue: 'tts-local', deadLetterQueue: 'tts-dlq-local' }
+					]
+				}
+			}
+		} as DevflareConfig
+
+		const ref = createResolvedRef(referencedConfig, './workers/api/devflare.config.ts')
+		const primaryConfig = {
+			name: 'site-worker',
+			compatibilityDate: '2026-04-28',
+			bindings: {
+				services: {
+					API: {
+						service: 'api-worker',
+						entrypoint: 'ApiEntrypoint',
+						__ref: ref
+					}
+				}
+			}
+		} as DevflareConfig
+
+		const result = await resolveServiceBindings(primaryConfig, projectDir)
+		const apiWorker = result.workers.find((worker) => worker.name === 'api-worker')
+		const doWorker = result.workers.find((worker) => worker.name === 'api-worker-durable-objects')
+		const consumersByQueue = new Map<string, string[]>()
+
+		for (const worker of result.workers) {
+			for (const queue of Object.keys(worker.queueConsumers ?? {})) {
+				const owners = consumersByQueue.get(queue) ?? []
+				owners.push(worker.name)
+				consumersByQueue.set(queue, owners)
+			}
+		}
+
+		expect(apiWorker?.queueConsumers).toEqual({
+			'email-local': { deadLetterQueue: 'email-dlq-local' },
+			'tts-local': { deadLetterQueue: 'tts-dlq-local' }
+		})
+		expect(doWorker?.queueConsumers).toBeUndefined()
+		expect([...consumersByQueue.values()].filter((owners) => owners.length > 1)).toEqual([])
+	})
 })
