@@ -3,10 +3,13 @@
 
 import type { KVNamespace } from '@cloudflare/workers-types'
 
+import type { InferConfigVars } from 'devflare/config'
+type __DevflareConfigVars = InferConfigVars<Awaited<typeof import('./devflare.config').default>>
+
 declare global {
-	interface DevflareEnv {
+	interface DevflareVars extends __DevflareConfigVars {}
+	interface DevflareEnv extends __DevflareConfigVars {
 		CACHE: KVNamespace
-		LOG_LEVEL: string
 	}
 }
 

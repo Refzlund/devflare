@@ -10,6 +10,7 @@ import type { DocCodeSnippet } from '../../../../../apps/documentation/src/lib/d
 import { COMMANDS } from '../../../src/cli/help'
 import { rootConfigShape } from '../../../src/config/schema'
 import { bindingsSchema } from '../../../src/config/schema-bindings'
+import { snippetsWithInvalidCustomDomainRoutes } from './custom-domain-route-snippets'
 
 interface CodeFence {
 	index: number
@@ -416,30 +417,6 @@ function snippetsWithBareDevflareEnvImports(): string[] {
 				return files
 					.filter((file) => file.code.includes("import { env } from 'devflare'"))
 					.map((file) => `${doc.slug}/${section.id}/${snippet.title}/${file.path ?? 'inline'}`)
-			})
-		})
-	})
-}
-
-function snippetsWithInvalidCustomDomainRoutes(): string[] {
-	const objectLiteralPattern = /\{[^{}]*custom_domain:\s*true[^{}]*\}/g
-	const routePattern = /pattern:\s*['"]([^'"]+)['"]/
-
-	return docs.flatMap((doc) => {
-		return doc.sections.flatMap((section) => {
-			return (section.snippets ?? []).flatMap((snippet) => {
-				return snippetFiles(snippet).flatMap((file) => {
-					const failures: string[] = []
-					for (const objectMatch of file.code.matchAll(objectLiteralPattern)) {
-						const pattern = objectMatch[0].match(routePattern)?.[1]
-						if (pattern && /[/*]/.test(pattern)) {
-							failures.push(
-								`${doc.slug}/${section.id}/${snippet.title}/${file.path ?? snippet.filename ?? 'inline'}: ${pattern}`
-							)
-						}
-					}
-					return failures
-				})
 			})
 		})
 	})

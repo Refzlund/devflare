@@ -3,12 +3,14 @@
 
 import type { KVNamespace } from '@cloudflare/workers-types'
 
+import type { InferConfigVars } from 'devflare/config'
+type __DevflareConfigVars = InferConfigVars<Awaited<typeof import('./devflare.config').default>>
+
 declare global {
-	interface DevflareEnv {
+	interface DevflareVars extends __DevflareConfigVars {}
+	interface DevflareEnv extends __DevflareConfigVars {
 		WORKFLOW_STATE: KVNamespace
 		RESULTS: KVNamespace
-		MAX_RETRIES: string
-		RETRY_DELAY_MS: string
 	}
 }
 

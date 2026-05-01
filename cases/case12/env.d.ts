@@ -3,11 +3,14 @@
 
 import type { KVNamespace, SendEmail } from '@cloudflare/workers-types'
 
+import type { InferConfigVars } from 'devflare/config'
+type __DevflareConfigVars = InferConfigVars<Awaited<typeof import('./devflare.config').default>>
+
 declare global {
-	interface DevflareEnv {
+	interface DevflareVars extends __DevflareConfigVars {}
+	interface DevflareEnv extends __DevflareConfigVars {
 		EMAIL_LOG: KVNamespace
 		EMAIL: SendEmail
-		FORWARD_ADDRESS: string
 	}
 }
 
