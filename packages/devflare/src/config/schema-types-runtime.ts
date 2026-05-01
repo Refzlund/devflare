@@ -317,6 +317,9 @@ export interface RouteConfigInput {
 
 	/**
 	 * Whether this route is a custom domain route instead of a wildcard route.
+	 * Custom Domains attach the Worker to the whole hostname, so the pattern
+	 * must be a bare host such as `worker.example.com`. Use a normal route
+	 * with `zone_name` or `zone_id` for wildcard or path patterns.
 	 *
 	 * @default `false`
 	 *

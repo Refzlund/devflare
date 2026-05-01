@@ -2309,7 +2309,7 @@ export default defineConfig({
 	},
 	routes: [
 		{
-			pattern: 'docs.example.com/*',
+			pattern: 'docs.example.com',
 			custom_domain: true
 		}
 	],
@@ -3248,11 +3248,82 @@ The important habit is that runtime posture should be reviewable in source contr
 >
 > Devflare already includes `nodejs_compat` and `nodejs_als`. Keep `compatibilityFlags` focused on the extra posture your package actually needs.
 
+#### Choose the Cloudflare endpoint model first
+
+Cloudflare documents three inbound endpoint models for Workers: Custom Domains, normal Workers routes, and the automatic `workers.dev` route. They are not interchangeable, and Devflare keeps that distinction in the top-level `routes` config instead of inventing a second routing vocabulary.
+
+Use a Custom Domain when the Worker is the origin for a whole hostname. Use a normal Workers route when a Worker should sit in front of an existing proxied hostname, match a wildcard host, or match a path prefix. Use `workers.dev` for getting started or preview-style reachability, and disable it when production should only be reachable through your own domain.
+
+##### Reference table
+
+| Goal | Devflare config shape | Cloudflare behavior |
+| --- | --- | --- |
+| Worker owns every path on one hostname | `routes: [{ pattern: "app.example.com", custom_domain: true }]` | Custom Domains match the exact hostname; paths and query strings do not participate in the match. |
+| Worker intercepts a path or wildcard host in a Cloudflare zone | `routes: [{ pattern: "app.example.com/api/*", zone_name: "example.com" }]` | Normal routes use route patterns, may include `*`, and the most specific matching route wins. |
+| Worker remains reachable on the account subdomain | Default generated Wrangler config keeps `workers_dev: true`. | Cloudflare assigns `<worker>.<account>.workers.dev`; Cloudflare recommends routes or custom domains for production. |
+
+> **Note — Routes can sit in front of Custom Domains**
+>
+> Cloudflare treats a Worker on a Custom Domain as an origin. A more specific normal route on the same hostname can run first, then call `fetch(request)` to invoke the Custom Domain Worker behind it.
+
+> **Warning — Same-zone fetch is different for routes and Custom Domains**
+>
+> Cloudflare documents that Custom Domains can be invoked by same-zone `fetch()`, while normal routes cannot be the target of same-zone `fetch()` and should use service bindings for Worker-to-Worker calls.
+
+##### Example — Custom Domain for a Worker-owned hostname
+
+```ts
+import { defineConfig } from 'devflare/config'
+
+export default defineConfig({
+	name: 'app-worker',
+	routes: [
+		{
+			pattern: 'app.example.com',
+			custom_domain: true
+		}
+	]
+})
+```
+
+##### Example — Workers route for path or wildcard matching
+
+```ts
+import { defineConfig } from 'devflare/config'
+
+export default defineConfig({
+	name: 'api-proxy-worker',
+	routes: [
+		{
+			pattern: 'app.example.com/api/*',
+			zone_name: 'example.com'
+		}
+	]
+})
+```
+
+##### Example — Disable workers.dev when only custom endpoints should serve production
+
+```ts
+import { defineConfig } from 'devflare/config'
+
+export default defineConfig({
+	name: 'scratch-worker',
+	wrangler: {
+		passthrough: {
+			workers_dev: false
+		}
+	}
+})
+```
+
 #### Keep deployment shape in config, not in app routing or shell scripts
 
 Several config keys answer deployment questions rather than application-routing questions. Keeping those lanes separate is what stops app URLs, Cloudflare routes, and dev-only WebSocket proxy behavior from collapsing into one blurry story.
 
 If the package serves static assets, mounts a custom domain, or proxies Durable Object WebSockets in development, that shape should live in config beside the rest of the deployment contract.
+
+Custom Domains are host-only: use `custom_domain: true` with a bare hostname such as `docs.example.com`. For wildcard or path matching such as `docs.example.com/*` or `docs.example.com/api/*`, use a normal Workers route with `zone_name` or `zone_id` instead.
 
 ##### Reference table
 
@@ -3265,6 +3336,10 @@ If the package serves static assets, mounts a custom domain, or proxies Durable 
 > **Warning — Top-level `routes` is not the same thing as `files.routes`**
 >
 > `files.routes` controls your app route tree. Top-level `routes` controls Cloudflare deployment routing. Keep those ideas separate so the package stays reviewable.
+
+> **Warning — Custom Domains are not wildcard routes**
+>
+> Cloudflare Custom Domains match the hostname exactly and ignore paths. Do not add `/*` when `custom_domain: true`; a request to any path on that hostname will already invoke the Worker.
 
 ##### Example — One place for runtime posture and deployment-facing settings
 
@@ -3280,7 +3355,7 @@ export default defineConfig({
 		binding: 'ASSETS'
 	},
 	routes: [
-		{ pattern: 'docs.example.com/*', custom_domain: true }
+		{ pattern: 'docs.example.com', custom_domain: true }
 	],
 	wsRoutes: [
 		{

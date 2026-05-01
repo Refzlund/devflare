@@ -78,6 +78,26 @@ export const routeConfigSchema = z.object({
 	zone_name: z.string().optional(),
 	zone_id: z.string().optional(),
 	custom_domain: z.boolean().optional()
+}).superRefine((route, ctx) => {
+	if (!route.custom_domain) {
+		return
+	}
+
+	if (route.pattern.includes('*')) {
+		ctx.addIssue({
+			code: z.ZodIssueCode.custom,
+			path: ['pattern'],
+			message: 'Wildcard operators (*) are not allowed in Custom Domains'
+		})
+	}
+
+	if (route.pattern.includes('/')) {
+		ctx.addIssue({
+			code: z.ZodIssueCode.custom,
+			path: ['pattern'],
+			message: 'Paths are not allowed in Custom Domains'
+		})
+	}
 })
 
 /**

@@ -31,7 +31,7 @@ export default defineConfig({
 		API_TOKEN: { required: true }
 	},
 	routes: [
-		{ pattern: 'docs.example.com/*', custom_domain: true }
+		{ pattern: 'docs.example.com', custom_domain: true }
 	]
 })
 `

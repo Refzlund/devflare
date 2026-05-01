@@ -156,7 +156,7 @@ export const definitionsPart2: IntellisenseDefinition[] = [
 		propertyPaths: ['routes.pattern'],
 		summary: 'Cloudflare route pattern that should send traffic to the worker.',
 		detail:
-			'Use a host or zone pattern here when the deployment contract should attach the worker to specific traffic paths.',
+			'Use a normal route pattern such as api.example.com/* for path or wildcard routing. When the same route has custom_domain: true, the pattern must be a bare hostname such as api.example.com.',
 		requirement: 'optional',
 		availableIn: 'routes config',
 		references: [
@@ -177,7 +177,7 @@ export const definitionsPart2: IntellisenseDefinition[] = [
 		propertyPaths: ['routes.custom_domain'],
 		summary: 'Mark the deployment route as a custom domain attachment.',
 		detail:
-			'Use this when the route should be treated as a custom domain rather than only a zone pattern.',
+			'Use this when the Worker should be the origin for an entire hostname. Custom Domains do not allow wildcard operators or path segments in the pattern.',
 		requirement: 'optional',
 		availableIn: 'routes config',
 		references: [docsReference('Runtime & deploy settings', 'runtime-deploy-settings')]

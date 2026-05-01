@@ -421,6 +421,30 @@ function snippetsWithBareDevflareEnvImports(): string[] {
 	})
 }
 
+function snippetsWithInvalidCustomDomainRoutes(): string[] {
+	const objectLiteralPattern = /\{[^{}]*custom_domain:\s*true[^{}]*\}/g
+	const routePattern = /pattern:\s*['"]([^'"]+)['"]/
+
+	return docs.flatMap((doc) => {
+		return doc.sections.flatMap((section) => {
+			return (section.snippets ?? []).flatMap((snippet) => {
+				return snippetFiles(snippet).flatMap((file) => {
+					const failures: string[] = []
+					for (const objectMatch of file.code.matchAll(objectLiteralPattern)) {
+						const pattern = objectMatch[0].match(routePattern)?.[1]
+						if (pattern && /[/*]/.test(pattern)) {
+							failures.push(
+								`${doc.slug}/${section.id}/${snippet.title}/${file.path ?? snippet.filename ?? 'inline'}: ${pattern}`
+							)
+						}
+					}
+					return failures
+				})
+			})
+		})
+	})
+}
+
 function isCommandLanguage(language: string | undefined): boolean {
 	return ['bash', 'console', 'powershell', 'ps1', 'shell', 'sh', 'zsh'].includes(
 		(language ?? '').toLowerCase()
@@ -610,6 +634,10 @@ describe('documentation integrity', () => {
 
 	test('docs app snippets use explicit env imports for worker and test code', () => {
 		expect(snippetsWithBareDevflareEnvImports()).toEqual([])
+	})
+
+	test('docs app snippets do not show wildcard or path patterns for custom domains', () => {
+		expect(snippetsWithInvalidCustomDomainRoutes()).toEqual([])
 	})
 
 	test('docs app snippets have a file path, command language, inferred path, or inline-fragment label', () => {

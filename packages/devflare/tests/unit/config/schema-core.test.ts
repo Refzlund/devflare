@@ -255,13 +255,31 @@ describe('configSchema', () => {
 				compatibilityDate: '2025-01-07',
 				routes: [
 					{ pattern: 'example.com/*', zone_name: 'example.com' },
-					{ pattern: 'api.example.com/*', custom_domain: true }
+					{ pattern: 'api.example.com', custom_domain: true }
 				]
 			})
 
 			expect(result.success).toBe(true)
 			if (result.success) {
 				expect(result.data.routes?.[0].pattern).toBe('example.com/*')
+			}
+		})
+
+		test('rejects wildcard or path patterns for custom domain routes', () => {
+			const result = configSchema.safeParse({
+				name: 'my-worker',
+				compatibilityDate: '2025-01-07',
+				routes: [
+					{ pattern: 'api.example.com/*', custom_domain: true },
+					{ pattern: 'app.example.com/login', custom_domain: true }
+				]
+			})
+
+			expect(result.success).toBe(false)
+			if (!result.success) {
+				const messages = result.error.issues.map((issue) => issue.message)
+				expect(messages).toContain('Wildcard operators (*) are not allowed in Custom Domains')
+				expect(messages).toContain('Paths are not allowed in Custom Domains')
 			}
 		})
 

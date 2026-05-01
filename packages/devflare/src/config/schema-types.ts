@@ -45,7 +45,7 @@ import type {
  *     }
  *   },
  *   routes: [
- *     { pattern: 'example.com/*', custom_domain: true }
+ *     { pattern: 'example.com', custom_domain: true }
  *   ]
  * })
  * ```
@@ -265,7 +265,7 @@ export interface DevflareConfigInput {
 	 * @example
 	 * ```ts
 	 * routes: [
-	 *   { pattern: 'api.example.com/*', custom_domain: true }
+	 *   { pattern: 'api.example.com', custom_domain: true }
 	 * ]
 	 * ```
 	 */
