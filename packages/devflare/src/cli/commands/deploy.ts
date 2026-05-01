@@ -11,6 +11,7 @@ import {
 	compileConfig,
 	loadConfig,
 	prepareConfigResourcesForDeploy,
+	resolveConfigEnvVars,
 	resolveConfigForEnvironment
 } from '../../config'
 import { stringifyConfig } from '../../config/compiler'
@@ -95,9 +96,17 @@ export async function runDeployCommand(
 			resolvedPreviewScopeName =
 				previewScopeName || process.env.DEVFLARE_PREVIEW_BRANCH?.trim() || undefined
 			if (dryRun) {
-				const config = await loadConfig({ cwd, configFile: configPath })
+				const rawConfig = await loadConfig({ cwd, configFile: configPath })
+				const config = await resolveConfigEnvVars(
+					resolveConfigForEnvironment(rawConfig, environment),
+					{
+						cwd,
+						configPath,
+						mode: 'build'
+					}
+				)
 				const deploymentStrategy = applyDeploymentStrategy(
-					resolveConfigForEnvironment(config, environment),
+					config,
 					{
 						environment,
 						preview,

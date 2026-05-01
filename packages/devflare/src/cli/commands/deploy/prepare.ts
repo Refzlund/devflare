@@ -12,6 +12,7 @@ import {
 	loadConfig,
 	prepareConfigResourcesForDeploy,
 	readWranglerConfig,
+	resolveConfigEnvVars,
 	validateServiceBindings
 } from '../../../config'
 import { rebaseWranglerConfigPaths, writeWranglerConfig } from '../../../config/compiler'
@@ -144,9 +145,14 @@ export async function prepareDeployConfig(options: {
 	logger?: ConsolaInstance
 	force?: boolean
 }): Promise<PreparedDeployConfigResult> {
-	const rawConfig = await loadConfig({
+	const loadedConfig = await loadConfig({
 		cwd: options.cwd,
 		configFile: options.configPath
+	})
+	const rawConfig = await resolveConfigEnvVars(loadedConfig, {
+		cwd: options.cwd,
+		configPath: options.configPath,
+		mode: 'build'
 	})
 
 	// R2: detect drift between the build artefact manifest and the current
