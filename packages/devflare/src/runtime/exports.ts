@@ -62,6 +62,37 @@ export const env: Readonly<DevflareEnv> = createReadonlyProxy(
 )
 
 // =============================================================================
+// Runtime Variables (vars)
+// =============================================================================
+
+/**
+ * Access typed runtime variables declared with `defineConfig({ vars })`.
+ *
+ * @remarks
+ * This proxy reads from the active Worker environment object, just like
+ * {@link env}, but its type is generated from the `vars` config lane. Nested
+ * values are preserved, so `vars.mongo.database` works when config declares a
+ * nested object.
+ *
+ * @example
+ * ```ts
+ * import { vars } from 'devflare/runtime'
+ *
+ * export async function fetch() {
+ *   return Response.json({
+ *     database: vars.mongo.database
+ *   })
+ * }
+ * ```
+ *
+ * @throws {ContextAccessError} When accessed outside an active Devflare-managed handler trail
+ */
+export const vars: Readonly<DevflareVars> = createReadonlyProxy(
+	() => getContextOrNull()?.env as Record<string, unknown> | undefined,
+	'vars'
+)
+
+// =============================================================================
 // Execution Context (ctx)
 // =============================================================================
 

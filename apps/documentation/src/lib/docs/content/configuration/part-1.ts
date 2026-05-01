@@ -8,6 +8,9 @@ import {
 	previewBindingsLifecycleCode,
 	projectShapeConfigCode,
 	runtimeDeploySettingsCode,
+	typedEnvVarsConfigCode,
+	typedEnvVarsDotenvCode,
+	typedEnvVarsRuntimeCode,
 	workerSurfacesConfigCode
 } from './shared'
 
@@ -479,8 +482,8 @@ export const configurationDocsPart1: DocPage[] = [
 				id: 'vars-secrets-env',
 				title: 'Keep `.env`, `vars`, and `secrets` in separate jobs',
 				bullets: [
-					'Use `.env` for inputs that exist while `devflare.config.*` is being evaluated. Devflare prefers a workspace-root `.env` when it finds a workspace ancestor, otherwise it falls back to the nearest ancestor `.env`.',
-					'Use `vars` for string values that should compile into generated Worker-facing output.',
+					'Use `.env` and `.env.dev` for config-time inputs. Devflare reads those files itself from the config directory upward, with closer files winning and `.env` overriding `.env.dev` in the same directory.',
+					'Use `vars` for values that should compile into Worker-facing output, including nested typed values produced by `env.NAME` descriptors.',
 					'Use `secrets` to declare runtime secret binding names, not to store those secret values in config. Today that is mostly schema and type metadata: the schema accepts `{ required: false }`, but generated env typing still treats declared secrets as present and Devflare does not currently turn that flag into a separate deploy-time guarantee.',
 					'Use `.env.example` to document config-time inputs for the team instead of leaving those values to memory or chat scrollback.'
 				],
@@ -490,6 +493,140 @@ export const configurationDocsPart1: DocPage[] = [
 						title: 'Do not let every string become an environment variable by reflex',
 						body: [
 							'Stable infrastructure names and intentional runtime strings usually belong in authored config. Save secrets for the values that are actually secret.'
+						]
+					}
+				]
+			}
+		]
+	},
+	{
+		slug: 'typed-env-vars',
+		group: 'Devflare',
+		navTitle: 'Typed env vars',
+		readTime: '6 min read',
+		eyebrow: 'Configuration',
+		title:
+			'Resolve `.env` values through typed config vars instead of scattering process env reads',
+		summary:
+			'Use `env.NAME` descriptors inside `defineConfig({ vars })`, parse or default them in config, and read the resulting typed values at runtime with `import { vars } from "devflare"`.',
+		description:
+			'Devflare vars can now be a typed bridge from local `.env` files into Worker runtime code. The config owns which variables are required, optional, parsed, or dev-only, while application code reads the resolved shape through the `vars` runtime helper.',
+		highlights: [
+			'`env.EXAMPLE` reads the exact `EXAMPLE=...` name from Devflare-loaded `.env` files or `process.env`.',
+			'Variables are required by default; build fails when required values are missing.',
+			'Dev mode reports missing values and waits for `.env` / `.env.dev` changes instead of exiting immediately.',
+			'Nested objects are preserved, so `vars.mongo.database` is a normal typed runtime access.',
+			'Parsers, optional values, normal defaults, and dev-only defaults are all chainable.'
+		],
+		facts: [
+			{ label: 'Config import', value: "`import { defineConfig, env } from 'devflare/config'`" },
+			{ label: 'Runtime import', value: "`import { vars } from 'devflare'`" },
+			{ label: 'File order', value: 'Parents first, then closer directories; `.env.dev` first, `.env` last' },
+			{ label: 'Missing build vars', value: 'Build fails with a nested missing-variable report' }
+		],
+		sourcePages: [
+			'packages/devflare/src/config/env-vars.ts',
+			'packages/devflare/src/config/loader.ts',
+			'packages/devflare/src/runtime/exports.ts',
+			'packages/devflare/src/cli/commands/type-generation/generator.ts',
+			'packages/devflare/tests/unit/config/env-vars.test.ts'
+		],
+		sections: [
+			{
+				id: 'config-shape',
+				title: 'Declare the runtime shape in config',
+				paragraphs: [
+					'The `env` export from `devflare/config` does not read the variable immediately. It creates a descriptor that Devflare resolves when it starts dev, builds artifacts, or prints a phase-resolved config.',
+					'That keeps config import cheap and lets Devflare report every missing variable at once, using the nested path from `vars` instead of a generic process-env crash.'
+				],
+				snippets: [
+					{
+						title: 'Nested vars with required, optional, parsed, defaulted, and dev-only values',
+						language: 'ts',
+						code: typedEnvVarsConfigCode
+					}
+				]
+			},
+			{
+				id: 'runtime-access',
+				title: 'Read resolved values through the runtime `vars` helper',
+				paragraphs: [
+					'At runtime, Devflare exposes the resolved values on the Worker environment and through the `vars` helper. The helper is typed from `devflare types`, so parser return values and nested objects stay visible to TypeScript.',
+					'Unparsed environment descriptors resolve to strings. Parsed descriptors use the parser return type, defaults contribute their value type, and optional descriptors become optional properties.'
+				],
+				snippets: [
+					{
+						title: 'Runtime code can use the nested shape directly',
+						language: 'ts',
+						filename: 'src/fetch.ts',
+						code: typedEnvVarsRuntimeCode
+					}
+				]
+			},
+			{
+				id: 'dotenv-loading',
+				title: 'Let Devflare parse `.env` files itself',
+				paragraphs: [
+					'Devflare reads `.env.dev` and `.env` from the config directory and every parent directory. Parent files load first, then closer files override them. Within one directory, `.env.dev` loads first and `.env` wins last.',
+					'The parser does not expand `$OTHER_VARIABLE` references. Values such as passwords, MongoDB connection strings, and shell-looking fragments are read as written instead of being interpreted by Bun.'
+				],
+				snippets: [
+					{
+						title: 'The later `.env` value overrides the earlier `.env.dev` value',
+						filename: '.env',
+						language: 'dotenv',
+						code: typedEnvVarsDotenvCode
+					}
+				],
+				callouts: [
+					{
+						tone: 'info',
+						title: 'Process env still wins over files',
+						body: [
+							'CI-provided environment variables and explicit shell exports override `.env` file values. Dotenv files fill in missing process variables; they do not stomp values the process already had.'
+						]
+					}
+				]
+			},
+			{
+				id: 'missing-values',
+				title: 'Missing required values fail build and pause dev',
+				paragraphs: [
+					'Required is the default because a config variable usually means the Worker cannot run honestly without that value. Build and config-inspection commands fail with a grouped report that points at the nested `vars` path and the missing environment variable name.',
+					'Dev mode is gentler. It prints the same report, waits for `.env` or `.env.dev` to change, and then retries startup. That makes the local loop fixable without restarting the command.'
+				],
+				snippets: [
+					{
+						title: 'Missing variables are grouped by the config path that required them',
+						language: 'text',
+						filename: 'missing-env-vars.txt',
+						code: String.raw`These environment variables are missing:
+
+	secret: SECRET
+	mongo:
+		uri: MONGOURI`
+					}
+				]
+			},
+			{
+				id: 'chainable-helpers',
+				title: 'Use helpers to make intent explicit',
+				table: {
+					headers: ['Helper', 'Meaning', 'Example'],
+					rows: [
+						['`env.NAME`', 'Required string value.', '`env.SECRET`'],
+						['`.optional()`', 'Missing value is allowed and omitted.', '`env.OPTIONAL_LABEL.optional()`'],
+						['`.parse(fn)` / `.parser(fn)`', 'Transform the string from env files into a typed runtime value.', '`env.RETRIES.parse(Number)`'],
+						['`.default(value)`', 'Use a fallback in every mode when the env value is missing.', "`env.APP_MODE.default('local')`"],
+						['`.dev(value)`', 'Use a fallback only in dev when the env value is missing.', '`env.MOCK_TENANT_ID.dev(123)`']
+					]
+				},
+				callouts: [
+					{
+						tone: 'warning',
+						title: 'Dev-only defaults are still required in build',
+						body: [
+							'`.dev(value)` is intentionally local-only. If the same variable may be missing in build too, use `.default(value)` or `.optional()` instead.'
 						]
 					}
 				]

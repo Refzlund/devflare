@@ -1,5 +1,5 @@
 // =============================================================================
-// Runtime Exports Tests — env, ctx, event, locals proxies
+// Runtime Exports Tests — env, vars, ctx, event, locals proxies
 // =============================================================================
 
 import { describe, expect, test } from 'bun:test'
@@ -7,7 +7,7 @@ import { createFetchEvent, runWithContext, runWithEventContext } from '../../../
 import { ContextAccessError } from '../../../src/runtime/validation'
 
 // Import the actual exports we'll create
-import { env, ctx, event, locals } from '../../../src/runtime/exports'
+import { env, vars, ctx, event, locals } from '../../../src/runtime/exports'
 
 /** Helper to create a mock ExecutionContext */
 function createMockCtx(): ExecutionContext {
@@ -41,6 +41,38 @@ describe('env proxy', () => {
 			// TypeScript should prevent this, but let's verify runtime behavior
 			expect(() => {
 				(env as Record<string, unknown>).DB = 'modified'
+			}).toThrow()
+		})
+	})
+})
+
+describe('vars proxy', () => {
+	test('throws ContextAccessError outside request handler', () => {
+		expect(() => (vars as Record<string, unknown>).mongo).toThrow(ContextAccessError)
+	})
+
+	test('provides typed runtime vars from the active env object', () => {
+		const mockEnv = {
+			mongo: {
+				database: 'voices'
+			},
+			isNumber: 42
+		}
+		const mockCtx = createMockCtx()
+
+		runWithContext(mockEnv, mockCtx, null, () => {
+			expect((vars as Record<string, { database: string }>).mongo.database).toBe('voices')
+			expect((vars as Record<string, unknown>).isNumber).toBe(42)
+		})
+	})
+
+	test('vars is readonly', () => {
+		const mockEnv = { APP_ENV: 'local' }
+		const mockCtx = createMockCtx()
+
+		runWithContext(mockEnv, mockCtx, null, () => {
+			expect(() => {
+				(vars as Record<string, unknown>).APP_ENV = 'production'
 			}).toThrow()
 		})
 	})

@@ -134,6 +134,7 @@ const docStructure: DocGroupDefinition[] = [
 					'worker-surfaces',
 					'generated-types',
 					'config-environments',
+					'typed-env-vars',
 					'config-previews',
 					'runtime-deploy-settings'
 				]

@@ -47,8 +47,8 @@ export {
 export { runCli, parseArgs } from './cli'
 export type { ParsedArgs, CliOptions, CliResult } from './cli'
 
-// Unified env — tries request context first, falls back to bridge
-export { env } from './env'
+// Unified env / vars — tries request context first, falls back to bridge
+export { env, vars } from './env'
 
 // Re-export defineConfig as default for convenience
 export { defineConfig as default } from './config'

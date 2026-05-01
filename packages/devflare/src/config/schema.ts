@@ -20,6 +20,7 @@ import {
 } from './schema-build'
 import { bindingsSchema } from './schema-bindings'
 import { envConfigSchemaInner } from './schema-env'
+import { isEnvVarDescriptor } from './env-vars'
 import {
 	assetsConfigSchema,
 	compatibilityDateSchema,
@@ -78,6 +79,18 @@ function addSecretsStoreShorthandIssues(
 		})
 	}
 }
+
+const varValueSchema: z.ZodType<unknown> = z.lazy(() =>
+	z.union([
+		z.string(),
+		z.number(),
+		z.boolean(),
+		z.null(),
+		z.custom(isEnvVarDescriptor),
+		z.array(varValueSchema),
+		z.record(z.string(), varValueSchema)
+	])
+)
 
 /**
  * Raw Zod shape of the root devflare configuration (excluding the `env` field,
@@ -147,7 +160,7 @@ export const rootConfigShape = {
 	tailConsumers: z.array(tailConsumerSchema).optional(),
 
 	/** Environment variables. */
-	vars: z.record(z.string(), z.string()).optional(),
+	vars: z.record(z.string(), varValueSchema).optional(),
 
 	/** Secret declarations. */
 	secrets: z.record(z.string(), secretConfigSchema).optional(),
@@ -212,8 +225,81 @@ export const configSchema = canonicalConfigSchema
 /** Output type after Zod validation and transforms */
 export type DevflareConfig = z.output<typeof configSchema>
 
-/** Input type for defineConfig - before Zod transforms apply defaults */
-export type DevflareConfigInput = z.input<typeof configSchema>
+export type {
+	AiBindingInput,
+	AiSearchInstanceBindingInput,
+	AiSearchNamespaceBindingInput,
+	AnalyticsBindingInput,
+	ArtifactsBindingInput,
+	ArtifactsBindingObjectInput,
+	AssetsConfigInput,
+	BindingsConfigInput,
+	BrowserBindingInput,
+	BrowserBindingObjectInput,
+	ContainerConfigInput,
+	D1BindingByIdInput,
+	D1BindingByNameInput,
+	D1BindingInput,
+	DevflareConfigInput,
+	DevflareEnvConfigInput,
+	DispatchNamespaceBindingInput,
+	DispatchNamespaceBindingObjectInput,
+	DispatchNamespaceOutboundInput,
+	DurableObjectBindingInput,
+	DurableObjectBindingObjectInput,
+	FilesConfigInput,
+	HyperdriveBindingByIdInput,
+	HyperdriveBindingByNameInput,
+	HyperdriveBindingInput,
+	ImagesBindingInput,
+	ImagesBindingObjectInput,
+	KVBindingByIdInput,
+	KVBindingByNameInput,
+	KVBindingInput,
+	LimitsConfigInput,
+	MediaBindingInput,
+	MediaBindingObjectInput,
+	MigrationConfigInput,
+	ModuleRuleConfigInput,
+	MtlsCertificateBindingByIdInput,
+	MtlsCertificateBindingByWranglerIdInput,
+	MtlsCertificateBindingInput,
+	ObservabilityConfigInput,
+	ObservabilityLogsConfigInput,
+	ObservabilityTracesConfigInput,
+	PipelineBindingInput,
+	PipelineBindingObjectInput,
+	PlacementConfigInput,
+	PreviewConfigInput,
+	QueueConsumerInput,
+	QueuesConfigInput,
+	RateLimitBindingInput,
+	RateLimitSimpleInput,
+	RenamedClassMigrationInput,
+	RolldownConfigInput,
+	RouteConfigInput,
+	RouteTreeConfigInput,
+	SecretConfigInput,
+	SecretsStoreBindingInput,
+	SecretsStoreBindingObjectInput,
+	SendEmailBindingInput,
+	ServiceBindingInput,
+	SmartPlacementConfigInput,
+	TailConsumerConfigInput,
+	TailConsumerObjectConfigInput,
+	TargetedHostPlacementConfigInput,
+	TargetedHostnamePlacementConfigInput,
+	TargetedRegionPlacementConfigInput,
+	TriggersConfigInput,
+	VectorizeBindingInput,
+	VersionMetadataBindingInput,
+	ViteConfigInput,
+	WorkflowBindingInput,
+	WorkflowLimitsInput,
+	WorkerLoaderBindingInput,
+	WranglerConfigInput,
+	WsRouteConfigInput
+} from './schema-types'
 
 export type { DevflareRolldownOptions, DevflareRolldownOutputOptions, RolldownConfig, ViteConfig } from './schema-build'
 export type {

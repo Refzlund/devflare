@@ -3,6 +3,7 @@
 // =============================================================================
 
 import type { DevflareConfigInput } from './schema'
+import type { InferConfigVars } from './env-vars'
 
 /**
  * Input type for defineConfig - can be object, function, or async function
@@ -17,9 +18,14 @@ export type DefineConfigInput =
  * Configuration with entrypoints type attached for ref() type inference.
  * This is used by ref() to provide autocomplete for entrypoint names.
  */
-export interface TypedConfig<TEntrypoints extends string = string> extends DevflareConfigInput {
+export interface TypedConfig<
+	TEntrypoints extends string = string,
+	TVars = Record<string, unknown>
+> extends DevflareConfigInput {
 	/** @internal Type marker for entrypoint names - used by ref() for autocomplete */
 	readonly __entrypoints?: TEntrypoints
+	/** @internal Type marker for config-derived runtime vars. */
+	readonly __vars?: TVars
 }
 
 /**
@@ -48,24 +54,39 @@ export interface TypedConfig<TEntrypoints extends string = string> extends Devfl
  *   compatibilityDate: '2025-01-07'
  * }))
  */
-export function defineConfig<TEntrypoints extends string = string>(
-	config: DevflareConfigInput
-): TypedConfig<TEntrypoints>
-export function defineConfig<TEntrypoints extends string = string>(
-	config: () => DevflareConfigInput
-): TypedConfig<TEntrypoints>
-export function defineConfig<TEntrypoints extends string = string>(
-	config: () => Promise<DevflareConfigInput>
-): Promise<TypedConfig<TEntrypoints>>
-export function defineConfig<TEntrypoints extends string = string>(
-	config: DevflareConfigInput | (() => DevflareConfigInput) | (() => Promise<DevflareConfigInput>)
-): TypedConfig<TEntrypoints> | Promise<TypedConfig<TEntrypoints>> {
+export function defineConfig<
+	TEntrypoints extends string = string,
+	TConfig extends DevflareConfigInput = DevflareConfigInput
+>(
+	config: TConfig & DevflareConfigInput
+): TypedConfig<TEntrypoints, InferConfigVars<NonNullable<TConfig['vars']>>>
+export function defineConfig<
+	TEntrypoints extends string = string,
+	TConfig extends DevflareConfigInput = DevflareConfigInput
+>(
+	config: () => TConfig & DevflareConfigInput
+): TypedConfig<TEntrypoints, InferConfigVars<NonNullable<TConfig['vars']>>>
+export function defineConfig<
+	TEntrypoints extends string = string,
+	TConfig extends DevflareConfigInput = DevflareConfigInput
+>(
+	config: () => Promise<TConfig & DevflareConfigInput>
+): Promise<TypedConfig<TEntrypoints, InferConfigVars<NonNullable<TConfig['vars']>>>>
+export function defineConfig<
+	TEntrypoints extends string = string,
+	TConfig extends DevflareConfigInput = DevflareConfigInput
+>(
+	config:
+		| (TConfig & DevflareConfigInput)
+		| (() => TConfig & DevflareConfigInput)
+		| (() => Promise<TConfig & DevflareConfigInput>)
+): TypedConfig<TEntrypoints, InferConfigVars<NonNullable<TConfig['vars']>>> | Promise<TypedConfig<TEntrypoints, InferConfigVars<NonNullable<TConfig['vars']>>>> {
 	if (typeof config === 'function') {
 		const result = config()
 		if (result instanceof Promise) {
-			return result as Promise<TypedConfig<TEntrypoints>>
+			return result as Promise<TypedConfig<TEntrypoints, InferConfigVars<NonNullable<TConfig['vars']>>>>
 		}
-		return result as TypedConfig<TEntrypoints>
+		return result as TypedConfig<TEntrypoints, InferConfigVars<NonNullable<TConfig['vars']>>>
 	}
-	return config as TypedConfig<TEntrypoints>
+	return config as TypedConfig<TEntrypoints, InferConfigVars<NonNullable<TConfig['vars']>>>
 }

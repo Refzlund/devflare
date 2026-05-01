@@ -22,7 +22,7 @@ export default defineConfig({
 	}
 })`
 
-export const fullConfigExampleCode = String.raw`import { defineConfig } from 'devflare/config'
+export const fullConfigExampleCode = String.raw`import { defineConfig, env } from 'devflare/config'
 
 export default defineConfig({
 	name: 'docs-platform',
@@ -109,7 +109,12 @@ export default defineConfig({
 		crons: ['0 */6 * * *']
 	},
 	vars: {
-		APP_ENV: 'development'
+		APP_ENV: 'development',
+		mongo: {
+			uri: env.MONGOURI,
+			database: env.MONGODATABASE
+		},
+		retries: env.RETRIES.parse(Number)
 	},
 	secrets: {
 		API_TOKEN: {
@@ -181,6 +186,43 @@ export default defineConfig({
 		}
 	}
 })`
+
+export const typedEnvVarsConfigCode = String.raw`import { defineConfig, env } from 'devflare/config'
+
+export default defineConfig({
+	name: 'voices-api',
+	vars: {
+		secret: env.SECRET,
+		mongo: {
+			uri: env.MONGOURI,
+			database: env.MONGODATABASE
+		},
+		retries: env.RETRIES.parse(Number),
+		optionalLabel: env.OPTIONAL_LABEL.optional(),
+		mode: env.APP_MODE.default('local'),
+		mockTenantId: env.MOCK_TENANT_ID.dev(123)
+	}
+})`
+
+export const typedEnvVarsRuntimeCode = String.raw`import { vars } from 'devflare'
+
+export default {
+	async fetch() {
+		return Response.json({
+			database: vars.mongo.database,
+			retries: vars.retries
+		})
+	}
+}`
+
+export const typedEnvVarsDotenvCode = String.raw`# .env.dev
+SECRET=local-secret
+MONGOURI=mongodb://127.0.0.1:27017
+MONGODATABASE=voices_dev
+RETRIES=1
+
+# .env
+MONGODATABASE=voices`
 
 export const environmentOverlayCode = String.raw`import { defineConfig } from 'devflare/config'
 

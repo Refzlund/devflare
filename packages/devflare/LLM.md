@@ -13,7 +13,7 @@ It is meant to read like a proper markdown handbook rather than a second source 
 - Links use the same `/docs/...` routes as the documentation site.
 
 ## Documentation map
-This export covers 146 pages across 5 top-level groups.
+This export covers 147 pages across 5 top-level groups.
 
 ### Quickstart
 See why Devflare exists, build the smallest safe first worker, and move into routes, bindings, previews, and tests when the app needs them.
@@ -40,6 +40,7 @@ Keep the day-to-day Devflare surfaces easy to scan: runtime model, HTTP split, a
   - [Worker surfaces](/docs/worker-surfaces) — Devflare can compose or wrap several Worker surfaces into one generated entrypoint, but the authored source of truth should stay in explicit files such as `src/fetch.ts`, `src/queue.ts`, `src/scheduled.ts`, and `src/email.ts`.
   - [Generated types](/docs/generated-types) — `devflare types` turns config, discovered Durable Objects, named entrypoints, and cross-worker references into one generated TypeScript contract instead of a pile of hand-maintained env guesswork.
   - [Environments](/docs/config-environments) — Keep one base config, layer environment-specific overrides with `config.env`, and let Devflare resolve preview or production details only in the commands that actually need them.
+  - [Typed env vars](/docs/typed-env-vars) — Use `env.NAME` descriptors inside `defineConfig({ vars })`, parse or default them in config, and read the resulting typed values at runtime with `import { vars } from "devflare"`.
   - [Previews](/docs/config-previews) — Use `preview.scope()` for bindings that should belong to one preview scope. Devflare materializes names like `notes-db-next`, provisions or reuses the preview-only resources it can manage, and lets you clean them up by the same scope later without touching production resources.
   - [Runtime & deploy settings](/docs/runtime-deploy-settings) — Use config for account context, compatibility posture, assets, deployment routes, WebSocket proxy rules, migrations, observability, limits, and preview cron behavior instead of rediscovering those settings in scripts later.
 
@@ -2207,7 +2208,7 @@ That is what this page is for. The example below touches the major current top-l
 Hover any property in the config to see what that lane means. The example is intentionally broad, but the dedicated pages still own the deeper caveats and richer nested variants.
 
 ```ts
-import { defineConfig } from 'devflare/config'
+import { defineConfig, env } from 'devflare/config'
 
 export default defineConfig({
 	name: 'docs-platform',
@@ -2294,7 +2295,12 @@ export default defineConfig({
 		crons: ['0 */6 * * *']
 	},
 	vars: {
-		APP_ENV: 'development'
+		APP_ENV: 'development',
+		mongo: {
+			uri: env.MONGOURI,
+			database: env.MONGODATABASE
+		},
+		retries: env.RETRIES.parse(Number)
 	},
 	secrets: {
 		API_TOKEN: {
@@ -2904,14 +2910,147 @@ The replace-arrays rule is the one most likely to surprise someone arriving from
 
 ##### Key points
 
-- Use `.env` for inputs that exist while `devflare.config.*` is being evaluated. Devflare prefers a workspace-root `.env` when it finds a workspace ancestor, otherwise it falls back to the nearest ancestor `.env`.
-- Use `vars` for string values that should compile into generated Worker-facing output.
+- Use `.env` and `.env.dev` for config-time inputs. Devflare reads those files itself from the config directory upward, with closer files winning and `.env` overriding `.env.dev` in the same directory.
+- Use `vars` for values that should compile into Worker-facing output, including nested typed values produced by `env.NAME` descriptors.
 - Use `secrets` to declare runtime secret binding names, not to store those secret values in config. Today that is mostly schema and type metadata: the schema accepts `{ required: false }`, but generated env typing still treats declared secrets as present and Devflare does not currently turn that flag into a separate deploy-time guarantee.
 - Use `.env.example` to document config-time inputs for the team instead of leaving those values to memory or chat scrollback.
 
 > **Warning — Do not let every string become an environment variable by reflex**
 >
 > Stable infrastructure names and intentional runtime strings usually belong in authored config. Save secrets for the values that are actually secret.
+
+---
+
+### Resolve `.env` values through typed config vars instead of scattering process env reads
+
+> Use `env.NAME` descriptors inside `defineConfig({ vars })`, parse or default them in config, and read the resulting typed values at runtime with `import { vars } from "devflare"`.
+
+| Field | Value |
+| --- | --- |
+| Route | [`/docs/typed-env-vars`](/docs/typed-env-vars) |
+| Group | Devflare |
+| Navigation title | Typed env vars |
+| Eyebrow | Configuration |
+
+Devflare vars can now be a typed bridge from local `.env` files into Worker runtime code. The config owns which variables are required, optional, parsed, or dev-only, while application code reads the resolved shape through the `vars` runtime helper.
+
+#### At a glance
+
+| Fact | Value |
+| --- | --- |
+| Config import | `import { defineConfig, env } from 'devflare/config'` |
+| Runtime import | `import { vars } from 'devflare'` |
+| File order | Parents first, then closer directories; `.env.dev` first, `.env` last |
+| Missing build vars | Build fails with a nested missing-variable report |
+
+#### Declare the runtime shape in config
+
+The `env` export from `devflare/config` does not read the variable immediately. It creates a descriptor that Devflare resolves when it starts dev, builds artifacts, or prints a phase-resolved config.
+
+That keeps config import cheap and lets Devflare report every missing variable at once, using the nested path from `vars` instead of a generic process-env crash.
+
+##### Example — Nested vars with required, optional, parsed, defaulted, and dev-only values
+
+```ts
+import { defineConfig, env } from 'devflare/config'
+
+export default defineConfig({
+	name: 'voices-api',
+	vars: {
+		secret: env.SECRET,
+		mongo: {
+			uri: env.MONGOURI,
+			database: env.MONGODATABASE
+		},
+		retries: env.RETRIES.parse(Number),
+		optionalLabel: env.OPTIONAL_LABEL.optional(),
+		mode: env.APP_MODE.default('local'),
+		mockTenantId: env.MOCK_TENANT_ID.dev(123)
+	}
+})
+```
+
+#### Read resolved values through the runtime `vars` helper
+
+At runtime, Devflare exposes the resolved values on the Worker environment and through the `vars` helper. The helper is typed from `devflare types`, so parser return values and nested objects stay visible to TypeScript.
+
+Unparsed environment descriptors resolve to strings. Parsed descriptors use the parser return type, defaults contribute their value type, and optional descriptors become optional properties.
+
+##### Example — Runtime code can use the nested shape directly
+
+###### File — src/fetch.ts
+
+```ts
+import { vars } from 'devflare'
+
+export default {
+	async fetch() {
+		return Response.json({
+			database: vars.mongo.database,
+			retries: vars.retries
+		})
+	}
+}
+```
+
+#### Let Devflare parse `.env` files itself
+
+Devflare reads `.env.dev` and `.env` from the config directory and every parent directory. Parent files load first, then closer files override them. Within one directory, `.env.dev` loads first and `.env` wins last.
+
+The parser does not expand `$OTHER_VARIABLE` references. Values such as passwords, MongoDB connection strings, and shell-looking fragments are read as written instead of being interpreted by Bun.
+
+> **Note — Process env still wins over files**
+>
+> CI-provided environment variables and explicit shell exports override `.env` file values. Dotenv files fill in missing process variables; they do not stomp values the process already had.
+
+##### Example — The later `.env` value overrides the earlier `.env.dev` value
+
+###### File — .env
+
+```dotenv
+# .env.dev
+SECRET=local-secret
+MONGOURI=mongodb://127.0.0.1:27017
+MONGODATABASE=voices_dev
+RETRIES=1
+
+# .env
+MONGODATABASE=voices
+```
+
+#### Missing required values fail build and pause dev
+
+Required is the default because a config variable usually means the Worker cannot run honestly without that value. Build and config-inspection commands fail with a grouped report that points at the nested `vars` path and the missing environment variable name.
+
+Dev mode is gentler. It prints the same report, waits for `.env` or `.env.dev` to change, and then retries startup. That makes the local loop fixable without restarting the command.
+
+##### Example — Missing variables are grouped by the config path that required them
+
+###### File — missing-env-vars.txt
+
+```text
+These environment variables are missing:
+
+	secret: SECRET
+	mongo:
+		uri: MONGOURI
+```
+
+#### Use helpers to make intent explicit
+
+##### Reference table
+
+| Helper | Meaning | Example |
+| --- | --- | --- |
+| `env.NAME` | Required string value. | `env.SECRET` |
+| `.optional()` | Missing value is allowed and omitted. | `env.OPTIONAL_LABEL.optional()` |
+| `.parse(fn)` / `.parser(fn)` | Transform the string from env files into a typed runtime value. | `env.RETRIES.parse(Number)` |
+| `.default(value)` | Use a fallback in every mode when the env value is missing. | `env.APP_MODE.default('local')` |
+| `.dev(value)` | Use a fallback only in dev when the env value is missing. | `env.MOCK_TENANT_ID.dev(123)` |
+
+> **Warning — Dev-only defaults are still required in build**
+>
+> `.dev(value)` is intentionally local-only. If the same variable may be missing in build too, use `.default(value)` or `.optional()` instead.
 
 ---
 

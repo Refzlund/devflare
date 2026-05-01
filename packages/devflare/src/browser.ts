@@ -12,7 +12,7 @@ export { ref } from './config/ref'
 
 // Safe runtime-facing exports
 export { workerName } from './workerName'
-export { env } from './env'
+export { env, vars } from './env'
 
 // Bridge utilities that are safe in worker/browser bundles
 export {

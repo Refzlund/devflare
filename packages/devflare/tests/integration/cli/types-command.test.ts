@@ -214,4 +214,49 @@ export default defineConfig({
 		expect(generatedTypes).toContain("import type { Fetcher } from '@cloudflare/workers-types'")
 		expect(generatedTypes).toContain('TEST_BROWSER: Fetcher')
 	})
+
+	test('generates a DevflareVars contract inferred from config vars', async () => {
+		const configEntryImportPath = pathToFileURL(join(repoRoot, 'src', 'config-entry.ts')).href
+
+		await writeFile(join(projectDir, 'package.json'), JSON.stringify({
+			name: 'types-command-vars-test',
+			private: true,
+			type: 'module'
+		}, null, 2))
+
+		await writeFile(join(projectDir, 'devflare.config.ts'), `
+import { defineConfig, env } from '${configEntryImportPath}'
+
+export default defineConfig({
+	name: 'vars-worker',
+	compatibilityDate: '2026-05-01',
+	vars: {
+		mongo: {
+			uri: env.MONGOURI,
+			database: env.MONGODATABASE,
+			retries: env.RETRIES.parse(Number),
+			optionalLabel: env.OPTIONAL_LABEL.optional()
+		},
+		flag: env.FLAG.default('enabled')
+	}
+})
+`.trim())
+
+		setDependencies(createCliDependencies(createUnusedProcessRunner()))
+
+		const logger = createLogger({ includeLog: false })
+		const result = await runTypesCommand(
+			{ command: 'types', args: [], options: {} },
+			logger as any,
+			{ cwd: projectDir }
+		)
+
+		expect(result.exitCode).toBe(0)
+
+		const generatedTypes = await readFile(join(projectDir, 'env.d.ts'), 'utf8')
+		expect(generatedTypes).toContain("import type { InferConfigVars } from 'devflare/config'")
+		expect(generatedTypes).toContain("type __DevflareConfigVars = InferConfigVars<Awaited<typeof import('./devflare.config').default>>")
+		expect(generatedTypes).toContain('interface DevflareVars extends __DevflareConfigVars {}')
+		expect(generatedTypes).toContain('interface DevflareEnv extends __DevflareConfigVars {')
+	})
 })

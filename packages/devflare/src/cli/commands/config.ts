@@ -3,6 +3,7 @@ import {
 	ConfigResourceResolutionError,
 	loadConfig,
 	loadResolvedConfig,
+	resolveConfigEnvVars,
 	resolveResources,
 	type DevflareConfig
 } from '../../config'
@@ -26,10 +27,15 @@ async function loadConfigForPhase(options: {
 	phase: ConfigPhase
 }): Promise<DevflareConfig> {
 	if (options.phase === 'deploy') {
-		return await loadResolvedConfig({
+		const resolvedConfig = await loadResolvedConfig({
 			cwd: options.cwd,
 			configFile: options.configPath,
 			environment: options.environment
+		})
+		return await resolveConfigEnvVars(resolvedConfig, {
+			cwd: options.cwd,
+			configPath: options.configPath,
+			mode: 'build'
 		})
 	}
 
@@ -37,9 +43,14 @@ async function loadConfigForPhase(options: {
 		cwd: options.cwd,
 		configFile: options.configPath
 	})
-	return await resolveResources(config, {
+	const resourceResolvedConfig = await resolveResources(config, {
 		phase: options.phase,
 		environment: options.environment
+	})
+	return await resolveConfigEnvVars(resourceResolvedConfig, {
+		cwd: options.cwd,
+		configPath: options.configPath,
+		mode: options.phase === 'local' ? 'dev' : 'build'
 	})
 }
 

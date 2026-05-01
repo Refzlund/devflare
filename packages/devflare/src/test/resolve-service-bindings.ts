@@ -137,7 +137,7 @@ export interface ResolvedWorker {
 	/** Compatibility date */
 	compatibilityDate: string
 	compatibilityFlags?: string[]
-	bindings?: Record<string, string>
+	bindings?: Record<string, unknown>
 	kvNamespaces?: Record<string, string>
 	r2Buckets?: Record<string, string>
 	d1Databases?: Record<string, string>

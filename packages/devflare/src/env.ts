@@ -23,6 +23,9 @@ declare global {
 	// Default empty interface - users augment this via env.d.ts
 	// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 	interface DevflareEnv {}
+	// Default empty interface - users augment this via env.d.ts
+	// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+	interface DevflareVars {}
 }
 
 // -----------------------------------------------------------------------------
@@ -147,6 +150,67 @@ export const env: DevflareEnv & { dispose(): Promise<void> } = new Proxy(
 			const ctx = getContextOrNull()
 			const source = ctx?.env ?? testContextEnv ?? bridgeEnv
 			return Reflect.getOwnPropertyDescriptor(source as object, prop)
+		}
+	}
+)
+
+/**
+ * Unified runtime variables proxy.
+ *
+ * This reads from the same active environment object as {@link env}, but is
+ * typed from config `vars` via generated `env.d.ts` declarations. It is useful
+ * for nested typed values authored with `defineConfig({ vars })`.
+ */
+export const vars: Readonly<DevflareVars> = new Proxy(
+	{} as Readonly<DevflareVars>,
+	{
+		get(_target, prop: string | symbol) {
+			const ctx = getContextOrNull()
+			if (ctx?.env) {
+				return (ctx.env as Record<string, unknown>)[prop as string]
+			}
+
+			if (testContextEnv) {
+				return testContextEnv[prop as string]
+			}
+
+			return (bridgeEnv as Record<string, unknown>)[prop as string]
+		},
+
+		has(_target, prop: string | symbol) {
+			const ctx = getContextOrNull()
+			if (ctx?.env) {
+				return prop in (ctx.env as object)
+			}
+			if (testContextEnv) {
+				return prop in testContextEnv
+			}
+			return prop in bridgeEnv
+		},
+
+		ownKeys(_target) {
+			const ctx = getContextOrNull()
+			if (ctx?.env) {
+				return Reflect.ownKeys(ctx.env as object)
+			}
+			if (testContextEnv) {
+				return Reflect.ownKeys(testContextEnv)
+			}
+			return Reflect.ownKeys(bridgeEnv)
+		},
+
+		getOwnPropertyDescriptor(_target, prop) {
+			const ctx = getContextOrNull()
+			const source = ctx?.env ?? testContextEnv ?? bridgeEnv
+			return Reflect.getOwnPropertyDescriptor(source as object, prop)
+		},
+
+		set(_target, prop) {
+			throw new TypeError(`Cannot assign to '${String(prop)}' on 'vars' because it is read-only.`)
+		},
+
+		deleteProperty(_target, prop) {
+			throw new TypeError(`Cannot delete property '${String(prop)}' from 'vars' because it is read-only.`)
 		}
 	}
 )

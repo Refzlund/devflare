@@ -9,6 +9,11 @@ import type { Miniflare as MiniflareType } from 'miniflare'
 import { dirname, resolve } from 'pathe'
 import { loadConfig } from '../config/loader'
 import { applyLocalDevVarsToConfig } from '../config/local-dev-vars'
+import {
+	EnvVarResolutionError,
+	getDevflareDotenvPaths,
+	resolveConfigEnvVars
+} from '../config/env-vars'
 import { bundleWorkerEntry, type DOBundleResult } from '../bundler'
 import { checkRemoteBindingRequirements } from '../cli/wrangler-auth'
 import { setLocalSendEmailBindings } from '../utils/send-email'
@@ -237,7 +242,7 @@ export function createDevServer(options: DevServerOptions): DevServer {
 	}
 
 	async function reloadWorkerOnlyConfig(): Promise<void> {
-		await loadRuntimeConfig()
+		await loadRuntimeConfigWhenEnvReady()
 		if (!state.config) {
 			return
 		}
@@ -248,9 +253,14 @@ export function createDevServer(options: DevServerOptions): DevServer {
 	}
 
 	async function loadRuntimeConfig(): Promise<void> {
-		const loadedConfig = await loadConfig({ cwd, configFile: configPath })
 		state.resolvedWorkerConfigPath = await resolveWorkerConfigWatchPath(cwd, configPath)
-		state.config = await applyLocalDevVarsToConfig(loadedConfig, {
+		const loadedConfig = await loadConfig({ cwd, configFile: configPath })
+		const envResolvedConfig = await resolveConfigEnvVars(loadedConfig, {
+			cwd,
+			configPath: state.resolvedWorkerConfigPath ?? configPath,
+			mode: 'dev'
+		})
+		state.config = await applyLocalDevVarsToConfig(envResolvedConfig, {
 			cwd,
 			configPath: state.resolvedWorkerConfigPath ?? undefined
 		})
@@ -260,6 +270,49 @@ export function createDevServer(options: DevServerOptions): DevServer {
 					state.resolvedWorkerConfigPath ? dirname(state.resolvedWorkerConfigPath) : cwd
 				)
 			: null
+	}
+
+	async function waitForDotenvChange(): Promise<void> {
+		const configWatchPath = state.resolvedWorkerConfigPath
+			?? await resolveWorkerConfigWatchPath(cwd, configPath)
+		const startDir = configWatchPath ? dirname(configWatchPath) : cwd
+		const watchPaths = getDevflareDotenvPaths(startDir)
+		const { watch } = await import('chokidar')
+
+		await new Promise<void>((resolveWait, rejectWait) => {
+			const watcher = watch(watchPaths, {
+				ignoreInitial: true,
+				awaitWriteFinish: {
+					stabilityThreshold: 100,
+					pollInterval: 25
+				}
+			})
+			const finish = () => {
+				watcher.close().then(resolveWait, rejectWait)
+			}
+
+			watcher.on('add', finish)
+			watcher.on('change', finish)
+			watcher.on('unlink', finish)
+			watcher.on('error', rejectWait)
+		})
+	}
+
+	async function loadRuntimeConfigWhenEnvReady(): Promise<void> {
+		while (true) {
+			try {
+				await loadRuntimeConfig()
+				return
+			} catch (error) {
+				if (!(error instanceof EnvVarResolutionError)) {
+					throw error
+				}
+
+				logger?.warn(error.message)
+				logger?.info('Devflare dev is waiting for .env or .env.dev to change before starting.')
+				await waitForDotenvChange()
+			}
+		}
 	}
 
 	async function startWorkerSourceWatcher(): Promise<void> {
@@ -292,7 +345,7 @@ export function createDevServer(options: DevServerOptions): DevServer {
 		logger?.info('Starting unified dev server...')
 
 		// Load config
-		await loadRuntimeConfig()
+		await loadRuntimeConfigWhenEnvReady()
 		if (!state.config) {
 			throw new Error('Config not loaded')
 		}

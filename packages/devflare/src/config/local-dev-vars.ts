@@ -6,7 +6,7 @@ export interface LoadLocalDevVarsOptions {
 	cwd: string
 	configPath?: string
 	environment?: string
-	vars?: Record<string, string>
+	vars?: Record<string, unknown>
 	secrets?: DevflareConfig['secrets']
 	silent?: boolean
 }
@@ -125,7 +125,7 @@ export function toWranglerSecretsConfig(
 
 export async function loadLocalDevVars(
 	options: LoadLocalDevVarsOptions
-): Promise<Record<string, string>> {
+): Promise<Record<string, unknown>> {
 	const activeEnvironment = options.environment ?? process.env.CLOUDFLARE_ENV
 	const localVars = await loadWranglerCompatibleLocalVars(options.cwd, activeEnvironment)
 	const secretNames = toWranglerSecretsConfig(options.secrets)?.required

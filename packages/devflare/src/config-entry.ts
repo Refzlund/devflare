@@ -13,6 +13,12 @@ export {
 } from './config/define'
 
 export {
+	env,
+	type EnvVarDescriptor,
+	type InferConfigVars
+} from './config/env-vars'
+
+export {
 	preview,
 	type PreviewScopeFn,
 	type PreviewScopeOptions,
@@ -27,5 +33,7 @@ export {
 	type WorkerBindingAccessor,
 	type DOBindingRef
 } from './config/ref'
+
+export type * from './config/schema-types'
 
 export { defineConfig as default } from './config/define'

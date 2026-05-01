@@ -9,6 +9,7 @@
 import { relative } from 'pathe'
 import {
 	loadResolvedConfig,
+	resolveConfigEnvVars,
 	resolveResources
 } from '../config'
 import { loadConfig } from '../config/loader'
@@ -38,7 +39,7 @@ interface ProgrammaticConfigOptions {
 async function loadProgrammaticDevflareConfig(options: ProgrammaticConfigOptions) {
 	const cwd = options.cwd ?? process.cwd()
 	const strategy = options.resolve ?? 'offline-local'
-	const devflareConfig = strategy === 'remote'
+	const resourceResolvedConfig = strategy === 'remote'
 		? await loadResolvedConfig({
 			cwd,
 			configFile: options.configPath,
@@ -48,6 +49,11 @@ async function loadProgrammaticDevflareConfig(options: ProgrammaticConfigOptions
 			await loadConfig({ cwd, configFile: options.configPath }),
 			{ phase: 'local', environment: options.environment }
 		)
+	const devflareConfig = await resolveConfigEnvVars(resourceResolvedConfig, {
+		cwd,
+		configPath: options.configPath,
+		mode: strategy === 'remote' ? 'build' : 'dev'
+	})
 	return { cwd, devflareConfig }
 }
 

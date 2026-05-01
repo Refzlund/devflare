@@ -17,7 +17,8 @@ import {
 	normalizeMtlsCertificateBinding,
 	normalizePipelineBinding,
 	normalizeSecretsStoreBinding,
-	normalizeWorkflowBinding
+	normalizeWorkflowBinding,
+	resolveConfigEnvVars
 } from '../config'
 import { applyLocalDevVarsToConfig } from '../config/local-dev-vars'
 import {
@@ -124,7 +125,7 @@ export interface MiniflareOptions {
 		}
 	>
 	/** Environment variables */
-	bindings?: Record<string, string>
+	bindings?: Record<string, unknown>
 	/** Service bindings */
 	serviceBindings?: Record<string, { name: string; entrypoint?: string }>
 	/** Wrapped bindings to expose object-shaped local binding shims */
@@ -707,11 +708,18 @@ export async function startMiniflareFromConfig(
 	options: Partial<MiniflareOptions> = {}
 ): Promise<MiniflareInstance> {
 	const runtimeConfig = options.cwd
-		? await applyLocalDevVarsToConfig(config, {
-				cwd: options.cwd,
-				configPath: options.configPath,
-				environment: options.environment
-			})
+		? await applyLocalDevVarsToConfig(
+				await resolveConfigEnvVars(config, {
+					cwd: options.cwd,
+					configPath: options.configPath,
+					mode: 'dev'
+				}),
+				{
+					cwd: options.cwd,
+					configPath: options.configPath,
+					environment: options.environment
+				}
+			)
 		: config
 	const bindings = runtimeConfig.bindings ?? {}
 	const localSecretWrappedBindingConfig = options.cwd

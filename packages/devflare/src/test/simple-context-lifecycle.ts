@@ -8,7 +8,7 @@
 // =============================================================================
 
 import { dirname, resolve } from 'path'
-import { loadConfig } from '../config'
+import { loadConfig, resolveConfigEnvVars } from '../config'
 import { applyLocalDevVarsToConfig } from '../config/local-dev-vars'
 import type { DevflareConfig } from '../config'
 import type { BridgeClient } from '../bridge/client'
@@ -70,7 +70,12 @@ export async function resolveTestContextConfig(
 		cwd: configDir,
 		configFile: absolutePath.split(/[/\\]/).pop()
 	})
-	const config = await applyLocalDevVarsToConfig(loadedConfig, {
+	const envResolvedConfig = await resolveConfigEnvVars(loadedConfig, {
+		cwd: configDir,
+		configPath: absolutePath,
+		mode: 'dev'
+	})
+	const config = await applyLocalDevVarsToConfig(envResolvedConfig, {
 		cwd: configDir,
 		configPath: absolutePath
 	})

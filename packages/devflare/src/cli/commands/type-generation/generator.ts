@@ -77,7 +77,7 @@ interface TypeGenerationConfig {
 			allowedSenderAddresses?: string[]
 		}>
 	}
-	vars?: Record<string, string>
+	vars?: Record<string, unknown>
 	secrets?: Record<string, { required?: boolean }>
 }
 
@@ -87,7 +87,8 @@ function generateBindingMembers(
 	crossWorkerDOMap: Map<string, CrossWorkerDOInfo>,
 	serviceBindingMap: Map<string, ServiceBindingInfo>,
 	cwd: string,
-	indent: string
+	indent: string,
+	options: { includeVarsAsMembers?: boolean } = {}
 ): { lines: string[]; imports: string[] } {
 	const lines: string[] = []
 	const imports: string[] = []
@@ -264,7 +265,7 @@ function generateBindingMembers(
 		}
 	}
 
-	if (config.vars) {
+	if (options.includeVarsAsMembers !== false && config.vars) {
 		for (const key of Object.keys(config.vars)) {
 			lines.push(`${indent}${key}: string`)
 		}
@@ -325,7 +326,8 @@ export function generateBindingTypes(
 	discoveredDOs: DiscoveredDO[],
 	discoveredEntrypoints: DiscoveredEntrypoint[],
 	referencedConfigs: ReferencedConfig[],
-	cwd: string
+	cwd: string,
+	options: { configImportPath?: string } = {}
 ): string {
 	const doClassMap = new Map<string, { importPath: string; className: string }>()
 	for (const doInfo of discoveredDOs) {
@@ -392,6 +394,7 @@ export function generateBindingTypes(
 		'// Run `devflare types` to regenerate',
 		''
 	]
+	const hasConfigVars = Boolean(config.vars && Object.keys(config.vars).length > 0)
 
 	const hasLocalDOsWithClasses = Boolean(
 		config.bindings?.durableObjects
@@ -410,13 +413,21 @@ export function generateBindingTypes(
 		lines.push('')
 	}
 
+	if (hasConfigVars) {
+		const configImportPath = options.configImportPath ?? './devflare.config'
+		lines.push("import type { InferConfigVars } from 'devflare/config'")
+		lines.push(`type __DevflareConfigVars = InferConfigVars<Awaited<typeof import('${configImportPath}').default>>`)
+		lines.push('')
+	}
+
 	const { lines: bindingMembers, imports: serviceImports } = generateBindingMembers(
 		config,
 		doClassMap,
 		crossWorkerDOMap,
 		serviceBindingMap,
 		cwd,
-		'\t\t'
+		'\t\t',
+		{ includeVarsAsMembers: !hasConfigVars }
 	)
 	const uniqueImports = [...new Set(serviceImports)]
 	if (uniqueImports.length > 0) {
@@ -425,7 +436,12 @@ export function generateBindingTypes(
 	}
 
 	lines.push('declare global {')
-	lines.push('\tinterface DevflareEnv {')
+	if (hasConfigVars) {
+		lines.push('\tinterface DevflareVars extends __DevflareConfigVars {}')
+		lines.push('\tinterface DevflareEnv extends __DevflareConfigVars {')
+	} else {
+		lines.push('\tinterface DevflareEnv {')
+	}
 	lines.push(...bindingMembers)
 	lines.push('\t}')
 	lines.push('}')

@@ -11,7 +11,7 @@ import { DEFAULT_DO_PATTERN, DEFAULT_ENTRYPOINT_PATTERN } from '../../utils/glob
 import { discoverEntrypointsAsync, type DiscoveredEntrypoint } from '../../utils/entrypoint-discovery'
 import { resolveConfigCandidatePath } from '../config-path'
 import { bold, createCliTheme, dim } from '../ui'
-import { discoverDurableObjects, resolveReferencedConfigs } from './type-generation/discovery'
+import { discoverDurableObjects, generateImportPath, resolveReferencedConfigs } from './type-generation/discovery'
 import { generateBindingTypes } from './type-generation/generator'
 import type { DiscoveredDO } from './type-generation/models'
 
@@ -135,7 +135,8 @@ export async function runTypesCommand(
 			discoveredDOs,
 			discoveredEntrypoints,
 			referencedConfigs,
-			cwd
+			cwd,
+			{ configImportPath: generateImportPath(cwd, actualConfigPath) }
 		)
 
 		const { fs } = await getDependencies()

@@ -2,18 +2,17 @@
 // Config Loader — Load devflare.config.ts via c12
 // =============================================================================
 
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join, resolve } from 'pathe'
 import { applyFrameworkConfigProviders } from './framework-providers'
 import { configSchema, type DevflareConfig } from './schema'
+import { loadDevflareDotenvIntoProcess } from './env-vars'
 
 type C12LoadConfig = typeof import('c12')['loadConfig']
-type C12SetupDotenv = typeof import('c12')['setupDotenv']
 
 interface ResolvedC12Module {
 	loadConfig: C12LoadConfig
-	setupDotenv: C12SetupDotenv
 }
 
 /**
@@ -48,56 +47,14 @@ function resolveC12Module(cwd: string): ResolvedC12Module {
 	}
 }
 
-function hasWorkspacePackageJson(cwd: string): boolean {
-	const packageJsonPath = join(cwd, 'package.json')
-	if (!existsSync(packageJsonPath)) {
-		return false
+async function resolveConfigDotenvDirectory(cwd: string, configFile: string): Promise<string> {
+	const explicitConfigPath = resolve(cwd, configFile)
+	if (existsSync(explicitConfigPath)) {
+		return dirname(explicitConfigPath)
 	}
 
-	try {
-		const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8')) as {
-			workspaces?: unknown
-		}
-
-		return packageJson.workspaces !== undefined
-	} catch {
-		return false
-	}
-}
-
-function resolveWorkspaceDotenvDirectory(cwd: string): string | undefined {
-	let current = cwd
-	let nearestDotenvDirectory: string | undefined
-
-	while (true) {
-		if (existsSync(join(current, '.env'))) {
-			nearestDotenvDirectory ??= current
-
-			if (hasWorkspacePackageJson(current)) {
-				return current
-			}
-		}
-
-		const parent = dirname(current)
-		if (parent === current) {
-			return nearestDotenvDirectory
-		}
-
-		current = parent
-	}
-}
-
-async function loadWorkspaceDotenv(cwd: string, setupDotenv: C12SetupDotenv): Promise<void> {
-	const dotenvDirectory = resolveWorkspaceDotenvDirectory(cwd)
-	if (!dotenvDirectory) {
-		return
-	}
-
-	await setupDotenv({
-		cwd: dotenvDirectory,
-		fileName: '.env',
-		env: process.env
-	})
+	const discoveredConfigPath = await resolveConfigPath(cwd)
+	return discoveredConfigPath ? dirname(discoveredConfigPath) : cwd
 }
 
 /**
@@ -126,9 +83,9 @@ export async function resolveConfigPath(cwd: string): Promise<string | undefined
 export async function loadConfig(options: LoadConfigOptions = {}): Promise<DevflareConfig> {
 	const cwd = resolve(options.cwd ?? process.cwd())
 	const configFile = options.configFile ?? 'devflare.config'
-	const { loadConfig: c12LoadConfig, setupDotenv } = resolveC12Module(cwd)
+	const { loadConfig: c12LoadConfig } = resolveC12Module(cwd)
 
-	await loadWorkspaceDotenv(cwd, setupDotenv)
+	await loadDevflareDotenvIntoProcess(await resolveConfigDotenvDirectory(cwd, configFile))
 
 	// Resolve c12 from the target project so generated Vite configs and other
 	// repo-local Devflare entrypoints can still load app configs in CI where the

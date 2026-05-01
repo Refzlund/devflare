@@ -4,7 +4,8 @@
 //
 // Pins the public shape of the generated `env.d.ts` source: a global
 // `interface DevflareEnv` containing one typed member per binding from the
-// resolved devflare config. This is the contract relied on by:
+// resolved devflare config, plus typed config vars inferred from the user's
+// config. This is the contract relied on by:
 //   - src/env.ts                  (declares `interface DevflareEnv {}`)
 //   - src/test/simple-context.ts  (consumes DevflareEnv in test contexts)
 //   - src/runtime/exports.ts      (re-exports DevflareEnv to user code)
@@ -139,7 +140,12 @@ describe('generateBindingTypes — P1-codegen fixture', () => {
 
 	test('declares the DevflareEnv interface with one member per binding', () => {
 		expect(generated).toContain('declare global {')
-		expect(generated).toContain('interface DevflareEnv {')
+		expect(generated).toContain("import type { InferConfigVars } from 'devflare/config'")
+		expect(generated).toContain(
+			"type __DevflareConfigVars = InferConfigVars<Awaited<typeof import('./devflare.config').default>>"
+		)
+		expect(generated).toContain('interface DevflareVars extends __DevflareConfigVars {}')
+		expect(generated).toContain('interface DevflareEnv extends __DevflareConfigVars {')
 		expect(generated).toContain('MY_KV: KVNamespace')
 		expect(generated).toContain('MY_DB: D1Database')
 		expect(generated).toContain('MY_BUCKET: R2Bucket')
@@ -158,7 +164,6 @@ describe('generateBindingTypes — P1-codegen fixture', () => {
 		expect(generated).toContain('AI_SEARCH: AiSearchNamespace')
 		expect(generated).toContain('DOCS_SEARCH: AiSearchInstance')
 		expect(generated).toContain('MY_BROWSER: Fetcher')
-		expect(generated).toContain('MY_VAR: string')
 		expect(generated).toContain('MY_SECRET: string')
 	})
 

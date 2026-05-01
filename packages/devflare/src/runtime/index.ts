@@ -11,6 +11,7 @@
 // Request-scoped runtime proxies
 export {
 	env,
+	vars,
 	ctx,
 	event,
 	locals

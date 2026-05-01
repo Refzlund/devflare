@@ -5,6 +5,7 @@ import type { FileSystem } from '../dependencies'
 import {
 	compileBuildConfig,
 	loadConfig,
+	resolveConfigEnvVars,
 	resolveConfigForEnvironment,
 	type DevflareConfig
 } from '../../config'
@@ -402,7 +403,14 @@ export async function prepareBuildArtifacts(
 	const environment = parsed.options.env as string | undefined
 
 	const rawConfig = await loadConfig({ cwd, configFile: configPath })
-	const config = resolveConfigForEnvironment(rawConfig, environment)
+	const config = await resolveConfigEnvVars(
+		resolveConfigForEnvironment(rawConfig, environment),
+		{
+			cwd,
+			configPath,
+			mode: 'build'
+		}
+	)
 
 	logLine(logger, `Building: ${config.name}`)
 
@@ -534,7 +542,7 @@ export async function prepareBuildArtifacts(
 
 	// R2: emit a build manifest alongside the artefact so deploy can detect
 	// drift (config edits, version skew, target mismatch) before shipping.
-	const manifest = createBuildManifest(rawConfig, {
+	const manifest = createBuildManifest(config, {
 		devflareVersion: await getPackageVersion(),
 		intendedTarget: {
 			environment,

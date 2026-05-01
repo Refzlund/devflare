@@ -2,7 +2,24 @@
 // Config Module — Public exports
 // =============================================================================
 
-export { defineConfig } from './define'
+export { defineConfig, type DefineConfigInput, type TypedConfig } from './define'
+export {
+	env,
+	isEnvVarDescriptor,
+	loadDevflareDotenv,
+	loadDevflareDotenvIntoProcess,
+	parseDevflareEnvFile,
+	resolveConfigEnvVars,
+	EnvVarResolutionError,
+	EnvVarParseError,
+	type DevflareVarInput,
+	type DevflareVarsInput,
+	type EnvResolutionMode,
+	type EnvVarDescriptor,
+	type InferConfigVars,
+	type MissingEnvVar,
+	type ResolveConfigEnvVarsOptions
+} from './env-vars'
 export {
 	preview,
 	isPreviewScopedName,

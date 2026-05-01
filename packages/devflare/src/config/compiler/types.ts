@@ -140,7 +140,7 @@ export interface WranglerConfig {
 	}>
 
 	// Variables
-	vars?: Record<string, string>
+	vars?: Record<string, unknown>
 	secrets?: {
 		required?: string[]
 	}
