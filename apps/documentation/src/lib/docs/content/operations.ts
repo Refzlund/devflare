@@ -212,7 +212,7 @@ bunx --bun devflare account workers`
 					{
 						label: 'Tokens',
 						title: '`tokens`',
-						body: 'Creates, rolls, lists, and deletes Devflare-managed account-owned API tokens using a bootstrap token that already has token-management permissions. Cloudflare returns token secrets only once, so the first output matters.'
+						body: 'Creates, rolls, lists, and deletes Devflare-managed account-owned API tokens using a bootstrap token that already has token-management permissions. Created tokens include the selected account and all zones in that account so deploys can manage Worker route and custom-domain state. Cloudflare returns token secrets only once, so the first output matters.'
 					},
 					{
 						label: 'Pricing',

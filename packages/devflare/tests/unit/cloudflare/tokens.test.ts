@@ -45,21 +45,27 @@ describe('selectDevflarePermissionGroups', () => {
 		])
 	})
 
-	test('ignores matching permission names that are not account-scoped', () => {
+	test('keeps account and zone-scoped Devflare permission groups but excludes user-scoped matches', () => {
 		const selected = selectDevflarePermissionGroups([
 			{
-				id: 'workers-scripts-write-zone',
-				name: 'Workers Scripts Write',
+				id: 'workers-routes-write-zone',
+				name: 'Workers Routes Write',
 				scopes: ['com.cloudflare.api.account.zone']
 			},
 			{
 				id: 'workers-scripts-write-account',
 				name: 'Workers Scripts Write',
 				scopes: ['com.cloudflare.api.account']
+			},
+			{
+				id: 'workers-scripts-write-user',
+				name: 'Workers Scripts Write',
+				scopes: ['com.cloudflare.api.user']
 			}
 		])
 
 		expect(selected.map((group) => group.id)).toEqual([
+			'workers-routes-write-zone',
 			'workers-scripts-write-account'
 		])
 	})
@@ -89,6 +95,7 @@ describe('selectDevflarePermissionGroups', () => {
 				{ productName: 'R2', variants: ['Read', 'Write', 'Edit', 'Admin'] },
 				{ productName: 'D1', variants: ['Read', 'Write', 'Edit', 'Admin', 'Metadata Read'] },
 				{ productName: 'Workers Scripts', variants: ['Read', 'Write', 'Edit'] },
+				{ productName: 'Workers Routes', variants: ['Read', 'Write', 'Edit'] },
 				{ productName: 'Workers KV Storage', variants: ['Read', 'Write', 'Edit'] },
 				{ productName: 'Workers R2 Storage', variants: ['Read', 'Write', 'Edit', 'Bucket Item Read', 'Bucket Item Write'] },
 				{ productName: 'Queues', variants: ['Read', 'Write', 'Edit', 'Admin'] },
@@ -112,7 +119,11 @@ describe('selectDevflarePermissionGroups', () => {
 				return {
 					id: fullName.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
 					name: fullName,
-					scopes: ['com.cloudflare.api.account']
+					scopes: [
+						['Workers Routes', 'DNS', 'Cache Purge'].includes(productName)
+							? 'com.cloudflare.api.account.zone'
+							: 'com.cloudflare.api.account'
+					]
 				}
 			})
 		})
@@ -184,7 +195,7 @@ describe('selectDevflarePermissionGroups', () => {
 		])
 	})
 
-	test('keeps only account-scoped reusable permission groups for all-flags mode', () => {
+	test('keeps account and zone-scoped reusable permission groups for all-flags mode', () => {
 		const selected = selectAllReusablePermissionGroups([
 			{
 				id: 'workers-scripts-write-account',
@@ -210,17 +221,18 @@ describe('selectDevflarePermissionGroups', () => {
 
 		expect(selected.map((group) => group.id)).toEqual([
 			'workers-scripts-write-account',
+			'workers-scripts-write-zone',
 			'vectorize-write-account'
 		])
 	})
 
 	test('filters large mixed-scope permission catalogs below Cloudflare\'s limit', () => {
-		const accountScopedGroups = Array.from({ length: 299 }, (_, index) => ({
+		const accountScopedGroups = Array.from({ length: 200 }, (_, index) => ({
 			id: `account-${index + 1}`,
 			name: `Reusable Account Permission ${index + 1}`,
 			scopes: ['com.cloudflare.api.account']
 		}))
-		const zoneScopedGroups = Array.from({ length: 49 }, (_, index) => ({
+		const zoneScopedGroups = Array.from({ length: 99 }, (_, index) => ({
 			id: `zone-${index + 1}`,
 			name: `Reusable Zone Permission ${index + 1}`,
 			scopes: ['com.cloudflare.api.account.zone']
@@ -237,7 +249,8 @@ describe('selectDevflarePermissionGroups', () => {
 		])
 
 		expect(selected).toHaveLength(299)
-		expect(selected.every((group) => group.id.startsWith('account-'))).toBe(true)
+		expect(selected.filter((group) => group.id.startsWith('account-'))).toHaveLength(200)
+		expect(selected.filter((group) => group.id.startsWith('zone-'))).toHaveLength(99)
 	})
 
 	test('normalizes Devflare-managed token names to the devflare- prefix', () => {

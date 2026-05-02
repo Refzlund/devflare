@@ -20,6 +20,7 @@ const doService = ref(() => import('./do-service/devflare.config'))
 
 export default defineConfig({
 	name: 'case3-durable-objects',
+	compatibilityDate: '2026-04-26',
 
 	bindings: {
 		durableObjects: {

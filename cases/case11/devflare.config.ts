@@ -25,6 +25,7 @@ const doShared = ref(() => import('@devflare/case11-do-shared/devflare.config'))
 
 export default defineConfig({
 	name: 'case11-cross-package-do',
+	compatibilityDate: '2026-04-26',
 
 	bindings: {
 		durableObjects: {

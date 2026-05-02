@@ -2,6 +2,7 @@ import { defineConfig } from 'devflare/config'
 
 export default defineConfig({
 	name: 'do-service',
+	compatibilityDate: '2026-04-26',
 
 	files: {
 		// fetch.ts is at root (not in src/), so we must specify it

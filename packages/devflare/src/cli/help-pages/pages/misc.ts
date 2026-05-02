@@ -75,7 +75,7 @@ export const MISC_HELP_PAGES: HelpPage[] = [
 			entry('--delete [name]', 'Delete a Devflare-managed token by name'),
 			entry('--delete-all', 'Delete every Devflare-managed token in the selected account'),
 			entry('--account <id>', 'Use a specific Cloudflare account'),
-			entry('--all-flags', 'With `--new`, include every reusable account-scoped permission group')
+			entry('--all-flags', 'With `--new`, include every reusable account/zone-scoped permission group')
 		],
 		examples: [
 			entry('devflare tokens $BOOTSTRAP --list', 'List managed tokens'),
@@ -84,6 +84,7 @@ export const MISC_HELP_PAGES: HelpPage[] = [
 			entry('devflare tokens $BOOTSTRAP --delete-all', 'Delete every Devflare-managed token for the selected account')
 		],
 		notes: [
+			'Created tokens include the selected account resource and all zones in that account so deploys can manage Worker routes and custom-domain route state.',
 			'Cloudflare only returns token secrets once for create and roll operations, so store them immediately.'
 		]
 	},

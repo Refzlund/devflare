@@ -2,6 +2,7 @@ import { defineConfig } from 'devflare/config'
 
 export default defineConfig({
 	name: 'case6-queues-crons',
+	compatibilityDate: '2026-04-26',
 
 	bindings: {
 		queues: {

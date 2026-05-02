@@ -10,6 +10,7 @@ import type {
 const MAX_ACCOUNT_OWNED_TOKEN_PERMISSION_GROUPS = 300
 export const DEVFLARE_MANAGED_TOKEN_PREFIX = 'devflare-'
 const ACCOUNT_OWNED_TOKEN_SCOPE = 'com.cloudflare.api.account'
+const ACCOUNT_ZONE_OWNED_TOKEN_SCOPE = 'com.cloudflare.api.account.zone'
 
 const ACCOUNT_API_TOKENS_PERMISSION_GROUP_NAME_PATTERN = /^Account API Tokens\b/i
 const DEVFLARE_MANAGED_TOKEN_NAME_PATTERN = /^devflare-/i
@@ -199,7 +200,11 @@ function keepAccountOwnedTokenCompatiblePermissionGroups(
 	permissionGroups: AccountTokenPermissionGroup[]
 ): AccountTokenPermissionGroup[] {
 	return permissionGroups.filter((permissionGroup) => {
-		return permissionGroup.scopes.some((scope) => scope.trim() === ACCOUNT_OWNED_TOKEN_SCOPE)
+		return permissionGroup.scopes.some((scope) => {
+			const normalizedScope = scope.trim()
+			return normalizedScope === ACCOUNT_OWNED_TOKEN_SCOPE
+				|| normalizedScope === ACCOUNT_ZONE_OWNED_TOKEN_SCOPE
+		})
 	})
 }
 
@@ -316,7 +321,7 @@ export function selectAllReusablePermissionGroups(
 
 	if (selectedPermissionGroups.length === 0) {
 		throw new Error(
-			'Could not find any reusable account-scoped Cloudflare permission groups for this Devflare token.'
+			'Could not find any reusable account/zone-scoped Cloudflare permission groups for this Devflare token.'
 		)
 	}
 
@@ -393,7 +398,10 @@ export async function createAccountOwnedAPIToken(
 				{
 					effect: 'allow',
 					resources: {
-						[`com.cloudflare.api.account.${accountId}`]: '*'
+						[`com.cloudflare.api.account.${accountId}`]: {
+							'*': '*',
+							[`${ACCOUNT_ZONE_OWNED_TOKEN_SCOPE}.*`]: '*'
+						}
 					},
 					permission_groups: permissionGroupIds.map((id) => ({ id }))
 				}

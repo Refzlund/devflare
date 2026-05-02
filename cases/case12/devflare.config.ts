@@ -2,6 +2,7 @@ import { defineConfig } from 'devflare/config'
 
 export default defineConfig({
 	name: 'case12-email-handlers',
+	compatibilityDate: '2026-04-26',
 
 	bindings: {
 		// KV for storing processed emails

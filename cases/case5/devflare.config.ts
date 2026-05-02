@@ -6,6 +6,7 @@ const mathWorker = ref(() => import('./math-service/devflare.config'))
 
 export default defineConfig({
 	name: 'case5-gateway',
+	compatibilityDate: '2026-04-26',
 
 	bindings: {
 		// Service bindings to other workers (RPC-style)

@@ -5,6 +5,7 @@ import type { Entrypoints } from './env'
 // Run `devflare types` to generate the Entrypoints type in env.d.ts
 export default defineConfig<Entrypoints>({
 	name: 'math-worker',
+	compatibilityDate: '2026-04-26',
 
 	// worker.ts is at root (not in src/), so we must specify it
 	files: {

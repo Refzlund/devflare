@@ -4,6 +4,7 @@ const accountId = process.env.CLOUDFLARE_ACCOUNT_ID?.trim()
 
 export default defineConfig({
 	name: 'case15-ai-vectorize',
+	compatibilityDate: '2026-04-26',
 	accountId,
 
 	bindings: {

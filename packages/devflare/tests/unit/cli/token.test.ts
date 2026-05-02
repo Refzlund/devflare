@@ -93,6 +93,11 @@ describe('token command', () => {
 						scopes: ['com.cloudflare.api.account']
 					},
 					{
+						id: 'group-workers-routes',
+						name: 'Workers Routes Write',
+						scopes: ['com.cloudflare.api.account.zone']
+					},
+					{
 						id: 'group-nope',
 						name: 'Account WAF Write',
 						scopes: ['com.cloudflare.api.account']
@@ -127,7 +132,10 @@ describe('token command', () => {
 		const createRequest = requests.find((request) => request.method === 'POST')
 		const createRequestBody = JSON.parse(createRequest?.body ?? '{}') as {
 			name?: string
-			policies?: Array<{ permission_groups?: Array<{ id: string }> }>
+			policies?: Array<{
+				resources?: Record<string, unknown>
+				permission_groups?: Array<{ id: string }>
+			}>
 		}
 
 		expect(result.exitCode).toBe(0)
@@ -135,16 +143,23 @@ describe('token command', () => {
 		expect(requests).toHaveLength(3)
 		expect(requests.every((request) => request.authorization === 'Bearer bootstrap-token')).toBe(true)
 		expect(createRequestBody.name).toBe('devflare-custom')
+		expect(createRequestBody.policies?.[0]?.resources).toEqual({
+			'com.cloudflare.api.account.acc_123': {
+				'*': '*',
+				'com.cloudflare.api.account.zone.*': '*'
+			}
+		})
 		expect(createRequestBody.policies?.[0]?.permission_groups?.map((group) => group.id)).toEqual([
 			'group-workers',
-			'group-kv'
+			'group-kv',
+			'group-workers-routes'
 		])
 		expect(renderedMessages.some((message) => message.includes('Created devflare-custom'))).toBe(true)
-		expect(renderedMessages.some((message) => message.includes('Permission groups: 2 Devflare-relevant account-scoped selected from 3 available'))).toBe(true)
+		expect(renderedMessages.some((message) => message.includes('Permission groups: 3 Devflare-relevant account/zone-scoped selected from 4 available'))).toBe(true)
 		expect(renderedMessages.some((message) => message.includes('cfat_1234567890'))).toBe(true)
 	})
 
-	test('creates an all-flags token from reusable account-scoped permissions only', async () => {
+	test('creates an all-flags token from reusable account and zone-scoped permissions only', async () => {
 		const requests: RecordedTokenRequest[] = []
 		globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
 			const { url } = captureRecordedTokenRequest(requests, input, init)
@@ -211,18 +226,28 @@ describe('token command', () => {
 		const createRequest = requests.find((request) => request.method === 'POST')
 		const createRequestBody = JSON.parse(createRequest?.body ?? '{}') as {
 			name?: string
-			policies?: Array<{ permission_groups?: Array<{ id: string }> }>
+			policies?: Array<{
+				resources?: Record<string, unknown>
+				permission_groups?: Array<{ id: string }>
+			}>
 		}
 
 		expect(result.exitCode).toBe(0)
 		expect(result.output).toBe('cfat_all_flags')
 		expect(createRequestBody.name).toBe('devflare-everything')
+		expect(createRequestBody.policies?.[0]?.resources).toEqual({
+			'com.cloudflare.api.account.acc_123': {
+				'*': '*',
+				'com.cloudflare.api.account.zone.*': '*'
+			}
+		})
 		expect(createRequestBody.policies?.[0]?.permission_groups?.map((group) => group.id)).toEqual([
 			'group-workers-account',
-			'group-queues-account'
+			'group-queues-account',
+			'group-workers-zone'
 		])
-		expect(renderedMessages.some((message) => message.includes('Permission groups: 2 reusable account-scoped selected from 5 available'))).toBe(true)
-		expect(renderedMessages.some((message) => message.includes('zone/user-scoped groups are skipped automatically'))).toBe(true)
+		expect(renderedMessages.some((message) => message.includes('Permission groups: 3 reusable account/zone-scoped selected from 5 available'))).toBe(true)
+		expect(renderedMessages.some((message) => message.includes('user-scoped groups are skipped automatically'))).toBe(true)
 		expect(renderedMessages.some((message) => message.includes('Account API Tokens permissions are still excluded'))).toBe(true)
 	})
 

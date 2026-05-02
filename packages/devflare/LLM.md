@@ -6117,7 +6117,7 @@ That split matters because production inspection and production mutation are not
 ##### Highlights
 
 - **`worker rename`** — Renames the remote Worker when needed, updates the matching local config name when it can resolve that config safely, warns about remaining local references, and may leave existing preview URLs showing the old worker name until fresh preview uploads exist.
-- **`tokens`** — Creates, rolls, lists, and deletes Devflare-managed account-owned API tokens using a bootstrap token that already has token-management permissions. Cloudflare returns token secrets only once, so the first output matters.
+- **`tokens`** — Creates, rolls, lists, and deletes Devflare-managed account-owned API tokens using a bootstrap token that already has token-management permissions. Created tokens include the selected account and all zones in that account so deploys can manage Worker route and custom-domain state. Cloudflare returns token secrets only once, so the first output matters.
 - **`ai`** — Prints the built-in Workers AI pricing snapshot bundled with the current Devflare build. It is a reference command, not a live account-state query, so confirm current rates in Cloudflare docs when the numbers matter.
 
 ##### Key points

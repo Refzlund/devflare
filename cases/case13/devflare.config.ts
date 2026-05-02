@@ -2,6 +2,7 @@ import { defineConfig } from 'devflare/config'
 
 export default defineConfig({
 	name: 'case13-tail-workers',
+	compatibilityDate: '2026-04-26',
 
 	// This case calls src/tail.ts directly in tests while tail helper wiring
 	// remains a manual/advanced path.

@@ -75,6 +75,7 @@ function virtualModulesPlugin(): Plugin {
 
 export default defineConfig({
 	name: 'case17-rolldown-plugin',
+	compatibilityDate: '2026-04-26',
 
 	vite: {
 		plugins: [

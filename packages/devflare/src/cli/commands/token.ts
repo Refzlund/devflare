@@ -26,7 +26,7 @@ const TOKEN_OPERATION_SUMMARY_LINES = [
 	'--roll [name]      Roll a Devflare-managed account-owned token secret',
 	'--delete [name]    Delete a Devflare-managed account-owned token',
 	'--delete-all       Delete every Devflare-managed account-owned token',
-	'--all-flags        With --new, include every reusable account-scoped permission group'
+	'--all-flags        With --new, include every reusable account/zone-scoped permission group'
 ] as const
 
 type TokenOperation =
@@ -324,13 +324,13 @@ async function createManagedToken(
 	logger.success(`Created ${createdToken.name || tokenName}`)
 	logLine(
 		logger,
-		`${dim('Permission groups:', theme)} ${selectedPermissionGroups.length} ${includeAllFlags ? 'reusable account-scoped' : 'Devflare-relevant account-scoped'} selected from ${permissionGroups.length} available`
+		`${dim('Permission groups:', theme)} ${selectedPermissionGroups.length} ${includeAllFlags ? 'reusable account/zone-scoped' : 'Devflare-relevant account/zone-scoped'} selected from ${permissionGroups.length} available`
 	)
 	if (includeAllFlags) {
 		logLine(
 			logger,
 			dim(
-				'Account-owned tokens only accept account-scoped permission groups, so zone/user-scoped groups are skipped automatically.',
+				'Account-owned Devflare tokens include account resources plus all zones in the account; user-scoped groups are skipped automatically.',
 				theme
 			)
 		)
