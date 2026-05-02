@@ -60,7 +60,8 @@
 	"scripts": {
 		"llm:generate": "bun ./scripts/generate-llm.ts",
 		"refresh-permission-groups": "bun ./scripts/refresh-permission-groups.ts",
-		"build": "bun build ./src/index.ts ./src/browser.ts ./src/config-entry.ts ./src/cli/index.ts ./src/runtime/index.ts ./src/test/index.ts ./src/vite/index.ts ./src/sveltekit/index.ts ./src/cloudflare/index.ts ./src/decorators/index.ts ./src/utils/send-email.ts --root ./src --outdir ./dist --splitting --target node --packages=external && tsgo --declaration --emitDeclarationOnly --noEmit false --outDir ./dist",
+		"clean:dist": "bun ./scripts/clean-dist.ts",
+		"build": "bun run clean:dist && bun build ./src/index.ts ./src/browser.ts ./src/config-entry.ts ./src/cli/index.ts ./src/runtime/index.ts ./src/test/index.ts ./src/vite/index.ts ./src/sveltekit/index.ts ./src/cloudflare/index.ts ./src/decorators/index.ts ./src/utils/send-email.ts --root ./src --outdir ./dist --splitting --target node --packages=external && tsgo --declaration --emitDeclarationOnly --noEmit false --outDir ./dist",
 		"dev": "bun --watch ./src/cli/index.ts",
 		"prepack": "bun run llm:generate",
 		"test": "bun run test:unit && bun run test:integration:control && bun run test:integration:bridge && bun run test:integration:test-context && bun run test:integration:dev-server",
