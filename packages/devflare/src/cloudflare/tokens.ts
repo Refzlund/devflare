@@ -169,6 +169,14 @@ interface RawAccountOwnedAPIToken {
 	policies?: RawAccountOwnedAPITokenPolicy[]
 }
 
+interface AccountOwnedAPITokenCreatePolicy {
+	effect: 'allow'
+	resources: Record<string, unknown>
+	permission_groups: Array<{ id: string }>
+}
+
+type ScopedPermissionGroup = Pick<AccountTokenPermissionGroup, 'id' | 'scopes'>
+
 function dedupePermissionGroups(
 	permissionGroups: AccountTokenPermissionGroup[]
 ): AccountTokenPermissionGroup[] {
@@ -186,6 +194,91 @@ function dedupePermissionGroups(
 
 function dedupePermissionGroupIds(permissionGroupIds: string[]): string[] {
 	return Array.from(new Set(permissionGroupIds.map((id) => id.trim()).filter(Boolean)))
+}
+
+function dedupeScopedPermissionGroups(
+	permissionGroups: ScopedPermissionGroup[]
+): ScopedPermissionGroup[] {
+	const seenIds = new Set<string>()
+
+	return permissionGroups.filter((permissionGroup) => {
+		const id = permissionGroup.id.trim()
+		if (!id || seenIds.has(id)) {
+			return false
+		}
+
+		seenIds.add(id)
+		return true
+	})
+}
+
+function permissionGroupHasScope(
+	permissionGroup: ScopedPermissionGroup,
+	scope: string
+): boolean {
+	return permissionGroup.scopes.some((value) => value.trim() === scope)
+}
+
+function buildCreateTokenPoliciesFromPermissionGroups(
+	accountId: string,
+	permissionGroups: ScopedPermissionGroup[]
+): AccountOwnedAPITokenCreatePolicy[] {
+	const dedupedPermissionGroups = dedupeScopedPermissionGroups(permissionGroups)
+	const accountPermissionGroupIds = dedupePermissionGroupIds(
+		dedupedPermissionGroups
+			.filter((permissionGroup) => permissionGroupHasScope(permissionGroup, ACCOUNT_OWNED_TOKEN_SCOPE))
+			.map((permissionGroup) => permissionGroup.id)
+	)
+	const zonePermissionGroupIds = dedupePermissionGroupIds(
+		dedupedPermissionGroups
+			.filter((permissionGroup) => permissionGroupHasScope(permissionGroup, ACCOUNT_ZONE_OWNED_TOKEN_SCOPE))
+			.map((permissionGroup) => permissionGroup.id)
+	)
+	const policies: AccountOwnedAPITokenCreatePolicy[] = []
+
+	if (accountPermissionGroupIds.length > 0) {
+		policies.push({
+			effect: 'allow',
+			resources: {
+				[`com.cloudflare.api.account.${accountId}`]: '*'
+			},
+			permission_groups: accountPermissionGroupIds.map((id) => ({ id }))
+		})
+	}
+
+	if (zonePermissionGroupIds.length > 0) {
+		policies.push({
+			effect: 'allow',
+			resources: {
+				[`com.cloudflare.api.account.${accountId}`]: {
+					[`${ACCOUNT_ZONE_OWNED_TOKEN_SCOPE}.*`]: '*'
+				}
+			},
+			permission_groups: zonePermissionGroupIds.map((id) => ({ id }))
+		})
+	}
+
+	return policies
+}
+
+function buildCreateTokenPoliciesFromPermissionGroupIds(
+	accountId: string,
+	permissionGroupIds: string[]
+): AccountOwnedAPITokenCreatePolicy[] {
+	const dedupedPermissionGroupIds = dedupePermissionGroupIds(permissionGroupIds)
+	if (dedupedPermissionGroupIds.length === 0) {
+		return []
+	}
+
+	return [
+		{
+			effect: 'allow',
+			resources: {
+				[`com.cloudflare.api.account.${accountId}`]: '*'
+			},
+			permission_groups: dedupedPermissionGroupIds.map((id) => ({ id }))
+		}
+	]
 }
 
 function excludeAccountApiTokensPermissionGroups(
@@ -374,11 +467,16 @@ export async function createAccountOwnedAPIToken(
 	accountId: string,
 	options: {
 		name: string
-		permissionGroupIds: string[]
+		permissionGroupIds?: string[]
+		permissionGroups?: ScopedPermissionGroup[]
 	},
 	clientOptions?: APIClientOptions
 ): Promise<AccountOwnedAPIToken> {
-	const permissionGroupIds = dedupePermissionGroupIds(options.permissionGroupIds)
+	const permissionGroupIds = dedupePermissionGroupIds(
+		options.permissionGroups?.map((permissionGroup) => permissionGroup.id)
+			?? options.permissionGroupIds
+			?? []
+	)
 
 	if (permissionGroupIds.length === 0) {
 		throw new Error('Cannot create a Devflare token without any permission groups')
@@ -390,22 +488,19 @@ export async function createAccountOwnedAPIToken(
 		)
 	}
 
+	const policies = options.permissionGroups
+		? buildCreateTokenPoliciesFromPermissionGroups(accountId, options.permissionGroups)
+		: buildCreateTokenPoliciesFromPermissionGroupIds(accountId, permissionGroupIds)
+
+	if (policies.length === 0) {
+		throw new Error('Cannot create a Devflare token without any account- or zone-scoped permission groups')
+	}
+
 	const createdToken = await apiPost<RawAccountOwnedAPIToken>(
 		`/accounts/${accountId}/tokens`,
 		{
 			name: options.name,
-			policies: [
-				{
-					effect: 'allow',
-					resources: {
-						[`com.cloudflare.api.account.${accountId}`]: {
-							'*': '*',
-							[`${ACCOUNT_ZONE_OWNED_TOKEN_SCOPE}.*`]: '*'
-						}
-					},
-					permission_groups: permissionGroupIds.map((id) => ({ id }))
-				}
-			]
+			policies
 		},
 		clientOptions
 	)

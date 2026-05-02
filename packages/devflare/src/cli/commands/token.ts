@@ -308,7 +308,7 @@ async function createManagedToken(
 		accountId,
 		{
 			name: tokenName,
-			permissionGroupIds: selectedPermissionGroups.map((group) => group.id)
+			permissionGroups: selectedPermissionGroups
 		},
 		{
 			...CLI_API_OPTIONS,

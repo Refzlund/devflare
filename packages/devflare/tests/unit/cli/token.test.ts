@@ -143,16 +143,28 @@ describe('token command', () => {
 		expect(requests).toHaveLength(3)
 		expect(requests.every((request) => request.authorization === 'Bearer bootstrap-token')).toBe(true)
 		expect(createRequestBody.name).toBe('devflare-custom')
-		expect(createRequestBody.policies?.[0]?.resources).toEqual({
-			'com.cloudflare.api.account.acc_123': {
-				'*': '*',
-				'com.cloudflare.api.account.zone.*': '*'
+		expect(createRequestBody.policies).toEqual([
+			{
+				effect: 'allow',
+				resources: {
+					'com.cloudflare.api.account.acc_123': '*'
+				},
+				permission_groups: [
+					{ id: 'group-workers' },
+					{ id: 'group-kv' }
+				]
+			},
+			{
+				effect: 'allow',
+				resources: {
+					'com.cloudflare.api.account.acc_123': {
+						'com.cloudflare.api.account.zone.*': '*'
+					}
+				},
+				permission_groups: [
+					{ id: 'group-workers-routes' }
+				]
 			}
-		})
-		expect(createRequestBody.policies?.[0]?.permission_groups?.map((group) => group.id)).toEqual([
-			'group-workers',
-			'group-kv',
-			'group-workers-routes'
 		])
 		expect(renderedMessages.some((message) => message.includes('Created devflare-custom'))).toBe(true)
 		expect(renderedMessages.some((message) => message.includes('Permission groups: 3 Devflare-relevant account/zone-scoped selected from 4 available'))).toBe(true)
@@ -235,16 +247,28 @@ describe('token command', () => {
 		expect(result.exitCode).toBe(0)
 		expect(result.output).toBe('cfat_all_flags')
 		expect(createRequestBody.name).toBe('devflare-everything')
-		expect(createRequestBody.policies?.[0]?.resources).toEqual({
-			'com.cloudflare.api.account.acc_123': {
-				'*': '*',
-				'com.cloudflare.api.account.zone.*': '*'
+		expect(createRequestBody.policies).toEqual([
+			{
+				effect: 'allow',
+				resources: {
+					'com.cloudflare.api.account.acc_123': '*'
+				},
+				permission_groups: [
+					{ id: 'group-workers-account' },
+					{ id: 'group-queues-account' }
+				]
+			},
+			{
+				effect: 'allow',
+				resources: {
+					'com.cloudflare.api.account.acc_123': {
+						'com.cloudflare.api.account.zone.*': '*'
+					}
+				},
+				permission_groups: [
+					{ id: 'group-workers-zone' }
+				]
 			}
-		})
-		expect(createRequestBody.policies?.[0]?.permission_groups?.map((group) => group.id)).toEqual([
-			'group-workers-account',
-			'group-queues-account',
-			'group-workers-zone'
 		])
 		expect(renderedMessages.some((message) => message.includes('Permission groups: 3 reusable account/zone-scoped selected from 5 available'))).toBe(true)
 		expect(renderedMessages.some((message) => message.includes('user-scoped groups are skipped automatically'))).toBe(true)
