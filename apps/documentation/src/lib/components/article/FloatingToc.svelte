@@ -21,7 +21,6 @@
 	const SAFE_GAP = 24
 	const MIN_CONTENT_LEFT = 24
 	const SIDEBAR_SAFE_GAP = 32
-	const MAX_CONTENT_OFFSET = 260
 	const MIN_TOC_VIEWPORT_WIDTH = 760
 
 	type TitleMetrics = {
@@ -153,19 +152,8 @@
 		return Math.max(MIN_CONTENT_LEFT, sidebarRect.right + SIDEBAR_SAFE_GAP)
 	}
 
-	function getMaxContentOffset(contentRect: DOMRect): number {
-		return Math.max(
-			0,
-			Math.min(MAX_CONTENT_OFFSET, contentRect.left - getMinContentLeft())
-		)
-	}
-
-	function getAvailableSpace(tocRightX: number, contentRight: number, nextContentOffset: number): number {
-		return tocRightX - SAFE_GAP - (contentRight + nextContentOffset)
-	}
-
-	function getCenteredRailOffset(tocRightX: number, contentRect: DOMRect): number | null {
-		const railLeft = tocRightX - COLLAPSED_WIDTH
+	function getCenteredContentOffset(tocRightX: number, contentRect: DOMRect, tocWidth: number): number | null {
+		const railLeft = tocRightX - tocWidth
 		const laneLeft = getMinContentLeft()
 		const laneRight = railLeft - SAFE_GAP
 		const laneWidth = laneRight - laneLeft
@@ -271,29 +259,22 @@
 		const tocRightX = getTocRightX()
 		const titleMetrics = await measureTitleMetrics()
 		const fullTitleWidth = Math.max(MIN_DESKTOP_TITLE_WIDTH, titleMetrics.naturalWidth)
-		const availableSpace = getAvailableSpace(tocRightX, contentRect.right, 0)
-		const maxReadableOffset = getMaxContentOffset(contentRect)
-		const maxTitleWidthWithOffset = Math.min(
+		const preferredTitleWidth = Math.min(
 			fullTitleWidth,
-			availableSpace + maxReadableOffset - COLLAPSED_WIDTH
+			Math.max(titleMetrics.readableWidth, PREFERRED_TEXT_TITLE_WIDTH)
 		)
 
-		if (maxTitleWidthWithOffset >= titleMetrics.readableWidth) {
-			const preferredTitleWidth = Math.min(
-				fullTitleWidth,
-				maxTitleWidthWithOffset,
-				Math.max(titleMetrics.readableWidth, PREFERRED_TEXT_TITLE_WIDTH)
-			)
-			const requiredWidth = COLLAPSED_WIDTH + preferredTitleWidth
-			const neededOffset = Math.max(0, requiredWidth - availableSpace)
-			const nextContentOffset = -Math.min(maxReadableOffset, neededOffset)
-			const nextAvailableSpace = getAvailableSpace(tocRightX, contentRect.right, nextContentOffset)
-			const nextTitleWidth = Math.min(
-				fullTitleWidth,
-				Math.max(titleMetrics.readableWidth, nextAvailableSpace - COLLAPSED_WIDTH)
-			)
+		for (let nextTitleWidth = preferredTitleWidth; nextTitleWidth >= titleMetrics.readableWidth; nextTitleWidth -= 8) {
+			if (titleMetrics.lineCountAt(nextTitleWidth) > MAX_READABLE_TITLE_LINES) {
+				continue
+			}
 
-			if (titleMetrics.lineCountAt(nextTitleWidth) <= MAX_READABLE_TITLE_LINES) {
+			const nextContentOffset = getCenteredContentOffset(
+				tocRightX,
+				contentRect,
+				COLLAPSED_WIDTH + nextTitleWidth
+			)
+			if (nextContentOffset !== null) {
 				applyLayout(
 					Math.abs(nextTitleWidth - fullTitleWidth) <= 2 ? 'full' : 'narrow',
 					nextTitleWidth,
@@ -303,7 +284,7 @@
 			}
 		}
 
-		const railOffset = getCenteredRailOffset(tocRightX, contentRect)
+		const railOffset = getCenteredContentOffset(tocRightX, contentRect, COLLAPSED_WIDTH)
 		if (railOffset !== null) {
 			applyLayout(
 				'numbers',
