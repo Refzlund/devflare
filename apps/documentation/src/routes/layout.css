@@ -627,6 +627,7 @@ pre {
 	box-shadow: var(--docs-shadow-soft);
 	-webkit-backdrop-filter: blur(12px);
 	backdrop-filter: blur(12px);
+	z-index: 40;
 }
 
 .docs-floating-toc-list {
@@ -707,8 +708,31 @@ pre {
 }
 
 .docs-floating-toc-numbers:not(:hover):not(:focus-within):not(.docs-floating-toc-pinned)
+	.docs-floating-toc-list {
+	gap: 0.08rem;
+}
+
+.docs-floating-toc-numbers:not(:hover):not(:focus-within):not(.docs-floating-toc-pinned)
 	.docs-floating-toc-link {
+	align-items: center;
 	border-left-color: transparent;
+	display: flex;
+	justify-content: center;
+	min-block-size: 1.7rem;
+	padding: 0.18rem 0.35rem;
+}
+
+.docs-floating-toc-numbers:not(:hover):not(:focus-within):not(.docs-floating-toc-pinned)
+	.docs-floating-toc-title-shell {
+	display: none;
+}
+
+.docs-floating-toc-numbers:not(:hover):not(:focus-within):not(.docs-floating-toc-pinned)
+	.docs-floating-toc-index {
+	inline-size: auto;
+	line-height: 1.2rem;
+	min-inline-size: 0;
+	text-align: center;
 }
 
 .docs-floating-toc-numbers:not(:hover):not(:focus-within):not(.docs-floating-toc-pinned)

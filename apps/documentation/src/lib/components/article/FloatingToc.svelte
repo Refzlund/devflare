@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte'
-	import { loadPretext, type PretextModule } from '../../vendor/pretext'
+	import { loadPretext, type PreparedText, type PretextModule } from '../../vendor/pretext'
 	import InlineText from '../content/InlineText.svelte'
 
 	type TocItem = {
@@ -11,17 +11,24 @@
 
 	type TocMode = 'full' | 'narrow' | 'numbers' | 'hidden'
 
-	const COLLAPSED_WIDTH = 56
-	const MIN_NARROW_TITLE_WIDTH = 112
+	const COLLAPSED_WIDTH = 48
 	const MIN_DESKTOP_TITLE_WIDTH = 168
-	const MIN_HOVER_TITLE_WIDTH = 104
-	const MIN_RAIL_HOVER_TITLE_WIDTH = 48
+	const MIN_READABLE_TITLE_WIDTH = 220
+	const PREFERRED_TEXT_TITLE_WIDTH = 320
+	const HOVER_TITLE_WIDTH = 320
 	const MAX_TITLE_WIDTH = 440
+	const MAX_READABLE_TITLE_LINES = 2
 	const SAFE_GAP = 24
 	const MIN_CONTENT_LEFT = 24
 	const SIDEBAR_SAFE_GAP = 32
 	const MAX_CONTENT_OFFSET = 260
 	const MIN_TOC_VIEWPORT_WIDTH = 760
+
+	type TitleMetrics = {
+		naturalWidth: number
+		readableWidth: number
+		lineCountAt: (width: number) => number
+	}
 
 	let {
 		items,
@@ -100,14 +107,28 @@
 		return window.innerWidth - 16
 	}
 
+	function getElementTranslateX(element: HTMLElement): number {
+		const transform = window.getComputedStyle(element).transform
+		if (!transform || transform === 'none') {
+			return 0
+		}
+
+		try {
+			return new DOMMatrixReadOnly(transform).m41
+		} catch {
+			return 0
+		}
+	}
+
 	function getBaseContentRect(): DOMRect | null {
 		if (!contentElement) {
 			return null
 		}
 
 		const rect = contentElement.getBoundingClientRect()
+		const translateX = getElementTranslateX(contentElement)
 		return new DOMRect(
-			rect.left - contentOffset,
+			rect.left - translateX,
 			rect.top,
 			rect.width,
 			rect.height
@@ -143,49 +164,35 @@
 		return tocRightX - SAFE_GAP - (contentRight + nextContentOffset)
 	}
 
-	function resolveOffsetForWidth(
-		tocRightX: number,
-		contentRect: DOMRect,
-		requiredWidth: number
-	): number | null {
-		const availableSpace = getAvailableSpace(tocRightX, contentRect.right, 0)
-		if (availableSpace >= requiredWidth) {
-			return 0
-		}
-
-		const neededOffset = requiredWidth - availableSpace
-		const maxOffset = getMaxContentOffset(contentRect)
-		if (neededOffset <= maxOffset) {
-			return -neededOffset
-		}
-
-		return null
-	}
-
-	function resolveOffsetForPreferredWidth(
-		tocRightX: number,
-		contentRect: DOMRect,
-		requiredWidth: number,
-		preferredWidth: number
-	): number | null {
-		const availableSpace = getAvailableSpace(tocRightX, contentRect.right, 0)
-		const maxOffset = getMaxContentOffset(contentRect)
-		if (availableSpace + maxOffset < requiredWidth) {
+	function getCenteredRailOffset(tocRightX: number, contentRect: DOMRect): number | null {
+		const railLeft = tocRightX - COLLAPSED_WIDTH
+		const laneLeft = getMinContentLeft()
+		const laneRight = railLeft - SAFE_GAP
+		const laneWidth = laneRight - laneLeft
+		if (laneWidth < contentRect.width) {
 			return null
 		}
 
-		const desiredOffset = Math.max(0, preferredWidth - availableSpace)
-		return -Math.min(maxOffset, desiredOffset)
+		const targetLeft = laneLeft + ((laneWidth - contentRect.width) / 2)
+		return Math.round(targetLeft - contentRect.left)
 	}
 
-	async function measureNaturalTitleWidth(): Promise<number> {
+	async function measureTitleMetrics(): Promise<TitleMetrics> {
 		if (!tocElement) {
-			return MIN_DESKTOP_TITLE_WIDTH
+			return {
+				naturalWidth: MIN_DESKTOP_TITLE_WIDTH,
+				readableWidth: MIN_READABLE_TITLE_WIDTH,
+				lineCountAt: () => 1
+			}
 		}
 
 		const styleSource = tocElement.querySelector<HTMLElement>('[data-docs-toc-title]')
 		if (!styleSource) {
-			return MIN_DESKTOP_TITLE_WIDTH
+			return {
+				naturalWidth: MIN_DESKTOP_TITLE_WIDTH,
+				readableWidth: MIN_READABLE_TITLE_WIDTH,
+				lineCountAt: () => 1
+			}
 		}
 
 		const titleTexts = Array.from(
@@ -195,13 +202,21 @@
 			.filter((title) => title.length > 0)
 
 		if (titleTexts.length === 0) {
-			return MIN_DESKTOP_TITLE_WIDTH
+			return {
+				naturalWidth: MIN_DESKTOP_TITLE_WIDTH,
+				readableWidth: MIN_READABLE_TITLE_WIDTH,
+				lineCountAt: () => 1
+			}
 		}
 
 		const computedStyle = window.getComputedStyle(styleSource)
 		const font = computedStyle.font || `${computedStyle.fontWeight} ${computedStyle.fontSize} ${computedStyle.fontFamily}`
 		if (!font) {
-			return MIN_DESKTOP_TITLE_WIDTH
+			return {
+				naturalWidth: MIN_DESKTOP_TITLE_WIDTH,
+				readableWidth: MIN_READABLE_TITLE_WIDTH,
+				lineCountAt: () => 1
+			}
 		}
 
 		const documentWithFonts = document as Document & { fonts?: FontFaceSet }
@@ -209,15 +224,37 @@
 			await documentWithFonts.fonts.ready
 		}
 
-		const { measureNaturalWidth, prepareWithSegments } = await getPretextModule()
+		const lineHeight = Number.parseFloat(computedStyle.lineHeight)
+			|| Number.parseFloat(computedStyle.fontSize) * 1.55
+		const { layout, measureNaturalWidth, prepare, prepareWithSegments } = await getPretextModule()
+		const preparedTitles: PreparedText[] = []
 		let nextTitleWidth = MIN_DESKTOP_TITLE_WIDTH
 
 		for (const titleText of titleTexts) {
+			preparedTitles.push(prepare(titleText, font))
 			const prepared = prepareWithSegments(titleText, font)
 			nextTitleWidth = Math.max(nextTitleWidth, Math.ceil(measureNaturalWidth(prepared) + 18))
 		}
 
-		return Math.min(nextTitleWidth, MAX_TITLE_WIDTH)
+		const naturalWidth = Math.min(nextTitleWidth, MAX_TITLE_WIDTH)
+		const lineCountAt = (width: number) => Math.max(
+			1,
+			...preparedTitles.map((prepared) => layout(prepared, Math.max(1, width), lineHeight).lineCount)
+		)
+		let readableWidth = Math.min(naturalWidth, PREFERRED_TEXT_TITLE_WIDTH)
+
+		for (let width = MIN_READABLE_TITLE_WIDTH; width <= naturalWidth; width += 8) {
+			if (lineCountAt(width) <= MAX_READABLE_TITLE_LINES) {
+				readableWidth = width
+				break
+			}
+		}
+
+		return {
+			naturalWidth,
+			readableWidth,
+			lineCountAt
+		}
 	}
 
 	async function updateResponsiveLayout(): Promise<void> {
@@ -232,44 +269,45 @@
 		}
 
 		const tocRightX = getTocRightX()
-		const naturalTitleWidth = await measureNaturalTitleWidth()
-		const fullTitleWidth = Math.max(MIN_DESKTOP_TITLE_WIDTH, naturalTitleWidth)
-		const fullWidth = COLLAPSED_WIDTH + fullTitleWidth
+		const titleMetrics = await measureTitleMetrics()
+		const fullTitleWidth = Math.max(MIN_DESKTOP_TITLE_WIDTH, titleMetrics.naturalWidth)
+		const availableSpace = getAvailableSpace(tocRightX, contentRect.right, 0)
+		const maxReadableOffset = getMaxContentOffset(contentRect)
+		const maxTitleWidthWithOffset = Math.min(
+			fullTitleWidth,
+			availableSpace + maxReadableOffset - COLLAPSED_WIDTH
+		)
 
-		const fullOffset = resolveOffsetForWidth(tocRightX, contentRect, fullWidth)
-		if (fullOffset !== null) {
-			applyLayout('full', fullTitleWidth, fullOffset)
-			return
-		}
-
-		const minNarrowWidth = COLLAPSED_WIDTH + MIN_NARROW_TITLE_WIDTH
-		const narrowOffset = resolveOffsetForWidth(tocRightX, contentRect, minNarrowWidth)
-		if (narrowOffset !== null) {
-			const availableSpace = getAvailableSpace(tocRightX, contentRect.right, narrowOffset)
+		if (maxTitleWidthWithOffset >= titleMetrics.readableWidth) {
+			const preferredTitleWidth = Math.min(
+				fullTitleWidth,
+				maxTitleWidthWithOffset,
+				Math.max(titleMetrics.readableWidth, PREFERRED_TEXT_TITLE_WIDTH)
+			)
+			const requiredWidth = COLLAPSED_WIDTH + preferredTitleWidth
+			const neededOffset = Math.max(0, requiredWidth - availableSpace)
+			const nextContentOffset = -Math.min(maxReadableOffset, neededOffset)
+			const nextAvailableSpace = getAvailableSpace(tocRightX, contentRect.right, nextContentOffset)
 			const nextTitleWidth = Math.min(
 				fullTitleWidth,
-				Math.max(MIN_NARROW_TITLE_WIDTH, availableSpace - COLLAPSED_WIDTH)
+				Math.max(titleMetrics.readableWidth, nextAvailableSpace - COLLAPSED_WIDTH)
 			)
-			applyLayout('narrow', nextTitleWidth, narrowOffset)
-			return
+
+			if (titleMetrics.lineCountAt(nextTitleWidth) <= MAX_READABLE_TITLE_LINES) {
+				applyLayout(
+					Math.abs(nextTitleWidth - fullTitleWidth) <= 2 ? 'full' : 'narrow',
+					nextTitleWidth,
+					nextContentOffset
+				)
+				return
+			}
 		}
 
-		const preferredRailWidth = Math.min(fullWidth, COLLAPSED_WIDTH + MIN_HOVER_TITLE_WIDTH)
-		const railOffset = resolveOffsetForPreferredWidth(
-			tocRightX,
-			contentRect,
-			COLLAPSED_WIDTH,
-			preferredRailWidth
-		)
+		const railOffset = getCenteredRailOffset(tocRightX, contentRect)
 		if (railOffset !== null) {
-			const availableSpace = getAvailableSpace(tocRightX, contentRect.right, railOffset)
-			const hoverTitleWidth = Math.min(
-				fullTitleWidth,
-				Math.max(0, availableSpace - COLLAPSED_WIDTH)
-			)
 			applyLayout(
-				hoverTitleWidth >= MIN_RAIL_HOVER_TITLE_WIDTH ? 'numbers' : 'hidden',
-				hoverTitleWidth,
+				'numbers',
+				Math.min(fullTitleWidth, HOVER_TITLE_WIDTH),
 				railOffset
 			)
 			return
@@ -354,25 +392,6 @@
 		}
 
 		void tick().then(() => updateResponsiveLayout())
-	})
-
-	$effect(() => {
-		if (!hasMounted) {
-			return
-		}
-
-		const resizeObserver = new ResizeObserver(() => scheduleLayoutUpdate())
-		if (contentElement) {
-			resizeObserver.observe(contentElement)
-		}
-		if (tocElement) {
-			resizeObserver.observe(tocElement)
-		}
-		resizeObserver.observe(document.documentElement)
-
-		return () => {
-			resizeObserver.disconnect()
-		}
 	})
 </script>
 
