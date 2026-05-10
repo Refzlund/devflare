@@ -37,6 +37,8 @@ type TocItem = {
 let activeTocId = $state(pageTopId)
 let hasMounted = false
 let animationFrameId: number | undefined
+let articleContentElement = $state<HTMLElement | null>(null)
+let tocContentOffset = $state(0)
 
 const tocItems = $derived<TocItem[]>([
 	{
@@ -50,6 +52,7 @@ const tocItems = $derived<TocItem[]>([
 		title: section.title
 	}))
 ])
+const articleContentStyle = $derived(`--docs-article-content-offset: ${tocContentOffset}px`)
 
 function isExternalHref(href: string): boolean {
 	return /^[a-z]+:/i.test(href) || href.startsWith('//')
@@ -128,7 +131,7 @@ $effect(() => {
 </script>
 
 <article class="space-y-12">
-	<div class="space-y-12">
+	<div bind:this={articleContentElement} class="docs-article-content space-y-12" style={articleContentStyle}>
 	<Surface as="header" id={pageTopId} padding="lg" class="scroll-mt-24 space-y-7">
 		<div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
 			<div class="space-y-3">
@@ -320,5 +323,13 @@ $effect(() => {
 	{/if}
 	</div>
 
-	<FloatingToc items={tocItems} activeId={activeTocId} ariaLabel={m.article_on_this_page()} />
+	<FloatingToc
+		items={tocItems}
+		activeId={activeTocId}
+		ariaLabel={m.article_on_this_page()}
+		contentElement={articleContentElement}
+		onContentOffsetChange={(offset) => {
+			tocContentOffset = offset
+		}}
+	/>
 </article>

@@ -563,32 +563,49 @@ pre {
 	color: var(--docs-accent);
 }
 
-.docs-floating-toc-anchor {
-	position: fixed;
-	inset-inline-end: clamp(0.5rem, 1vw, 1rem);
-	top: clamp(6.75rem, 11vh, 8.5rem);
-	block-size: 1px;
-	inline-size: 1px;
-	pointer-events: none;
-	z-index: 30;
+.docs-article-content {
+	transform: translateX(var(--docs-article-content-offset, 0px));
+	transition: transform 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+	will-change: transform;
 }
 
 .docs-floating-toc {
+	position: fixed;
+	inset-block-start: clamp(6.75rem, 11vh, 8.5rem);
+	inset-inline-end: clamp(0.5rem, 1vw, 1rem);
 	width: var(--docs-toc-expanded-width);
 	max-width: min(calc(100vw - 0.75rem), var(--docs-toc-expanded-width));
 	max-block-size: calc(100svh - 7.5rem);
 	overflow-x: hidden;
 	overflow-y: auto;
 	scrollbar-width: none;
-	transition: width 0.26s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.18s ease;
+	transition:
+		width 0.26s cubic-bezier(0.22, 1, 0.36, 1),
+		background-color 0.18s ease,
+		border-color 0.18s ease,
+		box-shadow 0.18s ease;
 	z-index: 30;
+}
+
+.docs-floating-toc[data-ready="false"] {
+	pointer-events: none;
+	visibility: hidden;
 }
 
 .docs-floating-toc::-webkit-scrollbar {
 	display: none;
 }
 
-.docs-floating-toc-compact {
+.docs-floating-toc-full,
+.docs-floating-toc-narrow {
+	border: 0;
+	padding-block: 0.25rem;
+	padding-inline: 0;
+	background: transparent;
+	box-shadow: none;
+}
+
+.docs-floating-toc-numbers {
 	width: var(--docs-toc-collapsed-width);
 	border: 1px solid transparent;
 	border-radius: 0;
@@ -600,21 +617,16 @@ pre {
 	will-change: width;
 }
 
-.docs-floating-toc-wide {
-	border: 0;
-	padding-block: 0.25rem;
-	padding-inline: 0;
-	background: transparent;
-	box-shadow: none;
-}
-
-.docs-floating-toc-compact:hover,
-.docs-floating-toc-compact:focus-within,
-.docs-floating-toc-compact.docs-floating-toc-pinned {
+.docs-floating-toc-numbers:hover,
+.docs-floating-toc-numbers:focus-within,
+.docs-floating-toc-numbers.docs-floating-toc-pinned {
 	width: var(--docs-toc-expanded-width);
 	border-color: var(--docs-border);
-	background: transparent;
-	box-shadow: none;
+	border-radius: 0.75rem;
+	background: color-mix(in srgb, var(--docs-bg-app) 94%, transparent);
+	box-shadow: var(--docs-shadow-soft);
+	-webkit-backdrop-filter: blur(12px);
+	backdrop-filter: blur(12px);
 }
 
 .docs-floating-toc-list {
@@ -674,10 +686,11 @@ pre {
 	white-space: nowrap;
 }
 
-.docs-floating-toc-wide .docs-floating-toc-title,
-.docs-floating-toc-compact:hover .docs-floating-toc-title,
-.docs-floating-toc-compact:focus-within .docs-floating-toc-title,
-.docs-floating-toc-compact.docs-floating-toc-pinned .docs-floating-toc-title {
+.docs-floating-toc-full .docs-floating-toc-title,
+.docs-floating-toc-narrow .docs-floating-toc-title,
+.docs-floating-toc-numbers:hover .docs-floating-toc-title,
+.docs-floating-toc-numbers:focus-within .docs-floating-toc-title,
+.docs-floating-toc-numbers.docs-floating-toc-pinned .docs-floating-toc-title {
 	text-overflow: clip;
 	text-wrap: pretty;
 	white-space: normal;
@@ -688,22 +701,22 @@ pre {
 	color: var(--docs-accent);
 }
 
-.docs-floating-toc-compact .docs-floating-toc-link {
+.docs-floating-toc-numbers .docs-floating-toc-link {
 	padding-inline-end: 0.65rem;
 	padding-inline-start: 0.8rem;
 }
 
-.docs-floating-toc-compact:not(:hover):not(:focus-within):not(.docs-floating-toc-pinned)
+.docs-floating-toc-numbers:not(:hover):not(:focus-within):not(.docs-floating-toc-pinned)
 	.docs-floating-toc-link {
 	border-left-color: transparent;
 }
 
-.docs-floating-toc-compact:not(:hover):not(:focus-within):not(.docs-floating-toc-pinned)
+.docs-floating-toc-numbers:not(:hover):not(:focus-within):not(.docs-floating-toc-pinned)
 	.docs-floating-toc-link-active {
 	color: var(--docs-text-muted);
 }
 
-.docs-floating-toc-compact:not(:hover):not(:focus-within):not(.docs-floating-toc-pinned)
+.docs-floating-toc-numbers:not(:hover):not(:focus-within):not(.docs-floating-toc-pinned)
 	.docs-floating-toc-link-active
 	.docs-floating-toc-index {
 	color: var(--docs-accent);
@@ -711,6 +724,10 @@ pre {
 
 @media (prefers-reduced-motion: reduce) {
 	.docs-floating-toc {
+		transition: none;
+	}
+
+	.docs-article-content {
 		transition: none;
 	}
 }

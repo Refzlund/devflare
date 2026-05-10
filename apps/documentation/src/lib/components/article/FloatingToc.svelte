@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte'
-	import floatingUI from '../../vendor/floating-runes'
 	import { loadPretext, type PretextModule } from '../../vendor/pretext'
 	import InlineText from '../content/InlineText.svelte'
 
@@ -10,37 +9,45 @@
 		title: string
 	}
 
+	type TocMode = 'full' | 'narrow' | 'numbers' | 'hidden'
+
 	const COLLAPSED_WIDTH = 56
-	const MIN_COMPACT_TITLE_WIDTH = 112
+	const MIN_NARROW_TITLE_WIDTH = 112
 	const MIN_DESKTOP_TITLE_WIDTH = 168
+	const MIN_HOVER_TITLE_WIDTH = 104
+	const MIN_RAIL_HOVER_TITLE_WIDTH = 48
 	const MAX_TITLE_WIDTH = 440
-	const VIEWPORT_PADDING = 32
-	const COMPACT_MEDIA_QUERY = '(max-width: 72rem)'
+	const SAFE_GAP = 24
+	const MIN_CONTENT_LEFT = 24
+	const SIDEBAR_SAFE_GAP = 32
+	const MAX_CONTENT_OFFSET = 260
+	const MIN_TOC_VIEWPORT_WIDTH = 760
 
 	let {
 		items,
 		activeId,
-		ariaLabel
+		ariaLabel,
+		contentElement,
+		onContentOffsetChange
 	}: {
 		items: TocItem[]
 		activeId: string
 		ariaLabel: string
+		contentElement: HTMLElement | null
+		onContentOffsetChange?: (offset: number) => void
 	} = $props()
 
-	const tocFloat = floatingUI({
-		placement: 'left-start',
-		strategy: 'fixed'
-	})
-
 	let hasMounted = false
-	let compactMediaQueryList: MediaQueryList | undefined
 	let pretextModule: PretextModule | undefined
 	let tocElement = $state<HTMLElement | null>(null)
 	let titleWidth = $state(MIN_DESKTOP_TITLE_WIDTH)
-	let isCompact = $state(false)
+	let tocMode = $state<TocMode>('full')
 	let isPinnedOpen = $state(false)
-	let widthAnimationFrameId: number | undefined
+	let tocLayoutReady = $state(false)
+	let contentOffset = $state(0)
+	let layoutAnimationFrameId: number | undefined
 
+	const isRailMode = $derived(tocMode === 'numbers')
 	const panelStyle = $derived(
 		[
 			`--docs-toc-collapsed-width: ${COLLAPSED_WIDTH}px`,
@@ -48,29 +55,6 @@
 			`--docs-toc-expanded-width: ${COLLAPSED_WIDTH + titleWidth}px`
 		].join('; ')
 	)
-
-	function getMinTitleWidth(): number {
-		return isCompact ? MIN_COMPACT_TITLE_WIDTH : MIN_DESKTOP_TITLE_WIDTH
-	}
-
-	function handleCompactChange(query: MediaQueryList | MediaQueryListEvent): void {
-		isCompact = query.matches
-
-		if (!isCompact) {
-			isPinnedOpen = false
-		}
-	}
-
-	function scheduleTitleWidthUpdate(): void {
-		if (!hasMounted || widthAnimationFrameId !== undefined) {
-			return
-		}
-
-		widthAnimationFrameId = window.requestAnimationFrame(() => {
-			widthAnimationFrameId = undefined
-			void updateTitleWidth()
-		})
-	}
 
 	async function getPretextModule(): Promise<PretextModule> {
 		if (!pretextModule) {
@@ -80,14 +64,128 @@
 		return pretextModule
 	}
 
-	async function updateTitleWidth(): Promise<void> {
-		if (!tocElement) {
+	function setContentOffset(nextOffset: number): void {
+		const roundedOffset = Math.round(nextOffset)
+		if (Math.abs(contentOffset - roundedOffset) < 1) {
 			return
+		}
+
+		contentOffset = roundedOffset
+		onContentOffsetChange?.(roundedOffset)
+	}
+
+	function applyLayout(nextMode: TocMode, nextTitleWidth: number, nextContentOffset: number): void {
+		tocMode = nextMode
+		titleWidth = Math.max(0, Math.round(nextTitleWidth))
+		setContentOffset(nextMode === 'hidden' ? 0 : nextContentOffset)
+		tocLayoutReady = nextMode === 'hidden' || !tocElement || window.getComputedStyle(tocElement).position !== 'static'
+
+		if (nextMode !== 'numbers') {
+			isPinnedOpen = false
+		}
+
+		if (!tocLayoutReady) {
+			window.setTimeout(() => scheduleLayoutUpdate(), 50)
+		}
+	}
+
+	function getTocRightX(): number {
+		if (tocElement) {
+			const rect = tocElement.getBoundingClientRect()
+			if (rect.right > 0) {
+				return rect.right
+			}
+		}
+
+		return window.innerWidth - 16
+	}
+
+	function getBaseContentRect(): DOMRect | null {
+		if (!contentElement) {
+			return null
+		}
+
+		const rect = contentElement.getBoundingClientRect()
+		return new DOMRect(
+			rect.left - contentOffset,
+			rect.top,
+			rect.width,
+			rect.height
+		)
+	}
+
+	function getMinContentLeft(): number {
+		if (window.innerWidth < 1024) {
+			return MIN_CONTENT_LEFT
+		}
+
+		const sidebarElement = document.querySelector<HTMLElement>('.docs-sidebar-panel')
+		if (!sidebarElement) {
+			return MIN_CONTENT_LEFT
+		}
+
+		const sidebarRect = sidebarElement.getBoundingClientRect()
+		if (sidebarRect.width <= 0 || sidebarRect.right <= 0) {
+			return MIN_CONTENT_LEFT
+		}
+
+		return Math.max(MIN_CONTENT_LEFT, sidebarRect.right + SIDEBAR_SAFE_GAP)
+	}
+
+	function getMaxContentOffset(contentRect: DOMRect): number {
+		return Math.max(
+			0,
+			Math.min(MAX_CONTENT_OFFSET, contentRect.left - getMinContentLeft())
+		)
+	}
+
+	function getAvailableSpace(tocRightX: number, contentRight: number, nextContentOffset: number): number {
+		return tocRightX - SAFE_GAP - (contentRight + nextContentOffset)
+	}
+
+	function resolveOffsetForWidth(
+		tocRightX: number,
+		contentRect: DOMRect,
+		requiredWidth: number
+	): number | null {
+		const availableSpace = getAvailableSpace(tocRightX, contentRect.right, 0)
+		if (availableSpace >= requiredWidth) {
+			return 0
+		}
+
+		const neededOffset = requiredWidth - availableSpace
+		const maxOffset = getMaxContentOffset(contentRect)
+		if (neededOffset <= maxOffset) {
+			return -neededOffset
+		}
+
+		return null
+	}
+
+	function resolveOffsetForPreferredWidth(
+		tocRightX: number,
+		contentRect: DOMRect,
+		requiredWidth: number,
+		preferredWidth: number
+	): number | null {
+		const availableSpace = getAvailableSpace(tocRightX, contentRect.right, 0)
+		const maxOffset = getMaxContentOffset(contentRect)
+		if (availableSpace + maxOffset < requiredWidth) {
+			return null
+		}
+
+		const desiredOffset = Math.max(0, preferredWidth - availableSpace)
+		return -Math.min(maxOffset, desiredOffset)
+	}
+
+	async function measureNaturalTitleWidth(): Promise<number> {
+		if (!tocElement) {
+			return MIN_DESKTOP_TITLE_WIDTH
 		}
 
 		const styleSource = tocElement.querySelector<HTMLElement>('[data-docs-toc-title]')
 		if (!styleSource) {
-			return
+			return MIN_DESKTOP_TITLE_WIDTH
 		}
 
 		const titleTexts = Array.from(
@@ -97,13 +195,13 @@
 			.filter((title) => title.length > 0)
 
 		if (titleTexts.length === 0) {
-			return
+			return MIN_DESKTOP_TITLE_WIDTH
 		}
 
 		const computedStyle = window.getComputedStyle(styleSource)
 		const font = computedStyle.font || `${computedStyle.fontWeight} ${computedStyle.fontSize} ${computedStyle.fontFamily}`
 		if (!font) {
-			return
+			return MIN_DESKTOP_TITLE_WIDTH
 		}
 
 		const documentWithFonts = document as Document & { fonts?: FontFaceSet }
@@ -112,26 +210,90 @@
 		}
 
 		const { measureNaturalWidth, prepareWithSegments } = await getPretextModule()
-		const minTitleWidth = getMinTitleWidth()
-		let nextTitleWidth = minTitleWidth
+		let nextTitleWidth = MIN_DESKTOP_TITLE_WIDTH
 
 		for (const titleText of titleTexts) {
 			const prepared = prepareWithSegments(titleText, font)
 			nextTitleWidth = Math.max(nextTitleWidth, Math.ceil(measureNaturalWidth(prepared) + 18))
 		}
 
-		const maxViewportWidth = Math.max(minTitleWidth, window.innerWidth - COLLAPSED_WIDTH - VIEWPORT_PADDING)
-		titleWidth = Math.max(
-			minTitleWidth,
-			Math.min(nextTitleWidth, Math.min(MAX_TITLE_WIDTH, maxViewportWidth))
+		return Math.min(nextTitleWidth, MAX_TITLE_WIDTH)
+	}
+
+	async function updateResponsiveLayout(): Promise<void> {
+		if (!hasMounted || !contentElement) {
+			return
+		}
+
+		const contentRect = getBaseContentRect()
+		if (!contentRect || window.innerWidth < MIN_TOC_VIEWPORT_WIDTH) {
+			applyLayout('hidden', 0, 0)
+			return
+		}
+
+		const tocRightX = getTocRightX()
+		const naturalTitleWidth = await measureNaturalTitleWidth()
+		const fullTitleWidth = Math.max(MIN_DESKTOP_TITLE_WIDTH, naturalTitleWidth)
+		const fullWidth = COLLAPSED_WIDTH + fullTitleWidth
+
+		const fullOffset = resolveOffsetForWidth(tocRightX, contentRect, fullWidth)
+		if (fullOffset !== null) {
+			applyLayout('full', fullTitleWidth, fullOffset)
+			return
+		}
+
+		const minNarrowWidth = COLLAPSED_WIDTH + MIN_NARROW_TITLE_WIDTH
+		const narrowOffset = resolveOffsetForWidth(tocRightX, contentRect, minNarrowWidth)
+		if (narrowOffset !== null) {
+			const availableSpace = getAvailableSpace(tocRightX, contentRect.right, narrowOffset)
+			const nextTitleWidth = Math.min(
+				fullTitleWidth,
+				Math.max(MIN_NARROW_TITLE_WIDTH, availableSpace - COLLAPSED_WIDTH)
+			)
+			applyLayout('narrow', nextTitleWidth, narrowOffset)
+			return
+		}
+
+		const preferredRailWidth = Math.min(fullWidth, COLLAPSED_WIDTH + MIN_HOVER_TITLE_WIDTH)
+		const railOffset = resolveOffsetForPreferredWidth(
+			tocRightX,
+			contentRect,
+			COLLAPSED_WIDTH,
+			preferredRailWidth
 		)
+		if (railOffset !== null) {
+			const availableSpace = getAvailableSpace(tocRightX, contentRect.right, railOffset)
+			const hoverTitleWidth = Math.min(
+				fullTitleWidth,
+				Math.max(0, availableSpace - COLLAPSED_WIDTH)
+			)
+			applyLayout(
+				hoverTitleWidth >= MIN_RAIL_HOVER_TITLE_WIDTH ? 'numbers' : 'hidden',
+				hoverTitleWidth,
+				railOffset
+			)
+			return
+		}
+
+		applyLayout('hidden', 0, 0)
+	}
+
+	function scheduleLayoutUpdate(): void {
+		if (!hasMounted || layoutAnimationFrameId !== undefined) {
+			return
+		}
+
+		layoutAnimationFrameId = window.requestAnimationFrame(() => {
+			layoutAnimationFrameId = undefined
+			void updateResponsiveLayout()
+		})
 	}
 
 	function handleLinkClick(event: MouseEvent): void {
 		const triggeredByKeyboard = event.detail === 0
 		const expandedByHover = tocElement?.matches(':hover') ?? false
 
-		if (!isCompact || isPinnedOpen || expandedByHover || triggeredByKeyboard) {
+		if (!isRailMode || isPinnedOpen || expandedByHover || triggeredByKeyboard) {
 			return
 		}
 
@@ -141,24 +303,17 @@
 
 	onMount(() => {
 		hasMounted = true
-		compactMediaQueryList = window.matchMedia(COMPACT_MEDIA_QUERY)
 
-		handleCompactChange(compactMediaQueryList)
-
-		const handleCompactQueryChange = (event: MediaQueryListEvent) => {
-			handleCompactChange(event)
-			scheduleTitleWidthUpdate()
-		}
-		const handleResize = () => scheduleTitleWidthUpdate()
+		const handleViewportResize = () => scheduleLayoutUpdate()
 		const handleKeyDown = (event: KeyboardEvent) => {
-			if (event.key !== 'Escape' || !isCompact) {
+			if (event.key !== 'Escape' || !isRailMode) {
 				return
 			}
 
 			isPinnedOpen = false
 		}
 		const handleDocumentPointerDown = (event: PointerEvent) => {
-			if (!isCompact || !isPinnedOpen || !tocElement) {
+			if (!isRailMode || !isPinnedOpen || !tocElement) {
 				return
 			}
 
@@ -170,20 +325,21 @@
 			isPinnedOpen = false
 		}
 
-		compactMediaQueryList.addEventListener('change', handleCompactQueryChange)
-		window.addEventListener('resize', handleResize)
+		window.addEventListener('resize', handleViewportResize)
+		window.visualViewport?.addEventListener('resize', handleViewportResize)
 		document.addEventListener('keydown', handleKeyDown)
 		document.addEventListener('pointerdown', handleDocumentPointerDown)
 
-		void tick().then(() => updateTitleWidth())
+		void tick().then(() => updateResponsiveLayout())
 
 		return () => {
-			if (widthAnimationFrameId !== undefined) {
-				window.cancelAnimationFrame(widthAnimationFrameId)
+			if (layoutAnimationFrameId !== undefined) {
+				window.cancelAnimationFrame(layoutAnimationFrameId)
 			}
 
-			compactMediaQueryList?.removeEventListener('change', handleCompactQueryChange)
-			window.removeEventListener('resize', handleResize)
+			setContentOffset(0)
+			window.removeEventListener('resize', handleViewportResize)
+			window.visualViewport?.removeEventListener('resize', handleViewportResize)
 			document.removeEventListener('keydown', handleKeyDown)
 			document.removeEventListener('pointerdown', handleDocumentPointerDown)
 		}
@@ -191,23 +347,42 @@
 
 	$effect(() => {
 		items
+		contentElement
 
 		if (!hasMounted) {
 			return
 		}
 
-		void tick().then(() => updateTitleWidth())
+		void tick().then(() => updateResponsiveLayout())
+	})
+
+	$effect(() => {
+		if (!hasMounted) {
+			return
+		}
+
+		const resizeObserver = new ResizeObserver(() => scheduleLayoutUpdate())
+		if (contentElement) {
+			resizeObserver.observe(contentElement)
+		}
+		if (tocElement) {
+			resizeObserver.observe(tocElement)
+		}
+		resizeObserver.observe(document.documentElement)
+
+		return () => {
+			resizeObserver.disconnect()
+		}
 	})
 </script>
 
-<div class="docs-floating-toc-anchor" use:tocFloat.ref aria-hidden="true"></div>
-
-
 <div
 	bind:this={tocElement}
-	use:tocFloat
-	class={`docs-floating-toc ${isCompact ? 'docs-floating-toc-compact' : 'docs-floating-toc-wide'} ${isPinnedOpen ? 'docs-floating-toc-pinned' : ''}`}
+	class={`docs-floating-toc docs-floating-toc-${tocMode} ${isPinnedOpen ? 'docs-floating-toc-pinned' : ''}`}
 	style={panelStyle}
+	hidden={tocMode === 'hidden'}
+	data-docs-floating-toc
+	data-ready={tocLayoutReady ? 'true' : 'false'}
 >
 	<nav aria-label={ariaLabel}>
 		<p class="sr-only">{ariaLabel}</p>
