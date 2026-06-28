@@ -309,8 +309,8 @@ export const DEFAULT_CHUNK_SIZE = 256 * 1024
 /** Threshold for switching to HTTP transfer (512 KB — workerd ~1MB WS message limit). */
 export const HTTP_TRANSFER_THRESHOLD = 512 * 1024
 
-/** Default WebSocket port for bridge */
-export const DEFAULT_BRIDGE_PORT = 8686
+/** Default WebSocket port for the bridge (matches the dev runtime port). */
+export const DEFAULT_BRIDGE_PORT = 8787
 
-/** Default HTTP port for large transfers */
-export const DEFAULT_HTTP_PORT = 8687
+/** Default HTTP port for large transfers (matches the dev runtime HTTP port). */
+export const DEFAULT_HTTP_PORT = 8788

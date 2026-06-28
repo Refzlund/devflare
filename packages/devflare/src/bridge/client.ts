@@ -120,7 +120,7 @@ export async function resolveBridgeWebSocketConstructor(
 // -----------------------------------------------------------------------------
 
 export interface BridgeClientOptions {
-	/** Bridge WebSocket URL (default: ws://localhost:8686) */
+	/** Bridge WebSocket URL (default: ws://localhost:8787) */
 	url?: string
 	/** Auto-reconnect on disconnect */
 	autoReconnect?: boolean

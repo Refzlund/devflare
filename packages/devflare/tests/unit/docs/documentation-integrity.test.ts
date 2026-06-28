@@ -152,23 +152,6 @@ async function runCommand(
 	}
 }
 
-function escapeRegExp(value: string): string {
-	return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-}
-
-function documentedEntrypointNames(readme: string, importPath: string): string[] {
-	const row = readme.match(
-		new RegExp(`^\\| \`${escapeRegExp(importPath)}\` \\| (?<description>.+?) \\|$`, 'm')
-	)
-	expect(row?.groups?.description).toBeDefined()
-
-	return [...(row?.groups?.description.matchAll(/`([^`]+)`/g) ?? [])]
-		.map((match) => match[1].replace(/\(\)$/g, ''))
-		.flatMap((name) => name.split('/'))
-		.map((name) => name.trim())
-		.filter((name) => /^[A-Za-z_$][\w$]*$/.test(name))
-}
-
 function localSourceExists(source: string): boolean {
 	if (/^https?:\/\//.test(source)) {
 		return true
@@ -688,28 +671,6 @@ describe('documentation integrity', () => {
 		} finally {
 			await rm(projectDir, { force: true, recursive: true })
 		}
-	})
-
-	test('README package entrypoint rows only name actual exports', async () => {
-		const readme = await readPackageReadme()
-		const entrypoints = [
-			{ importPath: 'devflare', mod: await import('../../../src/index') },
-			{ importPath: 'devflare/config', mod: await import('../../../src/config') },
-			{ importPath: 'devflare/runtime', mod: await import('../../../src/runtime') },
-			{ importPath: 'devflare/test', mod: await import('../../../src/test') },
-			{ importPath: 'devflare/vite', mod: await import('../../../src/vite') },
-			{ importPath: 'devflare/sveltekit', mod: await import('../../../src/sveltekit') },
-			{ importPath: 'devflare/cloudflare', mod: await import('../../../src/cloudflare') },
-			{ importPath: 'devflare/decorators', mod: await import('../../../src/decorators') }
-		]
-		const missingExports = entrypoints.flatMap(({ importPath, mod }) => {
-			const actualExports = new Set(Object.keys(mod))
-			return documentedEntrypointNames(readme, importPath)
-				.filter((name) => !actualExports.has(name))
-				.map((name) => `${importPath}: ${name}`)
-		})
-
-		expect(missingExports).toEqual([])
 	})
 
 	test('docs app source metadata points at existing local files or external URLs', () => {

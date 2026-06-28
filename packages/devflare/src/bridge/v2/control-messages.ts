@@ -2,9 +2,10 @@
 // Transport v2 — Auxiliary control vocabulary
 // =============================================================================
 // The v2 codec only owns rpc.{call,ok,err} + body.* + hello/welcome/error.
-// Everything else (WS relay envelopes, fire-and-forget pub/sub events,
-// HTTP transfer notifications) rides on the codec's `onUnknownControl`
-// hook. This module is the single source of truth for those shapes.
+// Everything else (WS relay envelopes, HTTP transfer notifications) rides on
+// the codec's `onUnknownControl` hook. This module is the single source of
+// truth for those shapes. (Fire-and-forget pub/sub `event` frames use the
+// `EventMsg { topic, data }` shape in `wire.ts` — the live consumer path.)
 // =============================================================================
 
 export interface TransportV2WsOpenMsg {
@@ -42,12 +43,6 @@ export interface TransportV2WsCloseMsg {
 	reason?: string
 }
 
-export interface TransportV2EventMsg {
-	t: 'event'
-	channel: string
-	payload: unknown
-}
-
 export interface TransportV2HttpTransferMsg {
 	t: 'http.transfer'
 	id: string
@@ -63,7 +58,6 @@ export type TransportV2AuxMsg =
 	| TransportV2WsOpenErrMsg
 	| TransportV2WsTextMsg
 	| TransportV2WsCloseMsg
-	| TransportV2EventMsg
 	| TransportV2HttpTransferMsg
 
 const TRANSPORT_V2_AUX_TAGS = new Set([
@@ -72,7 +66,6 @@ const TRANSPORT_V2_AUX_TAGS = new Set([
 	'ws.openerr',
 	'ws.text',
 	'ws.close',
-	'event',
 	'http.transfer'
 ])
 

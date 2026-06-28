@@ -98,18 +98,18 @@ bun test tests/worker.test.ts
 | Need | Open |
 | --- | --- |
 | Add route files | `/docs/first-route-tree`, then `/docs/http-routing` |
-| Add one binding | `/docs/first-bindings`, then `/docs/binding-chooser` |
+| Add one binding | `/docs/first-bindings`, then `/docs/storage-bindings` |
 | Pick a test helper | `/docs/test-helper-reference` |
 | Deploy safely | `/docs/deploy-command-recipes` |
 | Check support stance | `/docs/feature-index` |
-| Copy a larger example | `/docs/recipe-packs` or `cases/README.md` |
+| Copy a larger example | `cases/README.md` |
 
 ## Package Entrypoints
 
 | Import | Use |
 | --- | --- |
-| `devflare` | Node-side utilities: `defineConfig`, `preview`, `loadConfig`, `loadResolvedConfig`, `compileConfig`, `stringifyConfig`, `configSchema`, `ref()`, `workerName`, `env`, `durableObject`, `getDurableObjectOptions`, `runCli`, `parseArgs` |
-| `devflare/config` | Config and compiler utilities: `defineConfig`, `preview`, `ref`, `loadConfig`, `loadResolvedConfig`, `compileConfig`, `stringifyConfig`, `configSchema`, `resolveResources`, `writeWranglerConfig`, `readWranglerConfig`, `prepareConfigResourcesForDeploy`, `prepareMaterializedConfigResourcesForDeploy`, `resolveConfigPath`, `resolveConfigForEnvironment`, `resolvePreviewIdentifier`, `materializePreviewScopedConfig`, `materializePreviewScopedString`, `isPreviewScopedName`, `resolveMaterializedConfigResources`, `compileBuildConfig`, `validateServiceBindings`, `collectReferencedServiceNames`, `getLocalKVNamespaceIdentifier`, `getLocalD1DatabaseIdentifier`, `getLocalHyperdriveConfigIdentifier`, `getSingleBrowserBindingName`, `normalizeKVBinding`, `normalizeD1Binding`, `normalizeDOBinding`, `normalizeHyperdriveBinding`, `normalizeMtlsCertificateBinding`, `normalizeDispatchNamespaceBinding`, `normalizeWorkflowBinding`, `normalizePipelineBinding`, `normalizeImagesBinding`, `normalizeMediaBinding`, `normalizeSecretsStoreBinding`, `normalizeArtifactsBinding` |
+| `devflare` | Node-side utilities: `defineConfig`, `preview`, `loadConfig`, `loadResolvedConfig`, `compileConfig`, `stringifyConfig`, `configSchema`, `ConfigNotFoundError`, `ConfigValidationError`, `ConfigResourceResolutionError`, `ref()`, `workerName`, `env`, `vars`, `durableObject`, `getDurableObjectOptions`, `runCli`, `parseArgs` |
+| `devflare/config` | Lightweight config-authoring entry (no CLI/bridge/test barrel): `defineConfig`, `env`, `preview`, `ref`, plus the config types. The full Node-side compiler and normalizer helpers live on the bare devflare import instead. |
 | `devflare/runtime` | Worker-safe runtime helpers: `env`, `ctx`, `event`, `locals`, `sequence`, `defineFetchHandler`, `defineQueueHandler`, `defineScheduledHandler`, `markResolveStyle`, `markWorkerStyle`, `createResolveFetch`, `invokeFetchHandler`, `invokeFetchModule`, `matchFetchRoute`, `invokeRouteModules`, `createRouteResolve`, event creators and getters |
 | `devflare/test` | Testing helpers: `createTestContext`, `env`, `cf`, `worker`, `queue`, `scheduled`, `email`, `tail`, `shouldSkip`, `createOfflineEnv`, `createOfflineBindings`, `describeOfflineSupport`, `getOfflineSupportMatrix`, `containers`, `detectContainerEngine`, `getContainerSkipReason`, `stopActiveContainers`, `createMockEnv`, `createMockKV`, `createMockD1`, `createMockR2`, `createMockQueue`, `createMockRateLimit`, `createMockVersionMetadata`, `createMockHyperdrive`, `createMockWorkerLoader`, `createMockMTLSCertificate`, `createMockDispatchNamespace`, `createMockWorkflow`, `createMockPipeline`, `createMockImagesBinding`, `createMockMediaBinding`, `createMockArtifacts`, `createMockAISearchInstance`, `createMockAISearchNamespace`, `createMockTestContext`, `withTestContext`, `resolveServiceBindings`, `resolveDOBindings`, `clearBundleCache` |
 | `devflare/vite` | Vite integration: `devflarePlugin`, `getCloudflareConfig`, `getDevflareConfigs`, `getPluginContext`, `hasInlineViteConfig`, `resolveEffectiveViteProject`, `resolveViteUserConfig`, `writeGeneratedViteConfig` |
@@ -122,6 +122,7 @@ Runtime import rule of thumb:
 - Use `devflare/config` in config files.
 - Use `devflare/runtime` in Worker code.
 - Use `devflare/test` in tests.
+- Use `devflare/vite` in a Vite project; it re-exports Vite's `Plugin`/`ConfigEnv`/`UserConfig` types, so type-checking it needs `vite` (an optional peer) installed.
 - Use bare `devflare` for Node-side package tooling and the unified env proxy only when that is intentional.
 
 The authoritative frozen-entrypoint list and the stability guarantee on it live

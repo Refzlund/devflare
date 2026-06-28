@@ -2227,6 +2227,7 @@ export default defineConfig({
 		queue: 'src/queue.ts',
 		scheduled: 'src/scheduled.ts',
 		email: 'src/email.ts',
+		tail: 'src/tail.ts',
 		durableObjects: 'src/do/**/*.ts',
 		entrypoints: 'src/ep/**/*.ts',
 		routes: {
@@ -2566,6 +2567,7 @@ export default defineConfig({
 		queue: 'src/queue.ts',
 		scheduled: 'src/scheduled.ts',
 		email: 'src/email.ts',
+		tail: 'src/tail.ts',
 		routes: false
 	},
 	triggers: {

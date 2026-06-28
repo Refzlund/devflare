@@ -81,8 +81,10 @@ The package test lanes (`packages/devflare/package.json`):
 - `bun run --cwd packages/devflare test:unit` — fast unit tests (`tests/unit`),
   fully parallel. This is the lane the publish workflow gates on.
 - `bun run --cwd packages/devflare test:coverage` — the unit lane with coverage
-  measurement (`bun test tests/unit --coverage`). This is measurement only; there
-  is no coverage threshold gate.
+  measurement (`bun test tests/unit --coverage`). This is **unit-only** measurement
+  with no threshold gate: it excludes the integration lanes, so source exercised
+  only by integration tests (e.g. `dev-server/server.ts`, `src/vite/*`) reports as
+  near-uncovered. Read the number as unit coverage, not total coverage.
 - `bun run --cwd packages/devflare test` — the full suite (unit + every
   integration lane).
 

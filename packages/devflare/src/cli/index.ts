@@ -222,7 +222,7 @@ export async function runCli(argv: string[], options: CliOptions = {}): Promise<
 }
 
 // =============================================================================
-// Command Stubs (to be implemented)
+// Command dispatchers — each lazy-loads its command module on first use
 // =============================================================================
 
 async function runInit(
@@ -230,7 +230,6 @@ async function runInit(
 	logger: ConsolaInstance,
 	options: CliOptions
 ): Promise<CliResult> {
-	// Will be implemented in init.ts
 	const { runInitCommand } = await import('./commands/init')
 	return runInitCommand(parsed, logger, options)
 }
@@ -240,7 +239,6 @@ async function runDev(
 	logger: ConsolaInstance,
 	options: CliOptions
 ): Promise<CliResult> {
-	// Will be implemented in dev.ts
 	const { runDevCommand } = await import('./commands/dev')
 	return runDevCommand(parsed, logger, options)
 }
@@ -250,7 +248,6 @@ async function runBuild(
 	logger: ConsolaInstance,
 	options: CliOptions
 ): Promise<CliResult> {
-	// Will be implemented in build.ts
 	const { runBuildCommand } = await import('./commands/build')
 	return runBuildCommand(parsed, logger, options)
 }
@@ -260,7 +257,6 @@ async function runDeploy(
 	logger: ConsolaInstance,
 	options: CliOptions
 ): Promise<CliResult> {
-	// Will be implemented in deploy.ts
 	const { runDeployCommand } = await import('./commands/deploy')
 	return runDeployCommand(parsed, logger, {
 		...options,
@@ -273,7 +269,6 @@ async function runTypes(
 	logger: ConsolaInstance,
 	options: CliOptions
 ): Promise<CliResult> {
-	// Will be implemented in types.ts
 	const { runTypesCommand } = await import('./commands/types')
 	return runTypesCommand(parsed, logger, options)
 }
@@ -283,7 +278,6 @@ async function runDoctor(
 	logger: ConsolaInstance,
 	options: CliOptions
 ): Promise<CliResult> {
-	// Will be implemented in doctor.ts
 	const { runDoctorCommand } = await import('./commands/doctor')
 	return runDoctorCommand(parsed, logger, options)
 }
