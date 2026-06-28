@@ -9,10 +9,21 @@
  * `devflare/test` all threw `Export 'x' is not defined in module` on import,
  * across every published version. Run this after `build`, before publish.
  *
- * Exits non-zero if any entrypoint fails to import or exports nothing.
+ * It also statically checks that every bare package the bundle imports is
+ * declared in `dependencies`/`peerDependencies`/`optionalDependencies`. The
+ * import smoke alone cannot catch an undeclared dependency, because in the
+ * monorepo such a package is still resolvable via hoisting — but a real
+ * consumer install would fail. (This happened: `typescript` was imported at
+ * runtime by the test/vite tooling yet declared only as a devDependency.)
+ *
+ * Exits non-zero if any entrypoint fails to import, exports nothing, or the
+ * bundle imports an undeclared package.
  */
+import { isBuiltin } from 'node:module'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { Glob } from 'bun'
+import { init, parse } from 'es-module-lexer'
 
 interface ExportTarget {
 	browser?: string
@@ -23,6 +34,9 @@ interface ExportTarget {
 const pkgDir = resolve(import.meta.dir, '..')
 const pkg = (await Bun.file(resolve(pkgDir, 'package.json')).json()) as {
 	exports: Record<string, string | ExportTarget>
+	dependencies?: Record<string, string>
+	peerDependencies?: Record<string, string>
+	optionalDependencies?: Record<string, string>
 }
 
 // Collect every distinct JS file across conditions (skip the package.json
@@ -71,3 +85,44 @@ if (failures.length > 0) {
 	process.exit(1)
 }
 console.log(`verify-dist: all ${targets.length} entrypoints import cleanly under node`)
+
+// Every bare package the bundle imports must be a declared dependency, else a
+// consumer install (without the monorepo's hoisting) fails at runtime.
+const declared = new Set([
+	...Object.keys(pkg.dependencies ?? {}),
+	...Object.keys(pkg.peerDependencies ?? {}),
+	...Object.keys(pkg.optionalDependencies ?? {})
+])
+const packageOf = (spec: string): string => {
+	const parts = spec.split('/')
+	return spec.startsWith('@') ? `${parts[0]}/${parts[1]}` : (parts[0] ?? spec)
+}
+// Specifiers a consumer's environment provides, not npm packages: node/workers
+// runtime builtins, framework virtual modules (SvelteKit `$app`/`$env`/…), and
+// self-references to this package's own subpaths.
+const isProvided = (spec: string): boolean =>
+	isBuiltin(spec) ||
+	spec.startsWith('cloudflare:') ||
+	spec.startsWith('$') ||
+	spec === 'devflare' ||
+	spec.startsWith('devflare/')
+
+await init
+const undeclared = new Map<string, string>() // package -> first dist file seen in
+for await (const rel of new Glob('**/*.js').scan(resolve(pkgDir, 'dist'))) {
+	const text = await Bun.file(resolve(pkgDir, 'dist', rel)).text()
+	const [imports] = parse(text)
+	for (const imp of imports) {
+		const spec = imp.n // statically-resolvable specifier (undefined for dynamic exprs)
+		if (!spec || spec.startsWith('.') || isProvided(spec)) continue
+		const name = packageOf(spec)
+		if (!declared.has(name) && !undeclared.has(name)) undeclared.set(name, rel)
+	}
+}
+if (undeclared.size > 0) {
+	console.error(`verify-dist: ${undeclared.size} undeclared runtime dependenc(ies):`)
+	for (const [name, rel] of undeclared) console.error(`  ✗ ${name} (imported by dist/${rel})`)
+	console.error('  Add each to dependencies/peerDependencies in package.json.')
+	process.exit(1)
+}
+console.log('verify-dist: all bundle imports are declared dependencies')
