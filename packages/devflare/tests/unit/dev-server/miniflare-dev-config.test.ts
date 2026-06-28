@@ -66,4 +66,19 @@ describe('buildMiniflareDevConfig', () => {
 			entrypoint: 'VoiceStoryApi'
 		})
 	})
+
+	test('defaults the runtime host to 127.0.0.1', () => {
+		const mfConfig = buildMiniflareDevConfig(buildBaseInput())
+		expect(mfConfig.host).toBe('127.0.0.1')
+		expect(mfConfig.port).toBe(8787)
+	})
+
+	test('binds to the provided miniflareHost and miniflarePort', () => {
+		const mfConfig = buildMiniflareDevConfig(buildBaseInput({
+			miniflareHost: '0.0.0.0',
+			miniflarePort: 3000
+		}))
+		expect(mfConfig.host).toBe('0.0.0.0')
+		expect(mfConfig.port).toBe(3000)
+	})
 })

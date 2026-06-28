@@ -67,7 +67,8 @@ function resolveSinglePort(
 
 export function resolveDevRuntimePort(
 	options: Record<string, string | boolean>,
-	env: NodeJS.ProcessEnv = process.env
+	env: NodeJS.ProcessEnv = process.env,
+	configPort?: number
 ): number {
 	return resolveSinglePort(
 		readStringOption(options['runtime-port']),
@@ -79,7 +80,26 @@ export function resolveDevRuntimePort(
 			env.DEVFLARE_BRIDGE_PORT,
 			'environment'
 		)
+		?? configPort
 		?? 8787
+}
+
+/**
+ * Resolve the host the local Miniflare runtime instance binds to.
+ *
+ * Precedence: `--runtime-host` CLI flag > `DEVFLARE_RUNTIME_HOST` env var >
+ * `server.host` config value > `127.0.0.1`.
+ */
+export function resolveDevRuntimeHost(
+	options: Record<string, string | boolean>,
+	env: NodeJS.ProcessEnv = process.env,
+	configHost?: string
+): string {
+	const envHost = env.DEVFLARE_RUNTIME_HOST?.trim()
+	return readStringOption(options['runtime-host'])
+		?? (envHost ? envHost : undefined)
+		?? configHost
+		?? '127.0.0.1'
 }
 
 /**
@@ -148,16 +168,19 @@ export async function runDevCommand(
 	const debugEnabled = parsed.options.debug === true || process.env.DEVFLARE_DEBUG === 'true'
 	const verbose = parsed.options.verbose === true || debugEnabled
 	const theme = createCliTheme(parsed.options)
-	let miniflarePort: number
 
+	const config = await loadConfig({ cwd, configFile: configPath })
+
+	let miniflarePort: number
+	let miniflareHost: string
 	try {
-		miniflarePort = resolveDevRuntimePort(parsed.options)
+		miniflarePort = resolveDevRuntimePort(parsed.options, process.env, config.server?.port)
+		miniflareHost = resolveDevRuntimeHost(parsed.options, process.env, config.server?.host)
 	} catch (error) {
 		logger.error(error instanceof Error ? error.message : String(error))
 		return { exitCode: 1 }
 	}
 
-	const config = await loadConfig({ cwd, configFile: configPath })
 	const viteProject = resolveEffectiveViteProject(
 		await detectViteProject(cwd),
 		config
@@ -227,6 +250,7 @@ export async function runDevCommand(
 			configPath,
 			vitePort: port ? parseInt(port, 10) : 5173,
 			miniflarePort,
+			miniflareHost,
 			enableVite: viteProject.shouldStartVite,
 			persist: persistEnabled,
 			logger: devLogger,

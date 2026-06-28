@@ -150,6 +150,7 @@ The most important top-level keys are:
 - `rules`
 - `secrets`
 - `secretsStoreId`
+- `server`
 - `tailConsumers`
 - `triggers`
 - `vars`

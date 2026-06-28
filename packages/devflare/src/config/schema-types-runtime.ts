@@ -13,6 +13,40 @@ export interface PreviewConfigInput {
 }
 
 /**
+ * Dev server configuration for `devflare dev`.
+ *
+ * Controls the host and port the local Miniflare runtime instance binds to.
+ * Development-only; never emitted to compiled Wrangler output. CLI flags
+ * (`--runtime-port`, `--runtime-host`) and environment variables
+ * (`DEVFLARE_RUNTIME_PORT`, `DEVFLARE_RUNTIME_HOST`) take precedence.
+ */
+export interface ServerConfigInput {
+	/**
+	 * Host the local dev runtime binds to.
+	 *
+	 * @default `'127.0.0.1'`
+	 *
+	 * @example
+	 * ```ts
+	 * server: { host: '0.0.0.0' }
+	 * ```
+	 */
+	host?: string
+
+	/**
+	 * Port the local dev runtime binds to.
+	 *
+	 * @default `8787`
+	 *
+	 * @example
+	 * ```ts
+	 * server: { port: 3000 }
+	 * ```
+	 */
+	port?: number
+}
+
+/**
  * Source file discovery for Worker handlers and generated support files.
  */
 export interface FilesConfigInput {

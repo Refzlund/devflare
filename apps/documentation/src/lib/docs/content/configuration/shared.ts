@@ -32,6 +32,10 @@ export default defineConfig({
 	previews: {
 		includeCrons: false
 	},
+	server: {
+		host: '127.0.0.1',
+		port: 8787
+	},
 	files: {
 		fetch: 'src/fetch.ts',
 		queue: 'src/queue.ts',

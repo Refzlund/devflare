@@ -76,7 +76,7 @@ export const CORE_HELP_PAGES: HelpPage[] = [
 		path: ['dev'],
 		summary: 'Start the development server',
 		usage: [
-			'devflare dev [--config <path>] [--port <port>] [--runtime-port <port>] [--bridge-port <port>] [--persist] [--verbose] [--debug] [--log | --log-temp]'
+			'devflare dev [--config <path>] [--port <port>] [--runtime-port <port>] [--runtime-host <host>] [--bridge-port <port>] [--persist] [--verbose] [--debug] [--log | --log-temp]'
 		],
 		description: [
 			'Starts a worker-only Miniflare server by default, and automatically enables Vite when the current package has an effective local Vite setup.',
@@ -86,7 +86,8 @@ export const CORE_HELP_PAGES: HelpPage[] = [
 		options: [
 			entry('--config <path>', 'Use a specific devflare config file'),
 			entry('--port <port>', 'Preferred Vite dev server port (defaults to 5173 when Vite is enabled)'),
-			entry('--runtime-port <port>', 'Preferred local Miniflare runtime/bridge port (defaults to 8787)'),
+			entry('--runtime-port <port>', 'Preferred local Miniflare runtime/bridge port (defaults to server.port, then 8787)'),
+			entry('--runtime-host <host>', 'Host the local Miniflare runtime binds to (defaults to server.host, then 127.0.0.1)'),
 			entry('--bridge-port <port>', 'Alias for --runtime-port; also honored via DEVFLARE_BRIDGE_PORT'),
 			entry('--persist', 'Persist Miniflare storage between restarts'),
 			entry('--verbose', 'Increase logging verbosity'),
@@ -102,7 +103,7 @@ export const CORE_HELP_PAGES: HelpPage[] = [
 		],
 		notes: [
 			'Worker-only mode is the default when no effective local `vite.config.*` is present.',
-			'When no CLI port option is provided, Devflare reads DEVFLARE_RUNTIME_PORT and then DEVFLARE_BRIDGE_PORT before falling back to 8787.',
+			'Runtime host/port resolve as CLI flag, then DEVFLARE_RUNTIME_HOST/DEVFLARE_RUNTIME_PORT (and DEVFLARE_BRIDGE_PORT), then `server` config, then 127.0.0.1:8787.',
 			'`--log` and `--log-temp` still print to the terminal; they add a file mirror instead of redirecting output away.'
 		]
 	},

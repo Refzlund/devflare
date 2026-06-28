@@ -1,0 +1,103 @@
+name: Publish
+
+# Immediate prerelease publishing: any push to `next` that carries a pending
+# changeset is versioned (e.g. 1.0.0-next.27 -> 1.0.0-next.28), the bump is
+# committed back to `next`, and the package is published to npm under the
+# `next` dist-tag — no release PR.
+#
+# Publishing uses npm trusted publishing (OIDC), so no NPM token is required.
+# Requirements satisfied below: npm >= 11.5.1, `id-token: write`, and never
+# setting NODE_AUTH_TOKEN (an empty token would defeat OIDC fallback). The
+# trusted publisher on npmjs.com is bound to this workflow file name
+# (`publish.yml`) — do not rename it without updating npm.
+
+on:
+  push:
+    branches:
+      - next
+  workflow_dispatch: {}
+
+# Serialize releases so two pushes can't publish the same version concurrently.
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write # push the version-bump commit + tags back to `next`
+  id-token: write # OIDC token for npm trusted publishing
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      TURBO_TELEMETRY_DISABLED: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.12
+
+      # NOTE: intentionally no `registry-url` — it writes an `.npmrc` line
+      # `//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}` that, when the
+      # token is unset, becomes an empty token and prevents npm's OIDC fallback.
+      # The default registry is already registry.npmjs.org.
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Upgrade npm for trusted publishing (OIDC needs >= 11.5.1)
+        run: npm install -g npm@latest
+
+      - name: Install workspace dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Detect pending changesets
+        id: changesets
+        run: |
+          count=$(find .changeset -maxdepth 1 -name '*.md' ! -name 'README.md' | wc -l | tr -d ' ')
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+          if [ "$count" -gt 0 ]; then
+            echo "has=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Pending changesets: $count"
+
+      - name: Version packages
+        if: steps.changesets.outputs.has == 'true'
+        run: bunx changeset version
+
+      - name: Commit version bump to next
+        if: steps.changesets.outputs.has == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --staged --quiet; then
+            echo "Nothing to commit."
+          else
+            git commit -m "chore(release): version packages [skip ci]"
+            git push origin HEAD:next
+          fi
+
+      - name: Build devflare
+        if: steps.changesets.outputs.has == 'true' || github.event_name == 'workflow_dispatch'
+        run: bunx turbo run build --filter=devflare
+
+      # Publishes any package whose version is not yet on npm (idempotent), so a
+      # manual re-run recovers a bump that was committed but failed to publish.
+      - name: Publish to npm (trusted publishing / OIDC)
+        if: steps.changesets.outputs.has == 'true' || github.event_name == 'workflow_dispatch'
+        run: bunx changeset publish --tag next
+
+      - name: Push release git tags
+        if: steps.changesets.outputs.has == 'true' || github.event_name == 'workflow_dispatch'
+        run: git push origin --tags

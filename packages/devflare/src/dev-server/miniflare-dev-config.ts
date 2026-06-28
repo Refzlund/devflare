@@ -52,6 +52,7 @@ export interface BuildMiniflareDevConfigInput {
 	config: DevflareConfig
 	cwd: string
 	miniflarePort: number
+	miniflareHost?: string
 	persist: boolean
 	enableVite: boolean
 	debug: boolean
@@ -79,6 +80,7 @@ export function buildMiniflareDevConfig(input: BuildMiniflareDevConfigInput): an
 		config: loadedConfig,
 		cwd,
 		miniflarePort,
+		miniflareHost = '127.0.0.1',
 		persist,
 		enableVite,
 		debug,
@@ -105,7 +107,7 @@ export function buildMiniflareDevConfig(input: BuildMiniflareDevConfigInput): an
 
 	const sharedOptions: any = {
 		port: miniflarePort,
-		host: '127.0.0.1',
+		host: miniflareHost,
 		kvPersist: persist ? `${persistPath}/kv` : undefined,
 		r2Persist: persist ? `${persistPath}/r2` : undefined,
 		d1Persist: persist ? `${persistPath}/d1` : undefined,

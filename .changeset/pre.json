@@ -1,0 +1,32 @@
+{
+  "mode": "pre",
+  "tag": "next",
+  "initialVersions": {
+    "documentation": "0.0.1",
+    "testing": "0.0.1",
+    "testing-auth-service": "0.0.1",
+    "testing-lock-service": "0.0.1",
+    "testing-search-service": "0.0.1",
+    "@devflare/case1-basic-worker": "0.0.1",
+    "@devflare/case10-path-aliases": "0.0.1",
+    "@devflare/case11-cross-package-do": "0.0.1",
+    "@devflare/case11-do-shared": "0.0.1",
+    "@devflare/case12-email-handlers": "0.0.1",
+    "@devflare/case13-tail-workers": "0.0.1",
+    "@devflare/case14-hyperdrive": "0.0.1",
+    "@devflare/case15-ai-vectorize": "0.0.1",
+    "@devflare/case16-workflows": "0.0.1",
+    "@devflare/case17-rolldown-plugin": "0.0.1",
+    "@devflare/case18-sveltekit-full": "0.0.1",
+    "@devflare/case19-transport-do-rpc": "0.0.1",
+    "@devflare/case3-durable-objects": "0.0.1",
+    "@devflare/case5-multi-worker": "0.0.1",
+    "@devflare/case6-queues-crons": "0.0.1",
+    "@devflare/case7-edge-cases": "0.0.1",
+    "@devflare/case8-file-routing": "0.0.1",
+    "@devflare/case9-monorepo": "0.0.1",
+    "@devflare/case9-shared": "0.0.1",
+    "devflare": "1.0.0-next.27"
+  },
+  "changesets": []
+}

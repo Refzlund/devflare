@@ -64,6 +64,22 @@ export const previewsConfigSchema = z.object({
 }).optional()
 
 /**
+ * Dev server configuration for `devflare dev`.
+ *
+ * Controls the host and port the local Miniflare runtime instance binds to.
+ * This is a development-only setting and is never emitted to compiled Wrangler
+ * output. CLI flags (`--runtime-port`, `--runtime-host`) and environment
+ * variables (`DEVFLARE_RUNTIME_PORT`, `DEVFLARE_RUNTIME_HOST`) take precedence
+ * over these values.
+ */
+export const serverConfigSchema = z.object({
+	/** Host the dev runtime binds to. @default '127.0.0.1' */
+	host: z.string().min(1).optional(),
+	/** Port the dev runtime binds to. @default 8787 */
+	port: z.number().int().min(1).max(65535).optional()
+}).strict().optional()
+
+/**
  * Secret declaration options.
  */
 export const secretConfigSchema = z.object({
@@ -277,5 +293,6 @@ export type ModuleRuleConfig = z.infer<typeof moduleRuleSchema>
 export type PlacementConfig = z.infer<typeof placementSchema>
 export type PreviewConfig = z.output<typeof previewsConfigSchema>
 export type RouteConfig = z.infer<typeof routeConfigSchema>
+export type ServerConfig = z.infer<typeof serverConfigSchema>
 export type TailConsumerConfig = z.infer<typeof tailConsumerSchema>
 export type WsRouteConfig = z.infer<typeof wsRouteConfigSchema>

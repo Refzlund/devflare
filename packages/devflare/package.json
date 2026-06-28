@@ -2,6 +2,15 @@
 	"name": "devflare",
 	"version": "1.0.0-next.27",
 	"description": "Devflare is a developer-first toolkit for Cloudflare Workers that sits on top of Miniflare and Wrangler-compatible config",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/Refzlund/devflare.git",
+		"directory": "packages/devflare"
+	},
+	"homepage": "https://github.com/Refzlund/devflare#readme",
+	"bugs": {
+		"url": "https://github.com/Refzlund/devflare/issues"
+	},
 	"type": "module",
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",

@@ -34,6 +34,7 @@ import {
 	previewsConfigSchema,
 	routeConfigSchema,
 	secretConfigSchema,
+	serverConfigSchema,
 	tailConsumerSchema,
 	triggersSchema,
 	wranglerConfigSchema,
@@ -134,6 +135,9 @@ export const rootConfigShape = {
 
 	/** Preview-specific Devflare behavior. */
 	previews: previewsConfigSchema,
+
+	/** Dev server (Miniflare runtime instance) host/port for `devflare dev`. */
+	server: serverConfigSchema,
 
 	/** File handlers configuration. */
 	files: filesSchema,
@@ -283,6 +287,7 @@ export type {
 	SecretsStoreBindingInput,
 	SecretsStoreBindingObjectInput,
 	SendEmailBindingInput,
+	ServerConfigInput,
 	ServiceBindingInput,
 	SmartPlacementConfigInput,
 	TailConsumerConfigInput,
@@ -324,7 +329,7 @@ export type {
 	MtlsCertificateBinding
 } from './schema-bindings'
 export type { DevflareEnvConfig } from './schema-env'
-export type { AssetsConfig, ContainerConfig, MigrationConfig, ModuleRuleConfig, PlacementConfig, PreviewConfig, RouteConfig, TailConsumerConfig, WsRouteConfig } from './schema-runtime'
+export type { AssetsConfig, ContainerConfig, MigrationConfig, ModuleRuleConfig, PlacementConfig, PreviewConfig, RouteConfig, ServerConfig, TailConsumerConfig, WsRouteConfig } from './schema-runtime'
 export type {
 	NormalizedD1Binding,
 	NormalizedDispatchNamespaceBinding,

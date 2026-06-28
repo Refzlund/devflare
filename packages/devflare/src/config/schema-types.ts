@@ -17,6 +17,7 @@ import type {
 	PreviewConfigInput,
 	RouteConfigInput,
 	SecretConfigInput,
+	ServerConfigInput,
 	TailConsumerConfigInput,
 	TriggersConfigInput,
 	WsRouteConfigInput
@@ -120,6 +121,20 @@ export interface DevflareConfigInput {
 	 * ```
 	 */
 	previews?: PreviewConfigInput
+
+	/**
+	 * Dev server settings for `devflare dev`. Sets the host and port the local
+	 * Miniflare runtime instance binds to. Development-only; never affects
+	 * deployed Workers. CLI flags and environment variables take precedence.
+	 *
+	 * @default `{ host: '127.0.0.1', port: 8787 }`
+	 *
+	 * @example
+	 * ```ts
+	 * server: { host: '0.0.0.0', port: 3000 }
+	 * ```
+	 */
+	server?: ServerConfigInput
 
 	/**
 	 * Source file discovery for Worker handlers, Durable Objects, entrypoints,

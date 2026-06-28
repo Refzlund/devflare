@@ -112,6 +112,49 @@ describe('configSchema', () => {
 		})
 	})
 
+	describe('dev server settings', () => {
+		test('accepts a server host and port', () => {
+			const result = configSchema.safeParse({
+				name: 'my-worker',
+				compatibilityDate: '2025-01-07',
+				server: {
+					host: '0.0.0.0',
+					port: 3000
+				}
+			})
+
+			expect(result.success).toBe(true)
+			if (result.success) {
+				expect(result.data.server?.host).toBe('0.0.0.0')
+				expect(result.data.server?.port).toBe(3000)
+			}
+		})
+
+		test('rejects an out-of-range server port', () => {
+			const result = configSchema.safeParse({
+				name: 'my-worker',
+				compatibilityDate: '2025-01-07',
+				server: {
+					port: 70000
+				}
+			})
+
+			expect(result.success).toBe(false)
+		})
+
+		test('rejects unknown server keys', () => {
+			const result = configSchema.safeParse({
+				name: 'my-worker',
+				compatibilityDate: '2025-01-07',
+				server: {
+					hostname: 'localhost'
+				}
+			})
+
+			expect(result.success).toBe(false)
+		})
+	})
+
 	describe('file handlers', () => {
 		test('accepts file handler paths', () => {
 			const result = configSchema.safeParse({

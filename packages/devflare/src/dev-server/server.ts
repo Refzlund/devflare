@@ -47,6 +47,8 @@ export interface DevServerOptions {
 	vitePort?: number
 	/** Miniflare port for gateway (default: 8787) */
 	miniflarePort?: number
+	/** Host the Miniflare runtime instance binds to (default: 127.0.0.1) */
+	miniflareHost?: string
 	/** Whether to start Vite for this package */
 	enableVite?: boolean
 	/** Persist storage data */
@@ -78,6 +80,7 @@ export function createDevServer(options: DevServerOptions): DevServer {
 		configPath,
 		vitePort = 5173,
 		miniflarePort = 8787,
+		miniflareHost = '127.0.0.1',
 		enableVite: enableViteRequested = true,
 		persist = true, // Default to true for dev - migrations need persistence
 		logger,
@@ -132,6 +135,7 @@ export function createDevServer(options: DevServerOptions): DevServer {
 			config: state.config,
 			cwd,
 			miniflarePort,
+			miniflareHost,
 			persist,
 			enableVite: state.enableVite,
 			debug,
@@ -179,7 +183,10 @@ export function createDevServer(options: DevServerOptions): DevServer {
 		state.miniflare = new Miniflare(mfConfig)
 		await state.miniflare.ready
 
-		logger?.success(`Miniflare ready on http://localhost:${miniflarePort}`)
+		const displayHost = miniflareHost === '0.0.0.0' || miniflareHost === '::'
+			? 'localhost'
+			: miniflareHost
+		logger?.success(`Miniflare ready on http://${displayHost}:${miniflarePort}`)
 
 		if (shouldLogMiniflareDiagnostics) {
 			await logMiniflareBindingDiagnostics(logger, state.miniflare, mfConfig)
