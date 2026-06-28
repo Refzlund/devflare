@@ -13,8 +13,9 @@ export class ContextAccessError extends Error {
 	public readonly contextName: string
 	public readonly propertyName: string
 
-	constructor(contextName: string, propertyName: string) {
+	constructor(contextName: string, propertyName: string, message?: string) {
 		super(
+			message ??
 			`Cannot access ${contextName}.${propertyName} outside of an active Devflare handler trail.\n\n` +
 			`This typically happens when:\n` +
 			`  1. Accessing ${contextName} at module top-level (during import)\n` +
@@ -25,6 +26,26 @@ export class ContextAccessError extends Error {
 		this.name = 'ContextAccessError'
 		this.contextName = contextName
 		this.propertyName = propertyName
+	}
+
+	/**
+	 * Builds a `ContextAccessError` for the "no active handler trail" failure mode
+	 * (no AsyncLocalStorage store), with guidance toward the most common causes.
+	 * Pass `message` to override the default `nodejs_compat`-mentioning guidance.
+	 */
+	static contextUnavailable(message?: string): ContextAccessError {
+		return new ContextAccessError(
+			'context',
+			'<unavailable>',
+			message ??
+			`Context not available. Devflare uses AsyncLocalStorage to carry the active event through fetch, queue, scheduled, email, tail, and Durable Object handler call chains.\n\n` +
+			`This usually means one of:\n\n` +
+			`1. Accessing context at module top-level (runs at cold start, not per-request)\n` +
+			`2. Accessing context in setTimeout/setInterval callbacks\n` +
+			`3. Missing 'nodejs_compat' compatibility flag in your worker config\n\n` +
+			`Fix: Move the access inside your handler, middleware, or a helper called from that handler trail.\n` +
+			`Learn more: https://devflare.dev/docs/context-errors`
+		)
 	}
 }
 

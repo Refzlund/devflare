@@ -3515,8 +3515,8 @@ This is also why strict runtime helpers throwing outside context is healthy: it 
 | API | What it reads | Failure behavior | Mutation |
 | --- | --- | --- | --- |
 | Handler parameters | The explicit event object Devflare passes to the handler boundary. | No lookup needed at the boundary. | `event.locals` is mutable. |
-| Per-surface getters like `getFetchEvent()` | The stored `context.event` after Devflare verifies the active surface type. | Throws `ContextUnavailableError`, while `.safe()` returns `null`. | Readonly event view. |
-| `getContext()` | The full active `RequestContext` object for the current handler trail. | Throws `ContextUnavailableError` outside an active handler trail. | Use this mostly for debugging or advanced infrastructure helpers. |
+| Per-surface getters like `getFetchEvent()` | The stored `context.event` after Devflare verifies the active surface type. | Throws `ContextAccessError`, while `.safe()` returns `null`. | Readonly event view. |
+| `getContext()` | The full active `RequestContext` object for the current handler trail. | Throws `ContextAccessError` outside an active handler trail. | Use this mostly for debugging or advanced infrastructure helpers. |
 | `env`, `ctx`, `event` proxies | `getContextOrNull()` through readonly proxy wrappers. | Property access throws `ContextAccessError` outside an active handler trail. | Readonly. |
 | `locals` proxy | `getContextOrNull()?.locals` through the mutable context proxy. | Property access throws `ContextAccessError` outside an active handler trail. | Mutable and shared with `event.locals`. |
 
@@ -3582,7 +3582,7 @@ export const handle = sequence(requestId)
 - Module top-level code runs at cold start, not inside a request or job, so strict runtime helpers are unavailable there.
 - Callbacks that run after the handler trail ends should take explicit inputs instead of assuming context is still alive.
 - Timer callbacks like `setTimeout()` and `setInterval()` are outside the normal Devflare-managed handler trail.
-- Per-surface getters and `getContext()` throw `ContextUnavailableError`, while proxy property access such as `env.DB` or `locals.userId` throws `ContextAccessError` naming the missing property.
+- Per-surface getters and `getContext()` throw `ContextAccessError` describing the unavailable context, while proxy property access such as `env.DB` or `locals.userId` throws `ContextAccessError` naming the missing property.
 - If you are unsure whether the matching surface is active, prefer `.safe()` accessors such as `getFetchEvent.safe()` over catching thrown errors.
 - If runtime context access fails unexpectedly while bypassing Devflare-generated config or harnesses, open the runtime context internals page and verify the Worker still includes the compatibility flags Devflare normally adds for you.
 

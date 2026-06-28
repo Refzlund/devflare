@@ -49,7 +49,6 @@ export {
 	getDurableObjectWebSocketCloseEvent,
 	getDurableObjectWebSocketErrorEvent,
 	hasContext,
-	ContextUnavailableError,
 	type RuntimeEventType,
 	type RuntimeContextValue,
 	type RequestContext

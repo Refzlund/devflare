@@ -22,9 +22,9 @@ import {
 	runWithContext,
 	runWithEventContext,
 	getContext,
-	getContextOrNull,
-	ContextUnavailableError
+	getContextOrNull
 } from '../../../src/runtime/context'
+import { ContextAccessError } from '../../../src/runtime/validation'
 
 /** Helper to create a mock ExecutionContext */
 function createMockCtx(): ExecutionContext {
@@ -160,15 +160,15 @@ describe('runWithContext', () => {
 
 describe('getContext', () => {
 	test('throws when called outside context', () => {
-		expect(() => getContext()).toThrow(ContextUnavailableError)
+		expect(() => getContext()).toThrow(ContextAccessError)
 	})
 
 	test('error message is helpful', () => {
 		try {
 			getContext()
 		} catch (e) {
-			expect(e).toBeInstanceOf(ContextUnavailableError)
-			const error = e as ContextUnavailableError
+			expect(e).toBeInstanceOf(ContextAccessError)
+			const error = e as ContextAccessError
 			expect(error.message).toContain('Context not available')
 			expect(error.message).toContain('nodejs_compat')
 		}
@@ -275,7 +275,7 @@ describe('event-first context accessors', () => {
 
 		runWithEventContext(createQueueEvent(batch, mockEnv, mockCtx), () => {
 			expect(getFetchEvent.safe()).toBeNull()
-			expect(() => getFetchEvent()).toThrow(ContextUnavailableError)
+			expect(() => getFetchEvent()).toThrow(ContextAccessError)
 		})
 	})
 })

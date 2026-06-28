@@ -115,7 +115,7 @@ export function getContext<
 >(): RequestContext<TEnv, TLocals> {
 	const context = storage.getStore()
 	if (!context) {
-		throw new ContextUnavailableError()
+		throw ContextAccessError.contextUnavailable()
 	}
 
 	return context as RequestContext<TEnv, TLocals>
@@ -155,11 +155,11 @@ function createEventAccessor<TEvent extends EventContext>(
 		const currentEvent = getEventContextOrNull()
 
 		if (!currentEvent) {
-			throw new ContextUnavailableError()
+			throw ContextAccessError.contextUnavailable()
 		}
 
 		if (!matcher(currentEvent)) {
-			throw new ContextUnavailableError(
+			throw ContextAccessError.contextUnavailable(
 				`${name} is not available in the current '${currentEvent.type}' context.
 
 Devflare stores event objects in AsyncLocalStorage so helpers called within a handler can reach the active event.
@@ -233,30 +233,3 @@ export const getDurableObjectAlarmEvent = createEventAccessor<DurableObjectAlarm
 export const getDurableObjectWebSocketMessageEvent = createEventAccessor<DurableObjectWebSocketMessageEvent>('getDurableObjectWebSocketMessageEvent()', isDurableObjectWebSocketMessageEvent)
 export const getDurableObjectWebSocketCloseEvent = createEventAccessor<DurableObjectWebSocketCloseEvent>('getDurableObjectWebSocketCloseEvent()', isDurableObjectWebSocketCloseEvent)
 export const getDurableObjectWebSocketErrorEvent = createEventAccessor<DurableObjectWebSocketErrorEvent>('getDurableObjectWebSocketErrorEvent()', isDurableObjectWebSocketErrorEvent)
-
-/**
- * @deprecated Prefer {@link ContextAccessError} from `./validation`. This name
- * is retained as a subclass for backward compatibility — both names refer to
- * the same context-unavailable failure mode and `instanceof ContextAccessError`
- * is true for any instance.
- */
-export class ContextUnavailableError extends ContextAccessError {
-	readonly code = 'CONTEXT_UNAVAILABLE'
-
-	constructor(message?: string) {
-		super('context', '<unavailable>')
-		if (message !== undefined) {
-			this.message = message
-		} else {
-			this.message =
-				`Context not available. Devflare uses AsyncLocalStorage to carry the active event through fetch, queue, scheduled, email, tail, and Durable Object handler call chains.\n\n` +
-				`This usually means one of:\n\n` +
-				`1. Accessing context at module top-level (runs at cold start, not per-request)\n` +
-				`2. Accessing context in setTimeout/setInterval callbacks\n` +
-				`3. Missing 'nodejs_compat' compatibility flag in your worker config\n\n` +
-				`Fix: Move the access inside your handler, middleware, or a helper called from that handler trail.\n` +
-				`Learn more: https://devflare.dev/docs/context-errors`
-		}
-		this.name = 'ContextUnavailableError'
-	}
-}

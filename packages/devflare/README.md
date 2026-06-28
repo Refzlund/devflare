@@ -124,6 +124,11 @@ Runtime import rule of thumb:
 - Use `devflare/test` in tests.
 - Use bare `devflare` for Node-side package tooling and the unified env proxy only when that is intentional.
 
+The authoritative frozen-entrypoint list and the stability guarantee on it live
+in [API Stability Policy](https://github.com/Refzlund/devflare/blob/next/docs/API_STABILITY.md);
+the semver, prerelease lane, and release mechanics live in
+[Versioning & Release Policy](https://github.com/Refzlund/devflare/blob/next/docs/VERSIONING_AND_RELEASE.md).
+
 ## Config Map
 
 The most important top-level keys are:
