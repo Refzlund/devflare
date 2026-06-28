@@ -1,3 +1,5 @@
+import { createLocalHyperdrive } from '../../shims/local-hyperdrive'
+
 // =============================================================================
 // Mock Rate Limit
 // =============================================================================
@@ -63,33 +65,14 @@ export function createMockSecretsStoreSecret(value: string): SecretsStoreSecret 
 // Mock Hyperdrive
 // =============================================================================
 
-function defaultPortForDatabaseUrl(url: URL): number {
-	if (url.port) {
-		return Number(url.port)
-	}
-
-	return url.protocol === 'mysql:' ? 3306 : 5432
-}
-
 /**
  * Creates a Hyperdrive binding around a local database connection string.
+ *
+ * Connection fields are usable with any Node database client; the raw socket
+ * `connect()` is a documented limitation that throws a clear, actionable error.
  */
 export function createMockHyperdrive(connectionString: string): Hyperdrive {
-	const url = new URL(connectionString)
-
-	return {
-		connectionString,
-		host: url.hostname,
-		port: defaultPortForDatabaseUrl(url),
-		user: decodeURIComponent(url.username),
-		password: decodeURIComponent(url.password),
-		database: decodeURIComponent(url.pathname.replace(/^\//, '')),
-		connect(): Socket {
-			throw new Error(
-				'Mock Hyperdrive connect() is not implemented. Use connectionString with your database client, or run a Miniflare-backed test for socket behavior.'
-			)
-		}
-	} as Hyperdrive
+	return createLocalHyperdrive(connectionString)
 }
 
 // =============================================================================
@@ -108,8 +91,14 @@ function createDefaultWorkerStub(): WorkerStub {
 			)
 		},
 		getDurableObjectClass() {
+			// A DurableObjectClass is an opaque facet-spawning reference that
+			// cannot be materialised outside the workerd runtime. The pure mock
+			// has no runtime at all, so inject a stub to supply one.
 			throw new Error(
-				'Mock WorkerLoader stub has no Durable Object class. Pass createMockWorkerLoader({ stub }) for behavior.'
+				'Mock WorkerLoader stub cannot materialise a Durable Object class. '
+				+ 'getDurableObjectClass() returns an opaque facet-spawning reference that workerd '
+				+ 'only exposes inside the runtime. Pass createMockWorkerLoader({ stub }) to inject a stub, '
+				+ 'or use createTestContext() (a real Miniflare worker) for Durable Object behavior.'
 			)
 		}
 	} as unknown as WorkerStub

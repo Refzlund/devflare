@@ -329,11 +329,15 @@ export async function executeRpcMethod(
 
 		// Durable Objects
 		case 'do.idFromName':
-			return serializeDOId((binding as DurableObjectNamespace).idFromName(params[0] as string))
+			return serializeDOId(
+				resolveDoNamespace(binding as DurableObjectNamespace, params[1]).idFromName(params[0] as string)
+			)
 		case 'do.idFromString':
 			return serializeDOId((binding as DurableObjectNamespace).idFromString(params[0] as string))
 		case 'do.newUniqueId':
-			return serializeDOId((binding as DurableObjectNamespace).newUniqueId(params[0] as any))
+			return serializeDOId(
+				resolveDoNamespace(binding as DurableObjectNamespace, params[1]).newUniqueId(params[0] as any)
+			)
 		case 'do.get': {
 			const doId = deserializeDOId(params[0] as any, binding as DurableObjectNamespace)
 				// Instantiate stub to validate id; we return a DOStub reference for the client
@@ -460,6 +464,26 @@ function serializeWorkflowInstance(instance: WorkflowInstance): unknown {
 		__type: 'WorkflowInstance',
 		id: instance.id
 	}
+}
+
+/**
+ * Resolve a (possibly jurisdiction-scoped) DurableObjectNamespace.
+ *
+ * Forwards the jurisdiction faithfully when the binding implements it (real
+ * Cloudflare), and degrades to the plain binding otherwise (miniflare/workerd
+ * local emulation does not pin jurisdictions for storage/routing).
+ */
+function resolveDoNamespace(
+	binding: DurableObjectNamespace,
+	jurisdiction?: unknown
+): DurableObjectNamespace {
+	const withJurisdiction = binding as DurableObjectNamespace & {
+		jurisdiction?: (j: string) => DurableObjectNamespace
+	}
+	if (typeof jurisdiction === 'string' && typeof withJurisdiction.jurisdiction === 'function') {
+		return withJurisdiction.jurisdiction(jurisdiction)
+	}
+	return binding
 }
 
 // -----------------------------------------------------------------------------

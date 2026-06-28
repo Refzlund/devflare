@@ -159,16 +159,26 @@ describe('serializeRequest / serializeResponse \u2014 body transport', () => {
 		const original = new Request('https://example.com/upload', { method: 'POST', body: big })
 
 		await expect(serializeRequest(original, { httpThreshold: 16 })).rejects.toThrow(
-			/http body transfer not implemented/
+			/large request-body streaming is not yet supported/
 		)
 	})
 
-	test('serializeResponse throws for bodies above the http threshold', async () => {
-		const original = new Response(new Uint8Array(32))
+	test('serializeResponse streams bodies above the http threshold', async () => {
+		const payload = new Uint8Array(32).fill(7)
+		const original = new Response(payload)
 
-		await expect(serializeResponse(original, { httpThreshold: 16 })).rejects.toThrow(
-			/http body transfer not implemented/
-		)
+		const { serialized, streams } = await serializeResponse(original, { httpThreshold: 16 })
+		expect(serialized.body?.type).toBe('stream')
+		expect(streams.length).toBe(1)
+
+		// The returned stream carries the original bytes; feeding it back through
+		// deserializeResponse (via getStream) round-trips byte-identically.
+		const sid = (serialized.body as { type: 'stream'; sid: number }).sid
+		expect(streams[0].sid).toBe(sid)
+		const restored = deserializeResponse(serialized, (s) => (s === sid ? streams[0].stream : null))
+		const restoredBytes = new Uint8Array(await restored.arrayBuffer())
+		expect(restoredBytes.length).toBe(32)
+		expect(Array.from(restoredBytes)).toEqual(Array.from(payload))
 	})
 })
 
@@ -199,5 +209,66 @@ describe('serializeDOId / deserializeDOId \u2014 canonical wire shape', () => {
 	test('deserializeDOId rejects unknown shapes', () => {
 		const ns = { idFromString: () => { throw new Error('should not be called') } } as unknown as DurableObjectNamespace
 		expect(() => deserializeDOId({ type: 'do-id', hexId: 'x' } as never, ns)).toThrow(/Invalid DOId format/)
+	})
+})
+
+describe('serializeValue / deserializeValue \u2014 large Response streaming (B1)', () => {
+	test('a large Response inside an RPC result rides as a stream and round-trips', async () => {
+		// Mirrors the gateway → client result path: server.ts handleRpcCall
+		// runs serializeValue(result); the client reassembles via getStream.
+		const payload = new Uint8Array(40).map((_, i) => i)
+		const result = { ok: true, res: new Response(payload, { status: 200 }) }
+
+		const { value: encoded, streams } = await serializeValue(result, { httpThreshold: 16 })
+		expect(streams.length).toBe(1)
+
+		const encodedRes = (encoded as { res: { body?: { type?: string; sid?: number } } }).res
+		expect(encodedRes.body?.type).toBe('stream')
+		const sid = encodedRes.body!.sid as number
+		expect(streams[0].sid).toBe(sid)
+
+		// JSON transport of the control envelope (the stream bytes ride separately).
+		const transported = JSON.parse(JSON.stringify(encoded))
+		const getStream = (s: number) => (s === sid ? streams[0].stream : null)
+		const restored = deserializeValue(transported, getStream) as { ok: boolean; res: Response }
+		expect(restored.ok).toBe(true)
+		const restoredBytes = new Uint8Array(await restored.res.arrayBuffer())
+		expect(Array.from(restoredBytes)).toEqual(Array.from(payload))
+	})
+
+	test('a Response larger than ~1 MB is framed into multiple sub-frames (no oversized WS frame)', async () => {
+		// workerd rejects WebSocket messages above ~1 MB. The oversized-response
+		// stream must therefore enqueue the buffered body in slices no larger than
+		// the inline threshold (~512 KB), not one giant chunk.
+		const size = 2 * 1024 * 1024 + 123
+		const original = new Uint8Array(size).map((_, i) => i & 0xff)
+
+		const { serialized, streams } = await serializeResponse(new Response(original))
+		expect(serialized.body?.type).toBe('stream')
+		expect(streams.length).toBe(1)
+
+		const reader = streams[0].stream.getReader()
+		const chunks: Uint8Array[] = []
+		let total = 0
+		let maxChunk = 0
+		for (;;) {
+			const { done, value } = await reader.read()
+			if (done) break
+			chunks.push(value)
+			total += value.byteLength
+			maxChunk = Math.max(maxChunk, value.byteLength)
+		}
+
+		expect(chunks.length).toBeGreaterThan(1)
+		expect(maxChunk).toBeLessThanOrEqual(512 * 1024)
+		expect(total).toBe(size)
+
+		const joined = new Uint8Array(total)
+		let offset = 0
+		for (const chunk of chunks) {
+			joined.set(chunk, offset)
+			offset += chunk.byteLength
+		}
+		expect(joined).toEqual(original)
 	})
 })

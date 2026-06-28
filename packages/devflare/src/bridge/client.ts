@@ -185,6 +185,7 @@ export class BridgeClient {
 	private wsProxies = new Map<number, ActiveWsProxy>()
 	private pendingWsOpens = new Map<number, PendingWsOpen>()
 	private outgoingStreams = new Map<number, StreamRef>()
+	private eventListeners = new Map<string, Set<(data: unknown) => void>>()
 
 	private connectPromise: Promise<void> | null = null
 	private isConnected = false
@@ -308,6 +309,10 @@ export class BridgeClient {
 		this.ws = null
 		this.isConnected = false
 		this.cleanupPending(new Error('Bridge disconnected'))
+		// Drop event subscriptions only on an explicit disconnect (not on a
+		// transient auto-reconnect, which goes through handleDisconnect ->
+		// cleanupPending and intentionally preserves listeners).
+		this.eventListeners.clear()
 	}
 
 	/** Alias for disconnect() */
@@ -419,6 +424,36 @@ export class BridgeClient {
 			throw error
 		} finally {
 			if (timeoutHandle !== null) clearTimeout(timeoutHandle)
+		}
+	}
+
+	// ---------------------------------------------------------------------------
+	// Event Subscriptions
+	// ---------------------------------------------------------------------------
+
+	/**
+	 * Subscribe to bridge `event` notifications for a topic.
+	 *
+	 * Pass `'*'` to receive every event regardless of topic. Returns an
+	 * unsubscribe function; calling it removes this listener. Subscriptions
+	 * survive auto-reconnect and are only dropped on an explicit disconnect().
+	 *
+	 * NOTE: no gateway currently emits `event` frames, so listeners will not
+	 * fire until an event producer is wired on the gateway side. The subscriber
+	 * surface is provided so consumers can register ahead of that work.
+	 */
+	on(topic: string, cb: (data: unknown) => void): () => void {
+		let set = this.eventListeners.get(topic)
+		if (!set) {
+			set = new Set()
+			this.eventListeners.set(topic, set)
+		}
+		set.add(cb)
+		return () => {
+			const current = this.eventListeners.get(topic)
+			if (!current) return
+			current.delete(cb)
+			if (current.size === 0) this.eventListeners.delete(topic)
 		}
 	}
 
@@ -623,8 +658,29 @@ export class BridgeClient {
 		}
 	}
 
-	private handleEvent(_msg: { topic: string; data: unknown }): void {
-		// TODO: Emit event to subscribers when event system is implemented
+	private handleEvent(msg: { topic: string; data: unknown }): void {
+		// Fan-out to all subscribers of the exact topic, then to wildcard
+		// ('*') subscribers. A listener that throws must not abort delivery to
+		// its siblings, so each callback is isolated; the cause is surfaced via
+		// bridgeLog.warn rather than silently swallowed.
+		this.dispatchEvent(this.eventListeners.get(msg.topic), msg.data, msg.topic)
+		this.dispatchEvent(this.eventListeners.get('*'), msg.data, msg.topic)
+	}
+
+	private dispatchEvent(
+		listeners: Set<(data: unknown) => void> | undefined,
+		data: unknown,
+		topic: string
+	): void {
+		if (!listeners) return
+		// Snapshot so an unsubscribe during delivery cannot mutate the live set.
+		for (const cb of [...listeners]) {
+			try {
+				cb(data)
+			} catch (error) {
+				bridgeLog.warn(`event listener for topic "${topic}" threw`, error)
+			}
+		}
 	}
 
 	private handleStreamPull(msg: StreamPull): void {

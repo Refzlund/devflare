@@ -127,6 +127,19 @@ function isDurableObjectNamespace(binding) {
 }
 
 /**
+ * Resolve a (possibly jurisdiction-scoped) DurableObjectNamespace.
+ * Forwards the jurisdiction faithfully when the binding supports it
+ * (real Cloudflare), and degrades to the plain binding otherwise
+ * (miniflare/workerd local emulation, which does not pin jurisdictions).
+ */
+function resolveDoNamespace(binding, jurisdiction) {
+	if (jurisdiction && typeof binding.jurisdiction === 'function') {
+		return binding.jurisdiction(jurisdiction)
+	}
+	return binding
+}
+
+/**
  * Execute an RPC method against the gateway's bindings.
  *
  * Method format: "binding.operation". Operations must be namespaced by
@@ -222,7 +235,8 @@ async function executeRpcMethod(method, params, env, _ctx) {
 
 	// Durable Objects
 	if (operation === 'do.idFromName') {
-		const id = binding.idFromName(params[0])
+		const ns = resolveDoNamespace(binding, params[1])
+		const id = ns.idFromName(params[0])
 		return { __type: 'DOId', hex: id.toString() }
 	}
 	if (operation === 'do.idFromString') {
@@ -230,7 +244,8 @@ async function executeRpcMethod(method, params, env, _ctx) {
 		return { __type: 'DOId', hex: id.toString() }
 	}
 	if (operation === 'do.newUniqueId') {
-		const id = binding.newUniqueId(params[0])
+		const ns = resolveDoNamespace(binding, params[1])
+		const id = ns.newUniqueId(params[0])
 		return { __type: 'DOId', hex: id.toString() }
 	}
 	if (operation === 'do.fetch') {

@@ -8,7 +8,7 @@
 // gateway runtime variant.
 // =============================================================================
 
-import { nextStreamId } from './wire'
+import { nextStreamId, HTTP_TRANSFER_THRESHOLD } from './wire'
 
 // -----------------------------------------------------------------------------
 // Serialized Types
@@ -63,7 +63,7 @@ export async function serializeRequest(
 	options?: { httpThreshold?: number }
 ): Promise<{ serialized: SerializedRequest; streams: StreamRef[] }> {
 	const streams: StreamRef[] = []
-	const threshold = options?.httpThreshold ?? 10 * 1024 * 1024
+	const threshold = options?.httpThreshold ?? HTTP_TRANSFER_THRESHOLD
 
 	const headers: [string, string][] = []
 	request.headers.forEach((value, key) => {
@@ -78,10 +78,15 @@ export async function serializeRequest(
 		const bytes = await request.arrayBuffer()
 
 		if (bytes.byteLength > threshold) {
-			// The HTTP body-transfer path was never wired up end-to-end on the
-			// deserialize side. Fail loudly so future wiring cannot silently
-			// produce placeholder bodies.
-			throw new Error('http body transfer not implemented; caller should use inline or binary transfer')
+			// A request body above the inline threshold would have to ride as a
+			// stream from client → gateway, but the real dev gateway does not yet
+			// consume streamed request bodies (it has no stream.* handlers). Fail
+			// loudly rather than silently dropping the body. Responses (gateway →
+			// client) ARE streamed — see serializeResponse below.
+			throw new Error(
+				'Request body exceeds the bridge inline limit (~512 KB) and large request-body streaming is not yet supported over the local bridge. '
+				+ 'Send the payload in smaller chunks or via an R2 binding for now.'
+			)
 		} else if (bytes.byteLength > 0) {
 			// Body has content → inline bytes (base64)
 			body = { type: 'bytes', data: base64Encode(new Uint8Array(bytes)) }
@@ -140,7 +145,7 @@ export async function serializeResponse(
 	options?: { httpThreshold?: number }
 ): Promise<{ serialized: SerializedResponse; streams: StreamRef[] }> {
 	const streams: StreamRef[] = []
-	const threshold = options?.httpThreshold ?? 10 * 1024 * 1024
+	const threshold = options?.httpThreshold ?? HTTP_TRANSFER_THRESHOLD
 
 	const headers: [string, string][] = []
 	response.headers.forEach((value, key) => {
@@ -155,10 +160,31 @@ export async function serializeResponse(
 		const bytes = await response.arrayBuffer()
 
 		if (bytes.byteLength > threshold) {
-			// The HTTP body-transfer path was never wired up end-to-end on the
-			// deserialize side. Fail loudly so future wiring cannot silently
-			// produce placeholder bodies.
-			throw new Error('http body transfer not implemented; caller should use inline or binary transfer')
+			// Oversized response body → ride as a binary StreamChunk stream
+			// (the workerd ~1 MB per-WebSocket-message limit makes a single
+			// inline frame unsafe above the threshold). A one-shot ReadableStream
+			// carries the already-buffered bytes; the gateway registers it from
+			// the returned `streams` and pumps it on stream.pull, and the client
+			// reassembles it via getStream(sid). Fully wired gateway → client.
+			const sid = nextStreamId()
+			const payload = new Uint8Array(bytes)
+			// Slice the buffered body into frames no larger than the inline
+			// threshold (~512 KB) so no single StreamChunk frame exceeds workerd's
+			// ~1 MB per-WebSocket-message limit. The pump forwards each enqueued
+			// chunk as one frame without re-chunking, so a one-shot enqueue of the
+			// whole payload would re-introduce the oversized-frame failure for
+			// responses larger than ~1 MB.
+			const frameSize = HTTP_TRANSFER_THRESHOLD
+			const stream = new ReadableStream<Uint8Array>({
+				start(controller) {
+					for (let offset = 0; offset < payload.byteLength; offset += frameSize) {
+						controller.enqueue(payload.slice(offset, Math.min(offset + frameSize, payload.byteLength)))
+					}
+					controller.close()
+				}
+			})
+			streams.push({ sid, stream })
+			body = { type: 'stream', sid }
 		} else if (bytes.byteLength > 0) {
 			// Body has content → inline bytes (base64)
 			body = { type: 'bytes', data: base64Encode(new Uint8Array(bytes)) }
@@ -264,33 +290,37 @@ export type SerializedSpecial =
 	| { __devflare: 'error', name: string, message: string, stack?: string }
 
 /** Serialize a value that may contain special types */
-export async function serializeValue(value: unknown): Promise<{
+export async function serializeValue(
+	value: unknown,
+	options?: { httpThreshold?: number }
+): Promise<{
 	value: unknown
 	streams: StreamRef[]
 }> {
 	const streams: StreamRef[] = []
 
-	const result = await serializeValueInternal(value, streams)
+	const result = await serializeValueInternal(value, streams, options)
 
 	return { value: result, streams }
 }
 
 async function serializeValueInternal(
 	value: unknown,
-	streams: StreamRef[]
+	streams: StreamRef[],
+	options?: { httpThreshold?: number }
 ): Promise<unknown> {
 	if (value === null || value === undefined) {
 		return value
 	}
 
 	if (value instanceof Request) {
-		const { serialized, streams: reqStreams } = await serializeRequest(value)
+		const { serialized, streams: reqStreams } = await serializeRequest(value, options)
 		streams.push(...reqStreams)
 		return { __type: 'Request', ...serialized }
 	}
 
 	if (value instanceof Response) {
-		const { serialized, streams: resStreams } = await serializeResponse(value)
+		const { serialized, streams: resStreams } = await serializeResponse(value, options)
 		streams.push(...resStreams)
 		return { __type: 'Response', ...serialized }
 	}
@@ -331,8 +361,8 @@ async function serializeValueInternal(
 		const entries: [unknown, unknown][] = []
 		for (const [k, v] of value.entries()) {
 			entries.push([
-				await serializeValueInternal(k, streams),
-				await serializeValueInternal(v, streams)
+				await serializeValueInternal(k, streams, options),
+				await serializeValueInternal(v, streams, options)
 			])
 		}
 		return { __devflare: 'map', entries } satisfies SerializedSpecial
@@ -341,19 +371,19 @@ async function serializeValueInternal(
 	if (value instanceof Set) {
 		const values: unknown[] = []
 		for (const v of value.values()) {
-			values.push(await serializeValueInternal(v, streams))
+			values.push(await serializeValueInternal(v, streams, options))
 		}
 		return { __devflare: 'set', values } satisfies SerializedSpecial
 	}
 
 	if (Array.isArray(value)) {
-		return Promise.all(value.map((v) => serializeValueInternal(v, streams)))
+		return Promise.all(value.map((v) => serializeValueInternal(v, streams, options)))
 	}
 
 	if (typeof value === 'object') {
 		const result: Record<string, unknown> = {}
 		for (const [k, v] of Object.entries(value)) {
-			result[k] = await serializeValueInternal(v, streams)
+			result[k] = await serializeValueInternal(v, streams, options)
 		}
 		return result
 	}

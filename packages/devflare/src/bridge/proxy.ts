@@ -185,6 +185,8 @@ function createD1StatementProxy(
 
 interface DOProxyOptions {
 	transformResult?: (result: unknown) => unknown
+	/** Jurisdiction recorded by namespace.jurisdiction(j); forwarded to id resolution. */
+	jurisdiction?: string
 }
 
 function createDOProxy(
@@ -195,15 +197,15 @@ function createDOProxy(
 	return {
 		idFromName(name: string): DurableObjectId {
 			// Create a local ID reference that will be used in RPC calls
-			return createDOIdProxy(client, bindingName, { type: 'name', value: name })
+			return createDOIdProxy(client, bindingName, { type: 'name', value: name, jurisdiction: proxyOptions.jurisdiction })
 		},
 		idFromString(hexId: string): DurableObjectId {
-			return createDOIdProxy(client, bindingName, { type: 'hex', value: hexId })
+			return createDOIdProxy(client, bindingName, { type: 'hex', value: hexId, jurisdiction: proxyOptions.jurisdiction })
 		},
 		newUniqueId(options?: any): DurableObjectId {
 			// Generate a unique ID locally (this will be synced on first use)
 			const tempId = crypto.randomUUID().replace(/-/g, '')
-			return createDOIdProxy(client, bindingName, { type: 'unique', value: tempId, options })
+			return createDOIdProxy(client, bindingName, { type: 'unique', value: tempId, options, jurisdiction: proxyOptions.jurisdiction })
 		},
 		get(id: DurableObjectId): DurableObjectStub {
 			const idProxy = id as DOIdProxy
@@ -218,8 +220,11 @@ function createDOProxy(
 			return this.get(id)
 		},
 		jurisdiction(jurisdiction: string): DurableObjectNamespace {
-			// Return a new proxy with jurisdiction info
-			return createDOProxy(client, bindingName, proxyOptions)  // TODO: Add jurisdiction support
+			// Record the jurisdiction on a fresh proxy. It is threaded into id
+			// resolution (do.idFromName / do.newUniqueId) and applied on the
+			// gateway only when the underlying binding supports it; locally
+			// (miniflare/workerd) jurisdiction is a no-op for storage/routing.
+			return createDOProxy(client, bindingName, { ...proxyOptions, jurisdiction })
 		}
 	} as DurableObjectNamespace & { getByName(name: string): DurableObjectStub }
 }
@@ -228,6 +233,7 @@ interface DOIdInfo {
 	type: 'name' | 'hex' | 'unique'
 	value: string
 	options?: any
+	jurisdiction?: string
 }
 
 interface DOIdProxy extends DurableObjectId {
@@ -263,13 +269,13 @@ function createDOStubProxy(
 		if (resolvedId) return resolvedId
 		switch (idInfo.type) {
 			case 'name':
-				resolvedId = await client.call(`${bindingName}.do.idFromName`, [idInfo.value])
+				resolvedId = await client.call(`${bindingName}.do.idFromName`, [idInfo.value, idInfo.jurisdiction])
 				break
 			case 'hex':
 				resolvedId = { __type: 'DOId', hex: idInfo.value }
 				break
 			case 'unique':
-				resolvedId = await client.call(`${bindingName}.do.newUniqueId`, [idInfo.options])
+				resolvedId = await client.call(`${bindingName}.do.newUniqueId`, [idInfo.options, idInfo.jurisdiction])
 				break
 		}
 		return resolvedId
@@ -374,8 +380,22 @@ function createDOStubProxy(
 					wsProxy.close(1000, 'Normal closure')
 					return Promise.resolve()
 				},
-				startTls() {
-					throw new Error('startTls not supported on DO WebSocket proxy')
+				startTls(): Socket {
+					// Intentionally unsupported (documented limitation).
+					//
+					// This Socket is a facade over a WebSocket-message proxy to a
+					// Durable Object, not a raw TCP byte stream. StartTLS upgrades
+					// an in-band plaintext TCP connection to TLS; there is no such
+					// stream here - the DO is reached via fetch()/WebSocket and the
+					// transport is already secured by the outer connection. This
+					// matches Cloudflare semantics: Socket.startTls() is only
+					// meaningful on sockets returned by connect() to a raw TCP
+					// endpoint (cloudflare:sockets), never on a DO WebSocket.
+					throw new Error(
+						'startTls() is not supported on a Durable Object WebSocket connection. '
+						+ 'StartTLS applies to raw TCP sockets (cloudflare:sockets connect()), not '
+						+ 'WebSocket-tunneled DO connections, whose transport is already secured by the connection itself.'
+					)
 				}
 			} as unknown as Socket
 		},

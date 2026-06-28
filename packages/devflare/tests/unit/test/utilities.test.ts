@@ -27,6 +27,7 @@ import {
 } from '../../../src/test/utilities'
 import { getContext, hasContext } from '../../../src/runtime/context'
 import { env, locals } from '../../../src/runtime/exports'
+import { HYPERDRIVE_CONNECT_MESSAGE } from '../../../src/shims/local-hyperdrive'
 
 describe('createMockTestContext', () => {
 	test('creates context with default env', () => {
@@ -284,6 +285,65 @@ describe('createMockR2', () => {
 
 		expect(result.objects).toHaveLength(2)
 	})
+
+	test('multipart upload round-trips into the object store', async () => {
+		const r2 = createMockR2()
+
+		const mp = await r2.createMultipartUpload('big.txt')
+		const p1 = await mp.uploadPart(1, 'hello ')
+		const p2 = await mp.uploadPart(2, 'world')
+		const obj = await mp.complete([p1, p2])
+
+		expect(obj.key).toBe('big.txt')
+		expect(await (await r2.get('big.txt'))!.text()).toBe('hello world')
+	})
+
+	test('multipart complete composes parts by partNumber regardless of order', async () => {
+		const r2 = createMockR2()
+
+		const mp = await r2.createMultipartUpload('ordered.txt')
+		const p1 = await mp.uploadPart(1, 'hello ')
+		const p2 = await mp.uploadPart(2, 'world')
+		await mp.complete([p2, p1])
+
+		expect(await (await r2.get('ordered.txt'))!.text()).toBe('hello world')
+	})
+
+	test('multipart abort() discards the upload', async () => {
+		const r2 = createMockR2()
+
+		const mp = await r2.createMultipartUpload('discarded.txt')
+		await mp.uploadPart(1, 'data')
+		await mp.abort()
+
+		expect(await r2.get('discarded.txt')).toBeNull()
+	})
+
+	test('uploadPart after complete/abort fails loudly', async () => {
+		const r2 = createMockR2()
+
+		const mp = await r2.createMultipartUpload('gone.txt')
+		await mp.abort()
+
+		await expect(mp.uploadPart(1, 'data')).rejects.toThrow(/not active/)
+	})
+
+	test('resumeMultipartUpload reuses the existing upload and can complete', async () => {
+		const r2 = createMockR2()
+
+		const mp = await r2.createMultipartUpload('resumed.txt')
+		expect(mp.key).toBe('resumed.txt')
+		const p1 = await mp.uploadPart(1, 'part-one')
+
+		const resumed = r2.resumeMultipartUpload('resumed.txt', mp.uploadId)
+		expect(resumed.key).toBe('resumed.txt')
+		expect(resumed.uploadId).toBe(mp.uploadId)
+
+		const p2 = await resumed.uploadPart(2, '-part-two')
+		await resumed.complete([p1, p2])
+
+		expect(await (await r2.get('resumed.txt'))!.text()).toBe('part-one-part-two')
+	})
 })
 
 describe('createMockRateLimit', () => {
@@ -322,6 +382,36 @@ describe('createMockWorkerLoader', () => {
 				'index.js': 'export default {}'
 			}
 		})).toBe(stub)
+	})
+
+	test('default stub getDurableObjectClass() throws the precise documented limitation', () => {
+		const stub = createMockWorkerLoader().load({
+			compatibilityDate: '2026-04-26',
+			mainModule: 'index.js',
+			modules: {
+				'index.js': 'export default {}'
+			}
+		})
+
+		expect(() => stub.getDurableObjectClass()).toThrow(/Durable Object class/)
+	})
+
+	test('injected stub supplies its own getDurableObjectClass()', () => {
+		const fakeClass = { idFromName: () => ({ toString: () => 'id' }) }
+		const stub = {
+			getEntrypoint: () => ({ fetch: async () => new Response('ok') }),
+			getDurableObjectClass: () => fakeClass
+		} as unknown as WorkerStub
+
+		const loaded = createMockWorkerLoader({ stub }).load({
+			compatibilityDate: '2026-04-26',
+			mainModule: 'index.js',
+			modules: {
+				'index.js': 'export default {}'
+			}
+		})
+
+		expect(loaded.getDurableObjectClass()).toBe(fakeClass)
 	})
 })
 
@@ -370,6 +460,14 @@ describe('createMockHyperdrive', () => {
 		expect(hyperdrive.user).toBe('user')
 		expect(hyperdrive.password).toBe('pass')
 		expect(hyperdrive.database).toBe('app')
+	})
+
+	test('connect() throws while leaving the connection fields usable', () => {
+		const hyperdrive = createMockHyperdrive('postgres://user:pass@localhost:5432/app')
+
+		expect(() => hyperdrive.connect()).toThrow(HYPERDRIVE_CONNECT_MESSAGE)
+		expect(hyperdrive.host).toBe('localhost')
+		expect(hyperdrive.port).toBe(5432)
 	})
 })
 

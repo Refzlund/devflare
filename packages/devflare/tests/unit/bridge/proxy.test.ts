@@ -66,3 +66,80 @@ describe('createEnvProxy strict unknown bindings', () => {
 		expect('MISSING_VALUE' in env).toBe(false)
 	})
 })
+
+describe('createEnvProxy DO jurisdiction (B2)', () => {
+	test('threads jurisdiction(j) through do.idFromName and do.fetch', async () => {
+		const calls: Array<{ method: string; params: unknown[] }> = []
+		const client = {
+			async call(method: string, params: unknown[]) {
+				calls.push({ method, params })
+				if (method.endsWith('.do.idFromName')) {
+					return { __type: 'DOId', hex: 'deadbeef' }
+				}
+				if (method.endsWith('.do.fetch')) {
+					return textResponsePayload('do-ok')
+				}
+				throw new Error('unexpected method ' + method)
+			}
+		}
+
+		const env = createEnvProxy({
+			client: client as never,
+			hints: { MY_DO: 'do' }
+		})
+
+		const ns = env.MY_DO as DurableObjectNamespace
+		const stub = ns.jurisdiction('eu').get(ns.jurisdiction('eu').idFromName('room-1'))
+		const res = await stub.fetch(new Request('https://do.local/'))
+		expect(await res.text()).toBe('do-ok')
+
+		const idCall = calls.find((c) => c.method === 'MY_DO.do.idFromName')
+		expect(idCall).toBeTruthy()
+		expect(idCall?.params).toEqual(['room-1', 'eu'])
+	})
+
+	test('omits jurisdiction (undefined trailing arg) when not scoped', async () => {
+		const calls: Array<{ method: string; params: unknown[] }> = []
+		const client = {
+			async call(method: string, params: unknown[]) {
+				calls.push({ method, params })
+				if (method.endsWith('.do.idFromName')) return { __type: 'DOId', hex: 'cafef00d' }
+				if (method.endsWith('.do.fetch')) return textResponsePayload('ok')
+				throw new Error('unexpected method ' + method)
+			}
+		}
+		const env = createEnvProxy({ client: client as never, hints: { MY_DO: 'do' } })
+		const ns = env.MY_DO as DurableObjectNamespace
+		const stub = ns.get(ns.idFromName('plain'))
+		await stub.fetch(new Request('https://do.local/'))
+		const idCall = calls.find((c) => c.method === 'MY_DO.do.idFromName')
+		expect(idCall?.params).toEqual(['plain', undefined])
+	})
+})
+
+describe('createDOStubProxy.connect startTls (B5)', () => {
+	test('startTls throws the documented unsupported error', async () => {
+		const wsHandlers: { message?: (d: unknown) => void; close?: () => void } = {}
+		const client = {
+			async call() {
+				return { __type: 'DOId', hex: 'abc123' }
+			},
+			async createWsProxy() {
+				return {
+					wid: 1,
+					send: () => {},
+					close: () => {},
+					onMessage: (h: (d: unknown) => void) => { wsHandlers.message = h },
+					onClose: (h: () => void) => { wsHandlers.close = h }
+				}
+			}
+		}
+		const env = createEnvProxy({ client: client as never, hints: { MY_DO: 'do' } })
+		const ns = env.MY_DO as DurableObjectNamespace & { getByName(n: string): DurableObjectStub }
+		const stub = ns.getByName('socket')
+		const socket = await stub.connect('ws://do/chat')
+		expect(() => socket.startTls()).toThrow(
+			/not supported on a Durable Object WebSocket connection/
+		)
+	})
+})

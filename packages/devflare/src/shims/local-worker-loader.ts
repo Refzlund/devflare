@@ -64,7 +64,18 @@ function createLocalWorkerStub(
 			return fetcher
 		},
 		getDurableObjectClass() {
-			throw new Error('Worker Loader local shim does not support dynamic Durable Object classes yet.')
+			// A DurableObjectClass is an opaque facet-spawning reference that
+			// workerd only materialises inside the runtime (it is consumed solely
+			// by FacetStartupOptions.class); there is no public Miniflare/workerd
+			// API to construct one from outside. The local per-worker Miniflare
+			// shim can run the loaded worker's fetch entrypoint, but cannot hand
+			// back a standalone Durable Object class reference.
+			throw new Error(
+				'Worker Loader local shim cannot materialise a dynamic Durable Object class. '
+				+ 'getDurableObjectClass() returns an opaque facet-spawning reference that workerd '
+				+ 'only exposes inside the runtime. Use createTestContext() (a real Miniflare worker) '
+				+ 'for Durable Object behavior, or createMockWorkerLoader({ stub }) to inject a stub.'
+			)
 		}
 	} as unknown as WorkerStub
 }

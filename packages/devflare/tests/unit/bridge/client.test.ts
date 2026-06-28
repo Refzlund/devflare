@@ -219,3 +219,91 @@ describe('BridgeClient parse errors', () => {
 		}
 	})
 })
+
+// -----------------------------------------------------------------------------
+// Event subscriptions (B3)
+// -----------------------------------------------------------------------------
+
+describe('BridgeClient.on event subscriptions', () => {
+	test('delivers event frames to topic subscribers', async () => {
+		const client = new BridgeClient({ autoReconnect: false })
+		const connectPromise = client.connect()
+		const ws = FakeWebSocket.instances[0]
+		ws.open()
+		await connectPromise
+
+		const received: unknown[] = []
+		client.on('thing', (data) => received.push(data))
+
+		ws.emitJson({ t: 'event', topic: 'thing', data: { n: 1 } })
+		ws.emitJson({ t: 'event', topic: 'other', data: { n: 2 } })
+
+		expect(received).toEqual([{ n: 1 }])
+		client.disconnect()
+	})
+
+	test('delivers to wildcard subscribers and supports unsubscribe', async () => {
+		const client = new BridgeClient({ autoReconnect: false })
+		const connectPromise = client.connect()
+		const ws = FakeWebSocket.instances[0]
+		ws.open()
+		await connectPromise
+
+		const all: Array<{ topic: unknown }> = []
+		const off = client.on('*', (data) => all.push(data as { topic: unknown }))
+
+		ws.emitJson({ t: 'event', topic: 'a', data: { topic: 'a' } })
+		ws.emitJson({ t: 'event', topic: 'b', data: { topic: 'b' } })
+		expect(all.length).toBe(2)
+
+		off()
+		ws.emitJson({ t: 'event', topic: 'c', data: { topic: 'c' } })
+		expect(all.length).toBe(2)
+		client.disconnect()
+	})
+
+	test('a throwing listener does not block sibling listeners', async () => {
+		const client = new BridgeClient({ autoReconnect: false })
+		const connectPromise = client.connect()
+		const ws = FakeWebSocket.instances[0]
+		ws.open()
+		await connectPromise
+
+		const sibling: unknown[] = []
+		client.on('topic', () => { throw new Error('boom') })
+		client.on('topic', (data) => sibling.push(data))
+
+		const warnSpy = mock(() => {})
+		const originalWarn = console.warn
+		console.warn = warnSpy as unknown as typeof console.warn
+		try {
+			ws.emitJson({ t: 'event', topic: 'topic', data: 42 })
+			expect(sibling).toEqual([42])
+		} finally {
+			console.warn = originalWarn
+			client.disconnect()
+		}
+	})
+
+	test('subscriptions are cleared on explicit disconnect', async () => {
+		const client = new BridgeClient({ autoReconnect: false })
+		const connectPromise = client.connect()
+		const ws = FakeWebSocket.instances[0]
+		ws.open()
+		await connectPromise
+
+		const received: unknown[] = []
+		client.on('thing', (data) => received.push(data))
+		client.disconnect()
+
+		// Reconnect with a fresh socket; the old listener must be gone.
+		const reconnectClient = client
+		const again = reconnectClient.connect()
+		const ws2 = FakeWebSocket.instances[FakeWebSocket.instances.length - 1]
+		ws2.open()
+		await again
+		ws2.emitJson({ t: 'event', topic: 'thing', data: 'x' })
+		expect(received).toEqual([])
+		reconnectClient.disconnect()
+	})
+})

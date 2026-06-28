@@ -208,3 +208,60 @@ describe('executeRpcMethod — B5-frame: binding errors round-trip with typed ca
 	})
 })
 
+
+describe('executeRpcMethod — DO jurisdiction (B2)', () => {
+	test('forwards jurisdiction to binding.jurisdiction(j) when supported', async () => {
+		const seen: string[] = []
+		const scopedId = { toString: () => 'eu-id' }
+		const scopedNs = {
+			idFromName: (name: string) => { seen.push(`name:${name}`); return scopedId },
+			newUniqueId: () => scopedId
+		}
+		const binding = {
+			idFromName: () => { throw new Error('unscoped idFromName should not be called') },
+			idFromString: () => scopedId,
+			newUniqueId: () => { throw new Error('unscoped newUniqueId should not be called') },
+			get: () => ({ fetch: () => new Response('ok') }),
+			jurisdiction: (j: string) => { seen.push(`j:${j}`); return scopedNs }
+		}
+		const env = { MY_DO: binding } as unknown as GatewayEnv
+
+		const result = await executeRpcMethod('MY_DO.do.idFromName', ['room', 'eu'], env, noopCtx)
+		expect(result).toEqual({ __type: 'DOId', hex: 'eu-id' })
+		expect(seen).toEqual(['j:eu', 'name:room'])
+	})
+
+	test('degrades to the plain binding when jurisdiction() is absent', async () => {
+		const seen: string[] = []
+		const plainId = { toString: () => 'plain-id' }
+		const binding = {
+			idFromName: (name: string) => { seen.push(`name:${name}`); return plainId },
+			idFromString: () => plainId,
+			newUniqueId: () => plainId,
+			get: () => ({ fetch: () => new Response('ok') })
+			// no jurisdiction() method
+		}
+		const env = { MY_DO: binding } as unknown as GatewayEnv
+
+		const result = await executeRpcMethod('MY_DO.do.idFromName', ['room', 'eu'], env, noopCtx)
+		expect(result).toEqual({ __type: 'DOId', hex: 'plain-id' })
+		expect(seen).toEqual(['name:room'])
+	})
+
+	test('no jurisdiction arg → plain binding even when jurisdiction() exists', async () => {
+		const seen: string[] = []
+		const plainId = { toString: () => 'plain-id' }
+		const binding = {
+			idFromName: () => { throw new Error('idFromName(unscoped) should not run for newUniqueId test') },
+			idFromString: () => plainId,
+			newUniqueId: () => { seen.push('newUniqueId'); return plainId },
+			get: () => ({ fetch: () => new Response('ok') }),
+			jurisdiction: () => { throw new Error('jurisdiction() should not be called without an arg') }
+		}
+		const env = { MY_DO: binding } as unknown as GatewayEnv
+
+		const result = await executeRpcMethod('MY_DO.do.newUniqueId', [undefined, undefined], env, noopCtx)
+		expect(result).toEqual({ __type: 'DOId', hex: 'plain-id' })
+		expect(seen).toEqual(['newUniqueId'])
+	})
+})
