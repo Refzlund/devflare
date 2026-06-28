@@ -98,7 +98,7 @@ jobs:
         if: steps.changesets.outputs.has == 'true' || github.event_name == 'workflow_dispatch'
         run: |
           bun run devflare:typecheck
-          bun --cwd packages/devflare run test:unit
+          bun run --cwd packages/devflare test:unit
 
       - name: Version packages
         if: steps.changesets.outputs.has == 'true'
@@ -118,6 +118,13 @@ jobs:
       - name: Build devflare
         if: steps.changesets.outputs.has == 'true' || github.event_name == 'workflow_dispatch'
         run: bunx turbo run build --filter=devflare
+
+      # The unit gate above runs against `src`, so it cannot catch a `dist` that
+      # builds but is unimportable. Smoke-load every published entrypoint under
+      # node before publishing so a broken bundle can never ship.
+      - name: Verify built entrypoints import under node
+        if: steps.changesets.outputs.has == 'true' || github.event_name == 'workflow_dispatch'
+        run: bun run --cwd packages/devflare verify:dist
 
       # No --tag: in pre mode `changeset publish` always uses the pre tag
       # (`next`) as the npm dist-tag, and passing --tag is rejected. It publishes

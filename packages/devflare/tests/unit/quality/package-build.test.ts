@@ -15,7 +15,14 @@ describe('package build hygiene', () => {
 		}
 
 		expect(packageJson.scripts?.['clean:dist']).toBe('bun ./scripts/clean-dist.ts')
-		expect(packageJson.scripts?.build).toStartWith('bun run clean:dist && bun build ')
+		// The JS bundle is built with rolldown, not `bun build`: bun's bundler
+		// miscompiles pure re-export barrels (emits `export { x }` with no `from`
+		// clause), which broke every ESM entrypoint. tsgo still emits declarations.
+		expect(packageJson.scripts?.build).toStartWith(
+			'bun run clean:dist && rolldown -c rolldown.config.ts'
+		)
+		expect(packageJson.scripts?.build).toContain('tsgo --declaration')
 		expect(existsSync(workspacePath('packages/devflare/scripts/clean-dist.ts'))).toBe(true)
+		expect(existsSync(workspacePath('packages/devflare/rolldown.config.ts'))).toBe(true)
 	})
 })

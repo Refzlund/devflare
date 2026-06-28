@@ -51,6 +51,21 @@ day-to-day workflow is:
 3. **Pull** the bot's `chore(release): version packages` commit before
    continuing work on `next`.
 
+### The build
+
+The JS bundle is built with **rolldown** (`rolldown.config.ts`), not `bun build`:
+bun's bundler miscompiles pure re-export barrels (it emits `export { x }` with
+no `from` clause, so the symbol resolves to nothing and `node` import throws
+`Export 'x' is not defined in module`). `tsgo` then emits the `.d.ts` files, and
+`scripts/fix-dts-extensions.ts` rewrites their relative specifiers to carry
+explicit extensions (`./x` → `./x.js`, `./dir` → `./dir/index.js`) so the types
+resolve under `node16`/`nodenext`, not only `bundler`.
+
+After every build, `bun run --cwd packages/devflare verify:dist` loads each
+published entrypoint under node and asserts it exports something. The publish
+workflow runs this between build and publish, so an unimportable `dist` can
+never ship (the unit gate runs against `src` and would not catch it).
+
 ### Before the stable `1.0.0` cut
 
 Run the package-distribution linters against a fresh build and resolve (or
@@ -61,12 +76,15 @@ bun run --cwd packages/devflare build
 cd packages/devflare && bunx publint && bunx @arethetypeswrong/cli --pack
 ```
 
-`publint` validates the `exports`/`types`/`files` manifest, and
+`publint` validates the `exports`/`types`/`files` manifest (expected: all good).
 `@arethetypeswrong/cli` checks every entrypoint resolves its `.d.ts` correctly
 under each module-resolution mode (including the `browser` condition, which has
-no separate `types` condition). These need a correct build, so run them in an
-environment whose Bun version matches CI (the `--splitting` output is
-Bun-patch-version-sensitive).
+no separate `types` condition). The expected, accepted state for this ESM-only
+package is `node16 (from ESM)` and `bundler` **green** on every entry, with two
+deliberate non-green results: `node10` cannot read `exports` subpaths (it is
+end-of-life), and `node16 (from CJS)` reports "ESM (dynamic import only)" because
+there is no CommonJS build — CJS consumers use dynamic `import()`. Both are
+inherent to shipping ESM-only with an `exports` map.
 
 ## Local checks
 
