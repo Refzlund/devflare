@@ -47,11 +47,11 @@ the orchestrator pulls the bot's version-bump commit before the next phase.
 - C4 📝 Partial-local bindings (Browser advanced, Images hosted, Media, Pipelines, mTLS, Dispatch, Artifacts, AI Search, Hyperdrive socket, Workflows) documented with exact "what needs Cloudflare" notes
 
 ### Phase D — Deploy / preview / secrets maturity
-- D1 ⬜ Document auto-provisioning coverage (KV/D1/R2/Queues create; Hyperdrive/Vectorize resolve-only; rest reference-only)
-- D2 ⬜ Document partial-deploy orphan behavior (no auto-delete by design)
-- D3 ⬜ Secrets local-only — document the remote-secret workflow / boundary
-- D4 ⬜ Per-environment secret scoping — document / fix
-- D5 ⬜ Permission-groups generated UUIDs — maintainer refresh note + graceful fallback confirmation
+- D1 📝 Document auto-provisioning coverage (KV/D1/R2/Queues create; Hyperdrive/Vectorize resolve-only; Analytics Engine/Browser reference-only) — `docs/DEPLOY_AND_SECRETS.md`
+- D2 📝 Document partial-deploy orphan behavior (no auto-delete by design; the loud orphan footer + idempotent re-run recovery) — `docs/DEPLOY_AND_SECRETS.md`
+- D3 📝 Secrets local-only — documented the boundary (`secrets --local` enforced; references-only binding wiring; remote values managed out-of-band) — `docs/DEPLOY_AND_SECRETS.md`
+- D4 📝 Per-environment secret scoping — documented (deep-merge inheritance is correct-by-design; the implicit shared-root-store sharp edge is a doc note, not a footgun: env-aware shorthand validation already catches the only true error). No code change.
+- D5 ✅/📝 Permission-groups generated UUIDs — sharpened the display-name fallback warning to point at the refresh script instead of a misleading "add the id" instruction (`src/cloudflare/tokens.ts`); documented the empty-table story, the mint-time scope+name-prefix path, and the maintainer refresh step — `docs/DEPLOY_AND_SECRETS.md`
 
 ### Phase E — Test & CI quality gates
 - E1 ⬜ 🔴 Enforce lint/format in CI + reduce biome violations (2236 repo / 646 in src)
@@ -112,3 +112,16 @@ the orchestrator pulls the bot's version-bump commit before the next phase.
 - Reinforced the Phase-B token constraint: the `wrangler-v4-compat` audit reads tracked-file CONTENT from the working tree, so even uncommitted edits to a tracked doc that contain a removed-v4 token fail it. All Phase-C docs use descriptive language for removed features.
 
 **Verification:** typecheck ✅ · config→wrangler compile of all 3 flags (incl. explicit `false`) ✅ · config+docs+compat 344/0 ✅ · full unit 1050 pass / 0 fail · both adversarial reviews VERDICT: PASS.
+
+### Phase D — Deploy / preview / secrets maturity ✅
+
+**Done.** Authored `docs/DEPLOY_AND_SECRETS.md` as the production reference for deploy/preview/secrets (D1–D5): the auto-provisioning matrix (KV/D1/R2/Queues create; Hyperdrive/Vectorize resolve-only with the Vectorize preview-clone asymmetry; Analytics Engine/Browser reference-only), the deliberate Hyperdrive→Vectorize→KV→D1→R2→Queues resolution order, the no-auto-delete orphan behavior + loud footer + idempotent re-run recovery, the `--dry-run`/describe-only behavior (incl. the Vectorize/Hyperdrive omission from "Would create"), the preview/branch lifecycle (naming, per-type provisioning, `previews cleanup`), the secrets boundary, per-env secret scoping, and the permission-groups story.
+
+**Code change (the one safe clarification research flagged)**
+- `src/cloudflare/tokens.ts` — the display-name-fallback `console.warn` told users to "file an issue to add the permission-group id to `KNOWN_PERMISSION_GROUP_IDS`," but that map is **generated**; the actual fix is running the refresh script. Replaced the text with a pointer to `bun run --cwd packages/devflare refresh-permission-groups` (regenerates `known-permission-group-ids.generated.ts`), or opening an issue. Pure string change — no behavior change; the warning still interpolates the symbolic name (the only assertion in `tokens.test.ts`).
+
+**Decisions (docs-only, per research)**
+- D4 needs no guard: env overrides are a deep merge, so an env that sets `secretsStoreId` overrides root and one that omits it inherits — the Wrangler-consistent expectation, not a shared-store bug. The only sharp edge (two shorthand envs both inheriting the root store) is documented, not coded around; env-aware shorthand validation already flags the one true error (shorthand with no store id anywhere).
+- D5 nuance corrected vs the initial premise: `matchesKnownPermissionGroup`/`KNOWN_PERMISSION_GROUP_IDS` are consumed only by the refresh script + tests; the live `tokens --new` mint path selects by scope + name-prefix allowlist (`DEVFLARE_PERMISSION_GROUP_NAME_PATTERNS`), so the empty generated table does not affect minting. The doc says so explicitly.
+
+**Verification:** typecheck ✅ · `wrangler-v4-compat` ✅ (no removed-v4 tokens in the new doc or the edited source) · docs suite ✅ · cli + cloudflare unit suites ✅ (tokens fallback-warning test still green).

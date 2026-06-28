@@ -135,8 +135,10 @@ export function matchesKnownPermissionGroup(
 		console.warn(
 			`[devflare] Matched Cloudflare permission group '${symbolicName}' by display name `
 			+ `('${expectedName}') because no verified id is configured. Cloudflare display `
-			+ 'names are unstable; please file an issue to add the permission-group id to '
-			+ 'KNOWN_PERMISSION_GROUP_IDS.'
+			+ 'names are unstable; a maintainer should run '
+			+ '`bun run --cwd packages/devflare refresh-permission-groups` to regenerate '
+			+ 'known-permission-group-ids.generated.ts with the verified id (or open an '
+			+ 'issue so a maintainer can).'
 		)
 		return true
 	}
