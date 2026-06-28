@@ -68,6 +68,17 @@ matrix — they are the offline baseline.
 | Durable Objects | `durableObjects` | ✅ Full | Miniflare runs DO classes locally; string or `{ className, scriptName }`. | Provisioned via migrations, not a create API. |
 | Service bindings | `services` | ✅ Full | Worker-to-worker RPC; `{ service, environment?, entrypoint? }`. | No — the target Worker is deployed separately. |
 
+**Bridge response-size limit (cross-process access only).** When a Durable
+Object or service binding is reached *through the bridge* — i.e. from
+`devflare/test` or SvelteKit `platform.env` running in a separate process, not
+from inside the Worker — the proxied `fetch()` response body is delivered inline
+over the bridge WebSocket and is capped at **512 KB** (workerd's ~1 MB
+per-message limit minus base64/framing overhead). A larger response throws a
+clear error rather than being silently truncated. Large R2 objects are exempt —
+they use a dedicated HTTP transfer side-channel. DO WebSocket relaying
+(`stub.connect()`) is unaffected. Inside the Worker (the normal runtime path)
+there is no such cap.
+
 ## Edge and product bindings
 
 Columns: the binding, its config key in `defineConfig`, the local support level,

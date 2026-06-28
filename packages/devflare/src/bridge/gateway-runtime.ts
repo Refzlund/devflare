@@ -21,6 +21,12 @@
 export const GATEWAY_RUNTIME_JS = `
 const RAW_EMAIL = 'EmailMessage::raw'
 
+// Inline body cap for proxied DO/service-fetch responses. Matches
+// HTTP_TRANSFER_THRESHOLD in wire.ts (512 KB). A larger body would exceed
+// workerd's ~1 MB WebSocket message limit once base64-encoded into the rpc.ok
+// frame, so it is rejected with a clear error rather than silently truncated.
+const HTTP_TRANSFER_THRESHOLD = 512 * 1024
+
 function arrayBufferToBase64(buffer) {
 	const bytes = new Uint8Array(buffer)
 	let binary = ''
@@ -33,6 +39,33 @@ function base64ToArrayBuffer(base64) {
 	const bytes = new Uint8Array(binary.length)
 	for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
 	return bytes.buffer
+}
+
+// Binary WsData frame codec (10-byte header: kind:u8, id:u32 LE, seq:u32 LE,
+// flags:u8 + payload). MUST match wire.ts encodeBinaryFrame/decodeBinaryFrame so
+// the bridge client and this gateway agree on the WS-data wire format
+// (BinaryKind.WsData = 2, BinaryFlags.TEXT = 2).
+function encodeWsDataFrame(wid, flags, payload) {
+	const frame = new Uint8Array(10 + payload.byteLength)
+	const view = new DataView(frame.buffer)
+	view.setUint8(0, 2)
+	view.setUint32(1, wid, true)
+	view.setUint32(5, 0, true)
+	view.setUint8(9, flags)
+	frame.set(payload, 10)
+	return frame
+}
+
+function decodeWsDataFrame(buffer) {
+	const bytes = new Uint8Array(buffer)
+	if (bytes.byteLength < 10) return null
+	const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+	return {
+		kind: view.getUint8(0),
+		id: view.getUint32(1, true),
+		flags: view.getUint8(9),
+		payload: bytes.subarray(10)
+	}
 }
 
 function serializeR2Object(obj) {
@@ -86,6 +119,15 @@ async function serializeResponse(response) {
 	let body = null
 	if (response.body) {
 		const bytes = await response.arrayBuffer()
+		if (bytes.byteLength > HTTP_TRANSFER_THRESHOLD) {
+			throw new Error(
+				'[devflare][bridge] Response body (' + bytes.byteLength + ' bytes) exceeds the '
+				+ HTTP_TRANSFER_THRESHOLD + '-byte inline limit. DO and service-binding fetch responses '
+				+ 'are delivered inline over the bridge WebSocket and cannot be streamed locally; keep '
+				+ 'proxied response bodies under the limit (large R2 objects are exempt — read them through '
+				+ 'the R2 binding, which uses the HTTP transfer side-channel).'
+			)
+		}
 		if (bytes.byteLength > 0) {
 			body = { type: 'bytes', data: arrayBufferToBase64(bytes) }
 		}
@@ -424,8 +466,11 @@ async function handleBridgeWsOpen(msg, ws, env, wsProxies) {
 
 		doWs.addEventListener('message', (event) => {
 			const isText = typeof event.data === 'string'
-			const data = isText ? event.data : arrayBufferToBase64(event.data)
-			ws.send(JSON.stringify({ t: 'ws.data', wid: msg.wid, data, isText }))
+			const payload = isText
+				? new TextEncoder().encode(event.data)
+				: new Uint8Array(event.data)
+			const flags = isText ? 2 : 0
+			ws.send(encodeWsDataFrame(msg.wid, flags, payload))
 		})
 
 		doWs.addEventListener('close', (event) => {
@@ -451,17 +496,35 @@ function handleBridgeWsClose(msg, wsProxies) {
 	}
 }
 
+// Relay an inbound binary WsData frame (client -> DO). Mirrors server.ts
+// handleBinaryMessage: decode the frame, look up the proxy by ws id, and forward
+// the payload to the DO socket honoring the TEXT flag.
+function handleBridgeBinaryMessage(buffer, wsProxies) {
+	const frame = decodeWsDataFrame(buffer)
+	if (!frame || frame.kind !== 2) return
+	const proxy = wsProxies.get(frame.id)
+	if (!proxy) return
+	if ((frame.flags & 2) !== 0) {
+		proxy.doWs.send(new TextDecoder().decode(frame.payload))
+	} else {
+		proxy.doWs.send(frame.payload)
+	}
+}
+
 async function handleBridgeJsonMessage(data, ws, env, ctx, wsProxies) {
 	const msg = JSON.parse(data)
 	switch (msg.t) {
 		case 'hello':
 			// v2 handshake — acknowledge with welcome echoing the negotiated
-			// capability intersection. Capabilities advertised by the gateway
-			// are kept in sync with src/bridge/client.ts (BRIDGE_CLIENT_CAPABILITIES).
+			// capability intersection. The gateway advertises only what it
+			// implements end-to-end: 'ws-relay' (binary WsData relay to/from DO
+			// sockets) and 'http-transfer' (the R2 transfer HTTP side-channel).
+			// 'streams' is intentionally NOT advertised — large DO/service-fetch
+			// responses are inlined, not streamed, in this gateway.
 			ws.send(JSON.stringify({
 				t: 'welcome',
 				protocolVersion: 2,
-				capabilities: ['streams', 'ws-relay', 'http-transfer']
+				capabilities: ['ws-relay', 'http-transfer']
 					.filter((c) => Array.isArray(msg.capabilities) && msg.capabilities.includes(c))
 					.sort()
 			}))
@@ -490,6 +553,8 @@ function handleBridgeWebSocket(request, env, ctx) {
 		try {
 			if (typeof event.data === 'string') {
 				await handleBridgeJsonMessage(event.data, server, env, ctx, wsProxies)
+			} else {
+				handleBridgeBinaryMessage(event.data, wsProxies)
 			}
 		} catch (error) {
 			console.error('[Gateway] Error:', error)

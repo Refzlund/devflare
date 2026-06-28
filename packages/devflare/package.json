@@ -83,7 +83,7 @@
 		"test:unit": "bun test tests/unit",
 		"test:coverage": "bun test tests/unit --coverage",
 		"test:integration:control": "bun test tests/integration/cli tests/integration/examples tests/integration/package-entry tests/integration/vite",
-		"test:integration:bridge": "bun test tests/integration/bridge/bridge-proxy.test.ts --parallel=1 --max-concurrency=1 && bun test tests/integration/bridge/case18-do.test.ts --parallel=1 --max-concurrency=1 && bun test tests/integration/bridge/durable-object.test.ts --parallel=1 --max-concurrency=1 && bun test tests/integration/bridge/miniflare.test.ts --parallel=1 --max-concurrency=1 && bun test tests/integration/bridge/r2-transfer.test.ts --parallel=1 --max-concurrency=1",
+		"test:integration:bridge": "bun test tests/integration/bridge/bridge-proxy.test.ts --parallel=1 --max-concurrency=1 && bun test tests/integration/bridge/case18-do.test.ts --parallel=1 --max-concurrency=1 && bun test tests/integration/bridge/durable-object.test.ts --parallel=1 --max-concurrency=1 && bun test tests/integration/bridge/do-websocket.test.ts --parallel=1 --max-concurrency=1 && bun test tests/integration/bridge/miniflare.test.ts --parallel=1 --max-concurrency=1 && bun test tests/integration/bridge/r2-transfer.test.ts --parallel=1 --max-concurrency=1",
 		"test:integration:test-context": "bun test tests/integration/test-context --parallel=1 --max-concurrency=1",
 		"test:integration:dev-server": "bun test tests/integration/dev-server --parallel=1 --max-concurrency=1",
 		"test:watch": "bun test --watch",
