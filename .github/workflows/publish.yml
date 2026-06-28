@@ -56,6 +56,11 @@ jobs:
       - name: Upgrade npm for trusted publishing (OIDC needs >= 11.5.1)
         run: npm install -g npm@latest
 
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
       - name: Install workspace dependencies
         run: bun install --frozen-lockfile
 
@@ -92,8 +97,6 @@ jobs:
       - name: Commit version bump to next
         if: steps.changesets.outputs.has == 'true'
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           if git diff --staged --quiet; then
             echo "Nothing to commit."
