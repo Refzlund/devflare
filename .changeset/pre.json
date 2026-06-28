@@ -30,6 +30,7 @@
   },
   "changesets": [
     "cloudflare-deploy-policy-flags",
+    "deploy-secrets-guide",
     "dev-server-host-port",
     "phase-b-code-paths",
     "remove-context-unavailable-error"
