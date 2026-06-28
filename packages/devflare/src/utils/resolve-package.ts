@@ -2,12 +2,20 @@
 // Package Specifier Resolution — Resolves package specifiers to filesystem paths
 // =============================================================================
 
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, realpathSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { dirname, resolve } from 'pathe'
 
-const NOT_FOUND_CODES = new Set(['MODULE_NOT_FOUND', 'ERR_MODULE_NOT_FOUND'])
+const NOT_FOUND_CODES = new Set([
+	'MODULE_NOT_FOUND',
+	'ERR_MODULE_NOT_FOUND',
+	// A package that doesn't list `./package.json` in its `exports` map: this is
+	// not a "missing package", just an un-exported subpath. Reading a package's
+	// own package.json should never go through `exports`, so treat it as a soft
+	// miss and let the caller fall back to a filesystem lookup.
+	'ERR_PACKAGE_PATH_NOT_EXPORTED'
+])
 
 function isNotFoundError(error: unknown): boolean {
 	if (!error || typeof error !== 'object') {
@@ -16,6 +24,30 @@ function isNotFoundError(error: unknown): boolean {
 
 	const code = (error as { code?: unknown }).code
 	return typeof code === 'string' && NOT_FOUND_CODES.has(code)
+}
+
+/**
+ * Find a package's own `package.json` by walking `node_modules` up the tree,
+ * exactly like Node's directory resolution — and crucially WITHOUT consulting
+ * the package's `exports` map (a package need not expose `./package.json`).
+ */
+function findPackageJsonByWalk(packageName: string, fromDir: string): string | null {
+	let dir = resolve(fromDir)
+	while (true) {
+		const candidate = resolve(dir, 'node_modules', packageName, 'package.json')
+		if (existsSync(candidate)) {
+			// Resolve symlinks so workspace packages (linked into node_modules)
+			// report their real source location — downstream resolution computes
+			// paths relative to the package dir and needs the real one. This
+			// matches Node/Bun's default symlink-resolving module resolution.
+			return realpathSync(candidate)
+		}
+		const parent = dirname(dir)
+		if (parent === dir) {
+			return null
+		}
+		dir = parent
+	}
 }
 
 /**
@@ -87,11 +119,14 @@ export function resolvePackageSpecifier(specifier: string, fromDir: string): str
 				.join('/') // subpath after @scope/pkg
 		: specifier.split('/').slice(1).join('/') // subpath after pkg
 
-	// Try to find the package's package.json via ESM-first resolution.
-	// A missing package falls back to a path-based guess to preserve
-	// historical behavior callers depend on; other errors (syntax,
-	// permission, etc.) propagate from resolveSpecifier().
-	const pkgJsonPath = resolveSpecifier(`${parts}/package.json`, fromDir)
+	// Find the package's own package.json. A node_modules walk is tried first
+	// because it does NOT consult the package's `exports` map — reading a
+	// package's own package.json must work even when the package omits
+	// `./package.json` from `exports`. ESM resolution is the fallback (covers
+	// custom layouts the walk misses). A missing package falls back to a
+	// path-based guess to preserve historical behavior callers depend on.
+	const pkgJsonPath =
+		findPackageJsonByWalk(parts, fromDir) ?? resolveSpecifier(`${parts}/package.json`, fromDir)
 	if (!pkgJsonPath) {
 		return resolve(fromDir, specifier)
 	}

@@ -6,7 +6,15 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 const currentDir = dirname(fileURLToPath(import.meta.url))
 const sourceCliEntryPath = resolve(currentDir, '../src/cli/index.ts')
 const distCliEntryPath = resolve(currentDir, '../dist/cli/index.js')
-const cliEntryPath = existsSync(sourceCliEntryPath) ? sourceCliEntryPath : distCliEntryPath
+// Only the bun runtime can execute the TypeScript source directly (it tolerates
+// `.ts` + extensionless relative imports); under node — the default shebang and
+// what published consumers use — always run the built dist. In the monorepo
+// this means `devflare <cmd>` under node needs a prior build, which the
+// build/CI pipeline guarantees. A published install has no `src/`, so it falls
+// through to dist under any runtime.
+const runningBun = Boolean(process.versions.bun)
+const cliEntryPath =
+	runningBun && existsSync(sourceCliEntryPath) ? sourceCliEntryPath : distCliEntryPath
 
 const { runCli } = await import(pathToFileURL(cliEntryPath).href)
 
