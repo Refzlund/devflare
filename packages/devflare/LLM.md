@@ -2579,7 +2579,7 @@ export default defineConfig({
 
 #### Disable unused conventions explicitly and let Devflare compose the rest
 
-Generated composition is not only a build detail. The local dev server also uses the same surface model to decide what to watch, so the directories around configured or conventional fetch, queue, scheduled, email, route, and transport files all become reload roots.
+Generated composition is not only a build detail. The local dev server also uses the same surface model to decide what to watch, so the directories around configured or conventional fetch, queue, scheduled, email, tail, route, and transport files all become reload roots.
 
 That split is intentional: config-file edits take the config reload path, while worker-source changes under those watched roots take the worker reload path. You do not need a second watch system just because the package grew another surface.
 
@@ -2594,11 +2594,11 @@ That split is intentional: config-file edits take the config reload path, while 
 
 > **Note — Dev reload follows the same surface roots**
 >
-> Worker-source changes under the watched fetch, queue, scheduled, email, route, or transport roots trigger the worker reload path, while edits to the resolved `devflare.config.*` trigger the config reload path instead.
+> Worker-source changes under the watched fetch, queue, scheduled, email, tail, route, or transport roots trigger the worker reload path, while edits to the resolved `devflare.config.*` trigger the config reload path instead.
 
-> **Note — Tail is still a special case**
+> **Note — Tail follows the same `files.*` model**
 >
-> Devflare can exercise tail behavior in the test harness when `src/tail.ts` exists, but there is not yet a public `files.tail` config key. Keep the main project-shape story centered on the documented event surfaces, and open the `createTestContext()` page when the question is tail testing.
+> `files.tail` is a public config key that behaves like the other event surfaces: leave it unset to auto-discover `src/tail.ts`, point it at a custom path, or set `files.tail: false` to disable tail handler discovery. Open the `createTestContext()` page when the question is tail testing.
 
 #### Some nearby `files.*` keys are discovery globs, not event handlers
 
@@ -4395,21 +4395,21 @@ These helpers are runtime-shaped and context-accurate for handler logic, but the
 >
 > If a test depends on `waitUntil()` side effects being complete, a plain `cf.worker.fetch()` assertion may be too early. Either assert the side effect directly or move that check into a higher-fidelity path.
 
-#### Tail handlers are testable even before they become a public config lane
+#### Tail handlers are a public config surface with a real test helper
 
-Tail support is already a real helper surface in the harness even though it still sits outside the public `files.*` config keys. When `createTestContext()` finds `src/tail.ts`, it wires `cf.tail.trigger()` automatically and runs the handler with the same runtime helper access as the other test surfaces.
+Tail support is a real helper surface in the harness and a public `files.tail` config key, alongside `files.fetch`, `files.queue`, `files.scheduled`, and `files.email`. When `files.tail` is unset, `createTestContext()` auto-discovers `src/tail.ts`, wires `cf.tail.trigger()` automatically, and runs the handler with the same runtime helper access as the other test surfaces.
 
 The handler can export a default function or a named `tail` function. The helper accepts either full trace items or smaller option objects through `cf.tail.create(...)`, then waits for the handler and any queued `waitUntil()` work before it returns.
 
 ##### Key points
 
-- Keep `src/tail.ts` as a conventional file for now; there is still no public `files.tail` config key.
+- `src/tail.ts` is auto-discovered when `files.tail` is unset; set `files.tail` to point at a custom path, or `files.tail: false` to disable discovery — the same model as `files.fetch`, `files.queue`, `files.scheduled`, and `files.email`.
 - Use `cf.tail.create()` when the test only needs a few trace fields, and pass full trace items when the payload details are the point of the assertion.
 - Reach for a higher-fidelity integration path when the question is Cloudflare ingress behavior rather than your own log or trace handling logic.
 
-> **Warning — Supported helper, still a special-case surface**
+> **Note — Documented like the other handler surfaces**
 >
-> Tail support is real in the harness and runtime context model, but it is intentionally not documented like fetch, queue, scheduled, or email config yet because there is still no public `files.tail` key.
+> Tail has a public `files.tail` config key and is documented like fetch, queue, scheduled, and email: leave it unset to auto-discover `src/tail.ts`, point it at a custom path, or set it to `false` to disable discovery.
 
 ##### Example — A tiny tail handler plus one honest harness test
 

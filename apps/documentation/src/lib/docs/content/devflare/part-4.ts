@@ -121,9 +121,9 @@ export const devflareDocsPart4: DocPage[] = [
 			},
 			{
 				id: 'tail-support',
-				title: 'Tail handlers are testable even before they become a public config lane',
+				title: 'Tail handlers are a public config surface with a real test helper',
 				paragraphs: [
-					'Tail support is already a real helper surface in the harness even though it still sits outside the public `files.*` config keys. When `createTestContext()` finds `src/tail.ts`, it wires `cf.tail.trigger()` automatically and runs the handler with the same runtime helper access as the other test surfaces.',
+					'Tail support is a real helper surface in the harness and a public `files.tail` config key, alongside `files.fetch`, `files.queue`, `files.scheduled`, and `files.email`. When `files.tail` is unset, `createTestContext()` auto-discovers `src/tail.ts`, wires `cf.tail.trigger()` automatically, and runs the handler with the same runtime helper access as the other test surfaces.',
 					'The handler can export a default function or a named `tail` function. The helper accepts either full trace items or smaller option objects through `cf.tail.create(...)`, then waits for the handler and any queued `waitUntil()` work before it returns.'
 				],
 				snippets: [
@@ -183,16 +183,16 @@ test('tail handler sees trace items', async () => {
 					}
 				],
 				bullets: [
-					'Keep `src/tail.ts` as a conventional file for now; there is still no public `files.tail` config key.',
+					'`src/tail.ts` is auto-discovered when `files.tail` is unset; set `files.tail` to point at a custom path, or `files.tail: false` to disable discovery — the same model as `files.fetch`, `files.queue`, `files.scheduled`, and `files.email`.',
 					'Use `cf.tail.create()` when the test only needs a few trace fields, and pass full trace items when the payload details are the point of the assertion.',
 					'Reach for a higher-fidelity integration path when the question is Cloudflare ingress behavior rather than your own log or trace handling logic.'
 				],
 				callouts: [
 					{
-						tone: 'warning',
-						title: 'Supported helper, still a special-case surface',
+						tone: 'info',
+						title: 'Documented like the other handler surfaces',
 						body: [
-							'Tail support is real in the harness and runtime context model, but it is intentionally not documented like fetch, queue, scheduled, or email config yet because there is still no public `files.tail` key.'
+							'Tail has a public `files.tail` config key and is documented like fetch, queue, scheduled, and email: leave it unset to auto-discover `src/tail.ts`, point it at a custom path, or set it to `false` to disable discovery.'
 						]
 					}
 				]

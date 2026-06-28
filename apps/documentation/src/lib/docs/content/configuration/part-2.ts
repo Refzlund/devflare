@@ -330,7 +330,7 @@ export const configurationDocsPart2: DocPage[] = [
 				id: 'disable-and-compose',
 				title: 'Disable unused conventions explicitly and let Devflare compose the rest',
 				paragraphs: [
-					'Generated composition is not only a build detail. The local dev server also uses the same surface model to decide what to watch, so the directories around configured or conventional fetch, queue, scheduled, email, route, and transport files all become reload roots.',
+					'Generated composition is not only a build detail. The local dev server also uses the same surface model to decide what to watch, so the directories around configured or conventional fetch, queue, scheduled, email, tail, route, and transport files all become reload roots.',
 					'That split is intentional: config-file edits take the config reload path, while worker-source changes under those watched roots take the worker reload path. You do not need a second watch system just because the package grew another surface.'
 				],
 				bullets: [
@@ -346,14 +346,14 @@ export const configurationDocsPart2: DocPage[] = [
 						tone: 'info',
 						title: 'Dev reload follows the same surface roots',
 						body: [
-							'Worker-source changes under the watched fetch, queue, scheduled, email, route, or transport roots trigger the worker reload path, while edits to the resolved `devflare.config.*` trigger the config reload path instead.'
+							'Worker-source changes under the watched fetch, queue, scheduled, email, tail, route, or transport roots trigger the worker reload path, while edits to the resolved `devflare.config.*` trigger the config reload path instead.'
 						]
 					},
 					{
 						tone: 'info',
-						title: 'Tail is still a special case',
+						title: 'Tail follows the same `files.*` model',
 						body: [
-							'Devflare can exercise tail behavior in the test harness when `src/tail.ts` exists, but there is not yet a public `files.tail` config key. Keep the main project-shape story centered on the documented event surfaces, and open the `createTestContext()` page when the question is tail testing.'
+							'`files.tail` is a public config key that behaves like the other event surfaces: leave it unset to auto-discover `src/tail.ts`, point it at a custom path, or set `files.tail: false` to disable tail handler discovery. Open the `createTestContext()` page when the question is tail testing.'
 						]
 					}
 				]

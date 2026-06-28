@@ -15,6 +15,16 @@
 // type per phase so that `compileConfig` can refuse an unresolved config at
 // the type level.
 //
+// This is the canonical *resource-resolution* seam: every consumer that needs
+// resolved resources (Vite serve/build, programmatic Vite, deploy provisioning,
+// and the CLI config command) routes through `resolveResources`. The remaining
+// direct callers of `resolveConfigForEnvironment`/`mergeConfigForEnvironment`
+// are env-overlay-only (they read merged `.vite`, entry files, or preview
+// metadata and never resolve resource IDs), and `compileBuildConfig`
+// deliberately preserves name-based bindings for reproducible build artifacts.
+// Those are by design, not bypasses; the `@internal`-annotated lower-level
+// helpers are the seam's delegates.
+//
 // See `.local/refactors/R1-phase-discriminated-resolver.md` for the plan.
 // =============================================================================
 

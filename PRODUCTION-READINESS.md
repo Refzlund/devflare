@@ -62,12 +62,12 @@ the orchestrator pulls the bot's version-bump commit before the next phase.
 - E6 ✅/📝 Fixed the loader custom-config-path skip (`loadConfig` now resolves an absolute `configFile`; test un-skipped); the win-only `preferences` rename-cleanup skip is intentional and platform-correct (exercised on Linux CI) — documented, no change.
 
 ### Phase F — Architecture & docs debt (from INCONSISTENCIES.md)
-- F1 ⬜ Confirm/close one canonical phased `resolveResources({ phase })` across compile/Vite/deploy
-- F2 ⬜ DO ref `scriptName` overloaded meaning — clarify/discriminate
-- F3 ⬜ `router/` vs `runtime/` folder layout
-- F4 ⬜ Docs gaps: public `files.tail` key, local-vs-remote support matrix
-- F5 ⬜ README / LLM.md alignment with the docs-site source of truth
-- F6 ⬜ Close out INCONSISTENCIES.md (mark resolved items, carry forward the rest)
+- F1 ✅ Confirmed the single canonical phased `resolveResources({ phase })` seam (`config/resolve-phased.ts`) — every resource-resolution consumer (Vite serve/build, programmatic Vite, deploy provisioning, CLI config) routes through it, pinned by `tests/unit/config/resolver-contract.test.ts`. The remaining direct callers of the lower-level env-merge helpers are env-overlay-only (read merged `.vite`/entry files/preview metadata, never resolve resource IDs) — by design; the helpers are `@internal`-annotated delegates. Added a header note to `resolve-phased.ts` stating this explicitly.
+- F2 ✅ DO ref `scriptName` is no longer overloaded for branching: an explicit `kind: 'local' | 'cross-worker'` discriminant exists on `DOBindingRef` (`config/ref.ts:97`) and `NormalizedDOBinding` (`config/schema-normalization.ts`), computed in `normalizeDOBinding`, and the compiler branches on `kind` (`config/compiler/bindings.ts:176`); `scriptName` stays the identifier-by-value, with JSDoc directing callers to `kind`.
+- F3 ✅ No `router/` folder exists — all runtime code + types already live under `src/runtime/` (the split was collapsed in earlier convergence work; verified `find src -maxdepth 1 -type d -name router` is empty).
+- F4 ✅ `files.tail` documented as a fully-wired public config key (auto-discovers `src/tail.ts`, accepts a custom path, or `false` to disable): 4 stale docs-site statements rewritten (`apps/documentation/.../configuration/part-2.ts`, `.../devflare/part-4.ts`), the watched dev-reload-root lists now include tail, `LLM.md` regenerated. Local-vs-remote support matrix authored in Phase C (`docs/CLOUDFLARE_SUPPORT_MATRIX.md`).
+- F5 ✅ Root `README.md` gained a "Policy & reference docs" section linking all four policy docs; the `CONTRIBUTING.md` policy-docs list was extended — every policy doc (API stability, versioning/release, support matrix, deploy & secrets) is reachable from the primary entry points. Docs-site stays the authored source of truth; README + generated LLM.md align to it.
+- F6 ✅ `INCONSISTENCIES.md` closed out: every original 2026-04-21 item recorded as **Resolved (with evidence)** or **Deferred to post-1.0 (with reason)**; the confirmed product expectations are preserved as the measurement target. (Local scratch — gitignored, not shipped.)
 
 ---
 
@@ -138,3 +138,32 @@ the orchestrator pulls the bot's version-bump commit before the next phase.
 **Verification:** `biome check packages/devflare` 0 errors ✅ · typecheck ✅ · full unit 1051 pass / 1 skip / 0 fail ✅ · bridge + dev-server integration spot-checks ✅ · case5 13/0 ✅ · both workflow YAMLs parse ✅ · 3 adversarial reviews VERDICT: PASS.
 
 **Scope note:** the formatting reformat touched ~377 files but is behavior-preserving (full unit + integration green). No forbidden-v4 tokens introduced.
+
+### Phase F — Architecture & docs debt ✅
+
+**Done.** Worked the 2026-04-21 inconsistency list to a documented close-out (F1–F6). The architecture/code discriminants (F1 phased-resolver seam, F2 DO-ref `kind`, F3 `runtime/` folder) were already in place from earlier convergence work — Phase F **confirmed them with evidence and documented the seam**, rather than re-refactoring right before the freeze. The docs work (F4 `files.tail`, F5 README/CONTRIBUTING discoverability) was the substantive change, plus closing out `INCONSISTENCIES.md` (F6) with per-item Resolved/Deferred verdicts.
+
+**Code/docs changes**
+- `src/config/resolve-phased.ts` — header note stating it is the canonical resource-resolution seam and that the remaining env-overlay-only callers are by design (F1).
+- `apps/documentation/.../configuration/part-2.ts`, `.../devflare/part-4.ts`, `LLM.md` — `files.tail` now described as a public key alongside the other handler surfaces; watched dev-reload-root lists include tail (F4).
+- `README.md` (+"Policy & reference docs" section), `CONTRIBUTING.md` (extended policy-docs list) — all four `docs/` policy docs reachable from the entry points (F5).
+- `src/test/binding-hints.ts` — removed the last stale JSDoc reference to the deleted `createBridgeTestContext`.
+
+**New missing item discovered (and fixed here): a release-pipeline CI landmine.**
+- `changeset version` rewrites `packages/devflare/package.json` on **every** release, and its JSON writer always expands arrays to multi-line (verified on commit `6b7356d`: it re-expanded `"files": ["dist","bin","LLM.md"]` to multi-line). biome's formatter (lineWidth 100) collapses that short array back inline — a **permanent structural conflict**. The bump commit carries `[skip ci]` so it doesn't fail itself, but it leaves package.json in a biome-non-compliant state, so the **next** non-skip commit's `biome check packages/devflare` lint gate (run by `workspace-ci.yml`) would fail with zero source changes. Fixed by adding a biome `overrides` entry that disables the **formatter** for `**/package.json` (the linter still applies) — `biome.json`. This package.json is machine-managed; formatting it is biome's job to skip, not changesets' to fight.
+
+**Deferred to post-1.0 (logged in INCONSISTENCIES.md with reasons):** collapsing the double Zod/normalization binding-validation layer; unifying the worker-vs-DO bundler `platform` defaults (`'browser'` vs `'neutral'` — needs a per-bundle regression test first); further resolver-internals/folder convergence beyond the facade. All three are correct-as-is and carry real regression surface right before the freeze.
+
+**Verification:** biome `check packages/devflare` 0 errors ✅ (now stable across release bumps) · typecheck ✅ · full unit 1051 pass / 1 skip / 0 fail ✅ (incl. docs-integrity + `wrangler-v4-compat`) · no forbidden-v4 tokens · all 3 adversarial reviews VERDICT: PASS.
+
+---
+
+## Phase summary — `next` → ready for `1.0` exit
+
+All six phases (A–F) are complete and published as prereleases on the `next` dist-tag
+(`1.0.0-next.29` … `next.34`). The remaining gap to a stable `1.0.0` is the deliberate
+maintainer step: `changeset pre exit` → `changeset version` → push, which drops the
+`-next.N` suffix and publishes `1.0.0` to the `latest` tag. Everything documented as
+📝 is an inherent Cloudflare/platform boundary or an explicit post-1.0 deferral, not a
+code gap. The `docs/` policy set (API stability, versioning/release, support matrix,
+deploy & secrets) defines the public contract being frozen.

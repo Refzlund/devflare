@@ -11,6 +11,10 @@ source of truth; the package `LLM.md` is generated from it.
   surface and the semver guarantee on it.
 - [Versioning & Release Policy](./docs/VERSIONING_AND_RELEASE.md) — semver, the
   prerelease lane, and the `next → 1.0` exit.
+- [Cloudflare Support Matrix](./docs/CLOUDFLARE_SUPPORT_MATRIX.md) — which
+  Cloudflare resources and Worker surfaces are supported, and at what level.
+- [Deploy, Preview & Secrets](./docs/DEPLOY_AND_SECRETS.md) — the deploy/preview
+  lifecycle and how secrets are handled.
 
 ## Releasing with changesets
 

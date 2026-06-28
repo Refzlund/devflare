@@ -48,5 +48,11 @@
 			"semicolons": "asNeeded",
 			"trailingCommas": "none"
 		}
-	}
+	},
+	"overrides": [
+		{
+			"include": ["**/package.json"],
+			"formatter": { "enabled": false }
+		}
+	]
 }

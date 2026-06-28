@@ -8,9 +8,8 @@ import type { DevflareConfig } from '../config'
 /**
  * Derive `BindingHints` from a resolved Devflare config.
  *
- * Used by both `createTestContext` (simple-context) and `createBridgeTestContext`
- * (bridge-context) to avoid duplicating the mapping between config sections and
- * hint kinds.
+ * Shared by the test-context surface (`createTestContext` / simple-context) so
+ * the mapping between config sections and hint kinds lives in one place.
  */
 export function extractBindingHints(config: DevflareConfig): BindingHints {
 	const hints: BindingHints = {}

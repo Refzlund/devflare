@@ -33,6 +33,17 @@ Common aliases and broader monorepo lanes:
 - `bun run ci` — alias for `devflare:ci`
 - `bun run ci:strict` — root lint + root typecheck + `devflare:ci` (strict gate used in CI)
 
+## Policy & reference docs
+
+Contributor-facing policy and reference docs live under [`docs/`](./docs):
+
+- [API Stability Policy](./docs/API_STABILITY.md) — the frozen public entrypoint surface and the semver guarantee on it.
+- [Versioning & Release Policy](./docs/VERSIONING_AND_RELEASE.md) — semver, the prerelease lane, and the `next → 1.0` exit.
+- [Cloudflare Support Matrix](./docs/CLOUDFLARE_SUPPORT_MATRIX.md) — which Cloudflare resources and Worker surfaces are supported, and at what level.
+- [Deploy, Preview & Secrets](./docs/DEPLOY_AND_SECRETS.md) — the deploy/preview lifecycle and how secrets are handled.
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for the day-to-day workflow.
+
 ## Notes
 
 - The shared `check` lane stays focused on `apps/documentation`; `cases/case18` still expects Cloudflare-backed resource resolution that is outside the default local/CI lane.
