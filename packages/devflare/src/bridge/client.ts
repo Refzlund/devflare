@@ -10,35 +10,31 @@
 // and ws-relay messages are dispatched through the codec.
 // =============================================================================
 
-import {
-	type JsonMsg,
-	type StreamPull,
-	type WsOpen,
-	type WsOpened,
-	type WsClose,
-	parseJsonMsg,
-	stringifyJsonMsg,
-	encodeBinaryFrame,
-	decodeBinaryFrame,
-	BinaryKind,
-	BinaryFlags,
-	nextWsId,
-	DEFAULT_BRIDGE_PORT,
-	DEFAULT_CHUNK_SIZE
-} from './v2/wire'
-import {
-	serializeValue,
-	deserializeValue,
-	type StreamRef
-} from './v2/value-serialization'
+import { bridgeLog } from './log'
 import { TransportV2Codec } from './v2/codec'
+import type { TransportV2DecodedBinaryFrame } from './v2/frames'
 import type {
 	WebSocketLike,
-	WebSocketLikeMessageEvent,
-	WebSocketLikeCloseEvent
+	WebSocketLikeCloseEvent,
+	WebSocketLikeMessageEvent
 } from './v2/transport'
-import type { TransportV2DecodedBinaryFrame } from './v2/frames'
-import { bridgeLog } from './log'
+import { type StreamRef, deserializeValue, serializeValue } from './v2/value-serialization'
+import {
+	BinaryFlags,
+	BinaryKind,
+	DEFAULT_BRIDGE_PORT,
+	DEFAULT_CHUNK_SIZE,
+	type JsonMsg,
+	type StreamPull,
+	type WsClose,
+	type WsOpen,
+	type WsOpened,
+	decodeBinaryFrame,
+	encodeBinaryFrame,
+	nextWsId,
+	parseJsonMsg,
+	stringifyJsonMsg
+} from './v2/wire'
 
 // -----------------------------------------------------------------------------
 // Internal — adapter that exposes a real browser/Node WebSocket as a
@@ -76,9 +72,7 @@ async function importWsPackageConstructor(): Promise<WebSocketConstructor> {
 			const dynamicImport = new Function(
 				'specifier',
 				['return ', 'import', '(specifier)'].join('')
-			) as (
-				specifier: string
-			) => Promise<{
+			) as (specifier: string) => Promise<{
 				WebSocket?: unknown
 				default?: unknown
 			}>
@@ -264,7 +258,9 @@ export class BridgeClient {
 					// not implement v2 simply ignore it (the codec dispatches
 					// unknown text to onUnknownControl, which silently drops).
 					this.codec.sendHello()
-					this.codec.handshake.catch(() => { /* surfaced through cleanupPending */ })
+					this.codec.handshake.catch(() => {
+						/* surfaced through cleanupPending */
+					})
 					this.isConnected = true
 					this.connectPromise = null
 					resolve()
@@ -417,8 +413,11 @@ export class BridgeClient {
 		} catch (error) {
 			// Re-wrap codec's "v2 transport closed" error so callers continue
 			// to see the BridgeClient-level disconnect message they expect.
-			if (!this.isConnected && error instanceof Error
-				&& /v2 transport closed|transport/.test(error.message)) {
+			if (
+				!this.isConnected &&
+				error instanceof Error &&
+				/v2 transport closed|transport/.test(error.message)
+			) {
 				throw new Error('Bridge disconnected')
 			}
 			throw error
@@ -479,9 +478,9 @@ export class BridgeClient {
 		const wid = nextWsId()
 
 		const proxy: ActiveWsProxy = {
-			clientWs: null as any,  // Not a real WS, we handle it
-			onMessage: () => { },
-			onClose: () => { }
+			clientWs: null as any, // Not a real WS, we handle it
+			onMessage: () => {},
+			onClose: () => {}
 		}
 		this.wsProxies.set(wid, proxy)
 
@@ -509,9 +508,7 @@ export class BridgeClient {
 		return {
 			wid,
 			send: (data) => {
-				const payload = typeof data === 'string'
-					? new TextEncoder().encode(data)
-					: data
+				const payload = typeof data === 'string' ? new TextEncoder().encode(data) : data
 				const flags = typeof data === 'string' ? BinaryFlags.TEXT : 0
 				const frame = encodeBinaryFrame(BinaryKind.WsData, wid, 0, flags, payload)
 				this.sendBinary(frame)
@@ -709,13 +706,7 @@ export class BridgeClient {
 
 				if (value) {
 					// Send chunk
-					const frame = encodeBinaryFrame(
-						BinaryKind.StreamChunk,
-						streamRef.sid,
-						seq++,
-						0,
-						value
-					)
+					const frame = encodeBinaryFrame(BinaryKind.StreamChunk, streamRef.sid, seq++, 0, value)
 					this.sendBinary(frame)
 					sent += value.byteLength
 				}
@@ -780,9 +771,7 @@ export class BridgeClient {
 		if (!proxy) return
 
 		const isText = (decoded.flags & BinaryFlags.TEXT) !== 0
-		const data = isText
-			? new TextDecoder().decode(decoded.payload)
-			: decoded.payload
+		const data = isText ? new TextDecoder().decode(decoded.payload) : decoded.payload
 
 		proxy.onMessage(data)
 	}

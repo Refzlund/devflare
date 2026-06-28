@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
-import { dirname, join } from 'pathe'
 import { fileURLToPath } from 'node:url'
-import { createDevServer, type DevServer } from '../../../src/dev-server'
+import { dirname, join } from 'pathe'
+import { type DevServer, createDevServer } from '../../../src/dev-server'
 import {
 	deleteLocalSecret,
 	readLocalSecret,
@@ -48,9 +48,7 @@ async function waitForJson<T>(url: string, timeoutMs = 30_000): Promise<T> {
 		await Bun.sleep(300)
 	}
 
-	throw lastError instanceof Error
-		? lastError
-		: new Error(`Timed out waiting for JSON from ${url}`)
+	throw lastError instanceof Error ? lastError : new Error(`Timed out waiting for JSON from ${url}`)
 }
 
 async function syncSvelteKitCase(): Promise<void> {
@@ -120,55 +118,63 @@ describe('case18 SvelteKit local binding matrix', () => {
 		}
 	}, TEST_TIMEOUT_MS)
 
-	test('returns expected results from a SvelteKit API route', async () => {
-		const payload = await waitForJson<LocalBindingsPayload>(
-			`http://localhost:${vitePort}/api/local-bindings`
-		)
+	test(
+		'returns expected results from a SvelteKit API route',
+		async () => {
+			const payload = await waitForJson<LocalBindingsPayload>(
+				`http://localhost:${vitePort}/api/local-bindings`
+			)
 
-		expect(payload.secret).toBe('case18-secret-value')
-		expect(payload.hyperdrive).toEqual({
-			connectionString: 'postgres://case18:password@localhost:5432/case18',
-			database: 'case18'
-		})
-		expect(payload.workflow.id).toBe('case18-order-1')
-		expect(['queued', 'running', 'complete', 'waiting']).toContain(payload.workflow.status)
-		expect(payload.images).toEqual({
-			width: 1,
-			contentType: 'image/png',
-			status: 200
-		})
-		expect(payload.media).toEqual({
-			contentType: 'video/mp4',
-			status: 200
-		})
-		expect(payload.workerLoader).toEqual({
-			status: 200,
-			text: 'case18-loader-ok'
-		})
-		expect(payload.email).toBe('sent')
-	}, TEST_TIMEOUT_MS)
+			expect(payload.secret).toBe('case18-secret-value')
+			expect(payload.hyperdrive).toEqual({
+				connectionString: 'postgres://case18:password@localhost:5432/case18',
+				database: 'case18'
+			})
+			expect(payload.workflow.id).toBe('case18-order-1')
+			expect(['queued', 'running', 'complete', 'waiting']).toContain(payload.workflow.status)
+			expect(payload.images).toEqual({
+				width: 1,
+				contentType: 'image/png',
+				status: 200
+			})
+			expect(payload.media).toEqual({
+				contentType: 'video/mp4',
+				status: 200
+			})
+			expect(payload.workerLoader).toEqual({
+				status: 200,
+				text: 'case18-loader-ok'
+			})
+			expect(payload.email).toBe('sent')
+		},
+		TEST_TIMEOUT_MS
+	)
 
-	test('submits a SvelteKit server action that calls a ref service binding fetch', async () => {
-		const response = await fetch(`http://localhost:${vitePort}/service-action`, {
-			method: 'POST',
-			headers: {
-				'content-type': 'application/x-www-form-urlencoded'
-			},
-			body: new URLSearchParams({
-				email: 'creator@example.com'
-			}),
-			redirect: 'manual'
-		})
-		const body = await response.text()
+	test(
+		'submits a SvelteKit server action that calls a ref service binding fetch',
+		async () => {
+			const response = await fetch(`http://localhost:${vitePort}/service-action`, {
+				method: 'POST',
+				headers: {
+					'content-type': 'application/x-www-form-urlencoded'
+				},
+				body: new URLSearchParams({
+					email: 'creator@example.com'
+				}),
+				redirect: 'manual'
+			})
+			const body = await response.text()
 
-		expect(response.status).toBe(200)
-		expect(response.headers.get('set-cookie')).toContain(
-			'case18-service-action=creator%40example.com'
-		)
-		expect(body).toContain('creator@example.com')
-		expect(body).toContain('case18-api')
-		expect(body).toContain('service-fetch')
-		expect(body).toContain('case18-var-value')
-		expect(body).toContain('undefined')
-	}, TEST_TIMEOUT_MS)
+			expect(response.status).toBe(200)
+			expect(response.headers.get('set-cookie')).toContain(
+				'case18-service-action=creator%40example.com'
+			)
+			expect(body).toContain('creator@example.com')
+			expect(body).toContain('case18-api')
+			expect(body).toContain('service-fetch')
+			expect(body).toContain('case18-var-value')
+			expect(body).toContain('undefined')
+		},
+		TEST_TIMEOUT_MS
+	)
 })

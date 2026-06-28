@@ -9,24 +9,24 @@
 import { resolve } from 'pathe'
 import type { DevflareConfig } from '../config'
 import { getLocalD1DatabaseIdentifier, getLocalKVNamespaceIdentifier } from '../config/schema'
+import type { LocalSecretWrappedBindingConfig } from '../secrets/local-secrets'
 import type {
+	buildAiSearchInstancesConfig,
+	buildAiSearchNamespacesConfig,
+	buildArtifactsConfig,
+	buildDispatchNamespacesConfig,
+	buildHyperdrivesConfig,
+	buildImagesConfig,
+	buildMediaConfig,
+	buildMtlsCertificatesConfig,
+	buildPipelinesConfig,
 	buildRateLimitsConfig,
 	buildSecretsStoreConfig,
 	buildSendEmailConfig,
 	buildVersionMetadataConfig,
 	buildWorkerLoadersConfig,
-	buildMtlsCertificatesConfig,
-	buildDispatchNamespacesConfig,
-	buildWorkflowsConfig,
-	buildPipelinesConfig,
-	buildHyperdrivesConfig,
-	buildImagesConfig,
-	buildMediaConfig,
-	buildArtifactsConfig,
-	buildAiSearchNamespacesConfig,
-	buildAiSearchInstancesConfig
+	buildWorkflowsConfig
 } from './miniflare-bindings'
-import type { LocalSecretWrappedBindingConfig } from '../secrets/local-secrets'
 
 type Bindings = NonNullable<DevflareConfig['bindings']>
 type SendEmailConfig = ReturnType<typeof buildSendEmailConfig>
@@ -210,9 +210,7 @@ export function makeMiniflareWorker(
 
 	if (options.scriptPath) {
 		workerConfig.scriptPath = options.scriptPath
-		workerConfig.modulesRoot = loadedConfig.baseDir
-			? resolve(cwd, loadedConfig.baseDir)
-			: cwd
+		workerConfig.modulesRoot = loadedConfig.baseDir ? resolve(cwd, loadedConfig.baseDir) : cwd
 		workerConfig.modulesRules = [
 			...(loadedConfig.rules?.map(toMiniflareModuleRule) ?? []),
 			...DEFAULT_MODULE_RULES

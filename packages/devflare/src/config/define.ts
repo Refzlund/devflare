@@ -2,8 +2,8 @@
 // defineConfig — Type-safe config definition helper
 // =============================================================================
 
-import type { DevflareConfigInput } from './schema'
 import type { InferConfigVars } from './env-vars'
+import type { DevflareConfigInput } from './schema'
 
 /**
  * Input type for defineConfig - can be object, function, or async function
@@ -18,10 +18,8 @@ export type DefineConfigInput =
  * Configuration with entrypoints type attached for ref() type inference.
  * This is used by ref() to provide autocomplete for entrypoint names.
  */
-export interface TypedConfig<
-	TEntrypoints extends string = string,
-	TVars = Record<string, unknown>
-> extends DevflareConfigInput {
+export interface TypedConfig<TEntrypoints extends string = string, TVars = Record<string, unknown>>
+	extends DevflareConfigInput {
 	/** @internal Type marker for entrypoint names - used by ref() for autocomplete */
 	readonly __entrypoints?: TEntrypoints
 	/** @internal Type marker for config-derived runtime vars. */
@@ -30,9 +28,9 @@ export interface TypedConfig<
 
 /**
  * Type-safe helper for defining devflare configuration.
- * 
+ *
  * @typeParam TEntrypoints - Union of valid entrypoint names (from generated types)
- * 
+ *
  * @example
  * // Basic usage (entrypoints default to string)
  * export default defineConfig({
@@ -80,11 +78,15 @@ export function defineConfig<
 		| (TConfig & DevflareConfigInput)
 		| (() => TConfig & DevflareConfigInput)
 		| (() => Promise<TConfig & DevflareConfigInput>)
-): TypedConfig<TEntrypoints, InferConfigVars<NonNullable<TConfig['vars']>>> | Promise<TypedConfig<TEntrypoints, InferConfigVars<NonNullable<TConfig['vars']>>>> {
+):
+	| TypedConfig<TEntrypoints, InferConfigVars<NonNullable<TConfig['vars']>>>
+	| Promise<TypedConfig<TEntrypoints, InferConfigVars<NonNullable<TConfig['vars']>>>> {
 	if (typeof config === 'function') {
 		const result = config()
 		if (result instanceof Promise) {
-			return result as Promise<TypedConfig<TEntrypoints, InferConfigVars<NonNullable<TConfig['vars']>>>>
+			return result as Promise<
+				TypedConfig<TEntrypoints, InferConfigVars<NonNullable<TConfig['vars']>>>
+			>
 		}
 		return result as TypedConfig<TEntrypoints, InferConfigVars<NonNullable<TConfig['vars']>>>
 	}

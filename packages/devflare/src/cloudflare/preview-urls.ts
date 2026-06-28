@@ -5,10 +5,7 @@ function normalizeWorkersSubdomain(accountSubdomain: string): string {
 		.replace(/\.workers\.dev\/?$/i, '')
 }
 
-export function formatWorkersDevUrl(
-	workerName: string,
-	accountSubdomain: string
-): string {
+export function formatWorkersDevUrl(workerName: string, accountSubdomain: string): string {
 	const normalizedSubdomain = normalizeWorkersSubdomain(accountSubdomain)
 
 	return `https://${workerName}.${normalizedSubdomain}.workers.dev`

@@ -105,8 +105,7 @@ export function createMockEnv(options: MockEnvOptions = {}): Record<string, unkn
 	// Add Hyperdrive bindings
 	if (options.hyperdrive) {
 		for (const [name, binding] of Object.entries(options.hyperdrive)) {
-			env[name] =
-				typeof binding === 'string' ? createMockHyperdrive(binding) : binding
+			env[name] = typeof binding === 'string' ? createMockHyperdrive(binding) : binding
 		}
 	}
 

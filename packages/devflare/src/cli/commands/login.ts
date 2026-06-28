@@ -1,15 +1,22 @@
 import type { ConsolaInstance } from 'consola'
-import type { ParsedArgs, CliOptions, CliResult } from '../index'
 import { account } from '../../cloudflare'
 import { getConfiguredAccountId } from '../command-utils'
 import { getDependencies } from '../dependencies'
-import { createCliTheme, dim, green, logLine, yellow, whiteDim } from '../ui'
+import type { CliOptions, CliResult, ParsedArgs } from '../index'
+import { createCliTheme, dim, green, logLine, whiteDim, yellow } from '../ui'
 
-async function logResolvedAccount(cwd: string, logger: ConsolaInstance, theme: ReturnType<typeof createCliTheme>): Promise<void> {
+async function logResolvedAccount(
+	cwd: string,
+	logger: ConsolaInstance,
+	theme: ReturnType<typeof createCliTheme>
+): Promise<void> {
 	try {
 		const primaryAccount = await account.getPrimaryAccount()
 		if (primaryAccount) {
-			logLine(logger, `${dim('Primary account:', theme)} ${green(primaryAccount.name, theme)} ${whiteDim(`(${primaryAccount.id})`, theme)}`)
+			logLine(
+				logger,
+				`${dim('Primary account:', theme)} ${green(primaryAccount.name, theme)} ${whiteDim(`(${primaryAccount.id})`, theme)}`
+			)
 			return
 		}
 	} catch {
@@ -25,12 +32,18 @@ async function logResolvedAccount(cwd: string, logger: ConsolaInstance, theme: R
 
 	const configuredAccount = await account.getAccountById(configuredAccountId)
 	if (configuredAccount) {
-		logLine(logger, `${dim('Configured account:', theme)} ${green(configuredAccount.name, theme)} ${whiteDim(`(${configuredAccount.id})`, theme)}`)
+		logLine(
+			logger,
+			`${dim('Configured account:', theme)} ${green(configuredAccount.name, theme)} ${whiteDim(`(${configuredAccount.id})`, theme)}`
+		)
 		return
 	}
 
 	logLine(logger, `${dim('Configured account ID:', theme)} ${whiteDim(configuredAccountId, theme)}`)
-	logLine(logger, dim('Run `devflare account --account <id>` to inspect the configured account.', theme))
+	logLine(
+		logger,
+		dim('Run `devflare account --account <id>` to inspect the configured account.', theme)
+	)
 }
 
 export async function runLoginCommand(
@@ -42,7 +55,7 @@ export async function runLoginCommand(
 	const cwd = options.cwd ?? process.cwd()
 	const theme = createCliTheme(parsed.options)
 
-	if (!force && await account.isAuthenticated()) {
+	if (!force && (await account.isAuthenticated())) {
 		logger.success('Already authenticated with Cloudflare')
 		await logResolvedAccount(cwd, logger, theme)
 

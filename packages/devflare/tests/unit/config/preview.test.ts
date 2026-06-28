@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, test } from 'bun:test'
 import {
+	type DevflareConfig,
 	isPreviewScopedName,
 	materializePreviewScopedString,
 	preview,
-	resolveConfigForEnvironment,
-	type DevflareConfig
+	resolveConfigForEnvironment
 } from '../../../src/config'
 
 const previewBranchEnvKeys = [
@@ -37,20 +37,24 @@ describe('preview.scope', () => {
 		expect(typeof cacheName).toBe('string')
 		expect(isPreviewScopedName(cacheName)).toBe(true)
 		expect(materializePreviewScopedString(cacheName)).toBe('cache-kv')
-		expect(materializePreviewScopedString(cacheName, {
-			environment: 'preview'
-		})).toBe('cache-kv-preview')
+		expect(
+			materializePreviewScopedString(cacheName, {
+				environment: 'preview'
+			})
+		).toBe('cache-kv-preview')
 	})
 
 	test('supports custom separators and branch sanitization', () => {
 		const pv = preview.scope({ separator: '--' })
 		const datasetName = pv('analytics-dataset')
 
-		expect(materializePreviewScopedString(datasetName, {
-			env: {
-				DEVFLARE_PREVIEW_BRANCH: 'Feature/TeSt-Branch'
-			}
-		})).toBe('analytics-dataset--feature-test-branch')
+		expect(
+			materializePreviewScopedString(datasetName, {
+				env: {
+					DEVFLARE_PREVIEW_BRANCH: 'Feature/TeSt-Branch'
+				}
+			})
+		).toBe('analytics-dataset--feature-test-branch')
 	})
 
 	test('rejects empty base names early', () => {
@@ -133,10 +137,14 @@ describe('resolveConfigForEnvironment', () => {
 		expect(previewConfig.bindings?.queues?.producers?.JOBS).toBe('jobs-queue-preview')
 		expect(previewConfig.bindings?.queues?.consumers?.[0]?.queue).toBe('jobs-queue-preview')
 		expect(previewConfig.bindings?.queues?.consumers?.[0]?.deadLetterQueue).toBe('jobs-dlq-preview')
-		expect(previewConfig.bindings?.vectorize?.DOCUMENT_INDEX.indexName).toBe('document-index-preview')
+		expect(previewConfig.bindings?.vectorize?.DOCUMENT_INDEX.indexName).toBe(
+			'document-index-preview'
+		)
 		expect(previewConfig.bindings?.vectorize?.DOCUMENT_INDEX.remote).toBe(true)
 		expect(previewConfig.bindings?.browser?.BROWSER).toBe('browser-renderer-preview')
-		expect(previewConfig.bindings?.analyticsEngine?.APP_ANALYTICS.dataset).toBe('analytics-dataset-preview')
+		expect(previewConfig.bindings?.analyticsEngine?.APP_ANALYTICS.dataset).toBe(
+			'analytics-dataset-preview'
+		)
 
 		expect(productionConfig.bindings?.kv?.CACHE).toBe('cache-kv-production')
 		expect(productionConfig.bindings?.r2?.ASSETS).toBe('assets-bucket')
@@ -163,7 +171,9 @@ describe('resolveConfigForEnvironment', () => {
 		const previewConfig = resolveConfigForEnvironment(config, 'preview')
 
 		expect(previewConfig.bindings?.d1?.PRIMARY_DB).toBe('primary-db-feature-queue-cleanup')
-		expect(previewConfig.bindings?.hyperdrive?.POSTGRES).toBe('postgres-hyperdrive-feature-queue-cleanup')
+		expect(previewConfig.bindings?.hyperdrive?.POSTGRES).toBe(
+			'postgres-hyperdrive-feature-queue-cleanup'
+		)
 	})
 
 	test('materializes hyperdrive object-form bindings while preserving previewFallback', () => {
@@ -181,7 +191,7 @@ describe('resolveConfigForEnvironment', () => {
 
 		const previewConfig = resolveConfigForEnvironment(config, 'preview')
 		const postgres = previewConfig.bindings?.hyperdrive?.POSTGRES as
-			| { name: string, previewFallback?: 'base' }
+			| { name: string; previewFallback?: 'base' }
 			| undefined
 
 		expect(typeof postgres?.name).toBe('string')
@@ -261,20 +271,14 @@ describe('resolveConfigForEnvironment', () => {
 				KEEP: 'root',
 				SHARED: 'root'
 			},
-			routes: [
-				{ pattern: 'root.example/*', zone_name: 'example.com' }
-			],
+			routes: [{ pattern: 'root.example/*', zone_name: 'example.com' }],
 			triggers: {
 				crons: ['0 * * * *']
 			},
-			migrations: [
-				{ tag: 'v1', new_classes: ['RootCounter'] }
-			],
+			migrations: [{ tag: 'v1', new_classes: ['RootCounter'] }],
 			bindings: {
 				queues: {
-					consumers: [
-						{ queue: 'root-queue', deadLetterQueue: 'root-dlq' }
-					]
+					consumers: [{ queue: 'root-queue', deadLetterQueue: 'root-dlq' }]
 				}
 			},
 			env: {
@@ -283,20 +287,14 @@ describe('resolveConfigForEnvironment', () => {
 						SHARED: 'preview',
 						ONLY: 'preview'
 					},
-					routes: [
-						{ pattern: 'preview.example/*', zone_name: 'example.com' }
-					],
+					routes: [{ pattern: 'preview.example/*', zone_name: 'example.com' }],
 					triggers: {
 						crons: ['0 0 * * *']
 					},
-					migrations: [
-						{ tag: 'v2', new_classes: ['PreviewCounter'] }
-					],
+					migrations: [{ tag: 'v2', new_classes: ['PreviewCounter'] }],
 					bindings: {
 						queues: {
-							consumers: [
-								{ queue: 'preview-queue' }
-							]
+							consumers: [{ queue: 'preview-queue' }]
 						}
 					}
 				}
@@ -314,11 +312,7 @@ describe('resolveConfigForEnvironment', () => {
 			{ pattern: 'preview.example/*', zone_name: 'example.com' }
 		])
 		expect(previewConfig.triggers?.crons).toEqual(['0 0 * * *'])
-		expect(previewConfig.migrations).toEqual([
-			{ tag: 'v2', new_classes: ['PreviewCounter'] }
-		])
-		expect(previewConfig.bindings?.queues?.consumers).toEqual([
-			{ queue: 'preview-queue' }
-		])
+		expect(previewConfig.migrations).toEqual([{ tag: 'v2', new_classes: ['PreviewCounter'] }])
+		expect(previewConfig.bindings?.queues?.consumers).toEqual([{ queue: 'preview-queue' }])
 	})
 })

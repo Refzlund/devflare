@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, mock, test } from 'bun:test'
-import { mkdtemp, readFile, rm, writeFile, mkdir } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
+import { dirname, join } from 'node:path'
 import { runWorkerCommand } from '../../../src/cli/commands/worker'
 import { jsonResponse } from '../../helpers/cloudflare-api'
 import { createLogger } from '../../helpers/mock-logger'
@@ -29,7 +29,11 @@ async function createTempMonorepo(): Promise<string> {
 	return directory
 }
 
-async function writeConfigFile(rootDir: string, relativePath: string, workerName: string): Promise<string> {
+async function writeConfigFile(
+	rootDir: string,
+	relativePath: string,
+	workerName: string
+): Promise<string> {
 	const configPath = join(rootDir, relativePath)
 	await mkdir(dirname(configPath), { recursive: true })
 	await writeFile(
@@ -72,7 +76,12 @@ function mockRenameWorkerApi(fromName: string, toName: string): void {
 	}) as unknown as typeof fetch
 }
 
-async function runRenameWorker(rootDir: string, fromName: string, toName: string, logger: ReturnType<typeof createLogger>) {
+async function runRenameWorker(
+	rootDir: string,
+	fromName: string,
+	toName: string,
+	logger: ReturnType<typeof createLogger>
+) {
 	return await runWorkerCommand(
 		{
 			command: 'worker',
@@ -90,7 +99,11 @@ describe('worker command', () => {
 	test('renames a remote Worker and updates the matching nested devflare config', async () => {
 		process.env.CLOUDFLARE_API_TOKEN = 'cf_test_token'
 		const rootDir = await createTempMonorepo()
-		const configPath = await writeConfigFile(rootDir, 'apps/documentation/devflare.config.ts', 'documentation')
+		const configPath = await writeConfigFile(
+			rootDir,
+			'apps/documentation/devflare.config.ts',
+			'documentation'
+		)
 
 		mockRenameWorkerApi('documentation', 'devflare-documentation')
 
@@ -102,14 +115,28 @@ describe('worker command', () => {
 		expect(result.exitCode).toBe(0)
 		expect(updatedConfig).toContain("name: 'devflare-documentation'")
 		expect(updatedConfig).not.toContain("name: 'documentation'")
-		expect(logger.messages.some((message) => message.args.join(' ').includes('Renamed remote Worker documentation → devflare-documentation'))).toBe(true)
-		expect(logger.messages.some((message) => message.args.join(' ').includes('apps/documentation/devflare.config.ts'))).toBe(true)
+		expect(
+			logger.messages.some((message) =>
+				message.args
+					.join(' ')
+					.includes('Renamed remote Worker documentation → devflare-documentation')
+			)
+		).toBe(true)
+		expect(
+			logger.messages.some((message) =>
+				message.args.join(' ').includes('apps/documentation/devflare.config.ts')
+			)
+		).toBe(true)
 	})
 
 	test('renames the remote Worker when the matching nested config is already updated locally', async () => {
 		process.env.CLOUDFLARE_API_TOKEN = 'cf_test_token'
 		const rootDir = await createTempMonorepo()
-		const configPath = await writeConfigFile(rootDir, 'apps/documentation/devflare.config.ts', 'devflare-documentation')
+		const configPath = await writeConfigFile(
+			rootDir,
+			'apps/documentation/devflare.config.ts',
+			'devflare-documentation'
+		)
 
 		mockRenameWorkerApi('documentation', 'devflare-documentation')
 
@@ -120,8 +147,16 @@ describe('worker command', () => {
 
 		expect(result.exitCode).toBe(0)
 		expect(updatedConfig).toContain("name: 'devflare-documentation'")
-		expect(logger.messages.some((message) => message.args.join(' ').includes('Renamed remote Worker documentation → devflare-documentation'))).toBe(true)
-		expect(logger.messages.some((message) => message.args.join(' ').includes('already updated locally'))).toBe(true)
+		expect(
+			logger.messages.some((message) =>
+				message.args
+					.join(' ')
+					.includes('Renamed remote Worker documentation → devflare-documentation')
+			)
+		).toBe(true)
+		expect(
+			logger.messages.some((message) => message.args.join(' ').includes('already updated locally'))
+		).toBe(true)
 	})
 
 	test('fails clearly when multiple nested configs match the old worker name', async () => {
@@ -144,6 +179,10 @@ describe('worker command', () => {
 		)
 
 		expect(result.exitCode).toBe(1)
-		expect(logger.messages.some((message) => message.args.join(' ').includes('Multiple matching devflare configs were found'))).toBe(true)
+		expect(
+			logger.messages.some((message) =>
+				message.args.join(' ').includes('Multiple matching devflare configs were found')
+			)
+		).toBe(true)
 	})
 })

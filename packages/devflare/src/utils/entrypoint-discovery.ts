@@ -7,7 +7,7 @@
 // =============================================================================
 
 import { readFileSync } from 'fs'
-import { findFiles, findFilesSync, DEFAULT_ENTRYPOINT_PATTERN } from './glob'
+import { DEFAULT_ENTRYPOINT_PATTERN, findFiles, findFilesSync } from './glob'
 
 // -----------------------------------------------------------------------------
 // Types

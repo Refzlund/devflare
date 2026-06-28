@@ -13,10 +13,11 @@ describe('getOrCreateNamedKVNamespace', () => {
 		globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
 			const url = String(input)
 
-			if (init?.method === 'GET' && url.endsWith('/accounts/acc_123/storage/kv/namespaces?page=1&per_page=50')) {
-				return jsonResponse([
-					{ id: 'ns-other', title: 'other-namespace' }
-				], {
+			if (
+				init?.method === 'GET' &&
+				url.endsWith('/accounts/acc_123/storage/kv/namespaces?page=1&per_page=50')
+			) {
+				return jsonResponse([{ id: 'ns-other', title: 'other-namespace' }], {
 					page: 1,
 					per_page: 50,
 					total_pages: 2,
@@ -25,10 +26,11 @@ describe('getOrCreateNamedKVNamespace', () => {
 				})
 			}
 
-			if (init?.method === 'GET' && url.endsWith('/accounts/acc_123/storage/kv/namespaces?page=2&per_page=50')) {
-				return jsonResponse([
-					{ id: 'ns-devflare', title: 'devflare-usage' }
-				], {
+			if (
+				init?.method === 'GET' &&
+				url.endsWith('/accounts/acc_123/storage/kv/namespaces?page=2&per_page=50')
+			) {
+				return jsonResponse([{ id: 'ns-devflare', title: 'devflare-usage' }], {
 					page: 2,
 					per_page: 50,
 					total_pages: 2,
@@ -51,7 +53,10 @@ describe('getOrCreateNamedKVNamespace', () => {
 		globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
 			const url = String(input)
 
-			if (init?.method === 'GET' && url.endsWith('/accounts/acc_123/storage/kv/namespaces?page=1&per_page=50')) {
+			if (
+				init?.method === 'GET' &&
+				url.endsWith('/accounts/acc_123/storage/kv/namespaces?page=1&per_page=50')
+			) {
 				return jsonResponse([], {
 					page: 1,
 					per_page: 50,

@@ -296,7 +296,7 @@ export interface VersionMetadataBindingInput {
 /**
  * Worker Loader binding configuration for Dynamic Workers.
  */
-export interface WorkerLoaderBindingInput {}
+export type WorkerLoaderBindingInput = {}
 
 /**
  * Secrets Store binding by shorthand secret name or explicit store object.
@@ -501,7 +501,10 @@ export interface VectorizeBindingInput {
 /**
  * Hyperdrive binding by stable name, explicit ID, or resolver object.
  */
-export type HyperdriveBindingInput = string | HyperdriveBindingByIdInput | HyperdriveBindingByNameInput
+export type HyperdriveBindingInput =
+	| string
+	| HyperdriveBindingByIdInput
+	| HyperdriveBindingByNameInput
 
 /**
  * Hyperdrive binding by explicit configuration ID.

@@ -1,7 +1,11 @@
 import { afterEach, describe, expect, mock, test } from 'bun:test'
 import { runTokenCommand } from '../../../src/cli/commands/token'
 import { jsonResponse } from '../../helpers/cloudflare-api'
-import { createLogger as createBaseLogger, stripAnsi, type TestLogger as BaseTestLogger } from '../../helpers/mock-logger'
+import {
+	type TestLogger as BaseTestLogger,
+	createLogger as createBaseLogger,
+	stripAnsi
+} from '../../helpers/mock-logger'
 
 interface TestLogger extends BaseTestLogger {
 	prompt: ReturnType<typeof mock>
@@ -141,7 +145,9 @@ describe('token command', () => {
 		expect(result.exitCode).toBe(0)
 		expect(result.output).toBe('cfat_1234567890')
 		expect(requests).toHaveLength(3)
-		expect(requests.every((request) => request.authorization === 'Bearer bootstrap-token')).toBe(true)
+		expect(requests.every((request) => request.authorization === 'Bearer bootstrap-token')).toBe(
+			true
+		)
 		expect(createRequestBody.name).toBe('devflare-custom')
 		expect(createRequestBody.policies).toEqual([
 			{
@@ -149,10 +155,7 @@ describe('token command', () => {
 				resources: {
 					'com.cloudflare.api.account.acc_123': '*'
 				},
-				permission_groups: [
-					{ id: 'group-workers' },
-					{ id: 'group-kv' }
-				]
+				permission_groups: [{ id: 'group-workers' }, { id: 'group-kv' }]
 			},
 			{
 				effect: 'allow',
@@ -161,13 +164,19 @@ describe('token command', () => {
 						'com.cloudflare.api.account.zone.*': '*'
 					}
 				},
-				permission_groups: [
-					{ id: 'group-workers-routes' }
-				]
+				permission_groups: [{ id: 'group-workers-routes' }]
 			}
 		])
-		expect(renderedMessages.some((message) => message.includes('Created devflare-custom'))).toBe(true)
-		expect(renderedMessages.some((message) => message.includes('Permission groups: 3 Devflare-relevant account/zone-scoped selected from 4 available'))).toBe(true)
+		expect(renderedMessages.some((message) => message.includes('Created devflare-custom'))).toBe(
+			true
+		)
+		expect(
+			renderedMessages.some((message) =>
+				message.includes(
+					'Permission groups: 3 Devflare-relevant account/zone-scoped selected from 4 available'
+				)
+			)
+		).toBe(true)
 		expect(renderedMessages.some((message) => message.includes('cfat_1234567890'))).toBe(true)
 	})
 
@@ -253,10 +262,7 @@ describe('token command', () => {
 				resources: {
 					'com.cloudflare.api.account.acc_123': '*'
 				},
-				permission_groups: [
-					{ id: 'group-workers-account' },
-					{ id: 'group-queues-account' }
-				]
+				permission_groups: [{ id: 'group-workers-account' }, { id: 'group-queues-account' }]
 			},
 			{
 				effect: 'allow',
@@ -265,14 +271,26 @@ describe('token command', () => {
 						'com.cloudflare.api.account.zone.*': '*'
 					}
 				},
-				permission_groups: [
-					{ id: 'group-workers-zone' }
-				]
+				permission_groups: [{ id: 'group-workers-zone' }]
 			}
 		])
-		expect(renderedMessages.some((message) => message.includes('Permission groups: 3 reusable account/zone-scoped selected from 5 available'))).toBe(true)
-		expect(renderedMessages.some((message) => message.includes('user-scoped groups are skipped automatically'))).toBe(true)
-		expect(renderedMessages.some((message) => message.includes('Account API Tokens permissions are still excluded'))).toBe(true)
+		expect(
+			renderedMessages.some((message) =>
+				message.includes(
+					'Permission groups: 3 reusable account/zone-scoped selected from 5 available'
+				)
+			)
+		).toBe(true)
+		expect(
+			renderedMessages.some((message) =>
+				message.includes('user-scoped groups are skipped automatically')
+			)
+		).toBe(true)
+		expect(
+			renderedMessages.some((message) =>
+				message.includes('Account API Tokens permissions are still excluded')
+			)
+		).toBe(true)
 	})
 
 	test('prompts for the token name when --new is passed without a value', async () => {
@@ -374,7 +392,9 @@ describe('token command', () => {
 
 		expect(result.exitCode).toBe(0)
 		expect(result.output).toBe('preview')
-		expect(renderedMessages.some((message) => message.includes('Devflare-managed tokens'))).toBe(true)
+		expect(renderedMessages.some((message) => message.includes('Devflare-managed tokens'))).toBe(
+			true
+		)
 		expect(renderedMessages.some((message) => message.includes('preview'))).toBe(true)
 		expect(renderedMessages.some((message) => message.includes('devflare-preview'))).toBe(false)
 		expect(renderedMessages.some((message) => message.includes('manual-token'))).toBe(false)
@@ -428,10 +448,20 @@ describe('token command', () => {
 
 		expect(result.exitCode).toBe(0)
 		expect(result.output).toBe('cfat_rolled_secret')
-		expect(rollRequest?.url).toBe('https://api.cloudflare.com/client/v4/accounts/acc_123/tokens/token_123/value')
+		expect(rollRequest?.url).toBe(
+			'https://api.cloudflare.com/client/v4/accounts/acc_123/tokens/token_123/value'
+		)
 		expect(rollRequest?.body).toBe('{}')
-		expect(renderedMessages.some((message) => message.includes('Rolled 1 Devflare-managed token(s) named devflare-preview'))).toBe(true)
-		expect(renderedMessages.some((message) => message.includes('Cloudflare only returns the new token secret once. Store it safely now.'))).toBe(true)
+		expect(
+			renderedMessages.some((message) =>
+				message.includes('Rolled 1 Devflare-managed token(s) named devflare-preview')
+			)
+		).toBe(true)
+		expect(
+			renderedMessages.some((message) =>
+				message.includes('Cloudflare only returns the new token secret once. Store it safely now.')
+			)
+		).toBe(true)
 		expect(renderedMessages.some((message) => message.includes('cfat_rolled_secret'))).toBe(true)
 	})
 
@@ -486,7 +516,11 @@ describe('token command', () => {
 		expect(deletedUrls).toEqual([
 			'https://api.cloudflare.com/client/v4/accounts/acc_123/tokens/token_123'
 		])
-		expect(renderedMessages.some((message) => message.includes('Deleted 1 Devflare-managed token(s) named devflare-preview'))).toBe(true)
+		expect(
+			renderedMessages.some((message) =>
+				message.includes('Deleted 1 Devflare-managed token(s) named devflare-preview')
+			)
+		).toBe(true)
 	})
 
 	test('deletes all Devflare-managed account-owned tokens without touching other tokens', async () => {
@@ -546,8 +580,14 @@ describe('token command', () => {
 			'https://api.cloudflare.com/client/v4/accounts/acc_123/tokens/token_123',
 			'https://api.cloudflare.com/client/v4/accounts/acc_123/tokens/token_125'
 		])
-		expect(renderedMessages.some((message) => message.includes('Deleted 2 Devflare-managed token(s)'))).toBe(true)
-		expect(renderedMessages.some((message) => message.includes('Left 1 non-Devflare token(s) untouched.'))).toBe(true)
+		expect(
+			renderedMessages.some((message) => message.includes('Deleted 2 Devflare-managed token(s)'))
+		).toBe(true)
+		expect(
+			renderedMessages.some((message) =>
+				message.includes('Left 1 non-Devflare token(s) untouched.')
+			)
+		).toBe(true)
 	})
 
 	test('requires a bootstrap token argument', async () => {
@@ -564,7 +604,11 @@ describe('token command', () => {
 
 		expect(result.exitCode).toBe(1)
 		expect(logger.messages.some((message) => message.level === 'error')).toBe(false)
-		expect(logger.messages.some((message) => stripAnsi(message.args.join(' ')).includes('devflare tokens <bootstrap-token>'))).toBe(true)
+		expect(
+			logger.messages.some((message) =>
+				stripAnsi(message.args.join(' ')).includes('devflare tokens <bootstrap-token>')
+			)
+		).toBe(true)
 		expect(stripAnsi(logger.messages.at(-1)?.args.join(' ') ?? 'missing')).toBe('')
 	})
 
@@ -583,8 +627,18 @@ describe('token command', () => {
 
 		expect(result.exitCode).toBe(1)
 		expect(logger.messages.some((message) => message.level === 'error')).toBe(false)
-		expect(renderedMessages.some((message) => message.includes('Choose one token operation: --list, --new, --roll, --delete, or --delete-all.'))).toBe(false)
-		expect(renderedMessages.some((message) => message.includes('Usage: devflare tokens <bootstrap-token>'))).toBe(true)
+		expect(
+			renderedMessages.some((message) =>
+				message.includes(
+					'Choose one token operation: --list, --new, --roll, --delete, or --delete-all.'
+				)
+			)
+		).toBe(false)
+		expect(
+			renderedMessages.some((message) =>
+				message.includes('Usage: devflare tokens <bootstrap-token>')
+			)
+		).toBe(true)
 		expect(renderedMessages.some((message) => message.includes('--roll [name]'))).toBe(true)
 		expect(renderedMessages.at(-1)).toBe('')
 	})

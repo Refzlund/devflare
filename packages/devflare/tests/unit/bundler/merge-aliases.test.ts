@@ -7,9 +7,7 @@ describe('mergeAliases', () => {
 			{ find: 'debug', replacement: '/framework/debug-shim.js' },
 			{ find: 'devflare', replacement: '/framework/devflare.js' }
 		]
-		const userAliases = [
-			{ find: 'debug', replacement: '/user/my-debug.js' }
-		]
+		const userAliases = [{ find: 'debug', replacement: '/user/my-debug.js' }]
 
 		const merged = mergeAliases(userAliases, frameworkDefaults)
 
@@ -25,9 +23,7 @@ describe('mergeAliases', () => {
 	})
 
 	test('preserves ordering of user entries so regex specificity is predictable', () => {
-		const frameworkDefaults = [
-			{ find: 'shared', replacement: '/framework/shared.js' }
-		]
+		const frameworkDefaults = [{ find: 'shared', replacement: '/framework/shared.js' }]
 		const specificRegex = /^@app\/ui\//
 		const broadRegex = /^@app\//
 		const userAliases = [

@@ -5,8 +5,8 @@
 // so that env, ctx, event, and locals proxies work inside DO methods
 // =============================================================================
 
-import ts from 'typescript'
 import MagicString from 'magic-string'
+import ts from 'typescript'
 
 // =============================================================================
 // Class Detection (TypeScript AST-based)
@@ -67,7 +67,11 @@ function getDurableObjectDecorator(node: ts.ClassDeclaration): ts.Decorator | un
 	if (!decorators) return undefined
 	for (const decorator of decorators) {
 		const expr = decorator.expression
-		if (ts.isCallExpression(expr) && ts.isIdentifier(expr.expression) && expr.expression.text === 'durableObject') {
+		if (
+			ts.isCallExpression(expr) &&
+			ts.isIdentifier(expr.expression) &&
+			expr.expression.text === 'durableObject'
+		) {
 			return decorator
 		}
 		if (ts.isIdentifier(expr) && expr.text === 'durableObject') {
@@ -349,11 +353,7 @@ export async function transformDurableObject(
 					s.overwrite(classNameStart, classNameEnd, `__Original${className}`)
 				} else {
 					// Doesn't extend anything, add extends DurableObject
-					s.overwrite(
-						classNameStart,
-						classDefEnd,
-						`__Original${className} extends DurableObject`
-					)
+					s.overwrite(classNameStart, classDefEnd, `__Original${className} extends DurableObject`)
 				}
 			}
 		}

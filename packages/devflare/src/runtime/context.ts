@@ -3,7 +3,6 @@
 // =============================================================================
 
 import { AsyncLocalStorage } from 'node:async_hooks'
-import { ContextAccessError } from './validation'
 import {
 	createDefaultEvent,
 	createDurableObjectAlarmEvent,
@@ -33,6 +32,7 @@ import type {
 	ScheduledEvent,
 	TailEvent
 } from './context-types'
+import { ContextAccessError } from './validation'
 
 export {
 	createFetchEvent,
@@ -93,10 +93,7 @@ export function runWithEventContext<
 	T,
 	TEnv = unknown,
 	TLocals extends Record<string, unknown> = Record<string, unknown>
->(
-	event: EventContext<TEnv, TLocals>,
-	fn: () => T
-): T {
+>(event: EventContext<TEnv, TLocals>, fn: () => T): T {
 	const context: RequestContext<TEnv, TLocals> = {
 		env: event.env,
 		ctx: event.ctx,
@@ -210,26 +207,56 @@ function isDurableObjectAlarmEvent(event: EventContext): event is DurableObjectA
 	return event.type === 'durable-object-alarm' && 'state' in event
 }
 
-function isDurableObjectWebSocketMessageEvent(event: EventContext): event is DurableObjectWebSocketMessageEvent {
+function isDurableObjectWebSocketMessageEvent(
+	event: EventContext
+): event is DurableObjectWebSocketMessageEvent {
 	return event.type === 'durable-object-websocket-message' && 'ws' in event && 'message' in event
 }
 
-function isDurableObjectWebSocketCloseEvent(event: EventContext): event is DurableObjectWebSocketCloseEvent {
+function isDurableObjectWebSocketCloseEvent(
+	event: EventContext
+): event is DurableObjectWebSocketCloseEvent {
 	return event.type === 'durable-object-websocket-close' && 'ws' in event && 'code' in event
 }
 
-function isDurableObjectWebSocketErrorEvent(event: EventContext): event is DurableObjectWebSocketErrorEvent {
+function isDurableObjectWebSocketErrorEvent(
+	event: EventContext
+): event is DurableObjectWebSocketErrorEvent {
 	return event.type === 'durable-object-websocket-error' && 'ws' in event && 'error' in event
 }
 
 export const getFetchEvent = createEventAccessor<FetchEvent>('getFetchEvent()', isFetchEvent)
 export const getQueueEvent = createEventAccessor<QueueEvent>('getQueueEvent()', isQueueEvent)
-export const getScheduledEvent = createEventAccessor<ScheduledEvent>('getScheduledEvent()', isScheduledEvent)
+export const getScheduledEvent = createEventAccessor<ScheduledEvent>(
+	'getScheduledEvent()',
+	isScheduledEvent
+)
 export const getEmailEvent = createEventAccessor<EmailEvent>('getEmailEvent()', isEmailEvent)
 export const getTailEvent = createEventAccessor<TailEvent>('getTailEvent()', isTailEvent)
-export const getDurableObjectEvent = createEventAccessor<DurableObjectEvent>('getDurableObjectEvent()', isDurableObjectEvent)
-export const getDurableObjectFetchEvent = createEventAccessor<DurableObjectFetchEvent>('getDurableObjectFetchEvent()', isDurableObjectFetchEvent)
-export const getDurableObjectAlarmEvent = createEventAccessor<DurableObjectAlarmEvent>('getDurableObjectAlarmEvent()', isDurableObjectAlarmEvent)
-export const getDurableObjectWebSocketMessageEvent = createEventAccessor<DurableObjectWebSocketMessageEvent>('getDurableObjectWebSocketMessageEvent()', isDurableObjectWebSocketMessageEvent)
-export const getDurableObjectWebSocketCloseEvent = createEventAccessor<DurableObjectWebSocketCloseEvent>('getDurableObjectWebSocketCloseEvent()', isDurableObjectWebSocketCloseEvent)
-export const getDurableObjectWebSocketErrorEvent = createEventAccessor<DurableObjectWebSocketErrorEvent>('getDurableObjectWebSocketErrorEvent()', isDurableObjectWebSocketErrorEvent)
+export const getDurableObjectEvent = createEventAccessor<DurableObjectEvent>(
+	'getDurableObjectEvent()',
+	isDurableObjectEvent
+)
+export const getDurableObjectFetchEvent = createEventAccessor<DurableObjectFetchEvent>(
+	'getDurableObjectFetchEvent()',
+	isDurableObjectFetchEvent
+)
+export const getDurableObjectAlarmEvent = createEventAccessor<DurableObjectAlarmEvent>(
+	'getDurableObjectAlarmEvent()',
+	isDurableObjectAlarmEvent
+)
+export const getDurableObjectWebSocketMessageEvent =
+	createEventAccessor<DurableObjectWebSocketMessageEvent>(
+		'getDurableObjectWebSocketMessageEvent()',
+		isDurableObjectWebSocketMessageEvent
+	)
+export const getDurableObjectWebSocketCloseEvent =
+	createEventAccessor<DurableObjectWebSocketCloseEvent>(
+		'getDurableObjectWebSocketCloseEvent()',
+		isDurableObjectWebSocketCloseEvent
+	)
+export const getDurableObjectWebSocketErrorEvent =
+	createEventAccessor<DurableObjectWebSocketErrorEvent>(
+		'getDurableObjectWebSocketErrorEvent()',
+		isDurableObjectWebSocketErrorEvent
+	)

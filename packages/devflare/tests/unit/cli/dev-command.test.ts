@@ -41,10 +41,12 @@ describe('resolveDevRuntimePort', () => {
 	})
 
 	test('rejects conflicting runtime and bridge port options', () => {
-		expect(() => resolveDevRuntimePort({
-			'runtime-port': '8795',
-			'bridge-port': '8796'
-		})).toThrow('Conflicting Devflare runtime ports')
+		expect(() =>
+			resolveDevRuntimePort({
+				'runtime-port': '8795',
+				'bridge-port': '8796'
+			})
+		).toThrow('Conflicting Devflare runtime ports')
 	})
 
 	test('falls back to the config server.port before the 8787 default', () => {
@@ -68,9 +70,15 @@ describe('resolveDevRuntimeHost', () => {
 	})
 
 	test('honors --runtime-host and DEVFLARE_RUNTIME_HOST over config', () => {
-		expect(resolveDevRuntimeHost({}, { DEVFLARE_RUNTIME_HOST: 'example.local' }, '0.0.0.0')).toBe('example.local')
+		expect(resolveDevRuntimeHost({}, { DEVFLARE_RUNTIME_HOST: 'example.local' }, '0.0.0.0')).toBe(
+			'example.local'
+		)
 		expect(
-			resolveDevRuntimeHost({ 'runtime-host': '192.168.1.10' }, { DEVFLARE_RUNTIME_HOST: 'example.local' }, '0.0.0.0')
+			resolveDevRuntimeHost(
+				{ 'runtime-host': '192.168.1.10' },
+				{ DEVFLARE_RUNTIME_HOST: 'example.local' },
+				'0.0.0.0'
+			)
 		).toBe('192.168.1.10')
 	})
 

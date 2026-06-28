@@ -132,8 +132,9 @@ describe('ref', () => {
 		// Wrapping the template literal inside a factory prevents TypeScript/Bun
 		// from constant-folding `segment` into a static string literal.
 		const makeFn = (segment: string) => () => import(`./${segment}/devflare.config`) as never
-		expect(() => ref(makeFn('foo')))
-			.toThrow(/template literal with an embedded expression|static string literal/)
+		expect(() => ref(makeFn('foo'))).toThrow(
+			/template literal with an embedded expression|static string literal/
+		)
 	})
 
 	test('UPPER_CASE prop access pre-resolution still returns a lazy DO ref', () => {

@@ -4,9 +4,9 @@
 // Tests DO RPC pattern: env.MY_DO.getByName('name').methodName()
 // =============================================================================
 
-import { describe, test, expect, beforeAll, afterAll } from 'bun:test'
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import type { MiniflareInstance } from '../../../src/bridge/miniflare'
-import { counterDoWorkerScript, wrapMiniflare, callDoRpc, PORTS } from './_fixtures'
+import { PORTS, callDoRpc, counterDoWorkerScript, wrapMiniflare } from './_fixtures'
 
 // =============================================================================
 // Tests
@@ -83,7 +83,7 @@ describe('Durable Object Integration', () => {
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ method: 'reset', params: [] })
 			})
-			const resetData = await resetRes.json() as { ok: boolean; result: number }
+			const resetData = (await resetRes.json()) as { ok: boolean; result: number }
 			expect(resetData.ok).toBe(true)
 			expect(resetData.result).toBe(0)
 
@@ -93,7 +93,7 @@ describe('Durable Object Integration', () => {
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ method: 'increment', params: [] })
 			})
-			const incData = await incRes.json() as { ok: boolean; result: number }
+			const incData = (await incRes.json()) as { ok: boolean; result: number }
 			expect(incData.ok).toBe(true)
 			expect(incData.result).toBe(1)
 
@@ -103,7 +103,7 @@ describe('Durable Object Integration', () => {
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ method: 'getCount', params: [] })
 			})
-			const getData = await getRes.json() as { ok: boolean; result: number }
+			const getData = (await getRes.json()) as { ok: boolean; result: number }
 			expect(getData.ok).toBe(true)
 			expect(getData.result).toBe(1)
 		})

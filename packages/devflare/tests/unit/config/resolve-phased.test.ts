@@ -50,16 +50,12 @@ const cloudflareMocks = () => ({
 		accountId: 'effective-account',
 		source: 'workspace' as const
 	})),
-	listKVNamespaces: mock(async () => ([
-		{ id: 'resolved-cache-kv-id', name: 'cache-kv' }
-	])),
+	listKVNamespaces: mock(async () => [{ id: 'resolved-cache-kv-id', name: 'cache-kv' }]),
 	createKVNamespace: mock(async (_account: string, name: string) => ({
 		id: `created-${name}-id`,
 		name
 	})),
-	listD1Databases: mock(async () => ([
-		{ id: 'resolved-main-db-id', name: 'main-db' }
-	])),
+	listD1Databases: mock(async () => [{ id: 'resolved-main-db-id', name: 'main-db' }]),
 	createD1Database: mock(async (_account: string, name: string) => ({
 		id: `created-${name}-id`,
 		name
@@ -71,9 +67,7 @@ const cloudflareMocks = () => ({
 		id: `queue-${name}`,
 		name
 	})),
-	listHyperdrives: mock(async () => ([
-		{ id: 'resolved-postgres-id', name: 'devflare-postgres' }
-	])),
+	listHyperdrives: mock(async () => [{ id: 'resolved-postgres-id', name: 'devflare-postgres' }]),
 	listVectorizeIndexes: mock(async () => [])
 })
 
@@ -142,7 +136,9 @@ describe('resolveResources facade', () => {
 			phase: 'build',
 			environment: 'production'
 		})
-		expect((built.bindings?.kv as Record<string, { name?: string; id?: string }> | undefined)?.CACHE).toEqual({
+		expect(
+			(built.bindings?.kv as Record<string, { name?: string; id?: string }> | undefined)?.CACHE
+		).toEqual({
 			name: 'cache-kv-prod'
 		})
 	})
@@ -185,16 +181,19 @@ describe('resolveResources facade', () => {
 		})
 
 		test('phase=local matches resolveConfigForLocalRuntime for preview-scoped fixtures', async () => {
-			const seam = await resolveResources(previewFixture, { phase: 'local', environment: 'preview' })
+			const seam = await resolveResources(previewFixture, {
+				phase: 'local',
+				environment: 'preview'
+			})
 			const legacy = resolveConfigForLocalRuntime(previewFixture, 'preview')
 			expect(compileConfig(seam).kv_namespaces).toEqual(compileConfig(legacy).kv_namespaces)
 		})
 
 		test('phase=deploy matches resolveConfigResources for preview-scoped fixtures', async () => {
 			const cloudflare = cloudflareMocks()
-			cloudflare.listKVNamespaces = mock(async () => ([
+			cloudflare.listKVNamespaces = mock(async () => [
 				{ id: 'resolved-cache-preview-id', name: 'cache-kv-preview' }
-			])) as typeof cloudflare.listKVNamespaces
+			]) as typeof cloudflare.listKVNamespaces
 			const seam = await resolveResources(previewFixture, {
 				phase: 'deploy',
 				environment: 'preview',
@@ -202,9 +201,9 @@ describe('resolveResources facade', () => {
 			})
 
 			const cloudflare2 = cloudflareMocks()
-			cloudflare2.listKVNamespaces = mock(async () => ([
+			cloudflare2.listKVNamespaces = mock(async () => [
 				{ id: 'resolved-cache-preview-id', name: 'cache-kv-preview' }
-			])) as typeof cloudflare2.listKVNamespaces
+			]) as typeof cloudflare2.listKVNamespaces
 			const legacy = await resolveConfigResources(previewFixture, {
 				environment: 'preview',
 				cloudflare: cloudflare2

@@ -5,7 +5,7 @@
 // This validates DO RPC patterns work with real SvelteKit app structures
 // =============================================================================
 
-import { describe, test, expect, beforeAll, afterAll } from 'bun:test'
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import type { Miniflare } from 'miniflare'
 import { BridgeClient } from '../../../src/bridge/client'
 import { createEnvProxy, setBindingHints } from '../../../src/bridge/proxy'
@@ -187,7 +187,7 @@ describe('Case18 Bridge Integration', () => {
 		test('can call getOnlineCount RPC method', async () => {
 			const chatRoom = env.CHAT_ROOM as RpcNamespace
 			const room = chatRoom.getByName('rpc-count-room')
-			
+
 			const count = await room.getOnlineCount()
 			expect(count).toBe(0)
 		})
@@ -195,12 +195,15 @@ describe('Case18 Bridge Integration', () => {
 		test('can call broadcastSystemMessage RPC method', async () => {
 			const chatRoom = env.CHAT_ROOM as RpcNamespace
 			const room = chatRoom.getByName('broadcast-room')
-			
+
 			// Clear any existing messages first
 			await room.clearMessages()
-			
+
 			// Broadcast a system message
-			const result = await room.broadcastSystemMessage('Hello from test!') as { success: boolean; messageId: string }
+			const result = (await room.broadcastSystemMessage('Hello from test!')) as {
+				success: boolean
+				messageId: string
+			}
 			expect(result).toBeDefined()
 			expect(result.success).toBe(true)
 			expect(result.messageId).toBeDefined()
@@ -209,15 +212,15 @@ describe('Case18 Bridge Integration', () => {
 		test('can call getMessageCount RPC method', async () => {
 			const chatRoom = env.CHAT_ROOM as RpcNamespace
 			const room = chatRoom.getByName('count-room')
-			
+
 			// Clear first
 			await room.clearMessages()
 			expect(await room.getMessageCount()).toBe(0)
-			
+
 			// Add messages
 			await room.broadcastSystemMessage('Message 1')
 			await room.broadcastSystemMessage('Message 2')
-			
+
 			// Count should be 2
 			const count = await room.getMessageCount()
 			expect(count).toBe(2)
@@ -225,21 +228,21 @@ describe('Case18 Bridge Integration', () => {
 
 		test('multiple rooms have separate state', async () => {
 			const chatRoom = env.CHAT_ROOM as RpcNamespace
-			
+
 			const roomA = chatRoom.getByName('separate-a')
 			const roomB = chatRoom.getByName('separate-b')
-			
+
 			// Clear both
 			await roomA.clearMessages()
 			await roomB.clearMessages()
-			
+
 			// Add different counts
 			await roomA.broadcastSystemMessage('A1')
 			await roomA.broadcastSystemMessage('A2')
 			await roomA.broadcastSystemMessage('A3')
-			
+
 			await roomB.broadcastSystemMessage('B1')
-			
+
 			// Verify separate state
 			expect(await roomA.getMessageCount()).toBe(3)
 			expect(await roomB.getMessageCount()).toBe(1)
@@ -262,18 +265,18 @@ describe('Case18 Bridge Integration', () => {
 			// const id = CHAT_ROOM.idFromName(roomId)
 			// const stub = CHAT_ROOM.get(id)
 			// const response = await stub.fetch(request)
-			
+
 			const chatRoom = env.CHAT_ROOM as RpcNamespace
 			const room = chatRoom.getByName('sveltekit-pattern-room')
-			
+
 			// Clear room
 			await room.clearMessages()
-			
+
 			// Simulate user actions
 			await room.broadcastSystemMessage('User joined')
 			await room.broadcastSystemMessage('User sent a message')
 			await room.broadcastSystemMessage('User left')
-			
+
 			// Check final state
 			const count = await room.getMessageCount()
 			expect(count).toBe(3)

@@ -1,14 +1,14 @@
 import { dirname, relative, resolve } from 'pathe'
 import type { DevflareConfig } from '../config'
-import { normalizeDOBinding } from '../config/schema'
 import { resolveConfigForEnvironment } from '../config/resolve'
+import { normalizeDOBinding } from '../config/schema'
 import { DEFAULT_DO_PATTERN } from '../utils/glob'
 import { discoverDurableObjectFiles } from './durable-object-discovery'
-import { discoverRoutes, type RouteDiscoveryResult } from './routes'
+import { type RouteDiscoveryResult, discoverRoutes } from './routes'
 import {
+	type WorkerSurfacePaths,
 	looksLikeBuildArtifactPath,
-	resolveWorkerSurfacePaths,
-	type WorkerSurfacePaths
+	resolveWorkerSurfacePaths
 } from './surface-paths'
 
 interface GeneratedRouteModuleImport {
@@ -271,11 +271,14 @@ function buildDefaultExportBody(options: {
 
 function getComposedWorkerEntrypointSource(
 	surfaceImportPaths: WorkerSurfacePaths,
-	configuredLocalSendEmailBindings: Record<string, {
-		destinationAddress?: string
-		allowedDestinationAddresses?: string[]
-		allowedSenderAddresses?: string[]
-	}> = {},
+	configuredLocalSendEmailBindings: Record<
+		string,
+		{
+			destinationAddress?: string
+			allowedDestinationAddresses?: string[]
+			allowedSenderAddresses?: string[]
+		}
+	> = {},
 	durableObjectExports: readonly GeneratedDurableObjectExport[] = [],
 	routeImports: readonly GeneratedRouteModuleImport[] = [],
 	options: PrepareComposedWorkerEntrypointOptions = {}
@@ -301,7 +304,7 @@ function getComposedWorkerEntrypointSource(
 		'devflare/runtime'
 	)
 
-	const fallbackModules: Array<{ identifier: string, importPath: string | null }> = [
+	const fallbackModules: Array<{ identifier: string; importPath: string | null }> = [
 		{ identifier: '__devflareFetchModule', importPath: surfaceImportPaths.fetch },
 		{ identifier: '__devflareQueueModule', importPath: surfaceImportPaths.queue },
 		{ identifier: '__devflareScheduledModule', importPath: surfaceImportPaths.scheduled },
@@ -327,9 +330,11 @@ function getComposedWorkerEntrypointSource(
 		reExportsBuilder.reExport(classNames, importPath)
 	}
 
-	const routeManifestEntries = routeImports.map(({ identifier, filePath, routePath, segmentsJson }) => {
-		return `\t{ filePath: ${JSON.stringify(filePath)}, routePath: ${JSON.stringify(routePath)}, segments: ${segmentsJson}, module: ${identifier} }`
-	})
+	const routeManifestEntries = routeImports.map(
+		({ identifier, filePath, routePath, segmentsJson }) => {
+			return `\t{ filePath: ${JSON.stringify(filePath)}, routePath: ${JSON.stringify(routePath)}, segments: ${segmentsJson}, module: ${identifier} }`
+		}
+	)
 
 	const builder = new CodeBuilder()
 	builder.raw(importsBuilder.toString())
@@ -344,16 +349,31 @@ function getComposedWorkerEntrypointSource(
 	builder.blank()
 	builder.raw(RESOLVE_HANDLER_DECLARATION)
 	builder.blank()
-	builder.constDeclaration('__devflareQueueHandler', "__devflareResolveHandler(__devflareQueueModule, 'queue')")
-	builder.constDeclaration('__devflareScheduledHandler', "__devflareResolveHandler(__devflareScheduledModule, 'scheduled')")
-	builder.constDeclaration('__devflareEmailHandler', "__devflareResolveHandler(__devflareEmailModule, 'email')")
-	builder.constDeclaration('__devflareTailHandler', "__devflareResolveHandler(__devflareTailModule, 'tail')")
+	builder.constDeclaration(
+		'__devflareQueueHandler',
+		"__devflareResolveHandler(__devflareQueueModule, 'queue')"
+	)
+	builder.constDeclaration(
+		'__devflareScheduledHandler',
+		"__devflareResolveHandler(__devflareScheduledModule, 'scheduled')"
+	)
+	builder.constDeclaration(
+		'__devflareEmailHandler',
+		"__devflareResolveHandler(__devflareEmailModule, 'email')"
+	)
+	builder.constDeclaration(
+		'__devflareTailHandler',
+		"__devflareResolveHandler(__devflareTailModule, 'tail')"
+	)
 	emitDevOnlyEmailHooks(builder, { enabled: includeDevOnlyHooks })
 	builder.blank()
-	builder.exportDefault(buildDefaultExportBody({
-		hasFetchDispatch: Boolean(surfaceImportPaths.fetch) || routeImports.length > 0 || includeDevOnlyHooks,
-		includeDevOnlyHooks
-	}))
+	builder.exportDefault(
+		buildDefaultExportBody({
+			hasFetchDispatch:
+				Boolean(surfaceImportPaths.fetch) || routeImports.length > 0 || includeDevOnlyHooks,
+			includeDevOnlyHooks
+		})
+	)
 	builder.raw('')
 
 	return builder.toString()
@@ -401,9 +421,10 @@ async function createGeneratedDurableObjectExports(
 		return []
 	}
 
-	const pattern = typeof config.files?.durableObjects === 'string'
-		? config.files.durableObjects
-		: DEFAULT_DO_PATTERN
+	const pattern =
+		typeof config.files?.durableObjects === 'string'
+			? config.files.durableObjects
+			: DEFAULT_DO_PATTERN
 	const discoveredFiles = await discoverDurableObjectFiles(cwd, pattern)
 	const exports: GeneratedDurableObjectExport[] = []
 	const discoveredClassNames = new Set<string>()
@@ -426,12 +447,14 @@ async function createGeneratedDurableObjectExports(
 		})
 	}
 
-	const missingClassNames = Array.from(localClassNames).filter((className) => !discoveredClassNames.has(className))
+	const missingClassNames = Array.from(localClassNames).filter(
+		(className) => !discoveredClassNames.has(className)
+	)
 
 	if (missingClassNames.length > 0) {
 		throw new Error(
-			`Failed to discover local Durable Object class${missingClassNames.length === 1 ? '' : 'es'} ${missingClassNames.join(', ')} for worker composition. `
-			+ `Ensure files.durableObjects matches the source file pattern for your do.* files.`
+			`Failed to discover local Durable Object class${missingClassNames.length === 1 ? '' : 'es'} ${missingClassNames.join(', ')} for worker composition. ` +
+				`Ensure files.durableObjects matches the source file pattern for your do.* files.`
 		)
 	}
 
@@ -467,11 +490,11 @@ function needsComposedWorkerEntrypoint(
 	routeDiscovery: RouteDiscoveryResult | null
 ): boolean {
 	const hasAdditionalWorkerSurfaces = Boolean(
-		surfacePaths.queue
-		|| surfacePaths.scheduled
-		|| surfacePaths.email
-		|| surfacePaths.tail
-		|| routeDiscovery?.routes.length
+		surfacePaths.queue ||
+			surfacePaths.scheduled ||
+			surfacePaths.email ||
+			surfacePaths.tail ||
+			routeDiscovery?.routes.length
 	)
 
 	if (hasAdditionalWorkerSurfaces) {
@@ -490,9 +513,7 @@ function needsComposedWorkerEntrypoint(
 		}
 	}
 
-	return Boolean(
-		surfacePaths.fetch
-	)
+	return Boolean(surfacePaths.fetch)
 }
 
 export async function prepareComposedWorkerEntrypoint(
@@ -503,8 +524,8 @@ export async function prepareComposedWorkerEntrypoint(
 ): Promise<string | null> {
 	const resolvedConfig = resolveConfigForEnvironment(config, environment)
 	if (
-		resolvedConfig.wrangler?.passthrough
-		&& Object.prototype.hasOwnProperty.call(resolvedConfig.wrangler.passthrough, 'main')
+		resolvedConfig.wrangler?.passthrough &&
+		Object.prototype.hasOwnProperty.call(resolvedConfig.wrangler.passthrough, 'main')
 	) {
 		return null
 	}
@@ -550,7 +571,11 @@ export async function prepareComposedWorkerEntrypoint(
 		email: surfacePaths.email ? toImportSpecifier(entryPath, surfacePaths.email) : null,
 		tail: surfacePaths.tail ? toImportSpecifier(entryPath, surfacePaths.tail) : null
 	}
-	const durableObjectExports = await createGeneratedDurableObjectExports(entryPath, cwd, resolvedConfig)
+	const durableObjectExports = await createGeneratedDurableObjectExports(
+		entryPath,
+		cwd,
+		resolvedConfig
+	)
 	const routeImports = createGeneratedRouteModuleImports(entryPath, routeDiscovery)
 
 	await fs.writeFile(

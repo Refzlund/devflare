@@ -1,22 +1,23 @@
 import type { ConsolaInstance } from 'consola'
-import type { ParsedArgs, CliOptions, CliResult } from '../index'
 import {
-	account,
 	type APIClientOptions,
 	type WorkerDeploymentInfo,
 	type WorkerInfo,
-	type WorkerVersionInfo
+	type WorkerVersionInfo,
+	account
 } from '../../cloudflare'
-import { loadConfig, ConfigNotFoundError } from '../../config/loader'
+import { ConfigNotFoundError, loadConfig } from '../../config/loader'
+import { findFiles } from '../../utils/glob'
 import {
 	asOptionalString,
 	resolveCloudflareAccountId,
 	resolveNamedSelection
 } from '../command-utils'
 import { getDependencies } from '../dependencies'
-import { findFiles } from '../../utils/glob'
-import { collectConfiguredWorkerFamilies } from './previews-support/family'
+import type { CliOptions, CliResult, ParsedArgs } from '../index'
 import {
+	type CliTableColumn,
+	type CliTheme,
 	bold,
 	createCliTheme,
 	cyanBold,
@@ -27,17 +28,16 @@ import {
 	logTable,
 	red,
 	whiteDim,
-	yellow,
-	type CliTableColumn,
-	type CliTheme
+	yellow
 } from '../ui'
+import { collectConfiguredWorkerFamilies } from './previews-support/family'
 import type { ConfiguredWorkerFamilyMember } from './previews-support/types'
 
 const CLI_API_OPTIONS: APIClientOptions = { timeout: 10000 }
 const PRODUCTION_SUBCOMMANDS = ['list', 'versions', 'rollback', 'delete'] as const
 const VERSION_LIST_LIMIT = 10
 
-type ProductionSubcommand = typeof PRODUCTION_SUBCOMMANDS[number]
+type ProductionSubcommand = (typeof PRODUCTION_SUBCOMMANDS)[number]
 type WorkerNameSource = 'option' | 'arg' | 'config' | 'none'
 
 interface ProductionDiscoveryResult {
@@ -82,15 +82,15 @@ function isProductionSubcommand(value: string): value is ProductionSubcommand {
 	return PRODUCTION_SUBCOMMANDS.includes(value as ProductionSubcommand)
 }
 
-function shortenVersionId(versionId: string, length: number = 12): string {
-	return versionId.length <= length
-		? versionId
-		: `${versionId.slice(0, length)}…`
+function shortenVersionId(versionId: string, length = 12): string {
+	return versionId.length <= length ? versionId : `${versionId.slice(0, length)}…`
 }
 
 function selectDeploymentVersionId(deployment: WorkerDeploymentInfo): string | undefined {
-	return deployment.versions.find((version) => version.percentage === 100)?.versionId
-		?? deployment.versions[0]?.versionId
+	return (
+		deployment.versions.find((version) => version.percentage === 100)?.versionId ??
+		deployment.versions[0]?.versionId
+	)
 }
 
 function getWorkerVersionTimestamp(version: WorkerVersionInfo): Date | undefined {
@@ -101,29 +101,21 @@ function formatRecordDate(date: Date | undefined): string {
 	return date ? date.toISOString().slice(0, 19).replace('T', ' ') : 'N/A'
 }
 
-function formatWorkerStatus(
-	status: ProductionWorkerRow['status'],
-	theme: CliTheme
-): string {
+function formatWorkerStatus(status: ProductionWorkerRow['status'], theme: CliTheme): string {
 	switch (status) {
 		case 'active':
 			return green(status, theme)
 		case 'undeployed':
 			return yellow(status, theme)
-		case 'missing':
 		default:
 			return red(status, theme)
 	}
 }
 
-function formatVersionStatus(
-	status: ProductionVersionRow['status'],
-	theme: CliTheme
-): string {
+function formatVersionStatus(status: ProductionVersionRow['status'], theme: CliTheme): string {
 	switch (status) {
 		case 'active':
 			return green(status, theme)
-		case 'stored':
 		default:
 			return whiteDim(status, theme)
 	}
@@ -191,10 +183,12 @@ async function discoverProductionConfigs(
 	} else {
 		const loadedDirectly = await loadAndCollect()
 		if (!loadedDirectly) {
-			const configPaths = (await findFiles('**/devflare.config.{ts,js,mjs,cjs}', {
-				cwd,
-				absolute: true
-			})).sort((left, right) => left.localeCompare(right))
+			const configPaths = (
+				await findFiles('**/devflare.config.{ts,js,mjs,cjs}', {
+					cwd,
+					absolute: true
+				})
+			).sort((left, right) => left.localeCompare(right))
 
 			for (const configPath of configPaths) {
 				await loadAndCollect(configPath)
@@ -223,7 +217,9 @@ async function discoverProductionConfigs(
 
 			return left.baseName.localeCompare(right.baseName)
 		}),
-		primaryFamilyNames: Array.from(primaryFamilyNames).sort((left, right) => left.localeCompare(right))
+		primaryFamilyNames: Array.from(primaryFamilyNames).sort((left, right) =>
+			left.localeCompare(right)
+		)
 	}
 }
 
@@ -251,9 +247,10 @@ function resolveWorkerName(
 
 	return {
 		workerName: selection.value,
-		source: selection.value === discovery.defaultWorkerName
-			? discovery.defaultWorkerNameSource
-			: selection.source
+		source:
+			selection.value === discovery.defaultWorkerName
+				? discovery.defaultWorkerNameSource
+				: selection.source
 	}
 }
 
@@ -272,21 +269,25 @@ async function resolveContext(
 	const discovery = shouldDiscoverConfigs
 		? await discoverProductionConfigs(cwd, configFile, environment)
 		: {
-			accountId: undefined,
-			defaultWorkerName: undefined,
-			defaultWorkerNameSource: 'none' as const,
-			families: [],
-			primaryFamilyNames: []
-		}
+				accountId: undefined,
+				defaultWorkerName: undefined,
+				defaultWorkerNameSource: 'none' as const,
+				families: [],
+				primaryFamilyNames: []
+			}
 	const accountId = await resolveAccountId(parsed, discovery)
 	const workerSelection = resolveWorkerName(parsed, discovery, fallbackArg)
 
 	if (!accountId) {
-		throw new Error('No Cloudflare account could be resolved. Use --account or configure accountId in devflare.config.*.')
+		throw new Error(
+			'No Cloudflare account could be resolved. Use --account or configure accountId in devflare.config.*.'
+		)
 	}
 
 	if ((subcommand === 'rollback' || subcommand === 'delete') && !workerSelection.workerName) {
-		throw new Error(`A worker name is required for productions ${subcommand}. Use --worker or run inside a configured package with a single primary worker.`)
+		throw new Error(
+			`A worker name is required for productions ${subcommand}. Use --worker or run inside a configured package with a single primary worker.`
+		)
 	}
 
 	return {
@@ -321,33 +322,37 @@ async function buildProductionRows(
 	])
 	const workersByName = new Map(liveWorkers.map((worker) => [worker.name, worker]))
 
-	return Promise.all(families.map(async (family) => {
-		const worker = workersByName.get(family.baseName)
-		if (!worker) {
+	return Promise.all(
+		families.map(async (family) => {
+			const worker = workersByName.get(family.baseName)
+			if (!worker) {
+				return {
+					workerName: family.baseName,
+					role: family.roleLabel,
+					status: 'missing' as const,
+					url: getProductionUrl(family.baseName, workersSubdomain)
+				}
+			}
+
+			const deployments = await account.workerDeployments(accountId, family.baseName, apiOptions)
+			const latestDeployment = [...deployments].sort((left, right) => {
+				return right.createdOn.getTime() - left.createdOn.getTime()
+			})[0]
+			const activeVersionId = latestDeployment
+				? selectDeploymentVersionId(latestDeployment)
+				: undefined
+
 			return {
 				workerName: family.baseName,
 				role: family.roleLabel,
-				status: 'missing' as const,
+				status: latestDeployment ? 'active' : 'undeployed',
+				deployedAt: latestDeployment?.createdOn ?? worker.modifiedOn,
+				versionId: activeVersionId,
+				source: latestDeployment?.source,
 				url: getProductionUrl(family.baseName, workersSubdomain)
 			}
-		}
-
-		const deployments = await account.workerDeployments(accountId, family.baseName, apiOptions)
-		const latestDeployment = [...deployments].sort((left, right) => {
-			return right.createdOn.getTime() - left.createdOn.getTime()
-		})[0]
-		const activeVersionId = latestDeployment ? selectDeploymentVersionId(latestDeployment) : undefined
-
-		return {
-			workerName: family.baseName,
-			role: family.roleLabel,
-			status: latestDeployment ? 'active' : 'undeployed',
-			deployedAt: latestDeployment?.createdOn ?? worker.modifiedOn,
-			versionId: activeVersionId,
-			source: latestDeployment?.source,
-			url: getProductionUrl(family.baseName, workersSubdomain)
-		}
-	}))
+		})
+	)
 }
 
 function buildProductionColumns(theme: CliTheme): CliTableColumn<ProductionWorkerRow>[] {
@@ -375,7 +380,7 @@ function buildProductionColumns(theme: CliTheme): CliTableColumn<ProductionWorke
 		{
 			label: 'Version',
 			width: 13,
-			value: (row) => row.versionId ? shortenVersionId(row.versionId) : dim('N/A', theme)
+			value: (row) => (row.versionId ? shortenVersionId(row.versionId) : dim('N/A', theme))
 		},
 		{
 			label: 'Source',
@@ -436,7 +441,9 @@ async function loadWorkerVersionOverview(
 			return rightTime - leftTime
 		})
 		.slice(0, VERSION_LIST_LIMIT)
-	const activeVersionIds = new Set((deployments[0]?.versions ?? []).map((version) => version.versionId))
+	const activeVersionIds = new Set(
+		(deployments[0]?.versions ?? []).map((version) => version.versionId)
+	)
 	const latestDeploymentByVersionId = new Map<string, Date>()
 
 	for (const deployment of deployments) {
@@ -469,11 +476,39 @@ function showProductionOverview(
 	logLine(logger)
 
 	if (context.discovery.primaryFamilyNames.length === 1) {
-		logLine(logger, formatLabelValue('worker family', green(context.discovery.primaryFamilyNames[0], theme), theme))
-		logLine(logger, formatLabelValue('related', whiteDim(String(Math.max(context.discovery.families.length - 1, 0)), theme), theme))
+		logLine(
+			logger,
+			formatLabelValue(
+				'worker family',
+				green(context.discovery.primaryFamilyNames[0], theme),
+				theme
+			)
+		)
+		logLine(
+			logger,
+			formatLabelValue(
+				'related',
+				whiteDim(String(Math.max(context.discovery.families.length - 1, 0)), theme),
+				theme
+			)
+		)
 	} else if (context.discovery.primaryFamilyNames.length > 1) {
-		logLine(logger, formatLabelValue('configured', whiteDim(`${context.discovery.primaryFamilyNames.length} primary workers`, theme), theme))
-		logLine(logger, formatLabelValue('tracked', whiteDim(`${context.discovery.families.length} workers`, theme), theme))
+		logLine(
+			logger,
+			formatLabelValue(
+				'configured',
+				whiteDim(`${context.discovery.primaryFamilyNames.length} primary workers`, theme),
+				theme
+			)
+		)
+		logLine(
+			logger,
+			formatLabelValue(
+				'tracked',
+				whiteDim(`${context.discovery.families.length} workers`, theme),
+				theme
+			)
+		)
 	} else if (context.workerName) {
 		logLine(logger, formatLabelValue('worker', green(context.workerName, theme), theme))
 	}
@@ -494,7 +529,13 @@ function showProductionOverview(
 		titleAccent: 'green'
 	})
 	logLine(logger)
-	logLine(logger, dim('Use `devflare productions versions` for recent production versions, or `rollback` / `delete` to mutate one Worker.', theme))
+	logLine(
+		logger,
+		dim(
+			'Use `devflare productions versions` for recent production versions, or `rollback` / `delete` to mutate one Worker.',
+			theme
+		)
+	)
 	logLine(logger)
 }
 
@@ -546,8 +587,8 @@ async function runRollback(
 		return { exitCode: 1 }
 	}
 
-	const versionId = asOptionalString(parsed.options.version)
-		|| asOptionalString(parsed.options['version-id'])
+	const versionId =
+		asOptionalString(parsed.options.version) || asOptionalString(parsed.options['version-id'])
 	const apply = parsed.options.apply === true
 
 	if (!apply) {
@@ -560,8 +601,9 @@ async function runRollback(
 		return { exitCode: 0 }
 	}
 
-	const rollbackMessage = asOptionalString(parsed.options.message)
-		?? `Rolled back ${context.workerName} via devflare productions rollback`
+	const rollbackMessage =
+		asOptionalString(parsed.options.message) ??
+		`Rolled back ${context.workerName} via devflare productions rollback`
 	const rollbackArgs = ['wrangler', 'rollback']
 	if (versionId) {
 		rollbackArgs.push(versionId)
@@ -569,7 +611,10 @@ async function runRollback(
 	rollbackArgs.push('--name', context.workerName, '--message', rollbackMessage)
 
 	logLine(logger)
-	logLine(logger, `${cyanBold('productions rollback', theme)} ${dim(`Rolling back ${context.workerName}`, theme)}`)
+	logLine(
+		logger,
+		`${cyanBold('productions rollback', theme)} ${dim(`Rolling back ${context.workerName}`, theme)}`
+	)
 
 	const deps = await getDependencies()
 	const cwd = options.cwd ?? process.cwd()
@@ -583,7 +628,11 @@ async function runRollback(
 		return { exitCode: 1 }
 	}
 
-	const deployments = await account.workerDeployments(context.accountId, context.workerName, CLI_API_OPTIONS)
+	const deployments = await account.workerDeployments(
+		context.accountId,
+		context.workerName,
+		CLI_API_OPTIONS
+	)
 	const activeVersionId = deployments[0] ? selectDeploymentVersionId(deployments[0]) : undefined
 
 	logger.success(`Rolled back production deployment for ${context.workerName}`)
@@ -608,13 +657,17 @@ async function runDelete(
 	if (!apply) {
 		logger.success(`Production delete dry run complete for ${context.workerName}`)
 		logger.info(`Would delete Worker script ${context.workerName}`)
-		logger.warn('Deleting a production Worker script does not automatically delete KV, D1, R2, queue, or other account resources.')
+		logger.warn(
+			'Deleting a production Worker script does not automatically delete KV, D1, R2, queue, or other account resources.'
+		)
 		return { exitCode: 0 }
 	}
 
 	await account.deleteWorker(context.accountId, context.workerName, CLI_API_OPTIONS)
 	logger.success(`Deleted production Worker script ${context.workerName}`)
-	logger.warn('Devflare deleted the Worker script only. Review any shared account resources separately before cleaning them up.')
+	logger.warn(
+		'Devflare deleted the Worker script only. Review any shared account resources separately before cleaning them up.'
+	)
 	return { exitCode: 0 }
 }
 
@@ -631,12 +684,10 @@ export async function runProductionsCommand(
 	}
 
 	const rawSubcommand = parsed.args[0]
-	const fallbackWorkerArg = rawSubcommand && !isProductionSubcommand(rawSubcommand)
-		? rawSubcommand
-		: parsed.args[1]
-	const subcommand: ProductionSubcommand = rawSubcommand && isProductionSubcommand(rawSubcommand)
-		? rawSubcommand
-		: 'list'
+	const fallbackWorkerArg =
+		rawSubcommand && !isProductionSubcommand(rawSubcommand) ? rawSubcommand : parsed.args[1]
+	const subcommand: ProductionSubcommand =
+		rawSubcommand && isProductionSubcommand(rawSubcommand) ? rawSubcommand : 'list'
 	const theme = createCliTheme(parsed.options)
 
 	if (rawSubcommand && !isProductionSubcommand(rawSubcommand) && parsed.args.length > 2) {
@@ -647,25 +698,40 @@ export async function runProductionsCommand(
 
 	try {
 		const context = await resolveContext(parsed, options, subcommand, fallbackWorkerArg)
-		const selectedFamilies = context.discovery.families.length > 0
-			? context.discovery.families
-			: context.workerName
-				? [{ baseName: context.workerName, roleLabel: 'selected worker', role: 'primary' as const }]
-				: []
+		const selectedFamilies =
+			context.discovery.families.length > 0
+				? context.discovery.families
+				: context.workerName
+					? [
+							{
+								baseName: context.workerName,
+								roleLabel: 'selected worker',
+								role: 'primary' as const
+							}
+						]
+					: []
 
 		switch (subcommand) {
 			case 'versions': {
-				const workerNames = Array.from(new Set(
-					(context.workerName ? [context.workerName] : selectedFamilies.map((family) => family.baseName))
-				)).sort((left, right) => left.localeCompare(right))
+				const workerNames = Array.from(
+					new Set(
+						context.workerName
+							? [context.workerName]
+							: selectedFamilies.map((family) => family.baseName)
+					)
+				).sort((left, right) => left.localeCompare(right))
 
 				if (workerNames.length === 0) {
-					logger.error('No production Workers could be resolved. Use --worker or run inside a configured package.')
+					logger.error(
+						'No production Workers could be resolved. Use --worker or run inside a configured package.'
+					)
 					return { exitCode: 1 }
 				}
 
 				const overviews = await Promise.all(
-					workerNames.map((workerName) => loadWorkerVersionOverview(context.accountId, workerName, CLI_API_OPTIONS))
+					workerNames.map((workerName) =>
+						loadWorkerVersionOverview(context.accountId, workerName, CLI_API_OPTIONS)
+					)
 				)
 				showWorkerVersions(logger, overviews, theme)
 				return { exitCode: 0 }
@@ -677,10 +743,11 @@ export async function runProductionsCommand(
 			case 'delete':
 				return runDelete(context, parsed, logger)
 
-			case 'list':
 			default: {
 				if (selectedFamilies.length === 0) {
-					logger.error('No production Workers could be resolved. Use --worker, --config, or run inside a configured package.')
+					logger.error(
+						'No production Workers could be resolved. Use --worker, --config, or run inside a configured package.'
+					)
 					return { exitCode: 1 }
 				}
 

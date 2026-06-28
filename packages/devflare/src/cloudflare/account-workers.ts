@@ -1,10 +1,5 @@
-import { apiDelete, apiGet, apiGetAll, apiPatch, type APIClientOptions } from './api'
-import type {
-	WorkerDeploymentInfo,
-	WorkerInfo,
-	WorkerScript,
-	WorkerVersionInfo
-} from './types'
+import { type APIClientOptions, apiDelete, apiGet, apiGetAll, apiPatch } from './api'
+import type { WorkerDeploymentInfo, WorkerInfo, WorkerScript, WorkerVersionInfo } from './types'
 
 interface WorkersSubdomainResponse {
 	subdomain: string
@@ -72,10 +67,7 @@ export async function listWorkers(
 	accountId: string,
 	options?: APIClientOptions
 ): Promise<WorkerInfo[]> {
-	const scripts = await apiGetAll<WorkerScript>(
-		`/accounts/${accountId}/workers/scripts`,
-		options
-	)
+	const scripts = await apiGetAll<WorkerScript>(`/accounts/${accountId}/workers/scripts`, options)
 
 	return scripts.map((script) => ({
 		name: script.name ?? script.id,
@@ -109,10 +101,7 @@ export async function deleteWorker(
 	options?: APIClientOptions
 ): Promise<void> {
 	const encodedScriptName = encodeURIComponent(scriptName)
-	await apiDelete<unknown>(
-		`/accounts/${accountId}/workers/scripts/${encodedScriptName}`,
-		options
-	)
+	await apiDelete<unknown>(`/accounts/${accountId}/workers/scripts/${encodedScriptName}`, options)
 }
 
 function mapWorkerVersionInfo(
@@ -125,7 +114,9 @@ function mapWorkerVersionInfo(
 			authorEmail: version.metadata?.author_email,
 			authorId: version.metadata?.author_id,
 			createdOn: version.metadata?.created_on ? new Date(version.metadata.created_on) : undefined,
-			modifiedOn: version.metadata?.modified_on ? new Date(version.metadata.modified_on) : undefined,
+			modifiedOn: version.metadata?.modified_on
+				? new Date(version.metadata.modified_on)
+				: undefined,
 			hasPreview: version.metadata?.has_preview === true || version.metadata?.hasPreview === true,
 			source: version.metadata?.source
 		}
@@ -140,7 +131,7 @@ export async function listWorkerVersions(
 	const versions: WorkerVersionInfo[] = []
 	const encodedScriptName = encodeURIComponent(scriptName)
 
-	for (let page = 1;page <= 100;page++) {
+	for (let page = 1; page <= 100; page++) {
 		const result = await apiGet<WorkerVersionsListResult>(
 			`/accounts/${accountId}/workers/scripts/${encodedScriptName}/versions?page=${page}&per_page=100`,
 			options

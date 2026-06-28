@@ -15,7 +15,12 @@
 // =============================================================================
 
 import { join } from 'path'
-import { createFetchEvent, invokeFetchModule, resolveFetchHandler, runWithEventContext } from '../runtime'
+import {
+	createFetchEvent,
+	invokeFetchModule,
+	resolveFetchHandler,
+	runWithEventContext
+} from '../runtime'
 import { createRouteResolve, matchFetchRoute } from '../runtime'
 import type { RouteSegment } from '../runtime/router/types'
 
@@ -107,14 +112,11 @@ export function resetWorkerState(): void {
  * })
  * ```
  */
-async function fetch(
-	request: Request | string,
-	options?: WorkerFetchOptions
-): Promise<Response> {
+async function fetch(request: Request | string, options?: WorkerFetchOptions): Promise<Response> {
 	if (!fetchHandlerPath && fileRoutes.length === 0) {
 		throw new Error(
 			'Fetch handler not configured. Make sure your devflare.config.ts has files.fetch set or a routes directory is available, ' +
-			'and that the corresponding files exist (defaults: src/fetch.ts and src/routes/**).'
+				'and that the corresponding files exist (defaults: src/fetch.ts and src/routes/**).'
 		)
 	}
 
@@ -130,7 +132,9 @@ async function fetch(
 	// Normalize request
 	let req: Request
 	if (typeof request === 'string') {
-		const url = request.startsWith('http') ? request : `http://localhost${request.startsWith('/') ? '' : '/'}${request}`
+		const url = request.startsWith('http')
+			? request
+			: `http://localhost${request.startsWith('/') ? '' : '/'}${request}`
 		const headers = new Headers(options?.headers)
 
 		let body: BodyInit | undefined
@@ -158,26 +162,30 @@ async function fetch(
 	const handlerModule = fetchHandlerPath
 		? await import(join(workerConfigDir, fetchHandlerPath))
 		: {}
-	const routeModules = await Promise.all(fileRoutes.map(async (route) => {
-		return {
-			...route,
-			module: await import(join(workerConfigDir, route.filePath))
-		}
-	}))
+	const routeModules = await Promise.all(
+		fileRoutes.map(async (route) => {
+			return {
+				...route,
+				module: await import(join(workerConfigDir, route.filePath))
+			}
+		})
+	)
 
 	const methodExports = ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'ALL']
 	const hasMethodHandler = methodExports.some((method) => {
-		return typeof handlerModule[method] === 'function'
-			|| typeof handlerModule.default?.[method] === 'function'
+		return (
+			typeof handlerModule[method] === 'function' ||
+			typeof handlerModule.default?.[method] === 'function'
+		)
 	})
 
 	if (!resolveFetchHandler(handlerModule) && !hasMethodHandler && routeModules.length === 0) {
 		throw new Error(
 			`Fetch handler at "${fetchHandlerPath}" must export one of:\n` +
-			`- request-wide \"handle\" middleware\n` +
-			`- named \"fetch\"\n` +
-			`- default fetch handler\n` +
-			`- HTTP method exports such as \"GET\" or \"POST\"`
+				`- request-wide \"handle\" middleware\n` +
+				`- named \"fetch\"\n` +
+				`- default fetch handler\n` +
+				`- HTTP method exports such as \"GET\" or \"POST\"`
 		)
 	}
 
@@ -187,7 +195,7 @@ async function fetch(
 		waitUntil(promise: Promise<unknown>) {
 			waitUntilPromises.push(promise)
 		},
-		passThroughOnException() { },
+		passThroughOnException() {},
 		props: {}
 	}
 
@@ -199,9 +207,8 @@ async function fetch(
 	})
 
 	// Call the handler
-	const response = await runWithEventContext(
-		fetchEvent,
-		() => invokeFetchModule(
+	const response = await runWithEventContext(fetchEvent, () =>
+		invokeFetchModule(
 			handlerModule,
 			fetchEvent,
 			routeModules.length > 0 ? createRouteResolve(routeModules, fetchEvent) : undefined
@@ -224,14 +231,22 @@ async function get(path: string, headers?: Record<string, string>): Promise<Resp
 /**
  * Shorthand for POST requests with JSON body
  */
-async function post(path: string, body?: unknown, headers?: Record<string, string>): Promise<Response> {
+async function post(
+	path: string,
+	body?: unknown,
+	headers?: Record<string, string>
+): Promise<Response> {
 	return fetch(path, { method: 'POST', body, headers })
 }
 
 /**
  * Shorthand for PUT requests with JSON body
  */
-async function put(path: string, body?: unknown, headers?: Record<string, string>): Promise<Response> {
+async function put(
+	path: string,
+	body?: unknown,
+	headers?: Record<string, string>
+): Promise<Response> {
 	return fetch(path, { method: 'PUT', body, headers })
 }
 
@@ -245,7 +260,11 @@ async function del(path: string, headers?: Record<string, string>): Promise<Resp
 /**
  * Shorthand for PATCH requests with JSON body
  */
-async function patch(path: string, body?: unknown, headers?: Record<string, string>): Promise<Response> {
+async function patch(
+	path: string,
+	body?: unknown,
+	headers?: Record<string, string>
+): Promise<Response> {
 	return fetch(path, { method: 'PATCH', body, headers })
 }
 

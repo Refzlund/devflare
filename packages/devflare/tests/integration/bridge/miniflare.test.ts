@@ -8,7 +8,11 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { mkdtemp, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { type MiniflareInstance, startMiniflare, stopMiniflare } from '../../../src/bridge/miniflare'
+import {
+	type MiniflareInstance,
+	startMiniflare,
+	stopMiniflare
+} from '../../../src/bridge/miniflare'
 import { PORTS } from './_fixtures'
 
 describe('Miniflare Orchestration', () => {
@@ -71,7 +75,7 @@ describe('Miniflare Orchestration', () => {
 		test('health check returns binding info', async () => {
 			const response = await mf.dispatchFetch('http://localhost/_devflare/health')
 			expect(response.status).toBe(200)
-			const data = await response.json() as { status?: string; ok?: boolean; bindings: string[] }
+			const data = (await response.json()) as { status?: string; ok?: boolean; bindings: string[] }
 			expect(data.bindings).toContain('TEST_KV')
 		})
 	})

@@ -6,8 +6,8 @@ import { createTrackedTempDirectories } from '../../helpers/tracked-temp-directo
 import {
 	capturePreviewTestEnvironmentSnapshot,
 	jsonResponse,
-	runTrackedPreviewsCommand,
-	restorePreviewTestEnvironmentSnapshot
+	restorePreviewTestEnvironmentSnapshot,
+	runTrackedPreviewsCommand
 } from './previews.test-utils'
 
 const originalEnvironment = capturePreviewTestEnvironmentSnapshot()
@@ -15,11 +15,21 @@ const temporaryCacheDirectories = createTrackedTempDirectories()
 
 function writeFamilyProject(projectDir: string, cacheDir: string, packageName: string): string {
 	const configPath = join(projectDir, 'devflare.config.ts')
-	writeFileSync(join(projectDir, 'package.json'), JSON.stringify({
-		name: packageName,
-		type: 'module'
-	}, null, '\t'), 'utf-8')
-	writeFileSync(configPath, `
+	writeFileSync(
+		join(projectDir, 'package.json'),
+		JSON.stringify(
+			{
+				name: packageName,
+				type: 'module'
+			},
+			null,
+			'\t'
+		),
+		'utf-8'
+	)
+	writeFileSync(
+		configPath,
+		`
 		export default {
 			name: 'demo-worker',
 			accountId: 'acc_123',
@@ -31,22 +41,30 @@ function writeFamilyProject(projectDir: string, cacheDir: string, packageName: s
 				}
 			}
 		}
-	`, 'utf-8')
-	writeFileSync(join(cacheDir, 'preview-command-config.json'), JSON.stringify({
-		configs: {
-			[configPath]: {
-				accountId: 'acc_123',
-				name: 'demo-worker',
-				mtimeMs: statSync(configPath).mtimeMs
+	`,
+		'utf-8'
+	)
+	writeFileSync(
+		join(cacheDir, 'preview-command-config.json'),
+		JSON.stringify({
+			configs: {
+				[configPath]: {
+					accountId: 'acc_123',
+					name: 'demo-worker',
+					mtimeMs: statSync(configPath).mtimeMs
+				}
 			}
-		}
-	}), 'utf-8')
+		}),
+		'utf-8'
+	)
 
 	return configPath
 }
 
 function expectWorkerFamilyHeading(renderedMessages: string[]): void {
-	expect(renderedMessages.some((message) => message.includes('worker family demo-worker'))).toBe(true)
+	expect(renderedMessages.some((message) => message.includes('worker family demo-worker'))).toBe(
+		true
+	)
 	expect(renderedMessages.some((message) => message.includes('related workers 2'))).toBe(true)
 }
 
@@ -72,22 +90,57 @@ describe('previews command', () => {
 			}
 
 			if (url.includes('/accounts/acc_123/workers/scripts?page=1&per_page=50')) {
-				return jsonResponse([
-					{ id: 'demo-worker', created_on: '2025-01-01T10:00:00.000Z', modified_on: '2025-01-01T10:00:00.000Z' },
-					{ id: 'demo-auth-service', created_on: '2025-01-01T10:00:00.000Z', modified_on: '2025-01-01T10:00:00.000Z' },
-					{ id: 'demo-search-service', created_on: '2025-01-01T10:00:00.000Z', modified_on: '2025-01-01T10:00:00.000Z' },
-					{ id: 'demo-worker-next', created_on: '2025-01-03T00:00:00.000Z', modified_on: '2025-01-03T01:00:00.000Z' },
-					{ id: 'demo-auth-service-next', created_on: '2025-01-03T00:00:00.000Z', modified_on: '2025-01-03T01:00:00.000Z' },
-					{ id: 'demo-search-service-next', created_on: '2025-01-03T00:00:00.000Z', modified_on: '2025-01-03T01:00:00.000Z' },
-					{ id: 'demo-auth-service-pr-1', created_on: '2025-01-04T00:00:00.000Z', modified_on: '2025-01-04T01:00:00.000Z' },
-					{ id: 'demo-search-service-pr-1', created_on: '2025-01-04T00:00:00.000Z', modified_on: '2025-01-04T01:00:00.000Z' }
-				], {
-					page: 1,
-					per_page: 50,
-					total_pages: 1,
-					count: 8,
-					total_count: 8
-				})
+				return jsonResponse(
+					[
+						{
+							id: 'demo-worker',
+							created_on: '2025-01-01T10:00:00.000Z',
+							modified_on: '2025-01-01T10:00:00.000Z'
+						},
+						{
+							id: 'demo-auth-service',
+							created_on: '2025-01-01T10:00:00.000Z',
+							modified_on: '2025-01-01T10:00:00.000Z'
+						},
+						{
+							id: 'demo-search-service',
+							created_on: '2025-01-01T10:00:00.000Z',
+							modified_on: '2025-01-01T10:00:00.000Z'
+						},
+						{
+							id: 'demo-worker-next',
+							created_on: '2025-01-03T00:00:00.000Z',
+							modified_on: '2025-01-03T01:00:00.000Z'
+						},
+						{
+							id: 'demo-auth-service-next',
+							created_on: '2025-01-03T00:00:00.000Z',
+							modified_on: '2025-01-03T01:00:00.000Z'
+						},
+						{
+							id: 'demo-search-service-next',
+							created_on: '2025-01-03T00:00:00.000Z',
+							modified_on: '2025-01-03T01:00:00.000Z'
+						},
+						{
+							id: 'demo-auth-service-pr-1',
+							created_on: '2025-01-04T00:00:00.000Z',
+							modified_on: '2025-01-04T01:00:00.000Z'
+						},
+						{
+							id: 'demo-search-service-pr-1',
+							created_on: '2025-01-04T00:00:00.000Z',
+							modified_on: '2025-01-04T01:00:00.000Z'
+						}
+					],
+					{
+						page: 1,
+						per_page: 50,
+						total_pages: 1,
+						count: 8,
+						total_count: 8
+					}
+				)
 			}
 
 			throw new Error(`Unexpected fetch URL: ${url}`)
@@ -105,9 +158,19 @@ describe('previews command', () => {
 		expect(renderedMessages.some((message) => message.includes('3/3'))).toBe(true)
 		expect(renderedMessages.some((message) => message.includes('2/3'))).toBe(true)
 		expect(renderedMessages.some((message) => message.includes('missing primary'))).toBe(true)
-		expect(renderedMessages.some((message) => message.includes('demo-worker-next.example-subdomain.workers.dev'))).toBe(true)
-		expect(renderedMessages.some((message) => message.includes('Preview scopes are derived from live dedicated preview Worker names'))).toBe(true)
-		expect(renderedMessages.some((message) => message.includes('┌ worker demo-worker-next'))).toBe(false)
+		expect(
+			renderedMessages.some((message) =>
+				message.includes('demo-worker-next.example-subdomain.workers.dev')
+			)
+		).toBe(true)
+		expect(
+			renderedMessages.some((message) =>
+				message.includes('Preview scopes are derived from live dedicated preview Worker names')
+			)
+		).toBe(true)
+		expect(renderedMessages.some((message) => message.includes('┌ worker demo-worker-next'))).toBe(
+			false
+		)
 	})
 
 	test('previews list stays registry-free and reports when no dedicated preview scopes exist yet', async () => {
@@ -130,17 +193,32 @@ describe('previews command', () => {
 			}
 
 			if (url.includes('/accounts/acc_123/workers/scripts?page=1&per_page=50')) {
-				return jsonResponse([
-					{ id: 'demo-worker', created_on: '2025-01-01T10:00:00.000Z', modified_on: '2025-01-01T10:00:00.000Z' },
-					{ id: 'demo-auth-service', created_on: '2025-01-01T10:00:00.000Z', modified_on: '2025-01-01T10:00:00.000Z' },
-					{ id: 'demo-search-service', created_on: '2025-01-01T10:00:00.000Z', modified_on: '2025-01-01T10:00:00.000Z' }
-				], {
-					page: 1,
-					per_page: 50,
-					total_pages: 1,
-					count: 3,
-					total_count: 3
-				})
+				return jsonResponse(
+					[
+						{
+							id: 'demo-worker',
+							created_on: '2025-01-01T10:00:00.000Z',
+							modified_on: '2025-01-01T10:00:00.000Z'
+						},
+						{
+							id: 'demo-auth-service',
+							created_on: '2025-01-01T10:00:00.000Z',
+							modified_on: '2025-01-01T10:00:00.000Z'
+						},
+						{
+							id: 'demo-search-service',
+							created_on: '2025-01-01T10:00:00.000Z',
+							modified_on: '2025-01-01T10:00:00.000Z'
+						}
+					],
+					{
+						page: 1,
+						per_page: 50,
+						total_pages: 1,
+						count: 3,
+						total_count: 3
+					}
+				)
 			}
 
 			throw new Error(`Unexpected fetch URL: ${url}`)
@@ -150,7 +228,11 @@ describe('previews command', () => {
 
 		expect(result.exitCode).toBe(0)
 		expectWorkerFamilyHeading(renderedMessages)
-		expect(renderedMessages.some((message) => message.includes('No dedicated preview scopes found for this worker family.'))).toBe(true)
+		expect(
+			renderedMessages.some((message) =>
+				message.includes('No dedicated preview scopes found for this worker family.')
+			)
+		).toBe(true)
 		expect(renderedMessages.some((message) => message.includes('preview registry'))).toBe(false)
 	})
 })

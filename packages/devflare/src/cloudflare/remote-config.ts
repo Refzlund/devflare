@@ -5,9 +5,9 @@
 // File location: ~/.devflare/remote.json
 // =============================================================================
 
+import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs'
 import { homedir } from 'os'
 import { join } from 'path'
-import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync } from 'fs'
 
 // -----------------------------------------------------------------------------
 // Constants
@@ -82,17 +82,17 @@ function deleteConfig(): void {
  * @param minutes Duration in minutes (default: 30, clamped to 1-1440)
  * @returns The validated minutes value actually used
  */
-export function enableRemoteMode(minutes: number = 30): number {
+export function enableRemoteMode(minutes = 30): number {
 	// Validate and clamp
 	const validMinutes = Math.max(MIN_MINUTES, Math.min(MAX_MINUTES, Math.floor(minutes) || 30))
-	
+
 	const now = Date.now()
 	writeConfig({
 		enabledAt: now,
-		expiresAt: now + (validMinutes * 60 * 1000),
+		expiresAt: now + validMinutes * 60 * 1000,
 		durationMinutes: validMinutes
 	})
-	
+
 	return validMinutes
 }
 
@@ -149,17 +149,17 @@ export function getEffectiveRemoteModeStatus(): {
 	// Check env var first
 	const envValue = process.env.DEVFLARE_REMOTE ?? ''
 	const envVarSet = ['1', 'true', 'yes'].includes(envValue.toLowerCase())
-	
+
 	if (envVarSet) {
 		return {
 			isActive: true,
 			source: 'env',
-			remainingMinutes: Infinity,
+			remainingMinutes: Number.POSITIVE_INFINITY,
 			expiresAt: null,
 			envVarSet: true
 		}
 	}
-	
+
 	// Check stored config
 	const status = getRemoteModeStatus()
 	if (status.isEnabled) {
@@ -171,7 +171,7 @@ export function getEffectiveRemoteModeStatus(): {
 			envVarSet: false
 		}
 	}
-	
+
 	return {
 		isActive: false,
 		source: 'none',

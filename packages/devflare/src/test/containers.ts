@@ -5,7 +5,12 @@ import { createConnection } from 'node:net'
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { execa } from 'execa'
-import { type ContainerConfig, type DevflareConfig, loadConfig, resolveConfigEnvVars } from '../config'
+import {
+	type ContainerConfig,
+	type DevflareConfig,
+	loadConfig,
+	resolveConfigEnvVars
+} from '../config'
 import { applyLocalDevVarsToConfig } from '../config/local-dev-vars'
 import { findNearestConfig, getAvailablePort, getCallerDirectory } from './simple-context-paths'
 
@@ -665,9 +670,10 @@ function isTransientContainerFetchError(error: unknown): boolean {
 		return true
 	}
 
-	return typeof value.message === 'string' && (
-		value.message.includes('socket connection was closed') ||
-		value.message.includes('fetch failed')
+	return (
+		typeof value.message === 'string' &&
+		(value.message.includes('socket connection was closed') ||
+			value.message.includes('fetch failed'))
 	)
 }
 

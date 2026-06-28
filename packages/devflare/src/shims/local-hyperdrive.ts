@@ -11,10 +11,10 @@
 // shim is used. Kept as a single exported constant so the test/SvelteKit copies
 // stay byte-identical and a test can assert exact-string parity.
 export const HYPERDRIVE_CONNECT_MESSAGE =
-	'Local Hyperdrive does not implement the raw socket connect(). '
-	+ 'Use the populated connection fields (connectionString, or host/port/user/password/database) '
-	+ 'with your Node database driver, or run a createTestContext()/Miniflare-backed test '
-	+ '(Miniflare establishes real Hyperdrive socket connections) for socket-level behavior.'
+	'Local Hyperdrive does not implement the raw socket connect(). ' +
+	'Use the populated connection fields (connectionString, or host/port/user/password/database) ' +
+	'with your Node database driver, or run a createTestContext()/Miniflare-backed test ' +
+	'(Miniflare establishes real Hyperdrive socket connections) for socket-level behavior.'
 
 function defaultPortForDatabaseUrl(url: URL): number {
 	if (url.port) {

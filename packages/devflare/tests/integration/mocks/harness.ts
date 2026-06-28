@@ -2,9 +2,9 @@
 // CLI Test Harness — Integration testing utilities
 // =============================================================================
 
-import { mock, type Mock } from 'bun:test'
-import { createVirtualFS, VirtualFileSystem } from './virtual-fs'
-import { createMockExeca, MockExeca, createEmptyMockExeca } from './mock-execa'
+import { type Mock, mock } from 'bun:test'
+import { type MockExeca, createEmptyMockExeca, createMockExeca } from './mock-execa'
+import { type VirtualFileSystem, createVirtualFS } from './virtual-fs'
 
 /**
  * Test harness configuration
@@ -54,7 +54,7 @@ export interface TestHarness {
 /**
  * Create a test logger that captures all messages
  */
-function createTestLogger(silent: boolean = true): TestLogger {
+function createTestLogger(silent = true): TestLogger {
 	const messages: Array<{ level: string; args: unknown[] }> = []
 
 	const createMethod = (level: string) => {
@@ -155,17 +155,21 @@ export function createParsedArgs(
  * Standard project files for a devflare project
  */
 export const STANDARD_PROJECT_FILES = {
-	'package.json': JSON.stringify({
-		name: 'test-project',
-		version: '0.0.1',
-		type: 'module',
-		dependencies: {},
-		devDependencies: {
-			devflare: '^0.1.0',
-			vite: '^5.0.0',
-			'@cloudflare/vite-plugin': '^1.0.0'
-		}
-	}, null, 2),
+	'package.json': JSON.stringify(
+		{
+			name: 'test-project',
+			version: '0.0.1',
+			type: 'module',
+			dependencies: {},
+			devDependencies: {
+				devflare: '^0.1.0',
+				vite: '^5.0.0',
+				'@cloudflare/vite-plugin': '^1.0.0'
+			}
+		},
+		null,
+		2
+	),
 	'devflare.config.ts': `import { defineConfig } from 'devflare/config'
 
 export default defineConfig({
@@ -183,14 +187,18 @@ export default defineConfig({
 	}
 })
 `,
-	'tsconfig.json': JSON.stringify({
-		compilerOptions: {
-			target: 'ESNext',
-			module: 'ESNext',
-			moduleResolution: 'bundler',
-			strict: true
-		}
-	}, null, 2),
+	'tsconfig.json': JSON.stringify(
+		{
+			compilerOptions: {
+				target: 'ESNext',
+				module: 'ESNext',
+				moduleResolution: 'bundler',
+				strict: true
+			}
+		},
+		null,
+		2
+	),
 	'vite.config.ts': `import { defineConfig } from 'vite'
 import { cloudflare } from '@cloudflare/vite-plugin'
 
@@ -207,9 +215,7 @@ export default defineConfig({
 /**
  * Create a harness with standard project files
  */
-export function createStandardProjectHarness(
-	extraFiles?: Record<string, string>
-): TestHarness {
+export function createStandardProjectHarness(extraFiles?: Record<string, string>): TestHarness {
 	return createTestHarness({
 		files: {
 			...STANDARD_PROJECT_FILES,

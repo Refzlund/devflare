@@ -56,13 +56,18 @@ function createLanguageService() {
 		getScriptFileNames: () => [fixturePath],
 		getScriptSnapshot(fileName) {
 			const normalized = resolve(fileName)
-			const text = files.get(normalized) ?? (existsSync(normalized) ? readFileSync(normalized, 'utf8') : undefined)
+			const text =
+				files.get(normalized) ??
+				(existsSync(normalized) ? readFileSync(normalized, 'utf8') : undefined)
 			return text === undefined ? undefined : ts.ScriptSnapshot.fromString(text)
 		},
 		getScriptVersion: () => '1',
 		readFile: (fileName) => {
 			const normalized = resolve(fileName)
-			return files.get(normalized) ?? (existsSync(normalized) ? readFileSync(normalized, 'utf8') : undefined)
+			return (
+				files.get(normalized) ??
+				(existsSync(normalized) ? readFileSync(normalized, 'utf8') : undefined)
+			)
 		},
 		fileExists: (fileName) => {
 			const normalized = resolve(fileName)
@@ -88,9 +93,7 @@ function getLeadingDocText(node: ts.Node, sourceFile: ts.SourceFile): string {
 }
 
 function isExported(node: ts.Node): boolean {
-	return ts.getCombinedModifierFlags(node as ts.Declaration) & ts.ModifierFlags.Export
-		? true
-		: false
+	return (ts.getCombinedModifierFlags(node as ts.Declaration) & ts.ModifierFlags.Export) !== 0
 }
 
 function getSchemaTypesSourceFiles(): ts.SourceFile[] {

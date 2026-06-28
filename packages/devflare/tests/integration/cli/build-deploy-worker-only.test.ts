@@ -2,9 +2,10 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { access, mkdir, mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'pathe'
-import { clearDependencies, setDependencies } from '../../../src/cli/dependencies'
 import { runBuildCommand } from '../../../src/cli/commands/build'
+import { clearDependencies, setDependencies } from '../../../src/cli/dependencies'
 import {
+	type ExecInvocation,
 	createCliDependencies,
 	createLogger,
 	createProcessRunner,
@@ -19,8 +20,7 @@ import {
 	writeRequestWideHandleProjectFiles,
 	writeRolldownWorkerProjectFiles,
 	writeRouteProjectFiles,
-	writeServiceBindingProjectFiles,
-	type ExecInvocation
+	writeServiceBindingProjectFiles
 } from './build-deploy-worker-only.test-utils'
 
 const originalFetch = globalThis.fetch
@@ -40,18 +40,15 @@ function createBuildHarness(
 	}
 }
 
-async function runSuccessfulBuild(
-	projectDir: string,
-	logger: ReturnType<typeof createLogger>
-) {
-	const result = await runBuildCommand(
-		{ command: 'build', args: [], options: {} },
-		logger as any,
-		{ cwd: projectDir }
-	)
+async function runSuccessfulBuild(projectDir: string, logger: ReturnType<typeof createLogger>) {
+	const result = await runBuildCommand({ command: 'build', args: [], options: {} }, logger as any, {
+		cwd: projectDir
+	})
 
 	if (result.exitCode !== 0) {
-		throw new Error(logger.messages.map((message) => `[${message.level}] ${message.args.join(' ')}`).join('\n'))
+		throw new Error(
+			logger.messages.map((message) => `[${message.level}] ${message.args.join(' ')}`).join('\n')
+		)
 	}
 
 	expect(result.exitCode).toBe(0)
@@ -92,19 +89,19 @@ describe('build/deploy worker-only behavior', () => {
 	test('build skips vite for worker-only projects with no local vite.config', async () => {
 		await writeProjectFiles(projectDir, { withViteConfig: false, withViteDeps: false })
 
-		const { executions, logger } = createBuildHarness(
-			(command, args) => {
-				if (isViteBuildExecution(command, args)) {
-					throw new Error('vite build should not run for worker-only build')
-				}
-
-				return successResult()
+		const { executions, logger } = createBuildHarness((command, args) => {
+			if (isViteBuildExecution(command, args)) {
+				throw new Error('vite build should not run for worker-only build')
 			}
-		)
+
+			return successResult()
+		})
 
 		await runSuccessfulBuild(projectDir, logger)
 		expect(executions.some(({ command, args }) => isViteBuildExecution(command, args))).toBe(false)
-		expect(logger.messages.some((message) => message.args.join(' ').includes('Skipping Vite build'))).toBe(true)
+		expect(
+			logger.messages.some((message) => message.args.join(' ').includes('Skipping Vite build'))
+		).toBe(true)
 		await access(join(projectDir, '.devflare', 'wrangler.jsonc'))
 		await access(join(projectDir, '.devflare', 'build', 'wrangler.jsonc'))
 		await access(join(projectDir, '.wrangler', 'deploy', 'config.json'))
@@ -117,14 +114,18 @@ describe('build/deploy worker-only behavior', () => {
 			passthroughMain: 'src/fetch.ts'
 		})
 
-		const { executions, logger } = createBuildHarness(
-			(command, args) => successResult(`${command} ${args.join(' ')}`)
+		const { executions, logger } = createBuildHarness((command, args) =>
+			successResult(`${command} ${args.join(' ')}`)
 		)
 
 		await runSuccessfulBuild(projectDir, logger)
-		const viteBuildExecution = executions.find(({ command, args }) => isViteBuildExecution(command, args))
+		const viteBuildExecution = executions.find(({ command, args }) =>
+			isViteBuildExecution(command, args)
+		)
 		expect(viteBuildExecution).toBeDefined()
-		expect(extractViteEntryPath(viteBuildExecution!).replace(/\\/g, '/')).toContain('/node_modules/vite/bin/vite.js')
+		expect(extractViteEntryPath(viteBuildExecution!).replace(/\\/g, '/')).toContain(
+			'/node_modules/vite/bin/vite.js'
+		)
 		await access(join(projectDir, '.devflare', 'vite.config.mjs'))
 	})
 
@@ -136,14 +137,18 @@ describe('build/deploy worker-only behavior', () => {
 			passthroughMain: 'src/fetch.ts'
 		})
 
-		const { executions, logger } = createBuildHarness(
-			(command, args) => successResult(`${command} ${args.join(' ')}`)
+		const { executions, logger } = createBuildHarness((command, args) =>
+			successResult(`${command} ${args.join(' ')}`)
 		)
 
 		await runSuccessfulBuild(projectDir, logger)
-		const viteBuildExecution = executions.find(({ command, args }) => isViteBuildExecution(command, args))
+		const viteBuildExecution = executions.find(({ command, args }) =>
+			isViteBuildExecution(command, args)
+		)
 		expect(viteBuildExecution).toBeDefined()
-		expect(extractViteEntryPath(viteBuildExecution!).replace(/\\/g, '/')).toContain('/node_modules/vite/bin/vite.js')
+		expect(extractViteEntryPath(viteBuildExecution!).replace(/\\/g, '/')).toContain(
+			'/node_modules/vite/bin/vite.js'
+		)
 		expect(viteBuildExecution?.args).toContain('--config')
 		await access(join(projectDir, '.devflare', 'vite.config.mjs'))
 	})
@@ -168,7 +173,10 @@ describe('build/deploy worker-only behavior', () => {
 		const wranglerConfig = await readGeneratedDevConfig(projectDir)
 		expect(wranglerConfig).toContain('"main": "worker-entrypoints/main.js"')
 
-		const composedEntry = await readFile(join(projectDir, '.devflare', 'worker-entrypoints', 'main.ts'), 'utf8')
+		const composedEntry = await readFile(
+			join(projectDir, '.devflare', 'worker-entrypoints', 'main.ts'),
+			'utf8'
+		)
 		expect(composedEntry).toContain('src/fetch.ts')
 		expect(composedEntry).toContain('invokeFetchModule')
 	})
@@ -182,7 +190,10 @@ describe('build/deploy worker-only behavior', () => {
 		const wranglerConfig = await readGeneratedDevConfig(projectDir)
 		expect(wranglerConfig).toContain('"main": "worker-entrypoints/main.js"')
 
-		const composedEntry = await readFile(join(projectDir, '.devflare', 'worker-entrypoints', 'main.ts'), 'utf8')
+		const composedEntry = await readFile(
+			join(projectDir, '.devflare', 'worker-entrypoints', 'main.ts'),
+			'utf8'
+		)
 		expect(composedEntry).toContain('src/fetch.ts')
 		expect(composedEntry).toContain('src/queue.ts')
 		expect(composedEntry).toContain('src/scheduled.ts')
@@ -201,7 +212,10 @@ describe('build/deploy worker-only behavior', () => {
 		const wranglerConfig = await readGeneratedDevConfig(projectDir)
 		expect(wranglerConfig).toContain('"main": "worker-entrypoints/main.js"')
 
-		const composedEntry = await readFile(join(projectDir, '.devflare', 'worker-entrypoints', 'main.ts'), 'utf8')
+		const composedEntry = await readFile(
+			join(projectDir, '.devflare', 'worker-entrypoints', 'main.ts'),
+			'utf8'
+		)
 		expect(composedEntry).toContain('src/routes/index.ts')
 		expect(composedEntry).toContain('src/routes/users/[id].ts')
 		expect(composedEntry).toContain('createRouteResolve')
@@ -218,7 +232,9 @@ describe('build/deploy worker-only behavior', () => {
 
 		const wranglerConfig = await readGeneratedDevConfig(projectDir)
 		expect(wranglerConfig).toContain('"main": "../src/custom-main.ts"')
-		await expect(access(join(projectDir, '.devflare', 'worker-entrypoints', 'main.ts'))).rejects.toThrow()
+		await expect(
+			access(join(projectDir, '.devflare', 'worker-entrypoints', 'main.ts'))
+		).rejects.toThrow()
 	})
 
 	test('build applies rolldown plugins to the bundled worker artifact', async () => {
@@ -226,7 +242,10 @@ describe('build/deploy worker-only behavior', () => {
 
 		const { logger } = createBuildHarness()
 		await runSuccessfulBuild(projectDir, logger)
-		const bundledWorker = await readFile(join(projectDir, '.devflare', 'build', 'worker.js'), 'utf8')
+		const bundledWorker = await readFile(
+			join(projectDir, '.devflare', 'build', 'worker.js'),
+			'utf8'
+		)
 		expect(bundledWorker).toContain('Hello from Svelte')
 	})
 })

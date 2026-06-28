@@ -57,13 +57,7 @@ export async function findFiles(
 		gitignore,
 		// Additional ignore patterns for common non-source directories
 		// These are fallbacks in case no .gitignore exists
-		ignore: [
-			'**/node_modules/**',
-			'**/.devflare/**',
-			'**/dist/**',
-			'**/build/**',
-			'**/.git/**'
-		]
+		ignore: ['**/node_modules/**', '**/.devflare/**', '**/dist/**', '**/build/**', '**/.git/**']
 	})
 }
 
@@ -75,22 +69,13 @@ export async function findFiles(
  * @param options - Glob options
  * @returns Array of matching file paths
  */
-export function findFilesSync(
-	pattern: string | string[],
-	options: GlobOptions
-): string[] {
+export function findFilesSync(pattern: string | string[], options: GlobOptions): string[] {
 	const { cwd, absolute = true, gitignore = true } = options
 
 	return globbySync(pattern, {
 		cwd,
 		absolute,
 		gitignore,
-		ignore: [
-			'**/node_modules/**',
-			'**/.devflare/**',
-			'**/dist/**',
-			'**/build/**',
-			'**/.git/**'
-		]
+		ignore: ['**/node_modules/**', '**/.devflare/**', '**/dist/**', '**/build/**', '**/.git/**']
 	})
 }

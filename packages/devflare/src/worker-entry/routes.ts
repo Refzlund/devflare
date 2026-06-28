@@ -10,9 +10,7 @@ import { SUPPORTED_WORKER_EXTENSIONS } from './extensions'
 
 export const DEFAULT_ROUTE_DIR = 'src/routes'
 
-const DEFAULT_ROUTE_FILE_PATTERNS = SUPPORTED_WORKER_EXTENSIONS.map(
-	(ext) => `**/*${ext}`
-)
+const DEFAULT_ROUTE_FILE_PATTERNS = SUPPORTED_WORKER_EXTENSIONS.map((ext) => `**/*${ext}`)
 
 export interface DiscoveredRoute {
 	readonly absolutePath: string
@@ -52,9 +50,7 @@ function createStaticSegmentsFromPrefix(prefix: string): RouteSegment[] {
 }
 
 function shouldIgnoreRouteFile(relativePath: string): boolean {
-	return relativePath
-		.split('/')
-		.some((segment) => segment.startsWith('_'))
+	return relativePath.split('/').some((segment) => segment.startsWith('_'))
 }
 
 function toRoutePath(segments: readonly RouteSegment[]): string {
@@ -62,21 +58,23 @@ function toRoutePath(segments: readonly RouteSegment[]): string {
 		return '/'
 	}
 
-	return `/${segments.map((segment) => {
-		if (segment.type === 'static') {
-			return segment.value
-		}
+	return `/${segments
+		.map((segment) => {
+			if (segment.type === 'static') {
+				return segment.value
+			}
 
-		if (segment.type === 'param') {
-			return `[${segment.name}]`
-		}
+			if (segment.type === 'param') {
+				return `[${segment.name}]`
+			}
 
-		if (segment.type === 'rest') {
-			return `[...${segment.name}]`
-		}
+			if (segment.type === 'rest') {
+				return `[...${segment.name}]`
+			}
 
-		return `[[...${segment.name}]]`
-	}).join('/')}`
+			return `[[...${segment.name}]]`
+		})
+		.join('/')}`
 }
 
 function getRouteSignature(segments: readonly RouteSegment[]): string {
@@ -84,21 +82,23 @@ function getRouteSignature(segments: readonly RouteSegment[]): string {
 		return '/'
 	}
 
-	return segments.map((segment) => {
-		if (segment.type === 'static') {
-			return `static:${segment.value}`
-		}
+	return segments
+		.map((segment) => {
+			if (segment.type === 'static') {
+				return `static:${segment.value}`
+			}
 
-		if (segment.type === 'param') {
-			return 'param'
-		}
+			if (segment.type === 'param') {
+				return 'param'
+			}
 
-		if (segment.type === 'rest') {
-			return 'rest'
-		}
+			if (segment.type === 'rest') {
+				return 'rest'
+			}
 
-		return 'optional-rest'
-	}).join('/')
+			return 'optional-rest'
+		})
+		.join('/')
 }
 
 function getSegmentPriority(segment: RouteSegment): number {
@@ -152,7 +152,10 @@ function compareRoutes(a: DiscoveredRoute, b: DiscoveredRoute): number {
 	return a.filePath.localeCompare(b.filePath)
 }
 
-function parseRouteSegments(relativePath: string, prefixSegments: readonly RouteSegment[]): RouteSegment[] {
+function parseRouteSegments(
+	relativePath: string,
+	prefixSegments: readonly RouteSegment[]
+): RouteSegment[] {
 	const withoutExtension = relativePath.replace(/\.[^.]+$/u, '')
 	const rawSegments = withoutExtension.split('/').filter(Boolean)
 	const routeSegments: RouteSegment[] = [...prefixSegments]
@@ -220,7 +223,10 @@ async function directoryExists(dirPath: string): Promise<boolean> {
 	}
 }
 
-export function getRouteDirectoryCandidate(cwd: string, config: DevflareConfig): { dir: string; absoluteDir: string; prefix: string } | null {
+export function getRouteDirectoryCandidate(
+	cwd: string,
+	config: DevflareConfig
+): { dir: string; absoluteDir: string; prefix: string } | null {
 	const routesConfig = config.files?.routes
 	if (routesConfig === false) {
 		return null
@@ -234,7 +240,10 @@ export function getRouteDirectoryCandidate(cwd: string, config: DevflareConfig):
 	}
 }
 
-export async function discoverRoutes(cwd: string, config: DevflareConfig): Promise<RouteDiscoveryResult | null> {
+export async function discoverRoutes(
+	cwd: string,
+	config: DevflareConfig
+): Promise<RouteDiscoveryResult | null> {
 	const routeDirectory = getRouteDirectoryCandidate(cwd, config)
 	if (!routeDirectory) {
 		return null
@@ -254,7 +263,10 @@ export async function discoverRoutes(cwd: string, config: DevflareConfig): Promi
 	const routeSignatures = new Map<string, string>()
 
 	for (const absolutePath of files) {
-		const relativeToRouteDir = relative(routeDirectory.absoluteDir, absolutePath).replace(/\\/g, '/')
+		const relativeToRouteDir = relative(routeDirectory.absoluteDir, absolutePath).replace(
+			/\\/g,
+			'/'
+		)
 		if (shouldIgnoreRouteFile(relativeToRouteDir)) {
 			continue
 		}
@@ -268,7 +280,7 @@ export async function discoverRoutes(cwd: string, config: DevflareConfig): Promi
 		if (existingFilePath) {
 			throw new Error(
 				`Conflicting file routes detected for "${routePath}". ` +
-				`Both "${existingFilePath}" and "${filePath}" resolve to the same route.`
+					`Both "${existingFilePath}" and "${filePath}" resolve to the same route.`
 			)
 		}
 

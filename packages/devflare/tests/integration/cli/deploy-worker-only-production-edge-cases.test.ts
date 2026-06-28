@@ -15,7 +15,7 @@ import {
 	enableStrictDeployVerification,
 	restoreDeployEnvironmentSnapshot,
 	runWorkerOnlyDeploy,
-	writeAccountProjectFiles,
+	writeAccountProjectFiles
 } from './build-deploy-worker-only.test-utils'
 
 const originalEnvironment = captureDeployEnvironmentSnapshot()
@@ -77,10 +77,30 @@ describe('build/deploy worker-only behavior', () => {
 		const result = await runWorkerOnlyDeploy(projectDir, logger)
 
 		expect(result.exitCode).toBe(0)
-		expect(logger.messages.some((message) => message.args.join(' ').includes('Version ID: version-existing'))).toBe(true)
-		expect(logger.messages.some((message) => message.args.join(' ').includes('Deployment verification note:'))).toBe(true)
-		expect(logger.messages.some((message) => message.args.join(' ').includes('Cloudflare kept the existing live version'))).toBe(true)
-		expect(logger.messages.some((message) => message.args.join(' ').includes('Verified Cloudflare deployment deployment-existing for version version-existing'))).toBe(true)
+		expect(
+			logger.messages.some((message) =>
+				message.args.join(' ').includes('Version ID: version-existing')
+			)
+		).toBe(true)
+		expect(
+			logger.messages.some((message) =>
+				message.args.join(' ').includes('Deployment verification note:')
+			)
+		).toBe(true)
+		expect(
+			logger.messages.some((message) =>
+				message.args.join(' ').includes('Cloudflare kept the existing live version')
+			)
+		).toBe(true)
+		expect(
+			logger.messages.some((message) =>
+				message.args
+					.join(' ')
+					.includes(
+						'Verified Cloudflare deployment deployment-existing for version version-existing'
+					)
+			)
+		).toBe(true)
 	})
 
 	test('deploy fails when a fresh production deployment is required but Cloudflare only exposes the current live deployment', async () => {
@@ -93,7 +113,15 @@ describe('build/deploy worker-only behavior', () => {
 		const result = await runWorkerOnlyDeploy(projectDir, logger)
 
 		expect(result.exitCode).toBe(1)
-		expect(logger.messages.some((message) => message.args.join(' ').includes('requires a fresh production deployment'))).toBe(true)
-		expect(logger.messages.some((message) => message.args.join(' ').includes('reused live version as a failure'))).toBe(true)
+		expect(
+			logger.messages.some((message) =>
+				message.args.join(' ').includes('requires a fresh production deployment')
+			)
+		).toBe(true)
+		expect(
+			logger.messages.some((message) =>
+				message.args.join(' ').includes('reused live version as a failure')
+			)
+		).toBe(true)
 	})
 })

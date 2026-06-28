@@ -121,7 +121,7 @@ export function summarizeBindings(config: DevflareConfig): BuildManifest['bindin
 		artifacts: Object.keys(bindings.artifacts ?? {}).sort(),
 		secretsStore: Object.keys(bindings.secretsStore ?? {}).sort(),
 		tailConsumers: (config.tailConsumers ?? [])
-			.map((consumer) => typeof consumer === 'string' ? consumer : consumer.service)
+			.map((consumer) => (typeof consumer === 'string' ? consumer : consumer.service))
 			.sort(),
 		hyperdrive: Object.keys(bindings.hyperdrive ?? {}).sort(),
 		vectorize: Object.keys(bindings.vectorize ?? {}).sort(),
@@ -173,10 +173,12 @@ function targetsEqual(
 	a: BuildManifest['intendedTarget'],
 	b: BuildManifest['intendedTarget']
 ): boolean {
-	return a.environment === b.environment
-		&& a.preview === b.preview
-		&& a.previewScope === b.previewScope
-		&& a.branchName === b.branchName
+	return (
+		a.environment === b.environment &&
+		a.preview === b.preview &&
+		a.previewScope === b.previewScope &&
+		a.branchName === b.branchName
+	)
 }
 
 export function compareManifests(
@@ -208,12 +210,14 @@ export function compareManifests(
 export function formatDriftWarning(drift: ManifestDriftReport): string | null {
 	const lines: string[] = []
 	if (drift.versionChanged) {
-		lines.push(`devflare version differs (built with ${drift.previousVersion}, deploying with ${drift.currentVersion})`)
+		lines.push(
+			`devflare version differs (built with ${drift.previousVersion}, deploying with ${drift.currentVersion})`
+		)
 	}
 	if (drift.targetChanged) {
 		lines.push(
-			`deployment target differs (built for ${formatTarget(drift.previousTarget)}, `
-			+ `deploying as ${formatTarget(drift.currentTarget)})`
+			`deployment target differs (built for ${formatTarget(drift.previousTarget)}, ` +
+				`deploying as ${formatTarget(drift.currentTarget)})`
 		)
 	}
 	if (drift.configChanged) {

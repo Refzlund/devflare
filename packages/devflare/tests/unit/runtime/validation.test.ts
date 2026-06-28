@@ -3,8 +3,8 @@
 // =============================================================================
 
 import { describe, expect, test } from 'bun:test'
-import { createContextProxy, ContextAccessError } from '../../../src/runtime/validation'
 import { runWithContext } from '../../../src/runtime/context'
+import { ContextAccessError, createContextProxy } from '../../../src/runtime/validation'
 
 describe('createContextProxy', () => {
 	test('allows access when context is available', () => {
@@ -105,8 +105,8 @@ describe('integration with runWithContext', () => {
 	test('proxy works correctly within context', () => {
 		const mockEnv = { API_KEY: 'secret' }
 		const mockCtx: ExecutionContext = {
-			waitUntil: () => { },
-			passThroughOnException: () => { },
+			waitUntil: () => {},
+			passThroughOnException: () => {},
 			props: {}
 		}
 

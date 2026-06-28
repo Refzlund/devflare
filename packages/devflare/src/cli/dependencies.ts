@@ -2,8 +2,8 @@
 // CLI Dependencies — Injectable filesystem and process utilities
 // =============================================================================
 
-import type { PathLike, MakeDirectoryOptions, Stats } from 'node:fs'
-import type { Result, Options as ExecaOptions } from 'execa'
+import type { MakeDirectoryOptions, PathLike, Stats } from 'node:fs'
+import type { Options as ExecaOptions, Result } from 'execa'
 
 /**
  * Filesystem abstraction for CLI commands
@@ -15,7 +15,10 @@ export interface FileSystem {
 	mkdir(path: PathLike, options?: MakeDirectoryOptions): Promise<string | undefined>
 	access(path: PathLike, mode?: number): Promise<void>
 	stat(path: PathLike): Promise<Stats>
-	readdir(path: PathLike, options?: { withFileTypes?: boolean }): Promise<string[] | Array<{ name: string; isDirectory(): boolean; isFile(): boolean }>>
+	readdir(
+		path: PathLike,
+		options?: { withFileTypes?: boolean }
+	): Promise<string[] | Array<{ name: string; isDirectory(): boolean; isFile(): boolean }>>
 	rm(path: PathLike, options?: { recursive?: boolean; force?: boolean }): Promise<void>
 	unlink(path: PathLike): Promise<void>
 }
@@ -50,11 +53,7 @@ export interface SpawnedProcess {
  * Process execution abstraction for CLI commands
  */
 export interface ProcessRunner {
-	exec(
-		command: string,
-		args?: string[],
-		options?: ExecaOptions
-	): Promise<ExecResult>
+	exec(command: string, args?: string[], options?: ExecaOptions): Promise<ExecResult>
 	spawn(
 		command: string,
 		args?: string[],

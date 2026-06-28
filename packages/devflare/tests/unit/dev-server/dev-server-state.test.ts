@@ -7,7 +7,10 @@
 // =============================================================================
 
 import { describe, expect, mock, test } from 'bun:test'
-import { createDevServerState, disposeDevServerState } from '../../../src/dev-server/dev-server-state'
+import {
+	createDevServerState,
+	disposeDevServerState
+} from '../../../src/dev-server/dev-server-state'
 
 describe('createDevServerState', () => {
 	test('initializes every handle to its not-yet-started value', () => {
@@ -61,18 +64,28 @@ describe('disposeDevServerState', () => {
 		const state = createDevServerState({ enableVite: true })
 
 		state.doBundler = {
-			close: mock(async () => { order.push('doBundler') })
+			close: mock(async () => {
+				order.push('doBundler')
+			})
 		} as unknown as typeof state.doBundler
 		state.workerSourceWatcher = {
-			close: mock(async () => { order.push('watcher') })
+			close: mock(async () => {
+				order.push('watcher')
+			})
 		} as unknown as typeof state.workerSourceWatcher
 		state.miniflare = {
-			dispose: mock(async () => { order.push('miniflare') })
+			dispose: mock(async () => {
+				order.push('miniflare')
+			})
 		} as unknown as typeof state.miniflare
 		// viteProcess is killed via stopSpawnedProcessTree; we use a marker.
-		state.viteProcess = { __dispose: () => order.push('vite') } as unknown as typeof state.viteProcess
+		state.viteProcess = {
+			__dispose: () => order.push('vite')
+		} as unknown as typeof state.viteProcess
 		state.browserShim = {
-			stop: mock(async () => { order.push('browserShim') })
+			stop: mock(async () => {
+				order.push('browserShim')
+			})
 		} as unknown as typeof state.browserShim
 
 		// Patch stopSpawnedProcessTree by intercepting its module — easier: just
@@ -83,7 +96,15 @@ describe('disposeDevServerState', () => {
 		// immediately on every platform: setting `killed = true` short-circuits
 		// `waitForProcessExit`, and `pid = undefined` skips the win32
 		// `taskkill` branch so we don't try to spawn a real child process.
-		const fakeProc: { killed: boolean; pid: undefined; exitCode: number; kill: (signal?: string) => void; on: () => void; once: () => void; removeListener: () => void } = {
+		const fakeProc: {
+			killed: boolean
+			pid: undefined
+			exitCode: number
+			kill: (signal?: string) => void
+			on: () => void
+			once: () => void
+			removeListener: () => void
+		} = {
 			kill: (_signal?: string) => {
 				order.push('vite')
 				fakeProc.killed = true

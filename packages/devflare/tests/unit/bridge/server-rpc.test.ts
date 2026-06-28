@@ -2,14 +2,14 @@
 // Bridge Gateway — executeRpcMethod dispatch tests
 // =============================================================================
 
-import { describe, test, expect } from 'bun:test'
+import { describe, expect, test } from 'bun:test'
 import { executeRpcMethod } from '../../../src/bridge/server'
 import type { GatewayEnv } from '../../../src/bridge/server'
 import { serializeRequest } from '../../../src/bridge/v2/value-serialization'
 
 const noopCtx = {
-	waitUntil: () => { },
-	passThroughOnException: () => { }
+	waitUntil: () => {},
+	passThroughOnException: () => {}
 } as unknown as ExecutionContext
 
 describe('executeRpcMethod — namespaced dispatch', () => {
@@ -20,14 +20,19 @@ describe('executeRpcMethod — namespaced dispatch', () => {
 				calls.push(args)
 				return 'kv-value'
 			},
-			put: () => { },
-			list: () => { },
-			delete: () => { },
-			getWithMetadata: () => { }
+			put: () => {},
+			list: () => {},
+			delete: () => {},
+			getWithMetadata: () => {}
 		}
 		const env = { MY_KV: kv } as unknown as GatewayEnv
 
-		const result = await executeRpcMethod('MY_KV.kv.get', ['some-key', { type: 'text' }], env, noopCtx)
+		const result = await executeRpcMethod(
+			'MY_KV.kv.get',
+			['some-key', { type: 'text' }],
+			env,
+			noopCtx
+		)
 
 		expect(result).toBe('kv-value')
 		expect(calls).toEqual([['some-key', { type: 'text' }]])
@@ -53,8 +58,10 @@ describe('executeRpcMethod — namespaced dispatch', () => {
 	test('queue.send dispatches to Queue.send', async () => {
 		const sent: unknown[] = []
 		const queue = {
-			send: (msg: unknown) => { sent.push(msg) },
-			sendBatch: () => { }
+			send: (msg: unknown) => {
+				sent.push(msg)
+			},
+			sendBatch: () => {}
 		}
 		const env = { MY_Q: queue } as unknown as GatewayEnv
 		await executeRpcMethod('MY_Q.queue.send', [{ hello: 'world' }], env, noopCtx)
@@ -70,9 +77,9 @@ describe('executeRpcMethod — namespaced dispatch', () => {
 
 	test('ai.run throws when binding lacks run()', async () => {
 		const env = { AI: {} } as unknown as GatewayEnv
-		await expect(
-			executeRpcMethod('AI.ai.run', ['@cf/x', {}], env, noopCtx)
-		).rejects.toThrow(/does not support run/)
+		await expect(executeRpcMethod('AI.ai.run', ['@cf/x', {}], env, noopCtx)).rejects.toThrow(
+			/does not support run/
+		)
 	})
 
 	test('service.fetch dispatches to Cloudflare service binding fetch', async () => {
@@ -85,12 +92,19 @@ describe('executeRpcMethod — namespaced dispatch', () => {
 			}
 		}
 		const env = { API: service } as unknown as GatewayEnv
-		const { serialized } = await serializeRequest(new Request('https://api.local/action', {
-			method: 'POST',
-			body: 'payload'
-		}))
+		const { serialized } = await serializeRequest(
+			new Request('https://api.local/action', {
+				method: 'POST',
+				body: 'payload'
+			})
+		)
 
-		const result = await executeRpcMethod('API.service.fetch', [serialized], env, noopCtx) as Response
+		const result = (await executeRpcMethod(
+			'API.service.fetch',
+			[serialized],
+			env,
+			noopCtx
+		)) as Response
 
 		expect(result.status).toBe(202)
 		expect(result.headers.get('x-service')).toBe('ok')
@@ -102,10 +116,10 @@ describe('executeRpcMethod — B3-final: bare verbs and legacy sub-prefixes thro
 	const env = {
 		K: {
 			get: () => 'v',
-			put: () => { },
-			list: () => { },
-			delete: () => { },
-			getWithMetadata: () => { }
+			put: () => {},
+			list: () => {},
+			delete: () => {},
+			getWithMetadata: () => {}
 		},
 		D: {
 			idFromName: () => ({ __id: 'a' }),
@@ -115,30 +129,30 @@ describe('executeRpcMethod — B3-final: bare verbs and legacy sub-prefixes thro
 		},
 		DB: {
 			prepare: () => ({ first: () => ({ id: 1 }), bind: () => ({}) }),
-			exec: () => { },
-			batch: () => { },
-			dump: () => { }
+			exec: () => {},
+			batch: () => {},
+			dump: () => {}
 		},
-		X: { foo: () => { } }
+		X: { foo: () => {} }
 	} as unknown as GatewayEnv
 
 	test('bare verb on KV-shaped binding throws (no fallback translation)', async () => {
-		await expect(
-			executeRpcMethod('K.get', ['k1'], env, noopCtx)
-		).rejects.toThrow(/Unsupported bridge operation 'get'/)
+		await expect(executeRpcMethod('K.get', ['k1'], env, noopCtx)).rejects.toThrow(
+			/Unsupported bridge operation 'get'/
+		)
 	})
 
 	test('bare verb on DO-shaped binding throws', async () => {
 		const serializedId = { __type: 'DOId', hex: 'abc' }
-		await expect(
-			executeRpcMethod('D.get', [serializedId], env, noopCtx)
-		).rejects.toThrow(/Unsupported bridge operation 'get'/)
+		await expect(executeRpcMethod('D.get', [serializedId], env, noopCtx)).rejects.toThrow(
+			/Unsupported bridge operation 'get'/
+		)
 	})
 
 	test('bare verb on unknown binding kind throws', async () => {
-		await expect(
-			executeRpcMethod('X.get', ['k'], env, noopCtx)
-		).rejects.toThrow(/Unsupported bridge operation 'get'/)
+		await expect(executeRpcMethod('X.get', ['k'], env, noopCtx)).rejects.toThrow(
+			/Unsupported bridge operation 'get'/
+		)
 	})
 
 	test('bare fetch on a service-shaped binding explains the SvelteKit service-binding path', async () => {
@@ -148,81 +162,94 @@ describe('executeRpcMethod — B3-final: bare verbs and legacy sub-prefixes thro
 	})
 
 	test('legacy stmt.first prefix throws (use d1.stmt.first)', async () => {
-		await expect(
-			executeRpcMethod('DB.stmt.first', ['SELECT 1'], env, noopCtx)
-		).rejects.toThrow(/Unsupported bridge operation 'stmt\.first'/)
+		await expect(executeRpcMethod('DB.stmt.first', ['SELECT 1'], env, noopCtx)).rejects.toThrow(
+			/Unsupported bridge operation 'stmt\.first'/
+		)
 	})
 
 	test('legacy stub.fetch prefix throws (use do.fetch)', async () => {
-		await expect(
-			executeRpcMethod('D.stub.fetch', [], env, noopCtx)
-		).rejects.toThrow(/Unsupported bridge operation 'stub\.fetch'/)
+		await expect(executeRpcMethod('D.stub.fetch', [], env, noopCtx)).rejects.toThrow(
+			/Unsupported bridge operation 'stub\.fetch'/
+		)
 	})
 })
 
 describe('executeRpcMethod — B5-frame: binding errors round-trip with typed cause', () => {
 	test('KV.get throw surfaces back through executeRpcMethod', async () => {
 		const kv = {
-			get: () => { throw new Error('kv blew up') },
-			put: () => { },
-			list: () => { },
-			delete: () => { },
-			getWithMetadata: () => { }
+			get: () => {
+				throw new Error('kv blew up')
+			},
+			put: () => {},
+			list: () => {},
+			delete: () => {},
+			getWithMetadata: () => {}
 		}
 		const env = { K: kv } as unknown as GatewayEnv
-		await expect(
-			executeRpcMethod('K.kv.get', ['k1'], env, noopCtx)
-		).rejects.toThrow(/kv blew up/)
+		await expect(executeRpcMethod('K.kv.get', ['k1'], env, noopCtx)).rejects.toThrow(/kv blew up/)
 	})
 
 	test('R2.get throw surfaces back through executeRpcMethod', async () => {
 		const r2 = {
 			head: () => null,
-			get: () => { throw new Error('r2 blew up') },
-			put: () => { },
-			delete: () => { },
-			list: () => { },
-			createMultipartUpload: () => { }
+			get: () => {
+				throw new Error('r2 blew up')
+			},
+			put: () => {},
+			delete: () => {},
+			list: () => {},
+			createMultipartUpload: () => {}
 		}
 		const env = { B: r2 } as unknown as GatewayEnv
-		await expect(
-			executeRpcMethod('B.r2.get', ['some/key'], env, noopCtx)
-		).rejects.toThrow(/r2 blew up/)
+		await expect(executeRpcMethod('B.r2.get', ['some/key'], env, noopCtx)).rejects.toThrow(
+			/r2 blew up/
+		)
 	})
 
 	test('D1 prepare-then-first throw surfaces back through executeRpcMethod', async () => {
 		const stmt = {
 			bind: () => stmt,
-			first: () => { throw new Error('d1 blew up') }
+			first: () => {
+				throw new Error('d1 blew up')
+			}
 		}
 		const d1 = {
 			prepare: () => stmt,
-			exec: () => { },
-			batch: () => { },
-			dump: () => { }
+			exec: () => {},
+			batch: () => {},
+			dump: () => {}
 		}
 		const env = { DB: d1 } as unknown as GatewayEnv
-		await expect(
-			executeRpcMethod('DB.d1.stmt.first', ['SELECT 1'], env, noopCtx)
-		).rejects.toThrow(/d1 blew up/)
+		await expect(executeRpcMethod('DB.d1.stmt.first', ['SELECT 1'], env, noopCtx)).rejects.toThrow(
+			/d1 blew up/
+		)
 	})
 })
-
 
 describe('executeRpcMethod — DO jurisdiction (B2)', () => {
 	test('forwards jurisdiction to binding.jurisdiction(j) when supported', async () => {
 		const seen: string[] = []
 		const scopedId = { toString: () => 'eu-id' }
 		const scopedNs = {
-			idFromName: (name: string) => { seen.push(`name:${name}`); return scopedId },
+			idFromName: (name: string) => {
+				seen.push(`name:${name}`)
+				return scopedId
+			},
 			newUniqueId: () => scopedId
 		}
 		const binding = {
-			idFromName: () => { throw new Error('unscoped idFromName should not be called') },
+			idFromName: () => {
+				throw new Error('unscoped idFromName should not be called')
+			},
 			idFromString: () => scopedId,
-			newUniqueId: () => { throw new Error('unscoped newUniqueId should not be called') },
+			newUniqueId: () => {
+				throw new Error('unscoped newUniqueId should not be called')
+			},
 			get: () => ({ fetch: () => new Response('ok') }),
-			jurisdiction: (j: string) => { seen.push(`j:${j}`); return scopedNs }
+			jurisdiction: (j: string) => {
+				seen.push(`j:${j}`)
+				return scopedNs
+			}
 		}
 		const env = { MY_DO: binding } as unknown as GatewayEnv
 
@@ -235,7 +262,10 @@ describe('executeRpcMethod — DO jurisdiction (B2)', () => {
 		const seen: string[] = []
 		const plainId = { toString: () => 'plain-id' }
 		const binding = {
-			idFromName: (name: string) => { seen.push(`name:${name}`); return plainId },
+			idFromName: (name: string) => {
+				seen.push(`name:${name}`)
+				return plainId
+			},
 			idFromString: () => plainId,
 			newUniqueId: () => plainId,
 			get: () => ({ fetch: () => new Response('ok') })
@@ -252,15 +282,27 @@ describe('executeRpcMethod — DO jurisdiction (B2)', () => {
 		const seen: string[] = []
 		const plainId = { toString: () => 'plain-id' }
 		const binding = {
-			idFromName: () => { throw new Error('idFromName(unscoped) should not run for newUniqueId test') },
+			idFromName: () => {
+				throw new Error('idFromName(unscoped) should not run for newUniqueId test')
+			},
 			idFromString: () => plainId,
-			newUniqueId: () => { seen.push('newUniqueId'); return plainId },
+			newUniqueId: () => {
+				seen.push('newUniqueId')
+				return plainId
+			},
 			get: () => ({ fetch: () => new Response('ok') }),
-			jurisdiction: () => { throw new Error('jurisdiction() should not be called without an arg') }
+			jurisdiction: () => {
+				throw new Error('jurisdiction() should not be called without an arg')
+			}
 		}
 		const env = { MY_DO: binding } as unknown as GatewayEnv
 
-		const result = await executeRpcMethod('MY_DO.do.newUniqueId', [undefined, undefined], env, noopCtx)
+		const result = await executeRpcMethod(
+			'MY_DO.do.newUniqueId',
+			[undefined, undefined],
+			env,
+			noopCtx
+		)
 		expect(result).toEqual({ __type: 'DOId', hex: 'plain-id' })
 		expect(seen).toEqual(['newUniqueId'])
 	})

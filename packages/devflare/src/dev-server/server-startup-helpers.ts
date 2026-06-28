@@ -8,16 +8,16 @@
 import type { ConsolaInstance } from 'consola'
 import type { Miniflare as MiniflareType } from 'miniflare'
 import { resolve } from 'pathe'
+import { type BrowserShim, createBrowserShim } from '../browser-shim'
+import { type DOBundleResult, type DOBundler, createDOBundler } from '../bundler'
+import type { checkRemoteBindingRequirements } from '../cli/wrangler-auth'
 import { resolveConfigPath } from '../config/loader'
-import { createBrowserShim, type BrowserShim } from '../browser-shim'
-import { createDOBundler, type DOBundler, type DOBundleResult } from '../bundler'
-import { writeGeneratedViteConfig } from '../vite'
-import { resolveViteMode } from './vite-utils'
 import type { DevflareConfig } from '../config/schema'
 import { getSingleBrowserBindingName } from '../config/schema'
+import { writeGeneratedViteConfig } from '../vite'
 import type { RouteDiscoveryResult } from '../worker-entry/routes'
+import { resolveViteMode } from './vite-utils'
 import type { WorkerSurfacePaths } from './worker-surface-paths'
-import type { checkRemoteBindingRequirements } from '../cli/wrangler-auth'
 
 type RemoteBindingCheck = Awaited<ReturnType<typeof checkRemoteBindingRequirements>>
 
@@ -38,9 +38,8 @@ export function logWorkerHandlerDetection(
 		const detectedWorkerHandlers = Object.entries(mainWorkerSurfacePaths)
 			.filter(([, surfacePath]) => !!surfacePath)
 			.map(([surfaceName, surfacePath]) => `${surfaceName}=${surfacePath}`)
-		const detectedRouteHandlers = mainWorkerRoutes?.routes.map(
-			(route) => `route=${route.filePath}`
-		) ?? []
+		const detectedRouteHandlers =
+			mainWorkerRoutes?.routes.map((route) => `route=${route.filePath}`) ?? []
 		logger?.info(
 			`Worker handlers detected: ${[...detectedWorkerHandlers, ...detectedRouteHandlers].join(', ')}`
 		)
@@ -68,8 +67,10 @@ export function logRemoteBindingRequirements(
 
 	if (remoteCheck.missingAccountId) {
 		logger?.warn('⚠️  WARN: accountId is not set in devflare.config.ts')
-		logger?.warn('   Remote bindings (AI, Vectorize) require accountId to charge the correct account.')
-		logger?.warn('   Add: accountId: \'your-cloudflare-account-id\'')
+		logger?.warn(
+			'   Remote bindings (AI, Vectorize) require accountId to charge the correct account.'
+		)
+		logger?.warn("   Add: accountId: 'your-cloudflare-account-id'")
 		logger?.info('')
 	}
 
@@ -111,7 +112,7 @@ export async function resolveWorkerConfigWatchPath(
 		}
 	}
 
-	return await resolveConfigPath(cwd) ?? null
+	return (await resolveConfigPath(cwd)) ?? null
 }
 
 /**
@@ -124,12 +125,19 @@ export function logMiniflareConfigDiagnostics(
 	mfConfig: any
 ): void {
 	logger?.info('=== MINIFLARE CONFIG DEBUG ===')
-	logger?.info('Full config:', JSON.stringify(mfConfig, (key, value) => {
-		if (key === 'script' && typeof value === 'string' && value.length > 200) {
-			return value.substring(0, 200) + '...[truncated]'
-		}
-		return value
-	}, 2))
+	logger?.info(
+		'Full config:',
+		JSON.stringify(
+			mfConfig,
+			(key, value) => {
+				if (key === 'script' && typeof value === 'string' && value.length > 200) {
+					return value.substring(0, 200) + '...[truncated]'
+				}
+				return value
+			},
+			2
+		)
+	)
 
 	if (mfConfig.workers) {
 		logger?.info('Workers order:')
@@ -168,7 +176,9 @@ export async function logMiniflareBindingDiagnostics(
 							logger?.warn(`${w.name} is MISSING BROWSER binding`)
 						}
 					} catch (error) {
-						logger?.debug(`Skipping binding diagnostics for ${w.name}: ${formatErrorMessage(error)}`)
+						logger?.debug(
+							`Skipping binding diagnostics for ${w.name}: ${formatErrorMessage(error)}`
+						)
 					}
 				}
 			}

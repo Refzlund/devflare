@@ -7,12 +7,12 @@
 //   describe.skipIf(skipAI)('AI tests', () => { ... })
 // =============================================================================
 
-import { isAuthenticated } from '../cloudflare/auth'
 import { getPrimaryAccount } from '../cloudflare/account'
+import { isAuthenticated } from '../cloudflare/auth'
 import { getEffectiveAccountId } from '../cloudflare/preferences'
-import { canProceedWithTest } from '../cloudflare/usage'
-import { isRemoteModeActive, getRemoteModeStatus } from '../cloudflare/remote-config'
+import { getRemoteModeStatus, isRemoteModeActive } from '../cloudflare/remote-config'
 import type { CloudflareService } from '../cloudflare/types'
+import { canProceedWithTest } from '../cloudflare/usage'
 import { getContainerSkipReason } from './containers'
 
 // -----------------------------------------------------------------------------
@@ -81,7 +81,7 @@ function isExpectedError(error: unknown): boolean {
  * Compute whether to skip tests for a given service.
  * Returns true if tests should be SKIPPED.
  * Logs the reason to console.
- * 
+ *
  * Rethrows unexpected errors (programming bugs) to fail tests loudly.
  */
 async function computeSkip(service: CloudflareService): Promise<boolean> {
@@ -91,9 +91,9 @@ async function computeSkip(service: CloudflareService): Promise<boolean> {
 			const status = getRemoteModeStatus()
 			console.log(
 				`⏭️  ${service.toUpperCase()} tests skipped: Remote-only service.\n` +
-				`   Enable with: ${status.isEnabled ? '' : 'devflare remote enable'}\n` +
-				`   Or set: DEVFLARE_REMOTE=1\n` +
-				`   See: https://github.com/ArthurvdVenne/devflare#remote-testing`
+					`   Enable with: ${status.isEnabled ? '' : 'devflare remote enable'}\n` +
+					`   Or set: DEVFLARE_REMOTE=1\n` +
+					`   See: https://github.com/ArthurvdVenne/devflare#remote-testing`
 			)
 			return true
 		}
@@ -103,7 +103,7 @@ async function computeSkip(service: CloudflareService): Promise<boolean> {
 		if (!isAuth) {
 			console.log(
 				`⏭️  ${service.toUpperCase()} tests skipped: Not authenticated. Run: bunx wrangler login\n` +
-				`   See: https://github.com/ArthurvdVenne/devflare#authentication`
+					`   See: https://github.com/ArthurvdVenne/devflare#authentication`
 			)
 			return true
 		}
@@ -113,7 +113,7 @@ async function computeSkip(service: CloudflareService): Promise<boolean> {
 		if (!primary) {
 			console.log(
 				`⏭️  ${service.toUpperCase()} tests skipped: No Cloudflare account found\n` +
-				`   See: https://github.com/ArthurvdVenne/devflare#authentication`
+					`   See: https://github.com/ArthurvdVenne/devflare#authentication`
 			)
 			return true
 		}
@@ -180,11 +180,11 @@ function getContainerSkipResult(): Promise<boolean> {
 /**
  * Skip helper with property-based access for each service.
  * Each property returns a Promise<boolean> where true = SKIP the tests.
- * 
+ *
  * Usage:
  * ```ts
  * import { shouldSkip } from 'devflare/test'
- * 
+ *
  * describe.skipIf(shouldSkip.ai)('AI tests', () => {
  *   // These tests only run when authenticated and within limits
  * })

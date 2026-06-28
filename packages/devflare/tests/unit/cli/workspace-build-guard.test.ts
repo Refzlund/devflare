@@ -18,10 +18,21 @@ describe('workspace build guard', () => {
 		const packageRoot = await mkdtemp(join(tmpdir(), 'devflare-build-guard-missing-'))
 
 		try {
-			await writeFile(join(packageRoot, 'package.json'), JSON.stringify({
-				name: 'devflare'
-			}, null, 2))
-			await writeFixture(join(packageRoot, 'src', 'runtime.ts'), 'export const runtime = true', new Date('2026-04-16T10:00:00.000Z'))
+			await writeFile(
+				join(packageRoot, 'package.json'),
+				JSON.stringify(
+					{
+						name: 'devflare'
+					},
+					null,
+					2
+				)
+			)
+			await writeFixture(
+				join(packageRoot, 'src', 'runtime.ts'),
+				'export const runtime = true',
+				new Date('2026-04-16T10:00:00.000Z')
+			)
 
 			const status = await getLocalWorkspaceBuildStatus({ packageRoot })
 			expect(status.state).toBe('missing-dist')
@@ -39,11 +50,26 @@ describe('workspace build guard', () => {
 		const packageRoot = await mkdtemp(join(tmpdir(), 'devflare-build-guard-stale-'))
 
 		try {
-			await writeFile(join(packageRoot, 'package.json'), JSON.stringify({
-				name: 'devflare'
-			}, null, 2))
-			await writeFixture(join(packageRoot, 'src', 'runtime.ts'), 'export const runtime = true', new Date('2026-04-16T12:00:00.000Z'))
-			await writeFixture(join(packageRoot, 'dist', 'src', 'runtime.js'), 'export const runtime = true', new Date('2026-04-16T11:00:00.000Z'))
+			await writeFile(
+				join(packageRoot, 'package.json'),
+				JSON.stringify(
+					{
+						name: 'devflare'
+					},
+					null,
+					2
+				)
+			)
+			await writeFixture(
+				join(packageRoot, 'src', 'runtime.ts'),
+				'export const runtime = true',
+				new Date('2026-04-16T12:00:00.000Z')
+			)
+			await writeFixture(
+				join(packageRoot, 'dist', 'src', 'runtime.js'),
+				'export const runtime = true',
+				new Date('2026-04-16T11:00:00.000Z')
+			)
 
 			const status = await getLocalWorkspaceBuildStatus({ packageRoot })
 			expect(status.state).toBe('stale')
@@ -64,11 +90,26 @@ describe('workspace build guard', () => {
 		const packageRoot = await mkdtemp(join(tmpdir(), 'devflare-build-guard-fresh-'))
 
 		try {
-			await writeFile(join(packageRoot, 'package.json'), JSON.stringify({
-				name: 'devflare'
-			}, null, 2))
-			await writeFixture(join(packageRoot, 'src', 'runtime.ts'), 'export const runtime = true', new Date('2026-04-16T11:00:00.000Z'))
-			await writeFixture(join(packageRoot, 'dist', 'src', 'runtime.js'), 'export const runtime = true', new Date('2026-04-16T12:00:00.000Z'))
+			await writeFile(
+				join(packageRoot, 'package.json'),
+				JSON.stringify(
+					{
+						name: 'devflare'
+					},
+					null,
+					2
+				)
+			)
+			await writeFixture(
+				join(packageRoot, 'src', 'runtime.ts'),
+				'export const runtime = true',
+				new Date('2026-04-16T11:00:00.000Z')
+			)
+			await writeFixture(
+				join(packageRoot, 'dist', 'src', 'runtime.js'),
+				'export const runtime = true',
+				new Date('2026-04-16T12:00:00.000Z')
+			)
 
 			const status = await getLocalWorkspaceBuildStatus({ packageRoot })
 			expect(status.state).toBe('fresh')
@@ -81,10 +122,21 @@ describe('workspace build guard', () => {
 		const packageRoot = await mkdtemp(join(tmpdir(), 'devflare-build-guard-ci-'))
 
 		try {
-			await writeFile(join(packageRoot, 'package.json'), JSON.stringify({
-				name: 'devflare'
-			}, null, 2))
-			await writeFixture(join(packageRoot, 'src', 'runtime.ts'), 'export const runtime = true', new Date('2026-04-16T12:00:00.000Z'))
+			await writeFile(
+				join(packageRoot, 'package.json'),
+				JSON.stringify(
+					{
+						name: 'devflare'
+					},
+					null,
+					2
+				)
+			)
+			await writeFixture(
+				join(packageRoot, 'src', 'runtime.ts'),
+				'export const runtime = true',
+				new Date('2026-04-16T12:00:00.000Z')
+			)
 
 			const message = await getLocalWorkspaceBuildGuardMessage('deploy', {
 				packageRoot,

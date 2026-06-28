@@ -95,10 +95,10 @@ function createDefaultWorkerStub(): WorkerStub {
 			// cannot be materialised outside the workerd runtime. The pure mock
 			// has no runtime at all, so inject a stub to supply one.
 			throw new Error(
-				'Mock WorkerLoader stub cannot materialise a Durable Object class. '
-				+ 'getDurableObjectClass() returns an opaque facet-spawning reference that workerd '
-				+ 'only exposes inside the runtime. Pass createMockWorkerLoader({ stub }) to inject a stub, '
-				+ 'or use createTestContext() (a real Miniflare worker) for Durable Object behavior.'
+				'Mock WorkerLoader stub cannot materialise a Durable Object class. ' +
+					'getDurableObjectClass() returns an opaque facet-spawning reference that workerd ' +
+					'only exposes inside the runtime. Pass createMockWorkerLoader({ stub }) to inject a stub, ' +
+					'or use createTestContext() (a real Miniflare worker) for Durable Object behavior.'
 			)
 		}
 	} as unknown as WorkerStub

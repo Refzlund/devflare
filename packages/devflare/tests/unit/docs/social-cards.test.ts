@@ -3,18 +3,18 @@ import { mkdtemp, readFile, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import documentationPackageJson from '../../../../../apps/documentation/package.json'
-import { docs } from '../../../../../apps/documentation/src/lib/docs/content'
-import {
-	DEFAULT_SOCIAL_DESCRIPTION,
-	DEFAULT_SOCIAL_CARD_TITLE,
-	getSocialCardPath,
-	getSocialTitle
-} from '../../../../../apps/documentation/src/lib/site/social'
 import {
 	createSocialCardPages,
 	generateSocialCards,
 	renderSocialCardHtml
 } from '../../../../../apps/documentation/scripts/social-cards'
+import { docs } from '../../../../../apps/documentation/src/lib/docs/content'
+import {
+	DEFAULT_SOCIAL_CARD_TITLE,
+	DEFAULT_SOCIAL_DESCRIPTION,
+	getSocialCardPath,
+	getSocialTitle
+} from '../../../../../apps/documentation/src/lib/site/social'
 
 const transparentLogoSvg =
 	'<svg width="886" height="396" viewBox="0 0 886 396" xmlns="http://www.w3.org/2000/svg"><path fill="#ff5000" d="M0 0h886v396H0z"/></svg>'

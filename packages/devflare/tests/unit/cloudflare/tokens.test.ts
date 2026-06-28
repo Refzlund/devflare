@@ -92,26 +92,29 @@ describe('selectDevflarePermissionGroups', () => {
 			productName: string
 			variants: ReadonlyArray<string>
 		}> = [
-				{ productName: 'R2', variants: ['Read', 'Write', 'Edit', 'Admin'] },
-				{ productName: 'D1', variants: ['Read', 'Write', 'Edit', 'Admin', 'Metadata Read'] },
-				{ productName: 'Workers Scripts', variants: ['Read', 'Write', 'Edit'] },
-				{ productName: 'Workers Routes', variants: ['Read', 'Write', 'Edit'] },
-				{ productName: 'Workers KV Storage', variants: ['Read', 'Write', 'Edit'] },
-				{ productName: 'Workers R2 Storage', variants: ['Read', 'Write', 'Edit', 'Bucket Item Read', 'Bucket Item Write'] },
-				{ productName: 'Queues', variants: ['Read', 'Write', 'Edit', 'Admin'] },
-				{ productName: 'Hyperdrive', variants: ['Read', 'Write', 'Edit'] },
-				{ productName: 'Vectorize', variants: ['Read', 'Write', 'Edit'] },
-				{ productName: 'AI', variants: ['Read', 'Write', 'Edit'] },
-				{ productName: 'Browser Rendering', variants: ['Read', 'Write', 'Edit'] },
-				{ productName: 'Pages', variants: ['Read', 'Write', 'Edit'] },
-				{ productName: 'Email Routing', variants: ['Read', 'Write', 'Edit'] },
-				{ productName: 'Images', variants: ['Read', 'Write', 'Edit'] },
-				{ productName: 'Stream', variants: ['Read', 'Write', 'Edit'] },
-				{ productName: 'Logs', variants: ['Read', 'Write', 'Edit'] },
-				{ productName: 'Logpush', variants: ['Read', 'Write', 'Edit'] },
-				{ productName: 'DNS', variants: ['Read', 'Write', 'Edit'] },
-				{ productName: 'Cache Purge', variants: [''] }
-			]
+			{ productName: 'R2', variants: ['Read', 'Write', 'Edit', 'Admin'] },
+			{ productName: 'D1', variants: ['Read', 'Write', 'Edit', 'Admin', 'Metadata Read'] },
+			{ productName: 'Workers Scripts', variants: ['Read', 'Write', 'Edit'] },
+			{ productName: 'Workers Routes', variants: ['Read', 'Write', 'Edit'] },
+			{ productName: 'Workers KV Storage', variants: ['Read', 'Write', 'Edit'] },
+			{
+				productName: 'Workers R2 Storage',
+				variants: ['Read', 'Write', 'Edit', 'Bucket Item Read', 'Bucket Item Write']
+			},
+			{ productName: 'Queues', variants: ['Read', 'Write', 'Edit', 'Admin'] },
+			{ productName: 'Hyperdrive', variants: ['Read', 'Write', 'Edit'] },
+			{ productName: 'Vectorize', variants: ['Read', 'Write', 'Edit'] },
+			{ productName: 'AI', variants: ['Read', 'Write', 'Edit'] },
+			{ productName: 'Browser Rendering', variants: ['Read', 'Write', 'Edit'] },
+			{ productName: 'Pages', variants: ['Read', 'Write', 'Edit'] },
+			{ productName: 'Email Routing', variants: ['Read', 'Write', 'Edit'] },
+			{ productName: 'Images', variants: ['Read', 'Write', 'Edit'] },
+			{ productName: 'Stream', variants: ['Read', 'Write', 'Edit'] },
+			{ productName: 'Logs', variants: ['Read', 'Write', 'Edit'] },
+			{ productName: 'Logpush', variants: ['Read', 'Write', 'Edit'] },
+			{ productName: 'DNS', variants: ['Read', 'Write', 'Edit'] },
+			{ productName: 'Cache Purge', variants: [''] }
+		]
 
 		const fixtures = productVariantFixtures.flatMap(({ productName, variants }) => {
 			return variants.map((variant) => {
@@ -189,10 +192,7 @@ describe('selectDevflarePermissionGroups', () => {
 			}
 		])
 
-		expect(selected.map((group) => group.id)).toEqual([
-			'workers-scripts-write',
-			'vectorize-write'
-		])
+		expect(selected.map((group) => group.id)).toEqual(['workers-scripts-write', 'vectorize-write'])
 	})
 
 	test('keeps account and zone-scoped reusable permission groups for all-flags mode', () => {
@@ -226,7 +226,7 @@ describe('selectDevflarePermissionGroups', () => {
 		])
 	})
 
-	test('filters large mixed-scope permission catalogs below Cloudflare\'s limit', () => {
+	test("filters large mixed-scope permission catalogs below Cloudflare's limit", () => {
 		const accountScopedGroups = Array.from({ length: 200 }, (_, index) => ({
 			id: `account-${index + 1}`,
 			name: `Reusable Account Permission ${index + 1}`,
@@ -350,22 +350,14 @@ describe('matchesKnownPermissionGroup', () => {
 			)
 
 			// Id-matched: matches only the exact id, even though the display name drifted
-			expect(writeMatches.map((group) => group.id)).toEqual([
-				'verified-workers-scripts-write-id'
-			])
+			expect(writeMatches.map((group) => group.id)).toEqual(['verified-workers-scripts-write-id'])
 			// Display-name fallback: matches ONLY the exact name, not substrings
-			expect(readMatches.map((group) => group.id)).toEqual([
-				'some-unrelated-id-for-read'
-			])
+			expect(readMatches.map((group) => group.id)).toEqual(['some-unrelated-id-for-read'])
 
 			// No warning for id-matched path
-			expect(
-				warnCalls.some((message) => message.includes('WORKERS_SCRIPTS_WRITE'))
-			).toBe(false)
+			expect(warnCalls.some((message) => message.includes('WORKERS_SCRIPTS_WRITE'))).toBe(false)
 			// Warning emitted for display-name fallback path
-			expect(
-				warnCalls.some((message) => message.includes('WORKERS_SCRIPTS_READ'))
-			).toBe(true)
+			expect(warnCalls.some((message) => message.includes('WORKERS_SCRIPTS_READ'))).toBe(true)
 		} finally {
 			console.warn = originalWarn
 		}

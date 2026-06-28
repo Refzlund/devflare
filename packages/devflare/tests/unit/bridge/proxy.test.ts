@@ -129,8 +129,12 @@ describe('createDOStubProxy.connect startTls (B5)', () => {
 					wid: 1,
 					send: () => {},
 					close: () => {},
-					onMessage: (h: (d: unknown) => void) => { wsHandlers.message = h },
-					onClose: (h: () => void) => { wsHandlers.close = h }
+					onMessage: (h: (d: unknown) => void) => {
+						wsHandlers.message = h
+					},
+					onClose: (h: () => void) => {
+						wsHandlers.close = h
+					}
 				}
 			}
 		}

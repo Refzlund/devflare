@@ -32,35 +32,28 @@ describe('isTransformCandidate', () => {
 
 describe('runWorkerEntryTransform', () => {
 	test('returns null for non-worker files', async () => {
-		const result = await runWorkerEntryTransform(
-			'export default {}',
-			'/repo/src/foo.ts'
-		)
+		const result = await runWorkerEntryTransform('export default {}', '/repo/src/foo.ts')
 		expect(result).toBeNull()
 	})
 
 	test('returns null when worker source has no recognized handlers', async () => {
-		const result = await runWorkerEntryTransform(
-			'// nothing useful here',
-			'/repo/src/worker.ts'
-		)
+		const result = await runWorkerEntryTransform('// nothing useful here', '/repo/src/worker.ts')
 		expect(result).toBeNull()
 	})
 })
 
 describe('runDurableObjectTransform', () => {
 	test('returns null when doTransforms is disabled', async () => {
-		const code = 'import { DurableObject } from "cloudflare:workers"\nexport class C extends DurableObject {}'
+		const code =
+			'import { DurableObject } from "cloudflare:workers"\nexport class C extends DurableObject {}'
 		const result = await runDurableObjectTransform(code, '/repo/src/c.ts', { doTransforms: false })
 		expect(result).toBeNull()
 	})
 
 	test('returns null when source does not mention DurableObject', async () => {
-		const result = await runDurableObjectTransform(
-			'export const x = 1',
-			'/repo/src/x.ts',
-			{ doTransforms: true }
-		)
+		const result = await runDurableObjectTransform('export const x = 1', '/repo/src/x.ts', {
+			doTransforms: true
+		})
 		expect(result).toBeNull()
 	})
 })
@@ -76,20 +69,16 @@ describe('runDevflareTransform — order', () => {
 	})
 
 	test('skips non-source files entirely', async () => {
-		const result = await runDevflareTransform(
-			'.foo { color: red }',
-			'/repo/src/styles.css',
-			{ doTransforms: true }
-		)
+		const result = await runDevflareTransform('.foo { color: red }', '/repo/src/styles.css', {
+			doTransforms: true
+		})
 		expect(result).toBeNull()
 	})
 
 	test('returns null for ordinary modules with no DO marker', async () => {
-		const result = await runDevflareTransform(
-			'export const x = 1',
-			'/repo/src/util.ts',
-			{ doTransforms: true }
-		)
+		const result = await runDevflareTransform('export const x = 1', '/repo/src/util.ts', {
+			doTransforms: true
+		})
 		expect(result).toBeNull()
 	})
 
@@ -97,7 +86,9 @@ describe('runDevflareTransform — order', () => {
 		// worker.ts files with no recognized handler should fall through to the DO step.
 		// This pins the documented order: worker-entry first, DO second.
 		const code = 'export const placeholder = 1'
-		const workerResult = await runDevflareTransform(code, '/repo/src/worker.ts', { doTransforms: true })
+		const workerResult = await runDevflareTransform(code, '/repo/src/worker.ts', {
+			doTransforms: true
+		})
 		// No handler => worker step yields null, DO step also yields null (no DO marker).
 		expect(workerResult).toBeNull()
 	})

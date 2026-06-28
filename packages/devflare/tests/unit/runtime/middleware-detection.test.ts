@@ -3,18 +3,18 @@
 // =============================================================================
 
 import { describe, expect, test } from 'bun:test'
+import { createFetchEvent, runWithEventContext } from '../../../src/runtime/context'
 import {
+	type FetchMiddleware,
 	defineFetchHandler,
 	invokeFetchHandler,
-	sequence,
-	type FetchMiddleware
+	sequence
 } from '../../../src/runtime/middleware'
-import { createFetchEvent, runWithEventContext } from '../../../src/runtime/context'
 
 function createMockCtx(): ExecutionContext {
 	return {
-		waitUntil: () => { },
-		passThroughOnException: () => { },
+		waitUntil: () => {},
+		passThroughOnException: () => {},
 		props: {}
 	} as ExecutionContext
 }
@@ -62,7 +62,7 @@ describe('middleware detection', () => {
 	})
 
 	test('3-arg fetch(request, env, ctx) handler is routed worker-style', async () => {
-		let seen: { request: Request, env: unknown, ctx: unknown } | null = null
+		let seen: { request: Request; env: unknown; ctx: unknown } | null = null
 
 		const handler = (request: Request, env: unknown, ctx: unknown) => {
 			seen = { request, env, ctx }
@@ -82,7 +82,9 @@ describe('middleware detection', () => {
 	})
 
 	test('2-arg unmarked handler throws under R1-strict (no parameter-name fallback)', async () => {
-		const handler = simulateMinification(((_a: any, _b: any) => new Response('unreachable')) as (a: any, b: any) => Response)
+		const handler = simulateMinification(
+			((_a: any, _b: any) => new Response('unreachable')) as (a: any, b: any) => Response
+		)
 
 		const fetchEvent = createEvent('https://example.com/two')
 
@@ -92,12 +94,17 @@ describe('middleware detection', () => {
 	})
 
 	test('2-arg handler marked worker-style is routed worker-style even when minified', async () => {
-		let seen: { a: unknown, b: unknown } | null = null
+		let seen: { a: unknown; b: unknown } | null = null
 
-		const handler = simulateMinification(defineFetchHandler(((a: any, b: any) => {
-			seen = { a, b }
-			return new Response('worker-2')
-		}) as (a: any, b: any) => Response, { style: 'worker' }))
+		const handler = simulateMinification(
+			defineFetchHandler(
+				((a: any, b: any) => {
+					seen = { a, b }
+					return new Response('worker-2')
+				}) as (a: any, b: any) => Response,
+				{ style: 'worker' }
+			)
+		)
 
 		const fetchEvent = createEvent('https://example.com/two-marked')
 		const response = await runWithEventContext(fetchEvent, async () => {

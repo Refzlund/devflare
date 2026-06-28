@@ -1,4 +1,4 @@
-import { apiGet, apiGetAll, type APIClientOptions } from './api'
+import { type APIClientOptions, apiGet, apiGetAll } from './api'
 import type { AccountInfo, CloudflareAccount } from './types'
 
 export async function getAccounts(options?: APIClientOptions): Promise<AccountInfo[]> {
@@ -17,7 +17,10 @@ export async function getPrimaryAccount(options?: APIClientOptions): Promise<Acc
 	return accounts[0] ?? null
 }
 
-export async function getAccountById(accountId: string, options?: APIClientOptions): Promise<AccountInfo | null> {
+export async function getAccountById(
+	accountId: string,
+	options?: APIClientOptions
+): Promise<AccountInfo | null> {
 	try {
 		const account = await apiGet<CloudflareAccount>(`/accounts/${accountId}`, options)
 		return {

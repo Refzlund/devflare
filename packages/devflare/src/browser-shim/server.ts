@@ -26,18 +26,23 @@
 // Works with both Node.js and Bun runtimes
 // =============================================================================
 
-import type { ConsolaInstance } from 'consola'
+import { existsSync } from 'node:fs'
+import {
+	type Server as HttpServer,
+	type IncomingMessage,
+	type ServerResponse,
+	createServer
+} from 'node:http'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { existsSync } from 'node:fs'
-import { createServer, type IncomingMessage, type ServerResponse, type Server as HttpServer } from 'node:http'
-import puppeteerCore, { type Browser } from 'puppeteer-core'
 import {
-	install,
-	resolveBuildId,
+	Browser as BrowserType,
 	detectBrowserPlatform,
-	Browser as BrowserType
+	install,
+	resolveBuildId
 } from '@puppeteer/browsers'
+import type { ConsolaInstance } from 'consola'
+import puppeteerCore, { type Browser } from 'puppeteer-core'
 
 // -----------------------------------------------------------------------------
 // Types
@@ -136,10 +141,7 @@ export const DEFAULT_CHROME_FLAGS: readonly string[] = [
  * Flags appended only when `allowNoSandbox` is explicitly enabled. Kept in a
  * separate constant so callers and tests can assert they are opt-in.
  */
-export const NO_SANDBOX_FLAGS: readonly string[] = [
-	'--no-sandbox',
-	'--disable-setuid-sandbox'
-]
+export const NO_SANDBOX_FLAGS: readonly string[] = ['--no-sandbox', '--disable-setuid-sandbox']
 
 /**
  * Resolve the Chrome argv for a shim launch. Exported for testability.
@@ -170,7 +172,7 @@ export interface DownloadProgress {
  */
 export function createDownloadProgressLogger(
 	logger?: ConsolaInstance,
-	label: string = 'Chrome'
+	label = 'Chrome'
 ): {
 	onProgress: (downloadedBytes: number, totalBytes: number) => void
 	finalize: () => void
@@ -231,10 +233,7 @@ export function createDownloadProgressLogger(
  * Get or install Chrome Headless Shell
  * Uses a shared cache directory so Chrome is only installed once globally
  */
-async function ensureChrome(
-	cacheDir: string,
-	logger?: ConsolaInstance
-): Promise<string> {
+async function ensureChrome(cacheDir: string, logger?: ConsolaInstance): Promise<string> {
 	// Return cached path if already resolved
 	if (cachedExecutablePath && existsSync(cachedExecutablePath)) {
 		return cachedExecutablePath
@@ -246,11 +245,7 @@ async function ensureChrome(
 	}
 
 	// Resolve latest stable build ID for Chrome Headless Shell
-	const buildId = await resolveBuildId(
-		BrowserType.CHROMEHEADLESSSHELL,
-		platform,
-		'stable'
-	)
+	const buildId = await resolveBuildId(BrowserType.CHROMEHEADLESSSHELL, platform, 'stable')
 
 	logger?.debug(`[BrowserShim] Resolved Chrome Headless Shell build: ${buildId}`)
 
@@ -295,8 +290,8 @@ export function createBrowserShim(options: BrowserShimOptions = {}): BrowserShim
 	const chromeLaunchArgs = resolveChromeFlags({ allowNoSandbox })
 	if (allowNoSandbox) {
 		logger?.warn(
-			'[BrowserShim] Launching Chrome with --no-sandbox (allowNoSandbox=true). '
-			+ 'Only use this in trusted CI/rootless environments.'
+			'[BrowserShim] Launching Chrome with --no-sandbox (allowNoSandbox=true). ' +
+				'Only use this in trusted CI/rootless environments.'
 		)
 	}
 
@@ -326,10 +321,12 @@ export function createBrowserShim(options: BrowserShimOptions = {}): BrowserShim
 	function isLoopbackOrigin(origin: string): boolean {
 		try {
 			const url = new URL(origin)
-			return url.hostname === '127.0.0.1'
-				|| url.hostname === 'localhost'
-				|| url.hostname === '::1'
-				|| url.hostname === '[::1]'
+			return (
+				url.hostname === '127.0.0.1' ||
+				url.hostname === 'localhost' ||
+				url.hostname === '::1' ||
+				url.hostname === '[::1]'
+			)
 		} catch {
 			return false
 		}
@@ -410,8 +407,8 @@ export function createBrowserShim(options: BrowserShimOptions = {}): BrowserShim
 	 */
 	async function closeSession(
 		sessionId: string,
-		closeReason: number = 1,
-		closeReasonText: string = 'NormalClosure'
+		closeReason = 1,
+		closeReasonText = 'NormalClosure'
 	): Promise<void> {
 		const session = sessions.get(sessionId)
 		if (!session) return
@@ -477,7 +474,7 @@ export function createBrowserShim(options: BrowserShimOptions = {}): BrowserShim
 				if (method === 'GET') {
 					const keepAlive = url.searchParams.get('keep_alive')
 					if (keepAlive) {
-						acquireOptions.keep_alive = parseInt(keepAlive, 10)
+						acquireOptions.keep_alive = Number.parseInt(keepAlive, 10)
 					}
 				} else {
 					// Parse body for POST requests
@@ -614,7 +611,7 @@ export function createBrowserShim(options: BrowserShimOptions = {}): BrowserShim
 
 		// Try to dynamically import ws package
 		try {
-			const wsModule = await import('ws') as unknown as {
+			const wsModule = (await import('ws')) as unknown as {
 				WebSocketServer?: typeof import('ws').WebSocketServer
 				WebSocket?: typeof import('ws').WebSocket
 				default?: {
@@ -623,7 +620,9 @@ export function createBrowserShim(options: BrowserShimOptions = {}): BrowserShim
 				}
 			}
 			WebSocketServerClass = wsModule.WebSocketServer || wsModule.default?.WebSocketServer
-			WebSocketClass = (wsModule.WebSocket || wsModule.default?.WebSocket || wsModule.default) as typeof import('ws').WebSocket | undefined
+			WebSocketClass = (wsModule.WebSocket || wsModule.default?.WebSocket || wsModule.default) as
+				| typeof import('ws').WebSocket
+				| undefined
 		} catch {
 			logger?.warn('[BrowserShim] ws package not found, WebSocket proxy disabled')
 			logger?.warn('[BrowserShim] Install with: npm install ws')
@@ -701,7 +700,7 @@ export function createBrowserShim(options: BrowserShimOptions = {}): BrowserShim
 							} catch {
 								// Ignore errors
 							}
-							closeSession(sessionId, 5, 'ChromeConnectionTimeout').catch(() => { })
+							closeSession(sessionId, 5, 'ChromeConnectionTimeout').catch(() => {})
 						}
 					}, 10000) // 10 second timeout
 
@@ -714,7 +713,8 @@ export function createBrowserShim(options: BrowserShimOptions = {}): BrowserShim
 					})
 
 					chromeWs.on('message', (data: Buffer | string) => {
-						if (ws.readyState === 1) { // OPEN
+						if (ws.readyState === 1) {
+							// OPEN
 							ws.send(data)
 						}
 					})
@@ -724,7 +724,7 @@ export function createBrowserShim(options: BrowserShimOptions = {}): BrowserShim
 							logger?.debug(`[BrowserShim] Chrome WS closed: ${code}`)
 						}
 						// Ensure valid close code (1000-4999)
-						const validCode = (typeof code === 'number' && code >= 1000 && code <= 4999) ? code : 1000
+						const validCode = typeof code === 'number' && code >= 1000 && code <= 4999 ? code : 1000
 						try {
 							ws.close(validCode, reason?.toString?.() || '')
 						} catch {
@@ -753,7 +753,8 @@ export function createBrowserShim(options: BrowserShimOptions = {}): BrowserShim
 					})
 
 					ws.on('message', (data: Buffer | string) => {
-						if (chromeWs.readyState === 1) { // OPEN
+						if (chromeWs.readyState === 1) {
+							// OPEN
 							chromeWs.send(data)
 						}
 					})
@@ -763,7 +764,7 @@ export function createBrowserShim(options: BrowserShimOptions = {}): BrowserShim
 							logger?.debug(`[BrowserShim] Client WS closed for session ${sessionId}`)
 						}
 						// Ensure valid close code (1000-4999)
-						const validCode = (typeof code === 'number' && code >= 1000 && code <= 4999) ? code : 1000
+						const validCode = typeof code === 'number' && code >= 1000 && code <= 4999 ? code : 1000
 						try {
 							chromeWs.close(validCode, reason?.toString?.() || '')
 						} catch {

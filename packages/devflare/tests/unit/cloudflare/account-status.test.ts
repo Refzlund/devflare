@@ -29,20 +29,23 @@ test('getServiceStatus clears timeout guards after a successful inventory lookup
 			throw new Error(`Unexpected fetch URL: ${url}`)
 		}
 
-		return jsonResponse([
+		return jsonResponse(
+			[
+				{
+					id: 'worker-1',
+					name: 'worker-1',
+					created_on: '2026-04-12T00:00:00.000Z',
+					modified_on: '2026-04-12T00:00:00.000Z'
+				}
+			],
 			{
-				id: 'worker-1',
-				name: 'worker-1',
-				created_on: '2026-04-12T00:00:00.000Z',
-				modified_on: '2026-04-12T00:00:00.000Z'
+				page: 1,
+				per_page: 50,
+				total_pages: 1,
+				count: 1,
+				total_count: 1
 			}
-		], {
-			page: 1,
-			per_page: 50,
-			total_pages: 1,
-			count: 1,
-			total_count: 1
-		})
+		)
 	}) as unknown as typeof fetch
 
 	const status = await getServiceStatus('acc_123', 'workers')

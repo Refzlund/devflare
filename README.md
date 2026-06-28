@@ -19,7 +19,8 @@ The clean contributor workflow for the core `devflare` package now lives behind 
 - `bun run devflare:test` — run the stable downstream test lane for `devflare` dependents
 - `bun run devflare:types` — regenerate dependent package types through Turbo
 - `bun run devflare:check` — run the documentation app check lane
-- `bun run devflare:ci` — run the full validated `devflare` contributor lane
+- `bun run lint:devflare` — Biome lint/format check of the published `packages/devflare` (gates `devflare:ci`)
+- `bun run devflare:ci` — run the full validated `devflare` contributor lane (lints the package first, fail-fast)
 
 Common aliases and broader monorepo lanes:
 
@@ -28,12 +29,11 @@ Common aliases and broader monorepo lanes:
 - `bun run typecheck` / `bun run types` / `bun run check` — workspace-wide typecheck through Turbo
 - `bun run typecheck:root` — typecheck only the repo-root TypeScript surface (no workspace recursion)
 - `bun run build` — workspace-wide build through Turbo
-- `bun run lint` / `bun run lint:fix` / `bun run lint:root` — Biome-based linting (workspace and root)
+- `bun run lint` / `bun run lint:fix` / `bun run lint:root` / `bun run lint:devflare` — Biome-based linting (whole workspace, root, or just the published package)
 - `bun run ci` — alias for `devflare:ci`
 - `bun run ci:strict` — root lint + root typecheck + `devflare:ci` (strict gate used in CI)
 
 ## Notes
 
-- The shared Turbo lane intentionally excludes `@devflare/case5-multi-worker` from the default test pass because that case is not currently stable in the shared contributor workflow.
 - The shared `check` lane stays focused on `apps/documentation`; `cases/case18` still expects Cloudflare-backed resource resolution that is outside the default local/CI lane.
 - Package-level usage and API docs live in `packages/devflare/README.md`.

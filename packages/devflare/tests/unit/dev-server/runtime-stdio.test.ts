@@ -22,10 +22,7 @@ describe('createRuntimeStdioForwarder', () => {
 
 		await waitForForwarding()
 
-		expect(log.mock.calls.map(([message]) => message)).toEqual([
-			'fetch log',
-			'queue log'
-		])
+		expect(log.mock.calls.map(([message]) => message)).toEqual(['fetch log', 'queue log'])
 		expect(error).not.toHaveBeenCalled()
 	})
 

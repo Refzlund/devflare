@@ -1,9 +1,4 @@
-import type {
-	D1Binding,
-	DurableObjectBinding,
-	HyperdriveBinding,
-	KVBinding
-} from '../../../config'
+import type { D1Binding, DurableObjectBinding, HyperdriveBinding, KVBinding } from '../../../config'
 import type { DiscoveredEntrypoint } from '../../../utils/entrypoint-discovery'
 import { generateImportPath } from './discovery'
 import type {
@@ -25,43 +20,73 @@ interface TypeGenerationConfig {
 		r2?: Record<string, string>
 		durableObjects?: Record<string, { className?: string; scriptName?: string }>
 		queues?: { producers?: Record<string, string>; consumers?: unknown[] }
-		rateLimits?: Record<string, {
-			namespaceId?: string
-			simple?: { limit?: number; period?: 10 | 60 }
-		}>
+		rateLimits?: Record<
+			string,
+			{
+				namespaceId?: string
+				simple?: { limit?: number; period?: 10 | 60 }
+			}
+		>
 		versionMetadata?: { binding?: string }
 		workerLoaders?: Record<string, Record<string, never>>
-		mtlsCertificates?: Record<string, string | {
-			certificateId?: string
-			certificate_id?: string
-			remote?: boolean
-		}>
-		dispatchNamespaces?: Record<string, string | {
-			namespace?: string
-			outbound?: unknown
-			remote?: boolean
-		}>
-		workflows?: Record<string, {
-			name?: string
-			className?: string
-			scriptName?: string
-			remote?: boolean
-			limits?: { steps?: number }
-		}>
-		pipelines?: Record<string, string | {
-			pipeline?: string
-			remote?: boolean
-		}>
-		images?: Record<string, true | {
-			remote?: boolean
-		}>
-		media?: Record<string, true | {
-			remote?: boolean
-		}>
-		artifacts?: Record<string, string | {
-			namespace?: string
-			remote?: boolean
-		}>
+		mtlsCertificates?: Record<
+			string,
+			| string
+			| {
+					certificateId?: string
+					certificate_id?: string
+					remote?: boolean
+			  }
+		>
+		dispatchNamespaces?: Record<
+			string,
+			| string
+			| {
+					namespace?: string
+					outbound?: unknown
+					remote?: boolean
+			  }
+		>
+		workflows?: Record<
+			string,
+			{
+				name?: string
+				className?: string
+				scriptName?: string
+				remote?: boolean
+				limits?: { steps?: number }
+			}
+		>
+		pipelines?: Record<
+			string,
+			| string
+			| {
+					pipeline?: string
+					remote?: boolean
+			  }
+		>
+		images?: Record<
+			string,
+			| true
+			| {
+					remote?: boolean
+			  }
+		>
+		media?: Record<
+			string,
+			| true
+			| {
+					remote?: boolean
+			  }
+		>
+		artifacts?: Record<
+			string,
+			| string
+			| {
+					namespace?: string
+					remote?: boolean
+			  }
+		>
 		secretsStore?: Record<string, string | { storeId?: string; secretName?: string }>
 		services?: Record<string, { service?: string }>
 		ai?: { binding?: string; remote?: boolean; staging?: boolean }
@@ -71,11 +96,14 @@ interface TypeGenerationConfig {
 		hyperdrive?: Record<string, HyperdriveBinding>
 		browser?: Record<string, string | { remote?: boolean }>
 		analyticsEngine?: Record<string, { dataset?: string }>
-		sendEmail?: Record<string, {
-			destinationAddress?: string
-			allowedDestinationAddresses?: string[]
-			allowedSenderAddresses?: string[]
-		}>
+		sendEmail?: Record<
+			string,
+			{
+				destinationAddress?: string
+				allowedDestinationAddresses?: string[]
+				allowedSenderAddresses?: string[]
+			}
+		>
 	}
 	vars?: Record<string, unknown>
 	secrets?: Record<string, { required?: boolean }>
@@ -117,7 +145,9 @@ function generateBindingMembers(
 				const crossWorkerDO = crossWorkerDOMap.get(binding)
 				if (crossWorkerDO) {
 					const importPath = generateImportPath(cwd, crossWorkerDO.filePath)
-					lines.push(`${indent}${binding}: DurableObjectNamespace<Rpc.DurableObjectBranded & import('${importPath}').${crossWorkerDO.className}>`)
+					lines.push(
+						`${indent}${binding}: DurableObjectNamespace<Rpc.DurableObjectBranded & import('${importPath}').${crossWorkerDO.className}>`
+					)
 					continue
 				}
 
@@ -125,7 +155,9 @@ function generateBindingMembers(
 				if (className) {
 					const classInfo = doClassMap.get(className)
 					if (classInfo) {
-						lines.push(`${indent}${binding}: DurableObjectNamespace<Rpc.DurableObjectBranded & import('${classInfo.importPath}').${classInfo.className}>`)
+						lines.push(
+							`${indent}${binding}: DurableObjectNamespace<Rpc.DurableObjectBranded & import('${classInfo.importPath}').${classInfo.className}>`
+						)
 						continue
 					}
 				}
@@ -209,7 +241,9 @@ function generateBindingMembers(
 			for (const binding of Object.keys(config.bindings.services)) {
 				const serviceInfo = serviceBindingMap.get(binding)
 				if (serviceInfo?.interfaceType && serviceInfo.interfaceImport) {
-					imports.push(`import type { ${serviceInfo.interfaceType} } from '${serviceInfo.interfaceImport}'`)
+					imports.push(
+						`import type { ${serviceInfo.interfaceType} } from '${serviceInfo.interfaceImport}'`
+					)
 					lines.push(`${indent}${binding}: ${serviceInfo.interfaceType}`)
 					continue
 				}
@@ -354,21 +388,43 @@ export function generateBindingTypes(
 	const usedTypes = new Set<string>()
 
 	if (config.bindings) {
-		if (config.bindings.kv && Object.keys(config.bindings.kv).length > 0) usedTypes.add('KVNamespace')
-		if (config.bindings.d1 && Object.keys(config.bindings.d1).length > 0) usedTypes.add('D1Database')
+		if (config.bindings.kv && Object.keys(config.bindings.kv).length > 0)
+			usedTypes.add('KVNamespace')
+		if (config.bindings.d1 && Object.keys(config.bindings.d1).length > 0)
+			usedTypes.add('D1Database')
 		if (config.bindings.r2 && Object.keys(config.bindings.r2).length > 0) usedTypes.add('R2Bucket')
-		if (config.bindings.durableObjects && Object.keys(config.bindings.durableObjects).length > 0) usedTypes.add('DurableObjectNamespace')
-		if (config.bindings.queues?.producers && Object.keys(config.bindings.queues.producers).length > 0) usedTypes.add('Queue')
-		if (config.bindings.rateLimits && Object.keys(config.bindings.rateLimits).length > 0) usedTypes.add('RateLimit')
+		if (config.bindings.durableObjects && Object.keys(config.bindings.durableObjects).length > 0)
+			usedTypes.add('DurableObjectNamespace')
+		if (
+			config.bindings.queues?.producers &&
+			Object.keys(config.bindings.queues.producers).length > 0
+		)
+			usedTypes.add('Queue')
+		if (config.bindings.rateLimits && Object.keys(config.bindings.rateLimits).length > 0)
+			usedTypes.add('RateLimit')
 		if (config.bindings.versionMetadata?.binding) usedTypes.add('WorkerVersionMetadata')
-		if (config.bindings.workerLoaders && Object.keys(config.bindings.workerLoaders).length > 0) usedTypes.add('WorkerLoader')
-		if (config.bindings.mtlsCertificates && Object.keys(config.bindings.mtlsCertificates).length > 0) usedTypes.add('Fetcher')
-		if (config.bindings.dispatchNamespaces && Object.keys(config.bindings.dispatchNamespaces).length > 0) usedTypes.add('DispatchNamespace')
-		if (config.bindings.workflows && Object.keys(config.bindings.workflows).length > 0) usedTypes.add('Workflow')
-		if (config.bindings.images && Object.keys(config.bindings.images).length > 0) usedTypes.add('ImagesBinding')
-		if (config.bindings.media && Object.keys(config.bindings.media).length > 0) usedTypes.add('MediaBinding')
-		if (config.bindings.artifacts && Object.keys(config.bindings.artifacts).length > 0) usedTypes.add('Artifacts')
-		if (config.bindings.secretsStore && Object.keys(config.bindings.secretsStore).length > 0) usedTypes.add('SecretsStoreSecret')
+		if (config.bindings.workerLoaders && Object.keys(config.bindings.workerLoaders).length > 0)
+			usedTypes.add('WorkerLoader')
+		if (
+			config.bindings.mtlsCertificates &&
+			Object.keys(config.bindings.mtlsCertificates).length > 0
+		)
+			usedTypes.add('Fetcher')
+		if (
+			config.bindings.dispatchNamespaces &&
+			Object.keys(config.bindings.dispatchNamespaces).length > 0
+		)
+			usedTypes.add('DispatchNamespace')
+		if (config.bindings.workflows && Object.keys(config.bindings.workflows).length > 0)
+			usedTypes.add('Workflow')
+		if (config.bindings.images && Object.keys(config.bindings.images).length > 0)
+			usedTypes.add('ImagesBinding')
+		if (config.bindings.media && Object.keys(config.bindings.media).length > 0)
+			usedTypes.add('MediaBinding')
+		if (config.bindings.artifacts && Object.keys(config.bindings.artifacts).length > 0)
+			usedTypes.add('Artifacts')
+		if (config.bindings.secretsStore && Object.keys(config.bindings.secretsStore).length > 0)
+			usedTypes.add('SecretsStoreSecret')
 		if (config.bindings.services) {
 			const hasUntypedServices = Object.keys(config.bindings.services).some(
 				(name) => !serviceBindingMap.get(name)?.interfaceType
@@ -376,17 +432,25 @@ export function generateBindingTypes(
 			if (hasUntypedServices) usedTypes.add('Fetcher')
 		}
 		if (config.bindings.ai) usedTypes.add('Ai')
-		if (config.bindings.aiSearchNamespaces && Object.keys(config.bindings.aiSearchNamespaces).length > 0) {
+		if (
+			config.bindings.aiSearchNamespaces &&
+			Object.keys(config.bindings.aiSearchNamespaces).length > 0
+		) {
 			usedTypes.add('AiSearchNamespace')
 		}
 		if (config.bindings.aiSearch && Object.keys(config.bindings.aiSearch).length > 0) {
 			usedTypes.add('AiSearchInstance')
 		}
-		if (config.bindings.vectorize && Object.keys(config.bindings.vectorize).length > 0) usedTypes.add('VectorizeIndex')
-		if (config.bindings.hyperdrive && Object.keys(config.bindings.hyperdrive).length > 0) usedTypes.add('Hyperdrive')
-		if (config.bindings.browser && Object.keys(config.bindings.browser).length > 0) usedTypes.add('Fetcher')
-		if (config.bindings.analyticsEngine && Object.keys(config.bindings.analyticsEngine).length > 0) usedTypes.add('AnalyticsEngineDataset')
-		if (config.bindings.sendEmail && Object.keys(config.bindings.sendEmail).length > 0) usedTypes.add('SendEmail')
+		if (config.bindings.vectorize && Object.keys(config.bindings.vectorize).length > 0)
+			usedTypes.add('VectorizeIndex')
+		if (config.bindings.hyperdrive && Object.keys(config.bindings.hyperdrive).length > 0)
+			usedTypes.add('Hyperdrive')
+		if (config.bindings.browser && Object.keys(config.bindings.browser).length > 0)
+			usedTypes.add('Fetcher')
+		if (config.bindings.analyticsEngine && Object.keys(config.bindings.analyticsEngine).length > 0)
+			usedTypes.add('AnalyticsEngineDataset')
+		if (config.bindings.sendEmail && Object.keys(config.bindings.sendEmail).length > 0)
+			usedTypes.add('SendEmail')
 	}
 
 	const lines: string[] = [
@@ -397,8 +461,10 @@ export function generateBindingTypes(
 	const hasConfigVars = Boolean(config.vars && Object.keys(config.vars).length > 0)
 
 	const hasLocalDOsWithClasses = Boolean(
-		config.bindings?.durableObjects
-		&& Object.values(config.bindings.durableObjects).some((doConfig) => doConfig.className && doClassMap.has(doConfig.className))
+		config.bindings?.durableObjects &&
+			Object.values(config.bindings.durableObjects).some(
+				(doConfig) => doConfig.className && doClassMap.has(doConfig.className)
+			)
 	)
 	const hasCrossWorkerDOs = crossWorkerDOMap.size > 0
 	const hasDOsWithClasses = hasLocalDOsWithClasses || hasCrossWorkerDOs
@@ -416,7 +482,9 @@ export function generateBindingTypes(
 	if (hasConfigVars) {
 		const configImportPath = options.configImportPath ?? './devflare.config'
 		lines.push("import type { InferConfigVars } from 'devflare/config'")
-		lines.push(`type __DevflareConfigVars = InferConfigVars<Awaited<typeof import('${configImportPath}').default>>`)
+		lines.push(
+			`type __DevflareConfigVars = InferConfigVars<Awaited<typeof import('${configImportPath}').default>>`
+		)
 		lines.push('')
 	}
 
@@ -450,7 +518,9 @@ export function generateBindingTypes(
 	lines.push(...generateModuleRuleDeclarations(config))
 
 	if (discoveredEntrypoints.length > 0) {
-		const entrypointNames = discoveredEntrypoints.map((entrypoint) => `'${entrypoint.className}'`).join(' | ')
+		const entrypointNames = discoveredEntrypoints
+			.map((entrypoint) => `'${entrypoint.className}'`)
+			.join(' | ')
 		lines.push('/**')
 		lines.push(' * Named entrypoints discovered from ep.*.ts files.')
 		lines.push(' * Use with defineConfig<Entrypoints>() for type-safe cross-worker references.')

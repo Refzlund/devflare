@@ -204,7 +204,7 @@ export interface RouteTreeConfigInput {
 	 * ```ts
 	 * routes: { dir: 'src/routes', prefix: '/api' }
 	 * ```
-	*/
+	 */
 	prefix?: string
 }
 
@@ -990,6 +990,6 @@ export interface RenamedClassMigrationInput {
 	 * ```ts
 	 * to: 'Counter'
 	 * ```
-	*/
+	 */
 	to: string
 }

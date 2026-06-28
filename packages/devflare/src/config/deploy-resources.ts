@@ -1,4 +1,10 @@
 import {
+	type D1DatabaseInfo,
+	type HyperdriveConfigInfo,
+	type KVNamespaceInfo,
+	type QueueInfo,
+	type R2BucketInfo,
+	type VectorizeIndexInfo,
 	createD1Database,
 	createKVNamespace,
 	createQueue,
@@ -9,16 +15,11 @@ import {
 	listKVNamespaces,
 	listQueues,
 	listR2Buckets,
-	listVectorizeIndexes,
-	type D1DatabaseInfo,
-	type HyperdriveConfigInfo,
-	type KVNamespaceInfo,
-	type QueueInfo,
-	type R2BucketInfo,
-	type VectorizeIndexInfo
+	listVectorizeIndexes
 } from '../cloudflare/account'
 import { getEffectiveAccountId } from '../cloudflare/preferences'
 import {
+	type PendingNameBinding,
 	collectPendingNameBindings,
 	formatMissingBindings,
 	materializeHyperdriveIdBindings,
@@ -27,17 +28,16 @@ import {
 	normalizeD1NameBinding,
 	normalizeHyperdriveNameBinding,
 	normalizeKVNameBinding,
-	withResolvedIdBindings,
-	type PendingNameBinding
+	withResolvedIdBindings
 } from './binding-resolution-helpers'
-import { type PreviewResolutionOptions } from './preview'
-import {
-	getLocalD1DatabaseIdentifier,
-	getLocalKVNamespaceIdentifier,
-	type DevflareConfig
-} from './schema'
+import type { PreviewResolutionOptions } from './preview'
+import { type DeployConfig, brandAsDeployConfig, resolveResources } from './resolve-phased'
 import { ConfigResourceResolutionError } from './resource-resolution'
-import { brandAsDeployConfig, resolveResources, type DeployConfig } from './resolve-phased'
+import {
+	type DevflareConfig,
+	getLocalD1DatabaseIdentifier,
+	getLocalKVNamespaceIdentifier
+} from './schema'
 
 interface DeployResourcePreparationApi {
 	getPrimaryAccount: typeof getPrimaryAccount
@@ -139,7 +139,8 @@ function decorateOrphanError(err: unknown, created: DeployResourceNames): Error 
 	const summaryParts: string[] = []
 	if (created.kv.length > 0) summaryParts.push(`KV: ${created.kv.join(', ')}`)
 	if (created.d1.length > 0) summaryParts.push(`D1: ${created.d1.join(', ')}`)
-	if (created.hyperdrive.length > 0) summaryParts.push(`Hyperdrive: ${created.hyperdrive.join(', ')}`)
+	if (created.hyperdrive.length > 0)
+		summaryParts.push(`Hyperdrive: ${created.hyperdrive.join(', ')}`)
 	if (created.r2.length > 0) summaryParts.push(`R2: ${created.r2.join(', ')}`)
 	if (created.queues.length > 0) summaryParts.push(`Queues: ${created.queues.join(', ')}`)
 	if (created.vectorize.length > 0) summaryParts.push(`Vectorize: ${created.vectorize.join(', ')}`)
@@ -204,9 +205,7 @@ function collectVectorizeIndexNames(config: DevflareConfig): string[] {
 }
 
 function resolveUniquePendingBindings(pendingBindings: PendingNameBinding[]): PendingNameBinding[] {
-	return [...new Map(
-		pendingBindings.map((binding) => [binding.resourceName, binding])
-	).values()]
+	return [...new Map(pendingBindings.map((binding) => [binding.resourceName, binding])).values()]
 }
 
 async function resolveLookupAccountId(
@@ -220,9 +219,8 @@ async function resolveLookupAccountId(
 	// auto-create KV/D1 namespaces in the personal "primary" account while
 	// `wrangler deploy` simultaneously targets the env-var account — leaving
 	// orphaned resources cross-account with no warning.
-	const envAccountId = typeof process !== 'undefined'
-		? process.env?.CLOUDFLARE_ACCOUNT_ID?.trim()
-		: undefined
+	const envAccountId =
+		typeof process !== 'undefined' ? process.env?.CLOUDFLARE_ACCOUNT_ID?.trim() : undefined
 	const explicitAccountId = options.accountId ?? config.accountId ?? (envAccountId || undefined)
 	if (explicitAccountId) {
 		return explicitAccountId
@@ -280,15 +278,14 @@ async function resolveOrCreateResourceIdsByName<TResource extends { id: string; 
 		throw new ConfigResourceResolutionError(options.listFailureMessage, error)
 	}
 
-	const idsByName = new Map(
-		resources.map((resource) => [resource.name, resource.id])
-	)
+	const idsByName = new Map(resources.map((resource) => [resource.name, resource.id]))
 	const created: string[] = []
 	const existing = resolveUniquePendingBindings(pendingBindings)
 		.filter(({ resourceName }) => idsByName.has(resourceName))
 		.map(({ resourceName }) => resourceName)
-	const missingBindings = resolveUniquePendingBindings(pendingBindings)
-		.filter(({ resourceName }) => !idsByName.has(resourceName))
+	const missingBindings = resolveUniquePendingBindings(pendingBindings).filter(
+		({ resourceName }) => !idsByName.has(resourceName)
+	)
 
 	if (missingBindings.length === 0) {
 		return {
@@ -309,8 +306,8 @@ async function resolveOrCreateResourceIdsByName<TResource extends { id: string; 
 			created.push(createdResource.name)
 		} catch (error) {
 			throw new ConfigResourceResolutionError(
-				options.createFailureMessage?.(missingBinding.resourceName)
-				?? `Could not create Cloudflare resource "${missingBinding.resourceName}" during deploy preparation.`,
+				options.createFailureMessage?.(missingBinding.resourceName) ??
+					`Could not create Cloudflare resource "${missingBinding.resourceName}" during deploy preparation.`,
 				error
 			)
 		}
@@ -372,8 +369,8 @@ async function ensureNamedResourcesExist<TResource extends { name: string }>(
 			created.push(createdResource.name)
 		} catch (error) {
 			throw new ConfigResourceResolutionError(
-				options.createFailureMessage?.(resourceName)
-				?? `Could not create Cloudflare resource "${resourceName}" during deploy preparation.`,
+				options.createFailureMessage?.(resourceName) ??
+					`Could not create Cloudflare resource "${resourceName}" during deploy preparation.`,
 				error
 			)
 		}
@@ -399,7 +396,14 @@ export async function prepareMaterializedConfigResourcesForDeploy(
 	const queueNames = collectQueueNames(resolvedConfig)
 	const vectorizeNames = collectVectorizeIndexNames(resolvedConfig)
 
-	if (!kvBindings && !d1Bindings && !hyperdriveBindings && r2Names.length === 0 && queueNames.length === 0 && vectorizeNames.length === 0) {
+	if (
+		!kvBindings &&
+		!d1Bindings &&
+		!hyperdriveBindings &&
+		r2Names.length === 0 &&
+		queueNames.length === 0 &&
+		vectorizeNames.length === 0
+	) {
 		return {
 			config: brandAsDeployConfig(resolvedConfig),
 			created,
@@ -410,22 +414,31 @@ export async function prepareMaterializedConfigResourcesForDeploy(
 
 	const pendingKVNameBindings = collectPendingNameBindings(kvBindings, normalizeKVNameBinding)
 	const pendingD1NameBindings = collectPendingNameBindings(d1Bindings, normalizeD1NameBinding)
-	const pendingHyperdriveNameBindings = collectPendingNameBindings(hyperdriveBindings, normalizeHyperdriveNameBinding)
+	const pendingHyperdriveNameBindings = collectPendingNameBindings(
+		hyperdriveBindings,
+		normalizeHyperdriveNameBinding
+	)
 
 	if (
-		pendingKVNameBindings.length === 0
-		&& pendingD1NameBindings.length === 0
-		&& pendingHyperdriveNameBindings.length === 0
-		&& r2Names.length === 0
-		&& queueNames.length === 0
-		&& vectorizeNames.length === 0
+		pendingKVNameBindings.length === 0 &&
+		pendingD1NameBindings.length === 0 &&
+		pendingHyperdriveNameBindings.length === 0 &&
+		r2Names.length === 0 &&
+		queueNames.length === 0 &&
+		vectorizeNames.length === 0
 	) {
 		return {
-			config: brandAsDeployConfig(withResolvedIdBindings(resolvedConfig, {
-				kv: kvBindings ? materializeIdBindings(kvBindings, getLocalKVNamespaceIdentifier) : undefined,
-				d1: d1Bindings ? materializeIdBindings(d1Bindings, getLocalD1DatabaseIdentifier) : undefined,
-				hyperdrive: materializeHyperdriveIdBindings(hyperdriveBindings)
-			})),
+			config: brandAsDeployConfig(
+				withResolvedIdBindings(resolvedConfig, {
+					kv: kvBindings
+						? materializeIdBindings(kvBindings, getLocalKVNamespaceIdentifier)
+						: undefined,
+					d1: d1Bindings
+						? materializeIdBindings(d1Bindings, getLocalD1DatabaseIdentifier)
+						: undefined,
+					hyperdrive: materializeHyperdriveIdBindings(hyperdriveBindings)
+				})
+			),
 			created,
 			existing,
 			warnings
@@ -441,14 +454,24 @@ export async function prepareMaterializedConfigResourcesForDeploy(
 	// real, so the dry-run output reflects the actual mix of "would create"
 	// vs "would reuse" the live deploy would perform.
 	if (options.describeOnly) {
-		cloudflareApi.createKVNamespace = (async (_acc: string, name: string) =>
-			({ id: `<would-create:${name}>`, name })) as DeployResourcePreparationApi['createKVNamespace']
-		cloudflareApi.createD1Database = (async (_acc: string, name: string) =>
-			({ id: `<would-create:${name}>`, name, version: '', tableCount: 0, sizeBytes: 0 })) as DeployResourcePreparationApi['createD1Database']
-		cloudflareApi.createR2Bucket = (async (_acc: string, name: string) =>
-			({ name })) as DeployResourcePreparationApi['createR2Bucket']
-		cloudflareApi.createQueue = (async (_acc: string, name: string) =>
-			({ id: `<would-create:${name}>`, name })) as DeployResourcePreparationApi['createQueue']
+		cloudflareApi.createKVNamespace = (async (_acc: string, name: string) => ({
+			id: `<would-create:${name}>`,
+			name
+		})) as DeployResourcePreparationApi['createKVNamespace']
+		cloudflareApi.createD1Database = (async (_acc: string, name: string) => ({
+			id: `<would-create:${name}>`,
+			name,
+			version: '',
+			tableCount: 0,
+			sizeBytes: 0
+		})) as DeployResourcePreparationApi['createD1Database']
+		cloudflareApi.createR2Bucket = (async (_acc: string, name: string) => ({
+			name
+		})) as DeployResourcePreparationApi['createR2Bucket']
+		cloudflareApi.createQueue = (async (_acc: string, name: string) => ({
+			id: `<would-create:${name}>`,
+			name
+		})) as DeployResourcePreparationApi['createQueue']
 	}
 
 	// C13 — sequential provisioning leaves silent orphans. We do not
@@ -460,110 +483,123 @@ export async function prepareMaterializedConfigResourcesForDeploy(
 	// deploy, so the user can clean them up manually if the deploy is
 	// abandoned.
 	try {
-	// C3 — resolve-only resources (Hyperdrive, Vectorize) FIRST so that a
-	// "create the index first" failure happens BEFORE we provision any
-	// KV/D1/R2/Queue resources. Otherwise a missing Hyperdrive config would
-	// only be detected after side effects (orphans).
-	const hyperdriveIdsByName = await resolveOrCreateResourceIdsByName(pendingHyperdriveNameBindings, {
-		listResources: async () => cloudflareApi.listHyperdrives(accountId),
-		listFailureMessage: `Could not list Hyperdrive configurations for Cloudflare account ${accountId} while preparing deploy resources.`,
-		missingFailureMessage: (missingBindings) => {
-			return `Could not find Hyperdrive configuration(s) for ${formatMissingBindings(missingBindings)} in Cloudflare account ${accountId}. Cloudflare does not expose a create API that Devflare can use from only a binding name, so create the Hyperdrive config first or configure the binding with an explicit id.`
+		// C3 — resolve-only resources (Hyperdrive, Vectorize) FIRST so that a
+		// "create the index first" failure happens BEFORE we provision any
+		// KV/D1/R2/Queue resources. Otherwise a missing Hyperdrive config would
+		// only be detected after side effects (orphans).
+		const hyperdriveIdsByName = await resolveOrCreateResourceIdsByName(
+			pendingHyperdriveNameBindings,
+			{
+				listResources: async () => cloudflareApi.listHyperdrives(accountId),
+				listFailureMessage: `Could not list Hyperdrive configurations for Cloudflare account ${accountId} while preparing deploy resources.`,
+				missingFailureMessage: (missingBindings) => {
+					return `Could not find Hyperdrive configuration(s) for ${formatMissingBindings(missingBindings)} in Cloudflare account ${accountId}. Cloudflare does not expose a create API that Devflare can use from only a binding name, so create the Hyperdrive config first or configure the binding with an explicit id.`
+				}
+			}
+		)
+		created.hyperdrive.push(...hyperdriveIdsByName.created)
+		existing.hyperdrive.push(...hyperdriveIdsByName.existing)
+
+		const vectorizeState = await ensureNamedResourcesExist<VectorizeIndexInfo>(vectorizeNames, {
+			listResources: async () => cloudflareApi.listVectorizeIndexes(accountId),
+			listFailureMessage: `Could not list Vectorize indexes for Cloudflare account ${accountId} while preparing deploy resources.`,
+			missingFailureMessage: (missingNames) => {
+				return `Could not find Vectorize index(es) ${missingNames.join(', ')} in Cloudflare account ${accountId}. Devflare can only auto-provision preview-scoped Vectorize indexes by cloning an existing base index; for normal deploys create the index first.`
+			}
+		})
+		created.vectorize.push(...vectorizeState.created)
+		existing.vectorize.push(...vectorizeState.existing)
+
+		const namespaceIdsByName = await resolveOrCreateResourceIdsByName(pendingKVNameBindings, {
+			listResources: async () => cloudflareApi.listKVNamespaces(accountId),
+			createResource: async (resourceName) =>
+				cloudflareApi.createKVNamespace(accountId, resourceName),
+			listFailureMessage: `Could not list KV namespaces for Cloudflare account ${accountId} while preparing deploy resources.`,
+			missingFailureMessage: (missingBindings) => {
+				return `Could not find KV namespace(s) for ${formatMissingBindings(missingBindings)} in Cloudflare account ${accountId}.`
+			},
+			createFailureMessage: (resourceName) => {
+				return `Could not create KV namespace "${resourceName}" in Cloudflare account ${accountId} during deploy preparation.`
+			}
+		})
+		created.kv.push(...namespaceIdsByName.created)
+		existing.kv.push(...namespaceIdsByName.existing)
+
+		const databaseIdsByName = await resolveOrCreateResourceIdsByName(pendingD1NameBindings, {
+			listResources: async () => cloudflareApi.listD1Databases(accountId),
+			createResource: async (resourceName) =>
+				cloudflareApi.createD1Database(accountId, resourceName),
+			listFailureMessage: `Could not list D1 databases for Cloudflare account ${accountId} while preparing deploy resources.`,
+			missingFailureMessage: (missingBindings) => {
+				return `Could not find D1 database(s) for ${formatMissingBindings(missingBindings)} in Cloudflare account ${accountId}.`
+			},
+			createFailureMessage: (resourceName) => {
+				return `Could not create D1 database "${resourceName}" in Cloudflare account ${accountId} during deploy preparation.`
+			}
+		})
+		created.d1.push(...databaseIdsByName.created)
+		existing.d1.push(...databaseIdsByName.existing)
+
+		const r2State = await ensureNamedResourcesExist<R2BucketInfo>(r2Names, {
+			listResources: async () => cloudflareApi.listR2Buckets(accountId),
+			createResource: async (resourceName) => cloudflareApi.createR2Bucket(accountId, resourceName),
+			listFailureMessage: `Could not list R2 buckets for Cloudflare account ${accountId} while preparing deploy resources.`,
+			missingFailureMessage: (missingNames) => {
+				return `Could not find R2 bucket(s) ${missingNames.join(', ')} in Cloudflare account ${accountId}.`
+			},
+			createFailureMessage: (resourceName) => {
+				return `Could not create R2 bucket "${resourceName}" in Cloudflare account ${accountId} during deploy preparation.`
+			}
+		})
+		created.r2.push(...r2State.created)
+		existing.r2.push(...r2State.existing)
+
+		const queueState = await ensureNamedResourcesExist<QueueInfo>(queueNames, {
+			listResources: async () => cloudflareApi.listQueues(accountId),
+			createResource: async (resourceName) => cloudflareApi.createQueue(accountId, resourceName),
+			listFailureMessage: `Could not list Queues for Cloudflare account ${accountId} while preparing deploy resources.`,
+			missingFailureMessage: (missingNames) => {
+				return `Could not find Queue(s) ${missingNames.join(', ')} in Cloudflare account ${accountId}.`
+			},
+			createFailureMessage: (resourceName) => {
+				return `Could not create Queue "${resourceName}" in Cloudflare account ${accountId} during deploy preparation.`
+			}
+		})
+		created.queues.push(...queueState.created)
+		existing.queues.push(...queueState.existing)
+
+		const config = withResolvedIdBindings(resolvedConfig, {
+			kv: kvBindings
+				? pendingKVNameBindings.length > 0
+					? materializeResolvedNameBindings(
+							kvBindings,
+							normalizeKVNameBinding,
+							namespaceIdsByName.idsByName
+						)
+					: materializeIdBindings(kvBindings, getLocalKVNamespaceIdentifier)
+				: undefined,
+			d1: d1Bindings
+				? pendingD1NameBindings.length > 0
+					? materializeResolvedNameBindings(
+							d1Bindings,
+							normalizeD1NameBinding,
+							databaseIdsByName.idsByName
+						)
+					: materializeIdBindings(d1Bindings, getLocalD1DatabaseIdentifier)
+				: undefined,
+			hyperdrive: hyperdriveBindings
+				? pendingHyperdriveNameBindings.length > 0
+					? materializeHyperdriveIdBindings(hyperdriveBindings, hyperdriveIdsByName.idsByName)
+					: materializeHyperdriveIdBindings(hyperdriveBindings)
+				: undefined
+		})
+
+		return {
+			config: brandAsDeployConfig(config),
+			created,
+			existing,
+			warnings
 		}
-	})
-	created.hyperdrive.push(...hyperdriveIdsByName.created)
-	existing.hyperdrive.push(...hyperdriveIdsByName.existing)
-
-	const vectorizeState = await ensureNamedResourcesExist<VectorizeIndexInfo>(vectorizeNames, {
-		listResources: async () => cloudflareApi.listVectorizeIndexes(accountId),
-		listFailureMessage: `Could not list Vectorize indexes for Cloudflare account ${accountId} while preparing deploy resources.`,
-		missingFailureMessage: (missingNames) => {
-			return `Could not find Vectorize index(es) ${missingNames.join(', ')} in Cloudflare account ${accountId}. Devflare can only auto-provision preview-scoped Vectorize indexes by cloning an existing base index; for normal deploys create the index first.`
-		}
-	})
-	created.vectorize.push(...vectorizeState.created)
-	existing.vectorize.push(...vectorizeState.existing)
-
-	const namespaceIdsByName = await resolveOrCreateResourceIdsByName(pendingKVNameBindings, {
-		listResources: async () => cloudflareApi.listKVNamespaces(accountId),
-		createResource: async (resourceName) => cloudflareApi.createKVNamespace(accountId, resourceName),
-		listFailureMessage: `Could not list KV namespaces for Cloudflare account ${accountId} while preparing deploy resources.`,
-		missingFailureMessage: (missingBindings) => {
-			return `Could not find KV namespace(s) for ${formatMissingBindings(missingBindings)} in Cloudflare account ${accountId}.`
-		},
-		createFailureMessage: (resourceName) => {
-			return `Could not create KV namespace "${resourceName}" in Cloudflare account ${accountId} during deploy preparation.`
-		}
-	})
-	created.kv.push(...namespaceIdsByName.created)
-	existing.kv.push(...namespaceIdsByName.existing)
-
-	const databaseIdsByName = await resolveOrCreateResourceIdsByName(pendingD1NameBindings, {
-		listResources: async () => cloudflareApi.listD1Databases(accountId),
-		createResource: async (resourceName) => cloudflareApi.createD1Database(accountId, resourceName),
-		listFailureMessage: `Could not list D1 databases for Cloudflare account ${accountId} while preparing deploy resources.`,
-		missingFailureMessage: (missingBindings) => {
-			return `Could not find D1 database(s) for ${formatMissingBindings(missingBindings)} in Cloudflare account ${accountId}.`
-		},
-		createFailureMessage: (resourceName) => {
-			return `Could not create D1 database "${resourceName}" in Cloudflare account ${accountId} during deploy preparation.`
-		}
-	})
-	created.d1.push(...databaseIdsByName.created)
-	existing.d1.push(...databaseIdsByName.existing)
-
-	const r2State = await ensureNamedResourcesExist<R2BucketInfo>(r2Names, {
-		listResources: async () => cloudflareApi.listR2Buckets(accountId),
-		createResource: async (resourceName) => cloudflareApi.createR2Bucket(accountId, resourceName),
-		listFailureMessage: `Could not list R2 buckets for Cloudflare account ${accountId} while preparing deploy resources.`,
-		missingFailureMessage: (missingNames) => {
-			return `Could not find R2 bucket(s) ${missingNames.join(', ')} in Cloudflare account ${accountId}.`
-		},
-		createFailureMessage: (resourceName) => {
-			return `Could not create R2 bucket "${resourceName}" in Cloudflare account ${accountId} during deploy preparation.`
-		}
-	})
-	created.r2.push(...r2State.created)
-	existing.r2.push(...r2State.existing)
-
-	const queueState = await ensureNamedResourcesExist<QueueInfo>(queueNames, {
-		listResources: async () => cloudflareApi.listQueues(accountId),
-		createResource: async (resourceName) => cloudflareApi.createQueue(accountId, resourceName),
-		listFailureMessage: `Could not list Queues for Cloudflare account ${accountId} while preparing deploy resources.`,
-		missingFailureMessage: (missingNames) => {
-			return `Could not find Queue(s) ${missingNames.join(', ')} in Cloudflare account ${accountId}.`
-		},
-		createFailureMessage: (resourceName) => {
-			return `Could not create Queue "${resourceName}" in Cloudflare account ${accountId} during deploy preparation.`
-		}
-	})
-	created.queues.push(...queueState.created)
-	existing.queues.push(...queueState.existing)
-
-	const config = withResolvedIdBindings(resolvedConfig, {
-		kv: kvBindings
-			? pendingKVNameBindings.length > 0
-				? materializeResolvedNameBindings(kvBindings, normalizeKVNameBinding, namespaceIdsByName.idsByName)
-				: materializeIdBindings(kvBindings, getLocalKVNamespaceIdentifier)
-			: undefined,
-		d1: d1Bindings
-			? pendingD1NameBindings.length > 0
-				? materializeResolvedNameBindings(d1Bindings, normalizeD1NameBinding, databaseIdsByName.idsByName)
-				: materializeIdBindings(d1Bindings, getLocalD1DatabaseIdentifier)
-			: undefined,
-		hyperdrive: hyperdriveBindings
-			? pendingHyperdriveNameBindings.length > 0
-				? materializeHyperdriveIdBindings(hyperdriveBindings, hyperdriveIdsByName.idsByName)
-				: materializeHyperdriveIdBindings(hyperdriveBindings)
-			: undefined
-	})
-
-	return {
-		config: brandAsDeployConfig(config),
-		created,
-		existing,
-		warnings
-	}
 	} catch (err) {
 		throw decorateOrphanError(err, created)
 	}

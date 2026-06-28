@@ -2,14 +2,14 @@
 // Doctor Command — Check project configuration
 // =============================================================================
 
-import { type ConsolaInstance } from 'consola'
+import type { ConsolaInstance } from 'consola'
 import { basename, dirname, relative, resolve } from 'pathe'
-import type { ParsedArgs, CliOptions, CliResult } from '../index'
-import { resolveConfigPath, loadConfig } from '../../config/loader'
-import { getDependencies } from '../dependencies'
-import { getGeneratedArtifactPaths } from '../generated-artifacts'
+import { loadConfig, resolveConfigPath } from '../../config/loader'
 import { detectViteProject } from '../../dev-server/vite-utils'
 import { formatSupportedConfigFilenames, resolveConfigCandidatePath } from '../config-path'
+import { getDependencies } from '../dependencies'
+import { getGeneratedArtifactPaths } from '../generated-artifacts'
+import type { CliOptions, CliResult, ParsedArgs } from '../index'
 import { getPackageVersion } from '../package-metadata'
 import { bold, createCliTheme, dim, green, logLine, red, yellow } from '../ui'
 
@@ -34,12 +34,13 @@ export async function runDoctorCommand(
 		return { exitCode: 1 }
 	}
 
-	const requestedConfigPath = requestedConfigOption
-		? resolve(cwd, requestedConfigOption)
-		: cwd
+	const requestedConfigPath = requestedConfigOption ? resolve(cwd, requestedConfigOption) : cwd
 	const checks: CheckResult[] = []
 	const { fs } = await getDependencies()
-	const viteProject = await detectViteProject(cwd, fs as unknown as Parameters<typeof detectViteProject>[1])
+	const viteProject = await detectViteProject(
+		cwd,
+		fs as unknown as Parameters<typeof detectViteProject>[1]
+	)
 
 	logLine(logger)
 	logLine(logger, `${bold('doctor', theme)} ${dim('Running diagnostics', theme)}`)
@@ -58,9 +59,9 @@ export async function runDoctorCommand(
 		try {
 			const config = requestedConfigOption
 				? await loadConfig({
-					cwd: dirname(configPath),
-					configFile: basename(configPath)
-				})
+						cwd: dirname(configPath),
+						configFile: basename(configPath)
+					})
 				: await loadConfig({ cwd })
 			checks.push({
 				name: 'Config Valid',
@@ -151,7 +152,8 @@ export async function runDoctorCommand(
 			checks.push({
 				name: '@cloudflare/vite-plugin',
 				status: 'pass',
-				message: 'Optional: not declared in this package.json. Install it only when your Vite config calls the Cloudflare Vite plugin directly.'
+				message:
+					'Optional: not declared in this package.json. Install it only when your Vite config calls the Cloudflare Vite plugin directly.'
 			})
 		}
 
@@ -207,7 +209,8 @@ export async function runDoctorCommand(
 			checks.push({
 				name: 'Generated dev config',
 				status: 'warn',
-				message: 'Local readiness: not found. Run `devflare dev` or start `devflare/vite` to populate `.devflare/wrangler.jsonc`.'
+				message:
+					'Local readiness: not found. Run `devflare dev` or start `devflare/vite` to populate `.devflare/wrangler.jsonc`.'
 			})
 		}
 	}
@@ -224,7 +227,8 @@ export async function runDoctorCommand(
 			checks.push({
 				name: 'Generated deploy config',
 				status: 'warn',
-				message: 'Deploy readiness: not found. Run `devflare build` or `devflare deploy` to generate `.devflare/build/wrangler.jsonc`.'
+				message:
+					'Deploy readiness: not found. Run `devflare build` or `devflare deploy` to generate `.devflare/build/wrangler.jsonc`.'
 			})
 		}
 
@@ -239,7 +243,8 @@ export async function runDoctorCommand(
 			checks.push({
 				name: 'Wrangler deploy redirect',
 				status: 'warn',
-				message: 'Deploy readiness: not found. Run `devflare build` or `devflare deploy` to generate `.wrangler/deploy/config.json`.'
+				message:
+					'Deploy readiness: not found. Run `devflare build` or `devflare deploy` to generate `.wrangler/deploy/config.json`.'
 			})
 		}
 	}
@@ -251,12 +256,21 @@ export async function runDoctorCommand(
 	for (const check of checks) {
 		const icon = check.status === 'pass' ? '✓' : check.status === 'warn' ? '⚠' : '✗'
 		if (check.status === 'pass') {
-			logLine(logger, `${green(icon, theme)} ${bold(check.name, theme)}${dim(' — ', theme)}${check.message}`)
+			logLine(
+				logger,
+				`${green(icon, theme)} ${bold(check.name, theme)}${dim(' — ', theme)}${check.message}`
+			)
 		} else if (check.status === 'warn') {
-			logLine(logger, `${yellow(icon, theme)} ${bold(check.name, theme)}${dim(' — ', theme)}${check.message}`)
+			logLine(
+				logger,
+				`${yellow(icon, theme)} ${bold(check.name, theme)}${dim(' — ', theme)}${check.message}`
+			)
 			hasWarnings = true
 		} else {
-			logLine(logger, `${red(icon, theme)} ${bold(check.name, theme)}${dim(' — ', theme)}${check.message}`)
+			logLine(
+				logger,
+				`${red(icon, theme)} ${bold(check.name, theme)}${dim(' — ', theme)}${check.message}`
+			)
 			hasFailures = true
 		}
 	}
@@ -266,11 +280,11 @@ export async function runDoctorCommand(
 	if (hasFailures) {
 		logger.error('Some checks failed. Please fix the issues above.')
 		return { exitCode: 1 }
-	} else if (hasWarnings) {
+	}
+	if (hasWarnings) {
 		logger.warn('All critical checks passed, but there are warnings.')
 		return { exitCode: 0 }
-	} else {
-		logger.success('All checks passed!')
-		return { exitCode: 0 }
 	}
+	logger.success('All checks passed!')
+	return { exitCode: 0 }
 }

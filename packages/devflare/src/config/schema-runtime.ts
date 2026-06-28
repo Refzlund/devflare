@@ -25,43 +25,51 @@ export const routesConfigSchema = z.object({
  * File handler configuration.
  * Maps handler types to their source file paths.
  */
-export const filesSchema = z.object({
-	fetch: z.union([z.string(), z.literal(false)]).optional(),
-	queue: z.union([z.string(), z.literal(false)]).optional(),
-	scheduled: z.union([z.string(), z.literal(false)]).optional(),
-	email: z.union([z.string(), z.literal(false)]).optional(),
-	tail: z.union([z.string(), z.literal(false)]).optional(),
-	durableObjects: z.union([z.string(), z.literal(false)]).optional(),
-	entrypoints: z.union([z.string(), z.literal(false)]).optional(),
-	workflows: z.union([z.string(), z.literal(false)]).optional(),
-	routes: z.union([routesConfigSchema, z.literal(false)]).optional(),
-	transport: z.union([z.string(), z.null()]).optional()
-}).optional()
+export const filesSchema = z
+	.object({
+		fetch: z.union([z.string(), z.literal(false)]).optional(),
+		queue: z.union([z.string(), z.literal(false)]).optional(),
+		scheduled: z.union([z.string(), z.literal(false)]).optional(),
+		email: z.union([z.string(), z.literal(false)]).optional(),
+		tail: z.union([z.string(), z.literal(false)]).optional(),
+		durableObjects: z.union([z.string(), z.literal(false)]).optional(),
+		entrypoints: z.union([z.string(), z.literal(false)]).optional(),
+		workflows: z.union([z.string(), z.literal(false)]).optional(),
+		routes: z.union([routesConfigSchema, z.literal(false)]).optional(),
+		transport: z.union([z.string(), z.null()]).optional()
+	})
+	.optional()
 
 /**
  * Tail Consumer configuration.
  */
 export const tailConsumerSchema = z.union([
 	z.string().min(1),
-	z.object({
-		service: z.string().min(1),
-		environment: z.string().min(1).optional()
-	}).strict()
+	z
+		.object({
+			service: z.string().min(1),
+			environment: z.string().min(1).optional()
+		})
+		.strict()
 ])
 
 /**
  * Trigger configuration for scheduled (cron) events.
  */
-export const triggersSchema = z.object({
-	crons: z.array(z.string()).optional()
-}).optional()
+export const triggersSchema = z
+	.object({
+		crons: z.array(z.string()).optional()
+	})
+	.optional()
 
 /**
  * Preview-specific Devflare behavior.
  */
-export const previewsConfigSchema = z.object({
-	includeCrons: z.boolean().optional().default(false)
-}).optional()
+export const previewsConfigSchema = z
+	.object({
+		includeCrons: z.boolean().optional().default(false)
+	})
+	.optional()
 
 /**
  * Dev server configuration for `devflare dev`.
@@ -72,12 +80,15 @@ export const previewsConfigSchema = z.object({
  * variables (`DEVFLARE_RUNTIME_PORT`, `DEVFLARE_RUNTIME_HOST`) take precedence
  * over these values.
  */
-export const serverConfigSchema = z.object({
-	/** Host the dev runtime binds to. @default '127.0.0.1' */
-	host: z.string().min(1).optional(),
-	/** Port the dev runtime binds to. @default 8787 */
-	port: z.number().int().min(1).max(65535).optional()
-}).strict().optional()
+export const serverConfigSchema = z
+	.object({
+		/** Host the dev runtime binds to. @default '127.0.0.1' */
+		host: z.string().min(1).optional(),
+		/** Port the dev runtime binds to. @default 8787 */
+		port: z.number().int().min(1).max(65535).optional()
+	})
+	.strict()
+	.optional()
 
 /**
  * Secret declaration options.
@@ -89,32 +100,34 @@ export const secretConfigSchema = z.object({
 /**
  * Route configuration for worker deployment.
  */
-export const routeConfigSchema = z.object({
-	pattern: z.string(),
-	zone_name: z.string().optional(),
-	zone_id: z.string().optional(),
-	custom_domain: z.boolean().optional()
-}).superRefine((route, ctx) => {
-	if (!route.custom_domain) {
-		return
-	}
+export const routeConfigSchema = z
+	.object({
+		pattern: z.string(),
+		zone_name: z.string().optional(),
+		zone_id: z.string().optional(),
+		custom_domain: z.boolean().optional()
+	})
+	.superRefine((route, ctx) => {
+		if (!route.custom_domain) {
+			return
+		}
 
-	if (route.pattern.includes('*')) {
-		ctx.addIssue({
-			code: z.ZodIssueCode.custom,
-			path: ['pattern'],
-			message: 'Wildcard operators (*) are not allowed in Custom Domains'
-		})
-	}
+		if (route.pattern.includes('*')) {
+			ctx.addIssue({
+				code: z.ZodIssueCode.custom,
+				path: ['pattern'],
+				message: 'Wildcard operators (*) are not allowed in Custom Domains'
+			})
+		}
 
-	if (route.pattern.includes('/')) {
-		ctx.addIssue({
-			code: z.ZodIssueCode.custom,
-			path: ['pattern'],
-			message: 'Paths are not allowed in Custom Domains'
-		})
-	}
-})
+		if (route.pattern.includes('/')) {
+			ctx.addIssue({
+				code: z.ZodIssueCode.custom,
+				path: ['pattern'],
+				message: 'Paths are not allowed in Custom Domains'
+			})
+		}
+	})
 
 /**
  * WebSocket route configuration for dev mode Durable Object proxying.
@@ -129,98 +142,112 @@ export const wsRouteConfigSchema = z.object({
 /**
  * Static assets configuration.
  */
-export const assetsConfigSchema = z.object({
-	directory: z.string(),
-	binding: z.string().optional(),
-	html_handling: z.enum([
-		'auto-trailing-slash',
-		'force-trailing-slash',
-		'drop-trailing-slash',
-		'none'
-	]).optional(),
-	not_found_handling: z.enum([
-		'single-page-application',
-		'404-page',
-		'none'
-	]).optional(),
-	run_worker_first: z.union([
-		z.boolean(),
-		z.array(z.string())
-	]).optional()
-}).strict().optional()
+export const assetsConfigSchema = z
+	.object({
+		directory: z.string(),
+		binding: z.string().optional(),
+		html_handling: z
+			.enum(['auto-trailing-slash', 'force-trailing-slash', 'drop-trailing-slash', 'none'])
+			.optional(),
+		not_found_handling: z.enum(['single-page-application', '404-page', 'none']).optional(),
+		run_worker_first: z.union([z.boolean(), z.array(z.string())]).optional()
+	})
+	.strict()
+	.optional()
 
-const smartPlacementSchema = z.object({
-	mode: z.enum(['off', 'smart']),
-	hint: z.string().optional()
-}).strict().superRefine((placement, ctx) => {
-	if (placement.hint !== undefined && placement.mode !== 'smart') {
-		ctx.addIssue({
-			code: z.ZodIssueCode.custom,
-			path: ['hint'],
-			message: 'placement.hint can only be set when placement.mode is smart'
-		})
-	}
-})
+const smartPlacementSchema = z
+	.object({
+		mode: z.enum(['off', 'smart']),
+		hint: z.string().optional()
+	})
+	.strict()
+	.superRefine((placement, ctx) => {
+		if (placement.hint !== undefined && placement.mode !== 'smart') {
+			ctx.addIssue({
+				code: z.ZodIssueCode.custom,
+				path: ['hint'],
+				message: 'placement.hint can only be set when placement.mode is smart'
+			})
+		}
+	})
 
-const targetedRegionPlacementSchema = z.object({
-	mode: z.literal('targeted').optional(),
-	region: z.string().min(1)
-}).strict()
+const targetedRegionPlacementSchema = z
+	.object({
+		mode: z.literal('targeted').optional(),
+		region: z.string().min(1)
+	})
+	.strict()
 
-const targetedHostPlacementSchema = z.object({
-	mode: z.literal('targeted').optional(),
-	host: z.string().min(1)
-}).strict()
+const targetedHostPlacementSchema = z
+	.object({
+		mode: z.literal('targeted').optional(),
+		host: z.string().min(1)
+	})
+	.strict()
 
-const targetedHostnamePlacementSchema = z.object({
-	mode: z.literal('targeted').optional(),
-	hostname: z.string().min(1)
-}).strict()
+const targetedHostnamePlacementSchema = z
+	.object({
+		mode: z.literal('targeted').optional(),
+		hostname: z.string().min(1)
+	})
+	.strict()
 
 /**
  * Worker placement configuration.
  */
-export const placementSchema = z.union([
-	smartPlacementSchema,
-	targetedRegionPlacementSchema,
-	targetedHostPlacementSchema,
-	targetedHostnamePlacementSchema
-]).optional()
+export const placementSchema = z
+	.union([
+		smartPlacementSchema,
+		targetedRegionPlacementSchema,
+		targetedHostPlacementSchema,
+		targetedHostnamePlacementSchema
+	])
+	.optional()
 
 const samplingRateSchema = z.number().min(0).max(1)
 
-const observabilityLogsSchema = z.object({
-	enabled: z.boolean().optional(),
-	head_sampling_rate: samplingRateSchema.optional(),
-	invocation_logs: z.boolean().optional(),
-	persist: z.boolean().optional(),
-	destinations: z.array(z.string()).optional()
-}).strict()
+const observabilityLogsSchema = z
+	.object({
+		enabled: z.boolean().optional(),
+		head_sampling_rate: samplingRateSchema.optional(),
+		invocation_logs: z.boolean().optional(),
+		persist: z.boolean().optional(),
+		destinations: z.array(z.string()).optional()
+	})
+	.strict()
 
-const observabilityTracesSchema = z.object({
-	enabled: z.boolean().optional(),
-	head_sampling_rate: samplingRateSchema.optional(),
-	persist: z.boolean().optional(),
-	destinations: z.array(z.string()).optional()
-}).strict()
+const observabilityTracesSchema = z
+	.object({
+		enabled: z.boolean().optional(),
+		head_sampling_rate: samplingRateSchema.optional(),
+		persist: z.boolean().optional(),
+		destinations: z.array(z.string()).optional()
+	})
+	.strict()
 
 /**
  * Observability configuration for logs and traces.
  */
-export const observabilitySchema = z.object({
-	enabled: z.boolean().optional(),
-	head_sampling_rate: samplingRateSchema.optional(),
-	logs: observabilityLogsSchema.optional(),
-	traces: observabilityTracesSchema.optional()
-}).strict().optional()
+export const observabilitySchema = z
+	.object({
+		enabled: z.boolean().optional(),
+		head_sampling_rate: samplingRateSchema.optional(),
+		logs: observabilityLogsSchema.optional(),
+		traces: observabilityTracesSchema.optional()
+	})
+	.strict()
+	.optional()
 
 /**
  * Resource limits configuration.
  */
-export const limitsSchema = z.object({
-	cpu_ms: z.number().optional(),
-	subrequests: z.number().optional()
-}).strict().optional()
+export const limitsSchema = z
+	.object({
+		cpu_ms: z.number().optional(),
+		subrequests: z.number().optional()
+	})
+	.strict()
+	.optional()
 
 const rolloutStepPercentageSchema = z.union([
 	z.number().int().positive(),
@@ -234,17 +261,19 @@ const rolloutStepPercentageSchema = z.union([
  * `containers` array. Runtime launch/testing is handled by the local
  * container test shim, not by Miniflare itself.
  */
-export const containerConfigSchema = z.object({
-	className: z.string().min(1),
-	image: z.string().min(1),
-	maxInstances: z.number().int().positive().optional(),
-	instanceType: z.string().min(1).optional(),
-	name: z.string().min(1).optional(),
-	imageBuildContext: z.string().min(1).optional(),
-	imageVars: z.record(z.string(), z.string()).optional(),
-	rolloutActiveGracePeriod: z.number().int().nonnegative().optional(),
-	rolloutStepPercentage: rolloutStepPercentageSchema.optional()
-}).strict()
+export const containerConfigSchema = z
+	.object({
+		className: z.string().min(1),
+		image: z.string().min(1),
+		maxInstances: z.number().int().positive().optional(),
+		instanceType: z.string().min(1).optional(),
+		name: z.string().min(1).optional(),
+		imageBuildContext: z.string().min(1).optional(),
+		imageVars: z.record(z.string(), z.string()).optional(),
+		rolloutActiveGracePeriod: z.number().int().nonnegative().optional(),
+		rolloutStepPercentage: rolloutStepPercentageSchema.optional()
+	})
+	.strict()
 
 export const containersConfigSchema = z.array(containerConfigSchema).optional()
 
@@ -255,36 +284,44 @@ export const containersConfigSchema = z.array(containerConfigSchema).optional()
  * beta. Devflare keeps those behind `wrangler.passthrough` until the local
  * Python Worker toolchain has a stable Devflare integration point.
  */
-export const moduleRuleSchema = z.object({
-	type: z.enum(['ESModule', 'CommonJS', 'CompiledWasm', 'Text', 'Data']),
-	globs: z.array(z.string()).min(1),
-	fallthrough: z.boolean().optional()
-}).strict()
+export const moduleRuleSchema = z
+	.object({
+		type: z.enum(['ESModule', 'CommonJS', 'CompiledWasm', 'Text', 'Data']),
+		globs: z.array(z.string()).min(1),
+		fallthrough: z.boolean().optional()
+	})
+	.strict()
 
 export const moduleRulesSchema = z.array(moduleRuleSchema).optional()
 
 /**
  * Durable Object migration configuration.
  */
-const renamedClassMigrationSchema = z.object({
-	from: z.string(),
-	to: z.string()
-}).strict()
+const renamedClassMigrationSchema = z
+	.object({
+		from: z.string(),
+		to: z.string()
+	})
+	.strict()
 
-export const migrationSchema = z.object({
-	tag: z.string(),
-	new_classes: z.array(z.string()).optional(),
-	renamed_classes: z.array(renamedClassMigrationSchema).optional(),
-	deleted_classes: z.array(z.string()).optional(),
-	new_sqlite_classes: z.array(z.string()).optional()
-}).strict()
+export const migrationSchema = z
+	.object({
+		tag: z.string(),
+		new_classes: z.array(z.string()).optional(),
+		renamed_classes: z.array(renamedClassMigrationSchema).optional(),
+		deleted_classes: z.array(z.string()).optional(),
+		new_sqlite_classes: z.array(z.string()).optional()
+	})
+	.strict()
 
 /**
  * Wrangler configuration passthrough.
  */
-export const wranglerConfigSchema = z.object({
-	passthrough: z.record(z.string(), z.unknown()).optional()
-}).optional()
+export const wranglerConfigSchema = z
+	.object({
+		passthrough: z.record(z.string(), z.unknown()).optional()
+	})
+	.optional()
 
 export type AssetsConfig = z.infer<typeof assetsConfigSchema>
 export type ContainerConfig = z.infer<typeof containerConfigSchema>

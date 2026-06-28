@@ -2,9 +2,9 @@
 // Runtime File Router
 // =============================================================================
 
+import { type FetchEvent, createFetchEvent, runWithEventContext } from '../context'
+import { type ResolveFetch, invokeFetchModule } from '../middleware'
 import type { RouteMatchResult, RouteModuleDefinition, RouteSegment } from './types'
-import { createFetchEvent, runWithEventContext, type FetchEvent } from '../context'
-import { invokeFetchModule, type ResolveFetch } from '../middleware'
 
 function normalizePathname(pathname: string): string {
 	if (!pathname || pathname === '/') {
@@ -30,11 +30,7 @@ function getPathSegments(pathname: string): string[] {
 		return []
 	}
 
-	return normalizedPathname
-		.slice(1)
-		.split('/')
-		.filter(Boolean)
-		.map(decodePathSegment)
+	return normalizedPathname.slice(1).split('/').filter(Boolean).map(decodePathSegment)
 }
 
 function getMatchPathname(input: Request | URL | string): string {

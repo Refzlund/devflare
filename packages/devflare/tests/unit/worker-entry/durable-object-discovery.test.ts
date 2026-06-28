@@ -20,16 +20,13 @@ describe('discoverDurableObjectFiles', () => {
 	test('returns a stable map of file path → DO class names', async () => {
 		await writeFile(
 			join(TEST_DIR, 'src', 'do.chat.ts'),
-			'import { DurableObject } from \'cloudflare:workers\'\nexport class ChatRoom extends DurableObject {}\n'
+			"import { DurableObject } from 'cloudflare:workers'\nexport class ChatRoom extends DurableObject {}\n"
 		)
 		await writeFile(
 			join(TEST_DIR, 'src', 'do.counter.ts'),
-			'import { DurableObject } from \'cloudflare:workers\'\nexport class Counter extends DurableObject {}\nexport class Counter2 extends DurableObject {}\n'
+			"import { DurableObject } from 'cloudflare:workers'\nexport class Counter extends DurableObject {}\nexport class Counter2 extends DurableObject {}\n"
 		)
-		await writeFile(
-			join(TEST_DIR, 'src', 'do.empty.ts'),
-			'export const noop = () => {}\n'
-		)
+		await writeFile(join(TEST_DIR, 'src', 'do.empty.ts'), 'export const noop = () => {}\n')
 
 		const result = await discoverDurableObjectFiles(TEST_DIR, 'src/do.*.ts')
 
@@ -50,7 +47,7 @@ describe('discoverDurableObjectFiles', () => {
 	test('discoverDurableObjects wraps the file map with the worker name', async () => {
 		await writeFile(
 			join(TEST_DIR, 'src', 'do.thing.ts'),
-			'import { DurableObject } from \'cloudflare:workers\'\nexport class Thing extends DurableObject {}\n'
+			"import { DurableObject } from 'cloudflare:workers'\nexport class Thing extends DurableObject {}\n"
 		)
 
 		const discovery = await discoverDurableObjects(TEST_DIR, 'src/do.*.ts', 'do-worker')

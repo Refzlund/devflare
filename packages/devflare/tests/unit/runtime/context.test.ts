@@ -11,6 +11,8 @@ import {
 	createQueueEvent,
 	createScheduledEvent,
 	createTailEvent,
+	getContext,
+	getContextOrNull,
 	getDurableObjectAlarmEvent,
 	getDurableObjectEvent,
 	getDurableObjectFetchEvent,
@@ -20,17 +22,15 @@ import {
 	getScheduledEvent,
 	getTailEvent,
 	runWithContext,
-	runWithEventContext,
-	getContext,
-	getContextOrNull
+	runWithEventContext
 } from '../../../src/runtime/context'
 import { ContextAccessError } from '../../../src/runtime/validation'
 
 /** Helper to create a mock ExecutionContext */
 function createMockCtx(): ExecutionContext {
 	return {
-		waitUntil: () => { },
-		passThroughOnException: () => { },
+		waitUntil: () => {},
+		passThroughOnException: () => {},
 		props: {}
 	} as ExecutionContext
 }
@@ -38,7 +38,7 @@ function createMockCtx(): ExecutionContext {
 function createMockState(): DurableObjectState {
 	return {
 		storage: {} as DurableObjectStorage,
-		waitUntil: () => { },
+		waitUntil: () => {},
 		blockConcurrencyWhile: async <T>(callback: () => Promise<T>) => callback()
 	} as unknown as DurableObjectState
 }
@@ -58,12 +58,12 @@ function createMockQueueBatch(): MessageBatch<{ value: string }> {
 				timestamp: new Date('2026-03-17T00:00:00.000Z'),
 				body: { value: 'queued' },
 				attempts: 1,
-				ack() { },
-				retry() { }
+				ack() {},
+				retry() {}
 			} as Message<{ value: string }>
 		],
-		ackAll() { },
-		retryAll() { }
+		ackAll() {},
+		retryAll() {}
 	} as MessageBatch<{ value: string }>
 }
 
@@ -78,9 +78,9 @@ function createMockEmailMessage(): ForwardableEmailMessage {
 			}
 		}),
 		rawSize: 0,
-		setReject() { },
-		forward: async () => { },
-		reply: async () => { }
+		setReject() {},
+		forward: async () => {},
+		reply: async () => {}
 	} as unknown as ForwardableEmailMessage
 }
 
@@ -112,10 +112,16 @@ describe('runWithContext', () => {
 		const mockEnv = { TEST: true }
 		const mockState = createMockState()
 
-		runWithContext(mockEnv, mockState, null, () => {
-			expect(getDurableObjectEvent().type).toBe('durable-object-alarm')
-			expect(getDurableObjectAlarmEvent().state).toBe(mockState)
-		}, 'durable-object-alarm')
+		runWithContext(
+			mockEnv,
+			mockState,
+			null,
+			() => {
+				expect(getDurableObjectEvent().type).toBe('durable-object-alarm')
+				expect(getDurableObjectAlarmEvent().state).toBe(mockState)
+			},
+			'durable-object-alarm'
+		)
 	})
 
 	test('initializes empty locals', () => {
@@ -212,7 +218,9 @@ describe('event-first context accessors', () => {
 			expect(fetchEvent.request.url).toBe('https://example.com/users/123')
 			expect(Object.keys(fetchEvent)).toContain('url')
 			expect(Reflect.getOwnPropertyDescriptor(fetchEvent, 'url')?.value).toBeInstanceOf(URL)
-			expect((Reflect.getOwnPropertyDescriptor(fetchEvent, 'url')?.value as URL | undefined)?.href).toBe('https://example.com/users/123')
+			expect(
+				(Reflect.getOwnPropertyDescriptor(fetchEvent, 'url')?.value as URL | undefined)?.href
+			).toBe('https://example.com/users/123')
 		})
 	})
 
@@ -224,10 +232,12 @@ describe('event-first context accessors', () => {
 		const controller = {
 			cron: '0 * * * *',
 			scheduledTime: Date.now(),
-			noRetry() { }
+			noRetry() {}
 		} as ScheduledController
 		const emailMessage = createMockEmailMessage()
-		const traceItems = [{ scriptName: 'worker', outcome: 'ok', eventTimestamp: Date.now() } as TraceItem]
+		const traceItems = [
+			{ scriptName: 'worker', outcome: 'ok', eventTimestamp: Date.now() } as TraceItem
+		]
 		const doRequest = new Request('https://example.com/do')
 
 		runWithEventContext(createQueueEvent(batch, mockEnv, mockCtx), () => {

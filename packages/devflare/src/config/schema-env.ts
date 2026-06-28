@@ -24,10 +24,7 @@ import { rootConfigShape } from './schema'
  * module references `rootConfigShape` from schema.ts).
  */
 export const envConfigSchema = z.lazy(() =>
-	z.object(rootConfigShape)
-		.omit({ accountId: true, wsRoutes: true })
-		.partial()
-		.strict()
+	z.object(rootConfigShape).omit({ accountId: true, wsRoutes: true }).partial().strict()
 )
 
 export const envConfigSchemaInner = envConfigSchema

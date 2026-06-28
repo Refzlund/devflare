@@ -318,7 +318,11 @@ function bindingOverviewSupportFailures(slug: string): string[] {
 		failures.push(`${slug}: support section still writes the support level as body text`)
 	}
 
-	const redundantTitles = [`${supportLabel} support`, 'What works without Cloudflare', 'When to connect to Cloudflare']
+	const redundantTitles = [
+		`${supportLabel} support`,
+		'What works without Cloudflare',
+		'When to connect to Cloudflare'
+	]
 	const redundantCardTitle = supportSection?.cards
 		?.map((card) => card.title)
 		.find((title) => redundantTitles.includes(title))
@@ -889,7 +893,7 @@ describe('documentation integrity', () => {
 			runtimeSections
 				.filter(({ text }) => /devflare\/runtime/.test(text))
 				.map(({ slug }) => slug)
-			.sort()
+				.sort()
 		).toEqual(bindingSlugsAt(0).sort())
 	})
 

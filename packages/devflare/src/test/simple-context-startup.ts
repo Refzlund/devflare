@@ -28,11 +28,13 @@ export function isRetriableTestContextStartupError(error: unknown): boolean {
 	}
 
 	const message = error.message.toLowerCase()
-	return message.includes('websocket connection failed')
-		|| message.includes('connection timeout: ws://')
-		|| message.includes('econnrefused')
-		|| message.includes('eaddrinuse')
-		|| message.includes('address already in use')
+	return (
+		message.includes('websocket connection failed') ||
+		message.includes('connection timeout: ws://') ||
+		message.includes('econnrefused') ||
+		message.includes('eaddrinuse') ||
+		message.includes('address already in use')
+	)
 }
 
 async function waitForTestContextStartupRetry(): Promise<void> {
@@ -46,7 +48,7 @@ async function waitForBridgeClientRetry(): Promise<void> {
 export async function connectBridgeClientWithRetry(url: string): Promise<BridgeClient> {
 	let lastError: unknown
 
-	for (let attempt = 1;attempt <= TEST_CONTEXT_BRIDGE_CONNECT_RETRY_ATTEMPTS;attempt++) {
+	for (let attempt = 1; attempt <= TEST_CONTEXT_BRIDGE_CONNECT_RETRY_ATTEMPTS; attempt++) {
 		const client = new BridgeClient({ url })
 
 		try {
@@ -57,8 +59,8 @@ export async function connectBridgeClientWithRetry(url: string): Promise<BridgeC
 			client.disconnect()
 
 			if (
-				attempt >= TEST_CONTEXT_BRIDGE_CONNECT_RETRY_ATTEMPTS
-				|| !isRetriableTestContextStartupError(error)
+				attempt >= TEST_CONTEXT_BRIDGE_CONNECT_RETRY_ATTEMPTS ||
+				!isRetriableTestContextStartupError(error)
 			) {
 				throw error
 			}
@@ -95,9 +97,7 @@ function expandLocalBindingWorkers(mfConfig: any): any {
 		imagesPersist,
 		...primaryWorker
 	} = mfConfig
-	const primaryWorkerName = typeof primaryWorker.name === 'string'
-		? primaryWorker.name
-		: 'primary'
+	const primaryWorkerName = typeof primaryWorker.name === 'string' ? primaryWorker.name : 'primary'
 
 	return {
 		...(port !== undefined && { port }),
@@ -119,19 +119,23 @@ function expandLocalBindingWorkers(mfConfig: any): any {
 	}
 }
 
-export async function startBridgeBackedTestContext(mfConfig: any): Promise<StartedBridgeBackedTestContext> {
+export async function startBridgeBackedTestContext(
+	mfConfig: any
+): Promise<StartedBridgeBackedTestContext> {
 	const { Miniflare } = await import('miniflare')
 
-	for (let attempt = 1;attempt <= TEST_CONTEXT_STARTUP_RETRY_ATTEMPTS;attempt++) {
+	for (let attempt = 1; attempt <= TEST_CONTEXT_STARTUP_RETRY_ATTEMPTS; attempt++) {
 		const port = await getAvailablePort()
 		let miniflare: any = null
 		let client: BridgeClient | null = null
 
 		try {
-			miniflare = new Miniflare(expandLocalBindingWorkers({
-				...mfConfig,
-				port
-			}))
+			miniflare = new Miniflare(
+				expandLocalBindingWorkers({
+					...mfConfig,
+					port
+				})
+			)
 			await miniflare.ready
 
 			const miniflareBindings = wrapEnvSendEmailBindings(await miniflare.getBindings())
@@ -154,7 +158,10 @@ export async function startBridgeBackedTestContext(mfConfig: any): Promise<Start
 				}
 			}
 
-			if (attempt >= TEST_CONTEXT_STARTUP_RETRY_ATTEMPTS || !isRetriableTestContextStartupError(error)) {
+			if (
+				attempt >= TEST_CONTEXT_STARTUP_RETRY_ATTEMPTS ||
+				!isRetriableTestContextStartupError(error)
+			) {
 				throw error
 			}
 

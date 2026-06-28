@@ -58,7 +58,10 @@ async function readPackageDependencies(cwd: string): Promise<Record<string, stri
 	}
 }
 
-async function findFirstExistingTextFile(cwd: string, candidates: readonly string[]): Promise<string | null> {
+async function findFirstExistingTextFile(
+	cwd: string,
+	candidates: readonly string[]
+): Promise<string | null> {
 	for (const candidate of candidates) {
 		const fileText = await readTextIfExists(join(cwd, candidate))
 		if (fileText !== null) {
@@ -101,15 +104,13 @@ const svelteKitCloudflareProvider: FrameworkProvider = {
 	}
 }
 
-const frameworkProviders: readonly FrameworkProvider[] = [
-	svelteKitCloudflareProvider
-]
+const frameworkProviders: readonly FrameworkProvider[] = [svelteKitCloudflareProvider]
 
 function hasFrameworkInferenceGap(config: DevflareConfig): boolean {
 	return (
-		config.files?.fetch === undefined
-		|| config.assets?.directory === undefined
-		|| config.assets?.binding === undefined
+		config.files?.fetch === undefined ||
+		config.assets?.directory === undefined ||
+		config.assets?.binding === undefined
 	)
 }
 
@@ -119,16 +120,16 @@ function mergeInferredConfig(
 ): DevflareConfig {
 	const mergedFiles = inferredConfig.files
 		? {
-			...inferredConfig.files,
-			...(config.files ?? {})
-		}
+				...inferredConfig.files,
+				...(config.files ?? {})
+			}
 		: config.files
 
 	const mergedAssets = inferredConfig.assets
 		? {
-			...inferredConfig.assets,
-			...(config.assets ?? {})
-		}
+				...inferredConfig.assets,
+				...(config.assets ?? {})
+			}
 		: config.assets
 
 	return {

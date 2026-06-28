@@ -1,4 +1,4 @@
-import { apiGetAll, apiPost, type APIClientOptions } from './api'
+import { type APIClientOptions, apiGetAll, apiPost } from './api'
 import type { KVNamespace } from './types'
 
 export const DEVFLARE_KV_NAMESPACE_TITLE = 'devflare-usage'

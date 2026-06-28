@@ -1,6 +1,6 @@
 import { runPreviewsCommand } from '../../../src/cli/commands/previews'
 import { createD1ResultsResponse, jsonResponse } from '../../helpers/cloudflare-api'
-import { createLogger, renderMessages, stripAnsi, type TestLogger } from '../../helpers/mock-logger'
+import { type TestLogger, createLogger, renderMessages, stripAnsi } from '../../helpers/mock-logger'
 
 export type { TestLogger }
 export { createLogger, renderMessages, stripAnsi }
@@ -29,13 +29,17 @@ function restoreOptionalEnvironmentVariable(name: string, value: string | undefi
 	process.env[name] = value
 }
 
-export function restorePreviewTestEnvironmentSnapshot(snapshot: PreviewTestEnvironmentSnapshot): void {
+export function restorePreviewTestEnvironmentSnapshot(
+	snapshot: PreviewTestEnvironmentSnapshot
+): void {
 	globalThis.fetch = snapshot.fetch
 	restoreOptionalEnvironmentVariable('CLOUDFLARE_API_TOKEN', snapshot.token)
 	restoreOptionalEnvironmentVariable('DEVFLARE_CACHE_DIR', snapshot.cacheDir)
 }
 
-export function createRegistryDatabaseListResponse(databases: Array<Record<string, unknown>>): Response {
+export function createRegistryDatabaseListResponse(
+	databases: Array<Record<string, unknown>>
+): Response {
 	return jsonResponse(databases, {
 		page: 1,
 		per_page: 50,
@@ -45,13 +49,15 @@ export function createRegistryDatabaseListResponse(databases: Array<Record<strin
 	})
 }
 
-export function createRegistryDatabaseRecord(options: {
-	uuid?: string
-	name?: string
-	version?: string
-	numTables?: number
-	fileSize?: number
-} = {}): Record<string, unknown> {
+export function createRegistryDatabaseRecord(
+	options: {
+		uuid?: string
+		name?: string
+		version?: string
+		numTables?: number
+		fileSize?: number
+	} = {}
+): Record<string, unknown> {
 	return {
 		uuid: options.uuid ?? 'db_123',
 		name: options.name ?? 'devflare-registry',
@@ -74,7 +80,11 @@ interface PreviewRegistryFetchOptions {
 	previewRecords?: Array<Record<string, unknown>>
 	deploymentRecords?: Array<Record<string, unknown>>
 	onRequest?: (url: string, init?: RequestInit) => Response | Promise<Response> | undefined
-	onQuery?: (sql: string, url: string, init?: RequestInit) => Response | Promise<Response> | undefined
+	onQuery?: (
+		sql: string,
+		url: string,
+		init?: RequestInit
+	) => Response | Promise<Response> | undefined
 }
 
 export function createPreviewRegistryFetch(
@@ -118,11 +128,13 @@ export function createPreviewRegistryFetch(
 	}
 }
 
-export async function runTrackedPreviewsCommand(options: {
-	args?: string[]
-	account?: string
-	cwd?: string
-} = {}): Promise<{
+export async function runTrackedPreviewsCommand(
+	options: {
+		args?: string[]
+		account?: string
+		cwd?: string
+	} = {}
+): Promise<{
 	logger: TestLogger
 	result: Awaited<ReturnType<typeof runPreviewsCommand>>
 	renderedMessages: string[]

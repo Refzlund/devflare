@@ -2,16 +2,16 @@
 // CLI Init Command — Integration Tests
 // =============================================================================
 
-import { describe, expect, test, beforeEach, afterEach } from 'bun:test'
-import {
-	createTestHarness,
-	createParsedArgs,
-	createMockProcessRunner,
-	type TestHarness
-} from '../mocks'
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { runInitCommand } from '../../../src/cli/commands/init'
-import { setDependencies, clearDependencies } from '../../../src/cli/dependencies'
+import { clearDependencies, setDependencies } from '../../../src/cli/dependencies'
 import { getInitDependencyVersions } from '../../../src/cli/package-metadata'
+import {
+	type TestHarness,
+	createMockProcessRunner,
+	createParsedArgs,
+	createTestHarness
+} from '../mocks'
 
 describe('init command integration', () => {
 	let harness: TestHarness
@@ -238,9 +238,7 @@ describe('init command integration', () => {
 
 			// Check error message mentions directory exists
 			const errorCalls = harness.logger.error.mock.calls
-			const hasExistsError = errorCalls.some(
-				(call) => String(call[0]).includes('already exists')
-			)
+			const hasExistsError = errorCalls.some((call) => String(call[0]).includes('already exists'))
 			expect(hasExistsError).toBe(true)
 		})
 	})
@@ -267,11 +265,9 @@ describe('init command integration', () => {
 		test('tracks all mkdir operations', async () => {
 			const parsed = createParsedArgs('init', ['tracked-app'], {})
 
-			await runInitCommand(
-				parsed,
-				harness.logger as unknown as import('consola').ConsolaInstance,
-				{ cwd: harness.cwd }
-			)
+			await runInitCommand(parsed, harness.logger as unknown as import('consola').ConsolaInstance, {
+				cwd: harness.cwd
+			})
 
 			const mkdirOps = harness.fs.getOperations('mkdir')
 			expect(mkdirOps.length).toBeGreaterThan(0)
@@ -283,11 +279,9 @@ describe('init command integration', () => {
 		test('tracks all writeFile operations', async () => {
 			const parsed = createParsedArgs('init', ['written-app'], {})
 
-			await runInitCommand(
-				parsed,
-				harness.logger as unknown as import('consola').ConsolaInstance,
-				{ cwd: harness.cwd }
-			)
+			await runInitCommand(parsed, harness.logger as unknown as import('consola').ConsolaInstance, {
+				cwd: harness.cwd
+			})
 
 			const writeOps = harness.fs.getOperations('writeFile')
 			expect(writeOps.length).toBeGreaterThanOrEqual(4) // At least 4 files in minimal template

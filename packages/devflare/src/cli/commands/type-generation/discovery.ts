@@ -1,8 +1,11 @@
 import { readFile } from 'node:fs/promises'
 import { dirname, relative } from 'pathe'
-import { DEFAULT_DO_PATTERN, DEFAULT_ENTRYPOINT_PATTERN, findFiles } from '../../../utils/glob'
-import { discoverEntrypointsAsync, type DiscoveredEntrypoint } from '../../../utils/entrypoint-discovery'
 import { findDurableObjectClasses } from '../../../transform/durable-object'
+import {
+	type DiscoveredEntrypoint,
+	discoverEntrypointsAsync
+} from '../../../utils/entrypoint-discovery'
+import { DEFAULT_DO_PATTERN, DEFAULT_ENTRYPOINT_PATTERN, findFiles } from '../../../utils/glob'
 import { resolvePackageSpecifier } from '../../../utils/resolve-package'
 import { resolveConfigCandidatePath } from '../../config-path'
 import type {
@@ -46,9 +49,7 @@ async function readFileIfAvailable(filePath: string): Promise<string | null> {
 }
 
 function getInterfaceSearchKey(searchDirs: string[]): string {
-	return [...new Set(searchDirs)]
-		.sort((left, right) => left.localeCompare(right))
-		.join('\u0000')
+	return [...new Set(searchDirs)].sort((left, right) => left.localeCompare(right)).join('\u0000')
 }
 
 function getPatternMatches(pattern: RegExp, code: string): RegExpExecArray[] {
@@ -132,7 +133,8 @@ async function parseConfigForRefs(configPath: string): Promise<{
 		}
 	}
 
-	const refPattern = /const\s+(\w+)\s*=\s*ref\s*\(\s*(?:'[^']*'\s*,\s*)?(?:\(\s*\)\s*=>\s*)?import\s*\(\s*['"]([^'"]+)['"]\s*\)/g
+	const refPattern =
+		/const\s+(\w+)\s*=\s*ref\s*\(\s*(?:'[^']*'\s*,\s*)?(?:\(\s*\)\s*=>\s*)?import\s*\(\s*['"]([^'"]+)['"]\s*\)/g
 	for (const match of getPatternMatches(refPattern, code)) {
 		refs.push({
 			varName: match[1],
@@ -169,9 +171,7 @@ async function parseConfigForRefs(configPath: string): Promise<{
 	}
 }
 
-async function findInterfaceTypes(
-	searchDirs: string[]
-): Promise<Map<string, InterfaceTypeInfo>> {
+async function findInterfaceTypes(searchDirs: string[]): Promise<Map<string, InterfaceTypeInfo>> {
 	const interfaces = new Map<string, InterfaceTypeInfo>()
 
 	for (const dir of [...new Set(searchDirs)]) {
@@ -187,7 +187,9 @@ async function findInterfaceTypes(
 	return interfaces
 }
 
-async function getCachedInterfaceTypes(searchDirs: string[]): Promise<Map<string, InterfaceTypeInfo>> {
+async function getCachedInterfaceTypes(
+	searchDirs: string[]
+): Promise<Map<string, InterfaceTypeInfo>> {
 	const cacheKey = getInterfaceSearchKey(searchDirs)
 	const cached = interfaceTypeCache.get(cacheKey)
 	if (cached) {
@@ -260,12 +262,15 @@ export async function resolveReferencedConfigs(
 	}
 
 	const configDir = dirname(configPath)
-	const referencedConfigDetailsByPath = new Map<string, Promise<{
-		refDir: string
-		entrypoints: DiscoveredEntrypoint[]
-		refDOs: DiscoveredDO[]
-		interfaceMap: Map<string, InterfaceTypeInfo>
-	}>>()
+	const referencedConfigDetailsByPath = new Map<
+		string,
+		Promise<{
+			refDir: string
+			entrypoints: DiscoveredEntrypoint[]
+			refDOs: DiscoveredDO[]
+			interfaceMap: Map<string, InterfaceTypeInfo>
+		}>
+	>()
 
 	for (const ref of refs) {
 		const refImportPath = resolvePackageSpecifier(ref.importPath, configDir)
@@ -290,12 +295,7 @@ export async function resolveReferencedConfigs(
 				referencedConfigDetailsByPath.set(refConfigPath, referencedConfigDetails)
 			}
 
-			const {
-				refDir,
-				entrypoints,
-				refDOs,
-				interfaceMap
-			} = await referencedConfigDetails
+			const { refDir, entrypoints, refDOs, interfaceMap } = await referencedConfigDetails
 
 			const bindings = serviceBindings
 				.filter((serviceBinding) => serviceBinding.varName === ref.varName)
@@ -305,8 +305,9 @@ export async function resolveReferencedConfigs(
 						entrypoint: serviceBinding.entrypoint
 					}
 					const lookupKey = serviceBinding.entrypoint || '__default__'
-					const interfaceInfo = interfaceMap.get(lookupKey)
-						|| (serviceBinding.entrypoint ? interfaceMap.get(serviceBinding.entrypoint) : undefined)
+					const interfaceInfo =
+						interfaceMap.get(lookupKey) ||
+						(serviceBinding.entrypoint ? interfaceMap.get(serviceBinding.entrypoint) : undefined)
 
 					if (interfaceInfo) {
 						info.interfaceImport = generateImportPath(cwd, interfaceInfo.filePath)

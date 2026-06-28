@@ -4,34 +4,34 @@
 // Receives RPC calls from the bridge client and executes them against bindings
 // =============================================================================
 
+import { normalizeSendEmailMessage } from '../utils/send-email'
 import {
-	type JsonMsg,
-	type RpcCall,
-	type RpcOk,
-	type RpcErr,
-	type StreamOpen,
-	type StreamPull,
-	type WsOpen,
-	type WsClose,
-	parseJsonMsg,
-	stringifyJsonMsg,
-	encodeBinaryFrame,
-	decodeBinaryFrame,
-	BinaryKind,
-	BinaryFlags
-} from './v2/wire'
-import {
-	serializeValue,
-	deserializeValue,
-	deserializeRequest,
-	serializeDOId,
-	deserializeDOId,
+	type SerializedRequest,
+	type StreamRef,
 	base64Decode,
 	base64Encode,
-	type SerializedRequest,
-	type StreamRef
+	deserializeDOId,
+	deserializeRequest,
+	deserializeValue,
+	serializeDOId,
+	serializeValue
 } from './v2/value-serialization'
-import { normalizeSendEmailMessage } from '../utils/send-email'
+import {
+	BinaryFlags,
+	BinaryKind,
+	type JsonMsg,
+	type RpcCall,
+	type RpcErr,
+	type RpcOk,
+	type StreamOpen,
+	type StreamPull,
+	type WsClose,
+	type WsOpen,
+	decodeBinaryFrame,
+	encodeBinaryFrame,
+	parseJsonMsg,
+	stringifyJsonMsg
+} from './v2/wire'
 
 // -----------------------------------------------------------------------------
 // Types
@@ -94,17 +94,28 @@ async function handleWebSocket(
 
 	const activeStreams = new Map<number, ActiveStream>()
 	const wsProxies = new Map<number, ActiveWsProxy>()
-	const incomingStreams = new Map<number, {
-		controller: ReadableStreamDefaultController<Uint8Array>
-		stream: ReadableStream<Uint8Array>
-	}>()
+	const incomingStreams = new Map<
+		number,
+		{
+			controller: ReadableStreamDefaultController<Uint8Array>
+			stream: ReadableStream<Uint8Array>
+		}
+	>()
 
 	server.accept()
 
 	server.addEventListener('message', async (event) => {
 		try {
 			if (typeof event.data === 'string') {
-				await handleJsonMessage(event.data, server, env, ctx, activeStreams, wsProxies, incomingStreams)
+				await handleJsonMessage(
+					event.data,
+					server,
+					env,
+					ctx,
+					activeStreams,
+					wsProxies,
+					incomingStreams
+				)
 			} else if (event.data instanceof ArrayBuffer) {
 				handleBinaryMessage(new Uint8Array(event.data), server, wsProxies, incomingStreams)
 			}
@@ -146,7 +157,10 @@ async function handleJsonMessage(
 	ctx: ExecutionContext,
 	activeStreams: Map<number, ActiveStream>,
 	wsProxies: Map<number, ActiveWsProxy>,
-	incomingStreams: Map<number, { controller: ReadableStreamDefaultController<Uint8Array>; stream: ReadableStream<Uint8Array> }>
+	incomingStreams: Map<
+		number,
+		{ controller: ReadableStreamDefaultController<Uint8Array>; stream: ReadableStream<Uint8Array> }
+	>
 ): Promise<void> {
 	const msg = parseJsonMsg(data)
 
@@ -185,7 +199,10 @@ async function handleRpcCall(
 	env: GatewayEnv,
 	ctx: ExecutionContext,
 	activeStreams: Map<number, ActiveStream>,
-	incomingStreams: Map<number, { controller: ReadableStreamDefaultController<Uint8Array>; stream: ReadableStream<Uint8Array> }>
+	incomingStreams: Map<
+		number,
+		{ controller: ReadableStreamDefaultController<Uint8Array>; stream: ReadableStream<Uint8Array> }
+	>
 ): Promise<void> {
 	try {
 		// Deserialize params
@@ -276,11 +293,7 @@ export async function executeRpcMethod(
 		case 'kv.get':
 			return (binding as KVNamespace).get(params[0] as string, params[1] as any)
 		case 'kv.put':
-			return (binding as KVNamespace).put(
-				params[0] as string,
-				params[1] as any,
-				params[2] as any
-			)
+			return (binding as KVNamespace).put(params[0] as string, params[1] as any, params[2] as any)
 		case 'kv.delete':
 			return (binding as KVNamespace).delete(params[0] as string)
 		case 'kv.list':
@@ -292,13 +305,11 @@ export async function executeRpcMethod(
 		case 'r2.head':
 			return serializeR2Object(await (binding as R2Bucket).head(params[0] as string))
 		case 'r2.get':
-			return serializeR2ObjectBody(await (binding as R2Bucket).get(params[0] as string, params[1] as any))
-		case 'r2.put':
-			return (binding as R2Bucket).put(
-				params[0] as string,
-				params[1] as any,
-				params[2] as any
+			return serializeR2ObjectBody(
+				await (binding as R2Bucket).get(params[0] as string, params[1] as any)
 			)
+		case 'r2.put':
+			return (binding as R2Bucket).put(params[0] as string, params[1] as any, params[2] as any)
 		case 'r2.delete':
 			return (binding as R2Bucket).delete(params[0] as any)
 		case 'r2.list':
@@ -319,29 +330,45 @@ export async function executeRpcMethod(
 			// Statement binding handled specially
 			return { __type: 'D1Statement', sql: params[0], bindings: params.slice(1) }
 		case 'd1.stmt.first':
-			return executeD1Statement(binding as D1Database, params[0] as string, params.slice(1), 'first', params[params.length - 1])
+			return executeD1Statement(
+				binding as D1Database,
+				params[0] as string,
+				params.slice(1),
+				'first',
+				params[params.length - 1]
+			)
 		case 'd1.stmt.all':
 			return executeD1Statement(binding as D1Database, params[0] as string, params.slice(1), 'all')
 		case 'd1.stmt.run':
 			return executeD1Statement(binding as D1Database, params[0] as string, params.slice(1), 'run')
 		case 'd1.stmt.raw':
-			return executeD1Statement(binding as D1Database, params[0] as string, params.slice(1), 'raw', params[params.length - 1])
+			return executeD1Statement(
+				binding as D1Database,
+				params[0] as string,
+				params.slice(1),
+				'raw',
+				params[params.length - 1]
+			)
 
 		// Durable Objects
 		case 'do.idFromName':
 			return serializeDOId(
-				resolveDoNamespace(binding as DurableObjectNamespace, params[1]).idFromName(params[0] as string)
+				resolveDoNamespace(binding as DurableObjectNamespace, params[1]).idFromName(
+					params[0] as string
+				)
 			)
 		case 'do.idFromString':
 			return serializeDOId((binding as DurableObjectNamespace).idFromString(params[0] as string))
 		case 'do.newUniqueId':
 			return serializeDOId(
-				resolveDoNamespace(binding as DurableObjectNamespace, params[1]).newUniqueId(params[0] as any)
+				resolveDoNamespace(binding as DurableObjectNamespace, params[1]).newUniqueId(
+					params[0] as any
+				)
 			)
 		case 'do.get': {
 			const doId = deserializeDOId(params[0] as any, binding as DurableObjectNamespace)
-				// Instantiate stub to validate id; we return a DOStub reference for the client
-				; (binding as DurableObjectNamespace).get(doId)
+			// Instantiate stub to validate id; we return a DOStub reference for the client
+			;(binding as DurableObjectNamespace).get(doId)
 			return { __type: 'DOStub', binding: bindingName, id: params[0] }
 		}
 		case 'do.fetch':
@@ -349,7 +376,13 @@ export async function executeRpcMethod(
 		case 'do.rpc':
 			// DO RPC: Call a method on the Durable Object stub
 			// params = [bindingName, serializedId, methodName, methodArgs]
-			return executeDoRpc(env, params[0] as string, params[1] as any, params[2] as string, params[3] as unknown[])
+			return executeDoRpc(
+				env,
+				params[0] as string,
+				params[1] as any,
+				params[2] as string,
+				params[3] as unknown[]
+			)
 
 		// Service Bindings
 		case 'service.fetch':
@@ -398,28 +431,27 @@ export async function executeRpcMethod(
 }
 
 function createUnsupportedBridgeOperationError(bindingName: string, operation: string): Error {
-	const base =
-		`[devflare][bridge] Unsupported bridge operation '${operation}' for binding '${bindingName}'.`
+	const base = `[devflare][bridge] Unsupported bridge operation '${operation}' for binding '${bindingName}'.`
 
 	if (operation === 'fetch') {
 		return new Error(
-			`${base} Devflare could not dispatch fetch() for this binding through the local bridge. `
-			+ `Expected Cloudflare API: env.${bindingName}.fetch(request). `
-			+ 'If this came from SvelteKit platform.env, make sure the binding is declared as a service binding; '
-			+ 'this is a Devflare local bridge issue when service bindings fall back to a bare fetch operation.'
+			`${base} Devflare could not dispatch fetch() for this binding through the local bridge. ` +
+				`Expected Cloudflare API: env.${bindingName}.fetch(request). ` +
+				'If this came from SvelteKit platform.env, make sure the binding is declared as a service binding; ' +
+				'this is a Devflare local bridge issue when service bindings fall back to a bare fetch operation.'
 		)
 	}
 
 	if (operation === 'toString') {
 		return new Error(
-			`${base} A platform.env value was coerced to a string through the bridge. `
-			+ 'For SvelteKit local dev, declared vars should be plain string values and missing env names should read as undefined.'
+			`${base} A platform.env value was coerced to a string through the bridge. ` +
+				'For SvelteKit local dev, declared vars should be plain string values and missing env names should read as undefined.'
 		)
 	}
 
 	return new Error(
-		`${base} Bare verbs and the legacy \`stmt.*\` / \`stub.*\` sub-prefixes are not supported; `
-		+ 'use the namespaced form (e.g. `kv.get`, `r2.put`, `d1.stmt.first`, `do.fetch`, `service.fetch`).'
+		`${base} Bare verbs and the legacy \`stmt.*\` / \`stub.*\` sub-prefixes are not supported; ` +
+			'use the namespaced form (e.g. `kv.get`, `r2.put`, `d1.stmt.first`, `do.fetch`, `service.fetch`).'
 	)
 }
 
@@ -591,12 +623,14 @@ async function executeDoFetch(
 	const stub = binding.get(id)
 
 	// Reconstruct request
-	const bodyBytes = requestSerialized.body?.type === 'bytes'
-		? base64Decode(requestSerialized.body.data)
-		: undefined
+	const bodyBytes =
+		requestSerialized.body?.type === 'bytes' ? base64Decode(requestSerialized.body.data) : undefined
 	// Convert Uint8Array to ArrayBuffer for BodyInit compatibility
 	const bodyBuffer = bodyBytes
-		? bodyBytes.buffer.slice(bodyBytes.byteOffset, bodyBytes.byteOffset + bodyBytes.byteLength) as ArrayBuffer
+		? (bodyBytes.buffer.slice(
+				bodyBytes.byteOffset,
+				bodyBytes.byteOffset + bodyBytes.byteLength
+			) as ArrayBuffer)
 		: undefined
 	const request = new Request(requestSerialized.url, {
 		method: requestSerialized.method,
@@ -609,7 +643,7 @@ async function executeDoFetch(
 
 /**
  * Execute an RPC method on a Durable Object stub
- * 
+ *
  * This uses the DO's internal `_rpc` endpoint convention to call methods.
  * The DO class must expose an RPC handler via fetch() that routes to methods.
  */
@@ -626,13 +660,19 @@ async function executeDoRpc(
 
 	// Call the DO's RPC endpoint
 	// Convention: POST to /_rpc with { method, params }
-	const response = await stub.fetch(new Request('http://do/_rpc', {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({ method: methodName, params: args })
-	}))
+	const response = await stub.fetch(
+		new Request('http://do/_rpc', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ method: methodName, params: args })
+		})
+	)
 
-	const result = await response.json() as { ok: boolean; result?: unknown; error?: { message: string } }
+	const result = (await response.json()) as {
+		ok: boolean
+		result?: unknown
+		error?: { message: string }
+	}
 	if (!result.ok) {
 		throw new Error(result.error?.message ?? 'DO RPC failed')
 	}
@@ -665,30 +705,29 @@ async function handleStreamPull(
 			}
 
 			if (value) {
-				const frame = encodeBinaryFrame(
-					BinaryKind.StreamChunk,
-					msg.sid,
-					stream.seq++,
-					0,
-					value
-				)
+				const frame = encodeBinaryFrame(BinaryKind.StreamChunk, msg.sid, stream.seq++, 0, value)
 				ws.send(frame)
 				sent += value.byteLength
 			}
 		}
 	} catch (error) {
-		ws.send(stringifyJsonMsg({
-			t: 'stream.abort',
-			sid: msg.sid,
-			error: String(error)
-		}))
+		ws.send(
+			stringifyJsonMsg({
+				t: 'stream.abort',
+				sid: msg.sid,
+				error: String(error)
+			})
+		)
 		activeStreams.delete(msg.sid)
 	}
 }
 
 function handleStreamOpen(
 	msg: StreamOpen,
-	incomingStreams: Map<number, { controller: ReadableStreamDefaultController<Uint8Array>; stream: ReadableStream<Uint8Array> }>
+	incomingStreams: Map<
+		number,
+		{ controller: ReadableStreamDefaultController<Uint8Array>; stream: ReadableStream<Uint8Array> }
+	>
 ): void {
 	let controller!: ReadableStreamDefaultController<Uint8Array>
 	const stream = new ReadableStream<Uint8Array>({
@@ -701,7 +740,10 @@ function handleStreamOpen(
 
 function handleStreamEnd(
 	msg: { sid: number },
-	incomingStreams: Map<number, { controller: ReadableStreamDefaultController<Uint8Array>; stream: ReadableStream<Uint8Array> }>
+	incomingStreams: Map<
+		number,
+		{ controller: ReadableStreamDefaultController<Uint8Array>; stream: ReadableStream<Uint8Array> }
+	>
 ): void {
 	const stream = incomingStreams.get(msg.sid)
 	if (stream) {
@@ -712,7 +754,10 @@ function handleStreamEnd(
 
 function handleStreamAbort(
 	msg: { sid: number; error?: string },
-	incomingStreams: Map<number, { controller: ReadableStreamDefaultController<Uint8Array>; stream: ReadableStream<Uint8Array> }>
+	incomingStreams: Map<
+		number,
+		{ controller: ReadableStreamDefaultController<Uint8Array>; stream: ReadableStream<Uint8Array> }
+	>
 ): void {
 	const stream = incomingStreams.get(msg.sid)
 	if (stream) {
@@ -729,19 +774,23 @@ function handleBinaryMessage(
 	frame: Uint8Array,
 	ws: WebSocket,
 	wsProxies: Map<number, ActiveWsProxy>,
-	incomingStreams: Map<number, { controller: ReadableStreamDefaultController<Uint8Array>; stream: ReadableStream<Uint8Array> }>
+	incomingStreams: Map<
+		number,
+		{ controller: ReadableStreamDefaultController<Uint8Array>; stream: ReadableStream<Uint8Array> }
+	>
 ): void {
 	const decoded = decodeBinaryFrame(frame)
 
 	switch (decoded.kind) {
-		case BinaryKind.StreamChunk:
+		case BinaryKind.StreamChunk: {
 			// Incoming stream chunk from client
 			const stream = incomingStreams.get(decoded.id)
 			if (stream) {
 				stream.controller.enqueue(decoded.payload)
 			}
 			break
-		case BinaryKind.WsData:
+		}
+		case BinaryKind.WsData: {
 			// Forward to DO WebSocket
 			const proxy = wsProxies.get(decoded.id)
 			if (proxy) {
@@ -753,6 +802,7 @@ function handleBinaryMessage(
 				}
 			}
 			break
+		}
 	}
 }
 
@@ -784,11 +834,13 @@ async function handleWsOpen(
 		const doWs = response.webSocket
 
 		if (!doWs) {
-			ws.send(stringifyJsonMsg({
-				t: 'rpc.err',
-				id: `ws_${msg.wid}`,
-				error: { code: 'WS_UPGRADE_FAILED', message: 'DO did not return WebSocket' }
-			}))
+			ws.send(
+				stringifyJsonMsg({
+					t: 'rpc.err',
+					id: `ws_${msg.wid}`,
+					error: { code: 'WS_UPGRADE_FAILED', message: 'DO did not return WebSocket' }
+				})
+			)
 			return
 		}
 
@@ -814,33 +866,34 @@ async function handleWsOpen(
 		})
 
 		doWs.addEventListener('close', (event) => {
-			ws.send(stringifyJsonMsg({
-				t: 'ws.close',
-				wid: msg.wid,
-				code: event.code,
-				reason: event.reason
-			}))
+			ws.send(
+				stringifyJsonMsg({
+					t: 'ws.close',
+					wid: msg.wid,
+					code: event.code,
+					reason: event.reason
+				})
+			)
 			wsProxies.delete(msg.wid)
 		})
 
 		// Send opened confirmation
 		ws.send(stringifyJsonMsg({ t: 'ws.opened', wid: msg.wid }))
 	} catch (error) {
-		ws.send(stringifyJsonMsg({
-			t: 'rpc.err',
-			id: `ws_${msg.wid}`,
-			error: {
-				code: 'WS_OPEN_FAILED',
-				message: error instanceof Error ? error.message : String(error)
-			}
-		}))
+		ws.send(
+			stringifyJsonMsg({
+				t: 'rpc.err',
+				id: `ws_${msg.wid}`,
+				error: {
+					code: 'WS_OPEN_FAILED',
+					message: error instanceof Error ? error.message : String(error)
+				}
+			})
+		)
 	}
 }
 
-function handleWsClose(
-	msg: WsClose,
-	wsProxies: Map<number, ActiveWsProxy>
-): void {
+function handleWsClose(msg: WsClose, wsProxies: Map<number, ActiveWsProxy>): void {
 	const proxy = wsProxies.get(msg.wid)
 	if (proxy) {
 		proxy.doWs.close(msg.code, msg.reason)
@@ -852,11 +905,7 @@ function handleWsClose(
 // HTTP Transfer Handler (for large files)
 // -----------------------------------------------------------------------------
 
-async function handleHttpTransfer(
-	request: Request,
-	env: GatewayEnv,
-	url: URL
-): Promise<Response> {
+async function handleHttpTransfer(request: Request, env: GatewayEnv, url: URL): Promise<Response> {
 	// URL format: /_devflare/transfer/{id}
 	const transferId = decodeURIComponent(url.pathname.split('/').pop() ?? '')
 

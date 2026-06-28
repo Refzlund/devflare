@@ -27,8 +27,8 @@
 import { email } from './email'
 import { queue } from './queue'
 import { scheduled } from './scheduled'
-import { worker } from './worker'
 import { tail } from './tail'
+import { worker } from './worker'
 
 // Re-export individual helpers for tree-shaking
 export { email } from './email'
@@ -48,7 +48,7 @@ export type { TraceItemOptions, TailTriggerResult } from './tail'
  * Unified Cloudflare test helpers.
  *
  * Provides a consistent API for triggering the main Cloudflare Worker handler surfaces:
-	 * - `cf.email` — Email helper surface with a direct-handler path and a best-effort local endpoint fallback
+ * - `cf.email` — Email helper surface with a direct-handler path and a best-effort local endpoint fallback
  * - `cf.queue` — Queue consumer testing
  * - `cf.scheduled` — Cron/scheduled handler testing
  * - `cf.worker` — Fetch handler testing

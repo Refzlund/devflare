@@ -2,12 +2,12 @@ import { describe, expect, test } from 'bun:test'
 import { EventEmitter } from 'node:events'
 import { PassThrough } from 'node:stream'
 import {
+	type SpawnedLikeProcess,
+	type ViteProjectFileSystem,
 	detectViteProject,
 	extractViteReadyUrl,
 	stopSpawnedProcessTree,
-	waitForViteReady,
-	type SpawnedLikeProcess,
-	type ViteProjectFileSystem
+	waitForViteReady
 } from '../../../src/dev-server/vite-utils'
 
 function createMockFs(files: Record<string, string>): ViteProjectFileSystem {

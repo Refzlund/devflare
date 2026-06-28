@@ -1,13 +1,11 @@
-import type { HelpPage } from '../types'
 import { COMMANDS, COMMON_OPTIONS, entry } from '../shared'
+import type { HelpPage } from '../types'
 
 export const CORE_HELP_PAGES: HelpPage[] = [
 	{
 		path: [],
 		summary: 'Config compiler + CLI orchestrator for Cloudflare Workers',
-		usage: [
-			'devflare <command> [options]'
-		],
+		usage: ['devflare <command> [options]'],
 		description: [
 			'Use `devflare <command> --help` or `devflare help <command>` to see a detailed command guide.',
 			'Devflare commands resolve local config first, then bridge that config to Wrangler-compatible Cloudflare workflows.'
@@ -38,9 +36,15 @@ export const CORE_HELP_PAGES: HelpPage[] = [
 			entry('devflare dev', 'Start worker-only or unified local development'),
 			entry('devflare deploy --prod', 'Deploy explicitly to production'),
 			entry('devflare deploy --preview next', 'Deploy a named preview scope directly'),
-			entry('devflare previews cleanup --scope next --apply', 'Delete one dedicated preview scope and its preview-owned resources'),
+			entry(
+				'devflare previews cleanup --scope next --apply',
+				'Delete one dedicated preview scope and its preview-owned resources'
+			),
 			entry('devflare productions', 'Inspect live production Workers and active deployments'),
-			entry('devflare secrets --local --store store-123 --name api-token --value local-token', 'Set a local Secrets Store value'),
+			entry(
+				'devflare secrets --local --store store-123 --name api-token --value local-token',
+				'Set a local Secrets Store value'
+			),
 			entry('devflare help deploy', 'Show the detailed deploy help page')
 		],
 		notes: [
@@ -50,22 +54,19 @@ export const CORE_HELP_PAGES: HelpPage[] = [
 	{
 		path: ['init'],
 		summary: 'Create a new devflare project',
-		usage: [
-			'devflare init [name] [--template <minimal|api>]'
-		],
+		usage: ['devflare init [name] [--template <minimal|api>]'],
 		description: [
 			'Scaffolds a new project directory with a starter `devflare.config.ts`, TypeScript config, and package.json scripts.',
 			'Use the `api` template when you want middleware and API routing structure out of the box.'
 		],
-		arguments: [
-			entry('[name]', 'Project directory name (defaults to `my-devflare-app`)')
-		],
-		options: [
-			entry('--template <minimal|api>', 'Pick the starter template to scaffold')
-		],
+		arguments: [entry('[name]', 'Project directory name (defaults to `my-devflare-app`)')],
+		options: [entry('--template <minimal|api>', 'Pick the starter template to scaffold')],
 		examples: [
 			entry('devflare init my-app', 'Create a minimal starter called `my-app`'),
-			entry('devflare init edge-api --template api', 'Create the API starter with middleware structure')
+			entry(
+				'devflare init edge-api --template api',
+				'Create the API starter with middleware structure'
+			)
 		],
 		notes: [
 			'The command writes files only; install dependencies afterward with `bun install`.',
@@ -85,10 +86,22 @@ export const CORE_HELP_PAGES: HelpPage[] = [
 		],
 		options: [
 			entry('--config <path>', 'Use a specific devflare config file'),
-			entry('--port <port>', 'Preferred Vite dev server port (defaults to 5173 when Vite is enabled)'),
-			entry('--runtime-port <port>', 'Preferred local Miniflare runtime/bridge port (defaults to server.port, then 8787)'),
-			entry('--runtime-host <host>', 'Host the local Miniflare runtime binds to (defaults to server.host, then 127.0.0.1)'),
-			entry('--bridge-port <port>', 'Alias for --runtime-port; also honored via DEVFLARE_BRIDGE_PORT'),
+			entry(
+				'--port <port>',
+				'Preferred Vite dev server port (defaults to 5173 when Vite is enabled)'
+			),
+			entry(
+				'--runtime-port <port>',
+				'Preferred local Miniflare runtime/bridge port (defaults to server.port, then 8787)'
+			),
+			entry(
+				'--runtime-host <host>',
+				'Host the local Miniflare runtime binds to (defaults to server.host, then 127.0.0.1)'
+			),
+			entry(
+				'--bridge-port <port>',
+				'Alias for --runtime-port; also honored via DEVFLARE_BRIDGE_PORT'
+			),
 			entry('--persist', 'Persist Miniflare storage between restarts'),
 			entry('--verbose', 'Increase logging verbosity'),
 			entry('--debug', 'Enable extra debug logging and stack traces'),
@@ -98,8 +111,14 @@ export const CORE_HELP_PAGES: HelpPage[] = [
 		examples: [
 			entry('devflare dev', 'Start local development with automatic Vite detection'),
 			entry('devflare dev --port 3000', 'Use a custom Vite port when Vite is enabled'),
-			entry('devflare dev --runtime-port 8788', 'Use a custom local runtime port when another project owns 8787'),
-			entry('devflare dev --persist --log-temp', 'Keep Miniflare state and overwrite `.log` on each run')
+			entry(
+				'devflare dev --runtime-port 8788',
+				'Use a custom local runtime port when another project owns 8787'
+			),
+			entry(
+				'devflare dev --persist --log-temp',
+				'Keep Miniflare state and overwrite `.log` on each run'
+			)
 		],
 		notes: [
 			'Worker-only mode is the default when no effective local `vite.config.*` is present.',
@@ -110,9 +129,7 @@ export const CORE_HELP_PAGES: HelpPage[] = [
 	{
 		path: ['build'],
 		summary: 'Build production deployment artifacts',
-		usage: [
-			'devflare build [--config <path>] [--env <name>] [--debug]'
-		],
+		usage: ['devflare build [--config <path>] [--env <name>] [--debug]'],
 		description: [
 			'Resolves your Devflare config locally, applies environment overrides, and generates the build artifacts used by deploy flows.',
 			'Build preserves named bindings instead of provisioning Cloudflare resources, so it is the safest way to inspect what Devflare will hand to deploy before you actually ship.'
@@ -155,22 +172,46 @@ export const CORE_HELP_PAGES: HelpPage[] = [
 			entry('--preview', 'Deploy a same-worker preview upload'),
 			entry('--preview <name>', 'Deploy a named preview scope such as `next` or `pr-1`'),
 			entry('--config <path>', 'Use a specific devflare config file'),
-			entry('--build <path>', 'Reuse an existing build artifact such as `.devflare/build` or `.wrangler/deploy/config.json` instead of rebuilding'),
-			entry('--env <name>', 'Usually unnecessary because the explicit target already pins production vs preview. If you pass it, it must match that target'),
+			entry(
+				'--build <path>',
+				'Reuse an existing build artifact such as `.devflare/build` or `.wrangler/deploy/config.json` instead of rebuilding'
+			),
+			entry(
+				'--env <name>',
+				'Usually unnecessary because the explicit target already pins production vs preview. If you pass it, it must match that target'
+			),
 			entry('--dry-run', 'Print the synthesized Wrangler config and skip the actual deployment'),
-			entry('--branch-name <branch>', 'Provide explicit branch metadata for preview-aware naming when your workflow needs it'),
+			entry(
+				'--branch-name <branch>',
+				'Provide explicit branch metadata for preview-aware naming when your workflow needs it'
+			),
 			entry('--message <text>', 'Attach an explicit Wrangler deployment/version message'),
 			entry('--tag <text>', 'Attach an explicit Wrangler version tag'),
 			entry('--debug', 'Print stack traces when deployment orchestration fails')
 		],
 		examples: [
 			entry('devflare deploy --prod', 'Deploy explicitly to production'),
-			entry('devflare deploy --prod --build .devflare/build', 'Deploy a previously built artifact without rebuilding the package'),
-			entry('devflare deploy --production --message "Release"', 'Deploy to production with an explicit deployment message'),
-			entry('devflare deploy --preview next', 'Deploy the named `next` preview scope and provision preview-scoped resources automatically'),
+			entry(
+				'devflare deploy --prod --build .devflare/build',
+				'Deploy a previously built artifact without rebuilding the package'
+			),
+			entry(
+				'devflare deploy --production --message "Release"',
+				'Deploy to production with an explicit deployment message'
+			),
+			entry(
+				'devflare deploy --preview next',
+				'Deploy the named `next` preview scope and provision preview-scoped resources automatically'
+			),
 			entry('devflare deploy --preview pr-1', 'Deploy the named `pr-1` preview scope directly'),
-			entry('devflare deploy --preview --branch-name feature-branch', 'Upload a same-worker preview version with explicit branch metadata'),
-			entry('devflare deploy --preview next --dry-run', 'Inspect the generated named-preview Wrangler config without deploying')
+			entry(
+				'devflare deploy --preview --branch-name feature-branch',
+				'Upload a same-worker preview version with explicit branch metadata'
+			),
+			entry(
+				'devflare deploy --preview next --dry-run',
+				'Inspect the generated named-preview Wrangler config without deploying'
+			)
 		],
 		notes: [
 			'`devflare deploy` without an explicit target is rejected from the CLI so production and preview destinations stay unmistakable.',
@@ -194,16 +235,25 @@ export const CORE_HELP_PAGES: HelpPage[] = [
 		],
 		options: [
 			entry('--local', 'Use the project-local secret file instead of Cloudflare'),
-			entry('--store <id>', 'Secrets Store ID, matching the Cloudflare account store ID when you have one'),
+			entry(
+				'--store <id>',
+				'Secrets Store ID, matching the Cloudflare account store ID when you have one'
+			),
 			entry('--name <name>', 'Secret name inside the store'),
 			entry('--value <value>', 'Secret value to write locally'),
 			entry('--list', 'List local secret names without printing values'),
 			entry('--delete', 'Delete one local secret value')
 		],
 		examples: [
-			entry('devflare secrets --local --store store-123 --name api-token --value local-token', 'Create or replace one local secret value'),
+			entry(
+				'devflare secrets --local --store store-123 --name api-token --value local-token',
+				'Create or replace one local secret value'
+			),
 			entry('devflare secrets --local --store store-123 --list', 'List names in one local store'),
-			entry('devflare secrets --local --store store-123 --name api-token --delete', 'Delete one local secret value')
+			entry(
+				'devflare secrets --local --store store-123 --name api-token --delete',
+				'Delete one local secret value'
+			)
 		],
 		notes: [
 			'Local values are stored in `.devflare/secrets.local.json`, which is ignored by the repository template.',
@@ -213,9 +263,7 @@ export const CORE_HELP_PAGES: HelpPage[] = [
 	{
 		path: ['types'],
 		summary: 'Generate TypeScript bindings from your config',
-		usage: [
-			'devflare types [--config <path>] [--output <path>] [--debug]'
-		],
+		usage: ['devflare types [--config <path>] [--output <path>] [--debug]'],
 		description: [
 			'Generates `env.d.ts`-style bindings for KV, D1, R2, Durable Objects, Queues, service bindings, vars, and secrets.',
 			'Devflare also discovers entrypoints and cross-worker Durable Objects so service RPC bindings can stay strongly typed.'
@@ -227,7 +275,10 @@ export const CORE_HELP_PAGES: HelpPage[] = [
 		],
 		examples: [
 			entry('devflare types', 'Generate `env.d.ts` next to the current project'),
-			entry('devflare types --output src/generated/env.d.ts', 'Write generated bindings to a custom file')
+			entry(
+				'devflare types --output src/generated/env.d.ts',
+				'Write generated bindings to a custom file'
+			)
 		],
 		notes: [
 			'Type discovery respects configured file patterns and falls back to the default Durable Object and entrypoint glob patterns.',
@@ -237,20 +288,27 @@ export const CORE_HELP_PAGES: HelpPage[] = [
 	{
 		path: ['doctor'],
 		summary: 'Check project configuration',
-		usage: [
-			'devflare doctor [--config <path>] [--scope <all|local|deploy>]'
-		],
+		usage: ['devflare doctor [--config <path>] [--scope <all|local|deploy>]'],
 		description: [
 			'Checks for a loadable devflare config, package.json, TypeScript config, Vite integration, and generated Wrangler artifacts.',
 			'Useful when a project feels cursed but not cursed enough to throw a clear error yet.'
 		],
 		options: [
-			entry('--config <path>', 'Check a specific config path instead of the default resolution path'),
-			entry('--scope <all|local|deploy>', 'Choose local-only checks, deploy-readiness checks, or both (defaults to all)')
+			entry(
+				'--config <path>',
+				'Check a specific config path instead of the default resolution path'
+			),
+			entry(
+				'--scope <all|local|deploy>',
+				'Choose local-only checks, deploy-readiness checks, or both (defaults to all)'
+			)
 		],
 		examples: [
 			entry('devflare doctor', 'Run diagnostics for the current package'),
-			entry('devflare doctor --scope local', 'Skip deploy artifact readiness checks during local-only development'),
+			entry(
+				'devflare doctor --scope local',
+				'Skip deploy artifact readiness checks during local-only development'
+			),
 			entry('devflare doctor --config apps/docs/devflare.config.ts', 'Check a specific config file')
 		],
 		notes: [
@@ -270,19 +328,26 @@ export const CORE_HELP_PAGES: HelpPage[] = [
 			'Use `--format wrangler` when you want to inspect the exact Wrangler-compatible config Devflare will emit.',
 			'Use `--phase local` or `--local` for offline local-runtime inspection without resolving Cloudflare account resource names.'
 		],
-		subcommands: [
-			entry('print', 'Print the resolved config (default subcommand)')
-		],
+		subcommands: [entry('print', 'Print the resolved config (default subcommand)')],
 		options: [
 			entry('--config <path>', 'Use a specific devflare config file'),
 			entry('--env <name>', 'Resolve `config.env[name]` before printing'),
-			entry('--phase <build|local|deploy>', 'Choose build/offline, local-runtime, or deploy resource resolution (defaults to deploy)'),
+			entry(
+				'--phase <build|local|deploy>',
+				'Choose build/offline, local-runtime, or deploy resource resolution (defaults to deploy)'
+			),
 			entry('--local', 'Shortcut for --phase local'),
-			entry('--format <devflare|wrangler>', 'Choose whether to print raw Devflare config or compiled Wrangler JSON')
+			entry(
+				'--format <devflare|wrangler>',
+				'Choose whether to print raw Devflare config or compiled Wrangler JSON'
+			)
 		],
 		examples: [
 			entry('devflare config', 'Print the resolved Devflare config as JSON'),
-			entry('devflare config --phase local --format wrangler', 'Print local-runtime Wrangler JSON without Cloudflare account lookups'),
+			entry(
+				'devflare config --phase local --format wrangler',
+				'Print local-runtime Wrangler JSON without Cloudflare account lookups'
+			),
 			entry('devflare config --env preview', 'Print the preview environment config'),
 			entry('devflare config print --format wrangler', 'Print the compiled Wrangler config JSON')
 		],
@@ -303,26 +368,33 @@ export const CORE_HELP_PAGES: HelpPage[] = [
 		options: [
 			entry('--config <path>', 'Use a specific devflare config file'),
 			entry('--env <name>', 'Resolve `config.env[name]` before printing'),
-			entry('--phase <build|local|deploy>', 'Choose build/offline, local-runtime, or deploy resource resolution (defaults to deploy)'),
+			entry(
+				'--phase <build|local|deploy>',
+				'Choose build/offline, local-runtime, or deploy resource resolution (defaults to deploy)'
+			),
 			entry('--local', 'Shortcut for --phase local'),
 			entry('--format <devflare|wrangler>', 'Choose Devflare JSON or compiled Wrangler JSON output')
 		],
 		examples: [
 			entry('devflare config print --format wrangler', 'Print the compiled Wrangler config'),
-			entry('devflare config print --local --format wrangler', 'Print the local-runtime Wrangler config without account lookups')
+			entry(
+				'devflare config print --local --format wrangler',
+				'Print the local-runtime Wrangler config without account lookups'
+			)
 		]
 	},
 	{
 		path: ['login'],
 		summary: 'Authenticate with Cloudflare via Wrangler',
-		usage: [
-			'devflare login [--force]'
-		],
+		usage: ['devflare login [--force]'],
 		description: [
 			'Uses Wrangler login under the hood, then reports the resolved primary or configured account context.'
 		],
 		options: [
-			entry('--force', 'Open Wrangler login even when Devflare already sees an authenticated session')
+			entry(
+				'--force',
+				'Open Wrangler login even when Devflare already sees an authenticated session'
+			)
 		],
 		examples: [
 			entry('devflare login', 'Authenticate only when needed'),
@@ -335,17 +407,17 @@ export const CORE_HELP_PAGES: HelpPage[] = [
 	{
 		path: ['help'],
 		summary: 'Show command overview or command-specific help',
-		usage: [
-			'devflare help',
-			'devflare help <command> [subcommand]'
-		],
+		usage: ['devflare help', 'devflare help <command> [subcommand]'],
 		description: [
 			'Prints the root command overview or the detailed help page for a specific command path.'
 		],
 		examples: [
 			entry('devflare help', 'Show the root command overview'),
 			entry('devflare help previews', 'Show the detailed previews help page'),
-			entry('devflare help previews cleanup', 'Show nested help for a preview subcommand when available')
+			entry(
+				'devflare help previews cleanup',
+				'Show nested help for a preview subcommand when available'
+			)
 		],
 		notes: [
 			'`devflare <command> --help` resolves to the same detailed help page as `devflare help <command>`.'
@@ -354,13 +426,8 @@ export const CORE_HELP_PAGES: HelpPage[] = [
 	{
 		path: ['version'],
 		summary: 'Show the installed devflare version',
-		usage: [
-			'devflare version',
-			'devflare --version'
-		],
-		description: [
-			'Prints the installed package version and exits.'
-		],
+		usage: ['devflare version', 'devflare --version'],
+		description: ['Prints the installed package version and exits.'],
 		examples: [
 			entry('devflare version', 'Show the installed version'),
 			entry('devflare --version', 'Show the installed version using the global flag')

@@ -21,7 +21,9 @@ function normalizeNodeContentType(value: string | undefined, fallback: string): 
 	return value
 }
 
-async function readNodeBytes(stream: ReadableStream<Uint8Array> | null | undefined): Promise<Uint8Array> {
+async function readNodeBytes(
+	stream: ReadableStream<Uint8Array> | null | undefined
+): Promise<Uint8Array> {
 	const buffer = await new Response(stream ?? emptyNodeStream()).arrayBuffer()
 	return new Uint8Array(buffer)
 }
@@ -130,10 +132,7 @@ function createNodeMediaResult(
 
 function createNodeMediaTransformer(bytesPromise: Promise<Uint8Array>): MediaTransformer {
 	const output = (options: MediaTransformationOutputOptions = {}) =>
-		createNodeMediaResult(
-			bytesPromise,
-			normalizeNodeContentType(options.format, 'video/mp4')
-		)
+		createNodeMediaResult(bytesPromise, normalizeNodeContentType(options.format, 'video/mp4'))
 
 	return {
 		transform(_transform?: MediaTransformationInputOptions): MediaTransformationGenerator {
@@ -355,11 +354,16 @@ export default {
 }
 `
 
-function toLocalShimWorkerName(kind: LocalMediaShimKind, bindingName: string, index: number): string {
-	const slug = bindingName
-		.toLowerCase()
-		.replace(/[^a-z0-9]+/g, '-')
-		.replace(/^-+|-+$/g, '') || kind
+function toLocalShimWorkerName(
+	kind: LocalMediaShimKind,
+	bindingName: string,
+	index: number
+): string {
+	const slug =
+		bindingName
+			.toLowerCase()
+			.replace(/[^a-z0-9]+/g, '-')
+			.replace(/^-+|-+$/g, '') || kind
 
 	return `devflare-local-${kind}-${index}-${slug}`
 }

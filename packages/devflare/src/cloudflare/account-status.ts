@@ -1,11 +1,4 @@
-import { isAuthenticated } from './auth'
-import type {
-	AccountInfo,
-	CloudflareService,
-	ServiceStatus
-} from './types'
 import { getAccountById } from './account-core'
-import { listWorkers } from './account-workers'
 import {
 	listAIModels,
 	listD1Databases,
@@ -14,6 +7,9 @@ import {
 	listR2Buckets,
 	listVectorizeIndexes
 } from './account-resources'
+import { listWorkers } from './account-workers'
+import { isAuthenticated } from './auth'
+import type { AccountInfo, CloudflareService, ServiceStatus } from './types'
 
 const SERVICE_STATUS_TIMEOUT_MS = 10000
 
@@ -36,10 +32,7 @@ async function withServiceTimeout<T>(operation: Promise<T>): Promise<T> {
 	})
 
 	try {
-		return await Promise.race([
-			operation,
-			timeoutPromise
-		])
+		return await Promise.race([operation, timeoutPromise])
 	} finally {
 		if (timeoutId) {
 			clearTimeout(timeoutId)
@@ -47,10 +40,7 @@ async function withServiceTimeout<T>(operation: Promise<T>): Promise<T> {
 	}
 }
 
-function createAvailableServiceStatus(
-	service: CloudflareService,
-	count: number
-): ServiceStatus {
+function createAvailableServiceStatus(service: CloudflareService, count: number): ServiceStatus {
 	return {
 		service,
 		available: service === 'ai' ? count > 0 : true,
@@ -99,10 +89,7 @@ export async function checkAuth(): Promise<boolean> {
 	return isAuthenticated()
 }
 
-export async function hasService(
-	accountId: string,
-	service: CloudflareService
-): Promise<boolean> {
+export async function hasService(accountId: string, service: CloudflareService): Promise<boolean> {
 	const status = await getServiceStatus(accountId, service)
 	return status.available
 }

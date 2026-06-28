@@ -82,7 +82,8 @@ function createRemoteAIGateway(
 				signal: options?.signal
 			})
 
-			const logId = response.headers.get('cf-aig-log-id') ?? response.headers.get('cf-ai-gateway-log-id')
+			const logId =
+				response.headers.get('cf-aig-log-id') ?? response.headers.get('cf-ai-gateway-log-id')
 			if (logId) {
 				owner.aiGatewayLogId = logId
 			}

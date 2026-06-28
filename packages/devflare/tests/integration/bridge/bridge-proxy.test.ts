@@ -5,11 +5,11 @@
 // This demonstrates the user-facing API: env.MY_DO.getByName('name').method()
 // =============================================================================
 
-import { describe, test, expect, beforeAll, afterAll } from 'bun:test'
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import type { Miniflare } from 'miniflare'
 import { BridgeClient } from '../../../src/bridge/client'
 import { createEnvProxy, setBindingHints } from '../../../src/bridge/proxy'
-import { gatewayWorkerScript, PORTS } from './_fixtures'
+import { PORTS, gatewayWorkerScript } from './_fixtures'
 
 // =============================================================================
 // Helper Types - RPC stubs return `any` for dynamic method access

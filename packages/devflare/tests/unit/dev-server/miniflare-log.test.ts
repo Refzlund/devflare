@@ -10,7 +10,7 @@ const rawCompatibilityWarning = [
 	'The latest compatibility date supported by the installed Cloudflare Workers Runtime is ',
 	'\u001b[1m"2026-03-17"\u001b[22m',
 	',\n',
-	'but you\'ve requested ',
+	"but you've requested ",
 	'\u001b[1m"2026-03-28"\u001b[22m',
 	'. Falling back to ',
 	'\u001b[1m"2026-03-17"\u001b[22m',
@@ -24,7 +24,7 @@ class FakeMiniflareLog {
 	readonly warnings: string[] = []
 	readonly infos: string[] = []
 
-	constructor(readonly level?: number) { }
+	constructor(readonly level?: number) {}
 
 	warn(message: string): void {
 		this.warnings.push(message)
@@ -37,7 +37,9 @@ class FakeMiniflareLog {
 
 describe('formatCompatibilityDateFallbackNotice', () => {
 	test('rewrites Miniflare compatibility fallbacks into a shorter notice', () => {
-		expect(formatCompatibilityDateFallbackNotice(rawCompatibilityWarning)).toBe(friendlyCompatibilityNotice)
+		expect(formatCompatibilityDateFallbackNotice(rawCompatibilityWarning)).toBe(
+			friendlyCompatibilityNotice
+		)
 	})
 
 	test('returns null for unrelated warnings', () => {

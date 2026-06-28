@@ -10,28 +10,28 @@
 // =============================================================================
 
 import { isAbsolute, relative, resolve } from 'pathe'
-import { resolveConfigPath } from '../config/loader'
 import { resolveConfigEnvVars, resolveResources } from '../config'
 import {
+	type WranglerConfig,
 	compileBuildConfig,
 	compileConfig,
 	compileToProgrammaticConfig,
 	isolateViteBuildOutputPaths,
 	rebaseWranglerConfigPaths,
-	writeWranglerConfig,
-	type WranglerConfig
+	writeWranglerConfig
 } from '../config/compiler'
-import type { DevflareConfig } from '../config/schema'
+import { resolveConfigPath } from '../config/loader'
 import type { ResolvedConfig as ResolvedDevflareConfig } from '../config/resolve-phased'
+import type { DevflareConfig } from '../config/schema'
+import { resolveServiceBindings } from '../test/resolve-service-bindings'
 import { DEFAULT_DO_PATTERN } from '../utils/glob'
 import { prepareComposedWorkerEntrypoint } from '../worker-entry/composed-worker'
 import {
-	createAuxiliaryWorkerConfig,
-	discoverDurableObjects,
 	type AuxiliaryWorkerConfig,
-	type DODiscoveryResult
+	type DODiscoveryResult,
+	createAuxiliaryWorkerConfig,
+	discoverDurableObjects
 } from './plugin-durable-objects'
-import { resolveServiceBindings } from '../test/resolve-service-bindings'
 import { createAuxiliaryServiceWorkerConfigs } from './plugin-service-bindings'
 
 const CONFIG_DIR = '.devflare'
@@ -45,7 +45,9 @@ export interface ResolvedPluginContextState {
 	durableObjects: DODiscoveryResult | null
 }
 
-function removeDevflareHandledServeBindings(config: Record<string, unknown>): Record<string, unknown> {
+function removeDevflareHandledServeBindings(
+	config: Record<string, unknown>
+): Record<string, unknown> {
 	const next = { ...config }
 
 	// Devflare supplies these locally through its own Miniflare gateway and
@@ -75,32 +77,38 @@ export async function buildPluginContextState(
 	mode: 'serve' | 'build' = 'serve',
 	configDir: string = projectRoot
 ): Promise<ResolvedPluginContextState> {
-	const resourceResolvedConfig = mode === 'build'
-		? await resolveResources(devflareConfig, { phase: 'build', environment })
-		: await resolveResources(devflareConfig, { phase: 'local', environment })
+	const resourceResolvedConfig =
+		mode === 'build'
+			? await resolveResources(devflareConfig, { phase: 'build', environment })
+			: await resolveResources(devflareConfig, { phase: 'local', environment })
 	const effectiveConfig = await resolveConfigEnvVars(resourceResolvedConfig, {
 		cwd: configDir,
 		mode: mode === 'build' ? 'build' : 'dev'
 	})
-	const compiledWranglerConfig = mode === 'build'
-		? compileBuildConfig(effectiveConfig)
-		: compileConfig(effectiveConfig as ResolvedDevflareConfig)
-	const wranglerConfig = mode === 'build'
-		? isolateViteBuildOutputPaths(projectRoot, compiledWranglerConfig)
-		: removeDevflareHandledServeBindings(compiledWranglerConfig) as WranglerConfig
+	const compiledWranglerConfig =
+		mode === 'build'
+			? compileBuildConfig(effectiveConfig)
+			: compileConfig(effectiveConfig as ResolvedDevflareConfig)
+	const wranglerConfig =
+		mode === 'build'
+			? isolateViteBuildOutputPaths(projectRoot, compiledWranglerConfig)
+			: (removeDevflareHandledServeBindings(compiledWranglerConfig) as WranglerConfig)
 	const cloudflareConfig = {
 		...(mode === 'build'
 			? isolateViteBuildOutputPaths(
-				projectRoot,
-				compileToProgrammaticConfig(effectiveConfig, environment, { preserveNamedBindings: true }) as WranglerConfig
-			)
+					projectRoot,
+					compileToProgrammaticConfig(effectiveConfig, environment, {
+						preserveNamedBindings: true
+					}) as WranglerConfig
+				)
 			: removeDevflareHandledServeBindings(
-				compileToProgrammaticConfig(effectiveConfig, environment)
-			))
+					compileToProgrammaticConfig(effectiveConfig, environment)
+				))
 	}
-	const composedMainEntry = mode === 'build'
-		? null
-		: await prepareComposedWorkerEntrypoint(projectRoot, effectiveConfig, environment)
+	const composedMainEntry =
+		mode === 'build'
+			? null
+			: await prepareComposedWorkerEntrypoint(projectRoot, effectiveConfig, environment)
 	if (composedMainEntry) {
 		const relativeMain = relative(projectRoot, composedMainEntry)
 		wranglerConfig.main = relativeMain
@@ -127,7 +135,9 @@ export async function buildPluginContextState(
 				}
 			}
 			if (cloudflareConfig.durable_objects) {
-				const doConfig = cloudflareConfig.durable_objects as { bindings: Array<{ script_name?: string }> }
+				const doConfig = cloudflareConfig.durable_objects as {
+					bindings: Array<{ script_name?: string }>
+				}
 				for (const binding of doConfig.bindings) {
 					binding.script_name = doWorkerName
 				}
@@ -189,10 +199,8 @@ export async function resolvePluginConfigPath(
 	configPath?: string
 ): Promise<string | null> {
 	if (configPath) {
-		return isAbsolute(configPath)
-			? configPath
-			: resolve(projectRoot, configPath)
+		return isAbsolute(configPath) ? configPath : resolve(projectRoot, configPath)
 	}
 
-	return await resolveConfigPath(projectRoot) ?? null
+	return (await resolveConfigPath(projectRoot)) ?? null
 }

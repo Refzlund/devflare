@@ -31,11 +31,21 @@ describe('productions command', () => {
 		process.env.CLOUDFLARE_API_TOKEN = 'cf_test_token'
 		const projectDir = mkdtempSync(join(tmpdir(), 'devflare-productions-family-'))
 		temporaryDirectories.add(projectDir)
-		writeFileSync(join(projectDir, 'package.json'), JSON.stringify({
-			name: 'demo-productions-family',
-			type: 'module'
-		}, null, '\t'), 'utf-8')
-		writeFileSync(join(projectDir, 'devflare.config.ts'), `
+		writeFileSync(
+			join(projectDir, 'package.json'),
+			JSON.stringify(
+				{
+					name: 'demo-productions-family',
+					type: 'module'
+				},
+				null,
+				'\t'
+			),
+			'utf-8'
+		)
+		writeFileSync(
+			join(projectDir, 'devflare.config.ts'),
+			`
 			export default {
 				name: 'demo-worker',
 				accountId: 'acc_123',
@@ -46,30 +56,35 @@ describe('productions command', () => {
 					}
 				}
 			}
-		`, 'utf-8')
+		`,
+			'utf-8'
+		)
 
 		globalThis.fetch = mock(async (input: RequestInfo | URL) => {
 			const url = String(input)
 
 			if (url.includes('/accounts/acc_123/workers/scripts?page=1&per_page=50')) {
-				return jsonResponse([
+				return jsonResponse(
+					[
+						{
+							id: 'demo-worker',
+							created_on: '2026-04-12T10:00:00.000Z',
+							modified_on: '2026-04-12T10:05:00.000Z'
+						},
+						{
+							id: 'demo-auth-service',
+							created_on: '2026-04-12T10:00:00.000Z',
+							modified_on: '2026-04-12T10:04:00.000Z'
+						}
+					],
 					{
-						id: 'demo-worker',
-						created_on: '2026-04-12T10:00:00.000Z',
-						modified_on: '2026-04-12T10:05:00.000Z'
-					},
-					{
-						id: 'demo-auth-service',
-						created_on: '2026-04-12T10:00:00.000Z',
-						modified_on: '2026-04-12T10:04:00.000Z'
+						page: 1,
+						per_page: 50,
+						total_pages: 1,
+						count: 2,
+						total_count: 2
 					}
-				], {
-					page: 1,
-					per_page: 50,
-					total_pages: 1,
-					count: 2,
-					total_count: 2
-				})
+				)
 			}
 
 			if (url.endsWith('/accounts/acc_123/workers/subdomain')) {
@@ -134,10 +149,14 @@ describe('productions command', () => {
 		const renderedMessages = renderMessages(logger)
 
 		expect(result.exitCode).toBe(0)
-		expect(renderedMessages.some((message) => message.includes('worker family demo-worker'))).toBe(true)
+		expect(renderedMessages.some((message) => message.includes('worker family demo-worker'))).toBe(
+			true
+		)
 		expect(renderedMessages.some((message) => message.includes('related'))).toBe(true)
 		expect(renderedMessages.some((message) => message.includes('Productions (2)'))).toBe(true)
-		expect(renderedMessages.some((message) => message.includes('demo-worker.demo-subdomain.workers.dev'))).toBe(true)
+		expect(
+			renderedMessages.some((message) => message.includes('demo-worker.demo-subdomain.workers.dev'))
+		).toBe(true)
 		expect(renderedMessages.some((message) => message.includes('11111111-111'))).toBe(true)
 	})
 
@@ -146,7 +165,9 @@ describe('productions command', () => {
 		globalThis.fetch = mock(async (input: RequestInfo | URL) => {
 			const url = String(input)
 
-			if (url.endsWith('/accounts/acc_123/workers/scripts/demo-worker/versions?page=1&per_page=100')) {
+			if (
+				url.endsWith('/accounts/acc_123/workers/scripts/demo-worker/versions?page=1&per_page=100')
+			) {
 				return jsonResponse({
 					items: [
 						{
@@ -216,15 +237,17 @@ describe('productions command', () => {
 	test('rolls a worker back with Wrangler when apply is set', async () => {
 		process.env.CLOUDFLARE_API_TOKEN = 'cf_test_token'
 		const executions: Array<{ command: string; args: string[] }> = []
-		setDependencies(createCliDependencies({
-			exec: async (command, args = []) => {
-				executions.push({ command, args })
-				return successResult()
-			},
-			spawn: mock(() => {
-				throw new Error('spawn should not be called in productions rollback test')
-			}) as any
-		}))
+		setDependencies(
+			createCliDependencies({
+				exec: async (command, args = []) => {
+					executions.push({ command, args })
+					return successResult()
+				},
+				spawn: mock(() => {
+					throw new Error('spawn should not be called in productions rollback test')
+				}) as any
+			})
+		)
 
 		globalThis.fetch = mock(async (input: RequestInfo | URL) => {
 			const url = String(input)
@@ -277,14 +300,21 @@ describe('productions command', () => {
 			'--message',
 			'Rolled back demo-worker via devflare productions rollback'
 		])
-		expect(renderedMessages.some((message) => message.includes('Rolled back production deployment for demo-worker'))).toBe(true)
+		expect(
+			renderedMessages.some((message) =>
+				message.includes('Rolled back production deployment for demo-worker')
+			)
+		).toBe(true)
 	})
 
 	test('deletes a production worker script when apply is set', async () => {
 		process.env.CLOUDFLARE_API_TOKEN = 'cf_test_token'
 		globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
 			const url = String(input)
-			if (url.endsWith('/accounts/acc_123/workers/scripts/demo-worker') && init?.method === 'DELETE') {
+			if (
+				url.endsWith('/accounts/acc_123/workers/scripts/demo-worker') &&
+				init?.method === 'DELETE'
+			) {
 				return jsonResponse({})
 			}
 
@@ -308,6 +338,10 @@ describe('productions command', () => {
 		const renderedMessages = renderMessages(logger)
 
 		expect(result.exitCode).toBe(0)
-		expect(renderedMessages.some((message) => message.includes('Deleted production Worker script demo-worker'))).toBe(true)
+		expect(
+			renderedMessages.some((message) =>
+				message.includes('Deleted production Worker script demo-worker')
+			)
+		).toBe(true)
 	})
 })

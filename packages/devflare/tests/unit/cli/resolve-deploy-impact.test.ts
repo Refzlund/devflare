@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test'
 import {
+	SHARED_DEPLOY_INFRASTRUCTURE_PATTERNS,
 	createGlobalDependencyPatterns,
-	matchesAnyPattern,
-	SHARED_DEPLOY_INFRASTRUCTURE_PATTERNS
+	matchesAnyPattern
 	// @ts-ignore - JS module with no declarations
 } from '../../../../../.github/scripts/resolve-deploy-impact.mjs'
 
@@ -20,11 +20,19 @@ describe('resolve deploy impact script', () => {
 		}
 
 		expect(matchesAnyPattern('.github/actions/devflare-deploy/action.yml', patterns)).toBe(true)
-		expect(matchesAnyPattern('.github/actions/devflare-deploy-impact/action.yml', patterns)).toBe(true)
-		expect(matchesAnyPattern('.github/actions/devflare-github-feedback/action.yml', patterns)).toBe(true)
-		expect(matchesAnyPattern('.github/actions/devflare-setup-workspace/action.yml', patterns)).toBe(true)
+		expect(matchesAnyPattern('.github/actions/devflare-deploy-impact/action.yml', patterns)).toBe(
+			true
+		)
+		expect(matchesAnyPattern('.github/actions/devflare-github-feedback/action.yml', patterns)).toBe(
+			true
+		)
+		expect(matchesAnyPattern('.github/actions/devflare-setup-workspace/action.yml', patterns)).toBe(
+			true
+		)
 		expect(matchesAnyPattern('.github/scripts/resolve-deploy-impact.mjs', patterns)).toBe(true)
-		expect(matchesAnyPattern('.github/scripts/verify-testing-preview-deployment.ts', patterns)).toBe(true)
+		expect(
+			matchesAnyPattern('.github/scripts/verify-testing-preview-deployment.ts', patterns)
+		).toBe(true)
 		expect(matchesAnyPattern('.github/workflows/preview.yml', patterns)).toBe(true)
 		expect(matchesAnyPattern('.github/workflows/documentation-production.yml', patterns)).toBe(true)
 	})

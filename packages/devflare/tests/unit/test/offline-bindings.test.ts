@@ -1,7 +1,7 @@
+import { afterEach, describe, expect, test } from 'bun:test'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, test } from 'bun:test'
 import type { Pipeline } from 'cloudflare:pipelines'
 import { writeLocalSecret } from '../../../src/secrets/local-secrets'
 import {
@@ -273,15 +273,19 @@ describe('createOfflineBindings', () => {
 			value: 'local-secret'
 		})
 
-		const env = createOfflineEnv({
-			name: 'offline-secret-worker',
-			secretsStoreId: 'store-123',
-			bindings: {
-				secretsStore: {
-					API_TOKEN: 'api-token'
+		const env = createOfflineEnv(
+			{
+				name: 'offline-secret-worker',
+				secretsStoreId: 'store-123',
+				bindings: {
+					secretsStore: {
+						API_TOKEN: 'api-token'
+					}
 				}
-			}
-		}, {}, { cwd })
+			},
+			{},
+			{ cwd }
+		)
 
 		expect(await (env.API_TOKEN as SecretsStoreSecret).get()).toBe('local-secret')
 	})

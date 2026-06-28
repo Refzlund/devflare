@@ -1,21 +1,32 @@
-import { createD1Database, getWorkersSubdomain, listD1Databases, listWorkerDeployments, listWorkerVersions } from './account'
-import type { APIClientOptions } from './api'
-import { cachePreviewRegistryContext, clearCachedPreviewRegistryContext, getCachedPreviewRegistryContext, getRegistryDatabaseName } from './preview-registry-cache'
 import {
-	buildPreviewScopeRecord,
+	createD1Database,
+	getWorkersSubdomain,
+	listD1Databases,
+	listWorkerDeployments,
+	listWorkerVersions
+} from './account'
+import type { APIClientOptions } from './api'
+import {
+	cachePreviewRegistryContext,
+	clearCachedPreviewRegistryContext,
+	getCachedPreviewRegistryContext,
+	getRegistryDatabaseName
+} from './preview-registry-cache'
+import {
 	buildPreviewDeploymentRecord,
 	buildPreviewRecord,
+	buildPreviewScopeRecord,
 	buildProductionDeploymentRecord,
 	getExplicitPreviewSyncOverrides,
 	getPreviewDeploymentId,
 	getVersionInfoById,
 	hasRetireSelector,
 	markDeploymentRecordDeleted,
-	markPreviewScopeRecordDeleted,
 	markPreviewRecordDeleted,
-	matchesPreviewScopeRetireTarget,
+	markPreviewScopeRecordDeleted,
 	matchesPreviewDeploymentRetireTarget,
-	matchesPreviewRetireTarget
+	matchesPreviewRetireTarget,
+	matchesPreviewScopeRetireTarget
 } from './preview-registry-records'
 import {
 	clearPreviewRegistrySchemaCache,
@@ -23,11 +34,11 @@ import {
 	isMissingRegistrySchemaError,
 	isUnavailableRegistryContextError,
 	readDeploymentRows,
-	readPreviewScopeRows,
 	readPreviewRows,
+	readPreviewScopeRows,
 	upsertDeploymentRecord,
-	upsertPreviewScopeRecord,
-	upsertPreviewRecord
+	upsertPreviewRecord,
+	upsertPreviewScopeRecord
 } from './preview-registry-store'
 import type {
 	CleanupPreviewRegistryOptions,
@@ -126,15 +137,27 @@ async function applyDeletedRecords(
 	}
 ): Promise<void> {
 	for (const preview of options.previews) {
-		await upsertPreviewRecord(registry, markPreviewRecordDeleted(preview, options.now), options.apiOptions)
+		await upsertPreviewRecord(
+			registry,
+			markPreviewRecordDeleted(preview, options.now),
+			options.apiOptions
+		)
 	}
 
 	for (const scope of options.scopes) {
-		await upsertPreviewScopeRecord(registry, markPreviewScopeRecordDeleted(scope, options.now), options.apiOptions)
+		await upsertPreviewScopeRecord(
+			registry,
+			markPreviewScopeRecordDeleted(scope, options.now),
+			options.apiOptions
+		)
 	}
 
 	for (const deployment of options.deployments) {
-		await upsertDeploymentRecord(registry, markDeploymentRecordDeleted(deployment, options.now), options.apiOptions)
+		await upsertDeploymentRecord(
+			registry,
+			markDeploymentRecordDeleted(deployment, options.now),
+			options.apiOptions
+		)
 	}
 }
 
@@ -193,7 +216,9 @@ export async function ensurePreviewRegistry(options: {
 			created: true
 		}
 		cachePreviewRegistryContext(registry)
-		options.logger?.info?.(`Created Devflare preview registry D1 database: ${registry.databaseName}`)
+		options.logger?.info?.(
+			`Created Devflare preview registry D1 database: ${registry.databaseName}`
+		)
 	}
 
 	if (registry.created || options.skipSchemaIfExisting !== true) {
@@ -203,23 +228,26 @@ export async function ensurePreviewRegistry(options: {
 	return registry
 }
 
-export async function listTrackedRegistryState(
-	options: ListTrackedRegistryStateOptions
-): Promise<{
+export async function listTrackedRegistryState(options: ListTrackedRegistryStateOptions): Promise<{
 	previews: Awaited<ReturnType<typeof readPreviewRows>>
 	scopes: Awaited<ReturnType<typeof readPreviewScopeRows>>
 	deployments: Awaited<ReturnType<typeof readDeploymentRows>>
 }> {
-	const { result } = await withRegistryReadRecovery(options.registry, options.apiOptions, async (registry) => {
-		return loadTrackedRegistryRows(registry, options.workerName, options.apiOptions)
-	})
+	const { result } = await withRegistryReadRecovery(
+		options.registry,
+		options.apiOptions,
+		async (registry) => {
+			return loadTrackedRegistryRows(registry, options.workerName, options.apiOptions)
+		}
+	)
 
 	return result
 }
 
-export async function listTrackedPreviewRecords(
-	options: ListTrackedRecordsOptions
-): Promise<{ registry: PreviewRegistryContext; records: Awaited<ReturnType<typeof readPreviewRows>> }> {
+export async function listTrackedPreviewRecords(options: ListTrackedRecordsOptions): Promise<{
+	registry: PreviewRegistryContext
+	records: Awaited<ReturnType<typeof readPreviewRows>>
+}> {
 	const registry = await ensurePreviewRegistry({
 		accountId: options.accountId,
 		databaseName: options.databaseName,
@@ -239,9 +267,10 @@ export async function listTrackedPreviewRecords(
 	}
 }
 
-export async function listTrackedPreviewScopeRecords(
-	options: ListTrackedRecordsOptions
-): Promise<{ registry: PreviewRegistryContext; records: Awaited<ReturnType<typeof readPreviewScopeRows>> }> {
+export async function listTrackedPreviewScopeRecords(options: ListTrackedRecordsOptions): Promise<{
+	registry: PreviewRegistryContext
+	records: Awaited<ReturnType<typeof readPreviewScopeRows>>
+}> {
 	const registry = await ensurePreviewRegistry({
 		accountId: options.accountId,
 		databaseName: options.databaseName,
@@ -261,9 +290,10 @@ export async function listTrackedPreviewScopeRecords(
 	}
 }
 
-export async function listTrackedDeploymentRecords(
-	options: ListTrackedRecordsOptions
-): Promise<{ registry: PreviewRegistryContext; records: Awaited<ReturnType<typeof readDeploymentRows>> }> {
+export async function listTrackedDeploymentRecords(options: ListTrackedRecordsOptions): Promise<{
+	registry: PreviewRegistryContext
+	records: Awaited<ReturnType<typeof readDeploymentRows>>
+}> {
 	const registry = await ensurePreviewRegistry({
 		accountId: options.accountId,
 		databaseName: options.databaseName,
@@ -294,16 +324,28 @@ export async function reconcilePreviewRegistry(
 		logger: options.logger
 	})
 	const workersSubdomain = await getWorkersSubdomain(options.accountId, options.apiOptions)
-	const liveVersions = await listWorkerVersions(options.accountId, options.workerName, options.apiOptions)
-	const liveDeployments = await listWorkerDeployments(options.accountId, options.workerName, options.apiOptions)
-	const { previews: previewRecords, scopes: scopeRecords, deployments: deploymentRecords } = await loadTrackedRegistryRows(
-		registry,
+	const liveVersions = await listWorkerVersions(
+		options.accountId,
 		options.workerName,
 		options.apiOptions
 	)
-	const previewRecordByVersionId = new Map(previewRecords.map((record) => [record.versionId, record]))
+	const liveDeployments = await listWorkerDeployments(
+		options.accountId,
+		options.workerName,
+		options.apiOptions
+	)
+	const {
+		previews: previewRecords,
+		scopes: scopeRecords,
+		deployments: deploymentRecords
+	} = await loadTrackedRegistryRows(registry, options.workerName, options.apiOptions)
+	const previewRecordByVersionId = new Map(
+		previewRecords.map((record) => [record.versionId, record])
+	)
 	const previewScopeRecordByScope = new Map(scopeRecords.map((record) => [record.scope, record]))
-	const deploymentRecordById = new Map(deploymentRecords.map((record) => [record.deploymentId, record]))
+	const deploymentRecordById = new Map(
+		deploymentRecords.map((record) => [record.deploymentId, record])
+	)
 	const syncedPreviews: typeof previewRecords = []
 	const syncedScopes: typeof scopeRecords = []
 	const syncedDeployments: typeof deploymentRecords = []
@@ -311,9 +353,9 @@ export async function reconcilePreviewRegistry(
 	const previewVersions = [...liveVersions.filter((candidate) => candidate.metadata.hasPreview)]
 
 	if (
-		options.versionId
-		&& (options.previewUrl || options.previewScopeUrl || options.previewScope)
-		&& !previewVersions.some((version) => version.id === options.versionId)
+		options.versionId &&
+		(options.previewUrl || options.previewScopeUrl || options.previewScope) &&
+		!previewVersions.some((version) => version.id === options.versionId)
 	) {
 		const explicitPreviewVersion = await getVersionInfoById(
 			options.accountId,
@@ -347,7 +389,9 @@ export async function reconcilePreviewRegistry(
 		})
 
 		if (!previewRecord) {
-			options.logger?.warn?.(`Skipping preview registry sync for ${version.id} because no preview URL could be determined.`)
+			options.logger?.warn?.(
+				`Skipping preview registry sync for ${version.id} because no preview URL could be determined.`
+			)
 			continue
 		}
 
@@ -358,7 +402,9 @@ export async function reconcilePreviewRegistry(
 			accountId: options.accountId,
 			workerName: options.workerName,
 			previewRecord,
-			existing: previewRecord.scope ? previewScopeRecordByScope.get(previewRecord.scope) : undefined,
+			existing: previewRecord.scope
+				? previewScopeRecordByScope.get(previewRecord.scope)
+				: undefined,
 			now
 		})
 
@@ -371,7 +417,9 @@ export async function reconcilePreviewRegistry(
 			accountId: options.accountId,
 			workerName: options.workerName,
 			previewRecord,
-			existing: deploymentRecordById.get(getPreviewDeploymentId(options.workerName, previewRecord.versionId)),
+			existing: deploymentRecordById.get(
+				getPreviewDeploymentId(options.workerName, previewRecord.versionId)
+			),
 			now
 		})
 		await upsertDeploymentRecord(registry, previewDeploymentRecord, options.apiOptions)
@@ -382,12 +430,12 @@ export async function reconcilePreviewRegistry(
 		const versionId = deployment.versions[0]?.versionId
 		const version = versionId
 			? await getVersionInfoById(
-				options.accountId,
-				options.workerName,
-				versionId,
-				versionMetadataMap,
-				options.apiOptions
-			)
+					options.accountId,
+					options.workerName,
+					versionId,
+					versionMetadataMap,
+					options.apiOptions
+				)
 			: undefined
 		const deploymentRecord = buildProductionDeploymentRecord({
 			accountId: options.accountId,
@@ -429,11 +477,21 @@ export async function cleanupPreviewRegistry(
 		apiOptions: options.apiOptions,
 		logger: options.logger
 	})
-	const { previews, scopes, deployments } = await loadTrackedRegistryRows(registry, options.workerName, options.apiOptions)
+	const { previews, scopes, deployments } = await loadTrackedRegistryRows(
+		registry,
+		options.workerName,
+		options.apiOptions
+	)
 	const cutoff = new Date(now.getTime() - Math.max(options.days ?? 7, 0) * 24 * 60 * 60 * 1000)
-	const previewCandidates = previews.filter((record) => !record.deletedAt && record.createdAt <= cutoff && record.status !== 'active')
-	const scopeCandidates = scopes.filter((record) => !record.deletedAt && record.createdAt <= cutoff && record.status !== 'active')
-	const deploymentCandidates = deployments.filter((record) => !record.deletedAt && record.createdAt <= cutoff && record.status !== 'active')
+	const previewCandidates = previews.filter(
+		(record) => !record.deletedAt && record.createdAt <= cutoff && record.status !== 'active'
+	)
+	const scopeCandidates = scopes.filter(
+		(record) => !record.deletedAt && record.createdAt <= cutoff && record.status !== 'active'
+	)
+	const deploymentCandidates = deployments.filter(
+		(record) => !record.deletedAt && record.createdAt <= cutoff && record.status !== 'active'
+	)
 
 	if (options.apply) {
 		await applyDeletedRecords(registry, {
@@ -463,7 +521,9 @@ export async function retirePreviewRegistry(
 	options: RetirePreviewRegistryOptions
 ): Promise<RetirePreviewRegistryResult> {
 	if (!hasRetireSelector(options)) {
-		throw new Error('Retiring preview registry records requires at least one selector: branchName, previewScope, versionId, or commitSha.')
+		throw new Error(
+			'Retiring preview registry records requires at least one selector: branchName, previewScope, versionId, or commitSha.'
+		)
 	}
 
 	const now = options.now ?? new Date()
@@ -473,15 +533,25 @@ export async function retirePreviewRegistry(
 		apiOptions: options.apiOptions,
 		logger: options.logger
 	})
-	const { previews, scopes, deployments } = await loadTrackedRegistryRows(registry, options.workerName, options.apiOptions)
+	const { previews, scopes, deployments } = await loadTrackedRegistryRows(
+		registry,
+		options.workerName,
+		options.apiOptions
+	)
 
-	const directlyMatchedPreviews = previews.filter((record) => !record.deletedAt && matchesPreviewRetireTarget(record, options))
-	const directlyMatchedScopes = scopes.filter((record) => !record.deletedAt && matchesPreviewScopeRetireTarget(record, options))
-	const directlyMatchedDeployments = deployments.filter((record) => !record.deletedAt && matchesPreviewDeploymentRetireTarget(record, options))
+	const directlyMatchedPreviews = previews.filter(
+		(record) => !record.deletedAt && matchesPreviewRetireTarget(record, options)
+	)
+	const directlyMatchedScopes = scopes.filter(
+		(record) => !record.deletedAt && matchesPreviewScopeRetireTarget(record, options)
+	)
+	const directlyMatchedDeployments = deployments.filter(
+		(record) => !record.deletedAt && matchesPreviewDeploymentRetireTarget(record, options)
+	)
 
 	const candidatePreviewIds = new Set<string>([
 		...directlyMatchedPreviews.map((record) => record.id),
-		...directlyMatchedScopes.flatMap((record) => record.previewId ? [record.previewId] : [])
+		...directlyMatchedScopes.flatMap((record) => (record.previewId ? [record.previewId] : []))
 	])
 	const candidateVersionIds = new Set<string>([
 		...directlyMatchedPreviews.map((record) => record.versionId),
@@ -491,12 +561,12 @@ export async function retirePreviewRegistry(
 	])
 
 	const previewCandidates = previews.filter((record) => {
-		return !record.deletedAt
-			&& (
-				matchesPreviewRetireTarget(record, options)
-				|| candidatePreviewIds.has(record.id)
-				|| candidateVersionIds.has(record.versionId)
-			)
+		return (
+			!record.deletedAt &&
+			(matchesPreviewRetireTarget(record, options) ||
+				candidatePreviewIds.has(record.id) ||
+				candidateVersionIds.has(record.versionId))
+		)
 	})
 
 	const resolvedPreviewIds = new Set(previewCandidates.map((record) => record.id))
@@ -506,12 +576,12 @@ export async function retirePreviewRegistry(
 	])
 
 	const scopeCandidates = scopes.filter((record) => {
-		return !record.deletedAt
-			&& (
-				matchesPreviewScopeRetireTarget(record, options)
-				|| resolvedVersionIds.has(record.versionId)
-				|| (record.previewId !== undefined && resolvedPreviewIds.has(record.previewId))
-			)
+		return (
+			!record.deletedAt &&
+			(matchesPreviewScopeRetireTarget(record, options) ||
+				resolvedVersionIds.has(record.versionId) ||
+				(record.previewId !== undefined && resolvedPreviewIds.has(record.previewId)))
+		)
 	})
 
 	for (const record of scopeCandidates) {
@@ -522,13 +592,13 @@ export async function retirePreviewRegistry(
 	}
 
 	const deploymentCandidates = deployments.filter((record) => {
-		return !record.deletedAt
-			&& record.channel === 'preview'
-			&& (
-				matchesPreviewDeploymentRetireTarget(record, options)
-				|| resolvedVersionIds.has(record.versionId)
-				|| (record.previewId !== undefined && resolvedPreviewIds.has(record.previewId))
-			)
+		return (
+			!record.deletedAt &&
+			record.channel === 'preview' &&
+			(matchesPreviewDeploymentRetireTarget(record, options) ||
+				resolvedVersionIds.has(record.versionId) ||
+				(record.previewId !== undefined && resolvedPreviewIds.has(record.previewId)))
+		)
 	})
 
 	if (options.apply) {

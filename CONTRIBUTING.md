@@ -56,6 +56,12 @@ bun run devflare:typecheck
 bun run devflare:test
 ```
 
+`devflare:ci` lints the published package first (`lint:devflare` = `biome check
+packages/devflare`, fail-fast) before building, typechecking, and testing. Run
+the linter on its own with `bun run lint:devflare`; auto-fix safe issues with
+`bun run lint:fix`. (Whole-repo lint of `cases/**` and `apps/**` is available via
+`bun run lint:root` but is not gated in CI — those are unshipped.)
+
 The docs/README/`LLM.md` are guarded together — if you change the docs model,
 regenerate the package handbook and run the integrity suite:
 
@@ -63,3 +69,24 @@ regenerate the package handbook and run the integrity suite:
 bun run --cwd packages/devflare llm:generate
 bun run devflare:docs-integrity
 ```
+
+## Testing
+
+The package test lanes (`packages/devflare/package.json`):
+
+- `bun run --cwd packages/devflare test:unit` — fast unit tests (`tests/unit`),
+  fully parallel. This is the lane the publish workflow gates on.
+- `bun run --cwd packages/devflare test:coverage` — the unit lane with coverage
+  measurement (`bun test tests/unit --coverage`). This is measurement only; there
+  is no coverage threshold gate.
+- `bun run --cwd packages/devflare test` — the full suite (unit + every
+  integration lane).
+
+**Why the integration suites run serially.** The integration lanes
+(`test:integration:bridge`, `:test-context`, `:dev-server`) run with
+`--parallel=1 --max-concurrency=1` because they bind real OS ports and start
+Miniflare/workerd processes; running them concurrently races on port allocation
+and shared workerd runtime state. The bridge lane goes further and runs each file
+as its own `bun test … --parallel=1` invocation (a separate process per file) to
+fully isolate the gateway/bridge transport state. Unit tests have no such
+constraint and run fully parallel.

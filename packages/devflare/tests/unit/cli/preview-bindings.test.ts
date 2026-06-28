@@ -20,37 +20,54 @@ afterEach(() => {
 
 describe('preview binding inspection helpers', () => {
 	test('parses Wrangler versions view --json output into association rows', () => {
-		const parsed = parseWranglerVersionBindings(JSON.stringify({
-			id: 'version-demo',
-			metadata: { author_email: 'demo@example.com', created_on: '2025-01-04T00:00:00.000Z' },
-			resources: {
-				script: { handlers: ['fetch'] },
-				script_runtime: { compatibility_date: '2025-01-01' },
-				bindings: [
-					{ type: 'queue', name: 'JOBS', queue_name: 'jobs-queue' },
-					{ type: 'ratelimit', name: 'MY_RATE_LIMITER', namespace_id: '1001' },
-					{ type: 'service', name: 'AUTH_SERVICE', service: 'auth-service' },
-					{ type: 'worker_loader', name: 'LOADER' },
-					{ type: 'mtls_certificate', name: 'API_CERT', certificate_id: 'cert-123' },
-					{ type: 'dispatch_namespace', name: 'DISPATCHER', namespace: 'customers' },
-					{ type: 'workflow', name: 'ORDER_WORKFLOW', workflow_name: 'orders', class_name: 'OrderWorkflow' },
-					{ type: 'pipeline', name: 'EVENTS', pipeline: 'events-stream' },
-					{ type: 'images', name: 'IMAGES' },
-					{ type: 'media', name: 'MEDIA' },
-					{ type: 'artifacts', name: 'ARTIFACTS', namespace: 'default' },
-					{ type: 'secrets_store_secret', name: 'API_TOKEN', store_id: 'store-123', secret_name: 'api-token' },
-					{ type: 'analytics_engine', name: 'ANALYTICS', dataset: 'analytics-dataset' },
-					{ type: 'kv_namespace', name: 'CACHE', namespace_id: 'kv_abc' },
-					{ type: 'd1', name: 'DB', id: 'd1_xyz' },
-					{ type: 'r2_bucket', name: 'ASSETS', bucket_name: 'assets-bucket' },
-					{ type: 'durable_object_namespace', name: 'COUNTER', class_name: 'Counter', script_name: 'main' },
-					{ type: 'browser', name: 'BROWSER' },
-					{ type: 'ai', name: 'AI' },
-					{ type: 'plain_text', name: 'APP_NAME', text: 'demo-preview' },
-					{ type: 'secret_text', name: 'API_KEY' }
-				]
-			}
-		}))
+		const parsed = parseWranglerVersionBindings(
+			JSON.stringify({
+				id: 'version-demo',
+				metadata: { author_email: 'demo@example.com', created_on: '2025-01-04T00:00:00.000Z' },
+				resources: {
+					script: { handlers: ['fetch'] },
+					script_runtime: { compatibility_date: '2025-01-01' },
+					bindings: [
+						{ type: 'queue', name: 'JOBS', queue_name: 'jobs-queue' },
+						{ type: 'ratelimit', name: 'MY_RATE_LIMITER', namespace_id: '1001' },
+						{ type: 'service', name: 'AUTH_SERVICE', service: 'auth-service' },
+						{ type: 'worker_loader', name: 'LOADER' },
+						{ type: 'mtls_certificate', name: 'API_CERT', certificate_id: 'cert-123' },
+						{ type: 'dispatch_namespace', name: 'DISPATCHER', namespace: 'customers' },
+						{
+							type: 'workflow',
+							name: 'ORDER_WORKFLOW',
+							workflow_name: 'orders',
+							class_name: 'OrderWorkflow'
+						},
+						{ type: 'pipeline', name: 'EVENTS', pipeline: 'events-stream' },
+						{ type: 'images', name: 'IMAGES' },
+						{ type: 'media', name: 'MEDIA' },
+						{ type: 'artifacts', name: 'ARTIFACTS', namespace: 'default' },
+						{
+							type: 'secrets_store_secret',
+							name: 'API_TOKEN',
+							store_id: 'store-123',
+							secret_name: 'api-token'
+						},
+						{ type: 'analytics_engine', name: 'ANALYTICS', dataset: 'analytics-dataset' },
+						{ type: 'kv_namespace', name: 'CACHE', namespace_id: 'kv_abc' },
+						{ type: 'd1', name: 'DB', id: 'd1_xyz' },
+						{ type: 'r2_bucket', name: 'ASSETS', bucket_name: 'assets-bucket' },
+						{
+							type: 'durable_object_namespace',
+							name: 'COUNTER',
+							class_name: 'Counter',
+							script_name: 'main'
+						},
+						{ type: 'browser', name: 'BROWSER' },
+						{ type: 'ai', name: 'AI' },
+						{ type: 'plain_text', name: 'APP_NAME', text: 'demo-preview' },
+						{ type: 'secret_text', name: 'API_KEY' }
+					]
+				}
+			})
+		)
 
 		expect(parsed).toEqual([
 			{ type: 'Queue', bindingName: 'JOBS', resource: 'jobs-queue' },
@@ -79,17 +96,21 @@ describe('preview binding inspection helpers', () => {
 		expect(parseWranglerVersionBindings('not json')).toEqual([])
 		expect(parseWranglerVersionBindings('{}')).toEqual([])
 		expect(parseWranglerVersionBindings(JSON.stringify({ resources: {} }))).toEqual([])
-		expect(parseWranglerVersionBindings(JSON.stringify({ resources: { bindings: [] } }))).toEqual([])
+		expect(parseWranglerVersionBindings(JSON.stringify({ resources: { bindings: [] } }))).toEqual(
+			[]
+		)
 	})
 
 	test('parseWranglerVersionBindings carries entrypoint suffix on service bindings', () => {
-		const parsed = parseWranglerVersionBindings(JSON.stringify({
-			resources: {
-				bindings: [
-					{ type: 'service', name: 'INTERNAL', service: 'core-worker', entrypoint: 'AdminAPI' }
-				]
-			}
-		}))
+		const parsed = parseWranglerVersionBindings(
+			JSON.stringify({
+				resources: {
+					bindings: [
+						{ type: 'service', name: 'INTERNAL', service: 'core-worker', entrypoint: 'AdminAPI' }
+					]
+				}
+			})
+		)
 
 		expect(parsed).toEqual([
 			{ type: 'Worker', bindingName: 'INTERNAL', resource: 'core-worker#AdminAPI' }
@@ -97,13 +118,15 @@ describe('preview binding inspection helpers', () => {
 	})
 
 	test('parses Wrangler queue info output with inline and multiline worker lists', () => {
-		const parsed = parseWranglerQueueInfo(`
+		const parsed = parseWranglerQueueInfo(
+			`
 Queue Name: jobs-queue
 Producers:
   worker:demo-worker
   worker:other-worker
 Consumers: worker:demo-worker
-`.trim())
+`.trim()
+		)
 
 		expect(parsed).toEqual({
 			queueName: 'jobs-queue',
@@ -118,26 +141,29 @@ Consumers: worker:demo-worker
 			const url = String(input)
 
 			if (url.includes('/accounts/acc_123/workers/scripts?page=1&per_page=50')) {
-				return jsonResponse([
+				return jsonResponse(
+					[
+						{
+							id: 'script_demo',
+							name: 'demo-worker',
+							created_on: '2025-01-01T00:00:00.000Z',
+							modified_on: '2025-01-02T00:00:00.000Z'
+						},
+						{
+							id: 'script_other',
+							name: 'other-worker',
+							created_on: '2025-01-01T00:00:00.000Z',
+							modified_on: '2025-01-02T00:00:00.000Z'
+						}
+					],
 					{
-						id: 'script_demo',
-						name: 'demo-worker',
-						created_on: '2025-01-01T00:00:00.000Z',
-						modified_on: '2025-01-02T00:00:00.000Z'
-					},
-					{
-						id: 'script_other',
-						name: 'other-worker',
-						created_on: '2025-01-01T00:00:00.000Z',
-						modified_on: '2025-01-02T00:00:00.000Z'
+						page: 1,
+						per_page: 50,
+						total_pages: 1,
+						count: 2,
+						total_count: 2
 					}
-				], {
-					page: 1,
-					per_page: 50,
-					total_pages: 1,
-					count: 2,
-					total_count: 2
-				})
+				)
 			}
 
 			if (url.endsWith('/accounts/acc_123/workers/scripts/demo-worker/deployments')) {
@@ -148,9 +174,7 @@ Consumers: worker:demo-worker
 							created_on: '2025-01-04T00:00:00.000Z',
 							source: 'api',
 							strategy: 'percentage',
-							versions: [
-								{ percentage: 100, version_id: 'version-demo' }
-							],
+							versions: [{ percentage: 100, version_id: 'version-demo' }],
 							annotations: {},
 							author_email: 'demo@example.com'
 						}
@@ -166,9 +190,7 @@ Consumers: worker:demo-worker
 							created_on: '2025-01-04T00:00:00.000Z',
 							source: 'api',
 							strategy: 'percentage',
-							versions: [
-								{ percentage: 100, version_id: 'version-other' }
-							],
+							versions: [{ percentage: 100, version_id: 'version-other' }],
 							annotations: {},
 							author_email: 'other@example.com'
 						}
@@ -197,12 +219,22 @@ Consumers: worker:demo-worker
 									{ type: 'worker_loader', name: 'LOADER' },
 									{ type: 'mtls_certificate', name: 'API_CERT', certificate_id: 'cert-123' },
 									{ type: 'dispatch_namespace', name: 'DISPATCHER', namespace: 'customers' },
-									{ type: 'workflow', name: 'ORDER_WORKFLOW', workflow_name: 'orders', class_name: 'OrderWorkflow' },
+									{
+										type: 'workflow',
+										name: 'ORDER_WORKFLOW',
+										workflow_name: 'orders',
+										class_name: 'OrderWorkflow'
+									},
 									{ type: 'pipeline', name: 'EVENTS', pipeline: 'events-stream' },
 									{ type: 'images', name: 'IMAGES' },
 									{ type: 'media', name: 'MEDIA' },
 									{ type: 'artifacts', name: 'ARTIFACTS', namespace: 'default' },
-									{ type: 'secrets_store_secret', name: 'API_TOKEN', store_id: 'store-123', secret_name: 'api-token' },
+									{
+										type: 'secrets_store_secret',
+										name: 'API_TOKEN',
+										store_id: 'store-123',
+										secret_name: 'api-token'
+									},
 									{ type: 'service', name: 'AUTH_SERVICE', service: 'auth-service' }
 								]
 							}
@@ -218,9 +250,7 @@ Consumers: worker:demo-worker
 						exitCode: 0,
 						stdout: JSON.stringify({
 							resources: {
-								bindings: [
-									{ type: 'queue', name: 'JOBS', queue_name: 'jobs-queue' }
-								]
+								bindings: [{ type: 'queue', name: 'JOBS', queue_name: 'jobs-queue' }]
 							}
 						}),
 						stderr: '',
@@ -274,9 +304,7 @@ Consumers:
 				bindings: {
 					queues: {
 						producers: { JOBS: 'jobs-queue' },
-						consumers: [
-							{ queue: 'jobs-queue', deadLetterQueue: 'jobs-dlq' }
-						]
+						consumers: [{ queue: 'jobs-queue', deadLetterQueue: 'jobs-dlq' }]
 					},
 					services: {
 						AUTH_SERVICE: { service: 'auth-service' }
@@ -328,9 +356,7 @@ Consumers:
 						}
 					}
 				},
-				tailConsumers: [
-					'observability-tail'
-				]
+				tailConsumers: ['observability-tail']
 			},
 			workerName: 'demo-worker',
 			cwd: process.cwd(),
@@ -339,7 +365,9 @@ Consumers:
 
 		const jobsRow = inspection.rows.find((row) => row.resource === 'jobs-queue')
 		const rateLimitRow = inspection.rows.find((row) => row.resource === '1001')
-		const versionMetadataRow = inspection.rows.find((row) => row.reference === 'CF_VERSION_METADATA')
+		const versionMetadataRow = inspection.rows.find(
+			(row) => row.reference === 'CF_VERSION_METADATA'
+		)
 		const workerLoaderRow = inspection.rows.find((row) => row.reference === 'LOADER')
 		const mtlsCertificateRow = inspection.rows.find((row) => row.reference === 'API_CERT')
 		const dispatchNamespaceRow = inspection.rows.find((row) => row.reference === 'DISPATCHER')

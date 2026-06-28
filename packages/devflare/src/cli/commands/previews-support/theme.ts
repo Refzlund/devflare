@@ -1,8 +1,8 @@
 import {
 	bold,
+	createCliTheme,
 	cyan,
 	cyanBold,
-	createCliTheme,
 	dim,
 	formatTableLine,
 	green,
@@ -12,11 +12,7 @@ import {
 	yellow,
 	yellowBold
 } from '../../ui'
-import type {
-	PreviewOutputTheme,
-	StableWorkerRow,
-	PreviewScopeRow
-} from './types'
+import type { PreviewOutputTheme, PreviewScopeRow, StableWorkerRow } from './types'
 
 export {
 	bold,
@@ -95,8 +91,6 @@ function truncateCell(value: string, width: number): string {
 	return `${value.slice(0, width - 1)}…`
 }
 
-export function shortenVersionId(versionId: string, length: number = 12): string {
-	return versionId.length <= length
-		? versionId
-		: `${versionId.slice(0, length)}…`
+export function shortenVersionId(versionId: string, length = 12): string {
+	return versionId.length <= length ? versionId : `${versionId.slice(0, length)}…`
 }

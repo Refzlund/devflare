@@ -21,7 +21,10 @@ import {
 function pair(opts?: {
 	clientCaps?: string[]
 	serverCaps?: string[]
-	onServerCall?: (call: import('../../../../src/bridge/v2').TransportV2RpcCall, server: TransportV2Codec) => void
+	onServerCall?: (
+		call: import('../../../../src/bridge/v2').TransportV2RpcCall,
+		server: TransportV2Codec
+	) => void
 }) {
 	const { a, b } = createTransportV2Pair()
 	const client = new TransportV2Codec(a, { capabilities: opts?.clientCaps ?? [] })
@@ -51,14 +54,14 @@ describe('TransportV2Codec â€” handshake', () => {
 		// Pre-attach a catch on the server side so its rejection (when the
 		// peer's close cascades through) does not surface as an unhandled
 		// promise rejection in the test runner.
-		server.handshake.catch(() => { })
+		server.handshake.catch(() => {})
 		client.close(1000, 'before hello')
 		await expect(client.handshake).rejects.toThrow(/v2 transport closed/)
 	})
 })
 
 describe('TransportV2Codec â€” RPC', () => {
-	test('client.call resolves with the server\'s rpc.ok result', async () => {
+	test("client.call resolves with the server's rpc.ok result", async () => {
 		const { client, server } = pair({
 			onServerCall: (call, srv) => {
 				if (call.method === 'echo') srv.respondOk(call.id, call.params[0])
@@ -70,10 +73,14 @@ describe('TransportV2Codec â€” RPC', () => {
 		expect(result).toBe('hello world')
 	})
 
-	test('client.call rejects with the server\'s rpc.err message', async () => {
+	test("client.call rejects with the server's rpc.err message", async () => {
 		const { client, server } = pair({
 			onServerCall: (call, srv) => {
-				srv.respondErr(call.id, { code: 'EBOOM', message: 'server exploded', details: { trace: 'x' } })
+				srv.respondErr(call.id, {
+					code: 'EBOOM',
+					message: 'server exploded',
+					details: { trace: 'x' }
+				})
 			}
 		})
 		client.sendHello()
@@ -86,7 +93,7 @@ describe('TransportV2Codec â€” RPC', () => {
 	test('all pending RPC calls reject when the codec closes', async () => {
 		const { client, server } = pair({
 			// Server intentionally never replies.
-			onServerCall: () => { }
+			onServerCall: () => {}
 		})
 		client.sendHello()
 		await Promise.all([client.handshake, server.handshake])
@@ -113,19 +120,28 @@ describe('serializeRequestV2 / deserializeRequestV2 â€” streaming bodies', 
 			server.setRpcCallHandler((call) => {
 				if (call.method !== 'upload') return
 				try {
-					const serialized = call.params[0] as import('../../../../src/bridge/v2').TransportV2SerializedRequest
+					const serialized = call.params[0] as import(
+						'../../../../src/bridge/v2'
+					).TransportV2SerializedRequest
 					const reconstructed = deserializeRequestV2(serialized, server)
-					reconstructed.text().then((text) => {
-						server.respondOk(call.id, { length: text.length })
-						resolve(text)
-					}).catch(reject)
+					reconstructed
+						.text()
+						.then((text) => {
+							server.respondOk(call.id, { length: text.length })
+							resolve(text)
+						})
+						.catch(reject)
 				} catch (error) {
 					reject(error as Error)
 				}
 			})
 		})
 
-		const { serialized, bodyStreamPromise } = serializeRequestV2(sourceRequest, client, 'rpc_test_1')
+		const { serialized, bodyStreamPromise } = serializeRequestV2(
+			sourceRequest,
+			client,
+			'rpc_test_1'
+		)
 		expect(serialized.body?.type).toBe('stream')
 
 		const replyPromise = client.call('upload', [serialized])
@@ -158,11 +174,13 @@ describe('serializeRequestV2 / deserializeRequestV2 â€” streaming bodies', 
 			})
 			const { serialized, bodyStreamPromise } = serializeResponseV2(response, server, call.id)
 			server.respondOk(call.id, { response: serialized })
-			bodyStreamPromise.catch(() => { })
+			bodyStreamPromise.catch(() => {})
 		})
 
 		const reply = await client.call('download', [])
-		const serializedResponse = (reply as { response: import('../../../../src/bridge/v2').TransportV2SerializedResponse }).response
+		const serializedResponse = (
+			reply as { response: import('../../../../src/bridge/v2').TransportV2SerializedResponse }
+		).response
 		const reconstructed = deserializeResponseV2(serializedResponse, client)
 		const text = await reconstructed.text()
 		expect(reconstructed.status).toBe(200)
@@ -177,8 +195,8 @@ describe('TransportV2Codec â€” frame routing isolation', () => {
 		const left = new TransportV2Codec(a, { onUnknownControl: (m) => seen.push(m) })
 		const right = new TransportV2Codec(b)
 		// No handshake in this test; pre-catch to suppress unhandled rejection on close.
-		left.handshake.catch(() => { })
-		right.handshake.catch(() => { })
+		left.handshake.catch(() => {})
+		right.handshake.catch(() => {})
 		// Manually post a v1 message kind:
 		right.sendText('{"t":"event","topic":"v1-topic","data":42}')
 		// Wait one microtask cycle for delivery.
@@ -194,9 +212,11 @@ describe('TransportV2Codec â€” frame routing isolation', () => {
 		const seen: import('../../../../src/bridge/v2').TransportV2DecodedBinaryFrame[] = []
 		const left = new TransportV2Codec(a, { onUnknownBinary: (f) => seen.push(f) })
 		const right = new TransportV2Codec(b)
-		left.handshake.catch(() => { })
-		right.handshake.catch(() => { })
-		const { encodeTransportV2BinaryFrame, TransportV2BinaryKind } = await import('../../../../src/bridge/v2')
+		left.handshake.catch(() => {})
+		right.handshake.catch(() => {})
+		const { encodeTransportV2BinaryFrame, TransportV2BinaryKind } = await import(
+			'../../../../src/bridge/v2'
+		)
 		right.sendBinary(
 			encodeTransportV2BinaryFrame(TransportV2BinaryKind.WsData, 1, 0, 0, new Uint8Array([1, 2, 3]))
 		)
@@ -216,8 +236,8 @@ describe('TransportV2Codec — B5-frame: out-of-band wire error', () => {
 		const seen: import('../../../../src/bridge/v2').TransportV2WireError[] = []
 		const left = new TransportV2Codec(a, { onWireError: (e) => seen.push(e) })
 		const right = new TransportV2Codec(b)
-		left.handshake.catch(() => { })
-		right.handshake.catch(() => { })
+		left.handshake.catch(() => {})
+		right.handshake.catch(() => {})
 		right.sendWireError({
 			scope: 'stream',
 			error: { code: 'EBADCHUNK', message: 'malformed body chunk', details: { sid: 7 } },
@@ -240,8 +260,8 @@ describe('TransportV2Codec — B5-frame: out-of-band wire error', () => {
 		const unknown: string[] = []
 		const left = new TransportV2Codec(a, { onUnknownControl: (m) => unknown.push(m) })
 		const right = new TransportV2Codec(b)
-		left.handshake.catch(() => { })
-		right.handshake.catch(() => { })
+		left.handshake.catch(() => {})
+		right.handshake.catch(() => {})
 		// scope missing — must not be parsed as a wire error.
 		right.sendText('{"t":"error","error":{"code":"X","message":"y"}}')
 		await Promise.resolve()
@@ -251,4 +271,3 @@ describe('TransportV2Codec — B5-frame: out-of-band wire error', () => {
 		right.close()
 	})
 })
-

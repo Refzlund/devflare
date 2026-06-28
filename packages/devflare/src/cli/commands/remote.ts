@@ -5,19 +5,19 @@
 // =============================================================================
 
 import type { ConsolaInstance } from 'consola'
-import type { ParsedArgs, CliOptions, CliResult } from '../index'
-import { BOLD, DIM, RESET, GREEN, RED, YELLOW } from '../colors'
 import {
-	enableRemoteMode,
 	disableRemoteMode,
+	enableRemoteMode,
 	getEffectiveRemoteModeStatus
 } from '../../cloudflare/remote-config'
+import { BOLD, DIM, GREEN, RED, RESET, YELLOW } from '../colors'
+import type { CliOptions, CliResult, ParsedArgs } from '../index'
 
 // -----------------------------------------------------------------------------
 // Output Helpers
 // -----------------------------------------------------------------------------
 
-function log(message: string = ''): void {
+function log(message = ''): void {
 	console.log(message)
 }
 
@@ -74,14 +74,16 @@ function enable(inputMinutes: number): void {
 function disable(): void {
 	const statusBefore = getEffectiveRemoteModeStatus()
 	disableRemoteMode()
-	
+
 	log()
 	log(`${GREEN}✓${RESET} Remote test mode ${BOLD}disabled${RESET}`)
-	
+
 	// Warn if env var still active
 	if (statusBefore.envVarSet) {
 		log()
-		log(`${YELLOW}⚠${RESET}  Note: ${BOLD}DEVFLARE_REMOTE${RESET} environment variable is still set.`)
+		log(
+			`${YELLOW}⚠${RESET}  Note: ${BOLD}DEVFLARE_REMOTE${RESET} environment variable is still set.`
+		)
 		log(`   Remote mode will remain active until you unset it.`)
 	} else {
 		log(`  Remote-only tests (AI, Vectorize) will now be skipped.`)
@@ -103,8 +105,8 @@ export function runRemoteCommand(
 
 	switch (subcommand) {
 		case 'enable': {
-			const minutes = arg ? parseInt(arg, 10) : 30
-			enable(isNaN(minutes) ? 30 : minutes)
+			const minutes = arg ? Number.parseInt(arg, 10) : 30
+			enable(Number.isNaN(minutes) ? 30 : minutes)
 			return { exitCode: 0 }
 		}
 

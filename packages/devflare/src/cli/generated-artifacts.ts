@@ -32,7 +32,7 @@ export function getGeneratedArtifactPaths(cwd: string): GeneratedArtifactPaths {
 
 export async function ensureGeneratedDirectory(
 	dirPath: string,
-	writeGitignore: boolean = false
+	writeGitignore = false
 ): Promise<void> {
 	const fs = await import('node:fs/promises')
 	await fs.mkdir(dirPath, { recursive: true })

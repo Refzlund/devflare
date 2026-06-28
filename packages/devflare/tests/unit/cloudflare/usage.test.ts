@@ -3,8 +3,8 @@
 // =============================================================================
 
 import { describe, expect, test } from 'bun:test'
-import { recordUsage, type RecordUsageDeps } from '../../../src/cloudflare/usage'
 import type { UsageRecord } from '../../../src/cloudflare/types'
+import { type RecordUsageDeps, recordUsage } from '../../../src/cloudflare/usage'
 
 interface KvState {
 	value: string | null
@@ -24,7 +24,7 @@ function createDeps(state: KvState, overrides: Partial<RecordUsageDeps> = {}): R
 			const next = state.concurrentWrites.shift()
 			if (next) next(state)
 		},
-		sleep: async () => { },
+		sleep: async () => {},
 		maxAttempts: 5,
 		...overrides
 	}

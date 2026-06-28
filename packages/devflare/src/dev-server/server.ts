@@ -7,34 +7,50 @@
 import type { ConsolaInstance } from 'consola'
 import type { Miniflare as MiniflareType } from 'miniflare'
 import { dirname, resolve } from 'pathe'
-import { loadConfig } from '../config/loader'
-import { applyLocalDevVarsToConfig } from '../config/local-dev-vars'
+import { type DOBundleResult, bundleWorkerEntry } from '../bundler'
+import { checkRemoteBindingRequirements } from '../cli/wrangler-auth'
 import {
 	EnvVarResolutionError,
 	getDevflareDotenvPaths,
 	resolveConfigEnvVars
 } from '../config/env-vars'
-import { bundleWorkerEntry, type DOBundleResult } from '../bundler'
-import { checkRemoteBindingRequirements } from '../cli/wrangler-auth'
+import { loadConfig } from '../config/loader'
+import { applyLocalDevVarsToConfig } from '../config/local-dev-vars'
+import { resolveServiceBindings } from '../test/resolve-service-bindings'
 import { setLocalSendEmailBindings } from '../utils/send-email'
 import { prepareComposedWorkerEntrypoint } from '../worker-entry/composed-worker'
 import { discoverRoutes } from '../worker-entry/routes'
+import { bundleWorkflowEntrypointScript } from '../workflows/local-workflow-entrypoints'
 import { runD1Migrations } from './d1-migrations'
-import { createMiniflareLog } from './miniflare-log'
+import {
+	type DevServerState,
+	createDevServerState,
+	disposeDevServerState
+} from './dev-server-state'
 import { buildMiniflareDevConfig } from './miniflare-dev-config'
-import { createRuntimeStdioForwarder } from './runtime-stdio'
-import { startViteProcess } from './vite-process'
+import { createMiniflareLog } from './miniflare-log'
 import { createReloadQueue } from './reload-queue'
+import { createRuntimeStdioForwarder } from './runtime-stdio'
+import {
+	logMiniflareBindingDiagnostics,
+	logMiniflareConfigDiagnostics,
+	logRemoteBindingRequirements,
+	logWorkerHandlerDetection,
+	maybeStartBrowserShim,
+	maybeStartDOBundler,
+	resolveViteIntegration,
+	resolveWorkerConfigWatchPath
+} from './server-startup-helpers'
+import { startViteProcess } from './vite-process'
+import {
+	applyWatcherTargetDiff,
+	startWorkerSourceWatcher as createWorkerSourceWatcher
+} from './worker-source-watcher'
 import {
 	collectWorkerWatchRoots,
 	hasWorkerSurfacePaths,
 	resolveMainWorkerSurfacePaths
 } from './worker-surface-paths'
-import { applyWatcherTargetDiff, startWorkerSourceWatcher as createWorkerSourceWatcher } from './worker-source-watcher'
-import { logMiniflareBindingDiagnostics, logMiniflareConfigDiagnostics, logRemoteBindingRequirements, logWorkerHandlerDetection, maybeStartBrowserShim, maybeStartDOBundler, resolveViteIntegration, resolveWorkerConfigWatchPath } from './server-startup-helpers'
-import { createDevServerState, disposeDevServerState, type DevServerState } from './dev-server-state'
-import { bundleWorkflowEntrypointScript } from '../workflows/local-workflow-entrypoints'
-import { resolveServiceBindings } from '../test/resolve-service-bindings'
 
 // -----------------------------------------------------------------------------
 
@@ -183,9 +199,8 @@ export function createDevServer(options: DevServerOptions): DevServer {
 		state.miniflare = new Miniflare(mfConfig)
 		await state.miniflare.ready
 
-		const displayHost = miniflareHost === '0.0.0.0' || miniflareHost === '::'
-			? 'localhost'
-			: miniflareHost
+		const displayHost =
+			miniflareHost === '0.0.0.0' || miniflareHost === '::' ? 'localhost' : miniflareHost
 		logger?.success(`Miniflare ready on http://${displayHost}:${miniflarePort}`)
 
 		if (shouldLogMiniflareDiagnostics) {
@@ -200,8 +215,6 @@ export function createDevServer(options: DevServerOptions): DevServer {
 		state.currentDoResult = doResult
 		await reloadQueue.schedule()
 	}
-
-
 
 	async function refreshWorkerOnlySurfaceState(): Promise<void> {
 		if (!state.config) {
@@ -280,8 +293,8 @@ export function createDevServer(options: DevServerOptions): DevServer {
 	}
 
 	async function waitForDotenvChange(): Promise<void> {
-		const configWatchPath = state.resolvedWorkerConfigPath
-			?? await resolveWorkerConfigWatchPath(cwd, configPath)
+		const configWatchPath =
+			state.resolvedWorkerConfigPath ?? (await resolveWorkerConfigWatchPath(cwd, configPath))
 		const startDir = configWatchPath ? dirname(configWatchPath) : cwd
 		const watchPaths = getDevflareDotenvPaths(startDir)
 		const { watch } = await import('chokidar')
@@ -371,8 +384,9 @@ export function createDevServer(options: DevServerOptions): DevServer {
 		await refreshWorkerOnlySurfaceState()
 
 		if (
-			!state.enableVite
-			&& (hasWorkerSurfacePaths(state.mainWorkerSurfacePaths) || Boolean(state.mainWorkerRoutes?.routes.length))
+			!state.enableVite &&
+			(hasWorkerSurfacePaths(state.mainWorkerSurfacePaths) ||
+				Boolean(state.mainWorkerRoutes?.routes.length))
 		) {
 			logWorkerHandlerDetection(
 				logger,
@@ -382,7 +396,13 @@ export function createDevServer(options: DevServerOptions): DevServer {
 				state.mainWorkerRoutes
 			)
 		} else if (!state.enableVite) {
-			logWorkerHandlerDetection(logger, state.enableVite, false, state.mainWorkerSurfacePaths, state.mainWorkerRoutes)
+			logWorkerHandlerDetection(
+				logger,
+				state.enableVite,
+				false,
+				state.mainWorkerSurfacePaths,
+				state.mainWorkerRoutes
+			)
 		}
 
 		// Check for remote bindings and warn if requirements not met
@@ -390,7 +410,11 @@ export function createDevServer(options: DevServerOptions): DevServer {
 		logRemoteBindingRequirements(logger, remoteCheck)
 
 		// Start browser shim if browser rendering is configured
-		state.browserShim = await maybeStartBrowserShim(state.config, { browserShimPort: state.browserShimPort, logger, verbose })
+		state.browserShim = await maybeStartBrowserShim(state.config, {
+			browserShimPort: state.browserShimPort,
+			logger,
+			verbose
+		})
 
 		// Bundle DOs if pattern is set
 		const doInit = await maybeStartDOBundler(state.config, {

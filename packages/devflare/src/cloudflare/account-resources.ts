@@ -1,4 +1,4 @@
-import { apiDelete, apiGetAll, apiPost, CloudflareAPIError, type APIClientOptions } from './api'
+import { type APIClientOptions, CloudflareAPIError, apiDelete, apiGetAll, apiPost } from './api'
 import type {
 	AIModel,
 	AIModelInfo,
@@ -57,20 +57,14 @@ export async function deleteKVNamespace(
 	options?: APIClientOptions
 ): Promise<void> {
 	const encodedNamespaceId = encodeURIComponent(namespaceId)
-	await apiDelete<{}>(
-		`/accounts/${accountId}/storage/kv/namespaces/${encodedNamespaceId}`,
-		options
-	)
+	await apiDelete<{}>(`/accounts/${accountId}/storage/kv/namespaces/${encodedNamespaceId}`, options)
 }
 
 export async function listD1Databases(
 	accountId: string,
 	options?: APIClientOptions
 ): Promise<D1DatabaseInfo[]> {
-	const databases = await apiGetAll<D1Database>(
-		`/accounts/${accountId}/d1/database`,
-		options
-	)
+	const databases = await apiGetAll<D1Database>(`/accounts/${accountId}/d1/database`, options)
 
 	return databases.map((database) => ({
 		id: database.uuid,
@@ -94,7 +88,9 @@ export async function createD1Database(
 		{
 			name,
 			...(options?.jurisdiction ? { jurisdiction: options.jurisdiction } : {}),
-			...(options?.primaryLocationHint ? { primary_location_hint: options.primaryLocationHint } : {})
+			...(options?.primaryLocationHint
+				? { primary_location_hint: options.primaryLocationHint }
+				: {})
 		},
 		options
 	)
@@ -114,10 +110,7 @@ export async function deleteD1Database(
 	options?: APIClientOptions
 ): Promise<void> {
 	const encodedDatabaseId = encodeURIComponent(databaseId)
-	await apiDelete<{}>(
-		`/accounts/${accountId}/d1/database/${encodedDatabaseId}`,
-		options
-	)
+	await apiDelete<{}>(`/accounts/${accountId}/d1/database/${encodedDatabaseId}`, options)
 }
 
 export async function queryD1Database<T = Record<string, unknown>>(
@@ -158,15 +151,16 @@ export async function listQueues(
 	accountId: string,
 	options?: APIClientOptions
 ): Promise<QueueInfo[]> {
-	const queues = await apiGetAll<Queue>(
-		`/accounts/${accountId}/queues`,
-		options
-	)
+	const queues = await apiGetAll<Queue>(`/accounts/${accountId}/queues`, options)
 
 	return queues
 		.filter((queue): queue is Queue & { queue_id: string; queue_name: string } => {
-			return typeof queue.queue_id === 'string' && queue.queue_id.length > 0
-				&& typeof queue.queue_name === 'string' && queue.queue_name.length > 0
+			return (
+				typeof queue.queue_id === 'string' &&
+				queue.queue_id.length > 0 &&
+				typeof queue.queue_name === 'string' &&
+				queue.queue_name.length > 0
+			)
 		})
 		.map((queue) => ({
 			id: queue.queue_id,
@@ -207,20 +201,14 @@ export async function deleteQueue(
 	options?: APIClientOptions
 ): Promise<void> {
 	const encodedQueueId = encodeURIComponent(queueId)
-	await apiDelete<{}>(
-		`/accounts/${accountId}/queues/${encodedQueueId}`,
-		options
-	)
+	await apiDelete<{}>(`/accounts/${accountId}/queues/${encodedQueueId}`, options)
 }
 
 export async function listR2Buckets(
 	accountId: string,
 	options?: APIClientOptions
 ): Promise<R2BucketInfo[]> {
-	const buckets = await apiGetAll<R2Bucket>(
-		`/accounts/${accountId}/r2/buckets`,
-		options
-	)
+	const buckets = await apiGetAll<R2Bucket>(`/accounts/${accountId}/r2/buckets`, options)
 
 	return buckets.map((bucket) => ({
 		name: bucket.name,
@@ -260,10 +248,7 @@ export async function deleteR2Bucket(
 	options?: APIClientOptions
 ): Promise<void> {
 	const encodedBucketName = encodeURIComponent(bucketName)
-	await apiDelete<{}>(
-		`/accounts/${accountId}/r2/buckets/${encodedBucketName}`,
-		options
-	)
+	await apiDelete<{}>(`/accounts/${accountId}/r2/buckets/${encodedBucketName}`, options)
 }
 
 export async function listHyperdrives(
@@ -289,10 +274,7 @@ export async function deleteHyperdrive(
 	options?: APIClientOptions
 ): Promise<void> {
 	const encodedHyperdriveId = encodeURIComponent(hyperdriveId)
-	await apiDelete<{}>(
-		`/accounts/${accountId}/hyperdrive/configs/${encodedHyperdriveId}`,
-		options
-	)
+	await apiDelete<{}>(`/accounts/${accountId}/hyperdrive/configs/${encodedHyperdriveId}`, options)
 }
 
 export async function listVectorizeIndexes(
@@ -360,10 +342,7 @@ export async function deleteVectorizeIndex(
 	options?: APIClientOptions
 ): Promise<void> {
 	const encodedIndexName = encodeURIComponent(indexName)
-	await apiDelete<{}>(
-		`/accounts/${accountId}/vectorize/v2/indexes/${encodedIndexName}`,
-		options
-	)
+	await apiDelete<{}>(`/accounts/${accountId}/vectorize/v2/indexes/${encodedIndexName}`, options)
 }
 
 export async function listAIModels(
@@ -371,10 +350,7 @@ export async function listAIModels(
 	options?: APIClientOptions
 ): Promise<AIModelInfo[]> {
 	try {
-		const models = await apiGetAll<AIModel>(
-			`/accounts/${accountId}/ai/models/search`,
-			options
-		)
+		const models = await apiGetAll<AIModel>(`/accounts/${accountId}/ai/models/search`, options)
 
 		return models.map((model) => ({
 			id: model.id,

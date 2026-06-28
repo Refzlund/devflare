@@ -2,9 +2,9 @@
 // Vite Plugin Transform Hook — Integration Tests
 // =============================================================================
 
-import { describe, expect, test, beforeEach } from 'bun:test'
-import { devflarePlugin } from '../../../src/vite/plugin'
+import { beforeEach, describe, expect, test } from 'bun:test'
 import type { Plugin, TransformResult } from 'vite'
+import { devflarePlugin } from '../../../src/vite/plugin'
 
 /** Transform function signature - uses unknown for this context since we don't use it */
 type TransformFn = (
@@ -91,12 +91,7 @@ export class Counter extends DurableObject {
 }
 			`
 
-			const result = await transformFn.call(
-				mockContext,
-				code,
-				'/project/src/do/counter.ts',
-				{}
-			)
+			const result = await transformFn.call(mockContext, code, '/project/src/do/counter.ts', {})
 
 			expect(result).not.toBeNull()
 			expect(typeof result === 'object' && result !== null && 'code' in result).toBe(true)
@@ -111,12 +106,7 @@ export class StateDO extends DurableObject {
 }
 			`
 
-			const result = await transformFn.call(
-				mockContext,
-				code,
-				'/project/src/do/state.tsx',
-				{}
-			)
+			const result = await transformFn.call(mockContext, code, '/project/src/do/state.tsx', {})
 
 			expect(result).not.toBeNull()
 		})
@@ -136,17 +126,13 @@ export class Counter extends DurableObject {
 }
 			`
 
-			const result = await transformFn.call(
-				mockContext,
-				code,
-				'/project/src/counter.ts',
-				{}
-			)
+			const result = await transformFn.call(mockContext, code, '/project/src/counter.ts', {})
 
 			expect(result).not.toBeNull()
-			const output = typeof result === 'object' && result !== null && 'code' in result
-				? (result as { code: string }).code
-				: ''
+			const output =
+				typeof result === 'object' && result !== null && 'code' in result
+					? (result as { code: string }).code
+					: ''
 
 			// Should contain wrapper with actual naming pattern
 			expect(output).toContain('CounterWrapper')
@@ -168,17 +154,13 @@ export class Timer extends DurableObject {
 }
 			`
 
-			const result = await transformFn.call(
-				mockContext,
-				code,
-				'/project/src/objects.ts',
-				{}
-			)
+			const result = await transformFn.call(mockContext, code, '/project/src/objects.ts', {})
 
 			expect(result).not.toBeNull()
-			const output = typeof result === 'object' && result !== null && 'code' in result
-				? (result as { code: string }).code
-				: ''
+			const output =
+				typeof result === 'object' && result !== null && 'code' in result
+					? (result as { code: string }).code
+					: ''
 
 			// Both should be wrapped with actual naming pattern
 			expect(output).toContain('CounterWrapper')
@@ -196,12 +178,7 @@ export class Counter extends DurableObject {
 }
 			`
 
-			const result = await transformFn.call(
-				mockContext,
-				code,
-				'/project/src/counter.ts',
-				{}
-			)
+			const result = await transformFn.call(mockContext, code, '/project/src/counter.ts', {})
 
 			expect(result).not.toBeNull()
 			if (typeof result === 'object' && result !== null && 'map' in result) {
@@ -248,12 +225,7 @@ export class Counter {
 }
 			`
 
-			const result = await transformFn.call(
-				mockContext,
-				code,
-				'/project/src/counter.ts',
-				{}
-			)
+			const result = await transformFn.call(mockContext, code, '/project/src/counter.ts', {})
 
 			// Should at least detect the code contains @durableObject
 			// Full decorator support will be added in Phase C

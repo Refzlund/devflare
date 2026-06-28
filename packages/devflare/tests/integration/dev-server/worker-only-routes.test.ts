@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'pathe'
-import { createDevServer, type DevServer } from '../../../src/dev-server'
+import { type DevServer, createDevServer } from '../../../src/dev-server'
 import {
 	cleanupTempDirs,
 	getAvailablePort,

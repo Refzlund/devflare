@@ -62,7 +62,7 @@ export function detectRemoteBindings(config: DevflareConfig): string[] {
 
 /**
  * Check if wrangler is logged in by running `wrangler whoami`
- * 
+ *
  * Returns:
  * - loggedIn: true if user is authenticated
  * - accountId: the account ID if available
@@ -124,7 +124,7 @@ export async function checkWranglerAuth(): Promise<WranglerAuthStatus> {
 
 /**
  * Check if remote bindings are properly configured
- * 
+ *
  * Returns warnings if:
  * - Config has remote-only bindings but no accountId
  * - Config has remote-only bindings but user is not logged in to wrangler

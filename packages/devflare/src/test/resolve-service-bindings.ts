@@ -5,23 +5,18 @@
 // this module resolves the referenced worker configs and bundles their scripts.
 // =============================================================================
 
-import { dirname, join, resolve } from 'path'
 import { existsSync, readFileSync } from 'fs'
+import { dirname, join, resolve } from 'path'
 import {
-	getLocalD1DatabaseIdentifier,
-	getLocalKVNamespaceIdentifier,
-	normalizeDOBinding,
-	configSchema,
+	type DOBindingRef,
 	type DevflareConfig,
 	type DurableObjectBinding,
-	type DOBindingRef
+	configSchema,
+	getLocalD1DatabaseIdentifier,
+	getLocalKVNamespaceIdentifier,
+	normalizeDOBinding
 } from '../config'
 import type { RefResult, WorkerBinding } from '../config/ref'
-import { transformWorkerEntrypoint } from '../transform/worker-entrypoint'
-import { discoverEntrypointsSync } from '../utils/entrypoint-discovery'
-import { findDurableObjectClasses } from '../transform/durable-object'
-import { findFilesSync, DEFAULT_DO_PATTERN } from '../utils/glob'
-import { resolvePackageSpecifier } from '../utils/resolve-package'
 import {
 	buildAiSearchInstancesConfig,
 	buildAiSearchNamespacesConfig,
@@ -40,24 +35,31 @@ import {
 	buildWorkerLoadersConfig,
 	buildWorkflowsConfig
 } from '../dev-server/miniflare-bindings'
+import { findDurableObjectClasses } from '../transform/durable-object'
+import { transformWorkerEntrypoint } from '../transform/worker-entrypoint'
+import { discoverEntrypointsSync } from '../utils/entrypoint-discovery'
+import { DEFAULT_DO_PATTERN, findFilesSync } from '../utils/glob'
+import { resolvePackageSpecifier } from '../utils/resolve-package'
 
 // -----------------------------------------------------------------------------
 // Bun Runtime Detection
 // -----------------------------------------------------------------------------
 
-function getBunRuntime(): {
-	build: (options: {
-		entrypoints: string[]
-		target: string
-		format: string
-		minify: boolean
-		external?: string[]
-	}) => Promise<{
-		success: boolean
-		logs: string[]
-		outputs: Array<{ text: () => Promise<string> }>
-	}>
-} | undefined {
+function getBunRuntime():
+	| {
+			build: (options: {
+				entrypoints: string[]
+				target: string
+				format: string
+				minify: boolean
+				external?: string[]
+			}) => Promise<{
+				success: boolean
+				logs: string[]
+				outputs: Array<{ text: () => Promise<string> }>
+			}>
+	  }
+	| undefined {
 	const g = globalThis as { Bun?: unknown }
 	if (typeof g.Bun === 'object' && g.Bun !== null) {
 		return g.Bun as ReturnType<typeof getBunRuntime>
@@ -76,7 +78,10 @@ function getBunRuntime(): {
  * Uses the same glob pattern as the rest of the codebase for consistency.
  * Returns map of className -> filePath
  */
-function discoverDOFilesSync(dir: string, pattern: string = DEFAULT_DO_PATTERN): Map<string, string> {
+function discoverDOFilesSync(
+	dir: string,
+	pattern: string = DEFAULT_DO_PATTERN
+): Map<string, string> {
 	const classToPath = new Map<string, string>()
 
 	try {
@@ -152,12 +157,15 @@ export interface ResolvedWorker {
 	workerLoaders?: Record<string, Record<string, never>>
 	mtlsCertificates?: Record<string, { certificate_id: string }>
 	dispatchNamespaces?: Record<string, { namespace: string }>
-	workflows?: Record<string, {
-		name: string
-		className: string
-		scriptName?: string
-		stepLimit?: number
-	}>
+	workflows?: Record<
+		string,
+		{
+			name: string
+			className: string
+			scriptName?: string
+			stepLimit?: number
+		}
+	>
 	pipelines?: Record<string, string | { pipeline: string }>
 	hyperdrives?: Record<string, string>
 	media?: { binding: string }
@@ -186,7 +194,12 @@ export interface ServiceBindingResolution {
 }
 
 function findDefaultServiceWorkerEntrypoint(refConfigDir: string): string | null {
-	for (const candidate of ['src/worker.ts', 'src/worker.js']) {
+	// The default service-binding RPC surface is the conventional `worker.{ts,js}`
+	// (transformed into a WorkerEntrypoint), looked up at the referenced config's
+	// root (e.g. case5's `math-service/worker.ts`) and the conventional `src/`
+	// location. This is deliberately distinct from `files.fetch` (the HTTP fetch
+	// handler) — the fetch file must NOT be bundled as the RPC surface.
+	for (const candidate of ['worker.ts', 'worker.js', 'src/worker.ts', 'src/worker.js']) {
 		const absolutePath = resolve(refConfigDir, candidate)
 		if (existsSync(absolutePath)) {
 			return absolutePath
@@ -316,7 +329,9 @@ async function resolveReferencedLocalDurableObjects(
 
 		const scriptPath = discoveredDOs.get(doConfig.className)
 		if (!scriptPath) {
-			console.warn(`[devflare] DO "${bindingName}" (class: ${doConfig.className}) not found in files.durableObjects for "${workerName}"`)
+			console.warn(
+				`[devflare] DO "${bindingName}" (class: ${doConfig.className}) not found in files.durableObjects for "${workerName}"`
+			)
 			continue
 		}
 
@@ -345,17 +360,19 @@ async function resolveReferencedLocalDurableObjects(
 	}
 
 	return {
-		workers: [{
-			name: doWorkerName,
-			script,
-			modules: true,
-			compatibilityDate: config.compatibilityDate,
-			...doRuntimeConfig,
-			...(Object.keys(mergedServiceBindings).length > 0 && {
-				serviceBindings: mergedServiceBindings
-			}),
-			durableObjects
-		}],
+		workers: [
+			{
+				name: doWorkerName,
+				script,
+				modules: true,
+				compatibilityDate: config.compatibilityDate,
+				...doRuntimeConfig,
+				...(Object.keys(mergedServiceBindings).length > 0 && {
+					serviceBindings: mergedServiceBindings
+				}),
+				durableObjects
+			}
+		],
 		bindings: Object.fromEntries(
 			doClasses.map((do_) => [
 				do_.bindingName,
@@ -478,8 +495,9 @@ export async function resolveServiceBindings(
 
 /**
  * Resolve a referenced worker config to a bundled script.
- * Bundles the default `src/worker.{ts,js}` RPC surface plus any named
- * entrypoints discovered from `files.entrypoints` into a single script.
+ * Bundles the default `worker.{ts,js}` (root) or `src/worker.{ts,js}` RPC
+ * surface plus any named entrypoints discovered from `files.entrypoints` into a
+ * single script.
  */
 async function resolveRefWorker(
 	ref: RefResult,
@@ -499,7 +517,7 @@ async function resolveRefWorker(
 	// Collect all entrypoints to bundle
 	const entrypoints: Array<{ path: string; className: string; isWorkerTs: boolean }> = []
 
-	// 1. Default worker RPC surface from src/worker.{ts,js}
+	// 1. Default worker RPC surface from worker.{ts,js} (root) or src/worker.{ts,js}
 	const workerEntrypointPath = findDefaultServiceWorkerEntrypoint(refConfigDir)
 
 	if (workerEntrypointPath) {
@@ -514,9 +532,7 @@ async function resolveRefWorker(
 	if (config.files?.entrypoints !== false) {
 		const discoveredEntrypoints = discoverEntrypointsSync(
 			refConfigDir,
-			typeof config.files?.entrypoints === 'string'
-				? config.files.entrypoints
-				: undefined
+			typeof config.files?.entrypoints === 'string' ? config.files.entrypoints : undefined
 		)
 
 		for (const ep of discoveredEntrypoints) {
@@ -609,9 +625,7 @@ async function bundleAllEntrypoints(
 
 		// Create the unified entry file
 		// Include default export for the Worker class (used when no entrypoint is specified)
-		const defaultExport = defaultExportClass
-			? `\nexport default ${defaultExportClass}`
-			: ''
+		const defaultExport = defaultExportClass ? `\nexport default ${defaultExportClass}` : ''
 
 		const entryCode = `
 ${imports.join('\n')}
@@ -634,7 +648,9 @@ export { ${exports.join(', ')} }${defaultExport}
 			})
 
 			if (!result.success) {
-				console.warn(`[devflare] Failed to bundle worker "${workerName}": ${result.logs.join('\n')}`)
+				console.warn(
+					`[devflare] Failed to bundle worker "${workerName}": ${result.logs.join('\n')}`
+				)
 				return null
 			}
 
@@ -801,8 +817,9 @@ async function resolveDORefWorker(
 			if (discoveredPath) {
 				doClasses.push({ bindingName, className, scriptPath: discoveredPath })
 			} else {
-				console.warn(`[devflare] DO "${bindingName}" (class: ${className}) not found in do.*.ts files in "${ref.name}"`)
-				continue
+				console.warn(
+					`[devflare] DO "${bindingName}" (class: ${className}) not found in do.*.ts files in "${ref.name}"`
+				)
 			}
 		}
 	}
@@ -852,9 +869,9 @@ async function bundleDOClasses(
 		const { writeFileSync, mkdirSync, unlinkSync } = await import('fs')
 
 		// Build imports and exports for DO classes
-		const imports = doClasses.map((d) =>
-			`import { ${d.className} } from '${d.scriptPath.replace(/\\/g, '/')}'`
-		).join('\n')
+		const imports = doClasses
+			.map((d) => `import { ${d.className} } from '${d.scriptPath.replace(/\\/g, '/')}'`)
+			.join('\n')
 
 		const exports = doClasses.map((d) => d.className).join(', ')
 
@@ -889,7 +906,9 @@ export default {
 			})
 
 			if (!result.success) {
-				console.warn(`[devflare] Failed to bundle DO worker "${workerName}": ${result.logs.join('\n')}`)
+				console.warn(
+					`[devflare] Failed to bundle DO worker "${workerName}": ${result.logs.join('\n')}`
+				)
 				return null
 			}
 
@@ -897,7 +916,11 @@ export default {
 			bundleCache.set(cacheKey, bundledCode)
 			return bundledCode
 		} finally {
-			try { unlinkSync(entryPath) } catch { /* ignore */ }
+			try {
+				unlinkSync(entryPath)
+			} catch {
+				/* ignore */
+			}
 		}
 	} catch (error) {
 		console.warn(`[devflare] Error bundling DO worker "${workerName}":`, error)

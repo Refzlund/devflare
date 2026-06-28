@@ -1,19 +1,19 @@
+import { afterEach, describe, expect, test } from 'bun:test'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, test } from 'bun:test'
 
+import { startMiniflareFromConfig } from '../../../src/bridge/miniflare'
+import type { DevflareConfig } from '../../../src/config'
 import {
+	buildLocalSecretWrappedBindingConfig,
 	deleteLocalSecret,
 	listLocalSecrets,
-	buildLocalSecretWrappedBindingConfig,
 	readLocalSecret,
 	resolveLocalSecretValuesForBindings,
 	seedMiniflareLocalSecrets,
 	writeLocalSecret
 } from '../../../src/secrets/local-secrets'
-import type { DevflareConfig } from '../../../src/config'
-import { startMiniflareFromConfig } from '../../../src/bridge/miniflare'
 
 const tempDirs: string[] = []
 

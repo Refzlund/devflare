@@ -36,7 +36,7 @@ export async function resolveConfigCandidatePath(candidatePath: string): Promise
 		}
 	}
 
-	return await resolveConfigPath(candidatePath) ?? null
+	return (await resolveConfigPath(candidatePath)) ?? null
 }
 
 export async function findConfigPathsUnderDirectory(rootDir: string): Promise<string[]> {

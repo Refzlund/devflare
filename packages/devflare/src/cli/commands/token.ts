@@ -1,10 +1,11 @@
-import { type ConsolaInstance } from 'consola'
-import type { ParsedArgs, CliOptions, CliResult } from '../index'
+import type { ConsolaInstance } from 'consola'
 import { getPrimaryAccount } from '../../cloudflare/account'
-import { CloudflareAPIError, AuthenticationError, type APIClientOptions } from '../../cloudflare/api'
+import {
+	type APIClientOptions,
+	AuthenticationError,
+	CloudflareAPIError
+} from '../../cloudflare/api'
 import { getWorkspaceAccountId } from '../../cloudflare/preferences'
-import type { AccountOwnedAPIToken } from '../../cloudflare/types'
-import { createCliTheme, dim, green, logLine, logTable, whiteDim, yellow } from '../ui'
 import {
 	createAccountOwnedAPIToken,
 	deleteAccountOwnedAPIToken,
@@ -17,9 +18,13 @@ import {
 	selectDevflarePermissionGroups,
 	stripDevflareTokenNamePrefix
 } from '../../cloudflare/tokens'
+import type { AccountOwnedAPIToken } from '../../cloudflare/types'
+import type { CliOptions, CliResult, ParsedArgs } from '../index'
+import { createCliTheme, dim, green, logLine, logTable, whiteDim, yellow } from '../ui'
 
 const CLI_API_OPTIONS: APIClientOptions = { timeout: 10000 }
-const TOKENS_USAGE = 'devflare tokens <bootstrap-token> (--list | --new [token-name] | --roll [token-name] | --delete [token-name] | --delete-all) [--account <id>] [--all-flags]'
+const TOKENS_USAGE =
+	'devflare tokens <bootstrap-token> (--list | --new [token-name] | --roll [token-name] | --delete [token-name] | --delete-all) [--account <id>] [--all-flags]'
 const TOKEN_OPERATION_SUMMARY_LINES = [
 	'--list             List Devflare-managed account-owned tokens',
 	'--new [name]       Create a Devflare-managed account-owned token',
@@ -41,10 +46,7 @@ interface NamedManagedTokenSelection {
 	matchingTokens: AccountOwnedAPIToken[]
 }
 
-function getTrimmedStringOption(
-	options: ParsedArgs['options'],
-	key: string
-): string | undefined {
+function getTrimmedStringOption(options: ParsedArgs['options'], key: string): string | undefined {
 	const value = options[key]
 	if (typeof value !== 'string') {
 		return undefined
@@ -59,7 +61,10 @@ function formatTokenTimestamp(value?: Date): string {
 		return '—'
 	}
 
-	return value.toISOString().replace(/:\d{2}\.\d{3}Z$/, 'Z').replace('T', ' ')
+	return value
+		.toISOString()
+		.replace(/:\d{2}\.\d{3}Z$/, 'Z')
+		.replace('T', ' ')
 }
 
 function sortTokens(tokens: AccountOwnedAPIToken[]): AccountOwnedAPIToken[] {
@@ -73,11 +78,7 @@ function sortTokens(tokens: AccountOwnedAPIToken[]): AccountOwnedAPIToken[] {
 	})
 }
 
-
-function logUsage(
-	logger: ConsolaInstance,
-	theme: ReturnType<typeof createCliTheme>
-): void {
+function logUsage(logger: ConsolaInstance, theme: ReturnType<typeof createCliTheme>): void {
 	logLine(logger)
 	logLine(logger, `${dim('Usage:', theme)} ${TOKENS_USAGE}`)
 	logLine(logger, dim('Operations:', theme))
@@ -85,7 +86,10 @@ function logUsage(
 		logLine(logger, `  ${line}`)
 	}
 	logLine(logger, dim('Token names are normalized to the devflare- prefix automatically.', theme))
-	logLine(logger, dim('The bootstrap token must include Cloudflare API token management permissions.', theme))
+	logLine(
+		logger,
+		dim('The bootstrap token must include Cloudflare API token management permissions.', theme)
+	)
 	logLine(logger)
 }
 
@@ -129,7 +133,8 @@ function resolveTokenOperation(parsed: ParsedArgs): TokenOperation | string {
 		case 'delete':
 			return {
 				kind: 'delete',
-				requestedName: typeof deleteOption === 'string' ? deleteOption.trim() || undefined : undefined
+				requestedName:
+					typeof deleteOption === 'string' ? deleteOption.trim() || undefined : undefined
 			}
 
 		case 'list':
@@ -139,7 +144,6 @@ function resolveTokenOperation(parsed: ParsedArgs): TokenOperation | string {
 			return { kind: 'delete-all' }
 	}
 }
-
 
 function formatManagedTokenDisplayName(name: string): string {
 	return stripDevflareTokenNamePrefix(name)
@@ -176,7 +180,7 @@ async function resolveTokenName(
 	theme: ReturnType<typeof createCliTheme>,
 	promptMessage: string
 ): Promise<string | null> {
-	const rawName = requestedName ?? await promptForTokenName(logger, theme, promptMessage)
+	const rawName = requestedName ?? (await promptForTokenName(logger, theme, promptMessage))
 	if (!rawName) {
 		return null
 	}
@@ -197,26 +201,29 @@ async function resolveNamedManagedTokens(
 		multipleMatchMessage: string
 	}
 ): Promise<CliResult | NamedManagedTokenSelection> {
-	const tokenName = await resolveTokenName(
-		requestedName,
-		logger,
-		theme,
-		options.promptMessage
-	)
+	const tokenName = await resolveTokenName(requestedName, logger, theme, options.promptMessage)
 	if (!tokenName) {
 		return { exitCode: 0 }
 	}
 
 	logLine(logger)
-	logLine(logger, `${yellow('tokens', theme)} ${dim(`${options.actionLabel} a Devflare-managed account-owned token…`, theme)}`)
-	logLine(logger, `${dim('Account:', theme)} ${green(accountId, theme)} ${whiteDim(`(${accountSource})`, theme)}`)
+	logLine(
+		logger,
+		`${yellow('tokens', theme)} ${dim(`${options.actionLabel} a Devflare-managed account-owned token…`, theme)}`
+	)
+	logLine(
+		logger,
+		`${dim('Account:', theme)} ${green(accountId, theme)} ${whiteDim(`(${accountSource})`, theme)}`
+	)
 	logLine(logger, `${dim('Name:', theme)} ${green(tokenName, theme)}`)
 
 	const accountTokens = await listAccountOwnedAPITokens(accountId, {
 		...CLI_API_OPTIONS,
 		token: bootstrapToken
 	})
-	const matchingTokens = filterDevflareManagedTokens(accountTokens).filter((token) => token.name === tokenName)
+	const matchingTokens = filterDevflareManagedTokens(accountTokens).filter(
+		(token) => token.name === tokenName
+	)
 
 	if (matchingTokens.length === 0) {
 		logger.error(`No Devflare-managed token named ${tokenName} was found.`)
@@ -226,7 +233,10 @@ async function resolveNamedManagedTokens(
 	if (matchingTokens.length > 1) {
 		logLine(
 			logger,
-			dim(`Found ${matchingTokens.length} tokens with that name. ${options.multipleMatchMessage}.`, theme)
+			dim(
+				`Found ${matchingTokens.length} tokens with that name. ${options.multipleMatchMessage}.`,
+				theme
+			)
 		)
 	}
 
@@ -286,8 +296,14 @@ async function createManagedToken(
 	}
 
 	logLine(logger)
-	logLine(logger, `${yellow('tokens', theme)} ${dim('Creating an account-owned Devflare token…', theme)}`)
-	logLine(logger, `${dim('Account:', theme)} ${green(accountId, theme)} ${whiteDim(`(${accountSource})`, theme)}`)
+	logLine(
+		logger,
+		`${yellow('tokens', theme)} ${dim('Creating an account-owned Devflare token…', theme)}`
+	)
+	logLine(
+		logger,
+		`${dim('Account:', theme)} ${green(accountId, theme)} ${whiteDim(`(${accountSource})`, theme)}`
+	)
 	logLine(logger, `${dim('Name:', theme)} ${green(tokenName, theme)}`)
 
 	const permissionGroups = await listAccountTokenPermissionGroups(accountId, {
@@ -359,8 +375,14 @@ async function listManagedTokens(
 	theme: ReturnType<typeof createCliTheme>
 ): Promise<CliResult> {
 	logLine(logger)
-	logLine(logger, `${yellow('tokens', theme)} ${dim('Listing Devflare-managed account-owned tokens…', theme)}`)
-	logLine(logger, `${dim('Account:', theme)} ${green(accountId, theme)} ${whiteDim(`(${accountSource})`, theme)}`)
+	logLine(
+		logger,
+		`${yellow('tokens', theme)} ${dim('Listing Devflare-managed account-owned tokens…', theme)}`
+	)
+	logLine(
+		logger,
+		`${dim('Account:', theme)} ${green(accountId, theme)} ${whiteDim(`(${accountSource})`, theme)}`
+	)
 
 	const accountTokens = await listAccountOwnedAPITokens(accountId, {
 		...CLI_API_OPTIONS,
@@ -514,8 +536,14 @@ async function deleteAllManagedTokens(
 	theme: ReturnType<typeof createCliTheme>
 ): Promise<CliResult> {
 	logLine(logger)
-	logLine(logger, `${yellow('tokens', theme)} ${dim('Deleting all Devflare-managed account-owned tokens…', theme)}`)
-	logLine(logger, `${dim('Account:', theme)} ${green(accountId, theme)} ${whiteDim(`(${accountSource})`, theme)}`)
+	logLine(
+		logger,
+		`${yellow('tokens', theme)} ${dim('Deleting all Devflare-managed account-owned tokens…', theme)}`
+	)
+	logLine(
+		logger,
+		`${dim('Account:', theme)} ${green(accountId, theme)} ${whiteDim(`(${accountSource})`, theme)}`
+	)
 
 	const accountTokens = await listAccountOwnedAPITokens(accountId, {
 		...CLI_API_OPTIONS,
@@ -539,10 +567,7 @@ async function deleteAllManagedTokens(
 
 	const untouchedTokenCount = accountTokens.length - managedTokens.length
 	if (untouchedTokenCount > 0) {
-		logLine(
-			logger,
-			dim(`Left ${untouchedTokenCount} non-Devflare token(s) untouched.`, theme)
-		)
+		logLine(logger, dim(`Left ${untouchedTokenCount} non-Devflare token(s) untouched.`, theme))
 	}
 
 	return {
@@ -572,7 +597,10 @@ export async function runTokenCommand(
 	const requestedAccountId = getTrimmedStringOption(parsed.options, 'account')
 
 	try {
-		const { accountId, source } = await resolveRequestedAccountId(requestedAccountId, bootstrapToken)
+		const { accountId, source } = await resolveRequestedAccountId(
+			requestedAccountId,
+			bootstrapToken
+		)
 
 		switch (tokenOperation.kind) {
 			case 'new':

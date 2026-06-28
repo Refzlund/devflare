@@ -171,12 +171,12 @@ export const BinaryKind = {
 	WsData: 2
 } as const
 
-export type BinaryKind = typeof BinaryKind[keyof typeof BinaryKind]
+export type BinaryKind = (typeof BinaryKind)[keyof typeof BinaryKind]
 
 /** Binary frame flags */
 export const BinaryFlags = {
-	FIN: 0b0001,    // Last chunk/frame
-	TEXT: 0b0010    // Text vs binary (for WS data)
+	FIN: 0b0001, // Last chunk/frame
+	TEXT: 0b0010 // Text vs binary (for WS data)
 } as const
 
 /**
@@ -203,7 +203,7 @@ export function encodeBinaryFrame(
 	const view = new DataView(frame.buffer)
 
 	view.setUint8(0, kind)
-	view.setUint32(1, id, true)  // little-endian
+	view.setUint32(1, id, true) // little-endian
 	view.setUint32(5, seq, true)
 	view.setUint8(9, flags)
 

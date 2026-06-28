@@ -8,6 +8,7 @@
 // =============================================================================
 
 import {
+	type DevflareConfig,
 	normalizeArtifactsBinding,
 	normalizeDispatchNamespaceBinding,
 	normalizeHyperdriveBinding,
@@ -16,8 +17,7 @@ import {
 	normalizeMtlsCertificateBinding,
 	normalizePipelineBinding,
 	normalizeSecretsStoreBinding,
-	normalizeWorkflowBinding,
-	type DevflareConfig
+	normalizeWorkflowBinding
 } from '../config'
 
 type Bindings = NonNullable<DevflareConfig['bindings']>
@@ -79,9 +79,7 @@ export function buildRateLimitsConfig(
 	)
 }
 
-export function buildVersionMetadataConfig(
-	bindings: Bindings
-): string | undefined {
+export function buildVersionMetadataConfig(bindings: Bindings): string | undefined {
 	return bindings.versionMetadata?.binding
 }
 
@@ -137,14 +135,17 @@ export function buildDispatchNamespacesConfig(
 	)
 }
 
-export function buildWorkflowsConfig(
-	bindings: Bindings
-): Record<string, {
-	name: string
-	className: string
-	scriptName?: string
-	stepLimit?: number
-}> | undefined {
+export function buildWorkflowsConfig(bindings: Bindings):
+	| Record<
+			string,
+			{
+				name: string
+				className: string
+				scriptName?: string
+				stepLimit?: number
+			}
+	  >
+	| undefined {
 	if (!bindings.workflows) {
 		return undefined
 	}
@@ -177,9 +178,7 @@ export function buildPipelinesConfig(
 			const normalized = normalizePipelineBinding(binding)
 			return [
 				bindingName,
-				typeof binding === 'string'
-					? normalized.pipeline
-					: { pipeline: normalized.pipeline }
+				typeof binding === 'string' ? normalized.pipeline : { pipeline: normalized.pipeline }
 			]
 		})
 	)
@@ -200,9 +199,7 @@ function getHyperdriveLocalConnectionString(
 	return normalized.localConnectionString
 }
 
-export function buildHyperdrivesConfig(
-	bindings: Bindings
-): Record<string, string> | undefined {
+export function buildHyperdrivesConfig(bindings: Bindings): Record<string, string> | undefined {
 	if (!bindings.hyperdrive) {
 		return undefined
 	}
@@ -211,9 +208,7 @@ export function buildHyperdrivesConfig(
 		Object.entries(bindings.hyperdrive)
 			.map(([bindingName, binding]) => {
 				const localConnectionString = getHyperdriveLocalConnectionString(bindingName, binding)
-				return localConnectionString
-					? [bindingName, localConnectionString]
-					: null
+				return localConnectionString ? [bindingName, localConnectionString] : null
 			})
 			.filter((entry): entry is [string, string] => entry !== null)
 	)
@@ -221,9 +216,7 @@ export function buildHyperdrivesConfig(
 	return Object.keys(hyperdrives).length > 0 ? hyperdrives : undefined
 }
 
-export function buildImagesConfig(
-	bindings: Bindings
-): { binding: string } | undefined {
+export function buildImagesConfig(bindings: Bindings): { binding: string } | undefined {
 	if (!bindings.images) {
 		return undefined
 	}
@@ -240,9 +233,7 @@ export function buildImagesConfig(
 	}
 }
 
-export function buildMediaConfig(
-	bindings: Bindings
-): { binding: string } | undefined {
+export function buildMediaConfig(bindings: Bindings): { binding: string } | undefined {
 	if (!bindings.media) {
 		return undefined
 	}
@@ -327,30 +318,30 @@ export function buildSecretsStoreConfig(
 			return []
 		}
 
-			const normalized = normalizeSecretsStoreBinding(binding, defaultSecretsStoreId, bindingName)
-			return [[
+		const normalized = normalizeSecretsStoreBinding(binding, defaultSecretsStoreId, bindingName)
+		return [
+			[
 				bindingName,
 				{
 					store_id: normalized.storeId,
 					secret_name: normalized.secretName
 				}
-			]]
-		})
+			]
+		]
+	})
 
 	return entries.length > 0 ? Object.fromEntries(entries) : undefined
 }
 
-export function buildSendEmailConfig(
-	bindings: Bindings
-):
+export function buildSendEmailConfig(bindings: Bindings):
 	| {
-		send_email: Array<{
-			name: string
-			destination_address?: string
-			allowed_destination_addresses?: string[]
-			allowed_sender_addresses?: string[]
-		}>
-	}
+			send_email: Array<{
+				name: string
+				destination_address?: string
+				allowed_destination_addresses?: string[]
+				allowed_sender_addresses?: string[]
+			}>
+	  }
 	| undefined {
 	if (!bindings.sendEmail) {
 		return undefined

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
-import { join, isAbsolute } from 'pathe'
+import { isAbsolute, join } from 'pathe'
 import { bundleWorkerEntry } from '../../../src/bundler'
 import { configSchema } from '../../../src/config/schema'
 import { prepareComposedWorkerEntrypoint } from '../../../src/worker-entry/composed-worker'
@@ -10,14 +10,21 @@ const TEST_DIR = join(import.meta.dirname, '../.fixtures/worker-bundler')
 describe('bundleWorkerEntry', () => {
 	beforeEach(async () => {
 		await mkdir(join(TEST_DIR, 'src'), { recursive: true })
-		await writeFile(join(TEST_DIR, 'tsconfig.json'), JSON.stringify({
-			compilerOptions: {
-				target: 'ES2022',
-				module: 'ESNext',
-				moduleResolution: 'Bundler',
-				strict: true
-			}
-		}, null, '\t'))
+		await writeFile(
+			join(TEST_DIR, 'tsconfig.json'),
+			JSON.stringify(
+				{
+					compilerOptions: {
+						target: 'ES2022',
+						module: 'ESNext',
+						moduleResolution: 'Bundler',
+						strict: true
+					}
+				},
+				null,
+				'\t'
+			)
+		)
 	})
 
 	afterEach(async () => {
@@ -25,17 +32,23 @@ describe('bundleWorkerEntry', () => {
 	})
 
 	test('applies user Rolldown plugins to the composed main worker bundle', async () => {
-		await writeFile(join(TEST_DIR, 'src', 'Greeting.svelte'), `
+		await writeFile(
+			join(TEST_DIR, 'src', 'Greeting.svelte'),
+			`
 <h1>Hello from Svelte</h1>
-		`.trim())
+		`.trim()
+		)
 
-		await writeFile(join(TEST_DIR, 'src', 'fetch.ts'), `
+		await writeFile(
+			join(TEST_DIR, 'src', 'fetch.ts'),
+			`
 import renderGreeting from './Greeting.svelte'
 
 export async function fetch(): Promise<Response> {
 	return new Response(renderGreeting())
 }
-		`.trim())
+		`.trim()
+		)
 
 		const config = configSchema.parse({
 			name: 'worker-bundler-test',
@@ -58,21 +71,23 @@ export async function fetch(): Promise<Response> {
 			outFile: join(TEST_DIR, '.devflare', 'worker-entrypoints', 'main.js'),
 			sourcemap: true,
 			rolldownOptions: {
-				plugins: [{
-					name: 'test-svelte-transform',
-					transform(code, id) {
-						if (!id.endsWith('.svelte')) {
-							return null
-						}
+				plugins: [
+					{
+						name: 'test-svelte-transform',
+						transform(code, id) {
+							if (!id.endsWith('.svelte')) {
+								return null
+							}
 
-						const heading = code.match(/<h1>(.*?)<\/h1>/)?.[1] ?? 'Hello from Svelte'
+							const heading = code.match(/<h1>(.*?)<\/h1>/)?.[1] ?? 'Hello from Svelte'
 
-						return {
-							code: `export default function renderGreeting() { return ${JSON.stringify(heading)} }`,
-							map: null
+							return {
+								code: `export default function renderGreeting() { return ${JSON.stringify(heading)} }`,
+								map: null
+							}
 						}
 					}
-				}]
+				]
 			}
 		})
 
@@ -84,13 +99,16 @@ export async function fetch(): Promise<Response> {
 	})
 
 	test('bundles bare devflare root imports through the worker-safe entry', async () => {
-		await writeFile(join(TEST_DIR, 'src', 'fetch.ts'), `
+		await writeFile(
+			join(TEST_DIR, 'src', 'fetch.ts'),
+			`
 import { env } from 'devflare'
 
 export async function fetch(): Promise<Response> {
 	return new Response(String(env.MESSAGE ?? 'ok'))
 }
-		`.trim())
+		`.trim()
+		)
 
 		const config = configSchema.parse({
 			name: 'worker-bundler-root-import-test',
@@ -125,11 +143,20 @@ export async function fetch(): Promise<Response> {
 		await mkdir(join(TEST_DIR, 'node_modules', 'example-runtime'), {
 			recursive: true
 		})
-		await writeFile(join(TEST_DIR, 'node_modules', 'example-runtime', 'package.json'), JSON.stringify({
-			name: 'example-runtime',
-			type: 'module'
-		}, null, '\t'))
-		await writeFile(join(TEST_DIR, 'node_modules', 'example-runtime', 'index.js'), `
+		await writeFile(
+			join(TEST_DIR, 'node_modules', 'example-runtime', 'package.json'),
+			JSON.stringify(
+				{
+					name: 'example-runtime',
+					type: 'module'
+				},
+				null,
+				'\t'
+			)
+		)
+		await writeFile(
+			join(TEST_DIR, 'node_modules', 'example-runtime', 'index.js'),
+			`
 const importRuntimeModule = (module_name) => import(
 	/* @vite-ignore */
 	module_name
@@ -143,8 +170,11 @@ export async function loadAsyncHooks() {
 export async function loadCrypto() {
 	return (await importRuntimeModule('node:crypto')).webcrypto ? 'crypto-ready' : 'crypto-missing'
 }
-		`.trim())
-		await writeFile(join(TEST_DIR, 'src', 'fetch.ts'), `
+		`.trim()
+		)
+		await writeFile(
+			join(TEST_DIR, 'src', 'fetch.ts'),
+			`
 import { loadAsyncHooks, loadCrypto } from 'example-runtime'
 
 export async function fetch(): Promise<Response> {
@@ -153,7 +183,8 @@ export async function fetch(): Promise<Response> {
 		crypto: await loadCrypto()
 	}))
 }
-		`.trim())
+		`.trim()
+		)
 
 		const config = configSchema.parse({
 			name: 'worker-bundler-dynamic-import-helper-test',
@@ -177,7 +208,7 @@ export async function fetch(): Promise<Response> {
 		})
 
 		const output = await readFile(bundlePath, 'utf-8')
-		expect(output).not.toMatch(new RegExp('\\bimport\\s*\\('))
+		expect(output).not.toMatch(/\bimport\s*\(/)
 		expect(output).toContain('node:async_hooks')
 		expect(output).toContain('Unsupported dynamic import in Devflare worker bundle')
 	})
@@ -186,16 +217,28 @@ export async function fetch(): Promise<Response> {
 		await mkdir(join(TEST_DIR, 'node_modules', 'example-runtime'), {
 			recursive: true
 		})
-		await writeFile(join(TEST_DIR, 'node_modules', 'example-runtime', 'package.json'), JSON.stringify({
-			name: 'example-runtime',
-			type: 'module'
-		}, null, '\t'))
-		await writeFile(join(TEST_DIR, 'node_modules', 'example-runtime', 'index.js'), `
+		await writeFile(
+			join(TEST_DIR, 'node_modules', 'example-runtime', 'package.json'),
+			JSON.stringify(
+				{
+					name: 'example-runtime',
+					type: 'module'
+				},
+				null,
+				'\t'
+			)
+		)
+		await writeFile(
+			join(TEST_DIR, 'node_modules', 'example-runtime', 'index.js'),
+			`
 export async function loadRuntimeModule(moduleName) {
 	return import(moduleName)
 }
-		`.trim())
-		await writeFile(join(TEST_DIR, 'src', 'fetch.ts'), `
+		`.trim()
+		)
+		await writeFile(
+			join(TEST_DIR, 'src', 'fetch.ts'),
+			`
 import { loadRuntimeModule } from 'example-runtime'
 
 export async function fetch(request: Request): Promise<Response> {
@@ -203,7 +246,8 @@ export async function fetch(request: Request): Promise<Response> {
 	await loadRuntimeModule(moduleName)
 	return new Response('ok')
 }
-		`.trim())
+		`.trim()
+		)
 
 		const config = configSchema.parse({
 			name: 'worker-bundler-dynamic-import-error-test',
@@ -220,10 +264,14 @@ export async function fetch(request: Request): Promise<Response> {
 			throw new Error('Expected composed worker entry to be generated')
 		}
 
-		await expect(bundleWorkerEntry({
-			cwd: TEST_DIR,
-			inputFile: composedEntry,
-			outFile: join(TEST_DIR, '.devflare', 'worker-entrypoints', 'main.js')
-		})).rejects.toThrow('Devflare worker bundles cannot contain unresolved dynamic import() expressions')
+		await expect(
+			bundleWorkerEntry({
+				cwd: TEST_DIR,
+				inputFile: composedEntry,
+				outFile: join(TEST_DIR, '.devflare', 'worker-entrypoints', 'main.js')
+			})
+		).rejects.toThrow(
+			'Devflare worker bundles cannot contain unresolved dynamic import() expressions'
+		)
 	})
 })

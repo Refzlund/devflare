@@ -1,10 +1,13 @@
 import { afterAll, beforeEach, describe, expect, test } from 'bun:test'
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { RefResult } from '../../../src/config/ref'
 import type { DevflareConfig } from '../../../src/config/schema'
-import { clearBundleCache, resolveServiceBindings } from '../../../src/test/resolve-service-bindings'
+import {
+	clearBundleCache,
+	resolveServiceBindings
+} from '../../../src/test/resolve-service-bindings'
 
 const tempDirs: string[] = []
 
@@ -51,19 +54,27 @@ describe('resolveServiceBindings', () => {
 		await mkdir(join(workerDir, 'src'), { recursive: true })
 		await mkdir(join(workerDir, 'rpc', 'admin'), { recursive: true })
 
-		await writeFile(join(workerDir, 'src', 'worker.ts'), `
+		await writeFile(
+			join(workerDir, 'src', 'worker.ts'),
+			`
 export async function defaultPing(): Promise<string> {
 	return 'DEFAULT_RPC_SENTINEL'
 }
-`.trim())
+`.trim()
+		)
 
-		await writeFile(join(workerDir, 'src', 'fetch.ts'), `
+		await writeFile(
+			join(workerDir, 'src', 'fetch.ts'),
+			`
 export async function fetch(): Promise<Response> {
 	return new Response('FETCH_FILE_SHOULD_NOT_BE_BUNDLED')
 }
-`.trim())
+`.trim()
+		)
 
-		await writeFile(join(workerDir, 'rpc', 'admin', 'ep.admin.ts'), `
+		await writeFile(
+			join(workerDir, 'rpc', 'admin', 'ep.admin.ts'),
+			`
 import { WorkerEntrypoint } from 'cloudflare:workers'
 
 export class AdminEntrypoint extends WorkerEntrypoint {
@@ -71,7 +82,8 @@ export class AdminEntrypoint extends WorkerEntrypoint {
 		return 'ENTRYPOINT_RPC_SENTINEL'
 	}
 }
-`.trim())
+`.trim()
+		)
 
 		const referencedConfig = {
 			name: 'math-worker',
@@ -125,17 +137,23 @@ export class AdminEntrypoint extends WorkerEntrypoint {
 		const workerDir = join(projectDir, 'workers', 'rpc-worker')
 		await mkdir(join(workerDir, 'src'), { recursive: true })
 
-		await writeFile(join(workerDir, 'src', 'worker.ts'), `
+		await writeFile(
+			join(workerDir, 'src', 'worker.ts'),
+			`
 export async function serviceAnswer(): Promise<string> {
 	return 'WORKER_RPC_SENTINEL'
 }
-`.trim())
+`.trim()
+		)
 
-		await writeFile(join(workerDir, 'src', 'fetch.ts'), `
+		await writeFile(
+			join(workerDir, 'src', 'fetch.ts'),
+			`
 export async function fetch(): Promise<Response> {
 	return new Response('FETCH_FILE_SHOULD_NOT_BE_BUNDLED')
 }
-`.trim())
+`.trim()
+		)
 
 		const referencedConfig = {
 			name: 'rpc-worker',
@@ -176,11 +194,14 @@ export async function fetch(): Promise<Response> {
 		const workerDir = join(projectDir, 'workers', 'api')
 		await mkdir(join(workerDir, 'src'), { recursive: true })
 
-		await writeFile(join(workerDir, 'src', 'worker.ts'), `
+		await writeFile(
+			join(workerDir, 'src', 'worker.ts'),
+			`
 export async function ping(): Promise<string> {
 	return 'PONG'
 }
-`.trim())
+`.trim()
+		)
 
 		const referencedConfig = {
 			name: 'api-worker',
@@ -238,7 +259,9 @@ export async function ping(): Promise<string> {
 		const workerDir = join(projectDir, 'workers', 'api')
 		await mkdir(join(workerDir, 'src'), { recursive: true })
 
-		await writeFile(join(workerDir, 'src', 'ep.api.ts'), `
+		await writeFile(
+			join(workerDir, 'src', 'ep.api.ts'),
+			`
 import { WorkerEntrypoint } from 'cloudflare:workers'
 
 export class ApiEntrypoint extends WorkerEntrypoint {
@@ -246,9 +269,12 @@ export class ApiEntrypoint extends WorkerEntrypoint {
 		return 'PONG'
 	}
 }
-`.trim())
+`.trim()
+		)
 
-		await writeFile(join(workerDir, 'src', 'do.counter.ts'), `
+		await writeFile(
+			join(workerDir, 'src', 'do.counter.ts'),
+			`
 import { DurableObject } from 'cloudflare:workers'
 
 export class Counter extends DurableObject {
@@ -256,7 +282,8 @@ export class Counter extends DurableObject {
 		return 'DO_PONG'
 	}
 }
-`.trim())
+`.trim()
+		)
 
 		const referencedConfig = {
 			name: 'api-worker',
@@ -309,7 +336,9 @@ export class Counter extends DurableObject {
 		const workerDir = join(projectDir, 'workers', 'api')
 		await mkdir(join(workerDir, 'src'), { recursive: true })
 
-		await writeFile(join(workerDir, 'src', 'ep.api.ts'), `
+		await writeFile(
+			join(workerDir, 'src', 'ep.api.ts'),
+			`
 import { WorkerEntrypoint } from 'cloudflare:workers'
 
 export class ApiEntrypoint extends WorkerEntrypoint {
@@ -317,9 +346,12 @@ export class ApiEntrypoint extends WorkerEntrypoint {
 		return new Response('API_OK')
 	}
 }
-`.trim())
+`.trim()
+		)
 
-		await writeFile(join(workerDir, 'src', 'do.counter.ts'), `
+		await writeFile(
+			join(workerDir, 'src', 'do.counter.ts'),
+			`
 import { DurableObject } from 'cloudflare:workers'
 
 export class Counter extends DurableObject {
@@ -327,7 +359,8 @@ export class Counter extends DurableObject {
 		return new Response('DO_OK')
 	}
 }
-`.trim())
+`.trim()
+		)
 
 		const referencedConfig = {
 			name: 'api-worker',

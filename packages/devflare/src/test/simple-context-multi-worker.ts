@@ -9,8 +9,8 @@
 // and rewrites `mfConfig` in place into a multi-worker layout.
 // =============================================================================
 
-import type { resolveDOBindings, resolveServiceBindings } from './resolve-service-bindings'
 import type { DevflareConfig } from '../config'
+import type { resolveDOBindings, resolveServiceBindings } from './resolve-service-bindings'
 
 type ServiceBindingResolution = Awaited<ReturnType<typeof resolveServiceBindings>>
 type DOBindingResolution = Awaited<ReturnType<typeof resolveDOBindings>>
@@ -57,16 +57,14 @@ export function applyMultiWorkerConfig(
 		...(mfConfig.wrappedBindings && { wrappedBindings: mfConfig.wrappedBindings }),
 		...(mfConfig.email && { email: mfConfig.email }),
 		...(Object.keys(primaryDurableObjects).length > 0 && { durableObjects: primaryDurableObjects }),
-		...(
-			mfConfig.serviceBindings || serviceBindingResolution?.primaryServiceBindings
-				? {
-						serviceBindings: {
-							...(mfConfig.serviceBindings ?? {}),
-							...(serviceBindingResolution?.primaryServiceBindings ?? {})
-						}
+		...(mfConfig.serviceBindings || serviceBindingResolution?.primaryServiceBindings
+			? {
+					serviceBindings: {
+						...(mfConfig.serviceBindings ?? {}),
+						...(serviceBindingResolution?.primaryServiceBindings ?? {})
 					}
-				: {}
-		)
+				}
+			: {})
 	}
 
 	const additionalWorkers = [
@@ -75,7 +73,7 @@ export function applyMultiWorkerConfig(
 		...(mfConfig.__devflareLocalSecretWorkers || []),
 		...(mfConfig.__devflareLocalBindingWorkers || [])
 	]
-	const workersByName = new Map<string, typeof additionalWorkers[0]>()
+	const workersByName = new Map<string, (typeof additionalWorkers)[0]>()
 
 	for (const worker of additionalWorkers) {
 		if (!workersByName.has(worker.name)) {

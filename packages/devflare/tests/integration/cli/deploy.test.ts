@@ -2,14 +2,14 @@
 // CLI Deploy Command — Integration Tests
 // =============================================================================
 
-import { describe, expect, test, beforeEach, afterEach } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
+import { clearDependencies, setDependencies } from '../../../src/cli/dependencies'
 import {
-	createTestHarness,
-	createParsedArgs,
+	type TestHarness,
 	createMockProcessRunner,
-	type TestHarness
+	createParsedArgs,
+	createTestHarness
 } from '../mocks'
-import { setDependencies, clearDependencies } from '../../../src/cli/dependencies'
 
 /**
  * Note: Deploy command requires config loading via c12.

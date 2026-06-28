@@ -1,4 +1,10 @@
 import {
+	type D1DatabaseInfo,
+	type HyperdriveConfigInfo,
+	type KVNamespaceInfo,
+	type QueueInfo,
+	type R2BucketInfo,
+	type VectorizeIndexInfo,
 	createD1Database,
 	createKVNamespace,
 	createQueue,
@@ -16,20 +22,14 @@ import {
 	listKVNamespaces,
 	listQueues,
 	listR2Buckets,
-	listVectorizeIndexes,
-	type D1DatabaseInfo,
-	type HyperdriveConfigInfo,
-	type KVNamespaceInfo,
-	type QueueInfo,
-	type R2BucketInfo,
-	type VectorizeIndexInfo
+	listVectorizeIndexes
 } from '../cloudflare/account'
 import { getEffectiveAccountId } from '../cloudflare/preferences'
 import {
+	type PreviewResolutionOptions,
 	isPreviewScopedName,
 	materializePreviewScopedConfig,
-	materializePreviewScopedString,
-	type PreviewResolutionOptions
+	materializePreviewScopedString
 } from './preview'
 import { mergeConfigForEnvironment } from './resolve'
 import type { DevflareConfig } from './schema'
@@ -271,12 +271,14 @@ function resolvePreviewScopedResourceLifecycleWarnings(plan: PreviewScopedResour
 }
 
 function hasPreviewScopedLifecycleResources(plan: PreviewScopedResourcePlan): boolean {
-	return plan.kv.length > 0
-		|| plan.d1.length > 0
-		|| plan.r2.length > 0
-		|| plan.queues.length > 0
-		|| plan.vectorize.length > 0
-		|| plan.hyperdrive.length > 0
+	return (
+		plan.kv.length > 0 ||
+		plan.d1.length > 0 ||
+		plan.r2.length > 0 ||
+		plan.queues.length > 0 ||
+		plan.vectorize.length > 0 ||
+		plan.hyperdrive.length > 0
+	)
 }
 
 async function resolveLifecycleAccountId(
@@ -308,14 +310,28 @@ async function loadPreviewScopedResourceLifecycleState(
 	plan: PreviewScopedResourcePlan,
 	cloudflareApi: PreviewScopedResourceLifecycleApi
 ): Promise<PreviewScopedResourceLifecycleState> {
-	const [namespaces, databases, buckets, queues, vectorizeIndexes, hyperdrives] = await Promise.all([
-		plan.kv.length > 0 ? cloudflareApi.listKVNamespaces(accountId) : Promise.resolve([] as KVNamespaceInfo[]),
-		plan.d1.length > 0 ? cloudflareApi.listD1Databases(accountId) : Promise.resolve([] as D1DatabaseInfo[]),
-		plan.r2.length > 0 ? cloudflareApi.listR2Buckets(accountId) : Promise.resolve([] as R2BucketInfo[]),
-		plan.queues.length > 0 ? cloudflareApi.listQueues(accountId) : Promise.resolve([] as QueueInfo[]),
-		plan.vectorize.length > 0 ? cloudflareApi.listVectorizeIndexes(accountId) : Promise.resolve([] as VectorizeIndexInfo[]),
-		plan.hyperdrive.length > 0 ? cloudflareApi.listHyperdrives(accountId) : Promise.resolve([] as HyperdriveConfigInfo[])
-	])
+	const [namespaces, databases, buckets, queues, vectorizeIndexes, hyperdrives] = await Promise.all(
+		[
+			plan.kv.length > 0
+				? cloudflareApi.listKVNamespaces(accountId)
+				: Promise.resolve([] as KVNamespaceInfo[]),
+			plan.d1.length > 0
+				? cloudflareApi.listD1Databases(accountId)
+				: Promise.resolve([] as D1DatabaseInfo[]),
+			plan.r2.length > 0
+				? cloudflareApi.listR2Buckets(accountId)
+				: Promise.resolve([] as R2BucketInfo[]),
+			plan.queues.length > 0
+				? cloudflareApi.listQueues(accountId)
+				: Promise.resolve([] as QueueInfo[]),
+			plan.vectorize.length > 0
+				? cloudflareApi.listVectorizeIndexes(accountId)
+				: Promise.resolve([] as VectorizeIndexInfo[]),
+			plan.hyperdrive.length > 0
+				? cloudflareApi.listHyperdrives(accountId)
+				: Promise.resolve([] as HyperdriveConfigInfo[])
+		]
+	)
 
 	return {
 		namespaces,
@@ -361,17 +377,11 @@ function findD1DatabaseByName(
 	return databases.find((database) => database.name === name)
 }
 
-function findR2BucketByName(
-	buckets: R2BucketInfo[],
-	name: string
-): R2BucketInfo | undefined {
+function findR2BucketByName(buckets: R2BucketInfo[], name: string): R2BucketInfo | undefined {
 	return buckets.find((bucket) => bucket.name === name)
 }
 
-function findQueueByName(
-	queues: QueueInfo[],
-	name: string
-): QueueInfo | undefined {
+function findQueueByName(queues: QueueInfo[], name: string): QueueInfo | undefined {
 	return queues.find((queue) => queue.name === name)
 }
 
@@ -454,15 +464,15 @@ export function collectPreviewScopedResourcePlan(
 					return createPreviewScopedResourceRef(bindingConfig, bindingName, options)
 				}
 				if (
-					bindingConfig
-					&& typeof bindingConfig === 'object'
-					&& 'name' in bindingConfig
-					&& typeof bindingConfig.name === 'string'
+					bindingConfig &&
+					typeof bindingConfig === 'object' &&
+					'name' in bindingConfig &&
+					typeof bindingConfig.name === 'string'
 				) {
 					if (
-						'previewId' in bindingConfig
-						&& typeof bindingConfig.previewId === 'string'
-						&& bindingConfig.previewId.trim()
+						'previewId' in bindingConfig &&
+						typeof bindingConfig.previewId === 'string' &&
+						bindingConfig.previewId.trim()
 					) {
 						return null
 					}
@@ -522,14 +532,8 @@ export async function preparePreviewScopedResourcesForDeploy(
 	const cloudflareApi = resolvePreviewScopedResourceLifecycleApi(options.cloudflare)
 	const accountId = await resolveLifecycleAccountId(config, options, cloudflareApi)
 
-	const {
-		namespaces,
-		databases,
-		buckets,
-		queues,
-		vectorizeIndexes,
-		hyperdrives
-	} = await loadPreviewScopedResourceLifecycleState(accountId, plan, cloudflareApi)
+	const { namespaces, databases, buckets, queues, vectorizeIndexes, hyperdrives } =
+		await loadPreviewScopedResourceLifecycleState(accountId, plan, cloudflareApi)
 
 	for (const ref of plan.kv) {
 		if (findKVNamespaceByName(namespaces, ref.previewName)) {
@@ -613,11 +617,13 @@ export async function preparePreviewScopedResourcesForDeploy(
 		}
 
 		if (!ref.allowBaseFallback) {
-			const bindingLabel = ref.bindingName ? `"${ref.bindingName}"` : `for preview name "${ref.previewName}"`
+			const bindingLabel = ref.bindingName
+				? `"${ref.bindingName}"`
+				: `for preview name "${ref.previewName}"`
 			throw new Error(
-				`Preview Hyperdrive binding ${bindingLabel} has no dedicated preview Hyperdrive configuration "${ref.previewName}" in this account. `
-				+ 'Either provision a dedicated preview Hyperdrive (or set `previewId` on the binding), '
-				+ "or opt in to reusing the base Hyperdrive by setting `previewFallback: 'base'` on the binding."
+				`Preview Hyperdrive binding ${bindingLabel} has no dedicated preview Hyperdrive configuration "${ref.previewName}" in this account. ` +
+					'Either provision a dedicated preview Hyperdrive (or set `previewId` on the binding), ' +
+					"or opt in to reusing the base Hyperdrive by setting `previewFallback: 'base'` on the binding."
 			)
 		}
 
@@ -669,14 +675,8 @@ export async function cleanupPreviewScopedResources(
 	const accountId = await resolveLifecycleAccountId(config, options, cloudflareApi)
 	const apply = options.apply === true
 
-	const {
-		namespaces,
-		databases,
-		buckets,
-		queues,
-		vectorizeIndexes,
-		hyperdrives
-	} = await loadPreviewScopedResourceLifecycleState(accountId, plan, cloudflareApi)
+	const { namespaces, databases, buckets, queues, vectorizeIndexes, hyperdrives } =
+		await loadPreviewScopedResourceLifecycleState(accountId, plan, cloudflareApi)
 
 	const kvCandidates = plan.kv
 		.map((ref) => findKVNamespaceByName(namespaces, ref.previewName))
@@ -727,7 +727,9 @@ export async function cleanupPreviewScopedResources(
 		}
 
 		if (!queue.id) {
-			warnings.push(`Skipping queue deletion for "${queue.name}" because Cloudflare did not return a queue id.`)
+			warnings.push(
+				`Skipping queue deletion for "${queue.name}" because Cloudflare did not return a queue id.`
+			)
 			continue
 		}
 

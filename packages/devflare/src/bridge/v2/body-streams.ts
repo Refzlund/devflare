@@ -76,7 +76,9 @@ export async function writeTransportV2Body(
 		kind,
 		rpcId,
 		...(writerOptions?.contentType !== undefined ? { contentType: writerOptions.contentType } : {}),
-		...(writerOptions?.contentLength !== undefined ? { contentLength: writerOptions.contentLength } : {})
+		...(writerOptions?.contentLength !== undefined
+			? { contentLength: writerOptions.contentLength }
+			: {})
 	}
 	io.sendText(stringifyTransportV2ControlMsg(open))
 
@@ -94,13 +96,7 @@ export async function writeTransportV2Body(
 				const end = Math.min(offset + chunkSize, value.byteLength)
 				const slice = value.subarray(offset, end)
 				io.sendBinary(
-					encodeTransportV2BinaryFrame(
-						TransportV2BinaryKind.BodyChunk,
-						bid,
-						seq,
-						0,
-						slice
-					)
+					encodeTransportV2BinaryFrame(TransportV2BinaryKind.BodyChunk, bid, seq, 0, slice)
 				)
 				seq += 1
 				offset = end

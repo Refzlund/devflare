@@ -1,4 +1,4 @@
-import { describe, test, expect } from 'bun:test'
+import { describe, expect, test } from 'bun:test'
 
 describe('main barrel public surface', () => {
 	test('exports expected public names', async () => {

@@ -53,7 +53,10 @@ async function fetchWithTimeout(
 	const abortTimeoutId = setTimeout(() => controller.abort(), timeoutMs)
 	let rejectTimeoutId: ReturnType<typeof setTimeout> | null = null
 	const timeoutPromise = new Promise<never>((_, reject) => {
-		rejectTimeoutId = setTimeout(() => reject(new Error(`Request timed out after ${timeoutMs}ms`)), timeoutMs)
+		rejectTimeoutId = setTimeout(
+			() => reject(new Error(`Request timed out after ${timeoutMs}ms`)),
+			timeoutMs
+		)
 	})
 
 	try {
@@ -91,10 +94,12 @@ function tryParseJson(text: string): { ok: true; value: unknown } | { ok: false 
 function isEnvelopeShape(value: unknown): value is CloudflareAPIResponse<unknown> {
 	if (!value || typeof value !== 'object') return false
 	const record = value as Record<string, unknown>
-	return typeof record.success === 'boolean'
-		&& Array.isArray(record.errors)
-		&& Array.isArray(record.messages)
-		&& 'result' in record
+	return (
+		typeof record.success === 'boolean' &&
+		Array.isArray(record.errors) &&
+		Array.isArray(record.messages) &&
+		'result' in record
+	)
 }
 
 /**
@@ -213,10 +218,7 @@ export async function parseCloudflareEnvelope<T>(
  * Raw JSON parser for Cloudflare endpoints that do not use the v4 envelope.
  * Reads the body once as text and parses it as JSON.
  */
-export async function parseRawJson<T>(
-	response: Response,
-	opts: { endpoint: string }
-): Promise<T> {
+export async function parseRawJson<T>(response: Response, opts: { endpoint: string }): Promise<T> {
 	const text = await response.text()
 	const parsed = tryParseJson(text)
 	if (!parsed.ok) {
@@ -249,7 +251,9 @@ interface CreateAuthSessionOptions {
  * we sending" for every request. The session owns token resolution and
  * invalidation so request code does not call `getApiToken` directly.
  */
-export function createCloudflareAuthSession(opts: CreateAuthSessionOptions = {}): CloudflareAuthSession {
+export function createCloudflareAuthSession(
+	opts: CreateAuthSessionOptions = {}
+): CloudflareAuthSession {
 	const provider = opts.tokenProvider ?? ((forceRefresh: boolean) => getApiToken(forceRefresh))
 	const onInvalidate = opts.onInvalidate ?? invalidateToken
 
@@ -269,7 +273,10 @@ export function createCloudflareAuthSession(opts: CreateAuthSessionOptions = {})
 
 const defaultAuthSession = createCloudflareAuthSession({})
 
-async function resolveAuthHeader(options?: APIClientOptions, forceRefresh = false): Promise<string> {
+async function resolveAuthHeader(
+	options?: APIClientOptions,
+	forceRefresh = false
+): Promise<string> {
 	if (options?.token) {
 		return `Bearer ${options.token}`
 	}
@@ -298,11 +305,15 @@ interface CloudflareJsonRequestOptions {
  */
 function isAuthError(response: Response, envelope: CloudflareAPIResponse<unknown>): boolean {
 	if (response.status === 401) return true
-	if (!envelope.success && envelope.errors?.some((e) =>
-		e.code === 10000 || // Auth error code
-		e.message?.toLowerCase().includes('authentication') ||
-		e.message?.toLowerCase().includes('token')
-	)) {
+	if (
+		!envelope.success &&
+		envelope.errors?.some(
+			(e) =>
+				e.code === 10000 || // Auth error code
+				e.message?.toLowerCase().includes('authentication') ||
+				e.message?.toLowerCase().includes('token')
+		)
+	) {
 		return true
 	}
 	return false
@@ -351,14 +362,18 @@ async function requestCloudflareJson<T>(
 	const makeRequest = async (forceRefresh: boolean) => {
 		const authorization = await resolveAuthHeader(options, forceRefresh)
 		const headers = new Headers({
-			'Authorization': authorization,
+			Authorization: authorization,
 			'Content-Type': 'application/json'
 		})
-		const response = await fetchWithTimeout(`${API_BASE}${path}`, {
-			method: request.method,
-			headers,
-			...(request.body !== undefined ? { body: JSON.stringify(request.body) } : {})
-		}, options?.timeout ?? DEFAULT_TIMEOUT)
+		const response = await fetchWithTimeout(
+			`${API_BASE}${path}`,
+			{
+				method: request.method,
+				headers,
+				...(request.body !== undefined ? { body: JSON.stringify(request.body) } : {})
+			},
+			options?.timeout ?? DEFAULT_TIMEOUT
+		)
 		const envelope = await decodeCloudflareEnvelope<T>(response, { endpoint })
 		// allow404 is not set, so envelope is non-null.
 		return { response, envelope: envelope as CloudflareAPIResponse<T> }
@@ -381,14 +396,20 @@ async function requestCloudflareJson<T>(
 		if (!shouldRetryResponse(current.response) || attempt === RETRY_MAX_ATTEMPTS - 1) {
 			break
 		}
-		await new Promise((r) => setTimeout(r, backoffDelayMs(attempt, current.response.headers.get('retry-after'))))
+		await new Promise((r) =>
+			setTimeout(r, backoffDelayMs(attempt, current.response.headers.get('retry-after')))
+		)
 	}
 
 	if (!result) {
 		throw lastError ?? new Error(`Cloudflare API request failed: ${endpoint}`)
 	}
 
-	if (request.allowAuthRetry === true && isAuthError(result.response, result.envelope) && !options?.token) {
+	if (
+		request.allowAuthRetry === true &&
+		isAuthError(result.response, result.envelope) &&
+		!options?.token
+	) {
 		defaultAuthSession.invalidate()
 		result = await makeRequest(true)
 	}
@@ -412,14 +433,15 @@ async function requestCloudflareResult<T>(
  * Make a GET request to the Cloudflare API
  * Automatically retries with a fresh token on auth failure
  */
-export async function apiGet<T>(
-	path: string,
-	options?: APIClientOptions
-): Promise<T> {
-	return requestCloudflareResult(path, {
-		method: 'GET',
-		allowAuthRetry: true
-	}, options)
+export async function apiGet<T>(path: string, options?: APIClientOptions): Promise<T> {
+	return requestCloudflareResult(
+		path,
+		{
+			method: 'GET',
+			allowAuthRetry: true
+		},
+		options
+	)
 }
 
 /**
@@ -430,10 +452,14 @@ export async function apiPost<T>(
 	body: unknown,
 	options?: APIClientOptions
 ): Promise<T> {
-	return requestCloudflareResult(path, {
-		method: 'POST',
-		body
-	}, options)
+	return requestCloudflareResult(
+		path,
+		{
+			method: 'POST',
+			body
+		},
+		options
+	)
 }
 
 /**
@@ -444,10 +470,14 @@ export async function apiPut<T>(
 	body: unknown,
 	options?: APIClientOptions
 ): Promise<T> {
-	return requestCloudflareResult(path, {
-		method: 'PUT',
-		body
-	}, options)
+	return requestCloudflareResult(
+		path,
+		{
+			method: 'PUT',
+			body
+		},
+		options
+	)
 }
 
 /**
@@ -458,22 +488,27 @@ export async function apiPatch<T>(
 	body: unknown,
 	options?: APIClientOptions
 ): Promise<T> {
-	return requestCloudflareResult(path, {
-		method: 'PATCH',
-		body
-	}, options)
+	return requestCloudflareResult(
+		path,
+		{
+			method: 'PATCH',
+			body
+		},
+		options
+	)
 }
 
 /**
  * Make a DELETE request to the Cloudflare API
  */
-export async function apiDelete<T>(
-	path: string,
-	options?: APIClientOptions
-): Promise<T> {
-	return requestCloudflareResult(path, {
-		method: 'DELETE'
-	}, options)
+export async function apiDelete<T>(path: string, options?: APIClientOptions): Promise<T> {
+	return requestCloudflareResult(
+		path,
+		{
+			method: 'DELETE'
+		},
+		options
+	)
 }
 
 export interface PaginationOptions extends APIClientOptions {
@@ -504,10 +539,7 @@ const DEFAULT_PAGINATION_PAGE_SIZE = 50
  * higher `maxPages` when the caller knows the resource count can exceed the
  * default cap.
  */
-export async function apiGetAll<T>(
-	path: string,
-	options?: PaginationOptions
-): Promise<T[]> {
+export async function apiGetAll<T>(path: string, options?: PaginationOptions): Promise<T[]> {
 	const results: T[] = []
 	let page = 1
 	let cursor: string | undefined
@@ -521,12 +553,16 @@ export async function apiGetAll<T>(
 		}
 
 		if (!result || typeof result !== 'object') {
-			throw new Error('Expected paginated Cloudflare API result to be an array or an object containing an array.')
+			throw new Error(
+				'Expected paginated Cloudflare API result to be an array or an object containing an array.'
+			)
 		}
 
 		const arrayEntries = Object.entries(result).filter(([, value]) => Array.isArray(value))
 		if (arrayEntries.length !== 1) {
-			throw new Error('Expected paginated Cloudflare API result object to contain exactly one array property.')
+			throw new Error(
+				'Expected paginated Cloudflare API result object to contain exactly one array property.'
+			)
 		}
 
 		return arrayEntries[0][1] as T[]
@@ -538,10 +574,14 @@ export async function apiGetAll<T>(
 			? `${path}${separator}cursor=${encodeURIComponent(cursor)}&per_page=${perPage}`
 			: `${path}${separator}page=${page}&per_page=${perPage}`
 
-		const { response, envelope } = await requestCloudflareJson<T[] | Record<string, unknown>>(pagedPath, {
-			method: 'GET',
-			allowAuthRetry: true
-		}, options)
+		const { response, envelope } = await requestCloudflareJson<T[] | Record<string, unknown>>(
+			pagedPath,
+			{
+				method: 'GET',
+				allowAuthRetry: true
+			},
+			options
+		)
 
 		if (!envelope.success) {
 			throw envelopeFailureError(response, envelope, `GET ${pagedPath}`)
@@ -625,14 +665,17 @@ async function requestKVValue(
 	accountId: string,
 	namespaceId: string,
 	key: string,
-	request: {
-		method: 'GET'
-	} | {
-		method: 'PUT'
-		value: string
-	} | {
-		method: 'DELETE'
-	},
+	request:
+		| {
+				method: 'GET'
+		  }
+		| {
+				method: 'PUT'
+				value: string
+		  }
+		| {
+				method: 'DELETE'
+		  },
 	options?: APIClientOptions
 ): Promise<Response> {
 	const authorization = await resolveAuthHeader(options)
@@ -640,14 +683,18 @@ async function requestKVValue(
 	const encodedKey = encodeURIComponent(key)
 	const url = `${API_BASE}/accounts/${accountId}/storage/kv/namespaces/${namespaceId}/values/${encodedKey}`
 
-	return fetchWithTimeout(url, {
-		method: request.method,
-		headers: {
-			'Authorization': authorization,
-			...(request.method === 'PUT' ? { 'Content-Type': 'text/plain' } : {})
+	return fetchWithTimeout(
+		url,
+		{
+			method: request.method,
+			headers: {
+				Authorization: authorization,
+				...(request.method === 'PUT' ? { 'Content-Type': 'text/plain' } : {})
+			},
+			...(request.method === 'PUT' ? { body: request.value } : {})
 		},
-		...(request.method === 'PUT' ? { body: request.value } : {})
-	}, options?.timeout ?? DEFAULT_TIMEOUT)
+		options?.timeout ?? DEFAULT_TIMEOUT
+	)
 }
 
 /**
@@ -673,9 +720,15 @@ export async function kvGet(
 	key: string,
 	options?: APIClientOptions
 ): Promise<string | null> {
-	const response = await requestKVValue(accountId, namespaceId, key, {
-		method: 'GET'
-	}, options)
+	const response = await requestKVValue(
+		accountId,
+		namespaceId,
+		key,
+		{
+			method: 'GET'
+		},
+		options
+	)
 
 	if (response.status === 404) {
 		return null
@@ -698,10 +751,16 @@ export async function kvPut(
 	value: string,
 	options?: APIClientOptions
 ): Promise<void> {
-	const response = await requestKVValue(accountId, namespaceId, key, {
-		method: 'PUT',
-		value
-	}, options)
+	const response = await requestKVValue(
+		accountId,
+		namespaceId,
+		key,
+		{
+			method: 'PUT',
+			value
+		},
+		options
+	)
 
 	if (!response.ok) {
 		await throwKVValueError(response, 'KV write')
@@ -718,9 +777,15 @@ export async function kvDelete(
 	key: string,
 	options?: APIClientOptions
 ): Promise<void> {
-	const response = await requestKVValue(accountId, namespaceId, key, {
-		method: 'DELETE'
-	}, options)
+	const response = await requestKVValue(
+		accountId,
+		namespaceId,
+		key,
+		{
+			method: 'DELETE'
+		},
+		options
+	)
 
 	if (response.status === 404) {
 		return

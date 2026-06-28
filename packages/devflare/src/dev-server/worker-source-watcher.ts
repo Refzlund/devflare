@@ -51,7 +51,9 @@ export async function startWorkerSourceWatcher(
 		reloadInProgress = true
 
 		try {
-			const normalizedConfigPath = resolvedWorkerConfigPath ? normalizePath(resolvedWorkerConfigPath) : null
+			const normalizedConfigPath = resolvedWorkerConfigPath
+				? normalizePath(resolvedWorkerConfigPath)
+				: null
 			if (normalizedConfigPath && normalizePath(filePath) === normalizedConfigPath) {
 				logger?.info(`Devflare config changed: ${filePath}`)
 				await onConfigChange()

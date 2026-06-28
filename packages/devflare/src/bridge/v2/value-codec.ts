@@ -10,14 +10,14 @@
 // =============================================================================
 
 import { writeTransportV2Body } from './body-streams'
+import type { TransportV2Codec } from './codec'
 import {
-	serializeRequestV2,
 	deserializeRequestV2,
-	serializeResponseV2,
-	deserializeResponseV2
+	deserializeResponseV2,
+	serializeRequestV2,
+	serializeResponseV2
 } from './serialization'
 import type { TransportV2SerializedRequest, TransportV2SerializedResponse } from './serialization'
-import type { TransportV2Codec } from './codec'
 
 // -----------------------------------------------------------------------------
 // Tagged shapes
@@ -329,10 +329,12 @@ export async function serializeR2ObjectBody(obj: R2ObjectBody | R2Object | null)
 function applySerializedHttpMetadata(headers: Headers, httpMetadata?: R2HTTPMetadata): void {
 	if (httpMetadata?.contentType) headers.set('Content-Type', httpMetadata.contentType)
 	if (httpMetadata?.contentLanguage) headers.set('Content-Language', httpMetadata.contentLanguage)
-	if (httpMetadata?.contentDisposition) headers.set('Content-Disposition', httpMetadata.contentDisposition)
+	if (httpMetadata?.contentDisposition)
+		headers.set('Content-Disposition', httpMetadata.contentDisposition)
 	if (httpMetadata?.contentEncoding) headers.set('Content-Encoding', httpMetadata.contentEncoding)
 	if (httpMetadata?.cacheControl) headers.set('Cache-Control', httpMetadata.cacheControl)
-	if (httpMetadata?.cacheExpiry) headers.set('Expires', new Date(httpMetadata.cacheExpiry).toUTCString())
+	if (httpMetadata?.cacheExpiry)
+		headers.set('Expires', new Date(httpMetadata.cacheExpiry).toUTCString())
 }
 
 function createSerializedR2Metadata(serialized: TransportV2SerializedR2Object) {

@@ -1,4 +1,4 @@
-import { account, type APIClientOptions, type WorkerDeploymentInfo } from '../cloudflare'
+import { type APIClientOptions, type WorkerDeploymentInfo, account } from '../cloudflare'
 import { compileBuildConfig } from '../config/compiler'
 import type { DevflareConfig } from '../config/schema'
 import type { ProcessRunner } from './dependencies'
@@ -76,7 +76,8 @@ function formatSendEmailResource(entry: {
 
 	const destinations = uniqueStrings(entry.allowed_destination_addresses ?? [])
 	const senders = uniqueStrings(entry.allowed_sender_addresses ?? [])
-	const destinationLabel = destinations.length > 0 ? destinations.join(', ') : 'configured destinations'
+	const destinationLabel =
+		destinations.length > 0 ? destinations.join(', ') : 'configured destinations'
 
 	if (senders.length === 0) {
 		return destinationLabel
@@ -294,9 +295,7 @@ function collectBindingAssociationTargets(config: DevflareConfig): BindingAssoci
 		addAssociationTarget(targets, {
 			reference: binding.binding,
 			type: 'Worker',
-			resource: binding.entrypoint
-				? `${binding.service}#${binding.entrypoint}`
-				: binding.service,
+			resource: binding.entrypoint ? `${binding.service}#${binding.entrypoint}` : binding.service,
 			note: binding.environment ? `env ${binding.environment}` : undefined
 		})
 	}
@@ -353,10 +352,14 @@ function collectBindingAssociationTargets(config: DevflareConfig): BindingAssoci
 }
 
 function getActiveVersionId(deployments: WorkerDeploymentInfo[]): string | undefined {
-	const sortedDeployments = [...deployments].sort((left, right) => right.createdOn.getTime() - left.createdOn.getTime())
+	const sortedDeployments = [...deployments].sort(
+		(left, right) => right.createdOn.getTime() - left.createdOn.getTime()
+	)
 
 	for (const deployment of sortedDeployments) {
-		const version = [...deployment.versions].sort((left, right) => right.percentage - left.percentage)[0]
+		const version = [...deployment.versions].sort(
+			(left, right) => right.percentage - left.percentage
+		)[0]
 		if (version?.versionId) {
 			return version.versionId
 		}
@@ -504,7 +507,7 @@ function mapWranglerBindingType(
 	binding: RawWranglerBinding
 ): { friendlyType: string; resource: string } | null {
 	const stringField = (key: string): string =>
-		typeof binding[key] === 'string' ? binding[key] as string : ''
+		typeof binding[key] === 'string' ? (binding[key] as string) : ''
 
 	switch (type) {
 		case 'kv_namespace':
@@ -543,9 +546,8 @@ function mapWranglerBindingType(
 		case 'send_email':
 			return {
 				friendlyType: 'Send Email',
-				resource: stringField('destination_address')
-					|| stringField('name')
-					|| (binding.name as string)
+				resource:
+					stringField('destination_address') || stringField('name') || (binding.name as string)
 			}
 		case 'mtls_certificate':
 			return { friendlyType: 'mTLS Certificate', resource: stringField('certificate_id') }
@@ -678,7 +680,9 @@ export async function inspectBindingAssociations(
 	const queueTargets = uniqueStrings(
 		targets
 			.map((target) => target.queueName)
-			.filter((queueName): queueName is string => typeof queueName === 'string' && queueName.length > 0)
+			.filter(
+				(queueName): queueName is string => typeof queueName === 'string' && queueName.length > 0
+			)
 	)
 	const queueAssociations = new Map<string, ParsedQueueAssociation>()
 
@@ -743,9 +747,7 @@ export async function inspectBindingAssociations(
 	}
 
 	const rows = targets.map((target) => {
-		const queueAssociation = target.queueName
-			? queueAssociations.get(target.queueName)
-			: undefined
+		const queueAssociation = target.queueName ? queueAssociations.get(target.queueName) : undefined
 		const directlyConnectedWorkers = Array.from(bindingUsage.get(target.key) ?? [])
 		const connectedWorkers = uniqueStrings([
 			...directlyConnectedWorkers,

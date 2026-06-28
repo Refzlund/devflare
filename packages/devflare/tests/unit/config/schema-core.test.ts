@@ -417,9 +417,7 @@ describe('configSchema', () => {
 			const result = configSchema.safeParse({
 				name: 'my-worker',
 				compatibilityDate: '2025-01-07',
-				rules: [
-					{ type: 'PythonModule', globs: ['**/*.py'] }
-				]
+				rules: [{ type: 'PythonModule', globs: ['**/*.py'] }]
 			})
 
 			expect(result.success).toBe(false)

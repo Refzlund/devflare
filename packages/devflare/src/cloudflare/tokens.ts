@@ -1,4 +1,4 @@
-import { apiDelete, apiGetAll, apiPost, apiPut, type APIClientOptions } from './api'
+import { type APIClientOptions, apiDelete, apiGetAll, apiPost, apiPut } from './api'
 import { KNOWN_PERMISSION_GROUP_IDS_DATA } from './known-permission-group-ids.generated'
 import type {
 	AccountOwnedAPIToken,
@@ -133,12 +133,12 @@ export function matchesKnownPermissionGroup(
 	const expectedName = knownDisplayNames[symbolicName]
 	if (typeof expectedName === 'string' && permissionGroup.name === expectedName) {
 		console.warn(
-			`[devflare] Matched Cloudflare permission group '${symbolicName}' by display name `
-			+ `('${expectedName}') because no verified id is configured. Cloudflare display `
-			+ 'names are unstable; a maintainer should run '
-			+ '`bun run --cwd packages/devflare refresh-permission-groups` to regenerate '
-			+ 'known-permission-group-ids.generated.ts with the verified id (or open an '
-			+ 'issue so a maintainer can).'
+			`[devflare] Matched Cloudflare permission group '${symbolicName}' by display name ` +
+				`('${expectedName}') because no verified id is configured. Cloudflare display ` +
+				'names are unstable; a maintainer should run ' +
+				'`bun run --cwd packages/devflare refresh-permission-groups` to regenerate ' +
+				'known-permission-group-ids.generated.ts with the verified id (or open an ' +
+				'issue so a maintainer can).'
 		)
 		return true
 	}
@@ -214,10 +214,7 @@ function dedupeScopedPermissionGroups(
 	})
 }
 
-function permissionGroupHasScope(
-	permissionGroup: ScopedPermissionGroup,
-	scope: string
-): boolean {
+function permissionGroupHasScope(permissionGroup: ScopedPermissionGroup, scope: string): boolean {
 	return permissionGroup.scopes.some((value) => value.trim() === scope)
 }
 
@@ -228,12 +225,16 @@ function buildCreateTokenPoliciesFromPermissionGroups(
 	const dedupedPermissionGroups = dedupeScopedPermissionGroups(permissionGroups)
 	const accountPermissionGroupIds = dedupePermissionGroupIds(
 		dedupedPermissionGroups
-			.filter((permissionGroup) => permissionGroupHasScope(permissionGroup, ACCOUNT_OWNED_TOKEN_SCOPE))
+			.filter((permissionGroup) =>
+				permissionGroupHasScope(permissionGroup, ACCOUNT_OWNED_TOKEN_SCOPE)
+			)
 			.map((permissionGroup) => permissionGroup.id)
 	)
 	const zonePermissionGroupIds = dedupePermissionGroupIds(
 		dedupedPermissionGroups
-			.filter((permissionGroup) => permissionGroupHasScope(permissionGroup, ACCOUNT_ZONE_OWNED_TOKEN_SCOPE))
+			.filter((permissionGroup) =>
+				permissionGroupHasScope(permissionGroup, ACCOUNT_ZONE_OWNED_TOKEN_SCOPE)
+			)
 			.map((permissionGroup) => permissionGroup.id)
 	)
 	const policies: AccountOwnedAPITokenCreatePolicy[] = []
@@ -297,8 +298,10 @@ function keepAccountOwnedTokenCompatiblePermissionGroups(
 	return permissionGroups.filter((permissionGroup) => {
 		return permissionGroup.scopes.some((scope) => {
 			const normalizedScope = scope.trim()
-			return normalizedScope === ACCOUNT_OWNED_TOKEN_SCOPE
-				|| normalizedScope === ACCOUNT_ZONE_OWNED_TOKEN_SCOPE
+			return (
+				normalizedScope === ACCOUNT_OWNED_TOKEN_SCOPE ||
+				normalizedScope === ACCOUNT_ZONE_OWNED_TOKEN_SCOPE
+			)
 		})
 	})
 }
@@ -388,11 +391,13 @@ export function filterDevflareManagedTokens(
 export function selectDevflarePermissionGroups(
 	permissionGroups: AccountTokenPermissionGroup[]
 ): AccountTokenPermissionGroup[] {
-	const selectedPermissionGroups = dedupePermissionGroups(selectReusableAccountOwnedTokenPermissionGroups(permissionGroups).filter((permissionGroup) => {
-		return DEVFLARE_PERMISSION_GROUP_NAME_PATTERNS.some((pattern) => {
-			return pattern.test(permissionGroup.name)
+	const selectedPermissionGroups = dedupePermissionGroups(
+		selectReusableAccountOwnedTokenPermissionGroups(permissionGroups).filter((permissionGroup) => {
+			return DEVFLARE_PERMISSION_GROUP_NAME_PATTERNS.some((pattern) => {
+				return pattern.test(permissionGroup.name)
+			})
 		})
-	}))
+	)
 
 	if (selectedPermissionGroups.length === 0) {
 		throw new Error(
@@ -454,7 +459,10 @@ export async function deleteAccountOwnedAPIToken(
 	tokenId: string,
 	options?: APIClientOptions
 ): Promise<AccountOwnedAPITokenDeleteResult> {
-	return apiDelete<AccountOwnedAPITokenDeleteResult>(`/accounts/${accountId}/tokens/${tokenId}`, options)
+	return apiDelete<AccountOwnedAPITokenDeleteResult>(
+		`/accounts/${accountId}/tokens/${tokenId}`,
+		options
+	)
 }
 
 export async function rollAccountOwnedAPITokenValue(
@@ -475,9 +483,9 @@ export async function createAccountOwnedAPIToken(
 	clientOptions?: APIClientOptions
 ): Promise<AccountOwnedAPIToken> {
 	const permissionGroupIds = dedupePermissionGroupIds(
-		options.permissionGroups?.map((permissionGroup) => permissionGroup.id)
-			?? options.permissionGroupIds
-			?? []
+		options.permissionGroups?.map((permissionGroup) => permissionGroup.id) ??
+			options.permissionGroupIds ??
+			[]
 	)
 
 	if (permissionGroupIds.length === 0) {
@@ -495,7 +503,9 @@ export async function createAccountOwnedAPIToken(
 		: buildCreateTokenPoliciesFromPermissionGroupIds(accountId, permissionGroupIds)
 
 	if (policies.length === 0) {
-		throw new Error('Cannot create a Devflare token without any account- or zone-scoped permission groups')
+		throw new Error(
+			'Cannot create a Devflare token without any account- or zone-scoped permission groups'
+		)
 	}
 
 	const createdToken = await apiPost<RawAccountOwnedAPIToken>(

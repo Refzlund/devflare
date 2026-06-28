@@ -87,13 +87,12 @@ export function accent(value: string, theme: CliTheme, kind: CliAccent = 'cyan')
 			return bold(value, theme)
 		case 'white-dim':
 			return whiteDim(value, theme)
-		case 'cyan':
 		default:
 			return cyanBold(value, theme)
 	}
 }
 
-export function logLine(logger: ConsolaInstance, message: string = ''): void {
+export function logLine(logger: ConsolaInstance, message = ''): void {
 	logger.log(message)
 }
 
@@ -123,7 +122,7 @@ function truncateStyledCell(value: string, width: number): string {
 	const prefixMatch = value.match(/^((?:\x1b\[[0-9;]*m)+)/)
 	const suffixMatch = value.match(/((?:\x1b\[[0-9;]*m)+)$/)
 	const prefix = prefixMatch?.[1] ?? ''
-	const suffix = prefix ? RESET : suffixMatch?.[1] ?? ''
+	const suffix = prefix ? RESET : (suffixMatch?.[1] ?? '')
 
 	return `${prefix}${truncatedPlainValue}${suffix}`
 }
@@ -135,14 +134,16 @@ function padStyledCell(value: string, width: number): string {
 }
 
 export function formatTableLine(values: string[], widths: Array<number | undefined>): string {
-	return values.map((value, index) => {
-		const width = widths[index]
-		if (width === undefined || index === values.length - 1) {
-			return value
-		}
+	return values
+		.map((value, index) => {
+			const width = widths[index]
+			if (width === undefined || index === values.length - 1) {
+				return value
+			}
 
-		return padStyledCell(value, width)
-	}).join('  ')
+			return padStyledCell(value, width)
+		})
+		.join('  ')
 }
 
 export function renderTable<Row>(
@@ -156,8 +157,16 @@ export function renderTable<Row>(
 
 	const widths = columns.map((column) => column.width)
 	return [
-		formatTableLine(columns.map((column) => dim(column.label, theme)), widths),
-		...rows.map((row) => formatTableLine(columns.map((column) => column.value(row)), widths))
+		formatTableLine(
+			columns.map((column) => dim(column.label, theme)),
+			widths
+		),
+		...rows.map((row) =>
+			formatTableLine(
+				columns.map((column) => column.value(row)),
+				widths
+			)
+		)
 	]
 }
 
@@ -175,7 +184,10 @@ export function logTable<Row>(
 		return
 	}
 
-	logLine(logger, `${accent(options.title, options.theme, options.titleAccent)} ${dim(`(${options.rows.length})`, options.theme)}`)
+	logLine(
+		logger,
+		`${accent(options.title, options.theme, options.titleAccent)} ${dim(`(${options.rows.length})`, options.theme)}`
+	)
 	for (const line of renderTable(options.rows, options.columns, options.theme)) {
 		logLine(logger, line)
 	}
@@ -185,7 +197,7 @@ export function formatLabelValue(
 	label: string,
 	value: string,
 	theme: CliTheme,
-	labelWidth: number = 12
+	labelWidth = 12
 ): string {
 	return `${dim(label.padEnd(labelWidth), theme)} ${value}`
 }
@@ -194,6 +206,6 @@ export function formatCommand(command: string, description: string, theme: CliTh
 	return `  ${cyan(command, theme)}${dim(' — ', theme)}${description}`
 }
 
-export function formatBullet(text: string, theme: CliTheme, bullet: string = '•'): string {
+export function formatBullet(text: string, theme: CliTheme, bullet = '•'): string {
 	return `  ${dim(bullet, theme)} ${text}`
 }

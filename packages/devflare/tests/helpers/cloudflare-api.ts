@@ -1,15 +1,18 @@
 export function jsonResponse(result: unknown, resultInfo?: Record<string, unknown>): Response {
-	return new Response(JSON.stringify({
-		success: true,
-		errors: [],
-		messages: [],
-		result,
-		...(resultInfo ? { result_info: resultInfo } : {})
-	}), {
-		headers: {
-			'Content-Type': 'application/json'
+	return new Response(
+		JSON.stringify({
+			success: true,
+			errors: [],
+			messages: [],
+			result,
+			...(resultInfo ? { result_info: resultInfo } : {})
+		}),
+		{
+			headers: {
+				'Content-Type': 'application/json'
+			}
 		}
-	})
+	)
 }
 
 export function createD1ResultsResponse(results: unknown[] = []): Response {

@@ -42,38 +42,47 @@ function toWranglerDurableObjectBinding(
 function toWranglerWorkerConfig(worker: ResolvedWorker): WranglerConfig {
 	const queueProducers = worker.queueProducers
 		? objectEntries(worker.queueProducers).map(([binding, producer]) => ({
-			binding,
-			queue: producer.queueName
-		}))
+				binding,
+				queue: producer.queueName
+			}))
 		: undefined
 	const queueConsumers = worker.queueConsumers
 		? objectEntries(worker.queueConsumers).map(([queue, consumer]) => ({
-			queue,
-			...(consumer.maxBatchSize !== undefined && { max_batch_size: consumer.maxBatchSize as number }),
-			...(consumer.maxBatchTimeout !== undefined && { max_batch_timeout: consumer.maxBatchTimeout as number }),
-			...(consumer.maxRetries !== undefined && { max_retries: consumer.maxRetries as number }),
-			...(typeof consumer.deadLetterQueue === 'string' && { dead_letter_queue: consumer.deadLetterQueue }),
-			...(consumer.maxConcurrency !== undefined && { max_concurrency: consumer.maxConcurrency as number }),
-			...(consumer.retryDelay !== undefined && { retry_delay: consumer.retryDelay as number })
-		}))
+				queue,
+				...(consumer.maxBatchSize !== undefined && {
+					max_batch_size: consumer.maxBatchSize as number
+				}),
+				...(consumer.maxBatchTimeout !== undefined && {
+					max_batch_timeout: consumer.maxBatchTimeout as number
+				}),
+				...(consumer.maxRetries !== undefined && { max_retries: consumer.maxRetries as number }),
+				...(typeof consumer.deadLetterQueue === 'string' && {
+					dead_letter_queue: consumer.deadLetterQueue
+				}),
+				...(consumer.maxConcurrency !== undefined && {
+					max_concurrency: consumer.maxConcurrency as number
+				}),
+				...(consumer.retryDelay !== undefined && { retry_delay: consumer.retryDelay as number })
+			}))
 		: undefined
-	const queues = queueProducers || queueConsumers
-		? {
-			...(queueProducers && { producers: queueProducers }),
-			...(queueConsumers && { consumers: queueConsumers })
-		}
-		: undefined
+	const queues =
+		queueProducers || queueConsumers
+			? {
+					...(queueProducers && { producers: queueProducers }),
+					...(queueConsumers && { consumers: queueConsumers })
+				}
+			: undefined
 	const durableObjectBindings = worker.durableObjects
 		? objectEntries(worker.durableObjects).map(([name, value]) =>
-			toWranglerDurableObjectBinding(name, value)
-		)
+				toWranglerDurableObjectBinding(name, value)
+			)
 		: []
 	const serviceBindings = worker.serviceBindings
 		? objectEntries(worker.serviceBindings).map(([binding, target]) => ({
-			binding,
-			service: target.name,
-			...(target.entrypoint && { entrypoint: target.entrypoint })
-		}))
+				binding,
+				service: target.name,
+				...(target.entrypoint && { entrypoint: target.entrypoint })
+			}))
 		: []
 
 	const config: WranglerConfig = {

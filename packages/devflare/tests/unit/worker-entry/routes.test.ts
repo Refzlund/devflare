@@ -51,9 +51,12 @@ describe('discoverRoutes', () => {
 		)
 		await writeFile(join(routesDir, '_internal', 'helper.ts'), 'export const helper = true')
 
-		const routes = await discoverRoutes(projectDir, createRouteConfig({
-			name: 'route-discovery-test'
-		}))
+		const routes = await discoverRoutes(
+			projectDir,
+			createRouteConfig({
+				name: 'route-discovery-test'
+			})
+		)
 
 		expect(routes?.dir).toBe('src/routes')
 		const routePaths = routes?.routes.map((route) => route.routePath) ?? []
@@ -74,15 +77,18 @@ describe('discoverRoutes', () => {
 			'export async function GET() { return new Response("user") }'
 		)
 
-		const routes = await discoverRoutes(projectDir, createRouteConfig({
-			name: 'route-discovery-prefix-test',
-			files: {
-				routes: {
-					dir: 'app-routes',
-					prefix: '/api'
+		const routes = await discoverRoutes(
+			projectDir,
+			createRouteConfig({
+				name: 'route-discovery-prefix-test',
+				files: {
+					routes: {
+						dir: 'app-routes',
+						prefix: '/api'
+					}
 				}
-			}
-		}))
+			})
+		)
 
 		expect(routes?.prefix).toBe('/api')
 		expect(routes?.routes.map((route) => route.routePath)).toEqual(['/api/users/[id]'])
@@ -93,11 +99,22 @@ describe('discoverRoutes', () => {
 		const routesDir = join(projectDir, DEFAULT_ROUTE_DIR, 'users')
 
 		await mkdir(routesDir, { recursive: true })
-		await writeFile(join(routesDir, '[id].ts'), 'export async function GET() { return new Response("id") }')
-		await writeFile(join(routesDir, '[slug].ts'), 'export async function GET() { return new Response("slug") }')
+		await writeFile(
+			join(routesDir, '[id].ts'),
+			'export async function GET() { return new Response("id") }'
+		)
+		await writeFile(
+			join(routesDir, '[slug].ts'),
+			'export async function GET() { return new Response("slug") }'
+		)
 
-		await expect(discoverRoutes(projectDir, createRouteConfig({
-			name: 'route-conflict-test'
-		}))).rejects.toThrow('Conflicting file routes detected')
+		await expect(
+			discoverRoutes(
+				projectDir,
+				createRouteConfig({
+					name: 'route-conflict-test'
+				})
+			)
+		).rejects.toThrow('Conflicting file routes detected')
 	})
 })

@@ -1,16 +1,3 @@
-import type {
-	WorkerDeploymentInfo,
-	WorkerVersionInfo
-} from './types'
-import {
-	devflareDeploymentRecordSchema,
-	devflarePreviewScopeRecordSchema,
-	devflarePreviewRecordSchema,
-	type DevflareDeploymentRecord,
-	type DevflarePreviewScopeRecord,
-	type DevflarePreviewRecord,
-	type DevflareRecordSource
-} from './registry-schema'
 import {
 	getDeploymentRecordId,
 	getPreviewDeploymentId,
@@ -19,20 +6,28 @@ import {
 	inferRecordSource
 } from './preview-registry-inference'
 import { formatVersionPreviewUrl } from './preview-urls'
+import {
+	type DevflareDeploymentRecord,
+	type DevflarePreviewRecord,
+	type DevflarePreviewScopeRecord,
+	type DevflareRecordSource,
+	devflareDeploymentRecordSchema,
+	devflarePreviewRecordSchema,
+	devflarePreviewScopeRecordSchema
+} from './registry-schema'
+import type { WorkerDeploymentInfo, WorkerVersionInfo } from './types'
 
 interface RegistryRecordParser<TRecord> {
 	parse(value: unknown): TRecord
 }
 
-function markRecordDeleted<TRecord extends {
-	updatedAt?: Date
-	deletedAt?: Date
-	status: string
-}>(
-	record: TRecord,
-	now: Date,
-	parser: RegistryRecordParser<TRecord>
-): TRecord {
+function markRecordDeleted<
+	TRecord extends {
+		updatedAt?: Date
+		deletedAt?: Date
+		status: string
+	}
+>(record: TRecord, now: Date, parser: RegistryRecordParser<TRecord>): TRecord {
 	return parser.parse({
 		...record,
 		updatedAt: now,
@@ -97,15 +92,18 @@ export function buildPreviewRecord(options: {
 	now: Date
 }): DevflarePreviewRecord | null {
 	const scope = options.previewScope ?? options.existing?.scope
-	const previewUrl = options.previewUrl
-		?? options.existing?.previewUrl
-		?? (options.workersSubdomain
+	const previewUrl =
+		options.previewUrl ??
+		options.existing?.previewUrl ??
+		(options.workersSubdomain
 			? formatVersionPreviewUrl(options.version.id, options.workerName, options.workersSubdomain)
 			: undefined)
-	const scopeChanged = options.previewScope !== undefined && options.previewScope !== options.existing?.scope
-	const scopeUrl = options.previewScopeUrl
-		?? (options.previewScope !== undefined ? options.previewUrl : undefined)
-		?? (!scopeChanged ? options.existing?.scopeUrl : undefined)
+	const scopeChanged =
+		options.previewScope !== undefined && options.previewScope !== options.existing?.scope
+	const scopeUrl =
+		options.previewScopeUrl ??
+		(options.previewScope !== undefined ? options.previewUrl : undefined) ??
+		(!scopeChanged ? options.existing?.scopeUrl : undefined)
 
 	if (!previewUrl) {
 		return null
@@ -157,7 +155,7 @@ export function buildPreviewScopeRecord(options: {
 		}),
 		scope: options.previewRecord.scope,
 		scopeUrl: options.previewRecord.scopeUrl,
-		branchName: options.previewRecord.branchName,
+		branchName: options.previewRecord.branchName
 	})
 }
 
@@ -184,7 +182,7 @@ export function buildPreviewDeploymentRecord(options: {
 		channel: 'preview',
 		environment: 'preview',
 		url: options.previewRecord.scopeUrl ?? options.previewRecord.previewUrl,
-		message: options.existing?.message,
+		message: options.existing?.message
 	})
 }
 
@@ -228,18 +226,30 @@ export function buildProductionDeploymentRecord(options: {
 		url: productionUrl,
 		message: options.deploymentMessage ?? options.deployment.message ?? options.existing?.message,
 		commitSha: options.commitSha ?? options.existing?.commitSha,
-		source: inferRecordSource(options.source, options.version?.metadata.source ?? options.deployment.source)
+		source: inferRecordSource(
+			options.source,
+			options.version?.metadata.source ?? options.deployment.source
+		)
 	})
 }
 
-export function markPreviewRecordDeleted(record: DevflarePreviewRecord, now: Date): DevflarePreviewRecord {
+export function markPreviewRecordDeleted(
+	record: DevflarePreviewRecord,
+	now: Date
+): DevflarePreviewRecord {
 	return markRecordDeleted(record, now, devflarePreviewRecordSchema)
 }
 
-export function markPreviewScopeRecordDeleted(record: DevflarePreviewScopeRecord, now: Date): DevflarePreviewScopeRecord {
+export function markPreviewScopeRecordDeleted(
+	record: DevflarePreviewScopeRecord,
+	now: Date
+): DevflarePreviewScopeRecord {
 	return markRecordDeleted(record, now, devflarePreviewScopeRecordSchema)
 }
 
-export function markDeploymentRecordDeleted(record: DevflareDeploymentRecord, now: Date): DevflareDeploymentRecord {
+export function markDeploymentRecordDeleted(
+	record: DevflareDeploymentRecord,
+	now: Date
+): DevflareDeploymentRecord {
 	return markRecordDeleted(record, now, devflareDeploymentRecordSchema)
 }

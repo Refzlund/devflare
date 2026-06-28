@@ -32,9 +32,9 @@
 import { writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { KNOWN_PERMISSION_GROUP_IDS_DATA } from '../src/cloudflare/known-permission-group-ids.generated'
 import { listAccountTokenPermissionGroups } from '../src/cloudflare/tokens'
 import { KNOWN_PERMISSION_GROUP_DISPLAY_NAMES } from '../src/cloudflare/tokens'
-import { KNOWN_PERMISSION_GROUP_IDS_DATA } from '../src/cloudflare/known-permission-group-ids.generated'
 
 interface RefreshOptions {
 	accountId: string
@@ -48,8 +48,8 @@ function readRequiredEnv(name: string): string {
 	const value = process.env[name]
 	if (!value || value.trim().length === 0) {
 		throw new Error(
-			`Missing required environment variable ${name}. `
-			+ 'Set CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID before running this script.'
+			`Missing required environment variable ${name}. ` +
+				'Set CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID before running this script.'
 		)
 	}
 	return value.trim()
@@ -64,7 +64,7 @@ function parseCliFlags(argv: readonly string[]): {
 	let keepExisting = false
 	let outputOverride: string | undefined
 
-	for (let index = 0;index < argv.length;index++) {
+	for (let index = 0; index < argv.length; index++) {
 		const arg = argv[index]
 		switch (arg) {
 			case '--dry-run':
@@ -84,7 +84,9 @@ function parseCliFlags(argv: readonly string[]): {
 			}
 			default:
 				if (arg.startsWith('--')) {
-					throw new Error(`Unknown flag ${arg}. Supported: --dry-run, --keep-existing, --output <path>.`)
+					throw new Error(
+						`Unknown flag ${arg}. Supported: --dry-run, --keep-existing, --output <path>.`
+					)
 				}
 		}
 	}
@@ -95,13 +97,7 @@ function parseCliFlags(argv: readonly string[]): {
 function getDefaultOutputPath(): string {
 	const scriptPath = fileURLToPath(import.meta.url)
 	const scriptDir = dirname(scriptPath)
-	return resolve(
-		scriptDir,
-		'..',
-		'src',
-		'cloudflare',
-		'known-permission-group-ids.generated.ts'
-	)
+	return resolve(scriptDir, '..', 'src', 'cloudflare', 'known-permission-group-ids.generated.ts')
 }
 
 interface ResolvedPermissionEntry {
@@ -127,9 +123,9 @@ function resolveUpdatedEntries(
 		}
 	}
 
-	const symbolicNames = Object.keys(
-		KNOWN_PERMISSION_GROUP_DISPLAY_NAMES
-	) as Array<keyof typeof KNOWN_PERMISSION_GROUP_DISPLAY_NAMES>
+	const symbolicNames = Object.keys(KNOWN_PERMISSION_GROUP_DISPLAY_NAMES) as Array<
+		keyof typeof KNOWN_PERMISSION_GROUP_DISPLAY_NAMES
+	>
 
 	return symbolicNames.map((symbolicName) => {
 		const displayName = KNOWN_PERMISSION_GROUP_DISPLAY_NAMES[symbolicName]
@@ -150,7 +146,8 @@ function renderGeneratedFile(entries: ResolvedPermissionEntry[]): string {
 	const typeBody = entries.map((entry) => `\t${entry.symbolicName}: string | null`).join('\n')
 	const dataBody = entries
 		.map((entry) => {
-			const value = entry.resolvedId === null ? 'null' : `'${entry.resolvedId.replace(/'/g, "\\'")}'`
+			const value =
+				entry.resolvedId === null ? 'null' : `'${entry.resolvedId.replace(/'/g, "\\'")}'`
 			return `\t${entry.symbolicName}: ${value}`
 		})
 		.join(',\n')
@@ -179,9 +176,16 @@ ${dataBody}
 }
 
 function reportDrift(entries: ResolvedPermissionEntry[]): void {
-	const newlyResolved = entries.filter((entry) => entry.previousId === null && entry.resolvedId !== null)
+	const newlyResolved = entries.filter(
+		(entry) => entry.previousId === null && entry.resolvedId !== null
+	)
 	const stillMissing = entries.filter((entry) => entry.resolvedId === null)
-	const changed = entries.filter((entry) => entry.previousId !== null && entry.resolvedId !== null && entry.previousId !== entry.resolvedId)
+	const changed = entries.filter(
+		(entry) =>
+			entry.previousId !== null &&
+			entry.resolvedId !== null &&
+			entry.previousId !== entry.resolvedId
+	)
 
 	if (newlyResolved.length > 0) {
 		console.log(`[refresh-permission-groups] Newly resolved (${newlyResolved.length}):`)
@@ -198,7 +202,9 @@ function reportDrift(entries: ResolvedPermissionEntry[]): void {
 	}
 
 	if (stillMissing.length > 0) {
-		console.warn(`[refresh-permission-groups] Still unverified after refresh (${stillMissing.length}):`)
+		console.warn(
+			`[refresh-permission-groups] Still unverified after refresh (${stillMissing.length}):`
+		)
 		for (const entry of stillMissing) {
 			console.warn(`  ? ${entry.symbolicName} (display name: '${entry.displayName}')`)
 		}

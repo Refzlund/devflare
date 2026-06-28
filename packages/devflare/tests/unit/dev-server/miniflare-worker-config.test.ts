@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import {
-	makeMiniflareWorker,
-	type MakeMiniflareWorkerContext
+	type MakeMiniflareWorkerContext,
+	makeMiniflareWorker
 } from '../../../src/dev-server/miniflare-worker-config'
 
 describe('makeMiniflareWorker', () => {

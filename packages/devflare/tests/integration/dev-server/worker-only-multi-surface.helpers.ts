@@ -40,19 +40,33 @@ export async function createProject(
 
 	await installBuiltDevflare(projectDir)
 
-	await writeFile(join(projectDir, 'package.json'), JSON.stringify({
-		name: options.prefix,
-		private: true,
-		type: 'module'
-	}, null, 2))
+	await writeFile(
+		join(projectDir, 'package.json'),
+		JSON.stringify(
+			{
+				name: options.prefix,
+				private: true,
+				type: 'module'
+			},
+			null,
+			2
+		)
+	)
 
-	await writeFile(join(projectDir, 'tsconfig.json'), JSON.stringify({
-		compilerOptions: {
-			target: 'ESNext',
-			module: 'ESNext',
-			moduleResolution: 'Bundler'
-		}
-	}, null, 2))
+	await writeFile(
+		join(projectDir, 'tsconfig.json'),
+		JSON.stringify(
+			{
+				compilerOptions: {
+					target: 'ESNext',
+					module: 'ESNext',
+					moduleResolution: 'Bundler'
+				}
+			},
+			null,
+			2
+		)
+	)
 
 	await writeFile(join(projectDir, 'devflare.config.ts'), options.config)
 
@@ -87,12 +101,14 @@ function formatLogValue(value: unknown): string {
 
 export function createCapturedLogger(): CapturedLogger {
 	const messages: CapturedLogEntry[] = []
-	const capture = (level: string) => (...args: unknown[]) => {
-		messages.push({
-			level,
-			message: args.map((arg) => formatLogValue(arg)).join(' ')
-		})
-	}
+	const capture =
+		(level: string) =>
+		(...args: unknown[]) => {
+			messages.push({
+				level,
+				message: args.map((arg) => formatLogValue(arg)).join(' ')
+			})
+		}
 
 	return {
 		messages,
@@ -123,5 +139,7 @@ export async function waitForLogEntry(
 		await new Promise((resolvePromise) => setTimeout(resolvePromise, 200))
 	}
 
-	throw new Error(`Timed out waiting for log containing "${expectedText}". Captured logs:\n${lastSeen}`)
+	throw new Error(
+		`Timed out waiting for log containing "${expectedText}". Captured logs:\n${lastSeen}`
+	)
 }

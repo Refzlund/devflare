@@ -29,7 +29,7 @@ async function resolveInternalModuleEntry(relativeCandidates: string[]): Promise
 			await fs.access(absolutePath)
 			return absolutePath
 		} catch {
-			continue
+			// Candidate not found — try the next one.
 		}
 	}
 
@@ -42,10 +42,7 @@ async function resolveInternalAliasMap(outDir: string): Promise<Record<string, s
 		'../runtime/index.ts',
 		'../runtime/index.js'
 	])
-	const packageEntry = await resolveInternalModuleEntry([
-		'../browser.ts',
-		'../browser.js'
-	])
+	const packageEntry = await resolveInternalModuleEntry(['../browser.ts', '../browser.js'])
 
 	return {
 		debug: debugShimPath,

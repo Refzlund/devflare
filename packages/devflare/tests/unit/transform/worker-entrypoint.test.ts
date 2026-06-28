@@ -5,9 +5,9 @@
 import { describe, expect, test } from 'bun:test'
 import {
 	findExportedFunctions,
+	generateRpcInterface,
 	shouldTransformWorker,
-	transformWorkerEntrypoint,
-	generateRpcInterface
+	transformWorkerEntrypoint
 } from '../../../src/transform/worker-entrypoint'
 
 describe('findExportedFunctions', () => {
@@ -162,7 +162,9 @@ export function fetch(request: Request, env: Env, ctx: ExecutionContext): Respon
 		const result = transformWorkerEntrypoint(code, 'worker.ts')
 
 		expect(result).not.toBeNull()
-		expect(result?.code).toContain("import { createFetchEvent, invokeFetchHandler, runWithEventContext } from 'devflare/runtime'")
+		expect(result?.code).toContain(
+			"import { createFetchEvent, invokeFetchHandler, runWithEventContext } from 'devflare/runtime'"
+		)
 		expect(result?.code).toContain('async fetch(request: Request): Promise<Response>')
 		expect(result?.code).toContain('createFetchEvent(request, this.env, this.ctx)')
 		expect(result?.code).toContain('runWithEventContext')
@@ -226,7 +228,9 @@ export function fetch({ request }: FetchEvent): Response {
 		const result = transformWorkerEntrypoint(code, 'worker.ts')
 
 		expect(result).not.toBeNull()
-		expect(result?.code).toContain('const __devflareEvent = createFetchEvent(request, this.env, this.ctx)')
+		expect(result?.code).toContain(
+			'const __devflareEvent = createFetchEvent(request, this.env, this.ctx)'
+		)
 		expect(result?.code).toContain('invokeFetchHandler(__originalFetch, __devflareEvent)')
 	})
 

@@ -15,29 +15,27 @@
 
 import { dirname, resolve } from 'pathe'
 import type { Plugin, ResolvedConfig, ViteDevServer } from 'vite'
+import type { WranglerConfig } from '../config/compiler'
 import { loadConfig } from '../config/loader'
 import type { DevflareConfig } from '../config/schema'
-import type { WranglerConfig } from '../config/compiler'
-import {
-	generateVirtualDOEntry,
-	logDiscoveredDurableObjects,
-	RESOLVED_VIRTUAL_DO_ENTRY,
-	VIRTUAL_DO_ENTRY,
-	type AuxiliaryWorkerConfig,
-	type DODiscoveryResult
-} from './plugin-durable-objects'
-import {
-	RESOLVED_VIRTUAL_SERVICE_WORKER_PREFIX,
-	VIRTUAL_SERVICE_WORKER_PREFIX
-} from './plugin-service-bindings'
+import { buildPluginConfigHookResult } from './plugin-config-hook'
 import {
 	buildPluginContextState,
 	resolvePluginConfigPath,
 	writeGeneratedWranglerConfig
 } from './plugin-context'
 import {
-	buildPluginConfigHookResult
-} from './plugin-config-hook'
+	type AuxiliaryWorkerConfig,
+	type DODiscoveryResult,
+	RESOLVED_VIRTUAL_DO_ENTRY,
+	VIRTUAL_DO_ENTRY,
+	generateVirtualDOEntry,
+	logDiscoveredDurableObjects
+} from './plugin-durable-objects'
+import {
+	RESOLVED_VIRTUAL_SERVICE_WORKER_PREFIX,
+	VIRTUAL_SERVICE_WORKER_PREFIX
+} from './plugin-service-bindings'
 import { runDevflareTransform } from './plugin-transform'
 
 export type { AuxiliaryWorkerConfig, DODiscoveryResult }
@@ -227,7 +225,9 @@ export function devflarePlugin(options: DevflarePluginOptions = {}): Plugin {
 		environment,
 		doTransforms = true,
 		watchConfig = true,
-		bridgePort = process.env.DEVFLARE_BRIDGE_PORT ? parseInt(process.env.DEVFLARE_BRIDGE_PORT, 10) : undefined,
+		bridgePort = process.env.DEVFLARE_BRIDGE_PORT
+			? Number.parseInt(process.env.DEVFLARE_BRIDGE_PORT, 10)
+			: undefined,
 		wsProxyPatterns = []
 	} = options
 
@@ -286,7 +286,9 @@ export function devflarePlugin(options: DevflarePluginOptions = {}): Plugin {
 					state,
 					{ configPath, environment },
 					config.command === 'build' ? 'build' : 'serve',
-					(ctx) => { lastPluginContext = ctx }
+					(ctx) => {
+						lastPluginContext = ctx
+					}
 				)
 
 				if (config.command === 'serve') {
@@ -311,8 +313,9 @@ export function devflarePlugin(options: DevflarePluginOptions = {}): Plugin {
 			if (!watchConfig) return
 
 			// Watch devflare.config.ts for changes
-			const fullConfigPath = state.resolvedPluginConfigPath
-				?? resolve(state.projectRoot, configPath || 'devflare.config.ts')
+			const fullConfigPath =
+				state.resolvedPluginConfigPath ??
+				resolve(state.projectRoot, configPath || 'devflare.config.ts')
 
 			server.watcher.add(fullConfigPath)
 
@@ -321,12 +324,9 @@ export function devflarePlugin(options: DevflarePluginOptions = {}): Plugin {
 					console.log('[devflare] Config changed, reloading...')
 
 					try {
-						await loadAndApplyConfig(
-							state,
-							{ configPath, environment },
-							'serve',
-							(ctx) => { lastPluginContext = ctx }
-						)
+						await loadAndApplyConfig(state, { configPath, environment }, 'serve', (ctx) => {
+							lastPluginContext = ctx
+						})
 
 						console.log('[devflare] Config reloaded')
 

@@ -2,10 +2,10 @@
 // Build Command — Build for production
 // =============================================================================
 
-import { type ConsolaInstance } from 'consola'
-import type { ParsedArgs, CliOptions, CliResult } from '../index'
-import { prepareBuildArtifacts } from './build-artifacts'
+import type { ConsolaInstance } from 'consola'
+import type { CliOptions, CliResult, ParsedArgs } from '../index'
 import { createCliTheme, cyanBold, dim, logLine } from '../ui'
+import { prepareBuildArtifacts } from './build-artifacts'
 
 export async function runBuildCommand(
 	parsed: ParsedArgs,

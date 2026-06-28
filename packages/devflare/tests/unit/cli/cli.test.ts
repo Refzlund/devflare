@@ -2,7 +2,7 @@
 // CLI Tests — Command structure and execution
 // =============================================================================
 
-import { describe, expect, test, mock, beforeEach, afterEach } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test'
 import { parseArgs, runCli } from '../../../src/cli/index'
 import { getPackageVersion } from '../../../src/cli/package-metadata'
 
@@ -161,7 +161,13 @@ describe('parseArgs', () => {
 	})
 
 	test('parses worker rename command', () => {
-		const result = parseArgs(['worker', 'rename', 'documentation', '--to', 'devflare-documentation'])
+		const result = parseArgs([
+			'worker',
+			'rename',
+			'documentation',
+			'--to',
+			'devflare-documentation'
+		])
 		expect(result.command).toBe('worker')
 		expect(result.args).toEqual(['rename', 'documentation'])
 		expect(result.options.to).toBe('devflare-documentation')
@@ -193,10 +199,16 @@ describe('runCli', () => {
 	test('returns exit code 0 for help', async () => {
 		const result = await runCli(['--help'], { silent: true })
 		expect(result.exitCode).toBe(0)
-		expect(result.output).toContain('devflare Config compiler + CLI orchestrator for Cloudflare Workers')
+		expect(result.output).toContain(
+			'devflare Config compiler + CLI orchestrator for Cloudflare Workers'
+		)
 		expect(result.output).toContain('devflare <command> [options]')
-		expect(result.output).toContain('previews — Inspect and clean dedicated preview Workers and scopes')
-		expect(result.output).toContain('productions — Inspect and manage live production Workers and deployments')
+		expect(result.output).toContain(
+			'previews — Inspect and clean dedicated preview Workers and scopes'
+		)
+		expect(result.output).toContain(
+			'productions — Inspect and manage live production Workers and deployments'
+		)
 		expect(result.output).toContain('Use `devflare <command> --help` or `devflare help <command>`')
 		expect(result.output).toContain('devflare help deploy')
 	})
@@ -210,9 +222,15 @@ describe('runCli', () => {
 		const result = await runCli(['deploy', '--help'], { silent: true })
 
 		expect(result.exitCode).toBe(0)
-		expect(result.output).toContain('devflare deploy --preview <name> [--config <path>] [--build <path>] [--message <text>] [--tag <text>]')
-		expect(result.output).toContain('devflare deploy --preview [--config <path>] [--build <path>] [--branch-name <branch>] [--message <text>] [--tag <text>]')
-		expect(result.output).toContain('--preview <name> — Deploy a named preview scope such as `next` or `pr-1`')
+		expect(result.output).toContain(
+			'devflare deploy --preview <name> [--config <path>] [--build <path>] [--message <text>] [--tag <text>]'
+		)
+		expect(result.output).toContain(
+			'devflare deploy --preview [--config <path>] [--build <path>] [--branch-name <branch>] [--message <text>] [--tag <text>]'
+		)
+		expect(result.output).toContain(
+			'--preview <name> — Deploy a named preview scope such as `next` or `pr-1`'
+		)
 		expect(result.output).toContain('--build <path> — Reuse an existing build artifact')
 	})
 
@@ -220,8 +238,12 @@ describe('runCli', () => {
 		const result = await runCli(['previews', 'cleanup', '--help'], { silent: true })
 
 		expect(result.exitCode).toBe(0)
-		expect(result.output).toContain('devflare previews cleanup [--config <path>] [--env <name>] [--scope <name> | --all] [--account <id>] [--apply]')
-		expect(result.output).toContain('--scope <name> — Clean one preview scope instead of the default `preview` scope')
+		expect(result.output).toContain(
+			'devflare previews cleanup [--config <path>] [--env <name>] [--scope <name> | --all] [--account <id>] [--apply]'
+		)
+		expect(result.output).toContain(
+			'--scope <name> — Clean one preview scope instead of the default `preview` scope'
+		)
 		expect(result.output).not.toContain('preview registry')
 	})
 
@@ -232,29 +254,47 @@ describe('runCli', () => {
 		expect(viaHelpCommand.exitCode).toBe(0)
 		expect(viaFlag.exitCode).toBe(0)
 		expect(viaHelpCommand.output).toBe(viaFlag.output)
-		expect(viaFlag.output).toContain('devflare previews Inspect and clean dedicated preview Worker scopes')
-		expect(viaFlag.output).toContain('devflare previews cleanup [--config <path>] [--env <name>] [--scope <name> | --all] [--account <id>] [--apply]')
+		expect(viaFlag.output).toContain(
+			'devflare previews Inspect and clean dedicated preview Worker scopes'
+		)
+		expect(viaFlag.output).toContain(
+			'devflare previews cleanup [--config <path>] [--env <name>] [--scope <name> | --all] [--account <id>] [--apply]'
+		)
 		expect(viaFlag.output).toContain('--scope <name>')
-		expect(viaFlag.output).toContain('`cleanup` removes preview-only Cloudflare resources for the targeted scope and also deletes dedicated preview-scope Worker scripts')
+		expect(viaFlag.output).toContain(
+			'`cleanup` removes preview-only Cloudflare resources for the targeted scope and also deletes dedicated preview-scope Worker scripts'
+		)
 	})
 
 	test('shows nested help for preview cleanup', async () => {
 		const result = await runCli(['previews', 'cleanup', '--help'], { silent: true })
 
 		expect(result.exitCode).toBe(0)
-		expect(result.output).toContain('devflare previews cleanup Delete preview-only Worker scripts and preview-scoped Cloudflare resources')
-		expect(result.output).toContain('--scope <name> — Clean one preview scope instead of the default `preview` scope')
-		expect(result.output).toContain('--all — Clean every live preview scope Devflare can discover for the current worker family')
+		expect(result.output).toContain(
+			'devflare previews cleanup Delete preview-only Worker scripts and preview-scoped Cloudflare resources'
+		)
+		expect(result.output).toContain(
+			'--scope <name> — Clean one preview scope instead of the default `preview` scope'
+		)
+		expect(result.output).toContain(
+			'--all — Clean every live preview scope Devflare can discover for the current worker family'
+		)
 		expect(result.output).toContain('--apply — Apply the cleanup instead of doing a dry run')
-		expect(result.output).toContain('Dedicated preview Worker scripts are candidates only when their names resolve to the targeted preview scope')
+		expect(result.output).toContain(
+			'Dedicated preview Worker scripts are candidates only when their names resolve to the targeted preview scope'
+		)
 	})
 
 	test('shows nested help for worker rename', async () => {
 		const result = await runCli(['worker', 'rename', '--help'], { silent: true })
 
 		expect(result.exitCode).toBe(0)
-		expect(result.output).toContain('devflare worker rename Rename a Worker and sync the matching config')
-		expect(result.output).toContain('devflare worker rename <old-name> --to <new-name> [--config <path>] [--account <id>]')
+		expect(result.output).toContain(
+			'devflare worker rename Rename a Worker and sync the matching config'
+		)
+		expect(result.output).toContain(
+			'devflare worker rename <old-name> --to <new-name> [--config <path>] [--account <id>]'
+		)
 	})
 
 	test('resolves the correct help page even when positional arguments are already present', async () => {
@@ -288,22 +328,64 @@ describe('runCli', () => {
 		const commandChecks = [
 			{ argv: ['init', '--help'], snippet: 'devflare init Create a new devflare project' },
 			{ argv: ['dev', '--help'], snippet: 'devflare dev Start the development server' },
-			{ argv: ['build', '--help'], snippet: 'devflare build Build production deployment artifacts' },
-			{ argv: ['deploy', '--help'], snippet: 'devflare deploy Deploy explicitly to Cloudflare production or preview targets' },
-			{ argv: ['types', '--help'], snippet: 'devflare types Generate TypeScript bindings from your config' },
+			{
+				argv: ['build', '--help'],
+				snippet: 'devflare build Build production deployment artifacts'
+			},
+			{
+				argv: ['deploy', '--help'],
+				snippet: 'devflare deploy Deploy explicitly to Cloudflare production or preview targets'
+			},
+			{
+				argv: ['types', '--help'],
+				snippet: 'devflare types Generate TypeScript bindings from your config'
+			},
 			{ argv: ['doctor', '--help'], snippet: 'devflare doctor Check project configuration' },
-			{ argv: ['config', '--help'], snippet: 'devflare config Print resolved Devflare or Wrangler config' },
-			{ argv: ['account', '--help'], snippet: 'devflare account Inspect Cloudflare accounts, resources, and usage data' },
-			{ argv: ['login', '--help'], snippet: 'devflare login Authenticate with Cloudflare via Wrangler' },
-			{ argv: ['previews', '--help'], snippet: 'devflare previews Inspect and clean dedicated preview Worker scopes' },
-			{ argv: ['productions', '--help'], snippet: 'devflare productions Inspect and manage live production Workers and deployments' },
-			{ argv: ['worker', '--help'], snippet: 'devflare worker Rename and manage Worker control-plane operations' },
-			{ argv: ['tokens', '--help'], snippet: 'devflare tokens Manage Devflare-managed Cloudflare API tokens' },
-			{ argv: ['secrets', '--help'], snippet: 'devflare secrets Manage local Secrets Store values' },
+			{
+				argv: ['config', '--help'],
+				snippet: 'devflare config Print resolved Devflare or Wrangler config'
+			},
+			{
+				argv: ['account', '--help'],
+				snippet: 'devflare account Inspect Cloudflare accounts, resources, and usage data'
+			},
+			{
+				argv: ['login', '--help'],
+				snippet: 'devflare login Authenticate with Cloudflare via Wrangler'
+			},
+			{
+				argv: ['previews', '--help'],
+				snippet: 'devflare previews Inspect and clean dedicated preview Worker scopes'
+			},
+			{
+				argv: ['productions', '--help'],
+				snippet: 'devflare productions Inspect and manage live production Workers and deployments'
+			},
+			{
+				argv: ['worker', '--help'],
+				snippet: 'devflare worker Rename and manage Worker control-plane operations'
+			},
+			{
+				argv: ['tokens', '--help'],
+				snippet: 'devflare tokens Manage Devflare-managed Cloudflare API tokens'
+			},
+			{
+				argv: ['secrets', '--help'],
+				snippet: 'devflare secrets Manage local Secrets Store values'
+			},
 			{ argv: ['ai', '--help'], snippet: 'devflare ai Show Workers AI pricing information' },
-			{ argv: ['remote', '--help'], snippet: 'devflare remote Manage remote test mode for paid Cloudflare features' },
-			{ argv: ['help', 'help'], snippet: 'devflare help Show command overview or command-specific help' },
-			{ argv: ['version', '--help'], snippet: 'devflare version Show the installed devflare version' }
+			{
+				argv: ['remote', '--help'],
+				snippet: 'devflare remote Manage remote test mode for paid Cloudflare features'
+			},
+			{
+				argv: ['help', 'help'],
+				snippet: 'devflare help Show command overview or command-specific help'
+			},
+			{
+				argv: ['version', '--help'],
+				snippet: 'devflare version Show the installed devflare version'
+			}
 		]
 
 		for (const check of commandChecks) {
@@ -316,31 +398,111 @@ describe('runCli', () => {
 
 	test('provides detailed help pages for nested command paths', async () => {
 		const nestedChecks = [
-			{ argv: ['config', 'print', '--help'], snippet: 'devflare config print Print the resolved config' },
-			{ argv: ['account', 'info', '--help'], snippet: 'devflare account info Show the selected account overview' },
-			{ argv: ['account', 'workers', '--help'], snippet: 'devflare account workers List Workers in the selected account' },
-			{ argv: ['account', 'kv', '--help'], snippet: 'devflare account kv List KV namespaces in the selected account' },
-			{ argv: ['account', 'd1', '--help'], snippet: 'devflare account d1 List D1 databases in the selected account' },
-			{ argv: ['account', 'r2', '--help'], snippet: 'devflare account r2 List R2 buckets in the selected account' },
-			{ argv: ['account', 'vectorize', '--help'], snippet: 'devflare account vectorize List Vectorize indexes in the selected account' },
-			{ argv: ['account', 'usage', '--help'], snippet: 'devflare account usage Show Devflare usage summaries' },
-			{ argv: ['account', 'limits', '--help'], snippet: 'devflare account limits Show or update Devflare usage limits' },
-			{ argv: ['account', 'limits', 'set', '--help'], snippet: 'devflare account limits set Set one Devflare usage limit' },
-			{ argv: ['account', 'limits', 'enable', '--help'], snippet: 'devflare account limits enable Enable Devflare usage-limit enforcement' },
-			{ argv: ['account', 'limits', 'disable', '--help'], snippet: 'devflare account limits disable Disable Devflare usage-limit enforcement' },
-			{ argv: ['account', 'global', '--help'], snippet: 'devflare account global Choose the global default Cloudflare account' },
-			{ argv: ['account', 'workspace', '--help'], snippet: 'devflare account workspace Choose the workspace Cloudflare account' },
-			{ argv: ['previews', 'list', '--help'], snippet: 'devflare previews list List stable workers and dedicated preview scopes' },
-			{ argv: ['previews', 'bindings', '--help'], snippet: 'devflare previews bindings Inspect resolved bindings/resources and live worker associations' },
-			{ argv: ['previews', 'cleanup', '--help'], snippet: 'devflare previews cleanup Delete preview-only Worker scripts and preview-scoped Cloudflare resources' },
-			{ argv: ['productions', 'list', '--help'], snippet: 'devflare productions list List live production Workers and their active deployments' },
-			{ argv: ['productions', 'versions', '--help'], snippet: 'devflare productions versions Show recent stored production versions and the current active version' },
-			{ argv: ['productions', 'rollback', '--help'], snippet: 'devflare productions rollback Roll a Worker back to the previous or specified production version' },
-			{ argv: ['productions', 'delete', '--help'], snippet: 'devflare productions delete Delete a live production Worker script' },
-			{ argv: ['worker', 'rename', '--help'], snippet: 'devflare worker rename Rename a Worker and sync the matching config' },
-			{ argv: ['remote', 'status', '--help'], snippet: 'devflare remote status Show the current effective remote-mode status' },
-			{ argv: ['remote', 'enable', '--help'], snippet: 'devflare remote enable Enable remote test mode' },
-			{ argv: ['remote', 'disable', '--help'], snippet: 'devflare remote disable Disable remote test mode' }
+			{
+				argv: ['config', 'print', '--help'],
+				snippet: 'devflare config print Print the resolved config'
+			},
+			{
+				argv: ['account', 'info', '--help'],
+				snippet: 'devflare account info Show the selected account overview'
+			},
+			{
+				argv: ['account', 'workers', '--help'],
+				snippet: 'devflare account workers List Workers in the selected account'
+			},
+			{
+				argv: ['account', 'kv', '--help'],
+				snippet: 'devflare account kv List KV namespaces in the selected account'
+			},
+			{
+				argv: ['account', 'd1', '--help'],
+				snippet: 'devflare account d1 List D1 databases in the selected account'
+			},
+			{
+				argv: ['account', 'r2', '--help'],
+				snippet: 'devflare account r2 List R2 buckets in the selected account'
+			},
+			{
+				argv: ['account', 'vectorize', '--help'],
+				snippet: 'devflare account vectorize List Vectorize indexes in the selected account'
+			},
+			{
+				argv: ['account', 'usage', '--help'],
+				snippet: 'devflare account usage Show Devflare usage summaries'
+			},
+			{
+				argv: ['account', 'limits', '--help'],
+				snippet: 'devflare account limits Show or update Devflare usage limits'
+			},
+			{
+				argv: ['account', 'limits', 'set', '--help'],
+				snippet: 'devflare account limits set Set one Devflare usage limit'
+			},
+			{
+				argv: ['account', 'limits', 'enable', '--help'],
+				snippet: 'devflare account limits enable Enable Devflare usage-limit enforcement'
+			},
+			{
+				argv: ['account', 'limits', 'disable', '--help'],
+				snippet: 'devflare account limits disable Disable Devflare usage-limit enforcement'
+			},
+			{
+				argv: ['account', 'global', '--help'],
+				snippet: 'devflare account global Choose the global default Cloudflare account'
+			},
+			{
+				argv: ['account', 'workspace', '--help'],
+				snippet: 'devflare account workspace Choose the workspace Cloudflare account'
+			},
+			{
+				argv: ['previews', 'list', '--help'],
+				snippet: 'devflare previews list List stable workers and dedicated preview scopes'
+			},
+			{
+				argv: ['previews', 'bindings', '--help'],
+				snippet:
+					'devflare previews bindings Inspect resolved bindings/resources and live worker associations'
+			},
+			{
+				argv: ['previews', 'cleanup', '--help'],
+				snippet:
+					'devflare previews cleanup Delete preview-only Worker scripts and preview-scoped Cloudflare resources'
+			},
+			{
+				argv: ['productions', 'list', '--help'],
+				snippet:
+					'devflare productions list List live production Workers and their active deployments'
+			},
+			{
+				argv: ['productions', 'versions', '--help'],
+				snippet:
+					'devflare productions versions Show recent stored production versions and the current active version'
+			},
+			{
+				argv: ['productions', 'rollback', '--help'],
+				snippet:
+					'devflare productions rollback Roll a Worker back to the previous or specified production version'
+			},
+			{
+				argv: ['productions', 'delete', '--help'],
+				snippet: 'devflare productions delete Delete a live production Worker script'
+			},
+			{
+				argv: ['worker', 'rename', '--help'],
+				snippet: 'devflare worker rename Rename a Worker and sync the matching config'
+			},
+			{
+				argv: ['remote', 'status', '--help'],
+				snippet: 'devflare remote status Show the current effective remote-mode status'
+			},
+			{
+				argv: ['remote', 'enable', '--help'],
+				snippet: 'devflare remote enable Enable remote test mode'
+			},
+			{
+				argv: ['remote', 'disable', '--help'],
+				snippet: 'devflare remote disable Disable remote test mode'
+			}
 		]
 
 		for (const check of nestedChecks) {

@@ -1,13 +1,6 @@
 import type { WorkerInfo } from '../../../cloudflare'
-import {
-	resolveConfigForEnvironment,
-	type DevflareConfig
-} from '../../../config'
-import type {
-	ConfiguredWorkerFamilyMember,
-	PreviewScopeRow,
-	StableWorkerRow
-} from './types'
+import { type DevflareConfig, resolveConfigForEnvironment } from '../../../config'
+import type { ConfiguredWorkerFamilyMember, PreviewScopeRow, StableWorkerRow } from './types'
 
 function compareConfiguredWorkerFamilies(
 	left: ConfiguredWorkerFamilyMember,
@@ -63,7 +56,10 @@ export function collectConfiguredWorkerFamilies(
 	return Array.from(families.values()).sort(compareConfiguredWorkerFamilies)
 }
 
-function getWorkerUrl(workerName: string, workersSubdomain: string | null | undefined): string | undefined {
+function getWorkerUrl(
+	workerName: string,
+	workersSubdomain: string | null | undefined
+): string | undefined {
 	if (!workersSubdomain) {
 		return undefined
 	}
@@ -114,7 +110,9 @@ function getDedicatedPreviewFamilyNamesFromWorkers(
 			continue
 		}
 
-		if (workerNames.some((workerName) => Boolean(getWorkerScopeSuffix(workerName, family.baseName)))) {
+		if (
+			workerNames.some((workerName) => Boolean(getWorkerScopeSuffix(workerName, family.baseName)))
+		) {
 			familyNames.add(family.baseName)
 		}
 	}
@@ -132,47 +130,50 @@ export function buildPreviewScopeRowsFromLiveWorkers(
 	const expectedFamilies = families.filter((family) => previewFamilyNames.has(family.baseName))
 	const workerCandidatesByScope = buildPreviewWorkerCandidatesByScope(families, workers)
 
-	return Array.from(workerCandidatesByScope.keys()).map((scope) => {
-		const resolvedFamilies = expectedFamilies.map((family) => ({
-			family,
-			worker: workersByName.get(`${family.baseName}-${scope}`)
-		}))
-		const presentFamilies = resolvedFamilies.filter((entry) => entry.worker)
-		const updatedAt = presentFamilies.reduce<Date | undefined>((latest, entry) => {
-			const currentDate = entry.worker?.modifiedOn
-			if (!currentDate) {
+	return Array.from(workerCandidatesByScope.keys())
+		.map((scope) => {
+			const resolvedFamilies = expectedFamilies.map((family) => ({
+				family,
+				worker: workersByName.get(`${family.baseName}-${scope}`)
+			}))
+			const presentFamilies = resolvedFamilies.filter((entry) => entry.worker)
+			const updatedAt = presentFamilies.reduce<Date | undefined>((latest, entry) => {
+				const currentDate = entry.worker?.modifiedOn
+				if (!currentDate) {
+					return latest
+				}
+
+				if (!latest || currentDate.getTime() > latest.getTime()) {
+					return currentDate
+				}
+
 				return latest
+			}, undefined)
+			const primaryEntry = resolvedFamilies.find((entry) => entry.family.role === 'primary')
+			const entryWorker = primaryEntry?.worker ?? presentFamilies[0]?.worker
+			const missingLabels = resolvedFamilies
+				.filter((entry) => !entry.worker)
+				.map((entry) => (entry.family.role === 'primary' ? 'primary' : entry.family.roleLabel))
+			const notes: string[] = []
+
+			if (missingLabels.length > 0) {
+				notes.push(`missing ${missingLabels.join(', ')}`)
 			}
+			const strategy: PreviewScopeRow['strategy'] = 'dedicated workers'
+			const status: PreviewScopeRow['status'] =
+				presentFamilies.length === resolvedFamilies.length ? 'ready' : 'partial'
 
-			if (!latest || currentDate.getTime() > latest.getTime()) {
-				return currentDate
+			return {
+				scope,
+				strategy,
+				workersLabel: `${presentFamilies.length}/${resolvedFamilies.length}`,
+				status,
+				updatedAt,
+				notes: notes.length > 0 ? notes.join(' · ') : undefined,
+				entryUrl: entryWorker ? getWorkerUrl(entryWorker.name, workersSubdomain) : undefined
 			}
-
-			return latest
-		}, undefined)
-		const primaryEntry = resolvedFamilies.find((entry) => entry.family.role === 'primary')
-		const entryWorker = primaryEntry?.worker ?? presentFamilies[0]?.worker
-		const missingLabels = resolvedFamilies
-			.filter((entry) => !entry.worker)
-			.map((entry) => entry.family.role === 'primary' ? 'primary' : entry.family.roleLabel)
-		const notes: string[] = []
-
-		if (missingLabels.length > 0) {
-			notes.push(`missing ${missingLabels.join(', ')}`)
-		}
-		const strategy: PreviewScopeRow['strategy'] = 'dedicated workers'
-		const status: PreviewScopeRow['status'] = presentFamilies.length === resolvedFamilies.length ? 'ready' : 'partial'
-
-		return {
-			scope,
-			strategy,
-			workersLabel: `${presentFamilies.length}/${resolvedFamilies.length}`,
-			status,
-			updatedAt,
-			notes: notes.length > 0 ? notes.join(' · ') : undefined,
-			entryUrl: entryWorker ? getWorkerUrl(entryWorker.name, workersSubdomain) : undefined
-		}
-	}).sort(comparePreviewScopeRows)
+		})
+		.sort(comparePreviewScopeRows)
 }
 
 export function buildPreviewWorkerCandidatesByScope(
@@ -194,9 +195,11 @@ export function buildPreviewWorkerCandidatesByScope(
 		}
 	}
 
-	return new Map(Array.from(candidates.entries()).map(([scope, workerNames]) => {
-		return [scope, Array.from(workerNames).sort((left, right) => left.localeCompare(right))]
-	}))
+	return new Map(
+		Array.from(candidates.entries()).map(([scope, workerNames]) => {
+			return [scope, Array.from(workerNames).sort((left, right) => left.localeCompare(right))]
+		})
+	)
 }
 
 export function orderPreviewWorkerNamesForDeletion(
@@ -213,7 +216,9 @@ export function orderPreviewWorkerNamesForDeletion(
 		})
 	}
 
-	const resolveFamilyForWorker = (workerName: string): { priority: number; roleLabel: string; baseName?: string } => {
+	const resolveFamilyForWorker = (
+		workerName: string
+	): { priority: number; roleLabel: string; baseName?: string } => {
 		for (const family of families) {
 			if (getWorkerScopeSuffix(workerName, family.baseName) === scope) {
 				const resolved = familyPriority.get(family.baseName)
@@ -245,7 +250,11 @@ export function orderPreviewWorkerNamesForDeletion(
 			return leftFamily.roleLabel.localeCompare(rightFamily.roleLabel)
 		}
 
-		if (leftFamily.baseName && rightFamily.baseName && leftFamily.baseName !== rightFamily.baseName) {
+		if (
+			leftFamily.baseName &&
+			rightFamily.baseName &&
+			leftFamily.baseName !== rightFamily.baseName
+		) {
 			return leftFamily.baseName.localeCompare(rightFamily.baseName)
 		}
 

@@ -7,36 +7,39 @@ import { z } from 'zod'
 export type DurableObjectBindingInput =
 	| string
 	| {
-		/** The Durable Object class name */
-		readonly className: string
-		/**
-		 * Script name for cross-worker DO access.
-		 * For local DOs: file path (e.g., 'do.counter.ts')
-		 * For cross-worker DOs: worker name (e.g., 'do-service')
-		 */
-		readonly scriptName?: string
-		/** @internal Reference marker for cross-worker DO bindings */
-		readonly __ref?: unknown
-	}
+			/** The Durable Object class name */
+			readonly className: string
+			/**
+			 * Script name for cross-worker DO access.
+			 * For local DOs: file path (e.g., 'do.counter.ts')
+			 * For cross-worker DOs: worker name (e.g., 'do-service')
+			 */
+			readonly scriptName?: string
+			/** @internal Reference marker for cross-worker DO bindings */
+			readonly __ref?: unknown
+	  }
 
 /**
  * Durable Object binding schema.
  * Validates DO binding configuration in either string or object form.
  */
-export const durableObjectBindingSchema = z.custom<DurableObjectBindingInput>((val) => {
-	if (typeof val === 'string') {
-		return true
-	}
+export const durableObjectBindingSchema = z.custom<DurableObjectBindingInput>(
+	(val) => {
+		if (typeof val === 'string') {
+			return true
+		}
 
-	if (val && typeof val === 'object' && 'className' in val) {
-		const obj = val as Record<string, unknown>
-		return typeof obj.className === 'string'
-	}
+		if (val && typeof val === 'object' && 'className' in val) {
+			const obj = val as Record<string, unknown>
+			return typeof obj.className === 'string'
+		}
 
-	return false
-}, {
-	message: 'Expected string or { className: string, scriptName?: string }'
-})
+		return false
+	},
+	{
+		message: 'Expected string or { className: string, scriptName?: string }'
+	}
+)
 
 /**
  * Queue consumer configuration.
@@ -90,25 +93,31 @@ export const queuesConfigSchema = z.object({
  * Devflare uses camelCase authoring and compiles to Wrangler's `ratelimits`
  * array (`namespace_id`, `simple.limit`, `simple.period`).
  */
-export const rateLimitBindingSchema = z.object({
-	/** Positive integer string unique to the Cloudflare account */
-	namespaceId: z.string().regex(/^[1-9]\d*$/, 'namespaceId must be a positive integer string'),
-	/** Simple rate limiting is the only currently supported Cloudflare mode */
-	simple: z.object({
-		/** Number of allowed calls within the configured period */
-		limit: z.number().int().positive(),
-		/** Rate limit window in seconds */
-		period: z.union([z.literal(10), z.literal(60)])
-	}).strict()
-}).strict()
+export const rateLimitBindingSchema = z
+	.object({
+		/** Positive integer string unique to the Cloudflare account */
+		namespaceId: z.string().regex(/^[1-9]\d*$/, 'namespaceId must be a positive integer string'),
+		/** Simple rate limiting is the only currently supported Cloudflare mode */
+		simple: z
+			.object({
+				/** Number of allowed calls within the configured period */
+				limit: z.number().int().positive(),
+				/** Rate limit window in seconds */
+				period: z.union([z.literal(10), z.literal(60)])
+			})
+			.strict()
+	})
+	.strict()
 
 /**
  * Version Metadata binding configuration.
  */
-export const versionMetadataBindingSchema = z.object({
-	/** Binding name exposed in env (for example, CF_VERSION_METADATA) */
-	binding: z.string().min(1)
-}).strict()
+export const versionMetadataBindingSchema = z
+	.object({
+		/** Binding name exposed in env (for example, CF_VERSION_METADATA) */
+		binding: z.string().min(1)
+	})
+	.strict()
 
 /**
  * Worker Loader binding configuration for Dynamic Workers.
@@ -122,12 +131,14 @@ export const workerLoaderBindingSchema = z.object({}).strict()
  */
 export const secretsStoreBindingSchema = z.union([
 	z.string().min(1),
-	z.object({
-		/** Secrets Store ID containing the account-level secret */
-		storeId: z.string().min(1),
-		/** Secret name within the store */
-		secretName: z.string().min(1)
-	}).strict()
+	z
+		.object({
+			/** Secrets Store ID containing the account-level secret */
+			storeId: z.string().min(1),
+			/** Secret name within the store */
+			secretName: z.string().min(1)
+		})
+		.strict()
 ])
 
 /**
@@ -147,11 +158,17 @@ function isServiceBindingValue(val: unknown): boolean {
 		return false
 	}
 
-	if (obj.environment !== undefined && (typeof obj.environment !== 'string' || obj.environment.trim().length === 0)) {
+	if (
+		obj.environment !== undefined &&
+		(typeof obj.environment !== 'string' || obj.environment.trim().length === 0)
+	) {
 		return false
 	}
 
-	if (obj.entrypoint !== undefined && (typeof obj.entrypoint !== 'string' || obj.entrypoint.trim().length === 0)) {
+	if (
+		obj.entrypoint !== undefined &&
+		(typeof obj.entrypoint !== 'string' || obj.entrypoint.trim().length === 0)
+	) {
 		return false
 	}
 
@@ -176,43 +193,50 @@ export const serviceBindingSchema = z.custom<{
 	/** @internal Reference marker for ref() bindings */
 	__ref?: unknown
 }>(isServiceBindingValue, {
-	message: 'Expected service binding object with { service: string, environment?: string, entrypoint?: string } or ref().worker'
+	message:
+		'Expected service binding object with { service: string, environment?: string, entrypoint?: string } or ref().worker'
 })
 
 /**
  * AI binding configuration.
  * Provides access to Cloudflare Workers AI for inference.
  */
-export const aiBindingSchema = z.object({
-	/** Binding name exposed in env (e.g., 'AI') */
-	binding: z.string(),
-	/** Ask Wrangler local development to connect this binding to the remote Workers AI service */
-	remote: z.boolean().optional(),
-	/** Use Cloudflare's staging Workers AI environment for this binding */
-	staging: z.boolean().optional()
-}).strict()
+export const aiBindingSchema = z
+	.object({
+		/** Binding name exposed in env (e.g., 'AI') */
+		binding: z.string(),
+		/** Ask Wrangler local development to connect this binding to the remote Workers AI service */
+		remote: z.boolean().optional(),
+		/** Use Cloudflare's staging Workers AI environment for this binding */
+		staging: z.boolean().optional()
+	})
+	.strict()
 
 /**
  * AI Search namespace binding configuration.
  * Provides access to all AI Search instances in a namespace.
  */
-export const aiSearchNamespaceBindingSchema = z.object({
-	/** AI Search namespace name */
-	namespace: z.string().min(1),
-	/** Ask Wrangler local development to connect this binding remotely */
-	remote: z.boolean().optional()
-}).strict()
+export const aiSearchNamespaceBindingSchema = z
+	.object({
+		/** AI Search namespace name */
+		namespace: z.string().min(1),
+		/** Ask Wrangler local development to connect this binding remotely */
+		remote: z.boolean().optional()
+	})
+	.strict()
 
 /**
  * AI Search instance binding configuration.
  * Provides direct access to one AI Search instance in the default namespace.
  */
-export const aiSearchInstanceBindingSchema = z.object({
-	/** AI Search instance name */
-	instanceName: z.string().min(1),
-	/** Ask Wrangler local development to connect this binding remotely */
-	remote: z.boolean().optional()
-}).strict()
+export const aiSearchInstanceBindingSchema = z
+	.object({
+		/** AI Search instance name */
+		instanceName: z.string().min(1),
+		/** Ask Wrangler local development to connect this binding remotely */
+		remote: z.boolean().optional()
+	})
+	.strict()
 
 /**
  * Vectorize index binding configuration.
@@ -229,30 +253,34 @@ export const vectorizeBindingSchema = z.object({
  * Hyperdrive binding configuration.
  * Provides accelerated PostgreSQL connections via connection pooling.
  */
-export const hyperdriveBindingByIdSchema = z.object({
-	/** Explicit Hyperdrive configuration ID */
-	id: z.string(),
-	/** Direct database connection string used by local Miniflare/Wrangler dev */
-	localConnectionString: z.string().optional()
-}).strict()
+export const hyperdriveBindingByIdSchema = z
+	.object({
+		/** Explicit Hyperdrive configuration ID */
+		id: z.string(),
+		/** Direct database connection string used by local Miniflare/Wrangler dev */
+		localConnectionString: z.string().optional()
+	})
+	.strict()
 
-export const hyperdriveBindingByNameSchema = z.object({
-	/** Stable Hyperdrive configuration name to resolve to an ID at config/build/deploy time */
-	name: z.string(),
-	/** Direct database connection string used by local Miniflare/Wrangler dev */
-	localConnectionString: z.string().optional(),
-	/**
-	 * Opt-in fallback behavior for preview-scoped Hyperdrive bindings.
-	 * When set to `'base'`, Devflare is permitted to reuse the base Hyperdrive
-	 * configuration if no dedicated preview Hyperdrive exists in the account.
-	 * When omitted, missing preview Hyperdrives cause a config-resolution error.
-	 */
-	previewFallback: z.literal('base').optional(),
-	/** Explicit dedicated preview Hyperdrive configuration ID */
-	previewId: z.string().optional(),
-	/** Legacy alias for a preview/dev local connection string; prefer localConnectionString */
-	previewLocalConnectionString: z.string().optional()
-}).strict()
+export const hyperdriveBindingByNameSchema = z
+	.object({
+		/** Stable Hyperdrive configuration name to resolve to an ID at config/build/deploy time */
+		name: z.string(),
+		/** Direct database connection string used by local Miniflare/Wrangler dev */
+		localConnectionString: z.string().optional(),
+		/**
+		 * Opt-in fallback behavior for preview-scoped Hyperdrive bindings.
+		 * When set to `'base'`, Devflare is permitted to reuse the base Hyperdrive
+		 * configuration if no dedicated preview Hyperdrive exists in the account.
+		 * When omitted, missing preview Hyperdrives cause a config-resolution error.
+		 */
+		previewFallback: z.literal('base').optional(),
+		/** Explicit dedicated preview Hyperdrive configuration ID */
+		previewId: z.string().optional(),
+		/** Legacy alias for a preview/dev local connection string; prefer localConnectionString */
+		previewLocalConnectionString: z.string().optional()
+	})
+	.strict()
 
 export const hyperdriveBindingSchema = z.union([
 	z.string(),
@@ -260,7 +288,8 @@ export const hyperdriveBindingSchema = z.union([
 	hyperdriveBindingByNameSchema
 ])
 
-const SINGLE_BROWSER_BINDING_ERROR_MESSAGE = 'Devflare currently supports exactly one browser binding because Wrangler only supports a single browser binding.'
+const SINGLE_BROWSER_BINDING_ERROR_MESSAGE =
+	'Devflare currently supports exactly one browser binding because Wrangler only supports a single browser binding.'
 
 export function formatBrowserBindingLimitMessage(bindingNames: string[]): string {
 	if (bindingNames.length <= 1) {
@@ -280,21 +309,25 @@ export function getBrowserBindingNames(bindings: Record<string, unknown> | undef
  */
 export const browserBindingValueSchema = z.union([
 	z.string(),
-	z.object({
-		/** Ask Wrangler local development to connect this binding to the remote Browser Rendering service */
-		remote: z.boolean().optional()
-	}).strict()
+	z
+		.object({
+			/** Ask Wrangler local development to connect this binding to the remote Browser Rendering service */
+			remote: z.boolean().optional()
+		})
+		.strict()
 ])
 
-export const browserBindingSchema = z.record(z.string(), browserBindingValueSchema).superRefine((bindings, ctx) => {
-	const bindingNames = getBrowserBindingNames(bindings)
-	if (bindingNames.length > 1) {
-		ctx.addIssue({
-			code: z.ZodIssueCode.custom,
-			message: formatBrowserBindingLimitMessage(bindingNames)
-		})
-	}
-})
+export const browserBindingSchema = z
+	.record(z.string(), browserBindingValueSchema)
+	.superRefine((bindings, ctx) => {
+		const bindingNames = getBrowserBindingNames(bindings)
+		if (bindingNames.length > 1) {
+			ctx.addIssue({
+				code: z.ZodIssueCode.custom,
+				message: formatBrowserBindingLimitMessage(bindingNames)
+			})
+		}
+	})
 
 /**
  * Analytics Engine binding configuration.
@@ -309,65 +342,75 @@ export const analyticsBindingSchema = z.object({
  * Email sending binding configuration.
  * Enables sending emails via Cloudflare Email Routing.
  */
-export const sendEmailBindingSchema = z.object({
-	/** Restrict this binding to a specific verified destination address */
-	destinationAddress: z.string().optional(),
-	/** Restrict this binding to a set of verified destination addresses */
-	allowedDestinationAddresses: z.array(z.string()).optional(),
-	/** Restrict this binding to a set of verified sender addresses */
-	allowedSenderAddresses: z.array(z.string()).optional()
-}).refine((binding) => {
-	return !(binding.destinationAddress && binding.allowedDestinationAddresses)
-}, {
-	message: 'sendEmail bindings must use either destinationAddress or allowedDestinationAddresses, not both',
-	path: ['allowedDestinationAddresses']
-})
+export const sendEmailBindingSchema = z
+	.object({
+		/** Restrict this binding to a specific verified destination address */
+		destinationAddress: z.string().optional(),
+		/** Restrict this binding to a set of verified destination addresses */
+		allowedDestinationAddresses: z.array(z.string()).optional(),
+		/** Restrict this binding to a set of verified sender addresses */
+		allowedSenderAddresses: z.array(z.string()).optional()
+	})
+	.refine(
+		(binding) => {
+			return !(binding.destinationAddress && binding.allowedDestinationAddresses)
+		},
+		{
+			message:
+				'sendEmail bindings must use either destinationAddress or allowedDestinationAddresses, not both',
+			path: ['allowedDestinationAddresses']
+		}
+	)
 
-export const d1BindingByIdSchema = z.object({
-	/** Explicit D1 database ID */
-	id: z.string()
-}).strict()
+export const d1BindingByIdSchema = z
+	.object({
+		/** Explicit D1 database ID */
+		id: z.string()
+	})
+	.strict()
 
-export const d1BindingByNameSchema = z.object({
-	/** Stable D1 database name to resolve to an ID at config/build/deploy time */
-	name: z.string()
-}).strict()
+export const d1BindingByNameSchema = z
+	.object({
+		/** Stable D1 database name to resolve to an ID at config/build/deploy time */
+		name: z.string()
+	})
+	.strict()
 
-export const d1BindingSchema = z.union([
-	z.string(),
-	d1BindingByIdSchema,
-	d1BindingByNameSchema
-])
+export const d1BindingSchema = z.union([z.string(), d1BindingByIdSchema, d1BindingByNameSchema])
 
-export const kvBindingByIdSchema = z.object({
-	/** Explicit KV namespace ID */
-	id: z.string()
-}).strict()
+export const kvBindingByIdSchema = z
+	.object({
+		/** Explicit KV namespace ID */
+		id: z.string()
+	})
+	.strict()
 
-export const kvBindingByNameSchema = z.object({
-	/** Stable KV namespace name to resolve to an ID at config/build/deploy time */
-	name: z.string()
-}).strict()
+export const kvBindingByNameSchema = z
+	.object({
+		/** Stable KV namespace name to resolve to an ID at config/build/deploy time */
+		name: z.string()
+	})
+	.strict()
 
-export const kvBindingSchema = z.union([
-	z.string(),
-	kvBindingByIdSchema,
-	kvBindingByNameSchema
-])
+export const kvBindingSchema = z.union([z.string(), kvBindingByIdSchema, kvBindingByNameSchema])
 
-export const mtlsCertificateBindingByIdSchema = z.object({
-	/** Uploaded mTLS certificate UUID from `wrangler mtls-certificate upload` */
-	certificateId: z.string().min(1),
-	/** Ask Wrangler local development to use the remote binding when available */
-	remote: z.boolean().optional()
-}).strict()
+export const mtlsCertificateBindingByIdSchema = z
+	.object({
+		/** Uploaded mTLS certificate UUID from `wrangler mtls-certificate upload` */
+		certificateId: z.string().min(1),
+		/** Ask Wrangler local development to use the remote binding when available */
+		remote: z.boolean().optional()
+	})
+	.strict()
 
-export const mtlsCertificateBindingByWranglerIdSchema = z.object({
-	/** Wrangler-native uploaded mTLS certificate UUID */
-	certificate_id: z.string().min(1),
-	/** Ask Wrangler local development to use the remote binding when available */
-	remote: z.boolean().optional()
-}).strict()
+export const mtlsCertificateBindingByWranglerIdSchema = z
+	.object({
+		/** Wrangler-native uploaded mTLS certificate UUID */
+		certificate_id: z.string().min(1),
+		/** Ask Wrangler local development to use the remote binding when available */
+		remote: z.boolean().optional()
+	})
+	.strict()
 
 /**
  * C17 — mTLS Certificate binding.
@@ -384,236 +427,264 @@ export const mtlsCertificateBindingSchema = z.union([
  */
 export const dispatchNamespaceBindingSchema = z.union([
 	z.string().min(1),
-	z.object({
-		namespace: z.string().min(1),
-		outbound: z.object({
-			service: z.string().min(1),
-			environment: z.string().optional(),
-			parameters: z.array(z.string()).optional()
-		}).strict().optional(),
-		remote: z.boolean().optional()
-	}).strict()
+	z
+		.object({
+			namespace: z.string().min(1),
+			outbound: z
+				.object({
+					service: z.string().min(1),
+					environment: z.string().optional(),
+					parameters: z.array(z.string()).optional()
+				})
+				.strict()
+				.optional(),
+			remote: z.boolean().optional()
+		})
+		.strict()
 ])
 
 /**
  * C17 — Workflows-as-binding (a workflow class exposed for another worker
  * to invoke). Distinct from a worker declaring its own workflows.
  */
-export const workflowBindingSchema = z.object({
-	name: z.string().min(1),
-	className: z.string().min(1),
-	scriptName: z.string().min(1).optional(),
-	remote: z.boolean().optional(),
-	limits: z.object({
-		steps: z.number().int().positive()
-	}).strict().optional()
-}).strict()
+export const workflowBindingSchema = z
+	.object({
+		name: z.string().min(1),
+		className: z.string().min(1),
+		scriptName: z.string().min(1).optional(),
+		remote: z.boolean().optional(),
+		limits: z
+			.object({
+				steps: z.number().int().positive()
+			})
+			.strict()
+			.optional()
+	})
+	.strict()
 
 /**
  * C17 — Cloudflare Pipelines binding.
  */
 export const pipelineBindingSchema = z.union([
 	z.string().min(1),
-	z.object({
-		pipeline: z.string().min(1),
-		remote: z.boolean().optional()
-	}).strict()
+	z
+		.object({
+			pipeline: z.string().min(1),
+			remote: z.boolean().optional()
+		})
+		.strict()
 ])
 
 /**
  * C17 — Cloudflare Images binding (transformation/upload service).
  */
-export const imagesBindingSchema = z.object({
-	remote: z.boolean().optional()
-}).strict().or(z.literal(true))
+export const imagesBindingSchema = z
+	.object({
+		remote: z.boolean().optional()
+	})
+	.strict()
+	.or(z.literal(true))
 
 /**
  * C17 — Cloudflare Media Transformations binding.
  */
-export const mediaBindingSchema = z.object({
-	remote: z.boolean().optional()
-}).strict().or(z.literal(true))
+export const mediaBindingSchema = z
+	.object({
+		remote: z.boolean().optional()
+	})
+	.strict()
+	.or(z.literal(true))
 
 /**
  * C17 — Cloudflare Artifacts binding.
  */
 export const artifactsBindingSchema = z.union([
 	z.string().min(1),
-	z.object({
-		namespace: z.string().min(1),
-		remote: z.boolean().optional()
-	}).strict()
+	z
+		.object({
+			namespace: z.string().min(1),
+			remote: z.boolean().optional()
+		})
+		.strict()
 ])
 
 /**
  * All worker bindings configuration.
  * Defines connections to Cloudflare services and resources.
  */
-export const bindingsSchema = z.object({
-	/**
-	 * KV Namespace bindings.
-	 * Maps binding name to either a stable KV namespace name or an explicit resolver object.
-	 */
-	kv: z.record(z.string(), kvBindingSchema).optional(),
+export const bindingsSchema = z
+	.object({
+		/**
+		 * KV Namespace bindings.
+		 * Maps binding name to either a stable KV namespace name or an explicit resolver object.
+		 */
+		kv: z.record(z.string(), kvBindingSchema).optional(),
 
-	/**
-	 * D1 Database bindings.
-	 * Maps binding name to either a stable D1 database name or an explicit resolver object.
-	 */
-	d1: z.record(z.string(), d1BindingSchema).optional(),
+		/**
+		 * D1 Database bindings.
+		 * Maps binding name to either a stable D1 database name or an explicit resolver object.
+		 */
+		d1: z.record(z.string(), d1BindingSchema).optional(),
 
-	/**
-	 * R2 Bucket bindings.
-	 * Maps binding name to R2 bucket name.
-	 */
-	r2: z.record(z.string(), z.string()).optional(),
+		/**
+		 * R2 Bucket bindings.
+		 * Maps binding name to R2 bucket name.
+		 */
+		r2: z.record(z.string(), z.string()).optional(),
 
-	/**
-	 * Durable Object bindings.
-	 * Maps binding name to DO class configuration.
-	 */
-	durableObjects: z.record(z.string(), durableObjectBindingSchema).optional(),
+		/**
+		 * Durable Object bindings.
+		 * Maps binding name to DO class configuration.
+		 */
+		durableObjects: z.record(z.string(), durableObjectBindingSchema).optional(),
 
-	/**
-	 * Queue bindings for producers and consumers.
-	 */
-	queues: queuesConfigSchema.optional(),
+		/**
+		 * Queue bindings for producers and consumers.
+		 */
+		queues: queuesConfigSchema.optional(),
 
-	/**
-	 * Rate Limiting bindings.
-	 */
-	rateLimits: z.record(z.string(), rateLimitBindingSchema).optional(),
+		/**
+		 * Rate Limiting bindings.
+		 */
+		rateLimits: z.record(z.string(), rateLimitBindingSchema).optional(),
 
-	/**
-	 * Version Metadata binding.
-	 */
-	versionMetadata: versionMetadataBindingSchema.optional(),
+		/**
+		 * Version Metadata binding.
+		 */
+		versionMetadata: versionMetadataBindingSchema.optional(),
 
-	/**
-	 * Worker Loader bindings for Dynamic Workers.
-	 */
-	workerLoaders: z.record(z.string(), workerLoaderBindingSchema).optional(),
+		/**
+		 * Worker Loader bindings for Dynamic Workers.
+		 */
+		workerLoaders: z.record(z.string(), workerLoaderBindingSchema).optional(),
 
-	/**
-	 * Secrets Store bindings.
-	 */
-	secretsStore: z.record(z.string(), secretsStoreBindingSchema).optional(),
+		/**
+		 * Secrets Store bindings.
+		 */
+		secretsStore: z.record(z.string(), secretsStoreBindingSchema).optional(),
 
-	/**
-	 * Service bindings to other Workers.
-	 * Enables RPC-style communication between workers.
-	 */
-	services: z.record(z.string(), serviceBindingSchema).optional(),
+		/**
+		 * Service bindings to other Workers.
+		 * Enables RPC-style communication between workers.
+		 */
+		services: z.record(z.string(), serviceBindingSchema).optional(),
 
-	/**
-	 * Workers AI binding for ML inference.
-	 */
-	ai: aiBindingSchema.optional(),
+		/**
+		 * Workers AI binding for ML inference.
+		 */
+		ai: aiBindingSchema.optional(),
 
-	/**
-	 * AI Search namespace bindings.
-	 */
-	aiSearchNamespaces: z.record(z.string(), aiSearchNamespaceBindingSchema).optional(),
+		/**
+		 * AI Search namespace bindings.
+		 */
+		aiSearchNamespaces: z.record(z.string(), aiSearchNamespaceBindingSchema).optional(),
 
-	/**
-	 * AI Search instance bindings.
-	 */
-	aiSearch: z.record(z.string(), aiSearchInstanceBindingSchema).optional(),
+		/**
+		 * AI Search instance bindings.
+		 */
+		aiSearch: z.record(z.string(), aiSearchInstanceBindingSchema).optional(),
 
-	/**
-	 * Vectorize index bindings for vector similarity search.
-	 */
-	vectorize: z.record(z.string(), vectorizeBindingSchema).optional(),
+		/**
+		 * Vectorize index bindings for vector similarity search.
+		 */
+		vectorize: z.record(z.string(), vectorizeBindingSchema).optional(),
 
-	/**
-	 * Hyperdrive bindings for accelerated PostgreSQL.
-	 */
-	hyperdrive: z.record(z.string(), hyperdriveBindingSchema).optional(),
+		/**
+		 * Hyperdrive bindings for accelerated PostgreSQL.
+		 */
+		hyperdrive: z.record(z.string(), hyperdriveBindingSchema).optional(),
 
-	/**
-	 * Browser Rendering binding for headless browser access.
-	 */
-	browser: browserBindingSchema.optional(),
+		/**
+		 * Browser Rendering binding for headless browser access.
+		 */
+		browser: browserBindingSchema.optional(),
 
-	/**
-	 * Analytics Engine bindings for event logging.
-	 */
-	analyticsEngine: z.record(z.string(), analyticsBindingSchema).optional(),
+		/**
+		 * Analytics Engine bindings for event logging.
+		 */
+		analyticsEngine: z.record(z.string(), analyticsBindingSchema).optional(),
 
-	/**
-	 * Email sending bindings.
-	 */
-	sendEmail: z.record(z.string(), sendEmailBindingSchema).optional(),
+		/**
+		 * Email sending bindings.
+		 */
+		sendEmail: z.record(z.string(), sendEmailBindingSchema).optional(),
 
-	/**
-	 * C17 — mTLS Certificate bindings.
-	 * Maps a binding name to the certificate UUID issued via
-	 * `wrangler mtls-certificate upload`. The runtime exposes the certificate
-	 * to the worker as `env.<binding>` for use with `fetch`'s `mTLS` option.
-	 */
-	mtlsCertificates: z.record(z.string(), mtlsCertificateBindingSchema).optional(),
+		/**
+		 * C17 — mTLS Certificate bindings.
+		 * Maps a binding name to the certificate UUID issued via
+		 * `wrangler mtls-certificate upload`. The runtime exposes the certificate
+		 * to the worker as `env.<binding>` for use with `fetch`'s `mTLS` option.
+		 */
+		mtlsCertificates: z.record(z.string(), mtlsCertificateBindingSchema).optional(),
 
-	/**
-	 * C17 — Workers for Platforms (Dispatch Namespace) bindings.
-	 * Maps a binding name to the dispatch namespace name. Allows a parent
-	 * worker to look up and dispatch to user workers stored in the namespace.
-	 */
-	dispatchNamespaces: z.record(z.string(), dispatchNamespaceBindingSchema).optional(),
+		/**
+		 * C17 — Workers for Platforms (Dispatch Namespace) bindings.
+		 * Maps a binding name to the dispatch namespace name. Allows a parent
+		 * worker to look up and dispatch to user workers stored in the namespace.
+		 */
+		dispatchNamespaces: z.record(z.string(), dispatchNamespaceBindingSchema).optional(),
 
-	/**
-	 * C17 — Workflows-as-binding.
-	 * Maps a binding name to a workflow class hosted by another worker (or
-	 * the same worker, via `scriptName`). Distinct from `bindings.workflows`
-	 * declarations of workflows defined IN this worker.
-	 */
-	workflows: z.record(z.string(), workflowBindingSchema).optional(),
+		/**
+		 * C17 — Workflows-as-binding.
+		 * Maps a binding name to a workflow class hosted by another worker (or
+		 * the same worker, via `scriptName`). Distinct from `bindings.workflows`
+		 * declarations of workflows defined IN this worker.
+		 */
+		workflows: z.record(z.string(), workflowBindingSchema).optional(),
 
-	/**
-	 * C17 — Pipelines bindings.
-	 * Maps a binding name to a Cloudflare Pipelines pipeline (R2-backed
-	 * streaming ingestion).
-	 */
-	pipelines: z.record(z.string(), pipelineBindingSchema).optional(),
+		/**
+		 * C17 — Pipelines bindings.
+		 * Maps a binding name to a Cloudflare Pipelines pipeline (R2-backed
+		 * streaming ingestion).
+		 */
+		pipelines: z.record(z.string(), pipelineBindingSchema).optional(),
 
-	/**
-	 * C17 — Cloudflare Images binding.
-	 * Maps a binding name to access the Images service from the worker
-	 * (transformation/upload via `env.<binding>`).
-	 */
-	images: z.record(z.string(), imagesBindingSchema).optional().superRefine((bindings, ctx) => {
-		if (!bindings || Object.keys(bindings).length <= 1) {
-			return
-		}
+		/**
+		 * C17 — Cloudflare Images binding.
+		 * Maps a binding name to access the Images service from the worker
+		 * (transformation/upload via `env.<binding>`).
+		 */
+		images: z
+			.record(z.string(), imagesBindingSchema)
+			.optional()
+			.superRefine((bindings, ctx) => {
+				if (!bindings || Object.keys(bindings).length <= 1) {
+					return
+				}
 
-		ctx.addIssue({
-			code: z.ZodIssueCode.custom,
-			message: 'Wrangler currently supports one Images binding per Worker'
-		})
-	}),
+				ctx.addIssue({
+					code: z.ZodIssueCode.custom,
+					message: 'Wrangler currently supports one Images binding per Worker'
+				})
+			}),
 
-	/**
-	 * C17 — Cloudflare Media Transformations binding.
-	 * Maps a binding name to access the Media Transformations service from
-	 * the worker (video/audio/frame extraction via `env.<binding>`).
-	 */
-	media: z.record(z.string(), mediaBindingSchema).optional().superRefine((bindings, ctx) => {
-		if (!bindings || Object.keys(bindings).length <= 1) {
-			return
-		}
+		/**
+		 * C17 — Cloudflare Media Transformations binding.
+		 * Maps a binding name to access the Media Transformations service from
+		 * the worker (video/audio/frame extraction via `env.<binding>`).
+		 */
+		media: z
+			.record(z.string(), mediaBindingSchema)
+			.optional()
+			.superRefine((bindings, ctx) => {
+				if (!bindings || Object.keys(bindings).length <= 1) {
+					return
+				}
 
-		ctx.addIssue({
-			code: z.ZodIssueCode.custom,
-			message: 'Wrangler currently supports one Media Transformations binding per Worker'
-		})
-	}),
+				ctx.addIssue({
+					code: z.ZodIssueCode.custom,
+					message: 'Wrangler currently supports one Media Transformations binding per Worker'
+				})
+			}),
 
-	/**
-	 * C17 — Cloudflare Artifacts bindings.
-	 * Maps a binding name to an Artifacts namespace for Git-compatible
-	 * file storage.
-	 */
-	artifacts: z.record(z.string(), artifactsBindingSchema).optional()
-}).optional()
+		/**
+		 * C17 — Cloudflare Artifacts bindings.
+		 * Maps a binding name to an Artifacts namespace for Git-compatible
+		 * file storage.
+		 */
+		artifacts: z.record(z.string(), artifactsBindingSchema).optional()
+	})
+	.optional()
 
 export type BrowserBindings = z.infer<typeof browserBindingSchema>
 export type BrowserBinding = z.infer<typeof browserBindingValueSchema>

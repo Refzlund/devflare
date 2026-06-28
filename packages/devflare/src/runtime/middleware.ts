@@ -2,7 +2,7 @@
 // Middleware System — Composable request handling
 // =============================================================================
 
-import { runWithEventContext, type FetchEvent } from './context'
+import { type FetchEvent, runWithEventContext } from './context'
 
 type AnyFunction = (...args: any[]) => any
 type FetchModule = Record<string, unknown>
@@ -24,7 +24,9 @@ export type Awaitable<T> = T | Promise<T>
  * Passing a new event mirrors SvelteKit's `resolve(event)` pattern and lets
  * middleware continue the chain with a modified request context.
  */
-export type ResolveFetch<TEvent extends FetchEvent = FetchEvent> = (event?: TEvent) => Promise<Response>
+export type ResolveFetch<TEvent extends FetchEvent = FetchEvent> = (
+	event?: TEvent
+) => Promise<Response>
 
 /**
  * Request-wide fetch middleware.
@@ -155,11 +157,11 @@ function assertExplicit2ArgStyle(handler: AnyFunction): void {
 	}
 
 	throw new Error(
-		'[devflare] Ambiguous 2-argument fetch handler. The calling convention must be declared explicitly via '
-		+ "`defineFetchHandler(fn, { style: 'resolve' })` (for `(event, resolve) => Response`) or "
-		+ "`defineFetchHandler(fn, { style: 'worker' })` (for `(request, env) => Response`). "
-		+ 'Single-arg `(event) => Response` and 3-arg worker-style `(request, env, ctx) => Response` '
-		+ 'handlers do not require wrapping.'
+		'[devflare] Ambiguous 2-argument fetch handler. The calling convention must be declared explicitly via ' +
+			"`defineFetchHandler(fn, { style: 'resolve' })` (for `(event, resolve) => Response`) or " +
+			"`defineFetchHandler(fn, { style: 'worker' })` (for `(request, env) => Response`). " +
+			'Single-arg `(event) => Response` and 3-arg worker-style `(request, env, ctx) => Response` ' +
+			'handlers do not require wrapping.'
 	)
 }
 
@@ -224,9 +226,9 @@ export function assertExplicitQueueHandlerStyle(handler: AnyFunction): void {
 	}
 
 	throw new Error(
-		'[devflare] Ambiguous 2-argument queue handler. The calling convention must be declared explicitly via '
-		+ '`defineQueueHandler(fn)` for `(batch, env) => void` worker-style handlers. '
-		+ 'Single-arg `(event) => void` and 3-arg `(batch, env, ctx) => void` handlers do not require wrapping.'
+		'[devflare] Ambiguous 2-argument queue handler. The calling convention must be declared explicitly via ' +
+			'`defineQueueHandler(fn)` for `(batch, env) => void` worker-style handlers. ' +
+			'Single-arg `(event) => void` and 3-arg `(batch, env, ctx) => void` handlers do not require wrapping.'
 	)
 }
 
@@ -243,9 +245,9 @@ export function assertExplicitScheduledHandlerStyle(handler: AnyFunction): void 
 	}
 
 	throw new Error(
-		'[devflare] Ambiguous 2-argument scheduled handler. The calling convention must be declared explicitly via '
-		+ '`defineScheduledHandler(fn)` for `(controller, env) => void` worker-style handlers. '
-		+ 'Single-arg `(event) => void` and 3-arg `(controller, env, ctx) => void` handlers do not require wrapping.'
+		'[devflare] Ambiguous 2-argument scheduled handler. The calling convention must be declared explicitly via ' +
+			'`defineScheduledHandler(fn)` for `(controller, env) => void` worker-style handlers. ' +
+			'Single-arg `(event) => void` and 3-arg `(controller, env, ctx) => void` handlers do not require wrapping.'
 	)
 }
 
@@ -404,9 +406,9 @@ function assertSinglePrimaryFetchEntry(candidates: PrimaryFetchEntryCandidate[])
 
 	const foundEntries = candidates.map(({ name }) => `"${name}"`).join(', ')
 	throw new Error(
-		`Ambiguous fetch entry module. Export exactly one primary fetch entry per module. `
-		+ `Use either "fetch" or "handle" (or one default equivalent), not both. `
-		+ `Found: ${foundEntries}`
+		`Ambiguous fetch entry module. Export exactly one primary fetch entry per module. ` +
+			`Use either "fetch" or "handle" (or one default equivalent), not both. ` +
+			`Found: ${foundEntries}`
 	)
 }
 
@@ -417,9 +419,11 @@ interface MethodResolution {
 
 function resolveMethodHandler(module: FetchModule, method: string): MethodResolution | null {
 	const normalizedMethod = method.toUpperCase()
-	const directHandler = (isFunction(module[normalizedMethod])
-		? module[normalizedMethod]
-		: bindMethod(module.default, normalizedMethod)) as AnyFunction | null
+	const directHandler = (
+		isFunction(module[normalizedMethod])
+			? module[normalizedMethod]
+			: bindMethod(module.default, normalizedMethod)
+	) as AnyFunction | null
 
 	if (directHandler) {
 		return {
@@ -429,9 +433,9 @@ function resolveMethodHandler(module: FetchModule, method: string): MethodResolu
 	}
 
 	if (normalizedMethod === 'HEAD') {
-		const getHandler = (isFunction(module.GET)
-			? module.GET
-			: bindMethod(module.default, 'GET')) as AnyFunction | null
+		const getHandler = (
+			isFunction(module.GET) ? module.GET : bindMethod(module.default, 'GET')
+		) as AnyFunction | null
 
 		if (getHandler) {
 			return {
@@ -441,9 +445,9 @@ function resolveMethodHandler(module: FetchModule, method: string): MethodResolu
 		}
 	}
 
-	const allHandler = (isFunction(module.ALL)
-		? module.ALL
-		: bindMethod(module.default, 'ALL')) as AnyFunction | null
+	const allHandler = (
+		isFunction(module.ALL) ? module.ALL : bindMethod(module.default, 'ALL')
+	) as AnyFunction | null
 
 	if (allHandler) {
 		return {

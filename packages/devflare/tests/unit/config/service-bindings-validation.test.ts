@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test'
 import type { DevflareConfig } from '../../../src/config/schema'
 import {
-	collectReferencedServiceNames,
 	ServiceBindingValidationError,
+	collectReferencedServiceNames,
 	validateServiceBindings
 } from '../../../src/config/service-bindings-validation'
 
@@ -35,11 +35,13 @@ describe('collectReferencedServiceNames', () => {
 	})
 
 	test('returns [] for configs without service bindings', () => {
-		expect(collectReferencedServiceNames({
-			name: 'x',
-			compatibilityDate: '2025-01-07',
-			compatibilityFlags: []
-		})).toEqual([])
+		expect(
+			collectReferencedServiceNames({
+				name: 'x',
+				compatibilityDate: '2025-01-07',
+				compatibilityFlags: []
+			})
+		).toEqual([])
 	})
 })
 
@@ -57,19 +59,14 @@ describe('validateServiceBindings', () => {
 
 	test('tolerates a missing self-reference (first-deploy)', async () => {
 		await validateServiceBindings(fixtureWithServices, 'acct', {
-			listWorkers: async () => [
-				{ name: 'user-api' },
-				{ name: 'payments' }
-			],
+			listWorkers: async () => [{ name: 'user-api' }, { name: 'payments' }],
 			selfWorkerName: 'caller-worker'
 		})
 	})
 
 	test('throws ServiceBindingValidationError listing every missing target', async () => {
 		const promise = validateServiceBindings(fixtureWithServices, 'acct', {
-			listWorkers: async () => [
-				{ name: 'user-api' }
-			],
+			listWorkers: async () => [{ name: 'user-api' }],
 			selfWorkerName: 'caller-worker'
 		})
 		await expect(promise).rejects.toBeInstanceOf(ServiceBindingValidationError)
@@ -85,16 +82,20 @@ describe('validateServiceBindings', () => {
 
 	test('skips listing the account when there are no referenced services', async () => {
 		let called = false
-		await validateServiceBindings({
-			name: 'x',
-			compatibilityDate: '2025-01-07',
-			compatibilityFlags: []
-		}, 'acct', {
-			listWorkers: async () => {
-				called = true
-				return []
+		await validateServiceBindings(
+			{
+				name: 'x',
+				compatibilityDate: '2025-01-07',
+				compatibilityFlags: []
+			},
+			'acct',
+			{
+				listWorkers: async () => {
+					called = true
+					return []
+				}
 			}
-		})
+		)
 		expect(called).toBe(false)
 	})
 })

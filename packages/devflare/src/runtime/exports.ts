@@ -6,7 +6,7 @@
 // handler trails
 // =============================================================================
 
-import { getContextOrNull, type EventContext, type RuntimeContextValue } from './context'
+import { type EventContext, type RuntimeContextValue, getContextOrNull } from './context'
 import { createContextProxy } from './validation'
 // Side-effect import to ensure the canonical `declare global { interface
 // DevflareEnv {} }` from `src/env.ts` is loaded so the type used below
@@ -41,16 +41,16 @@ function createReadonlyProxy<T extends object>(
  *
  * @example
  * ```ts
-	 * import { env, type FetchEvent } from 'devflare/runtime'
+ * import { env, type FetchEvent } from 'devflare/runtime'
  *
-	 * export async function fetch(event: FetchEvent) {
+ * export async function fetch(event: FetchEvent) {
  *   const value = await env.MY_KV.get('key')
  *   const dbResult = await env.DB.prepare('SELECT * FROM users').all()
-	 *   return new Response(JSON.stringify({
-	 *     path: event.url.pathname,
-	 *     value,
-	 *     dbResult
-	 *   }))
+ *   return new Response(JSON.stringify({
+ *     path: event.url.pathname,
+ *     value,
+ *     dbResult
+ *   }))
  * }
  * ```
  *
@@ -108,11 +108,11 @@ export const vars: Readonly<DevflareVars> = createReadonlyProxy(
  *
  * @example
  * ```ts
-	 * import { ctx, type FetchEvent } from 'devflare/runtime'
+ * import { ctx, type FetchEvent } from 'devflare/runtime'
  *
-	 * export async function fetch(event: FetchEvent) {
+ * export async function fetch(event: FetchEvent) {
  *   const response = new Response('OK')
-	 *   ctx.waitUntil(analytics.track(event.url.pathname))
+ *   ctx.waitUntil(analytics.track(event.url.pathname))
  *   return response
  * }
  * ```
@@ -140,16 +140,16 @@ export const ctx: Readonly<RuntimeContextValue> = createReadonlyProxy(
  *
  * @example
  * ```ts
-	 * import { event as runtimeEvent, type FetchEvent, type ScheduledEvent } from 'devflare/runtime'
+ * import { event as runtimeEvent, type FetchEvent, type ScheduledEvent } from 'devflare/runtime'
  *
-	 * export async function fetch(event: FetchEvent) {
-	 *   console.log(runtimeEvent.type)
-	 *   console.log(event.url.pathname)
+ * export async function fetch(event: FetchEvent) {
+ *   console.log(runtimeEvent.type)
+ *   console.log(event.url.pathname)
  * }
  *
-	 * export async function scheduled(event: ScheduledEvent) {
-	 *   console.log(runtimeEvent.type)
-	 *   console.log(event.cron)
+ * export async function scheduled(event: ScheduledEvent) {
+ *   console.log(runtimeEvent.type)
+ *   console.log(event.cron)
  * }
  * ```
  *
@@ -176,17 +176,17 @@ export const event: Readonly<EventContext> = createReadonlyProxy(
  *
  * @example
  * ```ts
-	 * import { locals, type FetchEvent } from 'devflare/runtime'
+ * import { locals, type FetchEvent } from 'devflare/runtime'
  *
  * // In auth middleware
-	 * const authMiddleware = async (event: FetchEvent, next: () => Promise<Response>) => {
+ * const authMiddleware = async (event: FetchEvent, next: () => Promise<Response>) => {
  *   locals.user = await validateToken(event.request?.headers.get('Authorization'))
  *   return next()
  * }
  *
  * // In handler
-	 * export async function fetch(event: FetchEvent) {
-	 *   void event
+ * export async function fetch(event: FetchEvent) {
+ *   void event
  *   console.log(locals.user)
  * }
  * ```

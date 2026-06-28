@@ -1,10 +1,10 @@
 import { describe, expect, test } from 'bun:test'
 import {
-	collectTestingPreviewVerificationErrors,
 	DEFAULT_EXPECTED_APP_NAME,
 	DEFAULT_EXPECTED_DEPLOYMENT_CHANNEL,
-	loadTestingPreviewConfig,
-	REQUIRED_MAIN_BINDINGS
+	REQUIRED_MAIN_BINDINGS,
+	collectTestingPreviewVerificationErrors,
+	loadTestingPreviewConfig
 } from '../../../../../.github/scripts/verify-testing-preview-deployment'
 
 describe('testing preview deployment verifier', () => {

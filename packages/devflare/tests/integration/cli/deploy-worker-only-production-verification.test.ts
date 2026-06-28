@@ -17,7 +17,7 @@ import {
 	restoreDeployEnvironmentSnapshot,
 	runWorkerOnlyDeploy,
 	successResult,
-	writeAccountProjectFiles,
+	writeAccountProjectFiles
 } from './build-deploy-worker-only.test-utils'
 
 const originalEnvironment = captureDeployEnvironmentSnapshot()
@@ -71,7 +71,13 @@ describe('build/deploy worker-only behavior', () => {
 		const result = await runWorkerOnlyDeploy(projectDir, logger)
 
 		expect(result.exitCode).toBe(0)
-		expect(logger.messages.some((message) => message.args.join(' ').includes('Verified Cloudflare deployment deployment-123 for version version-123'))).toBe(true)
+		expect(
+			logger.messages.some((message) =>
+				message.args
+					.join(' ')
+					.includes('Verified Cloudflare deployment deployment-123 for version version-123')
+			)
+		).toBe(true)
 	})
 
 	test('deploy verifies production deployments when Wrangler only reports the version id through structured output', async () => {
@@ -109,8 +115,20 @@ describe('build/deploy worker-only behavior', () => {
 		const result = await runWorkerOnlyDeploy(projectDir, logger)
 
 		expect(result.exitCode).toBe(0)
-		expect(logger.messages.some((message) => message.args.join(' ').includes('Version ID: version-structured'))).toBe(true)
-		expect(logger.messages.some((message) => message.args.join(' ').includes('Verified Cloudflare deployment deployment-structured for version version-structured'))).toBe(true)
+		expect(
+			logger.messages.some((message) =>
+				message.args.join(' ').includes('Version ID: version-structured')
+			)
+		).toBe(true)
+		expect(
+			logger.messages.some((message) =>
+				message.args
+					.join(' ')
+					.includes(
+						'Verified Cloudflare deployment deployment-structured for version version-structured'
+					)
+			)
+		).toBe(true)
 	})
 
 	test('deploy falls back to the latest Cloudflare version when Wrangler omits the production version id', async () => {
@@ -149,9 +167,25 @@ describe('build/deploy worker-only behavior', () => {
 		const result = await runWorkerOnlyDeploy(projectDir, logger)
 
 		expect(result.exitCode).toBe(0)
-		expect(logger.messages.some((message) => message.args.join(' ').includes('Version ID: version-from-list'))).toBe(true)
-		expect(logger.messages.some((message) => message.args.join(' ').includes('Resolved version id from Cloudflare version metadata'))).toBe(true)
-		expect(logger.messages.some((message) => message.args.join(' ').includes('Verified Cloudflare deployment deployment-from-list for version version-from-list'))).toBe(true)
+		expect(
+			logger.messages.some((message) =>
+				message.args.join(' ').includes('Version ID: version-from-list')
+			)
+		).toBe(true)
+		expect(
+			logger.messages.some((message) =>
+				message.args.join(' ').includes('Resolved version id from Cloudflare version metadata')
+			)
+		).toBe(true)
+		expect(
+			logger.messages.some((message) =>
+				message.args
+					.join(' ')
+					.includes(
+						'Verified Cloudflare deployment deployment-from-list for version version-from-list'
+					)
+			)
+		).toBe(true)
 	})
 
 	test('deploy falls back to the latest Cloudflare deployment when Wrangler omits the production version id entirely', async () => {
@@ -181,7 +215,19 @@ describe('build/deploy worker-only behavior', () => {
 		const result = await runWorkerOnlyDeploy(projectDir, logger)
 
 		expect(result.exitCode).toBe(0)
-		expect(logger.messages.some((message) => message.args.join(' ').includes('Version ID: version-from-deployment'))).toBe(true)
-		expect(logger.messages.some((message) => message.args.join(' ').includes('Verified Cloudflare deployment deployment-fallback for version version-from-deployment'))).toBe(true)
+		expect(
+			logger.messages.some((message) =>
+				message.args.join(' ').includes('Version ID: version-from-deployment')
+			)
+		).toBe(true)
+		expect(
+			logger.messages.some((message) =>
+				message.args
+					.join(' ')
+					.includes(
+						'Verified Cloudflare deployment deployment-fallback for version version-from-deployment'
+					)
+			)
+		).toBe(true)
 	}, 20000)
 })

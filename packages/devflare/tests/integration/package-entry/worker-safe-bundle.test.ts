@@ -12,22 +12,30 @@ interface BuildResult {
 	outputs: Array<{ path: string }>
 }
 
-const bun = (globalThis as typeof globalThis & {
-	Bun: {
-		spawn(args: string[], options: Record<string, unknown>): {
-			stdout: ReadableStream<Uint8Array> | null
-			stderr: ReadableStream<Uint8Array> | null
-			exited: Promise<number>
+const bun = (
+	globalThis as typeof globalThis & {
+		Bun: {
+			spawn(
+				args: string[],
+				options: Record<string, unknown>
+			): {
+				stdout: ReadableStream<Uint8Array> | null
+				stderr: ReadableStream<Uint8Array> | null
+				exited: Promise<number>
+			}
+			build(options: Record<string, unknown>): Promise<BuildResult>
 		}
-		build(options: Record<string, unknown>): Promise<BuildResult>
 	}
-}).Bun
+).Bun
 
 function formatBuildLogs(logs: Array<{ message?: string }>): string {
 	return logs.map((log) => log.message ?? String(log)).join('\n')
 }
 
-async function createBundleResult(importSource: string, importedNames: string): Promise<BuildResult> {
+async function createBundleResult(
+	importSource: string,
+	importedNames: string
+): Promise<BuildResult> {
 	const tempDir = await mkdtemp(join(tmpdir(), 'devflare-worker-bundle-'))
 	tempDirs.push(tempDir)
 
@@ -36,9 +44,9 @@ async function createBundleResult(importSource: string, importedNames: string): 
 	await writeFile(
 		join(tempDir, 'entry.ts'),
 		`import { ${importedNames} } from '${importSource}'\n` +
-		`export async function fetch() {\n` +
-		`\t\treturn new Response(String(Boolean(${importedNames.split(',')[0].trim()})))\n` +
-		`}\n`
+			`export async function fetch() {\n` +
+			`\t\treturn new Response(String(Boolean(${importedNames.split(',')[0].trim()})))\n` +
+			`}\n`
 	)
 
 	return await bun.build({
@@ -62,13 +70,19 @@ describe('worker-safe package entrypoints', () => {
 	})
 
 	test('runtime entry exports worker-safe context helpers', async () => {
-		const result = await createBundleResult('devflare/runtime', 'env, ctx, event, locals, runWithContext, runWithEventContext, getFetchEvent, getQueueEvent, getScheduledEvent, getEmailEvent')
+		const result = await createBundleResult(
+			'devflare/runtime',
+			'env, ctx, event, locals, runWithContext, runWithEventContext, getFetchEvent, getQueueEvent, getScheduledEvent, getEmailEvent'
+		)
 		expect(result.success).toBe(true)
 		expect(formatBuildLogs(result.logs)).toBe('')
 	})
 
 	test('runtime entry exports fetch middleware helpers', async () => {
-		const result = await createBundleResult('devflare/runtime', 'sequence, resolveFetchHandler, invokeFetchHandler, createResolveFetch, invokeFetchModule')
+		const result = await createBundleResult(
+			'devflare/runtime',
+			'sequence, resolveFetchHandler, invokeFetchHandler, createResolveFetch, invokeFetchModule'
+		)
 		expect(result.success).toBe(true)
 		expect(formatBuildLogs(result.logs)).toBe('')
 	})

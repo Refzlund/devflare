@@ -1,10 +1,6 @@
 import type { ConsolaInstance } from 'consola'
+import { deleteLocalSecret, listLocalSecrets, writeLocalSecret } from '../../secrets/local-secrets'
 import type { CliOptions, CliResult, ParsedArgs } from '../index'
-import {
-	deleteLocalSecret,
-	listLocalSecrets,
-	writeLocalSecret
-} from '../../secrets/local-secrets'
 
 function getStringOption(
 	options: Record<string, string | boolean>,

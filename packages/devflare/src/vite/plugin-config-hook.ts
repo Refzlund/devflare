@@ -40,7 +40,7 @@ export function buildWorkerNameDefine(
 	const workerNameValue = lfConfig.name ?? 'unknown'
 	return {
 		...existing,
-		'__DEVFLARE_WORKER_NAME__': JSON.stringify(workerNameValue)
+		__DEVFLARE_WORKER_NAME__: JSON.stringify(workerNameValue)
 	}
 }
 
@@ -73,10 +73,12 @@ export function buildWebSocketProxyConfig(
 			changeOrigin: true,
 			ws: true,
 			configure: (proxy: unknown) => {
-				; (proxy as { on: (event: string, handler: (err: Error) => void) => void })
-					.on('error', (err: Error) => {
+				;(proxy as { on: (event: string, handler: (err: Error) => void) => void }).on(
+					'error',
+					(err: Error) => {
 						console.error(`[devflare] Proxy error: ${err.message}`)
-					})
+					}
+				)
 			}
 		}
 	}

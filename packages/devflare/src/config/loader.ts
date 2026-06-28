@@ -5,9 +5,9 @@
 import { existsSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join, resolve } from 'pathe'
-import { applyFrameworkConfigProviders } from './framework-providers'
-import { configSchema, type DevflareConfig } from './schema'
 import { loadDevflareDotenvIntoProcess } from './env-vars'
+import { applyFrameworkConfigProviders } from './framework-providers'
+import { type DevflareConfig, configSchema } from './schema'
 
 type C12LoadConfig = typeof import('c12')['loadConfig']
 
@@ -129,8 +129,8 @@ export class ConfigNotFoundError extends Error {
 	) {
 		super(
 			`Config file not found in ${cwd}.\n` +
-			`Expected one of: ${CONFIG_FILES.join(', ')}\n` +
-			`Run 'devflare init' to create a new config.`
+				`Expected one of: ${CONFIG_FILES.join(', ')}\n` +
+				`Run 'devflare init' to create a new config.`
 		)
 		this.name = 'ConfigNotFoundError'
 	}
@@ -146,13 +146,9 @@ export class ConfigValidationError extends Error {
 		public readonly issues: Array<{ path: (string | number)[]; message: string }>,
 		public readonly configFile: string
 	) {
-		const issueMessages = issues
-			.map((i) => `  - ${i.path.join('.')}: ${i.message}`)
-			.join('\n')
+		const issueMessages = issues.map((i) => `  - ${i.path.join('.')}: ${i.message}`).join('\n')
 
-		super(
-			`Invalid config in ${configFile}:\n${issueMessages}`
-		)
+		super(`Invalid config in ${configFile}:\n${issueMessages}`)
 		this.name = 'ConfigValidationError'
 	}
 }

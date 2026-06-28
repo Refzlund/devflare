@@ -1,7 +1,7 @@
+import { afterEach, describe, expect, test } from 'bun:test'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, test } from 'bun:test'
 import {
 	applyLocalDevVarsToConfig,
 	loadLocalDevVars,
@@ -34,14 +34,8 @@ afterEach(() => {
 describe('loadLocalDevVars', () => {
 	test('loads .dev.vars ahead of .env and lets local values override config vars', async () => {
 		const cwd = makeTempProject()
-		writeProjectFile(cwd, '.dev.vars', [
-			'SHARED=from-dev-vars',
-			'LOCAL_ONLY=secret'
-		].join('\n'))
-		writeProjectFile(cwd, '.env', [
-			'LOCAL_ONLY=from-env',
-			'ENV_ONLY=ignored'
-		].join('\n'))
+		writeProjectFile(cwd, '.dev.vars', ['SHARED=from-dev-vars', 'LOCAL_ONLY=secret'].join('\n'))
+		writeProjectFile(cwd, '.env', ['LOCAL_ONLY=from-env', 'ENV_ONLY=ignored'].join('\n'))
 
 		const vars = await loadLocalDevVars({
 			cwd,
@@ -61,14 +55,8 @@ describe('loadLocalDevVars', () => {
 
 	test('uses environment-specific .dev.vars without merging generic .dev.vars', async () => {
 		const cwd = makeTempProject()
-		writeProjectFile(cwd, '.dev.vars', [
-			'SHARED=generic',
-			'GENERIC_ONLY=yes'
-		].join('\n'))
-		writeProjectFile(cwd, '.dev.vars.staging', [
-			'SHARED=staging',
-			'STAGING_ONLY=yes'
-		].join('\n'))
+		writeProjectFile(cwd, '.dev.vars', ['SHARED=generic', 'GENERIC_ONLY=yes'].join('\n'))
+		writeProjectFile(cwd, '.dev.vars.staging', ['SHARED=staging', 'STAGING_ONLY=yes'].join('\n'))
 
 		const vars = await loadLocalDevVars({
 			cwd,
@@ -84,20 +72,14 @@ describe('loadLocalDevVars', () => {
 
 	test('merges .env files and lets the most specific environment file win', async () => {
 		const cwd = makeTempProject()
-		writeProjectFile(cwd, '.env', [
-			'SHARED=base',
-			'BASE_ONLY=yes'
-		].join('\n'))
-		writeProjectFile(cwd, '.env.local', [
-			'LOCAL_ONLY=yes'
-		].join('\n'))
-		writeProjectFile(cwd, '.env.staging', [
-			'ENV_ONLY=yes'
-		].join('\n'))
-		writeProjectFile(cwd, '.env.staging.local', [
-			'SHARED=staging-local',
-			'STAGING_LOCAL_ONLY=yes'
-		].join('\n'))
+		writeProjectFile(cwd, '.env', ['SHARED=base', 'BASE_ONLY=yes'].join('\n'))
+		writeProjectFile(cwd, '.env.local', ['LOCAL_ONLY=yes'].join('\n'))
+		writeProjectFile(cwd, '.env.staging', ['ENV_ONLY=yes'].join('\n'))
+		writeProjectFile(
+			cwd,
+			'.env.staging.local',
+			['SHARED=staging-local', 'STAGING_LOCAL_ONLY=yes'].join('\n')
+		)
 
 		const vars = await loadLocalDevVars({
 			cwd,
@@ -116,10 +98,7 @@ describe('loadLocalDevVars', () => {
 
 	test('filters local secret files to required secret declarations when configured', async () => {
 		const cwd = makeTempProject()
-		writeProjectFile(cwd, '.dev.vars', [
-			'API_TOKEN=secret',
-			'EXTRA_SECRET=ignored'
-		].join('\n'))
+		writeProjectFile(cwd, '.dev.vars', ['API_TOKEN=secret', 'EXTRA_SECRET=ignored'].join('\n'))
 
 		const vars = await loadLocalDevVars({
 			cwd,
@@ -141,18 +120,22 @@ describe('loadLocalDevVars', () => {
 
 describe('toWranglerSecretsConfig', () => {
 	test('converts Devflare secret declarations into Wrangler required secret names', () => {
-		expect(toWranglerSecretsConfig({
-			API_TOKEN: { required: true },
-			OPTIONAL_TOKEN: { required: false }
-		})).toEqual({
+		expect(
+			toWranglerSecretsConfig({
+				API_TOKEN: { required: true },
+				OPTIONAL_TOKEN: { required: false }
+			})
+		).toEqual({
 			required: ['API_TOKEN']
 		})
 	})
 
 	test('omits Wrangler secrets config when no required secrets are declared', () => {
-		expect(toWranglerSecretsConfig({
-			OPTIONAL_TOKEN: { required: false }
-		})).toBeUndefined()
+		expect(
+			toWranglerSecretsConfig({
+				OPTIONAL_TOKEN: { required: false }
+			})
+		).toBeUndefined()
 	})
 })
 

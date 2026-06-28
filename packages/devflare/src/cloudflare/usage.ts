@@ -7,12 +7,7 @@
 
 import { kvGet, kvPut } from './api'
 import { DEVFLARE_KV_NAMESPACE_TITLE, getOrCreateNamedKVNamespace } from './kv-namespace'
-import type {
-	CloudflareService,
-	UsageLimits,
-	UsageRecord,
-	UsageSummary
-} from './types'
+import type { CloudflareService, UsageLimits, UsageRecord, UsageSummary } from './types'
 
 // -----------------------------------------------------------------------------
 // Constants
@@ -23,9 +18,9 @@ const LIMITS_KEY = 'limits'
 
 // Default limits (can be overridden by user)
 const DEFAULT_LIMITS: UsageLimits = {
-	aiTokensPerDay: 10000,      // 10k tokens per day for testing
-	aiRequestsPerDay: 100,      // 100 AI requests per day
-	vectorizeOpsPerDay: 1000,   // 1000 vectorize ops per day
+	aiTokensPerDay: 10000, // 10k tokens per day for testing
+	aiRequestsPerDay: 100, // 100 AI requests per day
+	vectorizeOpsPerDay: 1000, // 1000 vectorize ops per day
 	enabled: true
 }
 
@@ -120,13 +115,14 @@ const MAX_RECORD_USAGE_ATTEMPTS = 5
 export async function recordUsage(
 	accountId: string,
 	service: CloudflareService,
-	count: number = 1,
+	count = 1,
 	deps: RecordUsageDeps = {}
 ): Promise<UsageRecord> {
 	const kvGetFn = deps.kvGet ?? kvGet
 	const kvPutFn = deps.kvPut ?? kvPut
 	const getNamespaceId = deps.getNamespaceId ?? getOrCreateUsageNamespace
-	const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)))
+	const sleep =
+		deps.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)))
 	const now = deps.now ?? (() => new Date())
 	const maxAttempts = deps.maxAttempts ?? MAX_RECORD_USAGE_ATTEMPTS
 	const warn = deps.warn ?? ((message: string) => console.warn(message))
@@ -183,25 +179,24 @@ export async function recordUsage(
 	}
 
 	warn(
-		`[devflare] recordUsage: could not confirm usage write for ${service} after ${maxAttempts} attempts `
-		+ 'due to concurrent writes; usage counts are best-effort under concurrency.'
+		`[devflare] recordUsage: could not confirm usage write for ${service} after ${maxAttempts} attempts ` +
+			'due to concurrent writes; usage counts are best-effort under concurrency.'
 	)
 
-	return lastWritten ?? {
-		service,
-		date: today,
-		count: (lastObserved?.count ?? 0) + count,
-		updatedAt: now().toISOString()
-	}
+	return (
+		lastWritten ?? {
+			service,
+			date: today,
+			count: (lastObserved?.count ?? 0) + count,
+			updatedAt: now().toISOString()
+		}
+	)
 }
 
 /**
  * Reset usage for a service (typically called when limits are adjusted)
  */
-export async function resetUsage(
-	accountId: string,
-	service: CloudflareService
-): Promise<void> {
+export async function resetUsage(accountId: string, service: CloudflareService): Promise<void> {
 	const today = getTodayDate()
 	const namespaceId = await getOrCreateUsageNamespace(accountId)
 	const key = buildUsageKey(service, today)
@@ -261,10 +256,7 @@ export async function setLimits(
 /**
  * Enable or disable limits enforcement
  */
-export async function setLimitsEnabled(
-	accountId: string,
-	enabled: boolean
-): Promise<UsageLimits> {
+export async function setLimitsEnabled(accountId: string, enabled: boolean): Promise<UsageLimits> {
 	return setLimits(accountId, { enabled })
 }
 
@@ -348,9 +340,7 @@ export async function getUsageSummary(
 export async function getAllUsageSummaries(accountId: string): Promise<UsageSummary[]> {
 	const trackedServices: CloudflareService[] = ['ai', 'vectorize']
 
-	return Promise.all(
-		trackedServices.map((s) => getUsageSummary(accountId, s))
-	)
+	return Promise.all(trackedServices.map((s) => getUsageSummary(accountId, s)))
 }
 
 // -----------------------------------------------------------------------------
@@ -360,7 +350,7 @@ export async function getAllUsageSummaries(accountId: string): Promise<UsageSumm
 /**
  * Check if we can proceed with testing for a specific service
  * Returns true if within limits, false if limits exceeded
- * 
+ *
  * Use this before running tests that use remote bindings
  */
 export async function canProceedWithTest(
@@ -393,7 +383,7 @@ export async function canProceedWithTest(
 export async function recordTestUsage(
 	accountId: string,
 	service: CloudflareService,
-	count: number = 1
+	count = 1
 ): Promise<void> {
 	await recordUsage(accountId, service, count)
 }
@@ -402,29 +392,29 @@ export async function recordTestUsage(
 // Simplified Skip Check for Tests
 // -----------------------------------------------------------------------------
 
+import { getPrimaryAccount } from './account'
 // Import auth and account functions for skip check
 import { isAuthenticated } from './auth'
-import { getPrimaryAccount } from './account'
 import { getEffectiveAccountId } from './preferences'
 
 /**
  * Check if tests for a service should be skipped
- * 
+ *
  * Returns `true` if tests should be SKIPPED (service not available)
  * Returns `false` if tests can proceed
- * 
+ *
  * Automatically logs the skip reason to console.
- * 
+ *
  * NOTE: This function is read-only and catches all errors gracefully.
  * If Cloudflare is unreachable, auth fails, or limits can't be checked,
  * it will return true (skip) with an appropriate message.
- * 
+ *
  * Usage:
  * ```ts
  * import { account } from 'devflare/cloudflare'
- * 
+ *
  * const skipAI = await account.shouldSkip('ai')
- * 
+ *
  * describe.skipIf(skipAI)('AI tests', () => {
  *   // ...
  * })
@@ -435,7 +425,9 @@ export async function shouldSkip(service: CloudflareService): Promise<boolean> {
 		// 1. Check authentication
 		const isAuth = await isAuthenticated()
 		if (!isAuth) {
-			console.log(`⏭️  ${service.toUpperCase()} tests skipped: Not authenticated. Run: bunx wrangler login`)
+			console.log(
+				`⏭️  ${service.toUpperCase()} tests skipped: Not authenticated. Run: bunx wrangler login`
+			)
 			return true
 		}
 

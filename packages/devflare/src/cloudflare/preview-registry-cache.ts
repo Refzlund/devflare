@@ -62,7 +62,8 @@ export function getCachedPreviewRegistryContext(
 	accountId: string,
 	databaseName: string
 ): PreviewRegistryContext | null {
-	const entry = readPreviewRegistryCache().registries?.[getPreviewRegistryCacheKey(accountId, databaseName)]
+	const entry =
+		readPreviewRegistryCache().registries?.[getPreviewRegistryCacheKey(accountId, databaseName)]
 	if (!entry?.databaseId) {
 		return null
 	}

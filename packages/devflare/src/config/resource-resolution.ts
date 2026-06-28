@@ -1,6 +1,12 @@
-import { getPrimaryAccount, listD1Databases, listHyperdrives, listKVNamespaces } from '../cloudflare/account'
+import {
+	getPrimaryAccount,
+	listD1Databases,
+	listHyperdrives,
+	listKVNamespaces
+} from '../cloudflare/account'
 import { getEffectiveAccountId } from '../cloudflare/preferences'
 import {
+	type PendingNameBinding,
 	collectPendingNameBindings,
 	formatMissingBindings,
 	materializeHyperdriveIdBindings,
@@ -9,17 +15,22 @@ import {
 	normalizeD1NameBinding,
 	normalizeHyperdriveNameBinding,
 	normalizeKVNameBinding,
-	withResolvedIdBindings,
-	type PendingNameBinding
+	withResolvedIdBindings
 } from './binding-resolution-helpers'
-import { loadConfig, type LoadConfigOptions } from './loader'
-import { type PreviewResolutionOptions } from './preview'
-import { brandAsDeployConfig, brandAsLocalConfig, resolveResources, type DeployConfig, type LocalConfig } from './resolve-phased'
+import { type LoadConfigOptions, loadConfig } from './loader'
+import type { PreviewResolutionOptions } from './preview'
 import { resolveConfigForEnvironment } from './resolve'
 import {
+	type DeployConfig,
+	type LocalConfig,
+	brandAsDeployConfig,
+	brandAsLocalConfig,
+	resolveResources
+} from './resolve-phased'
+import {
+	type DevflareConfig,
 	getLocalD1DatabaseIdentifier,
-	getLocalKVNamespaceIdentifier,
-	type DevflareConfig
+	getLocalKVNamespaceIdentifier
 } from './schema'
 
 interface CloudflareConfigResolutionApi {
@@ -65,7 +76,7 @@ export class ConfigResourceResolutionError extends Error {
 		super(message)
 		this.name = 'ConfigResourceResolutionError'
 		if (cause !== undefined) {
-			; (this as Error & { cause?: unknown }).cause = cause
+			;(this as Error & { cause?: unknown }).cause = cause
 		}
 	}
 }
@@ -135,9 +146,7 @@ async function resolveResourceIdsByName<TResource extends { id: string; name: st
 		throw new ConfigResourceResolutionError(options.listFailureMessage, error)
 	}
 
-	const idsByName = new Map(
-		resources.map((resource) => [resource.name, resource.id])
-	)
+	const idsByName = new Map(resources.map((resource) => [resource.name, resource.id]))
 
 	const missingBindings = pendingBindings.filter(({ resourceName }) => {
 		return !idsByName.has(resourceName)
@@ -151,7 +160,7 @@ async function resolveResourceIdsByName<TResource extends { id: string; name: st
 }
 
 /**
-	* Resolve environment overrides and normalize KV/D1/Hyperdrive bindings for purely local runtimes.
+ * Resolve environment overrides and normalize KV/D1/Hyperdrive bindings for purely local runtimes.
  *
  * Local Miniflare/workerd flows can use either an explicit resource ID or the
  * stable resource name as the backing identifier, so this path avoids requiring
@@ -175,11 +184,13 @@ export function resolveConfigForLocalRuntime(
 		return brandAsLocalConfig(resolvedConfig)
 	}
 	const pendingKVNameBindings = collectPendingNameBindings(kvBindings, normalizeKVNameBinding)
-	return brandAsLocalConfig(withResolvedIdBindings(resolvedConfig, {
-		kv: kvBindings ? materializeIdBindings(kvBindings, getLocalKVNamespaceIdentifier) : undefined,
-		d1: d1Bindings ? materializeIdBindings(d1Bindings, getLocalD1DatabaseIdentifier) : undefined,
-		hyperdrive: materializeHyperdriveIdBindings(hyperdriveBindings)
-	}))
+	return brandAsLocalConfig(
+		withResolvedIdBindings(resolvedConfig, {
+			kv: kvBindings ? materializeIdBindings(kvBindings, getLocalKVNamespaceIdentifier) : undefined,
+			d1: d1Bindings ? materializeIdBindings(d1Bindings, getLocalD1DatabaseIdentifier) : undefined,
+			hyperdrive: materializeHyperdriveIdBindings(hyperdriveBindings)
+		})
+	)
 }
 
 /**
@@ -210,18 +221,27 @@ export async function resolveMaterializedConfigResources(
 
 	const pendingKVNameBindings = collectPendingNameBindings(kvBindings, normalizeKVNameBinding)
 	const pendingD1NameBindings = collectPendingNameBindings(d1Bindings, normalizeD1NameBinding)
-	const pendingHyperdriveNameBindings = collectPendingNameBindings(hyperdriveBindings, normalizeHyperdriveNameBinding)
+	const pendingHyperdriveNameBindings = collectPendingNameBindings(
+		hyperdriveBindings,
+		normalizeHyperdriveNameBinding
+	)
 
 	if (
-		pendingKVNameBindings.length === 0
-		&& pendingD1NameBindings.length === 0
-		&& pendingHyperdriveNameBindings.length === 0
+		pendingKVNameBindings.length === 0 &&
+		pendingD1NameBindings.length === 0 &&
+		pendingHyperdriveNameBindings.length === 0
 	) {
-		return brandAsDeployConfig(withResolvedIdBindings(resolvedConfig, {
-			kv: kvBindings ? materializeIdBindings(kvBindings, getLocalKVNamespaceIdentifier) : undefined,
-			d1: d1Bindings ? materializeIdBindings(d1Bindings, getLocalD1DatabaseIdentifier) : undefined,
-			hyperdrive: materializeHyperdriveIdBindings(hyperdriveBindings)
-		}))
+		return brandAsDeployConfig(
+			withResolvedIdBindings(resolvedConfig, {
+				kv: kvBindings
+					? materializeIdBindings(kvBindings, getLocalKVNamespaceIdentifier)
+					: undefined,
+				d1: d1Bindings
+					? materializeIdBindings(d1Bindings, getLocalD1DatabaseIdentifier)
+					: undefined,
+				hyperdrive: materializeHyperdriveIdBindings(hyperdriveBindings)
+			})
+		)
 	}
 
 	const cloudflareApi = resolveCloudflareApi(options.cloudflare)
@@ -251,15 +271,17 @@ export async function resolveMaterializedConfigResources(
 		}
 	})
 
-	return brandAsDeployConfig(withResolvedIdBindings(resolvedConfig, {
-		kv: materializeResolvedNameBindings(kvBindings, normalizeKVNameBinding, namespaceIdsByName),
-		d1: materializeResolvedNameBindings(d1Bindings, normalizeD1NameBinding, databaseIdsByName),
-		hyperdrive: materializeHyperdriveIdBindings(hyperdriveBindings, hyperdriveIdsByName)
-	}))
+	return brandAsDeployConfig(
+		withResolvedIdBindings(resolvedConfig, {
+			kv: materializeResolvedNameBindings(kvBindings, normalizeKVNameBinding, namespaceIdsByName),
+			d1: materializeResolvedNameBindings(d1Bindings, normalizeD1NameBinding, databaseIdsByName),
+			hyperdrive: materializeHyperdriveIdBindings(hyperdriveBindings, hyperdriveIdsByName)
+		})
+	)
 }
 
 /**
-	* Resolve Cloudflare-backed resource references such as KV/D1/Hyperdrive name bindings into
+ * Resolve Cloudflare-backed resource references such as KV/D1/Hyperdrive name bindings into
  * concrete IDs for build, deploy, and automation workflows.
  *
  * @internal Prefer the unified `resolveResources(config, { phase: 'deploy' })`

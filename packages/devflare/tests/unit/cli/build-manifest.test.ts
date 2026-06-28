@@ -45,9 +45,7 @@ describe('build-manifest', () => {
 	test('summarizeBindings collects sorted binding keys per type', () => {
 		const summary = summarizeBindings({
 			...baseConfig,
-			tailConsumers: [
-				'observability-tail'
-			],
+			tailConsumers: ['observability-tail'],
 			bindings: {
 				...baseConfig.bindings,
 				rateLimits: {

@@ -18,8 +18,8 @@
 //   and return the other end in the Response for workerd to use
 // =============================================================================
 
-import type { Miniflare } from 'miniflare'
 import type { ConsolaInstance } from 'consola'
+import type { Miniflare } from 'miniflare'
 
 // -----------------------------------------------------------------------------
 // Types
@@ -78,10 +78,7 @@ async function getWebSocketUtils() {
 export function createBrowserNodeHandler(options: BrowserNodeHandlerOptions) {
 	const { browserShimUrl, logger, verbose } = options
 
-	return async function browserHandler(
-		request: Request,
-		_miniflare: Miniflare
-	): Promise<Response> {
+	return async function browserHandler(request: Request, _miniflare: Miniflare): Promise<Response> {
 		const url = new URL(request.url)
 		const targetUrl = browserShimUrl + url.pathname + url.search
 
@@ -240,7 +237,9 @@ async function handleWebSocketUpgrade(
 		const { 0: worker, 1: client } = new WebSocketPair()
 
 		if (verbose) {
-			logger?.debug(`[BrowserHandler] WebSocketPair created, MfResponse type: ${MfResponse?.name || typeof MfResponse}`)
+			logger?.debug(
+				`[BrowserHandler] WebSocketPair created, MfResponse type: ${MfResponse?.name || typeof MfResponse}`
+			)
 		}
 
 		// Couple the Node.js ws (to browser shim) with the client end of the pair

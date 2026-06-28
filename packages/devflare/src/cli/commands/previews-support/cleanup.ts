@@ -60,24 +60,28 @@ export function buildPreviewCleanupTargets(
 export function getPreviewCleanupResourceCandidateCount(
 	result: PreviewCleanupExecution['result']
 ): number {
-	return result.candidates.kv.length
-		+ result.candidates.d1.length
-		+ result.candidates.r2.length
-		+ result.candidates.queues.length
-		+ result.candidates.vectorize.length
-		+ result.candidates.hyperdrive.length
+	return (
+		result.candidates.kv.length +
+		result.candidates.d1.length +
+		result.candidates.r2.length +
+		result.candidates.queues.length +
+		result.candidates.vectorize.length +
+		result.candidates.hyperdrive.length
+	)
 }
 
-function buildPreviewCleanupResourceSummary(
-	result: PreviewCleanupExecution['result']
-): string[] {
+function buildPreviewCleanupResourceSummary(result: PreviewCleanupExecution['result']): string[] {
 	return [
 		result.candidates.kv.length > 0 ? `KV ${result.candidates.kv.length}` : null,
 		result.candidates.d1.length > 0 ? `D1 ${result.candidates.d1.length}` : null,
 		result.candidates.r2.length > 0 ? `R2 ${result.candidates.r2.length}` : null,
 		result.candidates.queues.length > 0 ? `Queues ${result.candidates.queues.length}` : null,
-		result.candidates.vectorize.length > 0 ? `Vectorize ${result.candidates.vectorize.length}` : null,
-		result.candidates.hyperdrive.length > 0 ? `Hyperdrive ${result.candidates.hyperdrive.length}` : null
+		result.candidates.vectorize.length > 0
+			? `Vectorize ${result.candidates.vectorize.length}`
+			: null,
+		result.candidates.hyperdrive.length > 0
+			? `Hyperdrive ${result.candidates.hyperdrive.length}`
+			: null
 	].filter((segment): segment is string => segment !== null)
 }
 
@@ -112,9 +116,8 @@ export function logPreviewCleanupScopeBreakdown(
 	logLine(logger, `${dim('scope breakdown', theme)}`)
 	for (const execution of scopedExecutions) {
 		const target = execution.target!
-		const strategies = target.strategies.length > 0
-			? dim(`(${target.strategies.join(' + ')})`, theme)
-			: ''
+		const strategies =
+			target.strategies.length > 0 ? dim(`(${target.strategies.join(' + ')})`, theme) : ''
 		const summary = [
 			target.workerNames.length > 0 ? `Workers ${target.workerNames.length}` : null,
 			...buildPreviewCleanupResourceSummary(execution.result)

@@ -20,7 +20,9 @@ async function createTempDir(): Promise<string> {
 describe('tail test helper', () => {
 	test('invokes default object tail handlers with Cloudflare native arguments', async () => {
 		const dir = await createTempDir()
-		await writeFile(join(dir, 'tail-object.mjs'), `
+		await writeFile(
+			join(dir, 'tail-object.mjs'),
+			`
 export default {
 	async tail(events, env, ctx) {
 		env.calls.push({
@@ -29,7 +31,8 @@ export default {
 		})
 	}
 }
-		`.trim())
+		`.trim()
+		)
 
 		const env = { calls: [] as Array<{ eventCount: number; hasWaitUntil: boolean }> }
 		configureTail({
@@ -38,13 +41,9 @@ export default {
 			getEnv: () => env
 		})
 
-		const result = await tail.trigger([
-			{ scriptName: 'producer-worker' }
-		])
+		const result = await tail.trigger([{ scriptName: 'producer-worker' }])
 
 		expect(result).toEqual({ success: true, itemCount: 1 })
-		expect(env.calls).toEqual([
-			{ eventCount: 1, hasWaitUntil: true }
-		])
+		expect(env.calls).toEqual([{ eventCount: 1, hasWaitUntil: true }])
 	})
 })

@@ -2,10 +2,10 @@
 // Config Loader Tests — Load devflare.config.ts via c12
 // =============================================================================
 
-import { describe, expect, test, beforeEach, afterEach } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
+import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { join, relative } from 'pathe'
 import { loadConfig, resolveConfigPath } from '../../../src/config/loader'
-import { mkdir, rm, writeFile } from 'node:fs/promises'
 
 const TEST_DIR = join(import.meta.dirname, '../.fixtures/config-loader')
 const WORKSPACE_ENV_KEYS = ['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN'] as const
@@ -38,37 +38,51 @@ describe('loadConfig', () => {
 	test('loads config from devflare.config.ts', async () => {
 		const configPath = join(TEST_DIR, 'devflare.config.ts')
 		// Use direct export, not defineConfig since we're testing the loader
-		await writeFile(configPath, `
+		await writeFile(
+			configPath,
+			`
 			export default {
 				name: 'test-worker',
 				compatibilityDate: '2025-01-07'
 			}
-		`)
+		`
+		)
 
 		const config = await loadConfig({ cwd: TEST_DIR })
 
 		expect(config.name).toBe('test-worker')
 	})
 
-	test.skip('loads config from custom path', async () => {
-		// TODO: c12 has issues with custom config file names in test env
-		// This works correctly in real usage
-		const configPath = join(TEST_DIR, 'custom.config.ts')
-		// Use named export that c12 recognizes
-		await writeFile(configPath, `
+	test('loads config from custom path', async () => {
+		// Use a unique directory + filename so jiti's absolute-path module cache
+		// can never collide with the `config-loader` fixture dir that sibling
+		// tests create and rm in each beforeEach/afterEach (the stale-resolution
+		// source of the old c12/jiti "Cannot find module" flake here).
+		const customDir = join(import.meta.dirname, `../.fixtures/config-loader-custom-${Date.now()}`)
+		await mkdir(customDir, { recursive: true })
+		const configPath = join(customDir, 'custom.config.ts')
+		await writeFile(
+			configPath,
+			`
 const config = {
 	name: 'custom-worker',
 	compatibilityDate: '2025-01-07'
 }
 export default config
-		`.trim())
+		`.trim()
+		)
 
-		const config = await loadConfig({
-			cwd: TEST_DIR,
-			configFile: 'custom.config'  // c12 adds extension automatically
-		})
+		try {
+			// Pass the absolute config path so c12's name-based search is bypassed.
+			const config = await loadConfig({
+				cwd: customDir,
+				configFile: configPath
+			})
 
-		expect(config.name).toBe('custom-worker')
+			expect(config.name).toBe('custom-worker')
+		} finally {
+			await rm(customDir, { recursive: true, force: true })
+		}
 	})
 
 	test('throws when config file not found', async () => {
@@ -80,12 +94,15 @@ export default config
 		// issues in test environments, we test schema validation directly.
 		// The schema test suite covers the full validation behavior.
 		const configPath = join(TEST_DIR, 'devflare.config.ts')
-		await writeFile(configPath, `
+		await writeFile(
+			configPath,
+			`
 			export default {
 				name: 'test-worker',
 				compatibilityDate: '2025-01-07'
 			}
-		`)
+		`
+		)
 
 		// Valid config should load successfully
 		const config = await loadConfig({ cwd: TEST_DIR })
@@ -97,12 +114,15 @@ export default config
 	test('accepts relative cwd paths by normalizing them before loading config', async () => {
 		const projectDir = join(TEST_DIR, 'relative-cwd')
 		await mkdir(projectDir, { recursive: true })
-		await writeFile(join(projectDir, 'devflare.config.ts'), `
+		await writeFile(
+			join(projectDir, 'devflare.config.ts'),
+			`
 			export default {
 				name: 'relative-worker',
 				compatibilityDate: '2025-01-07'
 			}
-		`)
+		`
+		)
 
 		const config = await loadConfig({
 			cwd: relative(process.cwd(), projectDir)
@@ -115,14 +135,23 @@ export default config
 		const projectDir = join(TEST_DIR, 'sveltekit-inferred')
 		await mkdir(projectDir, { recursive: true })
 
-		await writeFile(join(projectDir, 'package.json'), JSON.stringify({
-			name: 'docs-app',
-			devDependencies: {
-				'@sveltejs/adapter-cloudflare': '^7.2.8',
-				'@sveltejs/kit': '^2.0.0'
-			}
-		}, null, 2))
-		await writeFile(join(projectDir, 'svelte.config.js'), `
+		await writeFile(
+			join(projectDir, 'package.json'),
+			JSON.stringify(
+				{
+					name: 'docs-app',
+					devDependencies: {
+						'@sveltejs/adapter-cloudflare': '^7.2.8',
+						'@sveltejs/kit': '^2.0.0'
+					}
+				},
+				null,
+				2
+			)
+		)
+		await writeFile(
+			join(projectDir, 'svelte.config.js'),
+			`
 			import adapter from '@sveltejs/adapter-cloudflare'
 
 			export default {
@@ -130,13 +159,17 @@ export default config
 					adapter: adapter()
 				}
 			}
-		`)
-		await writeFile(join(projectDir, 'devflare.config.ts'), `
+		`
+		)
+		await writeFile(
+			join(projectDir, 'devflare.config.ts'),
+			`
 			export default {
 				name: 'docs-worker',
 				compatibilityDate: '2025-01-07'
 			}
-		`)
+		`
+		)
 
 		const config = await loadConfig({ cwd: projectDir })
 
@@ -151,14 +184,23 @@ export default config
 		const projectDir = join(TEST_DIR, 'sveltekit-explicit')
 		await mkdir(projectDir, { recursive: true })
 
-		await writeFile(join(projectDir, 'package.json'), JSON.stringify({
-			name: 'docs-app',
-			devDependencies: {
-				'@sveltejs/adapter-cloudflare': '^7.2.8',
-				'@sveltejs/kit': '^2.0.0'
-			}
-		}, null, 2))
-		await writeFile(join(projectDir, 'svelte.config.js'), `
+		await writeFile(
+			join(projectDir, 'package.json'),
+			JSON.stringify(
+				{
+					name: 'docs-app',
+					devDependencies: {
+						'@sveltejs/adapter-cloudflare': '^7.2.8',
+						'@sveltejs/kit': '^2.0.0'
+					}
+				},
+				null,
+				2
+			)
+		)
+		await writeFile(
+			join(projectDir, 'svelte.config.js'),
+			`
 			import adapter from '@sveltejs/adapter-cloudflare'
 
 			export default {
@@ -166,8 +208,11 @@ export default config
 					adapter: adapter()
 				}
 			}
-		`)
-		await writeFile(join(projectDir, 'devflare.config.ts'), `
+		`
+		)
+		await writeFile(
+			join(projectDir, 'devflare.config.ts'),
+			`
 			export default {
 				name: 'docs-worker',
 				compatibilityDate: '2025-01-07',
@@ -179,7 +224,8 @@ export default config
 					directory: 'static'
 				}
 			}
-		`)
+		`
+		)
 
 		const config = await loadConfig({ cwd: projectDir })
 
@@ -195,19 +241,29 @@ export default config
 		const projectDir = join(workspaceDir, 'apps/docs')
 		await mkdir(projectDir, { recursive: true })
 
-		await writeFile(join(workspaceDir, 'package.json'), JSON.stringify({
-			name: 'workspace-root',
-			private: true,
-			workspaces: ['apps/*']
-		}, null, 2))
+		await writeFile(
+			join(workspaceDir, 'package.json'),
+			JSON.stringify(
+				{
+					name: 'workspace-root',
+					private: true,
+					workspaces: ['apps/*']
+				},
+				null,
+				2
+			)
+		)
 		await writeFile(join(workspaceDir, '.env'), 'CLOUDFLARE_ACCOUNT_ID=workspace-account\n')
-		await writeFile(join(projectDir, 'devflare.config.ts'), `
+		await writeFile(
+			join(projectDir, 'devflare.config.ts'),
+			`
 			export default {
 				name: 'docs-worker',
 				accountId: process.env.CLOUDFLARE_ACCOUNT_ID,
 				compatibilityDate: '2025-01-07'
 			}
-		`)
+		`
+		)
 
 		delete process.env.CLOUDFLARE_ACCOUNT_ID
 
@@ -221,19 +277,29 @@ export default config
 		const projectDir = join(workspaceDir, 'apps/docs')
 		await mkdir(projectDir, { recursive: true })
 
-		await writeFile(join(workspaceDir, 'package.json'), JSON.stringify({
-			name: 'workspace-root',
-			private: true,
-			workspaces: ['apps/*']
-		}, null, 2))
+		await writeFile(
+			join(workspaceDir, 'package.json'),
+			JSON.stringify(
+				{
+					name: 'workspace-root',
+					private: true,
+					workspaces: ['apps/*']
+				},
+				null,
+				2
+			)
+		)
 		await writeFile(join(workspaceDir, '.env'), 'CLOUDFLARE_ACCOUNT_ID=workspace-account\n')
-		await writeFile(join(projectDir, 'devflare.config.ts'), `
+		await writeFile(
+			join(projectDir, 'devflare.config.ts'),
+			`
 			export default {
 				name: 'docs-worker',
 				accountId: process.env.CLOUDFLARE_ACCOUNT_ID,
 				compatibilityDate: '2025-01-07'
 			}
-		`)
+		`
+		)
 
 		process.env.CLOUDFLARE_ACCOUNT_ID = 'explicit-account'
 

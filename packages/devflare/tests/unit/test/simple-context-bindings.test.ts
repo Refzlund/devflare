@@ -142,8 +142,12 @@ describe('buildRemoteAndStaticBindings', () => {
 		expect(typeof gateway.getLog).toBe('function')
 		expect(typeof gateway.getUrl).toBe('function')
 		expect(typeof gateway.run).toBe('function')
-		expect(await gateway.getUrl()).toBe('https://gateway.ai.cloudflare.com/v1/account-123/my-gateway/')
-		expect(await gateway.getUrl('workers-ai')).toBe('https://gateway.ai.cloudflare.com/v1/account-123/my-gateway/workers-ai')
+		expect(await gateway.getUrl()).toBe(
+			'https://gateway.ai.cloudflare.com/v1/account-123/my-gateway/'
+		)
+		expect(await gateway.getUrl('workers-ai')).toBe(
+			'https://gateway.ai.cloudflare.com/v1/account-123/my-gateway/workers-ai'
+		)
 
 		const response = await gateway.run({
 			provider: 'workers-ai',
@@ -158,8 +162,14 @@ describe('buildRemoteAndStaticBindings', () => {
 		expect(log.id).toBe('log-1')
 		expect(requests.map((request) => [request.url, request.init?.method])).toEqual([
 			['https://gateway.ai.cloudflare.com/v1/account-123/my-gateway/', 'POST'],
-			['https://api.cloudflare.com/client/v4/accounts/account-123/ai-gateway/gateways/my-gateway/logs/log-1', 'PATCH'],
-			['https://api.cloudflare.com/client/v4/accounts/account-123/ai-gateway/gateways/my-gateway/logs/log-1', 'GET']
+			[
+				'https://api.cloudflare.com/client/v4/accounts/account-123/ai-gateway/gateways/my-gateway/logs/log-1',
+				'PATCH'
+			],
+			[
+				'https://api.cloudflare.com/client/v4/accounts/account-123/ai-gateway/gateways/my-gateway/logs/log-1',
+				'GET'
+			]
 		])
 	})
 })

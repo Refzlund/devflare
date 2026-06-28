@@ -6,7 +6,7 @@
 // =============================================================================
 
 import type { Pipeline } from 'cloudflare:pipelines'
-import { normalizeHyperdriveBinding, type DevflareConfig } from '../config'
+import { type DevflareConfig, normalizeHyperdriveBinding } from '../config'
 import { resolveLocalSecretValuesForBindings } from '../secrets/local-secrets'
 import {
 	type MockAISearchInstanceOptions,
@@ -584,9 +584,10 @@ export function createOfflineBindings(
 	const remoteBoundaries: OfflineRemoteBoundary[] = []
 	const missingFixtures: OfflineMissingFixture[] = []
 	const bindings = config.bindings
-	const localSecretValues = options.cwd && options.useLocalSecrets !== false
-		? resolveLocalSecretValuesForBindings(config, options.cwd)
-		: {}
+	const localSecretValues =
+		options.cwd && options.useLocalSecrets !== false
+			? resolveLocalSecretValuesForBindings(config, options.cwd)
+			: {}
 
 	addStaticBindings(env, config)
 	addRateLimitBindings(env, bindings)

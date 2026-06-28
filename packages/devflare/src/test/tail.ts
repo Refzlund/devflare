@@ -16,8 +16,8 @@
 //   ])
 // =============================================================================
 
-import type { TraceItem, TraceLog, TraceException } from '@cloudflare/workers-types'
 import { join } from 'path'
+import type { TraceException, TraceItem, TraceLog } from '@cloudflare/workers-types'
 import { createTailEvent, runWithEventContext } from '../runtime'
 
 // -----------------------------------------------------------------------------
@@ -56,7 +56,11 @@ export interface TailTriggerResult {
 	itemCount: number
 }
 
-type TailHandler = (events: TraceItem[] | ReturnType<typeof createTailEvent>, env?: Record<string, unknown>, ctx?: ExecutionContext) => unknown
+type TailHandler = (
+	events: TraceItem[] | ReturnType<typeof createTailEvent>,
+	env?: Record<string, unknown>,
+	ctx?: ExecutionContext
+) => unknown
 
 // -----------------------------------------------------------------------------
 // Global State (set by createTestContext)
@@ -150,13 +154,11 @@ function createTraceItem(options: TraceItemOptions): TraceItem {
  * ])
  * ```
  */
-async function trigger(
-	items: Array<TraceItem | TraceItemOptions>
-): Promise<TailTriggerResult> {
+async function trigger(items: Array<TraceItem | TraceItemOptions>): Promise<TailTriggerResult> {
 	if (!tailHandlerPath) {
 		throw new Error(
 			'Tail handler not configured. Add a src/tail.ts file exporting tail(), ' +
-			'or configure a tail handler before calling cf.tail.trigger().'
+				'or configure a tail handler before calling cf.tail.trigger().'
 		)
 	}
 
@@ -181,15 +183,16 @@ async function trigger(
 
 	// Get the tail handler function from default function, default object, or named export.
 	const defaultExport = handlerModule.default
-	const tailHandler = typeof defaultExport === 'function'
-		? defaultExport
-		: defaultExport && typeof defaultExport.tail === 'function'
-			? defaultExport.tail.bind(defaultExport)
-			: handlerModule.tail
+	const tailHandler =
+		typeof defaultExport === 'function'
+			? defaultExport
+			: defaultExport && typeof defaultExport.tail === 'function'
+				? defaultExport.tail.bind(defaultExport)
+				: handlerModule.tail
 	if (typeof tailHandler !== 'function') {
 		throw new Error(
 			`Tail handler at "${tailHandlerPath}" must export a default function or named "tail" export.\n` +
-			+ `Expected: export async function tail(event) { ... } or export default { tail(events, env, ctx) { ... } }`
+				+`Expected: export async function tail(event) { ... } or export default { tail(events, env, ctx) { ... } }`
 		)
 	}
 
@@ -199,7 +202,7 @@ async function trigger(
 		waitUntil(promise: Promise<unknown>) {
 			waitUntilPromises.push(promise)
 		},
-		passThroughOnException() { },
+		passThroughOnException() {},
 		props: {}
 	}
 
@@ -209,9 +212,8 @@ async function trigger(
 
 	try {
 		// Call the handler
-		await runWithEventContext(
-			tailEvent,
-			() => (tailHandler as TailHandler).length >= 2
+		await runWithEventContext(tailEvent, () =>
+			(tailHandler as TailHandler).length >= 2
 				? tailHandler(traceItems, env, ctx)
 				: tailHandler(tailEvent, env, ctx)
 		)

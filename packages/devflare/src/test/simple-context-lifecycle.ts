@@ -8,19 +8,19 @@
 // =============================================================================
 
 import { dirname, resolve } from 'path'
-import { loadConfig, resolveConfigEnvVars } from '../config'
-import { applyLocalDevVarsToConfig } from '../config/local-dev-vars'
-import type { DevflareConfig } from '../config'
 import type { BridgeClient } from '../bridge/client'
+import { loadConfig, resolveConfigEnvVars } from '../config'
+import type { DevflareConfig } from '../config'
+import { applyLocalDevVarsToConfig } from '../config/local-dev-vars'
 import { __clearTestContext } from '../env'
-import { findNearestConfig, getCallerDirectory } from './simple-context-paths'
+import { disposeLocalWorkerLoaderBindings } from '../shims/local-worker-loader'
+import { stopActiveContainers } from './containers'
 import { resetEmailState } from './email'
 import { resetQueueState } from './queue'
 import { resetScheduledState } from './scheduled'
+import { findNearestConfig, getCallerDirectory } from './simple-context-paths'
 import { resetTailState } from './tail'
 import { resetWorkerState } from './worker'
-import { stopActiveContainers } from './containers'
-import { disposeLocalWorkerLoaderBindings } from '../shims/local-worker-loader'
 
 interface DisposeStateView {
 	client: BridgeClient | null
@@ -57,9 +57,9 @@ export async function resolveTestContextConfig(
 		const found = await findNearestConfig(callerDir)
 		if (!found) {
 			throw new Error(
-				`Could not find a devflare config file. Searched upward from: ${callerDir}\n`
-				+ `Expected one of: devflare.config.ts, devflare.config.mts, devflare.config.js, devflare.config.mjs\n`
-				+ `Either create a config file or provide an explicit path: createTestContext('./path/to/config.ts')`
+				`Could not find a devflare config file. Searched upward from: ${callerDir}\n` +
+					`Expected one of: devflare.config.ts, devflare.config.mts, devflare.config.js, devflare.config.mjs\n` +
+					`Either create a config file or provide an explicit path: createTestContext('./path/to/config.ts')`
 			)
 		}
 		absolutePath = found

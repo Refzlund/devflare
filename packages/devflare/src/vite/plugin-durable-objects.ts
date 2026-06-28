@@ -13,7 +13,10 @@
 // =============================================================================
 
 import type { WranglerConfig } from '../config/compiler'
-import { discoverDurableObjects, type DODiscoveryResult } from '../worker-entry/durable-object-discovery'
+import {
+	type DODiscoveryResult,
+	discoverDurableObjects
+} from '../worker-entry/durable-object-discovery'
 
 export const VIRTUAL_DO_ENTRY = 'virtual:devflare-do-entry'
 export const RESOLVED_VIRTUAL_DO_ENTRY = '\0' + VIRTUAL_DO_ENTRY
@@ -58,10 +61,11 @@ export function createAuxiliaryWorkerConfig(
 	wranglerConfig: WranglerConfig,
 	discovery: DODiscoveryResult
 ): AuxiliaryWorkerConfig {
-	const doBindings = wranglerConfig.durable_objects?.bindings?.map((binding) => ({
-		name: binding.name,
-		class_name: binding.class_name
-	})) ?? []
+	const doBindings =
+		wranglerConfig.durable_objects?.bindings?.map((binding) => ({
+			name: binding.name,
+			class_name: binding.class_name
+		})) ?? []
 
 	return {
 		config: {

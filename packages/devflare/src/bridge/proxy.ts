@@ -4,14 +4,14 @@
 // Creates a Proxy that transparently routes binding calls through the bridge
 // =============================================================================
 
-import { getClient, type BridgeClient } from './client'
-import { HTTP_TRANSFER_THRESHOLD } from './v2/wire'
+import { type BridgeClient, getClient } from './client'
 import {
-	deserializeValue,
-	serializeRequest,
+	type SerializedResponse,
 	deserializeResponse,
-	type SerializedResponse
+	deserializeValue,
+	serializeRequest
 } from './v2/value-serialization'
+import { HTTP_TRANSFER_THRESHOLD } from './v2/wire'
 
 // -----------------------------------------------------------------------------
 // Types
@@ -67,7 +67,9 @@ function createR2Proxy(client: BridgeClient, bindingName: string): R2Bucket {
 			return client.call(`${bindingName}.r2.head`, [key]) as Promise<R2Object | null>
 		},
 		async get(key: string, options?: any): Promise<R2ObjectBody | R2Object | null> {
-			return client.call(`${bindingName}.r2.get`, [key, options]) as Promise<R2ObjectBody | R2Object | null>
+			return client.call(`${bindingName}.r2.get`, [key, options]) as Promise<
+				R2ObjectBody | R2Object | null
+			>
 		},
 		async put(key: string, value: any, options?: any): Promise<R2Object | null> {
 			// Check if value is large enough to use HTTP transfer
@@ -77,7 +79,8 @@ function createR2Proxy(client: BridgeClient, bindingName: string): R2Bucket {
 				// Send to Miniflare gateway which handles the transfer
 				const transferId = `${bindingName}:${key}`
 				const httpUrl = client.getHttpUrl()
-				const transferUrl = httpUrl.replace(/\/$/, '') + `/_devflare/transfer/${encodeURIComponent(transferId)}`
+				const transferUrl =
+					httpUrl.replace(/\/$/, '') + `/_devflare/transfer/${encodeURIComponent(transferId)}`
 
 				// Upload via HTTP directly to the gateway
 				const response = await fetch(transferUrl, {
@@ -95,7 +98,7 @@ function createR2Proxy(client: BridgeClient, bindingName: string): R2Bucket {
 					throw new Error(`HTTP transfer failed: ${error}`)
 				}
 
-				const serialized = await response.json() as unknown
+				const serialized = (await response.json()) as unknown
 				return deserializeValue(serialized) as R2Object | null
 			}
 
@@ -108,10 +111,16 @@ function createR2Proxy(client: BridgeClient, bindingName: string): R2Bucket {
 			return client.call(`${bindingName}.r2.list`, [options]) as Promise<R2Objects>
 		},
 		async createMultipartUpload(key: string, options?: any): Promise<R2MultipartUpload> {
-			return client.call(`${bindingName}.r2.createMultipartUpload`, [key, options]) as Promise<R2MultipartUpload>
+			return client.call(`${bindingName}.r2.createMultipartUpload`, [
+				key,
+				options
+			]) as Promise<R2MultipartUpload>
 		},
 		async resumeMultipartUpload(key: string, uploadId: string): Promise<R2MultipartUpload> {
-			return client.call(`${bindingName}.r2.resumeMultipartUpload`, [key, uploadId]) as Promise<R2MultipartUpload>
+			return client.call(`${bindingName}.r2.resumeMultipartUpload`, [
+				key,
+				uploadId
+			]) as Promise<R2MultipartUpload>
 		}
 	} as unknown as R2Bucket
 }
@@ -121,7 +130,7 @@ function getValueSize(value: unknown): number {
 	if (value instanceof ArrayBuffer) return value.byteLength
 	if (value instanceof Uint8Array) return value.byteLength
 	if (typeof value === 'string') return new TextEncoder().encode(value).byteLength
-	if (value instanceof ReadableStream) return Infinity  // Assume large
+	if (value instanceof ReadableStream) return Number.POSITIVE_INFINITY // Assume large
 	return 0
 }
 
@@ -197,15 +206,28 @@ function createDOProxy(
 	return {
 		idFromName(name: string): DurableObjectId {
 			// Create a local ID reference that will be used in RPC calls
-			return createDOIdProxy(client, bindingName, { type: 'name', value: name, jurisdiction: proxyOptions.jurisdiction })
+			return createDOIdProxy(client, bindingName, {
+				type: 'name',
+				value: name,
+				jurisdiction: proxyOptions.jurisdiction
+			})
 		},
 		idFromString(hexId: string): DurableObjectId {
-			return createDOIdProxy(client, bindingName, { type: 'hex', value: hexId, jurisdiction: proxyOptions.jurisdiction })
+			return createDOIdProxy(client, bindingName, {
+				type: 'hex',
+				value: hexId,
+				jurisdiction: proxyOptions.jurisdiction
+			})
 		},
 		newUniqueId(options?: any): DurableObjectId {
 			// Generate a unique ID locally (this will be synced on first use)
 			const tempId = crypto.randomUUID().replace(/-/g, '')
-			return createDOIdProxy(client, bindingName, { type: 'unique', value: tempId, options, jurisdiction: proxyOptions.jurisdiction })
+			return createDOIdProxy(client, bindingName, {
+				type: 'unique',
+				value: tempId,
+				options,
+				jurisdiction: proxyOptions.jurisdiction
+			})
 		},
 		get(id: DurableObjectId): DurableObjectStub {
 			const idProxy = id as DOIdProxy
@@ -240,7 +262,11 @@ interface DOIdProxy extends DurableObjectId {
 	_idInfo: DOIdInfo
 }
 
-function createDOIdProxy(client: BridgeClient, bindingName: string, idInfo: DOIdInfo): DurableObjectId {
+function createDOIdProxy(
+	client: BridgeClient,
+	bindingName: string,
+	idInfo: DOIdInfo
+): DurableObjectId {
 	return {
 		_idInfo: idInfo,
 		toString(): string {
@@ -269,13 +295,19 @@ function createDOStubProxy(
 		if (resolvedId) return resolvedId
 		switch (idInfo.type) {
 			case 'name':
-				resolvedId = await client.call(`${bindingName}.do.idFromName`, [idInfo.value, idInfo.jurisdiction])
+				resolvedId = await client.call(`${bindingName}.do.idFromName`, [
+					idInfo.value,
+					idInfo.jurisdiction
+				])
 				break
 			case 'hex':
 				resolvedId = { __type: 'DOId', hex: idInfo.value }
 				break
 			case 'unique':
-				resolvedId = await client.call(`${bindingName}.do.newUniqueId`, [idInfo.options, idInfo.jurisdiction])
+				resolvedId = await client.call(`${bindingName}.do.newUniqueId`, [
+					idInfo.options,
+					idInfo.jurisdiction
+				])
 				break
 		}
 		return resolvedId
@@ -296,7 +328,7 @@ function createDOStubProxy(
 
 		/**
 		 * Connect to the Durable Object via WebSocket (hibernation pattern)
-		 * 
+		 *
 		 * This creates a proxied WebSocket connection through the bridge.
 		 * The DO must implement webSocketMessage/webSocketClose handlers.
 		 */
@@ -313,12 +345,7 @@ function createDOStubProxy(
 			}
 
 			// Create WebSocket proxy via bridge
-			const wsProxy = await client.createWsProxy(
-				bindingName,
-				id.hex,
-				url,
-				headersList
-			)
+			const wsProxy = await client.createWsProxy(bindingName, id.hex, url, headersList)
 
 			// Create readable stream from WS messages
 			let readController: ReadableStreamDefaultController<Uint8Array> | null = null
@@ -334,9 +361,7 @@ function createDOStubProxy(
 			// Set up message handler
 			wsProxy.onMessage((data) => {
 				if (readController) {
-					const chunk = typeof data === 'string'
-						? new TextEncoder().encode(data)
-						: data
+					const chunk = typeof data === 'string' ? new TextEncoder().encode(data) : data
 					readController.enqueue(chunk)
 				}
 			})
@@ -392,9 +417,9 @@ function createDOStubProxy(
 					// meaningful on sockets returned by connect() to a raw TCP
 					// endpoint (cloudflare:sockets), never on a DO WebSocket.
 					throw new Error(
-						'startTls() is not supported on a Durable Object WebSocket connection. '
-						+ 'StartTLS applies to raw TCP sockets (cloudflare:sockets connect()), not '
-						+ 'WebSocket-tunneled DO connections, whose transport is already secured by the connection itself.'
+						'startTls() is not supported on a Durable Object WebSocket connection. ' +
+							'StartTLS applies to raw TCP sockets (cloudflare:sockets connect()), not ' +
+							'WebSocket-tunneled DO connections, whose transport is already secured by the connection itself.'
 					)
 				}
 			} as unknown as Socket
@@ -430,12 +455,7 @@ function createDOStubProxy(
 			// Return a function that calls the DO via RPC
 			return async (...args: unknown[]) => {
 				const id = await resolveId()
-				let result = await client.call(`${bindingName}.do.rpc`, [
-					bindingName,
-					id,
-					prop,
-					args
-				])
+				let result = await client.call(`${bindingName}.do.rpc`, [bindingName, id, prop, args])
 				// Apply transport decoding if configured
 				if (transformResult) {
 					result = transformResult(result)
@@ -542,7 +562,10 @@ function createQueueProxy(client: BridgeClient, bindingName: string): Queue<unkn
 			await client.call(`${bindingName}.queue.send`, [message, options])
 			return createQueueResponse()
 		},
-		async sendBatch(messages: Iterable<unknown>, options?: unknown): Promise<QueueResponseSnapshot> {
+		async sendBatch(
+			messages: Iterable<unknown>,
+			options?: unknown
+		): Promise<QueueResponseSnapshot> {
 			await client.call(`${bindingName}.queue.sendBatch`, [messages, options])
 			return createQueueResponse()
 		}
@@ -567,18 +590,22 @@ function createAIProxy(client: BridgeClient, bindingName: string): any {
 
 function createSendEmailProxy(client: BridgeClient, bindingName: string): SendEmail {
 	return {
-		async send(message: EmailMessage | {
-			from: string
-			to: string | string[]
-			subject: string
-			replyTo?: string | EmailAddress
-			cc?: string | string[]
-			bcc?: string | string[]
-			headers?: Record<string, string>
-			text?: string
-			html?: string
-			attachments?: EmailAttachment[]
-		}): Promise<EmailSendResult> {
+		async send(
+			message:
+				| EmailMessage
+				| {
+						from: string
+						to: string | string[]
+						subject: string
+						replyTo?: string | EmailAddress
+						cc?: string | string[]
+						bcc?: string | string[]
+						headers?: Record<string, string>
+						text?: string
+						html?: string
+						attachments?: EmailAttachment[]
+				  }
+		): Promise<EmailSendResult> {
 			return client.call(`${bindingName}.email.send`, [message]) as Promise<EmailSendResult>
 		}
 	} as SendEmail
@@ -663,7 +690,9 @@ let globalBindingHints: BindingHints = {}
 /**
  * Create an env proxy that routes all binding access through the bridge
  */
-export function createEnvProxy(options: EnvProxyOptions & { hints?: BindingHints } = {}): Record<string, unknown> {
+export function createEnvProxy(
+	options: EnvProxyOptions & { hints?: BindingHints } = {}
+): Record<string, unknown> {
 	const client = options.client ?? getClient()
 	const bindingProxies = new Map<string, unknown>()
 	const doProxyOptions: DOProxyOptions = { transformResult: options.transformResult }
@@ -751,36 +780,39 @@ export function createEnvProxy(options: EnvProxyOptions & { hints?: BindingHints
 
 // Generic proxy for unknown binding types
 function createGenericBindingProxy(client: BridgeClient, bindingName: string): unknown {
-	return new Proxy({}, {
-		get(target, prop: string | symbol) {
-			if (typeof prop !== 'string') return undefined
+	return new Proxy(
+		{},
+		{
+			get(target, prop: string | symbol) {
+				if (typeof prop !== 'string') return undefined
 
-			// Common KV methods
-			if (['get', 'put', 'delete', 'list', 'getWithMetadata'].includes(prop)) {
-				return createKVProxy(client, bindingName)[prop as keyof KVNamespace]
-			}
+				// Common KV methods
+				if (['get', 'put', 'delete', 'list', 'getWithMetadata'].includes(prop)) {
+					return createKVProxy(client, bindingName)[prop as keyof KVNamespace]
+				}
 
-			// Common DO methods
-			if (['idFromName', 'idFromString', 'newUniqueId', 'get'].includes(prop)) {
-				return createDOProxy(client, bindingName)[prop as keyof DurableObjectNamespace]
-			}
+				// Common DO methods
+				if (['idFromName', 'idFromString', 'newUniqueId', 'get'].includes(prop)) {
+					return createDOProxy(client, bindingName)[prop as keyof DurableObjectNamespace]
+				}
 
-			// Common D1 methods
-			if (['prepare', 'batch', 'exec', 'dump'].includes(prop)) {
-				return createD1Proxy(client, bindingName)[prop as keyof D1Database]
-			}
+				// Common D1 methods
+				if (['prepare', 'batch', 'exec', 'dump'].includes(prop)) {
+					return createD1Proxy(client, bindingName)[prop as keyof D1Database]
+				}
 
-			// Common R2 methods
-			if (['head'].includes(prop)) {
-				return createR2Proxy(client, bindingName)[prop as keyof R2Bucket]
-			}
+				// Common R2 methods
+				if (['head'].includes(prop)) {
+					return createR2Proxy(client, bindingName)[prop as keyof R2Bucket]
+				}
 
-			// Fallback: call as generic method
-			return async (...args: unknown[]) => {
-				return client.call(`${bindingName}.${prop}`, args)
+				// Fallback: call as generic method
+				return async (...args: unknown[]) => {
+					return client.call(`${bindingName}.${prop}`, args)
+				}
 			}
 		}
-	})
+	)
 }
 
 // Simple binding proxy (for secrets/vars)
@@ -796,7 +828,8 @@ function createSimpleBindingProxy(client: BridgeClient, bindingName: string): un
 		}
 
 		if (!pendingValue) {
-			pendingValue = client.call(`${bindingName}.var.value`, [])
+			pendingValue = client
+				.call(`${bindingName}.var.value`, [])
 				.then((value) => {
 					cachedValue = value
 					fetched = true

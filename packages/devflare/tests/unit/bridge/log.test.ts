@@ -2,7 +2,7 @@
 // Bridge Log — Debug-gated logger tests
 // =============================================================================
 
-import { describe, test, expect, beforeEach, afterEach, mock } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test'
 import { bridgeLog } from '../../../src/bridge/log'
 
 describe('bridgeLog', () => {

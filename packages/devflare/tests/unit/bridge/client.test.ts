@@ -2,7 +2,7 @@
 // BridgeClient — createWsProxy await + disconnect cleanup tests
 // =============================================================================
 
-import { describe, test, expect, beforeEach, afterEach, mock } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test'
 import { BridgeClient } from '../../../src/bridge/client'
 import { stringifyJsonMsg } from '../../../src/bridge/v2/wire'
 
@@ -60,14 +60,13 @@ let originalWebSocket: typeof globalThis.WebSocket
 
 beforeEach(() => {
 	originalWebSocket = globalThis.WebSocket
-		; (globalThis as unknown as { WebSocket: unknown }).WebSocket =
-			FakeWebSocket as unknown as typeof WebSocket
+	;(globalThis as unknown as { WebSocket: unknown }).WebSocket =
+		FakeWebSocket as unknown as typeof WebSocket
 	FakeWebSocket.instances = []
 })
 
 afterEach(() => {
-	; (globalThis as unknown as { WebSocket: typeof WebSocket }).WebSocket =
-		originalWebSocket
+	;(globalThis as unknown as { WebSocket: typeof WebSocket }).WebSocket = originalWebSocket
 })
 
 function lastSentJson(ws: FakeWebSocket): Record<string, unknown> {
@@ -89,12 +88,10 @@ describe('BridgeClient.createWsProxy', () => {
 		await connectPromise
 
 		let resolved = false
-		const proxyPromise = client
-			.createWsProxy('MY_DO', 'abc', 'ws://do/chat', [])
-			.then((proxy) => {
-				resolved = true
-				return proxy
-			})
+		const proxyPromise = client.createWsProxy('MY_DO', 'abc', 'ws://do/chat', []).then((proxy) => {
+			resolved = true
+			return proxy
+		})
 
 		// Yield a few microtasks/macrotasks; the promise must still be pending
 		await new Promise((r) => setTimeout(r, 10))
@@ -204,7 +201,7 @@ describe('BridgeClient parse errors', () => {
 		ws.open()
 		await connectPromise
 
-		const spy = mock(() => { })
+		const spy = mock(() => {})
 		const originalError = console.error
 		console.error = spy as unknown as typeof console.error
 
@@ -270,7 +267,9 @@ describe('BridgeClient.on event subscriptions', () => {
 		await connectPromise
 
 		const sibling: unknown[] = []
-		client.on('topic', () => { throw new Error('boom') })
+		client.on('topic', () => {
+			throw new Error('boom')
+		})
 		client.on('topic', (data) => sibling.push(data))
 
 		const warnSpy = mock(() => {})

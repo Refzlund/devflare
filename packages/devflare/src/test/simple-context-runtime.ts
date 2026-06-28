@@ -7,8 +7,8 @@
 // well-named lifecycle steps (assemble config → boot runtime → wire env).
 // =============================================================================
 
-import { wrapEnvSendEmailBindings } from '../utils/send-email'
 import type { BridgeClient } from '../bridge/client'
+import { wrapEnvSendEmailBindings } from '../utils/send-email'
 import { getAvailablePort } from './simple-context-paths'
 import { startBridgeBackedTestContext } from './simple-context-startup'
 

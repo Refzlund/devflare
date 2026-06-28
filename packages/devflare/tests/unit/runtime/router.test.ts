@@ -1,13 +1,17 @@
 import { describe, expect, test } from 'bun:test'
 import { createFetchEvent, runWithEventContext } from '../../../src/runtime/context'
-import { invokeFetchModule, sequence, type FetchMiddleware } from '../../../src/runtime/middleware'
-import { createRouteResolve, invokeRouteModules, matchFetchRoute } from '../../../src/runtime/router'
+import { type FetchMiddleware, invokeFetchModule, sequence } from '../../../src/runtime/middleware'
+import {
+	createRouteResolve,
+	invokeRouteModules,
+	matchFetchRoute
+} from '../../../src/runtime/router'
 import type { RouteModuleDefinition } from '../../../src/runtime/router/types'
 
 function createMockCtx(): ExecutionContext {
 	return {
-		waitUntil: () => { },
-		passThroughOnException: () => { },
+		waitUntil: () => {},
+		passThroughOnException: () => {},
 		props: {}
 	} as ExecutionContext
 }
@@ -64,11 +68,7 @@ describe('runtime file router', () => {
 			}
 		}
 
-		const event = createFetchEvent(
-			new Request('https://example.com/users/42'),
-			{},
-			createMockCtx()
-		)
+		const event = createFetchEvent(new Request('https://example.com/users/42'), {}, createMockCtx())
 
 		const response = await runWithEventContext(event, () => invokeRouteModules([route], event))
 		expect(await response.text()).toBe('user:42')
@@ -103,13 +103,15 @@ describe('runtime file router', () => {
 			return next
 		}
 
-		const response = await runWithEventContext(event, () => invokeFetchModule(
-			{
-				handle: sequence(middleware)
-			},
-			event,
-			createRouteResolve([route], event)
-		))
+		const response = await runWithEventContext(event, () =>
+			invokeFetchModule(
+				{
+					handle: sequence(middleware)
+				},
+				event,
+				createRouteResolve([route], event)
+			)
+		)
 
 		expect(await response.text()).toBe('42')
 		expect(response.headers.get('x-route-id')).toBe('42')

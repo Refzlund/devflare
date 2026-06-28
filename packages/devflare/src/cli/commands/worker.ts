@@ -1,15 +1,15 @@
-import { type ConsolaInstance } from 'consola'
+import type { ConsolaInstance } from 'consola'
 import MagicString from 'magic-string'
 import { basename, dirname, relative, resolve } from 'pathe'
-import type { ParsedArgs, CliOptions, CliResult } from '../index'
 import { account } from '../../cloudflare'
-import { loadConfig, normalizeDOBinding, type DevflareConfig } from '../../config'
+import { type DevflareConfig, loadConfig, normalizeDOBinding } from '../../config'
+import { asOptionalString, resolveCloudflareAccountId } from '../command-utils'
 import {
 	findConfigPathsUnderDirectory,
 	formatSupportedConfigFilenames,
 	resolveConfigCandidatePath
 } from '../config-path'
-import { asOptionalString, resolveCloudflareAccountId } from '../command-utils'
+import type { CliOptions, CliResult, ParsedArgs } from '../index'
 import { bold, createCliTheme, dim, green, logLine, whiteDim, yellow } from '../ui'
 
 interface LoadedConfigRecord {
@@ -45,7 +45,10 @@ async function loadConfigFromPath(configPath: string): Promise<LoadedConfigRecor
 	}
 }
 
-async function loadDiscoveredConfigs(cwd: string, explicitConfigPath?: string): Promise<LoadedConfigRecord[]> {
+async function loadDiscoveredConfigs(
+	cwd: string,
+	explicitConfigPath?: string
+): Promise<LoadedConfigRecord[]> {
 	const candidatePaths = new Set<string>()
 	const discoveredPaths = await findConfigPathsUnderDirectory(cwd)
 	for (const configPath of discoveredPaths) {
@@ -71,7 +74,9 @@ async function loadDiscoveredConfigs(cwd: string, explicitConfigPath?: string): 
 }
 
 function formatConfigChoices(matches: LoadedConfigRecord[], cwd: string): string {
-	return matches.map((match) => `  - ${formatPathForLog(cwd, match.configPath)} (${match.config.name})`).join('\n')
+	return matches
+		.map((match) => `  - ${formatPathForLog(cwd, match.configPath)} (${match.config.name})`)
+		.join('\n')
 }
 
 function selectTargetConfig(
@@ -82,9 +87,7 @@ function selectTargetConfig(
 	explicitConfigPath?: string
 ): ConfigSelectionResult {
 	if (loadedConfigs.length === 0) {
-		throw new Error(
-			`Could not find ${formatSupportedConfigFilenames()} under ${cwd}.`
-		)
+		throw new Error(`Could not find ${formatSupportedConfigFilenames()} under ${cwd}.`)
 	}
 
 	if (explicitConfigPath) {
@@ -247,7 +250,10 @@ function findConfigObjectStart(source: string): number {
 	return -1
 }
 
-function getRootPropertySlices(source: string, objectStart: number): Array<{ start: number; end: number }> {
+function getRootPropertySlices(
+	source: string,
+	objectStart: number
+): Array<{ start: number; end: number }> {
 	const slices: Array<{ start: number; end: number }> = []
 	let curlyDepth = 1
 	let squareDepth = 0
@@ -258,7 +264,7 @@ function getRootPropertySlices(source: string, objectStart: number): Array<{ sta
 	while (index < source.length) {
 		const char = source[index]
 
-		if (char === '\'' || char === '"' || char === '`') {
+		if (char === "'" || char === '"' || char === '`') {
 			index = consumeQuotedLiteral(source, index, source.length)
 			continue
 		}
@@ -329,7 +335,7 @@ function findTopLevelColon(source: string, start: number, end: number): number {
 	while (index < end) {
 		const char = source[index]
 
-		if (char === '\'' || char === '"' || char === '`') {
+		if (char === "'" || char === '"' || char === '`') {
 			index = consumeQuotedLiteral(source, index, end)
 			continue
 		}
@@ -389,15 +395,17 @@ function findTopLevelColon(source: string, start: number, end: number): number {
 function normalizePropertyKey(rawKey: string): string {
 	const trimmed = rawKey.trim()
 	if (
-		(trimmed.startsWith('\'') && trimmed.endsWith('\''))
-		|| (trimmed.startsWith('"') && trimmed.endsWith('"'))
+		(trimmed.startsWith("'") && trimmed.endsWith("'")) ||
+		(trimmed.startsWith('"') && trimmed.endsWith('"'))
 	) {
 		return trimmed.slice(1, -1)
 	}
 	return trimmed
 }
 
-function findRootNameLiteralRange(source: string): { start: number; end: number; quote: '\'' | '"' } | null {
+function findRootNameLiteralRange(
+	source: string
+): { start: number; end: number; quote: "'" | '"' } | null {
 	const objectStart = findConfigObjectStart(source)
 	if (objectStart < 0) {
 		return null
@@ -417,8 +425,10 @@ function findRootNameLiteralRange(source: string): { start: number; end: number;
 
 		const valueStart = skipWhitespaceAndComments(source, colonIndex + 1, slice.end)
 		const quote = source[valueStart]
-		if (quote !== '\'' && quote !== '"') {
-			throw new Error('The top-level `name` property must be a string literal to be updated automatically.')
+		if (quote !== "'" && quote !== '"') {
+			throw new Error(
+				'The top-level `name` property must be a string literal to be updated automatically.'
+			)
 		}
 
 		return {
@@ -431,7 +441,7 @@ function findRootNameLiteralRange(source: string): { start: number; end: number;
 	return null
 }
 
-function quoteWorkerName(value: string, quote: '\'' | '"'): string {
+function quoteWorkerName(value: string, quote: "'" | '"'): string {
 	const escapedValue = value
 		.replace(/\\/g, '\\\\')
 		.replace(new RegExp(`\\${quote}`, 'g'), `\\${quote}`)
@@ -444,7 +454,9 @@ async function updateConfigName(configPath: string, newName: string): Promise<vo
 	const source = await fs.readFile(configPath, 'utf-8')
 	const literalRange = findRootNameLiteralRange(source)
 	if (!literalRange) {
-		throw new Error('Could not locate a top-level string literal `name` property in the selected devflare config.')
+		throw new Error(
+			'Could not locate a top-level string literal `name` property in the selected devflare config.'
+		)
 	}
 
 	const magicString = new MagicString(source)
@@ -479,7 +491,9 @@ function collectReferenceHitsFromConfig(
 		}
 	}
 
-	for (const [bindingName, bindingConfig] of Object.entries(configLike.bindings.durableObjects ?? {})) {
+	for (const [bindingName, bindingConfig] of Object.entries(
+		configLike.bindings.durableObjects ?? {}
+	)) {
 		const normalized = normalizeDOBinding(bindingConfig)
 		if (normalized.scriptName === oldName) {
 			hits.push({
@@ -532,13 +546,19 @@ export async function runWorkerCommand(
 
 	if (subcommand !== 'rename') {
 		logger.error(`Unknown worker subcommand: ${subcommand ?? '<none>'}`)
-		logLine(logger, dim('Usage: devflare worker rename <old-name> --to <new-name> [--config <path>]', theme))
+		logLine(
+			logger,
+			dim('Usage: devflare worker rename <old-name> --to <new-name> [--config <path>]', theme)
+		)
 		return { exitCode: 1 }
 	}
 
 	if (!oldName) {
 		logger.error('A current Worker name is required.')
-		logLine(logger, dim('Usage: devflare worker rename <old-name> --to <new-name> [--config <path>]', theme))
+		logLine(
+			logger,
+			dim('Usage: devflare worker rename <old-name> --to <new-name> [--config <path>]', theme)
+		)
 		return { exitCode: 1 }
 	}
 
@@ -557,7 +577,7 @@ export async function runWorkerCommand(
 	logLine(logger, `${dim('from', theme)} ${whiteDim(oldName, theme)}`)
 	logLine(logger, `${dim('to', theme)} ${green(newName, theme)}`)
 
-	if (!await account.isAuthenticated()) {
+	if (!(await account.isAuthenticated())) {
 		logger.error('Not authenticated with Cloudflare')
 		logLine(logger, dim('Run `devflare login` first.', theme))
 		return { exitCode: 1 }
@@ -587,11 +607,20 @@ export async function runWorkerCommand(
 		const accountId = await resolveAccountId(parsed, target.config)
 		if (!accountId) {
 			logger.error('No Cloudflare account could be resolved for this config.')
-			logLine(logger, dim('Set accountId in devflare.config.ts, pass --account, or configure a default account.', theme))
+			logLine(
+				logger,
+				dim(
+					'Set accountId in devflare.config.ts, pass --account, or configure a default account.',
+					theme
+				)
+			)
 			return { exitCode: 1 }
 		}
 
-		logLine(logger, `${dim('config', theme)} ${whiteDim(formatPathForLog(cwd, target.configPath), theme)}`)
+		logLine(
+			logger,
+			`${dim('config', theme)} ${whiteDim(formatPathForLog(cwd, target.configPath), theme)}`
+		)
 		logLine(logger, `${dim('account', theme)} ${whiteDim(accountId, theme)}`)
 		logLine(logger)
 
@@ -601,12 +630,17 @@ export async function runWorkerCommand(
 
 		if (hasOldWorker && hasNewWorker) {
 			logger.error(`Both \`${oldName}\` and \`${newName}\` already exist in Cloudflare.`)
-			logLine(logger, dim('Refusing to rename because the target Worker name is already taken.', theme))
+			logLine(
+				logger,
+				dim('Refusing to rename because the target Worker name is already taken.', theme)
+			)
 			return { exitCode: 1 }
 		}
 
 		if (!hasOldWorker && !hasNewWorker) {
-			logger.error(`Neither \`${oldName}\` nor \`${newName}\` exists in Cloudflare for account ${accountId}.`)
+			logger.error(
+				`Neither \`${oldName}\` nor \`${newName}\` exists in Cloudflare for account ${accountId}.`
+			)
 			return { exitCode: 1 }
 		}
 
@@ -615,7 +649,10 @@ export async function runWorkerCommand(
 			remoteRenamed = true
 			logger.success(`Renamed remote Worker ${oldName} → ${newName}`)
 		} else {
-			logLine(logger, `${dim('remote', theme)} ${green(newName, theme)} ${dim('is already the active Worker name in Cloudflare', theme)}`)
+			logLine(
+				logger,
+				`${dim('remote', theme)} ${green(newName, theme)} ${dim('is already the active Worker name in Cloudflare', theme)}`
+			)
 		}
 
 		if (!localConfigAlreadyUpdated) {
@@ -629,19 +666,39 @@ export async function runWorkerCommand(
 		if (referenceHits.length > 0) {
 			logger.warn(`Found ${referenceHits.length} local reference(s) that still use \`${oldName}\`.`)
 			for (const hit of referenceHits) {
-				logLine(logger, `  ${formatPathForLog(cwd, hit.configPath)} ${dim(`(${hit.scope})`, theme)} ${dim('—', theme)} ${hit.kind === 'service' ? 'service binding' : 'durable object binding'} ${bold(hit.bindingName, theme)}`)
+				logLine(
+					logger,
+					`  ${formatPathForLog(cwd, hit.configPath)} ${dim(`(${hit.scope})`, theme)} ${dim('—', theme)} ${hit.kind === 'service' ? 'service binding' : 'durable object binding'} ${bold(hit.bindingName, theme)}`
+				)
 			}
 		}
 
 		logLine(logger)
-		logLine(logger, `${yellow('preview urls', theme)} ${dim('Existing preview URLs and registry entries may continue using the old Worker name until you upload fresh previews for the renamed Worker.', theme)}`)
-		logLine(logger, dim('Future deploys and preview uploads from this config will target the new Worker name.', theme))
+		logLine(
+			logger,
+			`${yellow('preview urls', theme)} ${dim('Existing preview URLs and registry entries may continue using the old Worker name until you upload fresh previews for the renamed Worker.', theme)}`
+		)
+		logLine(
+			logger,
+			dim(
+				'Future deploys and preview uploads from this config will target the new Worker name.',
+				theme
+			)
+		)
 
 		return { exitCode: 0 }
 	} catch (error) {
 		if (remoteRenamed) {
-			logger.warn('The remote Worker rename succeeded, but the local config update did not complete.')
-			logLine(logger, dim('Update devflare.config.ts manually so future deploys target the renamed Worker.', theme))
+			logger.warn(
+				'The remote Worker rename succeeded, but the local config update did not complete.'
+			)
+			logLine(
+				logger,
+				dim(
+					'Update devflare.config.ts manually so future deploys target the renamed Worker.',
+					theme
+				)
+			)
 		}
 
 		if (error instanceof Error) {

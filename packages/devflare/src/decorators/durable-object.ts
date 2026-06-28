@@ -57,7 +57,7 @@ export interface DurableObjectOptions {
 type AnyClass = abstract new (...args: any[]) => any
 
 export function durableObject(options: DurableObjectOptions = {}) {
-	return function <T extends AnyClass>(target: T): T {
+	return <T extends AnyClass>(target: T): T => {
 		// Store options on the class for potential runtime access
 		Object.defineProperty(target, '__durableObjectOptions', {
 			value: options,
@@ -75,7 +75,8 @@ export function durableObject(options: DurableObjectOptions = {}) {
  */
 export function getDurableObjectOptions(target: unknown): DurableObjectOptions | undefined {
 	if (typeof target === 'function') {
-		return (target as unknown as { __durableObjectOptions?: DurableObjectOptions }).__durableObjectOptions
+		return (target as unknown as { __durableObjectOptions?: DurableObjectOptions })
+			.__durableObjectOptions
 	}
 	return undefined
 }

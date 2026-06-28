@@ -1,11 +1,6 @@
 import { existsSync } from 'node:fs'
 import { resolve } from 'pathe'
-import type {
-	ExternalOption,
-	InputOptions,
-	OutputOptions,
-	RolldownPluginOption
-} from 'rolldown'
+import type { ExternalOption, InputOptions, OutputOptions, RolldownPluginOption } from 'rolldown'
 import type { DevflareRolldownOptions } from '../config/schema'
 import {
 	assertWorkerBundleHasNoDynamicImports,
@@ -25,9 +20,26 @@ type SanitizedRolldownOutputOptions = NonNullable<DevflareRolldownOptions['outpu
 const DEFAULT_EXTERNAL_MODULES: ExternalPattern[] = [
 	/^cloudflare:/,
 	/^node:/,
-	'buffer', 'crypto', 'events', 'http', 'https', 'net', 'os', 'path',
-	'stream', 'tls', 'url', 'util', 'zlib', 'fs', 'child_process',
-	'async_hooks', 'querystring', 'string_decoder', 'assert', 'dns'
+	'buffer',
+	'crypto',
+	'events',
+	'http',
+	'https',
+	'net',
+	'os',
+	'path',
+	'stream',
+	'tls',
+	'url',
+	'util',
+	'zlib',
+	'fs',
+	'child_process',
+	'async_hooks',
+	'querystring',
+	'string_decoder',
+	'assert',
+	'dns'
 ]
 
 function toArray<T>(value: T | T[]): T[] {
@@ -77,9 +89,11 @@ function mergeExternalOptions(
 	}
 
 	return (id, parentId, isResolved) => {
-		return matchesExternalOption(base, id, parentId, isResolved)
-			|| matchesExternalOption(user, id, parentId, isResolved)
-			|| false
+		return (
+			matchesExternalOption(base, id, parentId, isResolved) ||
+			matchesExternalOption(user, id, parentId, isResolved) ||
+			false
+		)
 	}
 }
 
@@ -117,9 +131,7 @@ type RolldownAliasRecord = Record<string, string>
 export type AliasInput = RolldownAliasRecord | AliasEntry[] | undefined
 
 function aliasKey(find: string | RegExp): string {
-	return find instanceof RegExp
-		? `re:${find.source}:${find.flags}`
-		: `str:${find}`
+	return find instanceof RegExp ? `re:${find.source}:${find.flags}` : `str:${find}`
 }
 
 export function normalizeAliasEntries(input: AliasInput): AliasEntry[] {
@@ -164,7 +176,7 @@ export function mergeAliases(
 	// last occurrence (important for regex specificity).
 	const seenUserKeys = new Set<string>()
 	const dedupedUser: AliasEntry[] = []
-	for (let index = userAliases.length - 1;index >= 0;index--) {
+	for (let index = userAliases.length - 1; index >= 0; index--) {
 		const entry = userAliases[index]!
 		const key = aliasKey(entry.find)
 		if (seenUserKeys.has(key)) {
@@ -305,8 +317,8 @@ export function resolveWorkerCompatibleRolldownConfig(options: {
 			resolve: mergeResolveOptions(
 				options.alias
 					? {
-						alias: options.alias
-					}
+							alias: options.alias
+						}
 					: undefined,
 				userResolve
 			)

@@ -40,7 +40,9 @@ type TestModule = typeof import('./test')
 
 type ConfigNotFoundErrorArgs = ConstructorParameters<ConfigModule['ConfigNotFoundError']>
 type ConfigValidationErrorArgs = ConstructorParameters<ConfigModule['ConfigValidationError']>
-type ConfigResourceResolutionErrorArgs = ConstructorParameters<ConfigModule['ConfigResourceResolutionError']>
+type ConfigResourceResolutionErrorArgs = ConstructorParameters<
+	ConfigModule['ConfigResourceResolutionError']
+>
 
 function createUnsupportedApiError(name: string): Error {
 	return new Error(
@@ -75,10 +77,12 @@ function createUnsupportedObject<T extends object>(name: string): T {
 }
 
 export const loadConfig = unsupportedFunction<ConfigModule['loadConfig']>('loadConfig')
-export const loadResolvedConfig = unsupportedFunction<ConfigModule['loadResolvedConfig']>('loadResolvedConfig')
+export const loadResolvedConfig =
+	unsupportedFunction<ConfigModule['loadResolvedConfig']>('loadResolvedConfig')
 
 export const compileConfig = unsupportedFunction<ConfigModule['compileConfig']>('compileConfig')
-export const stringifyConfig = unsupportedFunction<ConfigModule['stringifyConfig']>('stringifyConfig')
+export const stringifyConfig =
+	unsupportedFunction<ConfigModule['stringifyConfig']>('stringifyConfig')
 export const configSchema = createUnsupportedObject<ConfigModule['configSchema']>('configSchema')
 
 export class ConfigNotFoundError extends Error {
@@ -111,23 +115,39 @@ export class ConfigResourceResolutionError extends Error {
 export const runCli = unsupportedFunction<CliModule['runCli']>('runCli')
 export const parseArgs = unsupportedFunction<CliModule['parseArgs']>('parseArgs')
 
-export const findDurableObjectClasses = unsupportedFunction<TransformModule['findDurableObjectClasses']>('findDurableObjectClasses')
-export const findDurableObjectClassesDetailed = unsupportedFunction<TransformModule['findDurableObjectClasses']>('findDurableObjectClassesDetailed')
-export const generateWrapper = unsupportedFunction<TransformModule['generateWrapper']>('generateWrapper')
-export const transformDurableObject = unsupportedFunction<TransformModule['transformDurableObject']>('transformDurableObject')
-export const transformWorkerEntrypoint = unsupportedFunction<TransformModule['transformWorkerEntrypoint']>('transformWorkerEntrypoint')
-export const findExportedFunctions = unsupportedFunction<TransformModule['findExportedFunctions']>('findExportedFunctions')
-export const shouldTransformWorker = unsupportedFunction<TransformModule['shouldTransformWorker']>('shouldTransformWorker')
-export const generateRpcInterface = unsupportedFunction<TransformModule['generateRpcInterface']>('generateRpcInterface')
+export const findDurableObjectClasses = unsupportedFunction<
+	TransformModule['findDurableObjectClasses']
+>('findDurableObjectClasses')
+export const findDurableObjectClassesDetailed = unsupportedFunction<
+	TransformModule['findDurableObjectClasses']
+>('findDurableObjectClassesDetailed')
+export const generateWrapper =
+	unsupportedFunction<TransformModule['generateWrapper']>('generateWrapper')
+export const transformDurableObject =
+	unsupportedFunction<TransformModule['transformDurableObject']>('transformDurableObject')
+export const transformWorkerEntrypoint = unsupportedFunction<
+	TransformModule['transformWorkerEntrypoint']
+>('transformWorkerEntrypoint')
+export const findExportedFunctions =
+	unsupportedFunction<TransformModule['findExportedFunctions']>('findExportedFunctions')
+export const shouldTransformWorker =
+	unsupportedFunction<TransformModule['shouldTransformWorker']>('shouldTransformWorker')
+export const generateRpcInterface =
+	unsupportedFunction<TransformModule['generateRpcInterface']>('generateRpcInterface')
 
-export const startMiniflare = unsupportedFunction<MiniflareModule['startMiniflare']>('startMiniflare')
-export const startMiniflareFromConfig = unsupportedFunction<MiniflareModule['startMiniflareFromConfig']>('startMiniflareFromConfig')
+export const startMiniflare =
+	unsupportedFunction<MiniflareModule['startMiniflare']>('startMiniflare')
+export const startMiniflareFromConfig = unsupportedFunction<
+	MiniflareModule['startMiniflareFromConfig']
+>('startMiniflareFromConfig')
 export const getMiniflare = unsupportedFunction<MiniflareModule['getMiniflare']>('getMiniflare')
 export const stopMiniflare = unsupportedFunction<MiniflareModule['stopMiniflare']>('stopMiniflare')
 export const gateway = createUnsupportedObject<BridgeServerModule['default']>('gateway')
 
-export const createTestContext = unsupportedFunction<TestModule['createTestContext']>('createTestContext')
-export const createMockTestContext = unsupportedFunction<TestModule['createMockTestContext']>('createMockTestContext')
+export const createTestContext =
+	unsupportedFunction<TestModule['createTestContext']>('createTestContext')
+export const createMockTestContext =
+	unsupportedFunction<TestModule['createMockTestContext']>('createMockTestContext')
 export const createMockKV = unsupportedFunction<TestModule['createMockKV']>('createMockKV')
 export const createMockD1 = unsupportedFunction<TestModule['createMockD1']>('createMockD1')
 export const createMockR2 = unsupportedFunction<TestModule['createMockR2']>('createMockR2')

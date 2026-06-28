@@ -9,8 +9,8 @@ import {
 	type DevflareConfig,
 	getLocalD1DatabaseIdentifier,
 	getLocalKVNamespaceIdentifier,
-	normalizeDOBinding,
 	normalizeArtifactsBinding,
+	normalizeDOBinding,
 	normalizeDispatchNamespaceBinding,
 	normalizeImagesBinding,
 	normalizeMediaBinding,
@@ -21,13 +21,13 @@ import {
 	resolveConfigEnvVars
 } from '../config'
 import { applyLocalDevVarsToConfig } from '../config/local-dev-vars'
+import { createMiniflareLog } from '../dev-server/miniflare-log'
 import {
+	type LocalSecretWrappedBindingConfig,
 	buildLocalSecretNodeBindings,
-	buildLocalSecretWrappedBindingConfig,
-	type LocalSecretWrappedBindingConfig
+	buildLocalSecretWrappedBindingConfig
 } from '../secrets/local-secrets'
 import { buildLocalBindingShimServiceConfig } from '../shims/local-media-bindings'
-import { createMiniflareLog } from '../dev-server/miniflare-log'
 import { GATEWAY_RUNTIME_JS } from './gateway-runtime'
 
 // -----------------------------------------------------------------------------
@@ -280,11 +280,7 @@ function createBaseMiniflareConfig(
 		compatibilityFlags: options.compatibilityFlags ?? []
 	}
 
-	const log = createMiniflareLog(
-		runtime.Log,
-		runtime.LogLevel,
-		options.verbose ? 'DEBUG' : 'WARN'
-	)
+	const log = createMiniflareLog(runtime.Log, runtime.LogLevel, options.verbose ? 'DEBUG' : 'WARN')
 	if (log) {
 		config.log = log as MfOptionsWithEmail['log']
 	}
@@ -564,9 +560,8 @@ function createConfigWithAuxiliaryWorkers(
 		...primaryWorker
 	} = config
 	const primaryWorkerRecord = primaryWorker as Record<string, unknown>
-	const primaryWorkerName = typeof primaryWorkerRecord.name === 'string'
-		? primaryWorkerRecord.name
-		: 'devflare-gateway'
+	const primaryWorkerName =
+		typeof primaryWorkerRecord.name === 'string' ? primaryWorkerRecord.name : 'devflare-gateway'
 
 	return {
 		...(port !== undefined && { port }),
@@ -663,7 +658,9 @@ export function createMiniflareInstanceHandle(
 		},
 
 		async getBindings() {
-			const bindings = primaryWorkerName ? await mf.getBindings(primaryWorkerName) : await mf.getBindings()
+			const bindings = primaryWorkerName
+				? await mf.getBindings(primaryWorkerName)
+				: await mf.getBindings()
 			return {
 				...bindings,
 				...nodeBindingOverrides
@@ -693,7 +690,11 @@ export async function startMiniflare(options: MiniflareOptions = {}): Promise<Mi
 	const mf = new runtime.Miniflare(mfConfig as MfOptions)
 	await mf.ready
 
-	return createMiniflareInstanceHandle(mf, getPrimaryWorkerName(mfConfig), options.nodeBindingOverrides)
+	return createMiniflareInstanceHandle(
+		mf,
+		getPrimaryWorkerName(mfConfig),
+		options.nodeBindingOverrides
+	)
 }
 
 // -----------------------------------------------------------------------------
@@ -876,13 +877,15 @@ export async function startMiniflareFromConfig(
 							runtimeConfig.secretsStoreId,
 							bindingName
 						)
-						return [[
-							bindingName,
-							{
-								store_id: normalized.storeId,
-								secret_name: normalized.secretName
-							}
-						]]
+						return [
+							[
+								bindingName,
+								{
+									store_id: normalized.storeId,
+									secret_name: normalized.secretName
+								}
+							]
+						]
 					})
 				)
 			: undefined,

@@ -7,13 +7,13 @@ import { createFetchEvent, runWithContext, runWithEventContext } from '../../../
 import { ContextAccessError } from '../../../src/runtime/validation'
 
 // Import the actual exports we'll create
-import { env, vars, ctx, event, locals } from '../../../src/runtime/exports'
+import { ctx, env, event, locals, vars } from '../../../src/runtime/exports'
 
 /** Helper to create a mock ExecutionContext */
 function createMockCtx(): ExecutionContext {
 	return {
-		waitUntil: () => { },
-		passThroughOnException: () => { },
+		waitUntil: () => {},
+		passThroughOnException: () => {},
 		props: {}
 	} as ExecutionContext
 }
@@ -40,7 +40,7 @@ describe('env proxy', () => {
 		runWithContext(mockEnv, mockCtx, null, () => {
 			// TypeScript should prevent this, but let's verify runtime behavior
 			expect(() => {
-				(env as Record<string, unknown>).DB = 'modified'
+				;(env as Record<string, unknown>).DB = 'modified'
 			}).toThrow()
 		})
 	})
@@ -72,7 +72,7 @@ describe('vars proxy', () => {
 
 		runWithContext(mockEnv, mockCtx, null, () => {
 			expect(() => {
-				(vars as Record<string, unknown>).APP_ENV = 'production'
+				;(vars as Record<string, unknown>).APP_ENV = 'production'
 			}).toThrow()
 		})
 	})
@@ -85,10 +85,10 @@ describe('ctx proxy', () => {
 
 	test('provides access to ExecutionContext within context', () => {
 		const mockEnv = {}
-		const waitUntilFn = () => { }
+		const waitUntilFn = () => {}
 		const mockCtx: ExecutionContext = {
 			waitUntil: waitUntilFn,
-			passThroughOnException: () => { },
+			passThroughOnException: () => {},
 			props: {}
 		}
 
@@ -149,8 +149,8 @@ describe('locals proxy', () => {
 		const mockCtx = createMockCtx()
 
 		runWithContext(mockEnv, mockCtx, null, () => {
-			; (locals as Record<string, unknown>).userId = '123'
-				; (locals as Record<string, unknown>).authenticated = true
+			;(locals as Record<string, unknown>).userId = '123'
+			;(locals as Record<string, unknown>).authenticated = true
 
 			expect(locals.userId).toBe('123')
 			expect(locals.authenticated).toBe(true)
@@ -163,7 +163,7 @@ describe('locals proxy', () => {
 
 		// First request
 		runWithContext(mockEnv, mockCtx, null, () => {
-			; (locals as Record<string, unknown>).value = 'request-1'
+			;(locals as Record<string, unknown>).value = 'request-1'
 		})
 
 		// Second request should have fresh locals
@@ -179,8 +179,10 @@ describe('combined usage', () => {
 		const mockRequest = new Request('https://api.example.com/users')
 		const waitUntilPromises: Promise<unknown>[] = []
 		const mockCtx: ExecutionContext = {
-			waitUntil: (p: Promise<unknown>) => { waitUntilPromises.push(p) },
-			passThroughOnException: () => { },
+			waitUntil: (p: Promise<unknown>) => {
+				waitUntilPromises.push(p)
+			},
+			passThroughOnException: () => {},
 			props: {}
 		}
 
@@ -194,8 +196,8 @@ describe('combined usage', () => {
 			// Access event
 			expect(event.request!.url).toBe('https://api.example.com/users')
 
-				// Use locals
-				; (locals as Record<string, unknown>).processedAt = Date.now()
+			// Use locals
+			;(locals as Record<string, unknown>).processedAt = Date.now()
 			expect(typeof locals.processedAt).toBe('number')
 		})
 

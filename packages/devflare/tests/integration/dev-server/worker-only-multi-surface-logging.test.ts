@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, test } from 'bun:test'
-import { createDevServer, type DevServer } from '../../../src/dev-server'
+import { type DevServer, createDevServer } from '../../../src/dev-server'
 import {
 	cleanupTempDirs,
 	createCapturedLogger,

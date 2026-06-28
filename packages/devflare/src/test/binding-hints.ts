@@ -2,8 +2,8 @@
 // Binding Hints — Shared extractor for test contexts
 // =============================================================================
 
-import type { DevflareConfig } from '../config'
 import type { BindingHints } from '../bridge/proxy'
+import type { DevflareConfig } from '../config'
 
 /**
  * Derive `BindingHints` from a resolved Devflare config.

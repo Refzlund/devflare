@@ -5,21 +5,21 @@
 // =============================================================================
 
 import type { ConsolaInstance } from 'consola'
-import type { ParsedArgs, CliOptions, CliResult } from '../index'
-import { CYAN, CYAN_BOLD, DIM, RESET } from '../colors'
 import {
-	account,
-	CloudflareAPIError,
+	type APIClientOptions,
 	AuthenticationError,
-	type APIClientOptions
+	CloudflareAPIError,
+	account
 } from '../../cloudflare'
-import { getConfiguredAccountId } from '../command-utils'
 import {
 	getGlobalDefaultAccountId,
-	setGlobalDefaultAccountId,
 	getWorkspaceAccountId,
-	setWorkspaceAccountId,
+	setGlobalDefaultAccountId,
+	setWorkspaceAccountId
 } from '../../cloudflare/preferences'
+import { CYAN, CYAN_BOLD, DIM, RESET } from '../colors'
+import { getConfiguredAccountId } from '../command-utils'
+import type { CliOptions, CliResult, ParsedArgs } from '../index'
 import {
 	type CliTheme,
 	bold,
@@ -107,11 +107,12 @@ function logSection(
 	accent: 'cyan' | 'yellow' | 'green' = 'cyan'
 ): void {
 	logLine(logger)
-	const heading = accent === 'yellow'
-		? yellow(title, theme)
-		: accent === 'green'
-			? green(title, theme)
-			: bold(title, theme)
+	const heading =
+		accent === 'yellow'
+			? yellow(title, theme)
+			: accent === 'green'
+				? green(title, theme)
+				: bold(title, theme)
 	logLine(logger, `${heading}${count === undefined ? '' : ` ${dim(`(${count})`, theme)}`}`)
 }
 
@@ -197,7 +198,6 @@ export async function runAccountCommand(
 			case 'usage':
 				return await showUsage(accountId, logger, theme)
 
-			case 'info':
 			default:
 				return await showAccountOverview(accountId, logger, theme)
 		}
@@ -264,11 +264,17 @@ async function showAccountOverview(
 	const globalId = await getGlobalDefaultAccountId(accountId)
 
 	if (limitedAccountView) {
-		logLine(logger, dim('Using the configured account directly because the current credentials cannot enumerate all Cloudflare accounts.', theme))
+		logLine(
+			logger,
+			dim(
+				'Using the configured account directly because the current credentials cannot enumerate all Cloudflare accounts.',
+				theme
+			)
+		)
 	}
 
 	// Show all accounts with proper badges
-	for (let i = 0;i < accounts.length;i++) {
+	for (let i = 0; i < accounts.length; i++) {
 		const acc = accounts[i]
 		const isWorkspace = acc.id === workspaceId
 		const isGlobal = acc.id === globalId
@@ -279,9 +285,7 @@ async function showAccountOverview(
 			badge = ` ${CYAN_BOLD}(workspace)${RESET}`
 		} else if (isGlobal) {
 			// If another account is workspace, dim the global badge
-			badge = workspaceId
-				? ` ${DIM}(global)${RESET}`
-				: ` ${CYAN}(global)${RESET}`
+			badge = workspaceId ? ` ${DIM}(global)${RESET}` : ` ${CYAN}(global)${RESET}`
 		}
 
 		if (i > 0) {
@@ -312,10 +316,7 @@ async function showAccountOverview(
 // Account Selection (Global)
 // -----------------------------------------------------------------------------
 
-async function selectGlobalAccount(
-	logger: ConsolaInstance,
-	theme: CliTheme
-): Promise<CliResult> {
+async function selectGlobalAccount(logger: ConsolaInstance, theme: CliTheme): Promise<CliResult> {
 	const accounts = await account.getAccounts()
 	if (accounts.length === 0) {
 		logger.error('No Cloudflare accounts found')
@@ -336,9 +337,7 @@ async function selectGlobalAccount(
 	const options = accounts.map((acc) => {
 		const isCurrent = acc.id === currentGlobal
 		return {
-			label: isCurrent
-				? `${acc.name} ${CYAN}(default)${RESET}`
-				: acc.name,
+			label: isCurrent ? `${acc.name} ${CYAN}(default)${RESET}` : acc.name,
 			value: acc.id,
 			hint: acc.id.substring(0, 8) + '...'
 		}
@@ -397,9 +396,7 @@ async function selectWorkspaceAccount(
 	const options = accounts.map((acc) => {
 		const isCurrent = acc.id === currentWorkspace
 		return {
-			label: isCurrent
-				? `${acc.name} ${CYAN}(workspace)${RESET}`
-				: acc.name,
+			label: isCurrent ? `${acc.name} ${CYAN}(workspace)${RESET}` : acc.name,
 			value: acc.id,
 			hint: acc.id.substring(0, 8) + '...'
 		}
@@ -450,7 +447,11 @@ async function showWorkers(
 		rows: workers,
 		columns: [
 			{ label: 'Name', width: 30, value: (worker) => worker.name },
-			{ label: 'Modified', width: 20, value: (worker) => whiteDim(formatDate(worker.modifiedOn), theme) }
+			{
+				label: 'Modified',
+				width: 20,
+				value: (worker) => whiteDim(formatDate(worker.modifiedOn), theme)
+			}
 		],
 		theme,
 		titleAccent: 'green'
@@ -544,7 +545,11 @@ async function showR2(
 		rows: buckets,
 		columns: [
 			{ label: 'Name', width: 30, value: (bucket) => bucket.name },
-			{ label: 'Created', width: 20, value: (bucket) => whiteDim(formatDate(bucket.createdOn), theme) },
+			{
+				label: 'Created',
+				width: 20,
+				value: (bucket) => whiteDim(formatDate(bucket.createdOn), theme)
+			},
 			{ label: 'Location', width: 10, value: (bucket) => bucket.location ?? 'auto' }
 		],
 		theme,
@@ -600,7 +605,15 @@ async function showUsage(
 	const limits = await account.getLimits(accountId)
 
 	logSection(logger, 'Usage', theme, undefined, 'yellow')
-	logLine(logger, formatLabelValue('limits', limits.enabled ? green('enabled', theme) : dim('disabled', theme), theme, 12))
+	logLine(
+		logger,
+		formatLabelValue(
+			'limits',
+			limits.enabled ? green('enabled', theme) : dim('disabled', theme),
+			theme,
+			12
+		)
+	)
 
 	if (usages.length === 0) {
 		return logEmptyState(logger, 'No usage tracked yet', theme)
@@ -614,7 +627,11 @@ async function showUsage(
 			{ label: 'Today', width: 10, value: (usage) => String(usage.today) },
 			{ label: 'Limit', width: 10, value: (usage) => usage.limit?.toString() ?? '∞' },
 			{ label: '%', width: 10, value: (usage) => formatPercent(usage.percentUsed) },
-			{ label: 'Status', width: 10, value: (usage) => usage.withinLimit ? green('ok', theme) : yellow('limit', theme) }
+			{
+				label: 'Status',
+				width: 10,
+				value: (usage) => (usage.withinLimit ? green('ok', theme) : yellow('limit', theme))
+			}
 		],
 		theme,
 		titleAccent: 'yellow'
@@ -663,16 +680,59 @@ async function showLimits(
 	const limits = await account.getLimits(accountId)
 
 	logSection(logger, 'Usage limits', theme, undefined, 'yellow')
-	logLine(logger, formatLabelValue('status', limits.enabled ? green('enabled', theme) : dim('disabled', theme), theme, 16))
+	logLine(
+		logger,
+		formatLabelValue(
+			'status',
+			limits.enabled ? green('enabled', theme) : dim('disabled', theme),
+			theme,
+			16
+		)
+	)
 	logLine(logger)
 	logLine(logger, dim('current limits', theme))
-	logLine(logger, formatLabelValue('AI Requests/Day', String(limits.aiRequestsPerDay ?? 'Unlimited'), theme, 18))
-	logLine(logger, formatLabelValue('AI Tokens/Day', String(limits.aiTokensPerDay ?? 'Unlimited'), theme, 18))
-	logLine(logger, formatLabelValue('Vectorize Ops/Day', String(limits.vectorizeOpsPerDay ?? 'Unlimited'), theme, 18))
+	logLine(
+		logger,
+		formatLabelValue('AI Requests/Day', String(limits.aiRequestsPerDay ?? 'Unlimited'), theme, 18)
+	)
+	logLine(
+		logger,
+		formatLabelValue('AI Tokens/Day', String(limits.aiTokensPerDay ?? 'Unlimited'), theme, 18)
+	)
+	logLine(
+		logger,
+		formatLabelValue(
+			'Vectorize Ops/Day',
+			String(limits.vectorizeOpsPerDay ?? 'Unlimited'),
+			theme,
+			18
+		)
+	)
 	logSection(logger, 'Commands', theme)
-	logLine(logger, formatCommand('devflare account limits set ai-requests 50', 'Set the AI request daily limit', theme))
-	logLine(logger, formatCommand('devflare account limits set ai-tokens 5000', 'Set the AI token daily limit', theme))
-	logLine(logger, formatCommand('devflare account limits set vectorize-ops 500', 'Set the Vectorize daily limit', theme))
+	logLine(
+		logger,
+		formatCommand(
+			'devflare account limits set ai-requests 50',
+			'Set the AI request daily limit',
+			theme
+		)
+	)
+	logLine(
+		logger,
+		formatCommand(
+			'devflare account limits set ai-tokens 5000',
+			'Set the AI token daily limit',
+			theme
+		)
+	)
+	logLine(
+		logger,
+		formatCommand(
+			'devflare account limits set vectorize-ops 500',
+			'Set the Vectorize daily limit',
+			theme
+		)
+	)
 	logLine(logger, formatCommand('devflare account limits enable', 'Enable usage limits', theme))
 	logLine(logger, formatCommand('devflare account limits disable', 'Disable usage limits', theme))
 	logLine(logger)
@@ -695,8 +755,8 @@ async function setLimit(
 		return { exitCode: 1 }
 	}
 
-	const value = parseInt(limitValue, 10)
-	if (isNaN(value) || value < 0) {
+	const value = Number.parseInt(limitValue, 10)
+	if (Number.isNaN(value) || value < 0) {
 		logger.error('Limit value must be a positive number')
 		return { exitCode: 1 }
 	}

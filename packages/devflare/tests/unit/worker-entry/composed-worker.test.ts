@@ -16,7 +16,10 @@ describe('prepareComposedWorkerEntrypoint', () => {
 	})
 
 	test('skips composition for adapter-generated fetch workers that already live in assets.directory', async () => {
-		await writeFile(join(TEST_DIR, '.adapter-cloudflare', '_worker.js'), 'export default { fetch() { return new Response("ok") } }')
+		await writeFile(
+			join(TEST_DIR, '.adapter-cloudflare', '_worker.js'),
+			'export default { fetch() { return new Response("ok") } }'
+		)
 
 		const config = configSchema.parse({
 			name: 'documentation',
@@ -37,16 +40,22 @@ describe('prepareComposedWorkerEntrypoint', () => {
 
 	test('re-exports local Durable Object classes from the composed worker entry', async () => {
 		await mkdir(join(TEST_DIR, 'src'), { recursive: true })
-		await writeFile(join(TEST_DIR, 'src', 'fetch.ts'), `
+		await writeFile(
+			join(TEST_DIR, 'src', 'fetch.ts'),
+			`
 export async function fetch(): Promise<Response> {
 	return new Response('ok')
 }
-		`.trim())
-		await writeFile(join(TEST_DIR, 'src', 'do.counter.ts'), `
+		`.trim()
+		)
+		await writeFile(
+			join(TEST_DIR, 'src', 'do.counter.ts'),
+			`
 import { DurableObject } from 'cloudflare:workers'
 
 export class Counter extends DurableObject<DevflareEnv> {}
-		`.trim())
+		`.trim()
+		)
 
 		const config = configSchema.parse({
 			name: 'do-composition-test',
@@ -73,11 +82,14 @@ export class Counter extends DurableObject<DevflareEnv> {}
 
 	test('throws when an explicit fetch handler path is missing instead of silently falling back to src/fetch.ts', async () => {
 		await mkdir(join(TEST_DIR, 'src'), { recursive: true })
-		await writeFile(join(TEST_DIR, 'src', 'fetch.ts'), `
+		await writeFile(
+			join(TEST_DIR, 'src', 'fetch.ts'),
+			`
 export async function fetch(): Promise<Response> {
 	return new Response('default')
 }
-		`.trim())
+		`.trim()
+		)
 
 		const config = configSchema.parse({
 			name: 'explicit-fetch-path-test',
@@ -112,9 +124,12 @@ export async function fetch(): Promise<Response> {
 		// When other surfaces need composition, devflare cannot defer to wrangler — the
 		// composed wrapper would have to import the missing artifact. Surface a clear error.
 		await mkdir(join(TEST_DIR, 'src'), { recursive: true })
-		await writeFile(join(TEST_DIR, 'src', 'queue.ts'), `
+		await writeFile(
+			join(TEST_DIR, 'src', 'queue.ts'),
+			`
 export async function queue(): Promise<void> {}
-		`.trim())
+		`.trim()
+		)
 
 		const config = configSchema.parse({
 			name: 'sveltekit-with-queue',
@@ -132,13 +147,16 @@ export async function queue(): Promise<void> {}
 
 	test('composes files.tail into a Worker tail handler', async () => {
 		await mkdir(join(TEST_DIR, 'src'), { recursive: true })
-		await writeFile(join(TEST_DIR, 'src', 'tail.ts'), `
+		await writeFile(
+			join(TEST_DIR, 'src', 'tail.ts'),
+			`
 export default {
 	async tail(events, env, ctx) {
 		ctx.waitUntil(Promise.resolve(events.length))
 	}
 }
-		`.trim())
+		`.trim()
+		)
 
 		const config = configSchema.parse({
 			name: 'tail-composition-test',

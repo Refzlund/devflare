@@ -6,6 +6,7 @@ import { runBuildCommand } from '../../../src/cli/commands/build'
 import { runDeployCommand } from '../../../src/cli/commands/deploy'
 import { clearDependencies, setDependencies } from '../../../src/cli/dependencies'
 import {
+	type ExecInvocation,
 	captureDeployEnvironmentSnapshot,
 	cloudflareApiResponse,
 	createCliDependencies,
@@ -16,8 +17,7 @@ import {
 	isViteBuildExecution,
 	readGeneratedDeployConfig,
 	successResult,
-	writeNamedD1ProjectFiles,
-	type ExecInvocation
+	writeNamedD1ProjectFiles
 } from './build-deploy-worker-only.test-utils'
 
 function createBuildHarness(
@@ -39,11 +39,9 @@ async function runSuccessfulBuild(
 	projectDir: string,
 	logger: ReturnType<typeof createLogger>
 ): Promise<void> {
-	const result = await runBuildCommand(
-		{ command: 'build', args: [], options: {} },
-		logger as any,
-		{ cwd: projectDir }
-	)
+	const result = await runBuildCommand({ command: 'build', args: [], options: {} }, logger as any, {
+		cwd: projectDir
+	})
 
 	expect(result.exitCode).toBe(0)
 }
@@ -99,12 +97,14 @@ describe('deploy build artifact provisioning', () => {
 				throw new Error(`Unexpected Cloudflare request: ${method} ${url}`)
 			}) as unknown as typeof fetch
 
-			const { executions, logger } = createDeployHarness(createWranglerDeployProcessRunner({
-				structuredOutput: {
-					version_id: 'version-123',
-					url: 'https://worker-build-test.example.workers.dev'
-				}
-			}))
+			const { executions, logger } = createDeployHarness(
+				createWranglerDeployProcessRunner({
+					structuredOutput: {
+						version_id: 'version-123',
+						url: 'https://worker-build-test.example.workers.dev'
+					}
+				})
+			)
 			const result = await runDeployCommand(
 				{ command: 'deploy', args: [], options: { build: '.devflare/build' } },
 				logger as any,
@@ -112,8 +112,15 @@ describe('deploy build artifact provisioning', () => {
 			)
 
 			expect(result.exitCode).toBe(0)
-			expect(executions.some(({ command, args }) => isViteBuildExecution(command, args))).toBe(false)
-			expect(executions.some(({ command, args }) => command === 'bunx' && args[0] === 'wrangler' && args[1] === 'deploy')).toBe(true)
+			expect(executions.some(({ command, args }) => isViteBuildExecution(command, args))).toBe(
+				false
+			)
+			expect(
+				executions.some(
+					({ command, args }) =>
+						command === 'bunx' && args[0] === 'wrangler' && args[1] === 'deploy'
+				)
+			).toBe(true)
 			expect(createdRequests).toHaveLength(1)
 			expect(createdRequests[0]).toContain('"name":"app-db"')
 

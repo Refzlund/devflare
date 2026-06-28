@@ -65,11 +65,7 @@
 	"bin": {
 		"devflare": "./bin/devflare.js"
 	},
-	"files": [
-		"dist",
-		"bin",
-		"LLM.md"
-	],
+	"files": ["dist", "bin", "LLM.md"],
 	"scripts": {
 		"llm:generate": "bun ./scripts/generate-llm.ts",
 		"refresh-permission-groups": "bun ./scripts/refresh-permission-groups.ts",
@@ -79,6 +75,7 @@
 		"prepack": "bun run llm:generate",
 		"test": "bun run test:unit && bun run test:integration:control && bun run test:integration:bridge && bun run test:integration:test-context && bun run test:integration:dev-server",
 		"test:unit": "bun test tests/unit",
+		"test:coverage": "bun test tests/unit --coverage",
 		"test:integration:control": "bun test tests/integration/cli tests/integration/examples tests/integration/package-entry tests/integration/vite",
 		"test:integration:bridge": "bun test tests/integration/bridge/bridge-proxy.test.ts --parallel=1 --max-concurrency=1 && bun test tests/integration/bridge/case18-do.test.ts --parallel=1 --max-concurrency=1 && bun test tests/integration/bridge/durable-object.test.ts --parallel=1 --max-concurrency=1 && bun test tests/integration/bridge/miniflare.test.ts --parallel=1 --max-concurrency=1 && bun test tests/integration/bridge/r2-transfer.test.ts --parallel=1 --max-concurrency=1",
 		"test:integration:test-context": "bun test tests/integration/test-context --parallel=1 --max-concurrency=1",

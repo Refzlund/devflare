@@ -2,32 +2,32 @@
 // Test Utilities Tests
 // =============================================================================
 
-import { describe, expect, test, mock } from 'bun:test'
+import { describe, expect, mock, test } from 'bun:test'
 import type { Pipeline } from 'cloudflare:pipelines'
-import {
-	createMockTestContext,
-	createMockKV,
-	createMockD1,
-	createMockR2,
-	createMockRateLimit,
-	createMockVersionMetadata,
-	createMockHyperdrive,
-	createMockWorkerLoader,
-	createMockMTLSCertificate,
-	createMockDispatchNamespace,
-	createMockWorkflow,
-	createMockPipeline,
-	createMockImagesBinding,
-	createMockMediaBinding,
-	createMockArtifacts,
-	createMockSecretsStoreSecret,
-	createMockEnv,
-	withTestContext,
-	type TestContextOptions
-} from '../../../src/test/utilities'
 import { getContext, hasContext } from '../../../src/runtime/context'
 import { env, locals } from '../../../src/runtime/exports'
 import { HYPERDRIVE_CONNECT_MESSAGE } from '../../../src/shims/local-hyperdrive'
+import {
+	type TestContextOptions,
+	createMockArtifacts,
+	createMockD1,
+	createMockDispatchNamespace,
+	createMockEnv,
+	createMockHyperdrive,
+	createMockImagesBinding,
+	createMockKV,
+	createMockMTLSCertificate,
+	createMockMediaBinding,
+	createMockPipeline,
+	createMockR2,
+	createMockRateLimit,
+	createMockSecretsStoreSecret,
+	createMockTestContext,
+	createMockVersionMetadata,
+	createMockWorkerLoader,
+	createMockWorkflow,
+	withTestContext
+} from '../../../src/test/utilities'
 
 describe('createMockTestContext', () => {
 	test('creates context with default env', () => {
@@ -90,7 +90,7 @@ describe('withTestContext', () => {
 
 	test('provides access to locals', async () => {
 		await withTestContext({}, async () => {
-			; (locals as Record<string, unknown>).userId = 'user-123'
+			;(locals as Record<string, unknown>).userId = 'user-123'
 			expect(locals.userId).toBe('user-123')
 		})
 	})
@@ -147,8 +147,8 @@ describe('createMockKV', () => {
 
 	test('pre-populates with initial data', async () => {
 		const kv = createMockKV({
-			'key1': 'value1',
-			'key2': JSON.stringify({ nested: true })
+			key1: 'value1',
+			key2: JSON.stringify({ nested: true })
 		})
 
 		expect(await kv.get('key1')).toBe('value1')
@@ -178,9 +178,7 @@ describe('createMockD1', () => {
 	})
 
 	test('supports prepare().first()', async () => {
-		const d1 = createMockD1([
-			{ id: 1, name: 'Alice' }
-		])
+		const d1 = createMockD1([{ id: 1, name: 'Alice' }])
 
 		const stmt = d1.prepare('SELECT * FROM users WHERE id = ?')
 		const result = await stmt.bind(1).first()
@@ -200,7 +198,10 @@ describe('createMockD1', () => {
 	test('returns per-table fixtures on SELECT FROM <table>', async () => {
 		const d1 = createMockD1({
 			fixtures: {
-				users: [{ id: 1, name: 'Alice' }, { id: 2, name: 'Bob' }],
+				users: [
+					{ id: 1, name: 'Alice' },
+					{ id: 2, name: 'Bob' }
+				],
 				posts: [{ id: 10, title: 'Hello' }]
 			}
 		})
@@ -218,7 +219,10 @@ describe('createMockD1', () => {
 		const d1 = createMockD1({
 			fixtures: {
 				users: [{ id: 1, name: 'Alice' }],
-				posts: [{ id: 10, title: 'Hello' }, { id: 11, title: 'World' }]
+				posts: [
+					{ id: 10, title: 'Hello' },
+					{ id: 11, title: 'World' }
+				]
 			}
 		})
 
@@ -235,10 +239,7 @@ describe('createMockD1', () => {
 		const before = await d1.prepare('SELECT * FROM users').all()
 		expect(before.results).toHaveLength(1)
 
-		const insert = await d1
-			.prepare('INSERT INTO users (name) VALUES (?)')
-			.bind('Bob')
-			.run()
+		const insert = await d1.prepare('INSERT INTO users (name) VALUES (?)').bind('Bob').run()
 		expect(insert.success).toBe(true)
 		expect(insert.meta.changes).toBe(1)
 
@@ -375,13 +376,15 @@ describe('createMockWorkerLoader', () => {
 		} as unknown as WorkerStub
 		const loader = createMockWorkerLoader({ stub })
 
-		expect(loader.load({
-			compatibilityDate: '2026-04-26',
-			mainModule: 'index.js',
-			modules: {
-				'index.js': 'export default {}'
-			}
-		})).toBe(stub)
+		expect(
+			loader.load({
+				compatibilityDate: '2026-04-26',
+				mainModule: 'index.js',
+				modules: {
+					'index.js': 'export default {}'
+				}
+			})
+		).toBe(stub)
 	})
 
 	test('default stub getDurableObjectClass() throws the precise documented limitation', () => {
@@ -611,7 +614,10 @@ describe('createMockEnv', () => {
 
 		const stream = new ReadableStream<Uint8Array>()
 		const info = await images.info(stream)
-		const result = await images.input(stream).transform({ width: 16 }).output({ format: 'image/png' })
+		const result = await images
+			.input(stream)
+			.transform({ width: 16 })
+			.output({ format: 'image/png' })
 
 		expect((info as { width?: number }).width).toBe(16)
 		expect(result.contentType()).toBe('image/png')
@@ -623,9 +629,9 @@ describe('createMockEnv', () => {
 			images: 'IMAGES'
 		}) as { IMAGES: ImagesBinding }
 
-		const response = (await mockEnv.IMAGES
-			.input(new ReadableStream<Uint8Array>())
-			.output({ format: 'image/png' })).response()
+		const response = (
+			await mockEnv.IMAGES.input(new ReadableStream<Uint8Array>()).output({ format: 'image/png' })
+		).response()
 
 		expect(response.headers.get('Content-Type')).toBe('image/png')
 	})
@@ -651,8 +657,7 @@ describe('createMockEnv', () => {
 			media: 'MEDIA'
 		}) as { MEDIA: MediaBinding }
 
-		const response = await mockEnv.MEDIA
-			.input(new ReadableStream<Uint8Array>())
+		const response = await mockEnv.MEDIA.input(new ReadableStream<Uint8Array>())
 			.output({ mode: 'audio' })
 			.response()
 

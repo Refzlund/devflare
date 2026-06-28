@@ -1,21 +1,23 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { dirname, join } from 'pathe'
-import { clearDependencies, setDependencies } from '../../../src/cli/dependencies'
 import { runTypesCommand } from '../../../src/cli/commands/types'
-import { createCliDependencies, createProcessRunner, successResult } from '../../helpers/process-runner'
+import { clearDependencies, setDependencies } from '../../../src/cli/dependencies'
 import { createLogger } from '../../helpers/mock-logger'
+import {
+	createCliDependencies,
+	createProcessRunner,
+	successResult
+} from '../../helpers/process-runner'
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '../../../')
 
 function createUnusedProcessRunner() {
-	return createProcessRunner(
-		() => successResult(),
-		[],
-		{ spawnErrorMessage: 'spawn() should not be called by runTypesCommand in this test' }
-	)
+	return createProcessRunner(() => successResult(), [], {
+		spawnErrorMessage: 'spawn() should not be called by runTypesCommand in this test'
+	})
 }
 
 describe('runTypesCommand', () => {
@@ -37,13 +39,22 @@ describe('runTypesCommand', () => {
 	test('preserves typed ref() service bindings when the main config is devflare.config.mts', async () => {
 		const indexImportPath = pathToFileURL(join(repoRoot, 'src', 'index.ts')).href
 
-		await writeFile(join(projectDir, 'package.json'), JSON.stringify({
-			name: 'types-command-mts-test',
-			private: true,
-			type: 'module'
-		}, null, 2))
+		await writeFile(
+			join(projectDir, 'package.json'),
+			JSON.stringify(
+				{
+					name: 'types-command-mts-test',
+					private: true,
+					type: 'module'
+				},
+				null,
+				2
+			)
+		)
 
-		await writeFile(join(projectDir, 'devflare.config.mts'), `
+		await writeFile(
+			join(projectDir, 'devflare.config.mts'),
+			`
 import { defineConfig, ref } from '${indexImportPath}'
 
 const authWorker = ref(() => import('./auth/devflare.config'))
@@ -57,26 +68,36 @@ export default defineConfig({
 		}
 	}
 })
-`.trim())
+`.trim()
+		)
 
-		await writeFile(join(projectDir, 'auth', 'devflare.config.ts'), `
+		await writeFile(
+			join(projectDir, 'auth', 'devflare.config.ts'),
+			`
 import { defineConfig } from '${indexImportPath}'
 
 export default defineConfig({
 	name: 'auth-worker',
 	compatibilityDate: '2026-03-17'
 })
-`.trim())
+`.trim()
+		)
 
-		await writeFile(join(projectDir, 'auth', 'src', 'ep.admin.ts'), `
+		await writeFile(
+			join(projectDir, 'auth', 'src', 'ep.admin.ts'),
+			`
 export class AdminEntrypoint {}
-`.trim())
+`.trim()
+		)
 
-		await writeFile(join(projectDir, 'auth', 'src', 'admin.types.ts'), `
+		await writeFile(
+			join(projectDir, 'auth', 'src', 'admin.types.ts'),
+			`
 export interface AdminEntrypointRpc {
 	ping(): Promise<string>
 }
-`.trim())
+`.trim()
+		)
 
 		setDependencies(createCliDependencies(createUnusedProcessRunner()))
 
@@ -90,7 +111,9 @@ export interface AdminEntrypointRpc {
 		expect(result.exitCode).toBe(0)
 
 		const generatedTypes = await readFile(join(projectDir, 'env.d.ts'), 'utf8')
-		expect(generatedTypes).toContain("import type { AdminEntrypointRpc } from './auth/src/admin.types'")
+		expect(generatedTypes).toContain(
+			"import type { AdminEntrypointRpc } from './auth/src/admin.types'"
+		)
 		expect(generatedTypes).toContain('AUTH: AdminEntrypointRpc')
 		expect(generatedTypes).not.toContain('AUTH: Fetcher')
 	})
@@ -98,13 +121,22 @@ export interface AdminEntrypointRpc {
 	test('generates SendEmail env bindings', async () => {
 		const indexImportPath = pathToFileURL(join(repoRoot, 'src', 'index.ts')).href
 
-		await writeFile(join(projectDir, 'package.json'), JSON.stringify({
-			name: 'types-command-send-email-test',
-			private: true,
-			type: 'module'
-		}, null, 2))
+		await writeFile(
+			join(projectDir, 'package.json'),
+			JSON.stringify(
+				{
+					name: 'types-command-send-email-test',
+					private: true,
+					type: 'module'
+				},
+				null,
+				2
+			)
+		)
 
-		await writeFile(join(projectDir, 'devflare.config.ts'), `
+		await writeFile(
+			join(projectDir, 'devflare.config.ts'),
+			`
 import { defineConfig } from '${indexImportPath}'
 
 export default defineConfig({
@@ -119,7 +151,8 @@ export default defineConfig({
 		}
 	}
 })
-`.trim())
+`.trim()
+		)
 
 		setDependencies(createCliDependencies(createUnusedProcessRunner()))
 
@@ -140,13 +173,22 @@ export default defineConfig({
 	test('generates D1 env bindings when databases are configured by name', async () => {
 		const indexImportPath = pathToFileURL(join(repoRoot, 'src', 'index.ts')).href
 
-		await writeFile(join(projectDir, 'package.json'), JSON.stringify({
-			name: 'types-command-d1-name-test',
-			private: true,
-			type: 'module'
-		}, null, 2))
+		await writeFile(
+			join(projectDir, 'package.json'),
+			JSON.stringify(
+				{
+					name: 'types-command-d1-name-test',
+					private: true,
+					type: 'module'
+				},
+				null,
+				2
+			)
+		)
 
-		await writeFile(join(projectDir, 'devflare.config.ts'), `
+		await writeFile(
+			join(projectDir, 'devflare.config.ts'),
+			`
 import { defineConfig } from '${indexImportPath}'
 
 export default defineConfig({
@@ -158,7 +200,8 @@ export default defineConfig({
 		}
 	}
 })
-`.trim())
+`.trim()
+		)
 
 		setDependencies(createCliDependencies(createUnusedProcessRunner()))
 
@@ -179,13 +222,22 @@ export default defineConfig({
 	test('generates Browser env bindings from map syntax', async () => {
 		const indexImportPath = pathToFileURL(join(repoRoot, 'src', 'index.ts')).href
 
-		await writeFile(join(projectDir, 'package.json'), JSON.stringify({
-			name: 'types-command-browser-test',
-			private: true,
-			type: 'module'
-		}, null, 2))
+		await writeFile(
+			join(projectDir, 'package.json'),
+			JSON.stringify(
+				{
+					name: 'types-command-browser-test',
+					private: true,
+					type: 'module'
+				},
+				null,
+				2
+			)
+		)
 
-		await writeFile(join(projectDir, 'devflare.config.ts'), `
+		await writeFile(
+			join(projectDir, 'devflare.config.ts'),
+			`
 import { defineConfig } from '${indexImportPath}'
 
 export default defineConfig({
@@ -197,7 +249,8 @@ export default defineConfig({
 		}
 	}
 })
-`.trim())
+`.trim()
+		)
 
 		setDependencies(createCliDependencies(createUnusedProcessRunner()))
 
@@ -218,13 +271,22 @@ export default defineConfig({
 	test('generates a DevflareVars contract inferred from config vars', async () => {
 		const configEntryImportPath = pathToFileURL(join(repoRoot, 'src', 'config-entry.ts')).href
 
-		await writeFile(join(projectDir, 'package.json'), JSON.stringify({
-			name: 'types-command-vars-test',
-			private: true,
-			type: 'module'
-		}, null, 2))
+		await writeFile(
+			join(projectDir, 'package.json'),
+			JSON.stringify(
+				{
+					name: 'types-command-vars-test',
+					private: true,
+					type: 'module'
+				},
+				null,
+				2
+			)
+		)
 
-		await writeFile(join(projectDir, 'devflare.config.ts'), `
+		await writeFile(
+			join(projectDir, 'devflare.config.ts'),
+			`
 import { defineConfig, env } from '${configEntryImportPath}'
 
 export default defineConfig({
@@ -240,7 +302,8 @@ export default defineConfig({
 		flag: env.FLAG.default('enabled')
 	}
 })
-`.trim())
+`.trim()
+		)
 
 		setDependencies(createCliDependencies(createUnusedProcessRunner()))
 
@@ -255,7 +318,9 @@ export default defineConfig({
 
 		const generatedTypes = await readFile(join(projectDir, 'env.d.ts'), 'utf8')
 		expect(generatedTypes).toContain("import type { InferConfigVars } from 'devflare/config'")
-		expect(generatedTypes).toContain("type __DevflareConfigVars = InferConfigVars<Awaited<typeof import('./devflare.config').default>>")
+		expect(generatedTypes).toContain(
+			"type __DevflareConfigVars = InferConfigVars<Awaited<typeof import('./devflare.config').default>>"
+		)
 		expect(generatedTypes).toContain('interface DevflareVars extends __DevflareConfigVars {}')
 		expect(generatedTypes).toContain('interface DevflareEnv extends __DevflareConfigVars {')
 	})

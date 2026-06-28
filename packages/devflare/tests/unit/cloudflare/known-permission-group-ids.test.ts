@@ -3,8 +3,8 @@ import {
 	renderGeneratedFile,
 	resolveUpdatedEntries
 } from '../../../scripts/refresh-permission-groups'
-import { KNOWN_PERMISSION_GROUP_DISPLAY_NAMES } from '../../../src/cloudflare/tokens'
 import { KNOWN_PERMISSION_GROUP_IDS_DATA } from '../../../src/cloudflare/known-permission-group-ids.generated'
+import { KNOWN_PERMISSION_GROUP_DISPLAY_NAMES } from '../../../src/cloudflare/tokens'
 
 describe('known-permission-group-ids.generated.ts', () => {
 	test('exports an entry for every symbolic permission name used by tokens.ts', () => {
@@ -60,9 +60,7 @@ describe('resolveUpdatedEntries', () => {
 	})
 
 	test('falls back to null when an entry is missing from the API response', () => {
-		const apiResponse = [
-			{ id: 'uuid-workers-scripts-write', name: 'Workers Scripts Write' }
-		]
+		const apiResponse = [{ id: 'uuid-workers-scripts-write', name: 'Workers Scripts Write' }]
 
 		const entries = resolveUpdatedEntries(apiResponse, { keepExisting: false })
 		const missingEntry = entries.find((entry) => entry.symbolicName === 'WORKERS_SCRIPTS_READ')
@@ -109,9 +107,7 @@ describe('resolveUpdatedEntries', () => {
 
 describe('renderGeneratedFile', () => {
 	test('emits a deterministic, importable TypeScript module with the AUTO-GENERATED banner', () => {
-		const apiResponse = [
-			{ id: 'uuid-workers-scripts-write', name: 'Workers Scripts Write' }
-		]
+		const apiResponse = [{ id: 'uuid-workers-scripts-write', name: 'Workers Scripts Write' }]
 		const entries = resolveUpdatedEntries(apiResponse, { keepExisting: false })
 
 		const rendered = renderGeneratedFile(entries)
@@ -126,9 +122,7 @@ describe('renderGeneratedFile', () => {
 	})
 
 	test('produces stable output for the same input (idempotent across calls)', () => {
-		const apiResponse = [
-			{ id: 'uuid-workers-scripts-write', name: 'Workers Scripts Write' }
-		]
+		const apiResponse = [{ id: 'uuid-workers-scripts-write', name: 'Workers Scripts Write' }]
 		const entries = resolveUpdatedEntries(apiResponse, { keepExisting: false })
 
 		const first = renderGeneratedFile(entries)

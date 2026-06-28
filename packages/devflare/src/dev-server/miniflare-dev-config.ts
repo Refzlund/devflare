@@ -7,14 +7,27 @@
 // be unit-tested independently of the dev-server lifecycle.
 // =============================================================================
 
-import { resolve } from 'pathe'
 import type { ConsolaInstance } from 'consola'
+import { resolve } from 'pathe'
+import { getBrowserBindingScript } from '../browser-shim/binding-worker'
+import type { DOBundleResult } from '../bundler'
 import type { DevflareConfig } from '../config'
 import { getSingleBrowserBindingName } from '../config/schema'
-import type { DOBundleResult } from '../bundler'
-import { getBrowserBindingScript } from '../browser-shim/binding-worker'
+import { buildLocalSecretWrappedBindingConfig } from '../secrets/local-secrets'
+import { buildLocalBindingShimServiceConfig } from '../shims/local-media-bindings'
+import type { resolveServiceBindings } from '../test/resolve-service-bindings'
 import type { RouteDiscoveryResult } from '../worker-entry/routes'
+import { getGatewayScript } from './gateway-script'
 import {
+	buildAiSearchInstancesConfig,
+	buildAiSearchNamespacesConfig,
+	buildArtifactsConfig,
+	buildDispatchNamespacesConfig,
+	buildHyperdrivesConfig,
+	buildImagesConfig,
+	buildMediaConfig,
+	buildMtlsCertificatesConfig,
+	buildPipelinesConfig,
 	buildQueueConsumers,
 	buildQueueProducers,
 	buildRateLimitsConfig,
@@ -22,28 +35,15 @@ import {
 	buildSendEmailConfig,
 	buildVersionMetadataConfig,
 	buildWorkerLoadersConfig,
-	buildMtlsCertificatesConfig,
-	buildDispatchNamespacesConfig,
-	buildWorkflowsConfig,
-	buildPipelinesConfig,
-	buildHyperdrivesConfig,
-	buildImagesConfig,
-	buildMediaConfig,
-	buildArtifactsConfig,
-	buildAiSearchNamespacesConfig,
-	buildAiSearchInstancesConfig
+	buildWorkflowsConfig
 } from './miniflare-bindings'
-import { getGatewayScript } from './gateway-script'
 import {
-	buildServiceBindings,
-	makeMiniflareWorker,
 	type MakeMiniflareWorkerContext,
-	type MiniflareServiceBinding
+	type MiniflareServiceBinding,
+	buildServiceBindings,
+	makeMiniflareWorker
 } from './miniflare-worker-config'
-import { hasWorkerSurfacePaths, type WorkerSurfacePaths } from './worker-surface-paths'
-import { buildLocalSecretWrappedBindingConfig } from '../secrets/local-secrets'
-import { buildLocalBindingShimServiceConfig } from '../shims/local-media-bindings'
-import type { resolveServiceBindings } from '../test/resolve-service-bindings'
+import { type WorkerSurfacePaths, hasWorkerSurfacePaths } from './worker-surface-paths'
 
 const INTERNAL_APP_SERVICE_BINDING = '__DEVFLARE_APP'
 type ServiceBindingResolution = Awaited<ReturnType<typeof resolveServiceBindings>>
@@ -98,10 +98,9 @@ export function buildMiniflareDevConfig(input: BuildMiniflareDevConfigInput): an
 	const bindings = loadedConfig.bindings ?? {}
 	const persistPath = resolve(cwd, '.devflare/data')
 	const appWorkerName = loadedConfig.name
-	const shouldRunMainWorker = !enableVite && (
-		hasWorkerSurfacePaths(mainWorkerSurfacePaths)
-		|| Boolean(mainWorkerRoutes?.routes.length)
-	)
+	const shouldRunMainWorker =
+		!enableVite &&
+		(hasWorkerSurfacePaths(mainWorkerSurfacePaths) || Boolean(mainWorkerRoutes?.routes.length))
 	const queueProducers = buildQueueProducers(bindings)
 	const queueConsumers = buildQueueConsumers(bindings)
 
@@ -117,13 +116,12 @@ export function buildMiniflareDevConfig(input: BuildMiniflareDevConfigInput): an
 	}
 
 	const localBindingShimServiceConfig = buildLocalBindingShimServiceConfig(loadedConfig)
-	const createServiceBindings = (
-		extraBindings: Record<string, MiniflareServiceBinding> = {}
-	) => buildServiceBindings(bindings, {
-		...(serviceBindingResolution?.primaryServiceBindings ?? {}),
-		...localBindingShimServiceConfig.serviceBindings,
-		...extraBindings
-	})
+	const createServiceBindings = (extraBindings: Record<string, MiniflareServiceBinding> = {}) =>
+		buildServiceBindings(bindings, {
+			...(serviceBindingResolution?.primaryServiceBindings ?? {}),
+			...localBindingShimServiceConfig.serviceBindings,
+			...extraBindings
+		})
 
 	const sendEmailConfig = buildSendEmailConfig(bindings)
 	const rateLimitsConfig = buildRateLimitsConfig(bindings)
@@ -182,18 +180,22 @@ export function buildMiniflareDevConfig(input: BuildMiniflareDevConfigInput): an
 				debug,
 				shouldRunMainWorker ? INTERNAL_APP_SERVICE_BINDING : null
 			)
-		].filter(Boolean).join('\n\n'),
+		]
+			.filter(Boolean)
+			.join('\n\n'),
 		serviceBindings: shouldRunMainWorker
 			? createServiceBindings({
-				[INTERNAL_APP_SERVICE_BINDING]: { name: appWorkerName }
-			})
+					[INTERNAL_APP_SERVICE_BINDING]: { name: appWorkerName }
+				})
 			: createServiceBindings()
 	})
 	gatewayWorker.routes = ['*']
 
 	const hasDurableObjectBundles = !!doResult && doResult.bundles.size > 0
 	const browserBindingName = getSingleBrowserBindingName(bindings.browser)
-	const needsBrowserWorker = Boolean(browserBindingName && (hasDurableObjectBundles || shouldRunMainWorker))
+	const needsBrowserWorker = Boolean(
+		browserBindingName && (hasDurableObjectBundles || shouldRunMainWorker)
+	)
 
 	const workers: any[] = []
 	const durableObjects: Record<string, { className: string; scriptName: string }> = {}
@@ -205,8 +207,8 @@ export function buildMiniflareDevConfig(input: BuildMiniflareDevConfigInput): an
 		const mainWorkerServiceBindings = createServiceBindings(
 			browserBindingName
 				? {
-					[browserBindingName]: { name: browserWorkerName }
-				}
+						[browserBindingName]: { name: browserWorkerName }
+					}
 				: {}
 		)
 
@@ -239,14 +241,16 @@ export function buildMiniflareDevConfig(input: BuildMiniflareDevConfigInput): an
 				serviceBindings: createServiceBindings(
 					browserBindingName
 						? {
-							[browserBindingName]: { name: browserWorkerName }
-						}
+								[browserBindingName]: { name: browserWorkerName }
+							}
 						: {}
 				)
 			})
 
 			if (browserBindingName) {
-				logger?.debug(`DO ${workerName} has browser service binding: ${browserBindingName} → ${browserWorkerName}`)
+				logger?.debug(
+					`DO ${workerName} has browser service binding: ${browserBindingName} → ${browserWorkerName}`
+				)
 			}
 
 			logger?.debug(`DO ${workerName} config:`, JSON.stringify(workerConfig, null, 2))

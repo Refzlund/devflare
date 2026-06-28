@@ -101,7 +101,9 @@ export function mergeParsedWranglerDeployOutputs(
 
 	return {
 		versionId: outputs.map((output) => output.versionId).find((value) => Boolean(value)),
-		previewUrl: outputs.map((output) => output.previewUrl).find((value) => Boolean(value)) ?? urls.find((url) => url.includes('workers.dev')),
+		previewUrl:
+			outputs.map((output) => output.previewUrl).find((value) => Boolean(value)) ??
+			urls.find((url) => url.includes('workers.dev')),
 		urls
 	}
 }
@@ -110,10 +112,11 @@ export function parseWranglerDeployOutput(output: string): ParsedWranglerDeployO
 	const normalizedOutput = output.replace(/\r/g, '')
 	const urls = [...new Set(normalizedOutput.match(/https?:\/\/[^\s'"`]+/g) ?? [])]
 
-	const previewUrl = matchNamedValue(normalizedOutput, [
-		/Preview URL:\s*(https?:\/\/\S+)/i,
-		/Version Preview URL:\s*(https?:\/\/\S+)/i
-	]) ?? urls.find((url) => url.includes('workers.dev'))
+	const previewUrl =
+		matchNamedValue(normalizedOutput, [
+			/Preview URL:\s*(https?:\/\/\S+)/i,
+			/Version Preview URL:\s*(https?:\/\/\S+)/i
+		]) ?? urls.find((url) => url.includes('workers.dev'))
 
 	const versionId = matchNamedValue(normalizedOutput, [
 		/Worker Version ID:\s*([A-Za-z0-9_-]+)/i,

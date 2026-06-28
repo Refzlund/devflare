@@ -105,7 +105,10 @@ const executeRpcScript = `
  * @param doClasses - String containing DO class definitions
  * @param gatewayName - Optional name for the gateway (for logging)
  */
-export function createGatewayScript(doClasses: string, gatewayName = 'Devflare Bridge Gateway'): string {
+export function createGatewayScript(
+	doClasses: string,
+	gatewayName = 'Devflare Bridge Gateway'
+): string {
 	return `
 ${doClasses}
 

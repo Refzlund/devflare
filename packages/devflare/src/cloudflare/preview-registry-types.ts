@@ -2,8 +2,8 @@ import type { ConsolaInstance } from 'consola'
 import type { APIClientOptions } from './api'
 import type {
 	DevflareDeploymentRecord,
-	DevflarePreviewScopeRecord,
 	DevflarePreviewRecord,
+	DevflarePreviewScopeRecord,
 	DevflareRecordSource
 } from './registry-schema'
 

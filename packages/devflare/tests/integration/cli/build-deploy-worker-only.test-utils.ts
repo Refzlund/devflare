@@ -1,14 +1,14 @@
-import { mkdir, writeFile, readFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'pathe'
 import { runDeployCommand } from '../../../src/cli/commands/deploy'
 import { setDependencies } from '../../../src/cli/dependencies'
 import { jsonResponse } from '../../helpers/cloudflare-api'
-import { createLogger, type TestLogger } from '../../helpers/mock-logger'
+import { type TestLogger, createLogger } from '../../helpers/mock-logger'
 import {
+	type ExecInvocation,
 	createCliDependencies,
 	createProcessRunner,
-	successResult,
-	type ExecInvocation
+	successResult
 } from '../../helpers/process-runner'
 export {
 	createCliDependencies,
@@ -60,17 +60,25 @@ export function restoreDeployEnvironmentSnapshot(snapshot: DeployEnvironmentSnap
 	restoreOptionalEnvironmentVariable('CLOUDFLARE_API_TOKEN', snapshot.token)
 	restoreOptionalEnvironmentVariable('CLOUDFLARE_ACCOUNT_ID', snapshot.accountId)
 	restoreOptionalEnvironmentVariable('DEVFLARE_VERIFY_DEPLOYMENT', snapshot.verifyDeployment)
-	restoreOptionalEnvironmentVariable('DEVFLARE_VERIFY_DEPLOYMENT_DELAY_MS', snapshot.verifyDeploymentDelayMs)
-	restoreOptionalEnvironmentVariable('DEVFLARE_REQUIRE_FRESH_PRODUCTION_DEPLOYMENT', snapshot.requireFreshProductionDeployment)
+	restoreOptionalEnvironmentVariable(
+		'DEVFLARE_VERIFY_DEPLOYMENT_DELAY_MS',
+		snapshot.verifyDeploymentDelayMs
+	)
+	restoreOptionalEnvironmentVariable(
+		'DEVFLARE_REQUIRE_FRESH_PRODUCTION_DEPLOYMENT',
+		snapshot.requireFreshProductionDeployment
+	)
 	restoreOptionalEnvironmentVariable('DEVFLARE_DEPLOY_METADATA_PATH', snapshot.deployMetadataPath)
 }
 
-export function enableStrictDeployVerification(options: {
-	token?: string
-	accountId?: string
-	delayMs?: string
-	requireFreshProductionDeployment?: boolean
-} = {}): void {
+export function enableStrictDeployVerification(
+	options: {
+		token?: string
+		accountId?: string
+		delayMs?: string
+		requireFreshProductionDeployment?: boolean
+	} = {}
+): void {
 	process.env.CLOUDFLARE_API_TOKEN = options.token ?? 'test-token'
 	delete process.env.CLOUDFLARE_ACCOUNT_ID
 	if (options.accountId) {
@@ -109,29 +117,31 @@ export function createDeployHarness(
 	}
 }
 
-export async function runWorkerOnlyDeploy(
-	projectDir: string,
-	logger: TestLogger
-) {
-	return await runDeployCommand(
-		{ command: 'deploy', args: [], options: {} },
-		logger as any,
-		{ cwd: projectDir }
-	)
+export async function runWorkerOnlyDeploy(projectDir: string, logger: TestLogger) {
+	return await runDeployCommand({ command: 'deploy', args: [], options: {} }, logger as any, {
+		cwd: projectDir
+	})
 }
 
-export function createWranglerDeployProcessRunner(options: {
-	stdout?: string
-	structuredOutput?: Record<string, unknown>
-} = {}): Parameters<typeof createProcessRunner>[0] {
+export function createWranglerDeployProcessRunner(
+	options: {
+		stdout?: string
+		structuredOutput?: Record<string, unknown>
+	} = {}
+): Parameters<typeof createProcessRunner>[0] {
 	return async (command, args, executionOptions) => {
 		if (command === 'bunx' && args[0] === 'wrangler' && args[1] === 'deploy') {
 			if (options.structuredOutput) {
-				const outputFilePath = String((executionOptions?.env as Record<string, unknown> | undefined)?.WRANGLER_OUTPUT_FILE_PATH ?? '')
+				const outputFilePath = String(
+					(executionOptions?.env as Record<string, unknown> | undefined)
+						?.WRANGLER_OUTPUT_FILE_PATH ?? ''
+				)
 				await writeFile(outputFilePath, JSON.stringify(options.structuredOutput))
 			}
 
-			return successResult(options.stdout ?? 'Deployed successfully to https://worker-build-test.example.workers.dev')
+			return successResult(
+				options.stdout ?? 'Deployed successfully to https://worker-build-test.example.workers.dev'
+			)
 		}
 
 		return successResult()
@@ -194,9 +204,7 @@ export function createWorkerDeployment(
 	}
 }
 
-export function createWorkerDeploymentsList(
-	deployments: Array<Record<string, unknown>>
-): Response {
+export function createWorkerDeploymentsList(deployments: Array<Record<string, unknown>>): Response {
 	return cloudflareApiResponse({ deployments })
 }
 
@@ -238,7 +246,6 @@ async function writeProjectFixture(
 		await mkdir(dirname(absolutePath), { recursive: true })
 		await writeFile(absolutePath, content.trim())
 	}
-
 }
 
 async function writeLocalViteInstall(projectDir: string): Promise<void> {
@@ -251,10 +258,13 @@ async function writeLocalViteInstall(projectDir: string): Promise<void> {
 			vite: 'bin/vite.js'
 		}
 	})
-	await writeFile(join(projectDir, 'node_modules', 'vite', 'bin', 'vite.js'), `
+	await writeFile(
+		join(projectDir, 'node_modules', 'vite', 'bin', 'vite.js'),
+		`
 #!/usr/bin/env node
 console.log('stub vite binary')
-`.trim())
+`.trim()
+	)
 }
 
 export async function writeProjectFiles(
@@ -281,9 +291,9 @@ export async function writeProjectFiles(
 			...DEFAULT_DEV_DEPENDENCIES,
 			...(options.withViteDeps
 				? {
-					vite: '^6.0.0',
-					'@cloudflare/vite-plugin': '^1.0.0'
-				}
+						vite: '^6.0.0',
+						'@cloudflare/vite-plugin': '^1.0.0'
+					}
 				: {})
 		},
 		configSource: `
@@ -292,26 +302,28 @@ export default {
 	compatibilityDate: '2026-03-17',
 	files: {
 		fetch: 'src/fetch.ts'
-	}${inlineViteConfig}${options.passthroughMain
-				? `,
+	}${inlineViteConfig}${
+		options.passthroughMain
+			? `,
 	wrangler: {
 		passthrough: {
 			main: '${options.passthroughMain}'
 		}
 	}`
-				: ''}
+			: ''
+	}
 }
 `.trim(),
 		files: {
 			'src/fetch.ts': DEFAULT_FETCH_HANDLER_SOURCE,
 			...(options.withViteConfig
 				? {
-					'vite.config.ts': `
+						'vite.config.ts': `
 import { defineConfig } from 'vite'
 
 export default defineConfig({})
 `.trim()
-				}
+					}
 				: {})
 		}
 	})
@@ -492,15 +504,16 @@ export default {
 	},
 	triggers: {
 		crons: ['0 * * * *']
-	}${options.passthroughMain
-				? `,
+	}${
+		options.passthroughMain
+			? `,
 	wrangler: {
 		passthrough: {
 			main: '${options.passthroughMain}'
 		}
 	}`
-				: ''
-			}
+			: ''
+	}
 }
 	`.trim(),
 		files: {
@@ -522,12 +535,12 @@ export async function email() {
 	`.trim(),
 			...(options.passthroughMain
 				? {
-					[options.passthroughMain]: `
+						[options.passthroughMain]: `
 export async function fetch(): Promise<Response> {
 	return new Response('custom')
 }
 	`.trim()
-				}
+					}
 				: {})
 		}
 	})
@@ -616,7 +629,9 @@ export function isViteBuildExecution(command: string, args: string[]): boolean {
 	// `bun --bun <vite.js> build …` (devflare's preferred Bun-runtime spawn)
 	if (command === 'bun') {
 		const bunFlagIndex = args.indexOf('--bun')
-		const viteIndex = args.findIndex((arg) => arg.replace(/\\/g, '/').endsWith('/node_modules/vite/bin/vite.js'))
+		const viteIndex = args.findIndex((arg) =>
+			arg.replace(/\\/g, '/').endsWith('/node_modules/vite/bin/vite.js')
+		)
 		if (bunFlagIndex >= 0 && viteIndex >= 0 && args[viteIndex + 1] === 'build') {
 			return true
 		}

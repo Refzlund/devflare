@@ -5,10 +5,10 @@
 // in development mode, while passing through the real platform in production.
 // =============================================================================
 
-import { loadConfig, type DevflareConfig } from '../config'
-import { createEnvProxy, getClient, setBindingHints, type BindingHints } from '../bridge'
-import { extractBindingHints } from '../test/binding-hints'
+import { type BindingHints, createEnvProxy, getClient, setBindingHints } from '../bridge'
+import { type DevflareConfig, loadConfig } from '../config'
 import { createFetchEvent, runWithEventContext } from '../runtime/context'
+import { extractBindingHints } from '../test/binding-hints'
 import { buildSvelteKitLocalBindings, overlayLocalBindings } from './local-bindings'
 
 // -----------------------------------------------------------------------------
@@ -63,7 +63,9 @@ let platformCache: { key: string; platform: Platform } | null = null
  * shared across configs with differing hint sets.
  */
 function fingerprintHints(hints: BindingHints): string {
-	const entries = Object.keys(hints).sort().map((name) => [name, hints[name]])
+	const entries = Object.keys(hints)
+		.sort()
+		.map((name) => [name, hints[name]])
 	return JSON.stringify(entries)
 }
 
@@ -113,15 +115,15 @@ export function drainWaitUntilErrors(platform: Platform): unknown[] {
 
 /**
  * Create a platform object that routes bindings through the bridge
- * 
+ *
  * Use this in dev mode to get access to Miniflare bindings via WebSocket RPC.
- * 
+ *
  * @example
  * ```ts
  * // src/hooks.server.ts
  * import { dev } from '$app/environment'
  * import { createDevflarePlatform } from 'devflare/sveltekit'
- * 
+ *
  * export async function handle({ event, resolve }) {
  *   if (dev && process.env.DEVFLARE_DEV) {
  *     // Override platform with bridge-connected proxy
@@ -204,15 +206,18 @@ function createMockCache() {
 
 	return {
 		async match(request: RequestInfo | URL): Promise<Response | undefined> {
-			const key = typeof request === 'string' ? request : request instanceof URL ? request.href : request.url
+			const key =
+				typeof request === 'string' ? request : request instanceof URL ? request.href : request.url
 			return store.get(key)?.clone()
 		},
 		async put(request: RequestInfo | URL, response: Response): Promise<void> {
-			const key = typeof request === 'string' ? request : request instanceof URL ? request.href : request.url
+			const key =
+				typeof request === 'string' ? request : request instanceof URL ? request.href : request.url
 			store.set(key, response.clone())
 		},
 		async delete(request: RequestInfo | URL): Promise<boolean> {
-			const key = typeof request === 'string' ? request : request instanceof URL ? request.href : request.url
+			const key =
+				typeof request === 'string' ? request : request instanceof URL ? request.href : request.url
 			return store.delete(key)
 		}
 	} as unknown as Cache
@@ -243,7 +248,7 @@ export function isDevflareDev(): boolean {
  * Get the bridge port from environment
  */
 export function getBridgePort(): number {
-	return parseInt(process.env.DEVFLARE_BRIDGE_PORT ?? '8787', 10)
+	return Number.parseInt(process.env.DEVFLARE_BRIDGE_PORT ?? '8787', 10)
 }
 
 // -----------------------------------------------------------------------------
@@ -284,7 +289,9 @@ async function loadConfigFromCurrentCwd(): Promise<DevflareConfig | null> {
 	return promise
 }
 
-async function loadPlatformOptionsFromConfig(): Promise<Pick<DevflarePlatformOptions, 'hints' | 'localBindings'>> {
+async function loadPlatformOptionsFromConfig(): Promise<
+	Pick<DevflarePlatformOptions, 'hints' | 'localBindings'>
+> {
 	const cwd = process.cwd()
 	const config = await loadConfigFromCurrentCwd()
 	if (!config) {
@@ -300,11 +307,7 @@ async function loadPlatformOptionsFromConfig(): Promise<Pick<DevflarePlatformOpt
 function resolveWithPlatformContext<
 	TEvent extends { platform?: unknown; request?: Request },
 	TResolve extends (event: unknown) => Response | Promise<Response>
->(
-	event: TEvent,
-	resolve: TResolve,
-	platform: Platform
-): Response | Promise<Response> {
+>(event: TEvent, resolve: TResolve, platform: Platform): Response | Promise<Response> {
 	if (!(event.request instanceof Request)) {
 		return resolve(event)
 	}
@@ -316,11 +319,7 @@ function resolveWithPlatformContext<
 async function createPlatformWithRequestContext<
 	TEvent extends { platform?: unknown; request?: Request },
 	TResolve extends (event: unknown) => Response | Promise<Response>
->(
-	event: TEvent,
-	resolve: TResolve,
-	options: DevflarePlatformOptions
-): Promise<Response> {
+>(event: TEvent, resolve: TResolve, options: DevflarePlatformOptions): Promise<Response> {
 	const platform = await createDevflarePlatform(options)
 	event.platform = platform as typeof event.platform
 	return resolveWithPlatformContext(event, resolve, platform)
@@ -360,12 +359,12 @@ export interface CreateHandleOptions extends DevflarePlatformOptions {
 /**
  * Create a SvelteKit handle that automatically injects the devflare platform
  * in development mode. This eliminates the need for boilerplate in hooks.server.ts.
- * 
+ *
  * @example
  * ```ts
  * // src/hooks.server.ts
  * import { createHandle } from 'devflare/sveltekit'
- * 
+ *
  * export const handle = createHandle({
  *   hints: {
  *     MY_KV: 'kv',
@@ -375,28 +374,31 @@ export interface CreateHandleOptions extends DevflarePlatformOptions {
  *   }
  * })
  * ```
- * 
+ *
  * @example Composing with other handles using SvelteKit's sequence
  * ```ts
  * import { sequence } from '@sveltejs/kit/hooks'
  * import { createHandle } from 'devflare/sveltekit'
- * 
+ *
  * const devflareHandle = createHandle({ hints: { ... } })
  * const authHandle: Handle = async ({ event, resolve }) => { ... }
- * 
+ *
  * export const handle = sequence(devflareHandle, authHandle)
  * ```
  */
-export function createHandle<T extends { event: { platform?: unknown; request?: Request }; resolve: (event: unknown) => Response | Promise<Response> }>(
-	options: CreateHandleOptions = {}
-): (input: T) => Promise<Response> {
+export function createHandle<
+	T extends {
+		event: { platform?: unknown; request?: Request }
+		resolve: (event: unknown) => Response | Promise<Response>
+	}
+>(options: CreateHandleOptions = {}): (input: T) => Promise<Response> {
 	const { shouldEnable, ...platformOptions } = options
 
 	return async ({ event, resolve }) => {
 		// Check if devflare should be enabled
 		const enabled = shouldEnable
 			? shouldEnable()
-			: (process.env.NODE_ENV !== 'production' && process.env.DEVFLARE_DEV === 'true')
+			: process.env.NODE_ENV !== 'production' && process.env.DEVFLARE_DEV === 'true'
 
 		if (enabled) {
 			try {
@@ -421,27 +423,32 @@ export function createHandle<T extends { event: { platform?: unknown; request?: 
 
 /**
  * Pre-configured SvelteKit handle that auto-loads binding hints from devflare.config.ts.
- * 
+ *
  * This is the simplest way to integrate devflare with SvelteKit:
- * 
+ *
  * @example Simplest usage — just re-export
  * ```ts
  * // src/hooks.server.ts
  * export { handle } from 'devflare/sveltekit'
  * ```
- * 
+ *
  * @example With other handles
  * ```ts
  * // src/hooks.server.ts
  * import { sequence } from '@sveltejs/kit/hooks'
  * import { handle as devflareHandle } from 'devflare/sveltekit'
- * 
+ *
  * const authHandle: Handle = async ({ event, resolve }) => { ... }
- * 
+ *
  * export const handle = sequence(devflareHandle, authHandle)
  * ```
  */
-export const handle = async <T extends { event: { platform?: unknown; request?: Request }; resolve: (event: unknown) => Response | Promise<Response> }>(
+export const handle = async <
+	T extends {
+		event: { platform?: unknown; request?: Request }
+		resolve: (event: unknown) => Response | Promise<Response>
+	}
+>(
 	input: T
 ): Promise<Response> => {
 	const { event, resolve } = input
@@ -451,11 +458,7 @@ export const handle = async <T extends { event: { platform?: unknown; request?: 
 
 	if (enabled) {
 		try {
-			return await createPlatformWithRequestContext(
-				event,
-				resolve,
-				await getAutoPlatformOptions()
-			)
+			return await createPlatformWithRequestContext(event, resolve, await getAutoPlatformOptions())
 		} catch (error) {
 			console.error('[devflare] Failed to create platform:', error)
 			// Fall through to default platform

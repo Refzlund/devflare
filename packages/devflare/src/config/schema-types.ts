@@ -1,5 +1,5 @@
-import type { BindingsConfigInput } from './schema-types-bindings'
 import type { DevflareVarsInput } from './env-vars'
+import type { BindingsConfigInput } from './schema-types-bindings'
 import type {
 	RolldownConfigInput,
 	ViteConfigInput,
@@ -469,7 +469,8 @@ export interface DevflareConfigInput {
  * Environment-specific config override input. All root fields are optional
  * inside an environment, except fields that do not make sense per environment.
  */
-export interface DevflareEnvConfigInput extends Partial<Omit<DevflareConfigInput, 'accountId' | 'wsRoutes' | 'env'>> {}
+export interface DevflareEnvConfigInput
+	extends Partial<Omit<DevflareConfigInput, 'accountId' | 'wsRoutes' | 'env'>> {}
 
 export type * from './schema-types-bindings'
 export type * from './schema-types-build'

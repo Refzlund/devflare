@@ -1,5 +1,5 @@
-import { resolve } from 'pathe'
 import { spawn } from 'node:child_process'
+import { resolve } from 'pathe'
 
 export const VITE_CONFIG_FILES = [
 	'vite.config.ts',
@@ -29,7 +29,10 @@ export interface SpawnedLikeProcess {
 	stderr: NodeJS.ReadableStream | null
 	readonly killed: boolean
 	kill(signal?: NodeJS.Signals): boolean
-	on(event: 'exit', handler: (code: number | null, signal: NodeJS.Signals | null) => void): SpawnedLikeProcess
+	on(
+		event: 'exit',
+		handler: (code: number | null, signal: NodeJS.Signals | null) => void
+	): SpawnedLikeProcess
 	on(event: 'error', handler: (error: Error) => void): SpawnedLikeProcess
 }
 
@@ -49,7 +52,7 @@ const ANSI_REGEX = /\x1b\[[0-9;]*m/g
 const LOCAL_VITE_URL_REGEX = /https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?\/?/i
 
 async function getNodeFs(): Promise<ViteProjectFileSystem> {
-	return await import('node:fs/promises') as unknown as ViteProjectFileSystem
+	return (await import('node:fs/promises')) as unknown as ViteProjectFileSystem
 }
 
 function safeParsePackageJson(content: string): Record<string, unknown> {
@@ -71,7 +74,7 @@ export async function detectViteProject(
 	cwd: string,
 	fs?: ViteProjectFileSystem
 ): Promise<ViteProjectDetection> {
-	const fileSystem = fs ?? await getNodeFs()
+	const fileSystem = fs ?? (await getNodeFs())
 	let viteConfigPath: string | null = null
 
 	for (const configName of VITE_CONFIG_FILES) {
@@ -81,7 +84,7 @@ export async function detectViteProject(
 			viteConfigPath = absolutePath
 			break
 		} catch {
-			continue
+			// Config file not present — try the next candidate.
 		}
 	}
 
@@ -166,11 +169,7 @@ export async function waitForViteReady(
 	process: SpawnedLikeProcess,
 	options: WaitForViteReadyOptions = {}
 ): Promise<string | null> {
-	const {
-		timeoutMs = 15000,
-		onStdout,
-		onStderr
-	} = options
+	const { timeoutMs = 15000, onStdout, onStderr } = options
 
 	let combinedOutput = ''
 

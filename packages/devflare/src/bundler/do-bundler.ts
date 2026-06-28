@@ -5,19 +5,19 @@
 // Supports TypeScript out of the box, handles cloudflare: imports
 // =============================================================================
 
-import { resolve, dirname, basename, relative } from 'pathe'
 import type { ConsolaInstance } from 'consola'
+import { basename, dirname, relative, resolve } from 'pathe'
 import picomatch from 'picomatch'
 import type { DevflareRolldownOptions } from '../config/schema'
-import { findFiles, DEFAULT_DO_PATTERN } from '../utils/glob'
 import { transformDurableObject } from '../transform/durable-object'
+import { DEFAULT_DO_PATTERN, findFiles } from '../utils/glob'
 import { discoverDurableObjectFiles } from '../worker-entry/durable-object-discovery'
+import { createWorkerdBundlerDefaults } from './defaults'
 import {
 	ensureDebugShim,
 	resolveWorkerCompatibleRolldownConfig,
 	writeWorkerCompatibleBundle
 } from './rolldown-shared'
-import { createWorkerdBundlerDefaults } from './defaults'
 
 // -----------------------------------------------------------------------------
 // Types
@@ -121,10 +121,7 @@ function stripDecoratorSyntax(code: string): string {
 
 	// 1. Remove @durableObject(...) decorator followed by export class
 	// Pattern: @durableObject({ ... }) or @durableObject() followed by newlines/whitespace and export class
-	result = result.replace(
-		/@durableObject\s*\([^)]*\)\s*\n?\s*(?=export\s+class)/g,
-		''
-	)
+	result = result.replace(/@durableObject\s*\([^)]*\)\s*\n?\s*(?=export\s+class)/g, '')
 
 	// 2. Remove import of durableObject from devflare/runtime
 	// Handle various import patterns:
@@ -188,8 +185,8 @@ async function bundleDOFile(
 
 	// Apply the Durable Object wrapper transform so event-first handlers receive
 	// AsyncLocalStorage-backed event injection in non-Vite dev/build paths too.
-	const transformedCode = (await transformDurableObject(sourceCode, sourcePath))?.code
-		?? stripDecoratorSyntax(sourceCode)
+	const transformedCode =
+		(await transformDurableObject(sourceCode, sourcePath))?.code ?? stripDecoratorSyntax(sourceCode)
 
 	// Create entry code that re-exports the class and has a default fetch handler
 	const entryCode = `${transformedCode}
@@ -236,11 +233,12 @@ export default {
 
 	const userRolldownOptions = bundleOptions?.rolldownOptions
 	const userPlugins = userRolldownOptions?.plugins
-	const mergedPlugins = userPlugins === undefined
-		? [virtualEntryPlugin]
-		: Array.isArray(userPlugins)
-			? [virtualEntryPlugin, ...userPlugins]
-			: [virtualEntryPlugin, userPlugins]
+	const mergedPlugins =
+		userPlugins === undefined
+			? [virtualEntryPlugin]
+			: Array.isArray(userPlugins)
+				? [virtualEntryPlugin, ...userPlugins]
+				: [virtualEntryPlugin, userPlugins]
 
 	const outFile = resolve(classOutDir, 'index.js')
 	const defaults = createWorkerdBundlerDefaults()
@@ -301,13 +299,7 @@ async function bundleAllDOs(
 		try {
 			logger?.debug(`Bundling ${do_.className} from ${do_.filePath}`)
 
-			const outFile = await bundleDOFile(
-				do_.filePath,
-				do_.className,
-				outDir,
-				cwd,
-				bundleOptions
-			)
+			const outFile = await bundleDOFile(do_.filePath, do_.className, outDir, cwd, bundleOptions)
 
 			bundles.set(do_.bindingName, outFile)
 			classes.set(do_.bindingName, do_.className)
@@ -374,7 +366,7 @@ export function createDOBundler(options: DOBundlerOptions): DOBundler {
 
 	/**
 	 * Watch for changes and rebuild
-	 * 
+	 *
 	 * Strategy: Watch parent directories of DO files with a filter for matching files.
 	 * This allows detection of new DO files created during dev.
 	 * Uses compiled picomatch for fast pattern matching instead of re-globbing on every event.
@@ -562,7 +554,9 @@ export function createDOBundler(options: DOBundlerOptions): DOBundler {
 /**
  * Bundle DOs without watching (one-shot build)
  */
-export async function bundleDOs(options: Omit<DOBundlerOptions, 'onRebuild'>): Promise<DOBundleResult> {
+export async function bundleDOs(
+	options: Omit<DOBundlerOptions, 'onRebuild'>
+): Promise<DOBundleResult> {
 	const bundler = createDOBundler(options)
 	const result = await bundler.build()
 	return result

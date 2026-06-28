@@ -2,17 +2,17 @@
 // Wrangler Auth Extraction
 // =============================================================================
 // Extracts usable API token from wrangler's config or via `wrangler auth token`
-// 
+//
 // Strategy:
 // 1. Read oauth_token + expiration_time from wrangler's config file (fast)
 // 2. If token is valid (not expired), use it directly
 // 3. If expired, call `wrangler auth token` to refresh (slow but necessary)
 // =============================================================================
 
+import { execSync } from 'node:child_process'
+import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { readFileSync, existsSync } from 'node:fs'
-import { execSync } from 'node:child_process'
 import { parse as parseToml } from 'smol-toml'
 import type { WranglerAuth } from './types'
 
@@ -187,7 +187,10 @@ function refreshWranglerToken(): string | null {
 		})
 
 		// Extract token from output (last non-empty line)
-		const lines = result.trim().split(/\r?\n/).filter((l) => l.trim().length > 0)
+		const lines = result
+			.trim()
+			.split(/\r?\n/)
+			.filter((l) => l.trim().length > 0)
 		const token = lines[lines.length - 1]?.trim()
 
 		if (token && token.length >= 20 && !token.includes('wrangler') && !token.includes('⛅')) {
@@ -202,13 +205,13 @@ function refreshWranglerToken(): string | null {
 
 /**
  * Get the API token to use for Cloudflare API requests
- * 
+ *
  * Strategy (fast path first):
  * 1. Check in-memory cache (unless forceRefresh)
  * 2. Check CLOUDFLARE_API_TOKEN env var
  * 3. Read token from wrangler config (if not expired)
  * 4. Call `wrangler auth token` to refresh (slow, only when needed)
- * 
+ *
  * @param forceRefresh - Skip cache and force a refresh via wrangler
  */
 export async function getApiToken(forceRefresh = false): Promise<string | null> {

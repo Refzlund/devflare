@@ -19,9 +19,10 @@ export type PreviewScopedName = string & {
 	readonly __devflarePreviewScopedName: unique symbol
 }
 
-export interface PreviewScopeFn {
-	(baseName: string, options?: PreviewScopedNameOptions): PreviewScopedName
-}
+export type PreviewScopeFn = (
+	baseName: string,
+	options?: PreviewScopedNameOptions
+) => PreviewScopedName
 
 export interface PreviewResolutionOptions {
 	environment?: string
@@ -29,14 +30,22 @@ export interface PreviewResolutionOptions {
 	identifier?: string
 }
 
-export type PreviewIdentifierSource = 'identifier' | 'env-identifier' | 'env-pr' | 'env-branch' | 'environment' | 'none'
+export type PreviewIdentifierSource =
+	| 'identifier'
+	| 'env-identifier'
+	| 'env-pr'
+	| 'env-branch'
+	| 'environment'
+	| 'none'
 
 export interface ResolvedPreviewIdentifier {
 	identifier?: string
 	source: PreviewIdentifierSource
 }
 
-function getPreviewScopedSeparator(options: PreviewScopedNameOptions | PreviewScopeOptions | undefined): string {
+function getPreviewScopedSeparator(
+	options: PreviewScopedNameOptions | PreviewScopeOptions | undefined
+): string {
 	return options?.separator ?? '-'
 }
 
@@ -60,9 +69,7 @@ function decodePreviewScopedName(value: PreviewScopedName): EncodedPreviewScoped
 		invalidPreviewScopedName('the encoded payload is not valid JSON')
 	}
 
-	const baseName = typeof parsed.baseName === 'string'
-		? parsed.baseName
-		: ''
+	const baseName = typeof parsed.baseName === 'string' ? parsed.baseName : ''
 
 	if (!baseName.trim()) {
 		invalidPreviewScopedName('the encoded payload is missing a non-empty baseName')
@@ -70,9 +77,8 @@ function decodePreviewScopedName(value: PreviewScopedName): EncodedPreviewScoped
 
 	return {
 		baseName,
-		separator: typeof parsed.separator === 'string' && parsed.separator.length > 0
-			? parsed.separator
-			: '-'
+		separator:
+			typeof parsed.separator === 'string' && parsed.separator.length > 0 ? parsed.separator : '-'
 	}
 }
 
@@ -94,7 +100,9 @@ function normalizePreviewFragment(rawValue: string): string {
 	return normalized
 }
 
-function getPreviewIdentifierFromEnv(env: Record<string, string | undefined>): ResolvedPreviewIdentifier {
+function getPreviewIdentifierFromEnv(
+	env: Record<string, string | undefined>
+): ResolvedPreviewIdentifier {
 	const explicitIdentifier = env.DEVFLARE_PREVIEW_IDENTIFIER?.trim()
 	if (explicitIdentifier) {
 		return {
@@ -125,7 +133,9 @@ function getPreviewIdentifierFromEnv(env: Record<string, string | undefined>): R
 	}
 }
 
-export function resolvePreviewIdentifier(options: PreviewResolutionOptions = {}): ResolvedPreviewIdentifier {
+export function resolvePreviewIdentifier(
+	options: PreviewResolutionOptions = {}
+): ResolvedPreviewIdentifier {
 	if (options.identifier?.trim()) {
 		return {
 			identifier: normalizePreviewFragment(options.identifier),
@@ -141,13 +151,13 @@ export function resolvePreviewIdentifier(options: PreviewResolutionOptions = {})
 
 	return options.environment === 'preview'
 		? {
-			identifier: 'preview',
-			source: 'environment'
-		}
+				identifier: 'preview',
+				source: 'environment'
+			}
 		: {
-			identifier: undefined,
-			source: 'none'
-		}
+				identifier: undefined,
+				source: 'none'
+			}
 }
 
 function mapRecordValues<TValue>(
@@ -214,115 +224,124 @@ export function materializePreviewScopedConfig(
 			...bindings,
 			...(bindings.kv
 				? {
-					kv: mapRecordValues(bindings.kv, (binding) => {
-						return typeof binding === 'string'
-							? materializePreviewScopedString(binding, options)
-							: binding
-					})
-				}
+						kv: mapRecordValues(bindings.kv, (binding) => {
+							return typeof binding === 'string'
+								? materializePreviewScopedString(binding, options)
+								: binding
+						})
+					}
 				: {}),
 			...(bindings.d1
 				? {
-					d1: mapRecordValues(bindings.d1, (binding) => {
-						return typeof binding === 'string'
-							? materializePreviewScopedString(binding, options)
-							: binding
-					})
-				}
+						d1: mapRecordValues(bindings.d1, (binding) => {
+							return typeof binding === 'string'
+								? materializePreviewScopedString(binding, options)
+								: binding
+						})
+					}
 				: {}),
 			...(bindings.r2
 				? {
-					r2: mapRecordValues(bindings.r2, (binding) => {
-						return materializePreviewScopedString(binding, options)
-					})
-				}
+						r2: mapRecordValues(bindings.r2, (binding) => {
+							return materializePreviewScopedString(binding, options)
+						})
+					}
 				: {}),
 			...(bindings.queues
 				? {
-					queues: {
-						...bindings.queues,
-						...(bindings.queues.producers
-							? {
-								producers: mapRecordValues(bindings.queues.producers, (queueName) => {
-									return materializePreviewScopedString(queueName, options)
-								})
-							}
-							: {}),
-						...(bindings.queues.consumers
-							? {
-								consumers: bindings.queues.consumers.map((consumer) => ({
-									...consumer,
-									queue: materializePreviewScopedString(consumer.queue, options),
-									...(consumer.deadLetterQueue
-										? {
-											deadLetterQueue: materializePreviewScopedString(consumer.deadLetterQueue, options)
-										}
-										: {})
-								}))
-							}
-							: {})
+						queues: {
+							...bindings.queues,
+							...(bindings.queues.producers
+								? {
+										producers: mapRecordValues(bindings.queues.producers, (queueName) => {
+											return materializePreviewScopedString(queueName, options)
+										})
+									}
+								: {}),
+							...(bindings.queues.consumers
+								? {
+										consumers: bindings.queues.consumers.map((consumer) => ({
+											...consumer,
+											queue: materializePreviewScopedString(consumer.queue, options),
+											...(consumer.deadLetterQueue
+												? {
+														deadLetterQueue: materializePreviewScopedString(
+															consumer.deadLetterQueue,
+															options
+														)
+													}
+												: {})
+										}))
+									}
+								: {})
+						}
 					}
-				}
 				: {}),
 			...(bindings.services
 				? {
-					services: mapRecordValues(bindings.services, (binding) => ({
-						...binding,
-						service: materializePreviewScopedString(binding.service, options)
-					}))
-				}
+						services: mapRecordValues(bindings.services, (binding) => ({
+							...binding,
+							service: materializePreviewScopedString(binding.service, options)
+						}))
+					}
 				: {}),
 			...(bindings.vectorize
 				? {
-					vectorize: mapRecordValues(bindings.vectorize, (binding) => ({
-						...binding,
-						indexName: materializePreviewScopedString(binding.indexName, options)
-					}))
-				}
+						vectorize: mapRecordValues(bindings.vectorize, (binding) => ({
+							...binding,
+							indexName: materializePreviewScopedString(binding.indexName, options)
+						}))
+					}
 				: {}),
 			...(bindings.hyperdrive
 				? {
-					hyperdrive: mapRecordValues(bindings.hyperdrive, (binding) => {
-						if (typeof binding === 'string') {
-							return materializePreviewScopedString(binding, options)
-						}
-						if (binding && typeof binding === 'object' && 'name' in binding && typeof binding.name === 'string') {
-							if (hasPreviewIdentifier && binding.previewId) {
+						hyperdrive: mapRecordValues(bindings.hyperdrive, (binding) => {
+							if (typeof binding === 'string') {
+								return materializePreviewScopedString(binding, options)
+							}
+							if (
+								binding &&
+								typeof binding === 'object' &&
+								'name' in binding &&
+								typeof binding.name === 'string'
+							) {
+								if (hasPreviewIdentifier && binding.previewId) {
+									return {
+										id: binding.previewId,
+										...(binding.localConnectionString && {
+											localConnectionString: binding.localConnectionString
+										}),
+										...(!binding.localConnectionString &&
+											binding.previewLocalConnectionString && {
+												localConnectionString: binding.previewLocalConnectionString
+											})
+									}
+								}
 								return {
-									id: binding.previewId,
-									...(binding.localConnectionString && {
-										localConnectionString: binding.localConnectionString
-									}),
-									...(!binding.localConnectionString && binding.previewLocalConnectionString && {
-										localConnectionString: binding.previewLocalConnectionString
-									})
+									...binding,
+									name: materializePreviewScopedString(binding.name, options)
 								}
 							}
-							return {
-								...binding,
-								name: materializePreviewScopedString(binding.name, options)
-							}
-						}
-						return binding
-					})
-				}
+							return binding
+						})
+					}
 				: {}),
 			...(bindings.browser
 				? {
-					browser: mapRecordValues(bindings.browser, (binding) => {
-						return typeof binding === 'string'
-							? materializePreviewScopedString(binding, options)
-							: binding
-					})
-				}
+						browser: mapRecordValues(bindings.browser, (binding) => {
+							return typeof binding === 'string'
+								? materializePreviewScopedString(binding, options)
+								: binding
+						})
+					}
 				: {}),
 			...(bindings.analyticsEngine
 				? {
-					analyticsEngine: mapRecordValues(bindings.analyticsEngine, (binding) => ({
-						...binding,
-						dataset: materializePreviewScopedString(binding.dataset, options)
-					}))
-				}
+						analyticsEngine: mapRecordValues(bindings.analyticsEngine, (binding) => ({
+							...binding,
+							dataset: materializePreviewScopedString(binding.dataset, options)
+						}))
+					}
 				: {})
 		}
 	}

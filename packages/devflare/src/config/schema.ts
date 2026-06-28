@@ -14,13 +14,10 @@
 
 import { z } from 'zod'
 import { normalizeCompatibilityFlags } from './compatibility'
-import {
-	rolldownConfigSchema,
-	viteConfigSchema
-} from './schema-build'
-import { bindingsSchema } from './schema-bindings'
-import { envConfigSchemaInner } from './schema-env'
 import { isEnvVarDescriptor } from './env-vars'
+import { bindingsSchema } from './schema-bindings'
+import { rolldownConfigSchema, viteConfigSchema } from './schema-build'
+import { envConfigSchemaInner } from './schema-env'
 import {
 	assetsConfigSchema,
 	compatibilityDateSchema,
@@ -75,8 +72,7 @@ function addSecretsStoreShorthandIssues(
 		ctx.addIssue({
 			code: z.ZodIssueCode.custom,
 			path: [...pathPrefix, 'bindings', 'secretsStore', bindingName],
-			message:
-				`Secrets Store binding "${bindingName}" uses shorthand and requires top-level secretsStoreId.`
+			message: `Secrets Store binding "${bindingName}" uses shorthand and requires top-level secretsStoreId.`
 		})
 	}
 }
@@ -131,7 +127,10 @@ export const rootConfigShape = {
 	 * Compatibility flags to enable additional features.
 	 * @default ['nodejs_compat', 'nodejs_als'] (always included)
 	 */
-	compatibilityFlags: z.array(z.string()).optional().transform((flags = []) => normalizeCompatibilityFlags(flags)),
+	compatibilityFlags: z
+		.array(z.string())
+		.optional()
+		.transform((flags = []) => normalizeCompatibilityFlags(flags)),
 
 	/** Preview-specific Devflare behavior. */
 	previews: previewsConfigSchema,
@@ -218,20 +217,27 @@ export const rootConfigShape = {
  * This is the complete schema for `devflare.config.ts` files.
  * Use `defineConfig()` for type-safe configuration with autocompletion.
  */
-const canonicalConfigSchema = z.object({
-	...rootConfigShape,
-	/** Environment-specific configuration overrides. */
-	env: z.record(z.string(), envConfigSchemaInner).optional()
-}).strict().superRefine((config, ctx) => {
-	addSecretsStoreShorthandIssues(ctx, config)
+const canonicalConfigSchema = z
+	.object({
+		...rootConfigShape,
+		/** Environment-specific configuration overrides. */
+		env: z.record(z.string(), envConfigSchemaInner).optional()
+	})
+	.strict()
+	.superRefine((config, ctx) => {
+		addSecretsStoreShorthandIssues(ctx, config)
 
-	for (const [envName, envConfig] of Object.entries(config.env ?? {})) {
-		addSecretsStoreShorthandIssues(ctx, {
-			...envConfig,
-			secretsStoreId: envConfig.secretsStoreId ?? config.secretsStoreId
-		}, ['env', envName])
-	}
-})
+		for (const [envName, envConfig] of Object.entries(config.env ?? {})) {
+			addSecretsStoreShorthandIssues(
+				ctx,
+				{
+					...envConfig,
+					secretsStoreId: envConfig.secretsStoreId ?? config.secretsStoreId
+				},
+				['env', envName]
+			)
+		}
+	})
 
 export const configSchema = canonicalConfigSchema
 
@@ -315,7 +321,12 @@ export type {
 	WsRouteConfigInput
 } from './schema-types'
 
-export type { DevflareRolldownOptions, DevflareRolldownOutputOptions, RolldownConfig, ViteConfig } from './schema-build'
+export type {
+	DevflareRolldownOptions,
+	DevflareRolldownOutputOptions,
+	RolldownConfig,
+	ViteConfig
+} from './schema-build'
 export type {
 	BrowserBindings,
 	D1Binding,
@@ -338,7 +349,18 @@ export type {
 	MtlsCertificateBinding
 } from './schema-bindings'
 export type { DevflareEnvConfig } from './schema-env'
-export type { AssetsConfig, ContainerConfig, MigrationConfig, ModuleRuleConfig, PlacementConfig, PreviewConfig, RouteConfig, ServerConfig, TailConsumerConfig, WsRouteConfig } from './schema-runtime'
+export type {
+	AssetsConfig,
+	ContainerConfig,
+	MigrationConfig,
+	ModuleRuleConfig,
+	PlacementConfig,
+	PreviewConfig,
+	RouteConfig,
+	ServerConfig,
+	TailConsumerConfig,
+	WsRouteConfig
+} from './schema-runtime'
 export type {
 	NormalizedD1Binding,
 	NormalizedDispatchNamespaceBinding,

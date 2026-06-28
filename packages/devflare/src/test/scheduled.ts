@@ -11,8 +11,8 @@
 //   await cf.scheduled.trigger()
 // =============================================================================
 
-import type { ScheduledController } from '@cloudflare/workers-types'
 import { join } from 'path'
+import type { ScheduledController } from '@cloudflare/workers-types'
 import { createScheduledEvent, runWithEventContext } from '../runtime'
 
 // -----------------------------------------------------------------------------
@@ -105,7 +105,7 @@ async function trigger(
 	if (!scheduledHandlerPath) {
 		throw new Error(
 			'Scheduled handler not configured. Make sure your devflare.config.ts has files.scheduled set, ' +
-			'and the file exists at the specified path (default: src/scheduled.ts)'
+				'and the file exists at the specified path (default: src/scheduled.ts)'
 		)
 	}
 
@@ -117,15 +117,13 @@ async function trigger(
 
 	// Normalize options
 	const options: ScheduledTriggerOptions =
-		typeof cronOrOptions === 'string'
-			? { cron: cronOrOptions }
-			: cronOrOptions ?? {}
+		typeof cronOrOptions === 'string' ? { cron: cronOrOptions } : (cronOrOptions ?? {})
 
 	const cron = options.cron ?? '* * * * *'
 	const scheduledTime =
 		options.scheduledTime instanceof Date
 			? options.scheduledTime.getTime()
-			: options.scheduledTime ?? Date.now()
+			: (options.scheduledTime ?? Date.now())
 
 	// Import the scheduled handler
 	const absolutePath = join(configDir, scheduledHandlerPath)
@@ -136,7 +134,7 @@ async function trigger(
 	if (typeof scheduledHandler !== 'function') {
 		throw new Error(
 			`Scheduled handler at "${scheduledHandlerPath}" must export a default function or named "scheduled" export.\n` +
-			+ `Expected: export async function scheduled(event) { ... }`
+				+`Expected: export async function scheduled(event) { ... }`
 		)
 	}
 
@@ -155,7 +153,7 @@ async function trigger(
 		waitUntil(promise: Promise<unknown>) {
 			waitUntilPromises.push(promise)
 		},
-		passThroughOnException() { },
+		passThroughOnException() {},
 		props: {}
 	}
 
@@ -165,10 +163,7 @@ async function trigger(
 
 	try {
 		// Call the handler
-		await runWithEventContext(
-			scheduledEvent,
-			() => scheduledHandler(scheduledEvent)
-		)
+		await runWithEventContext(scheduledEvent, () => scheduledHandler(scheduledEvent))
 
 		// Wait for all waitUntil promises
 		await Promise.all(waitUntilPromises)

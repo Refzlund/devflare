@@ -2,10 +2,10 @@
 // Init Command — Create new devflare project
 // =============================================================================
 
-import { type ConsolaInstance } from 'consola'
-import { resolve, join } from 'pathe'
-import type { ParsedArgs, CliOptions, CliResult } from '../index'
-import { getDependencies, type FileSystem } from '../dependencies'
+import type { ConsolaInstance } from 'consola'
+import { join, resolve } from 'pathe'
+import { type FileSystem, getDependencies } from '../dependencies'
+import type { CliOptions, CliResult, ParsedArgs } from '../index'
 import { getInitDependencyVersions } from '../package-metadata'
 import { createCliTheme, cyanBold, dim, green, logLine } from '../ui'
 
@@ -193,10 +193,11 @@ export async function runInitCommand(
 		const dir = fullPath.substring(0, fullPath.lastIndexOf('/'))
 
 		// Ensure directory exists
-		await fs.mkdir(dir, { recursive: true }).catch(() => { })
+		await fs.mkdir(dir, { recursive: true }).catch(() => {})
 
 		// Replace placeholders
-		const processedContent = content.replace(/\{\{PROJECT_NAME\}\}/g, projectName)
+		const processedContent = content
+			.replace(/\{\{PROJECT_NAME\}\}/g, projectName)
 			.replace(/\{\{DEVFLARE_VERSION\}\}/g, dependencyVersions.devflare)
 			.replace(/\{\{TYPESCRIPT_VERSION\}\}/g, dependencyVersions.typescript)
 			.replace(/\{\{WRANGLER_VERSION\}\}/g, dependencyVersions.wrangler)

@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { normalizeSecretsStoreBinding, type DevflareConfig } from '../config'
+import { type DevflareConfig, normalizeSecretsStoreBinding } from '../config'
 
 export const LOCAL_SECRETS_PATH = join('.devflare', 'secrets.local.json')
 
@@ -182,10 +182,11 @@ export function resolveLocalSecretValuesForBindings(
 }
 
 function toLocalSecretWorkerName(bindingName: string, index: number): string {
-	const slug = bindingName
-		.toLowerCase()
-		.replace(/[^a-z0-9]+/g, '-')
-		.replace(/^-+|-+$/g, '') || 'secret'
+	const slug =
+		bindingName
+			.toLowerCase()
+			.replace(/[^a-z0-9]+/g, '-')
+			.replace(/^-+|-+$/g, '') || 'secret'
 
 	return `devflare-local-secret-${index}-${slug}`
 }
@@ -238,7 +239,9 @@ export function buildLocalSecretNodeBindings(
 }
 
 function hasSecretsStoreAdminApi(value: unknown): value is MiniflareSecretsStoreSeeder {
-	return typeof (value as { getSecretsStoreSecretAPI?: unknown }).getSecretsStoreSecretAPI === 'function'
+	return (
+		typeof (value as { getSecretsStoreSecretAPI?: unknown }).getSecretsStoreSecretAPI === 'function'
+	)
 }
 
 async function getSecretAdmin(
@@ -249,10 +252,7 @@ async function getSecretAdmin(
 	return typeof adminOrFactory === 'function' ? adminOrFactory() : adminOrFactory
 }
 
-async function upsertMiniflareSecret(
-	admin: SecretsStoreSecretAdmin,
-	value: string
-): Promise<void> {
+async function upsertMiniflareSecret(admin: SecretsStoreSecretAdmin, value: string): Promise<void> {
 	if (admin.list && admin.update) {
 		const [existing] = await admin.list()
 		const id = existing?.metadata?.uuid ?? existing?.name

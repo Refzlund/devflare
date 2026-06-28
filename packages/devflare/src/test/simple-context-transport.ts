@@ -25,9 +25,9 @@ export async function loadTransportDecoders(
 
 	if (!transportModule.transport) {
 		console.warn(
-			`[devflare] Warning: Transport file "${transportFile}" does not export a named "transport" object.\n`
-			+ `Expected: export const transport = { ... }\n`
-			+ `Transport encoding/decoding will be disabled.`
+			`[devflare] Warning: Transport file "${transportFile}" does not export a named "transport" object.\n` +
+				`Expected: export const transport = { ... }\n` +
+				`Transport encoding/decoding will be disabled.`
 		)
 		return null
 	}

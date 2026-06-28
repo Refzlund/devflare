@@ -7,10 +7,10 @@
 // =============================================================================
 
 import type { BindingHints } from '../bridge/proxy'
-import type { ResolvedHandlerPaths } from './simple-context-handlers'
 import { configureEmail } from './email'
 import { configureQueue } from './queue'
 import { configureScheduled } from './scheduled'
+import type { ResolvedHandlerPaths } from './simple-context-handlers'
 import { configureTail } from './tail'
 import { configureWorker } from './worker'
 
@@ -44,11 +44,12 @@ export function configureSurfaceHandlers(input: {
 	})
 	configureWorker({
 		handlerPath: handlerPaths.fetch,
-		routes: handlerPaths.routes?.routes.map((route) => ({
-			filePath: route.filePath,
-			routePath: route.routePath,
-			segments: route.segments
-		})) ?? [],
+		routes:
+			handlerPaths.routes?.routes.map((route) => ({
+				filePath: route.filePath,
+				routePath: route.routePath,
+				segments: route.segments
+			})) ?? [],
 		configDir,
 		getEnv
 	})
@@ -80,33 +81,36 @@ export function createBridgeEnvAccessor(
 	hints: BindingHints,
 	shouldPreferBridgeBinding: (hint: BindingHints[string] | undefined) => boolean
 ): Record<string, unknown> {
-	return new Proxy({}, {
-		get(_, prop: string) {
-			const hint = hints[prop]
-			const prefersBridgeBinding = shouldPreferBridgeBinding(hint)
+	return new Proxy(
+		{},
+		{
+			get(_, prop: string) {
+				const hint = hints[prop]
+				const prefersBridgeBinding = shouldPreferBridgeBinding(hint)
 
-			if (state.remoteBindings && prop in state.remoteBindings) {
-				return state.remoteBindings[prop]
+				if (state.remoteBindings && prop in state.remoteBindings) {
+					return state.remoteBindings[prop]
+				}
+				if (!prefersBridgeBinding && state.miniflareBindings && prop in state.miniflareBindings) {
+					return state.miniflareBindings[prop]
+				}
+				if (state.envProxy) {
+					return state.envProxy[prop]
+				}
+				if (prefersBridgeBinding && state.miniflareBindings && prop in state.miniflareBindings) {
+					return state.miniflareBindings[prop]
+				}
+				return undefined
+			},
+			has(_, prop: string) {
+				return Boolean(
+					(state.remoteBindings && prop in state.remoteBindings) ||
+						(state.miniflareBindings && prop in state.miniflareBindings) ||
+						state.envProxy !== null
+				)
 			}
-			if (!prefersBridgeBinding && state.miniflareBindings && prop in state.miniflareBindings) {
-				return state.miniflareBindings[prop]
-			}
-			if (state.envProxy) {
-				return state.envProxy[prop]
-			}
-			if (prefersBridgeBinding && state.miniflareBindings && prop in state.miniflareBindings) {
-				return state.miniflareBindings[prop]
-			}
-			return undefined
-		},
-		has(_, prop: string) {
-			return Boolean(
-				(state.remoteBindings && prop in state.remoteBindings)
-				|| (state.miniflareBindings && prop in state.miniflareBindings)
-				|| (state.envProxy !== null)
-			)
 		}
-	}) as Record<string, unknown>
+	) as Record<string, unknown>
 }
 
 /**
@@ -114,21 +118,24 @@ export function createBridgeEnvAccessor(
  * bridge-backed proxy: services + DOs go through Miniflare's own bindings).
  */
 export function createMultiWorkerEnvAccessor(state: TestStateView): Record<string, unknown> {
-	return new Proxy({}, {
-		get(_, prop: string) {
-			if (state.remoteBindings && prop in state.remoteBindings) {
-				return state.remoteBindings[prop]
+	return new Proxy(
+		{},
+		{
+			get(_, prop: string) {
+				if (state.remoteBindings && prop in state.remoteBindings) {
+					return state.remoteBindings[prop]
+				}
+				if (state.miniflareBindings && prop in state.miniflareBindings) {
+					return state.miniflareBindings[prop]
+				}
+				return undefined
+			},
+			has(_, prop: string) {
+				return Boolean(
+					(state.remoteBindings && prop in state.remoteBindings) ||
+						(state.miniflareBindings && prop in state.miniflareBindings)
+				)
 			}
-			if (state.miniflareBindings && prop in state.miniflareBindings) {
-				return state.miniflareBindings[prop]
-			}
-			return undefined
-		},
-		has(_, prop: string) {
-			return Boolean(
-				(state.remoteBindings && prop in state.remoteBindings)
-				|| (state.miniflareBindings && prop in state.miniflareBindings)
-			)
 		}
-	}) as Record<string, unknown>
+	) as Record<string, unknown>
 }

@@ -4,21 +4,21 @@
 
 export type RouteSegment =
 	| {
-		readonly type: 'static'
-		readonly value: string
-	}
+			readonly type: 'static'
+			readonly value: string
+	  }
 	| {
-		readonly type: 'param'
-		readonly name: string
-	}
+			readonly type: 'param'
+			readonly name: string
+	  }
 	| {
-		readonly type: 'rest'
-		readonly name: string
-	}
+			readonly type: 'rest'
+			readonly name: string
+	  }
 	| {
-		readonly type: 'optional-rest'
-		readonly name: string
-	}
+			readonly type: 'optional-rest'
+			readonly name: string
+	  }
 
 export interface RouteModuleDefinition {
 	readonly filePath: string

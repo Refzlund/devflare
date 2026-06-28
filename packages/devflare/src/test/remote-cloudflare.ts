@@ -51,21 +51,24 @@ export function createRemoteCloudflareClient(accountId?: string): {
 
 	async function jsonRequest<T>(options: RemoteCloudflareJsonRequestOptions): Promise<T> {
 		const [acctId, token] = await Promise.all([getAccountId(), getToken()])
-		const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${acctId}${options.path}`, {
-			method: options.method,
-			headers: {
-				Authorization: `Bearer ${token}`,
-				'Content-Type': options.contentType ?? 'application/json'
-			},
-			body: options.body
-		})
+		const response = await fetch(
+			`https://api.cloudflare.com/client/v4/accounts/${acctId}${options.path}`,
+			{
+				method: options.method,
+				headers: {
+					Authorization: `Bearer ${token}`,
+					'Content-Type': options.contentType ?? 'application/json'
+				},
+				body: options.body
+			}
+		)
 
 		if (!response.ok) {
 			const errorText = await response.text()
 			throw new Error(`${options.serviceLabel} API error (${response.status}): ${errorText}`)
 		}
 
-		const result = await response.json() as CloudflareApiEnvelope<T>
+		const result = (await response.json()) as CloudflareApiEnvelope<T>
 		if (!result.success) {
 			const message = result.errors?.[0]?.message || `Unknown ${options.serviceLabel} error`
 			throw new Error(`${options.serviceLabel} API error: ${message}`)

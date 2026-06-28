@@ -20,23 +20,29 @@ describe('packaged CLI install smoke', () => {
 			includeBin: true,
 			runtimeDependencies: runtimeDependencyNames
 		})
-		await writeFile(join(projectDir, 'package.json'), JSON.stringify({
-			name: 'packaged-cli-smoke',
-			private: true,
-			type: 'module'
-		}, null, 2))
+		await writeFile(
+			join(projectDir, 'package.json'),
+			JSON.stringify(
+				{
+					name: 'packaged-cli-smoke',
+					private: true,
+					type: 'module'
+				},
+				null,
+				2
+			)
+		)
 
 		await access(join(projectDir, 'node_modules', 'devflare', 'dist', 'cli', 'index.js'))
 
-		const cli = Bun.spawn([
-			'bun',
-			join(projectDir, 'node_modules', 'devflare', 'bin', 'devflare.js'),
-			'version'
-		], {
-			cwd: projectDir,
-			stdout: 'pipe',
-			stderr: 'pipe'
-		})
+		const cli = Bun.spawn(
+			['bun', join(projectDir, 'node_modules', 'devflare', 'bin', 'devflare.js'), 'version'],
+			{
+				cwd: projectDir,
+				stdout: 'pipe',
+				stderr: 'pipe'
+			}
+		)
 
 		const [stdout, stderr, exitCode] = await Promise.all([
 			new Response(cli.stdout).text(),

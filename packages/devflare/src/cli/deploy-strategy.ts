@@ -77,8 +77,10 @@ export function applyDeploymentStrategy<TConfig extends DevflareConfig>(
 	config: TConfig,
 	options: ApplyDeploymentStrategyOptions = {}
 ): AppliedDeploymentStrategy<TConfig> {
-	const branchScope = normalizeBranchScope(options.previewBranch) ?? normalizeBranchScope(options.branchName)
-	const isBranchScopedPreviewDeploy = !options.preview && options.environment === 'preview' && Boolean(branchScope)
+	const branchScope =
+		normalizeBranchScope(options.previewBranch) ?? normalizeBranchScope(options.branchName)
+	const isBranchScopedPreviewDeploy =
+		!options.preview && options.environment === 'preview' && Boolean(branchScope)
 
 	if (!isBranchScopedPreviewDeploy) {
 		return {
@@ -117,9 +119,7 @@ export function describeDeploymentStrategy(result: AppliedDeploymentStrategy): s
 	const labels = result.omittedResources.map((resource) => {
 		return resource === 'queue-consumers' ? 'queue consumers' : 'cron triggers'
 	})
-	const formattedLabels = labels.length === 2
-		? `${labels[0]} and ${labels[1]}`
-		: labels[0]
+	const formattedLabels = labels.length === 2 ? `${labels[0]} and ${labels[1]}` : labels[0]
 	const scopeSuffix = result.branchScope ? ` (${result.branchScope})` : ''
 
 	return `Named preview-scope deploy detected${scopeSuffix}; omitting shared ${formattedLabels} from the deployed Wrangler config to avoid singleton Cloudflare resource conflicts.`

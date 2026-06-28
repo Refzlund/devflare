@@ -2,7 +2,7 @@
 // Mock Execa — Deep mock for subprocess simulation
 // =============================================================================
 
-import type { Result, Options } from 'execa'
+import type { Options, Result } from 'execa'
 
 /**
  * Command execution record for assertions
@@ -29,10 +29,7 @@ export interface MockExecResult {
 /**
  * Command matcher - can be string, regex, or function
  */
-export type CommandMatcher =
-	| string
-	| RegExp
-	| ((command: string, args: string[]) => boolean)
+export type CommandMatcher = string | RegExp | ((command: string, args: string[]) => boolean)
 
 /**
  * Mock command handler
@@ -57,9 +54,7 @@ export class MockExeca {
 	private getBunxExecutableArgs(args: string[]): string[] {
 		const firstExecutableIndex = args.findIndex((arg) => !arg.startsWith('-'))
 
-		return firstExecutableIndex >= 0
-			? args.slice(firstExecutableIndex)
-			: args
+		return firstExecutableIndex >= 0 ? args.slice(firstExecutableIndex) : args
 	}
 
 	/**
@@ -76,10 +71,7 @@ export class MockExeca {
 	/**
 	 * Register a command handler
 	 */
-	on(
-		matcher: CommandMatcher,
-		handler: MockCommandHandler['handler']
-	): this {
+	on(matcher: CommandMatcher, handler: MockCommandHandler['handler']): this {
 		this.handlers.push({ matcher, handler })
 		return this
 	}
@@ -87,10 +79,7 @@ export class MockExeca {
 	/**
 	 * Register a simple success response for a command
 	 */
-	onCommand(
-		matcher: CommandMatcher,
-		result: Partial<MockExecResult> = {}
-	): this {
+	onCommand(matcher: CommandMatcher, result: Partial<MockExecResult> = {}): this {
 		return this.on(matcher, () => ({
 			...this.defaultResult,
 			...result
@@ -100,10 +89,7 @@ export class MockExeca {
 	/**
 	 * Register a failure response for a command
 	 */
-	onCommandFail(
-		matcher: CommandMatcher,
-		stderr: string = 'Command failed'
-	): this {
+	onCommandFail(matcher: CommandMatcher, stderr = 'Command failed'): this {
 		return this.on(matcher, () => ({
 			exitCode: 1,
 			stdout: '',
@@ -116,18 +102,12 @@ export class MockExeca {
 	/**
 	 * Match a command against handlers
 	 */
-	private findHandler(
-		command: string,
-		args: string[]
-	): MockCommandHandler | undefined {
+	private findHandler(command: string, args: string[]): MockCommandHandler | undefined {
 		const fullCommand = `${command} ${args.join(' ')}`.trim()
 		// For bunx commands, the actual tool is in args
-		const executableArgs = command === 'bunx'
-			? this.getBunxExecutableArgs(args)
-			: args
-		const effectiveCommand = command === 'bunx' && executableArgs.length > 0
-			? executableArgs.join(' ')
-			: fullCommand
+		const executableArgs = command === 'bunx' ? this.getBunxExecutableArgs(args) : args
+		const effectiveCommand =
+			command === 'bunx' && executableArgs.length > 0 ? executableArgs.join(' ') : fullCommand
 
 		return this.handlers.find((h) => {
 			if (typeof h.matcher === 'string') {
@@ -135,12 +115,14 @@ export class MockExeca {
 				// effectiveCommand, while still allowing direct local CLI paths like
 				// ".../node_modules/vite/bin/vite.js build" via fullCommand matching.
 				// Or match exact full command
-				return effectiveCommand.startsWith(h.matcher) ||
+				return (
+					effectiveCommand.startsWith(h.matcher) ||
 					fullCommand.startsWith(h.matcher) ||
 					effectiveCommand === h.matcher ||
 					fullCommand === h.matcher ||
 					command === h.matcher ||
 					(command === 'bunx' && executableArgs[0] === h.matcher)
+				)
 			}
 			if (h.matcher instanceof RegExp) {
 				return h.matcher.test(fullCommand) || h.matcher.test(effectiveCommand)
@@ -190,7 +172,7 @@ export class MockExeca {
 			killed: result.killed,
 			signal: result.signal,
 			signalDescription: result.signal ? `Signal: ${result.signal}` : undefined,
-			cwd: options.cwd as string || process.cwd(),
+			cwd: (options.cwd as string) || process.cwd(),
 			durationMs: 0
 		} as unknown as Result<Options>
 
@@ -205,9 +187,7 @@ export class MockExeca {
 	 */
 	getExecutions(command?: string): CommandExecution[] {
 		if (!command) return this.executions
-		return this.executions.filter(
-			(e) => e.command === command || e.command.includes(command)
-		)
+		return this.executions.filter((e) => e.command === command || e.command.includes(command))
 	}
 
 	/**
@@ -261,13 +241,12 @@ export class MockExeca {
 	 * Create the mock module that can replace 'execa'
 	 */
 	createMock() {
-		const self = this
 		return {
-			execa: self.execa.bind(self),
+			execa: this.execa.bind(this),
 			execaSync: () => {
 				throw new Error('execaSync is not supported in mock')
 			},
-			$: self.execa.bind(self)
+			$: this.execa.bind(this)
 		}
 	}
 }
@@ -313,10 +292,12 @@ export function createEmptyMockExeca(): MockExeca {
  * Create a complete ProcessRunner mock from a MockExeca instance
  * This satisfies the ProcessRunner interface including spawn
  */
-export function createMockProcessRunner(mockExeca: MockExeca): import('../../../src/cli/dependencies').ProcessRunner {
+export function createMockProcessRunner(
+	mockExeca: MockExeca
+): import('../../../src/cli/dependencies').ProcessRunner {
 	return {
 		exec: async (command: string, args?: string[], options?: import('execa').Options) => {
-			const result = await mockExeca.execa(command, args ?? [], options ?? {}) as unknown as {
+			const result = (await mockExeca.execa(command, args ?? [], options ?? {})) as unknown as {
 				exitCode: number
 				stdout: string
 				stderr: string
@@ -333,7 +314,11 @@ export function createMockProcessRunner(mockExeca: MockExeca): import('../../../
 				signal: result.signal as string | undefined
 			}
 		},
-		spawn: (_command: string, _args?: string[], _options?: { cwd?: string; stdio?: unknown; env?: NodeJS.ProcessEnv }) => {
+		spawn: (
+			_command: string,
+			_args?: string[],
+			_options?: { cwd?: string; stdio?: unknown; env?: NodeJS.ProcessEnv }
+		) => {
 			// Return a mock spawned process that does nothing
 			const events: Record<string, Array<(arg: unknown) => void>> = {}
 			return {

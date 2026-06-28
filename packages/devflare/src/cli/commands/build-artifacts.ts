@@ -1,40 +1,36 @@
-import { type ConsolaInstance } from 'consola'
+import type { ConsolaInstance } from 'consola'
 import { dirname, relative, resolve } from 'pathe'
-import type { CliOptions, ParsedArgs } from '../index'
-import type { FileSystem } from '../dependencies'
+import { bundleWorkerEntry } from '../../bundler'
 import {
+	type DevflareConfig,
 	compileBuildConfig,
 	loadConfig,
 	resolveConfigEnvVars,
-	resolveConfigForEnvironment,
-	type DevflareConfig
+	resolveConfigForEnvironment
 } from '../../config'
 import {
+	type WranglerConfig,
 	compileConfig,
 	isolateViteBuildOutputPaths as isolateCompiledViteBuildOutputPaths,
 	rebaseWranglerConfigPaths,
-	writeWranglerConfig,
-	type WranglerConfig
+	writeWranglerConfig
 } from '../../config/compiler'
-import { getDependencies } from '../dependencies'
-import { ensureGeneratedDirectory, getGeneratedArtifactPaths } from '../generated-artifacts'
-import { applyDeploymentStrategy, describeDeploymentStrategy } from '../deploy-strategy'
-import { bundleWorkerEntry } from '../../bundler'
 import { detectViteProject } from '../../dev-server/vite-utils'
+import { resolvePackageSpecifier } from '../../utils/resolve-package'
 import {
+	type EffectiveViteProjectDetection,
 	resolveEffectiveViteProject,
-	writeGeneratedViteConfig,
-	type EffectiveViteProjectDetection
+	writeGeneratedViteConfig
 } from '../../vite'
 import { prepareComposedWorkerEntrypoint } from '../../worker-entry/composed-worker'
-import { resolvePackageSpecifier } from '../../utils/resolve-package'
-import { logLine } from '../ui'
-import {
-	createBuildManifest,
-	writeBuildManifest,
-	type BuildManifest
-} from '../build-manifest'
+import { type BuildManifest, createBuildManifest, writeBuildManifest } from '../build-manifest'
+import type { FileSystem } from '../dependencies'
+import { getDependencies } from '../dependencies'
+import { applyDeploymentStrategy, describeDeploymentStrategy } from '../deploy-strategy'
+import { ensureGeneratedDirectory, getGeneratedArtifactPaths } from '../generated-artifacts'
+import type { CliOptions, ParsedArgs } from '../index'
 import { getPackageVersion } from '../package-metadata'
+import { logLine } from '../ui'
 
 type BuildArtifactPaths = ReturnType<typeof getGeneratedArtifactPaths>
 
@@ -126,8 +122,7 @@ async function pathExists(cleanupFs: CleanupFileSystem, targetPath: string): Pro
 
 export function createDeferredCleanupPath(targetPath: string, uniqueSuffix?: string): string {
 	const suffix =
-		uniqueSuffix ??
-		`${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+		uniqueSuffix ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
 
 	return `${targetPath}.devflare-stale-${suffix}`
 }
@@ -175,13 +170,13 @@ async function tryMoveLockedPathAside(
 export async function removePathWithRetries(
 	targetPath: string,
 	logger: ConsolaInstance,
-	attempts: number = 5,
+	attempts = 5,
 	cleanupFs?: CleanupFileSystem
 ): Promise<void> {
-	const fs = cleanupFs ?? await getCleanupFileSystem()
+	const fs = cleanupFs ?? (await getCleanupFileSystem())
 	let lastError: unknown
 
-	for (let attempt = 1;attempt <= attempts;attempt++) {
+	for (let attempt = 1; attempt <= attempts; attempt++) {
 		try {
 			await fs.rm(targetPath, {
 				recursive: true,
@@ -195,17 +190,12 @@ export async function removePathWithRetries(
 				break
 			}
 
-			logger.warn(
-				`Retrying cleanup for ${targetPath} after ${error.code} (${attempt}/${attempts})`
-			)
+			logger.warn(`Retrying cleanup for ${targetPath} after ${error.code} (${attempt}/${attempts})`)
 			await new Promise((resolveRetry) => setTimeout(resolveRetry, attempt * 100))
 		}
 	}
 
-	if (
-		shouldRetryCleanup(lastError) &&
-		await tryMoveLockedPathAside(targetPath, logger, fs)
-	) {
+	if (shouldRetryCleanup(lastError) && (await tryMoveLockedPathAside(targetPath, logger, fs))) {
 		return
 	}
 
@@ -320,7 +310,10 @@ async function buildWorkerOnlyDeployArtifact(
 		logger
 	})
 
-	logLine(logger, `Generated deploy artifact: ${relative(cwd, bundledMainEntryPath).replace(/\\/g, '/')}`)
+	logLine(
+		logger,
+		`Generated deploy artifact: ${relative(cwd, bundledMainEntryPath).replace(/\\/g, '/')}`
+	)
 	return await writeGeneratedDeployWranglerConfig(cwd, wranglerConfig, {
 		main: './worker.js'
 	})
@@ -370,7 +363,7 @@ export async function findWorkspaceLocalBinary(
 ): Promise<string | null> {
 	let currentDir = resolve(startDir)
 	// Bound the walk by the filesystem root.
-	for (let depth = 0;depth < 64;depth++) {
+	for (let depth = 0; depth < 64; depth++) {
 		const candidate = resolve(currentDir, 'node_modules', ...segments)
 		try {
 			await fs.access(candidate)
@@ -389,8 +382,10 @@ export async function findWorkspaceLocalBinary(
 
 /** True when the current process is Bun (and `bun` is therefore on PATH). */
 export function isRunningUnderBun(): boolean {
-	return typeof (globalThis as { Bun?: unknown }).Bun !== 'undefined'
-		|| typeof (process.versions as { bun?: string }).bun === 'string'
+	return (
+		typeof (globalThis as { Bun?: unknown }).Bun !== 'undefined' ||
+		typeof (process.versions as { bun?: string }).bun === 'string'
+	)
 }
 
 export async function prepareBuildArtifacts(
@@ -403,14 +398,11 @@ export async function prepareBuildArtifacts(
 	const environment = parsed.options.env as string | undefined
 
 	const rawConfig = await loadConfig({ cwd, configFile: configPath })
-	const config = await resolveConfigEnvVars(
-		resolveConfigForEnvironment(rawConfig, environment),
-		{
-			cwd,
-			configPath,
-			mode: 'build'
-		}
-	)
+	const config = await resolveConfigEnvVars(resolveConfigForEnvironment(rawConfig, environment), {
+		cwd,
+		configPath,
+		mode: 'build'
+	})
 
 	logLine(logger, `Building: ${config.name}`)
 
@@ -500,45 +492,60 @@ export async function prepareBuildArtifacts(
 
 		if (buildProc.exitCode !== 0) {
 			throw new Error(
-				`Vite build failed (exit code ${buildProc.exitCode}).\n`
-				+ `\n`
-				+ `Command: ${buildCommand} ${buildArgs.join(' ')}\n`
-				+ `Working directory: ${cwd}\n`
-				+ `Vite executable: ${viteExecutablePath}\n`
-				+ `Runtime: ${useBunRuntime ? 'bun --bun' : 'node (default execa runtime)'}\n`
-				+ `\n`
-				+ `Vite's own output is printed above. If you only see "UNHANDLED PROMISE REJECTION"\n`
-				+ `with no other detail, common causes are:\n`
-				+ `  - A Vite plugin or transitive dependency (e.g. rolldown) cannot be resolved\n`
-				+ `    from the executable's physical path. This commonly happens when the package\n`
-				+ `    manager resolves the Vite binary to a global cache directory outside the\n`
-				+ `    workspace's node_modules tree. Try reinstalling, or run vite directly to\n`
-				+ `    isolate: \`bunx --bun vite build --config ${relative(cwd, generatedViteConfigPath).replace(/\\/g, '/')}\`.\n`
-				+ `  - A peer dependency or framework adapter is missing. Re-check the package's\n`
-				+ `    devDependencies against the framework's documented requirements.\n`
-				+ `  - The generated vite config references a path that does not yet exist.`
+				`Vite build failed (exit code ${buildProc.exitCode}).\n` +
+					`\n` +
+					`Command: ${buildCommand} ${buildArgs.join(' ')}\n` +
+					`Working directory: ${cwd}\n` +
+					`Vite executable: ${viteExecutablePath}\n` +
+					`Runtime: ${useBunRuntime ? 'bun --bun' : 'node (default execa runtime)'}\n` +
+					`\n` +
+					`Vite's own output is printed above. If you only see "UNHANDLED PROMISE REJECTION"\n` +
+					`with no other detail, common causes are:\n` +
+					`  - A Vite plugin or transitive dependency (e.g. rolldown) cannot be resolved\n` +
+					`    from the executable's physical path. This commonly happens when the package\n` +
+					`    manager resolves the Vite binary to a global cache directory outside the\n` +
+					`    workspace's node_modules tree. Try reinstalling, or run vite directly to\n` +
+					`    isolate: \`bunx --bun vite build --config ${relative(cwd, generatedViteConfigPath).replace(/\\/g, '/')}\`.\n` +
+					`  - A peer dependency or framework adapter is missing. Re-check the package's\n` +
+					`    devDependencies against the framework's documented requirements.\n` +
+					`  - The generated vite config references a path that does not yet exist.`
 			)
 		}
 
 		const existingDeployConfigPath = await readDeployRedirect(cwd)
-		const generatedDeployConfigPath = deployWranglerConfig.main && deployWranglerConfig.main !== devWranglerConfig.main
-			? await buildWorkerOnlyDeployArtifact(cwd, deployWranglerConfig, config, logger)
-			: await writeGeneratedDeployWranglerConfig(cwd, deployWranglerConfig)
+		const generatedDeployConfigPath =
+			deployWranglerConfig.main && deployWranglerConfig.main !== devWranglerConfig.main
+				? await buildWorkerOnlyDeployArtifact(cwd, deployWranglerConfig, config, logger)
+				: await writeGeneratedDeployWranglerConfig(cwd, deployWranglerConfig)
 
-		deployConfigPath = existingDeployConfigPath && existingDeployConfigPath !== generatedDeployConfigPath
-			? existingDeployConfigPath
-			: generatedDeployConfigPath
+		deployConfigPath =
+			existingDeployConfigPath && existingDeployConfigPath !== generatedDeployConfigPath
+				? existingDeployConfigPath
+				: generatedDeployConfigPath
 	} else {
 		logLine(logger, 'Skipping Vite build (no effective Vite config found for this package)')
-		deployConfigPath = await buildWorkerOnlyDeployArtifact(cwd, deployWranglerConfig, config, logger)
+		deployConfigPath = await buildWorkerOnlyDeployArtifact(
+			cwd,
+			deployWranglerConfig,
+			config,
+			logger
+		)
 	}
 
 	const generatedDevConfigPath = await writeGeneratedDevWranglerConfig(cwd, devWranglerConfig)
-	logger.debug(`Generated dev Wrangler config: ${relative(cwd, generatedDevConfigPath).replace(/\\/g, '/')}`)
+	logger.debug(
+		`Generated dev Wrangler config: ${relative(cwd, generatedDevConfigPath).replace(/\\/g, '/')}`
+	)
 
 	await writeDeployRedirect(cwd, deployConfigPath)
-	logLine(logger, `Generated deploy Wrangler config: ${relative(cwd, deployConfigPath).replace(/\\/g, '/')}`)
-	logLine(logger, `Generated deploy redirect: ${relative(cwd, getBuildArtifactPaths(cwd).deployRedirectPath).replace(/\\/g, '/')}`)
+	logLine(
+		logger,
+		`Generated deploy Wrangler config: ${relative(cwd, deployConfigPath).replace(/\\/g, '/')}`
+	)
+	logLine(
+		logger,
+		`Generated deploy redirect: ${relative(cwd, getBuildArtifactPaths(cwd).deployRedirectPath).replace(/\\/g, '/')}`
+	)
 
 	// R2: emit a build manifest alongside the artefact so deploy can detect
 	// drift (config edits, version skew, target mismatch) before shipping.

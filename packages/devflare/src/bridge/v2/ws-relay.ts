@@ -8,6 +8,14 @@
 // side closes by sending `ws.close`.
 // =============================================================================
 
+import type { TransportV2Codec } from './codec'
+import { parseTransportV2AuxMsg, stringifyTransportV2AuxMsg } from './control-messages'
+import type {
+	TransportV2AuxMsg,
+	TransportV2WsCloseMsg,
+	TransportV2WsOpenMsg,
+	TransportV2WsTextMsg
+} from './control-messages'
 import {
 	TransportV2BinaryFlags,
 	TransportV2BinaryKind,
@@ -15,17 +23,6 @@ import {
 	transportV2IsFin,
 	transportV2IsText
 } from './frames'
-import {
-	parseTransportV2AuxMsg,
-	stringifyTransportV2AuxMsg
-} from './control-messages'
-import type {
-	TransportV2AuxMsg,
-	TransportV2WsCloseMsg,
-	TransportV2WsOpenMsg,
-	TransportV2WsTextMsg
-} from './control-messages'
-import type { TransportV2Codec } from './codec'
 import type { TransportV2DecodedBinaryFrame } from './frames'
 
 export interface TransportV2WsProxyHandlers {
@@ -105,7 +102,10 @@ export class TransportV2WsRelayManager {
 				proxy._deliver((msg as TransportV2WsTextMsg).data)
 				return true
 			case 'ws.close':
-				proxy._handleClose((msg as TransportV2WsCloseMsg).code, (msg as TransportV2WsCloseMsg).reason)
+				proxy._handleClose(
+					(msg as TransportV2WsCloseMsg).code,
+					(msg as TransportV2WsCloseMsg).reason
+				)
 				this.#proxies.delete(proxy.id)
 				return true
 		}

@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, test } from 'bun:test'
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'pathe'
 import { env } from '../../../src'
@@ -20,12 +20,21 @@ describe('createTestContext startup retries', () => {
 		tempDirs.push(projectDir)
 
 		await mkdir(join(projectDir, 'src'), { recursive: true })
-		await writeFile(join(projectDir, 'package.json'), JSON.stringify({
-			name: 'test-context-retry-project',
-			private: true,
-			type: 'module'
-		}, null, 2))
-		await writeFile(join(projectDir, 'devflare.config.ts'), `
+		await writeFile(
+			join(projectDir, 'package.json'),
+			JSON.stringify(
+				{
+					name: 'test-context-retry-project',
+					private: true,
+					type: 'module'
+				},
+				null,
+				2
+			)
+		)
+		await writeFile(
+			join(projectDir, 'devflare.config.ts'),
+			`
 export default {
 	name: 'test-context-retry-project',
 	compatibilityDate: '2026-03-17',
@@ -35,14 +44,18 @@ export default {
 		}
 	}
 }
-`.trim())
-		await writeFile(join(projectDir, 'src', 'fetch.ts'), `
+`.trim()
+		)
+		await writeFile(
+			join(projectDir, 'src', 'fetch.ts'),
+			`
 export default {
 	async fetch() {
 		return new Response('ok')
 	}
 }
-`.trim())
+`.trim()
+		)
 
 		const originalConnect = BridgeClient.prototype.connect
 		let connectAttempts = 0

@@ -73,7 +73,9 @@ describe('configSchema', () => {
 			if (result.success) {
 				expect(result.data.env?.preview?.vite?.plugins).toEqual([{ name: 'preview-plugin' }])
 				expect(result.data.env?.preview?.rolldown?.minify).toBe(true)
-				expect(result.data.env?.preview?.rolldown?.options?.external).toEqual(['cloudflare:workers'])
+				expect(result.data.env?.preview?.rolldown?.options?.external).toEqual([
+					'cloudflare:workers'
+				])
 			}
 		})
 

@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
-import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'pathe'
-import { clearDependencies } from '../../../src/cli/dependencies'
 import { runDoctorCommand } from '../../../src/cli/commands/doctor'
+import { clearDependencies } from '../../../src/cli/dependencies'
 import { createLogger, renderMessages } from '../../helpers/mock-logger'
 
 async function writeProjectFiles(
@@ -15,24 +15,37 @@ async function writeProjectFiles(
 	await mkdir(join(projectDir, 'src'), { recursive: true })
 
 	await writeFile(join(projectDir, 'package.json'), JSON.stringify(packageJson, null, 2))
-	await writeFile(join(projectDir, 'tsconfig.json'), JSON.stringify({
-		compilerOptions: {
-			target: 'ESNext',
-			module: 'ESNext'
-		}
-	}, null, 2))
-	await writeFile(join(projectDir, configFileName), `
+	await writeFile(
+		join(projectDir, 'tsconfig.json'),
+		JSON.stringify(
+			{
+				compilerOptions: {
+					target: 'ESNext',
+					module: 'ESNext'
+				}
+			},
+			null,
+			2
+		)
+	)
+	await writeFile(
+		join(projectDir, configFileName),
+		`
 		export default {
 			name: 'test-worker'
 		}
-	`.trim())
+	`.trim()
+	)
 
 	if (withViteConfig) {
-		await writeFile(join(projectDir, 'vite.config.ts'), `
+		await writeFile(
+			join(projectDir, 'vite.config.ts'),
+			`
 			import { defineConfig } from 'vite'
 
 			export default defineConfig({})
-		`.trim())
+		`.trim()
+		)
 	}
 }
 
@@ -69,8 +82,14 @@ describe('runDoctorCommand', () => {
 
 		expect(result.exitCode).toBe(0)
 		expect(renderedMessages.some((message) => message.includes('No vite.config found'))).toBe(false)
-		expect(renderedMessages.some((message) => message.includes('vite required but not found'))).toBe(false)
-		expect(renderedMessages.some((message) => message.includes('@cloudflare/vite-plugin required but not found'))).toBe(false)
+		expect(
+			renderedMessages.some((message) => message.includes('vite required but not found'))
+		).toBe(false)
+		expect(
+			renderedMessages.some((message) =>
+				message.includes('@cloudflare/vite-plugin required but not found')
+			)
+		).toBe(false)
 		expect(renderedMessages.some((message) => message.includes('worker-only mode'))).toBe(true)
 	})
 
@@ -99,14 +118,18 @@ describe('runDoctorCommand', () => {
 	})
 
 	test('describes @cloudflare/vite-plugin as optional when a Vite package omits it', async () => {
-		await writeProjectFiles(projectDir, {
-			name: 'sveltekit-project',
-			private: true,
-			devDependencies: {
-				devflare: '^1.0.0',
-				vite: '^6.0.0'
-			}
-		}, true)
+		await writeProjectFiles(
+			projectDir,
+			{
+				name: 'sveltekit-project',
+				private: true,
+				devDependencies: {
+					devflare: '^1.0.0',
+					vite: '^6.0.0'
+				}
+			},
+			true
+		)
 
 		const logger = createLogger()
 		const result = await runDoctorCommand(
@@ -117,9 +140,11 @@ describe('runDoctorCommand', () => {
 		const renderedMessages = renderMessages(logger)
 
 		expect(result.exitCode).toBe(0)
-		expect(renderedMessages.some((message) =>
-			message.includes('@cloudflare/vite-plugin') && message.includes('Optional')
-		)).toBe(true)
+		expect(
+			renderedMessages.some(
+				(message) => message.includes('@cloudflare/vite-plugin') && message.includes('Optional')
+			)
+		).toBe(true)
 	})
 
 	test('reports package.json and resolved devflare versions', async () => {
@@ -140,9 +165,11 @@ describe('runDoctorCommand', () => {
 		const renderedMessages = renderMessages(logger)
 
 		expect(result.exitCode).toBe(0)
-		expect(renderedMessages.some((message) =>
-			message.includes('package.json: next') && message.includes('resolved:')
-		)).toBe(true)
+		expect(
+			renderedMessages.some(
+				(message) => message.includes('package.json: next') && message.includes('resolved:')
+			)
+		).toBe(true)
 	})
 
 	test('scope local omits deploy artifact readiness warnings', async () => {
@@ -163,8 +190,12 @@ describe('runDoctorCommand', () => {
 		const renderedMessages = renderMessages(logger)
 
 		expect(result.exitCode).toBe(0)
-		expect(renderedMessages.some((message) => message.includes('Generated deploy config'))).toBe(false)
-		expect(renderedMessages.some((message) => message.includes('Wrangler deploy redirect'))).toBe(false)
+		expect(renderedMessages.some((message) => message.includes('Generated deploy config'))).toBe(
+			false
+		)
+		expect(renderedMessages.some((message) => message.includes('Wrangler deploy redirect'))).toBe(
+			false
+		)
 	})
 
 	test('accepts .devflare/wrangler.jsonc as generated config output', async () => {
@@ -187,17 +218,24 @@ describe('runDoctorCommand', () => {
 		const renderedMessages = renderMessages(logger)
 
 		expect(result.exitCode).toBe(0)
-		expect(renderedMessages.some((message) => message.includes('.devflare/wrangler.jsonc'))).toBe(true)
+		expect(renderedMessages.some((message) => message.includes('.devflare/wrangler.jsonc'))).toBe(
+			true
+		)
 	})
 
 	test('supports --config with alternate supported config filenames', async () => {
-		await writeProjectFiles(projectDir, {
-			name: 'mts-project',
-			private: true,
-			devDependencies: {
-				devflare: '^1.0.0'
-			}
-		}, false, 'devflare.config.mts')
+		await writeProjectFiles(
+			projectDir,
+			{
+				name: 'mts-project',
+				private: true,
+				devDependencies: {
+					devflare: '^1.0.0'
+				}
+			},
+			false,
+			'devflare.config.mts'
+		)
 
 		const logger = createLogger()
 		const result = await runDoctorCommand(
@@ -212,13 +250,20 @@ describe('runDoctorCommand', () => {
 	})
 
 	test('lists all supported config filenames when none are found', async () => {
-		await writeFile(join(projectDir, 'package.json'), JSON.stringify({
-			name: 'missing-config-project',
-			private: true,
-			devDependencies: {
-				devflare: '^1.0.0'
-			}
-		}, null, 2))
+		await writeFile(
+			join(projectDir, 'package.json'),
+			JSON.stringify(
+				{
+					name: 'missing-config-project',
+					private: true,
+					devDependencies: {
+						devflare: '^1.0.0'
+					}
+				},
+				null,
+				2
+			)
+		)
 
 		const logger = createLogger()
 		const result = await runDoctorCommand(
@@ -229,6 +274,12 @@ describe('runDoctorCommand', () => {
 		const renderedMessages = renderMessages(logger)
 
 		expect(result.exitCode).toBe(1)
-		expect(renderedMessages.some((message) => message.includes('devflare.config.ts, devflare.config.mts, devflare.config.js, devflare.config.mjs'))).toBe(true)
+		expect(
+			renderedMessages.some((message) =>
+				message.includes(
+					'devflare.config.ts, devflare.config.mts, devflare.config.js, devflare.config.mjs'
+				)
+			)
+		).toBe(true)
 	})
 })

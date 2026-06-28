@@ -11,7 +11,9 @@ describe('runConfigCommand', () => {
 	beforeEach(async () => {
 		projectDir = await mkdtemp(join(tmpdir(), 'devflare-config-command-'))
 		await mkdir(join(projectDir, 'src'), { recursive: true })
-		await writeFile(join(projectDir, 'devflare.config.ts'), `
+		await writeFile(
+			join(projectDir, 'devflare.config.ts'),
+			`
 export default {
 	name: 'config-command-worker',
 	compatibilityDate: '2025-01-07',
@@ -24,7 +26,8 @@ export default {
 		}
 	}
 }
-		`.trim())
+		`.trim()
+		)
 	})
 
 	afterEach(async () => {
@@ -60,7 +63,9 @@ export default {
 	})
 
 	test('prints local wrangler config without Cloudflare account resource resolution', async () => {
-		await writeFile(join(projectDir, 'devflare.config.ts'), `
+		await writeFile(
+			join(projectDir, 'devflare.config.ts'),
+			`
 export default {
 	name: 'local-config-worker',
 	compatibilityDate: '2025-01-07',
@@ -70,11 +75,16 @@ export default {
 		}
 	}
 }
-		`.trim())
+		`.trim()
+		)
 
 		const logger = createLogger({ includeLog: false })
 		const result = await runConfigCommand(
-			{ command: 'config', args: ['print'], options: { format: 'wrangler', phase: 'local', json: true } },
+			{
+				command: 'config',
+				args: ['print'],
+				options: { format: 'wrangler', phase: 'local', json: true }
+			},
 			logger as any,
 			{ cwd: projectDir, silent: true }
 		)

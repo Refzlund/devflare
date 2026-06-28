@@ -103,7 +103,10 @@ export class TransportV2Codec {
 	#socket: WebSocketLike
 	#capabilities: readonly string[]
 	#options: TransportV2CodecOptions
-	#handshakeResolver: { resolve: (value: TransportV2HandshakeOk) => void; reject: (error: Error) => void } | null = null
+	#handshakeResolver: {
+		resolve: (value: TransportV2HandshakeOk) => void
+		reject: (error: Error) => void
+	} | null = null
 	#handshakePromise: Promise<TransportV2HandshakeOk>
 	#sentHello = false
 	#receivedHello = false
@@ -353,7 +356,10 @@ export class TransportV2Codec {
 		this.#socket.send(stringifyTransportV2ControlMsg(welcome))
 
 		// Server-side completes the handshake on receipt of `hello`.
-		this.#completeHandshake({ protocolVersion: TRANSPORT_V2_PROTOCOL_VERSION, capabilities: negotiated })
+		this.#completeHandshake({
+			protocolVersion: TRANSPORT_V2_PROTOCOL_VERSION,
+			capabilities: negotiated
+		})
 	}
 
 	#onWelcome(msg: TransportV2Welcome): void {

@@ -2,8 +2,8 @@
 // Vite Plugin Tests
 // =============================================================================
 
-import { describe, expect, test, mock, beforeEach } from 'bun:test'
-import { devflarePlugin, type DevflarePluginOptions } from '../../../src/vite/plugin'
+import { beforeEach, describe, expect, mock, test } from 'bun:test'
+import { type DevflarePluginOptions, devflarePlugin } from '../../../src/vite/plugin'
 
 describe('devflarePlugin', () => {
 	test('returns valid vite plugin object', () => {

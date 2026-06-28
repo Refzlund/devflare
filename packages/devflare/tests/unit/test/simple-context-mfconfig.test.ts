@@ -1,9 +1,9 @@
+import { afterEach, describe, expect, test } from 'bun:test'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, test } from 'bun:test'
-import { buildInlineBridgeMfConfig } from '../../../src/test/simple-context-mfconfig'
 import { writeLocalSecret } from '../../../src/secrets/local-secrets'
+import { buildInlineBridgeMfConfig } from '../../../src/test/simple-context-mfconfig'
 
 const tempDirs: string[] = []
 
@@ -131,18 +131,21 @@ describe('buildInlineBridgeMfConfig', () => {
 		const cwd = createTempDir()
 		writeLocalSecret({ cwd, storeId: 'store-123', name: 'api-token', value: 'local-secret' })
 
-		const mfConfig = buildInlineBridgeMfConfig({
-			name: 'my-worker',
-			compatibilityDate: '2026-04-26',
-			compatibilityFlags: [],
-			secretsStoreId: 'store-123',
-			bindings: {
-				secretsStore: {
-					API_TOKEN: 'api-token',
-					REMOTE_ONLY: 'remote-only'
+		const mfConfig = buildInlineBridgeMfConfig(
+			{
+				name: 'my-worker',
+				compatibilityDate: '2026-04-26',
+				compatibilityFlags: [],
+				secretsStoreId: 'store-123',
+				bindings: {
+					secretsStore: {
+						API_TOKEN: 'api-token',
+						REMOTE_ONLY: 'remote-only'
+					}
 				}
-			}
-		}, { cwd })
+			},
+			{ cwd }
+		)
 
 		expect(mfConfig.secretsStoreSecrets).toEqual({
 			REMOTE_ONLY: {

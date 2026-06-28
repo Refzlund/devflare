@@ -25,7 +25,7 @@ describe('Miniflare instance disposal', () => {
 
 	test('allows startup when optional direct-access helpers are missing', async () => {
 		const handle = createMiniflareInstanceHandle({
-			async dispose() { },
+			async dispose() {},
 			async getBindings() {
 				return { API_TOKEN: 'secret' }
 			},
@@ -52,31 +52,38 @@ describe('Miniflare instance disposal', () => {
 
 	test('reads bindings from the named primary worker when one is known', async () => {
 		let requestedWorkerName: string | undefined
-		const handle = createMiniflareInstanceHandle({
-			async dispose() { },
-			async getBindings(workerName?: string) {
-				requestedWorkerName = workerName
-				return { API_TOKEN: 'secret' }
-			}
-		} as never, 'devflare-gateway')
+		const handle = createMiniflareInstanceHandle(
+			{
+				async dispose() {},
+				async getBindings(workerName?: string) {
+					requestedWorkerName = workerName
+					return { API_TOKEN: 'secret' }
+				}
+			} as never,
+			'devflare-gateway'
+		)
 
 		await expect(handle.getBindings()).resolves.toEqual({ API_TOKEN: 'secret' })
 		expect(requestedWorkerName).toBe('devflare-gateway')
 	})
 
 	test('merges node-side binding overrides into getBindings results', async () => {
-		const handle = createMiniflareInstanceHandle({
-			async dispose() { },
-			async getBindings() {
-				return { EXISTING: 'value' }
-			}
-		} as never, undefined, {
-			API_TOKEN: {
-				async get() {
-					return 'local-secret'
+		const handle = createMiniflareInstanceHandle(
+			{
+				async dispose() {},
+				async getBindings() {
+					return { EXISTING: 'value' }
+				}
+			} as never,
+			undefined,
+			{
+				API_TOKEN: {
+					async get() {
+						return 'local-secret'
+					}
 				}
 			}
-		})
+		)
 
 		const bindings = await handle.getBindings()
 		expect(bindings.EXISTING).toBe('value')

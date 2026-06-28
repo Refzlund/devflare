@@ -8,7 +8,7 @@
 // gateway runtime variant.
 // =============================================================================
 
-import { nextStreamId, HTTP_TRANSFER_THRESHOLD } from './wire'
+import { HTTP_TRANSFER_THRESHOLD, nextStreamId } from './wire'
 
 // -----------------------------------------------------------------------------
 // Serialized Types
@@ -35,7 +35,7 @@ export interface SerializedResponse {
 
 /** Reference to a body - either inline bytes or stream */
 export type BodyRef =
-	| { type: 'bytes'; data: string }  // base64 for JSON transport
+	| { type: 'bytes'; data: string } // base64 for JSON transport
 	| { type: 'stream'; sid: number }
 
 /**
@@ -84,10 +84,11 @@ export async function serializeRequest(
 			// loudly rather than silently dropping the body. Responses (gateway →
 			// client) ARE streamed — see serializeResponse below.
 			throw new Error(
-				'Request body exceeds the bridge inline limit (~512 KB) and large request-body streaming is not yet supported over the local bridge. '
-				+ 'Send the payload in smaller chunks or via an R2 binding for now.'
+				'Request body exceeds the bridge inline limit (~512 KB) and large request-body streaming is not yet supported over the local bridge. ' +
+					'Send the payload in smaller chunks or via an R2 binding for now.'
 			)
-		} else if (bytes.byteLength > 0) {
+		}
+		if (bytes.byteLength > 0) {
 			// Body has content → inline bytes (base64)
 			body = { type: 'bytes', data: base64Encode(new Uint8Array(bytes)) }
 		}
@@ -178,7 +179,9 @@ export async function serializeResponse(
 			const stream = new ReadableStream<Uint8Array>({
 				start(controller) {
 					for (let offset = 0; offset < payload.byteLength; offset += frameSize) {
-						controller.enqueue(payload.slice(offset, Math.min(offset + frameSize, payload.byteLength)))
+						controller.enqueue(
+							payload.slice(offset, Math.min(offset + frameSize, payload.byteLength))
+						)
 					}
 					controller.close()
 				}
@@ -252,7 +255,7 @@ export function serializeDOId(id: DurableObjectId): SerializedDOId {
 
 /** Deserialize a canonical `SerializedDOId` back into a `DurableObjectId` bound to `ns`. */
 export function deserializeDOId(
-	serialized: SerializedDOId | { __type?: unknown, hex?: unknown },
+	serialized: SerializedDOId | { __type?: unknown; hex?: unknown },
 	ns: DurableObjectNamespace
 ): DurableObjectId {
 	if (serialized && (serialized as SerializedDOId).__type === DO_ID_TYPE) {
@@ -283,11 +286,11 @@ export function needsSpecialSerialization(value: unknown): boolean {
 
 /** Discriminator tag for structurally-encoded special values */
 export type SerializedSpecial =
-	| { __devflare: 'date', iso: string }
-	| { __devflare: 'map', entries: [unknown, unknown][] }
-	| { __devflare: 'set', values: unknown[] }
-	| { __devflare: 'url', href: string }
-	| { __devflare: 'error', name: string, message: string, stack?: string }
+	| { __devflare: 'date'; iso: string }
+	| { __devflare: 'map'; entries: [unknown, unknown][] }
+	| { __devflare: 'set'; values: unknown[] }
+	| { __devflare: 'url'; href: string }
+	| { __devflare: 'error'; name: string; message: string; stack?: string }
 
 /** Serialize a value that may contain special types */
 export async function serializeValue(
@@ -497,13 +500,10 @@ interface SerializedR2Object {
 	customMetadata?: Record<string, string>
 	range?: R2Range
 	storageClass?: string
-	bodyData?: string  // Base64-encoded body (only for R2ObjectBody)
+	bodyData?: string // Base64-encoded body (only for R2ObjectBody)
 }
 
-function applySerializedHttpMetadata(
-	headers: Headers,
-	httpMetadata?: R2HTTPMetadata
-): void {
+function applySerializedHttpMetadata(headers: Headers, httpMetadata?: R2HTTPMetadata): void {
 	if (httpMetadata?.contentType) {
 		headers.set('Content-Type', httpMetadata.contentType)
 	}
@@ -586,7 +586,10 @@ function deserializeR2ObjectBody(obj: Record<string, unknown>): R2ObjectBody {
 		async blob(): Promise<Blob> {
 			const contentType = serialized.httpMetadata?.contentType || 'application/octet-stream'
 			// Convert to ArrayBuffer for wider compatibility
-			const buffer = bodyBytes.buffer.slice(bodyBytes.byteOffset, bodyBytes.byteOffset + bodyBytes.byteLength) as ArrayBuffer
+			const buffer = bodyBytes.buffer.slice(
+				bodyBytes.byteOffset,
+				bodyBytes.byteOffset + bodyBytes.byteLength
+			) as ArrayBuffer
 			return new Blob([buffer], { type: contentType })
 		}
 	}
@@ -606,7 +609,7 @@ export function base64Encode(bytes: Uint8Array): string {
 	}
 	// Fallback for browser/worker environments
 	let binary = ''
-	for (let i = 0;i < bytes.byteLength;i++) {
+	for (let i = 0; i < bytes.byteLength; i++) {
 		binary += String.fromCharCode(bytes[i])
 	}
 	return btoa(binary)
@@ -621,7 +624,7 @@ export function base64Decode(str: string): Uint8Array {
 	// Fallback for browser/worker environments
 	const binary = atob(str)
 	const bytes = new Uint8Array(binary.length)
-	for (let i = 0;i < binary.length;i++) {
+	for (let i = 0; i < binary.length; i++) {
 		bytes[i] = binary.charCodeAt(i)
 	}
 	return bytes

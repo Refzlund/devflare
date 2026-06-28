@@ -1,9 +1,5 @@
+import { PREVIEWS_COMMON_OPTIONS, createPreviewSubcommandPage, entry } from '../shared'
 import type { HelpPage } from '../types'
-import {
-	PREVIEWS_COMMON_OPTIONS,
-	createPreviewSubcommandPage,
-	entry
-} from '../shared'
 
 export const PREVIEW_HELP_PAGES: HelpPage[] = [
 	{
@@ -20,25 +16,58 @@ export const PREVIEW_HELP_PAGES: HelpPage[] = [
 			'Use `bindings` to inspect preview-scoped resource associations for one scope, or `cleanup` to delete dedicated preview Workers plus preview-only Cloudflare resources for one scope or every live scope Devflare can discover from Worker names.'
 		],
 		subcommands: [
-			entry('list', 'List stable workers plus dedicated preview scopes for the current worker family (default)'),
-			entry('bindings', 'Inspect resolved bindings/resources and how many deployed workers currently reference them'),
+			entry(
+				'list',
+				'List stable workers plus dedicated preview scopes for the current worker family (default)'
+			),
+			entry(
+				'bindings',
+				'Inspect resolved bindings/resources and how many deployed workers currently reference them'
+			),
 			entry('cleanup', 'Delete preview-only Worker scripts and preview-scoped Cloudflare resources')
 		],
 		options: [
 			...PREVIEWS_COMMON_OPTIONS,
-			entry('--config <path>', 'Use a specific devflare config file for config-aware preview commands'),
-			entry('--env <name>', 'Resolve a non-default `config.env[name]` before config-aware preview commands when your preview bindings live outside `env.preview`'),
-			entry('--scope <name>', 'Resolve preview-scoped names for a specific identifier on config-aware preview commands'),
-			entry('--all', 'Clean every live preview scope Devflare can discover for the current worker family when used with `cleanup`'),
+			entry(
+				'--config <path>',
+				'Use a specific devflare config file for config-aware preview commands'
+			),
+			entry(
+				'--env <name>',
+				'Resolve a non-default `config.env[name]` before config-aware preview commands when your preview bindings live outside `env.preview`'
+			),
+			entry(
+				'--scope <name>',
+				'Resolve preview-scoped names for a specific identifier on config-aware preview commands'
+			),
+			entry(
+				'--all',
+				'Clean every live preview scope Devflare can discover for the current worker family when used with `cleanup`'
+			),
 			entry('--apply', 'Execute cleanup instead of doing a dry run'),
-			entry('--worker <name>', 'Override the primary worker name shown in the `bindings` report header')
+			entry(
+				'--worker <name>',
+				'Override the primary worker name shown in the `bindings` report header'
+			)
 		],
 		examples: [
 			entry('devflare previews', 'List preview scopes for the current package'),
-			entry('devflare previews --account <id>', 'List preview scopes for every configured package when run from a monorepo root'),
-			entry('devflare previews bindings --scope next', 'Inspect the `next` preview scope and its live worker associations'),
-			entry('devflare previews cleanup --scope next --apply', 'Delete preview-only resources and dedicated Workers for the `next` scope'),
-			entry('devflare previews cleanup --all --apply', 'Delete preview-only resources and dedicated Workers for every live discovered preview scope')
+			entry(
+				'devflare previews --account <id>',
+				'List preview scopes for every configured package when run from a monorepo root'
+			),
+			entry(
+				'devflare previews bindings --scope next',
+				'Inspect the `next` preview scope and its live worker associations'
+			),
+			entry(
+				'devflare previews cleanup --scope next --apply',
+				'Delete preview-only resources and dedicated Workers for the `next` scope'
+			),
+			entry(
+				'devflare previews cleanup --all --apply',
+				'Delete preview-only resources and dedicated Workers for every live discovered preview scope'
+			)
 		],
 		notes: [
 			'The default `list` view can aggregate every configured package from a monorepo root. `bindings` and `cleanup` still need one configured package, so run them inside that package or pass `--config <path>`.',
@@ -64,9 +93,18 @@ export const PREVIEW_HELP_PAGES: HelpPage[] = [
 			entry('--account <id>', 'Use a specific Cloudflare account')
 		],
 		[
-			entry('devflare previews', 'List stable workers and active preview scopes for the current package'),
-			entry('devflare previews --account <id>', 'Aggregate stable workers and preview scopes across every configured package in the current workspace root'),
-			entry('devflare previews list --env preview', 'List preview scopes using a non-default config environment when needed')
+			entry(
+				'devflare previews',
+				'List stable workers and active preview scopes for the current package'
+			),
+			entry(
+				'devflare previews --account <id>',
+				'Aggregate stable workers and preview scopes across every configured package in the current workspace root'
+			),
+			entry(
+				'devflare previews list --env preview',
+				'List preview scopes using a non-default config environment when needed'
+			)
 		],
 		[
 			'`list` is the default subcommand, so `devflare previews` and `devflare previews list` show the same view.',
@@ -85,13 +123,22 @@ export const PREVIEW_HELP_PAGES: HelpPage[] = [
 		[
 			entry('--config <path>', 'Use a specific devflare config file'),
 			entry('--env <name>', 'Resolve `config.env[name]` before inspecting bindings'),
-			entry('--scope <name>', 'Resolve preview-scoped names for a specific identifier instead of the default `preview` scope'),
+			entry(
+				'--scope <name>',
+				'Resolve preview-scoped names for a specific identifier instead of the default `preview` scope'
+			),
 			entry('--account <id>', 'Use a specific Cloudflare account'),
 			entry('--worker <name>', 'Override the primary worker name shown in the report header')
 		],
 		[
-			entry('devflare previews bindings --scope next', 'Inspect preview-scoped bindings for the `next` scope'),
-			entry('devflare previews bindings', 'Inspect preview-scoped bindings for the default `preview` scope')
+			entry(
+				'devflare previews bindings --scope next',
+				'Inspect preview-scoped bindings for the `next` scope'
+			),
+			entry(
+				'devflare previews bindings',
+				'Inspect preview-scoped bindings for the default `preview` scope'
+			)
 		],
 		[
 			'This command is read-only; it does not delete Workers or resources.',
@@ -110,16 +157,31 @@ export const PREVIEW_HELP_PAGES: HelpPage[] = [
 		],
 		[
 			entry('--config <path>', 'Use a specific devflare config file'),
-			entry('--env <name>', 'Resolve a non-default `config.env[name]` before cleanup when your preview bindings live outside `env.preview`'),
+			entry(
+				'--env <name>',
+				'Resolve a non-default `config.env[name]` before cleanup when your preview bindings live outside `env.preview`'
+			),
 			entry('--scope <name>', 'Clean one preview scope instead of the default `preview` scope'),
-			entry('--all', 'Clean every live preview scope Devflare can discover for the current worker family'),
+			entry(
+				'--all',
+				'Clean every live preview scope Devflare can discover for the current worker family'
+			),
 			entry('--account <id>', 'Use a specific Cloudflare account'),
 			entry('--apply', 'Apply the cleanup instead of doing a dry run')
 		],
 		[
-			entry('devflare previews cleanup --scope next', 'Show which dedicated Workers and preview-only resources belong to the `next` scope'),
-			entry('devflare previews cleanup --all', 'Show the cleanup plan for every live discovered preview scope'),
-			entry('devflare previews cleanup --all --apply', 'Delete dedicated preview Workers and preview-only resources for every live discovered preview scope')
+			entry(
+				'devflare previews cleanup --scope next',
+				'Show which dedicated Workers and preview-only resources belong to the `next` scope'
+			),
+			entry(
+				'devflare previews cleanup --all',
+				'Show the cleanup plan for every live discovered preview scope'
+			),
+			entry(
+				'devflare previews cleanup --all --apply',
+				'Delete dedicated preview Workers and preview-only resources for every live discovered preview scope'
+			)
 		],
 		[
 			'Dedicated preview Worker scripts are candidates only when their names resolve to the targeted preview scope. Stable shared Workers are never deleted.',

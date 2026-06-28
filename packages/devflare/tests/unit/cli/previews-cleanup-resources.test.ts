@@ -12,11 +12,21 @@ const temporaryCacheDirectories = createTrackedTempDirectories()
 
 function writeKvCleanupProject(projectDir: string, projectName: string): void {
 	const previewScopedValue = `__DEVFLARE_PREVIEW_SCOPE__:${JSON.stringify({ baseName: 'cache-kv', separator: '-' })}`
-	writeFileSync(join(projectDir, 'package.json'), JSON.stringify({
-		name: projectName,
-		type: 'module'
-	}, null, '\t'), 'utf-8')
-	writeFileSync(join(projectDir, 'devflare.config.ts'), `
+	writeFileSync(
+		join(projectDir, 'package.json'),
+		JSON.stringify(
+			{
+				name: projectName,
+				type: 'module'
+			},
+			null,
+			'\t'
+		),
+		'utf-8'
+	)
+	writeFileSync(
+		join(projectDir, 'devflare.config.ts'),
+		`
 		export default {
 			name: ${JSON.stringify(projectName)},
 			accountId: 'acc_123',
@@ -27,15 +37,27 @@ function writeKvCleanupProject(projectDir: string, projectName: string): void {
 				}
 			}
 		}
-	`, 'utf-8')
+	`,
+		'utf-8'
+	)
 }
 
 function writeServiceCleanupProject(projectDir: string): void {
-	writeFileSync(join(projectDir, 'package.json'), JSON.stringify({
-		name: 'demo-preview-cleanup-apply-order',
-		type: 'module'
-	}, null, '\t'), 'utf-8')
-	writeFileSync(join(projectDir, 'devflare.config.ts'), `
+	writeFileSync(
+		join(projectDir, 'package.json'),
+		JSON.stringify(
+			{
+				name: 'demo-preview-cleanup-apply-order',
+				type: 'module'
+			},
+			null,
+			'\t'
+		),
+		'utf-8'
+	)
+	writeFileSync(
+		join(projectDir, 'devflare.config.ts'),
+		`
 		export default {
 			name: 'demo-worker',
 			accountId: 'acc_123',
@@ -46,7 +68,9 @@ function writeServiceCleanupProject(projectDir: string): void {
 				}
 			}
 		}
-	`, 'utf-8')
+	`,
+		'utf-8'
+	)
 }
 
 afterEach(() => {
@@ -115,8 +139,18 @@ describe('previews command', () => {
 		const renderedMessages = renderMessages(logger)
 
 		expect(result.exitCode).toBe(0)
-		expect(renderedMessages.some((message) => message.includes('preview scope preview (default preview scope)'))).toBe(true)
-		expect(renderedMessages.some((message) => message.includes('No preview-only resources or dedicated preview Worker scripts matched the default "preview" scope'))).toBe(true)
+		expect(
+			renderedMessages.some((message) =>
+				message.includes('preview scope preview (default preview scope)')
+			)
+		).toBe(true)
+		expect(
+			renderedMessages.some((message) =>
+				message.includes(
+					'No preview-only resources or dedicated preview Worker scripts matched the default "preview" scope'
+				)
+			)
+		).toBe(true)
 	})
 
 	test('cleanup uses --scope to target named preview resources', async () => {
@@ -132,34 +166,40 @@ describe('previews command', () => {
 			}
 
 			if (url.includes('/accounts/acc_123/workers/scripts?page=1&per_page=50')) {
-				return jsonResponse([
+				return jsonResponse(
+					[
+						{
+							id: 'demo-preview-cleanup-scope-next',
+							created_on: '2026-04-08T00:00:00.000Z',
+							modified_on: '2026-04-08T00:00:00.000Z'
+						}
+					],
 					{
-						id: 'demo-preview-cleanup-scope-next',
-						created_on: '2026-04-08T00:00:00.000Z',
-						modified_on: '2026-04-08T00:00:00.000Z'
+						page: 1,
+						per_page: 50,
+						total_pages: 1,
+						count: 1,
+						total_count: 1
 					}
-				], {
-					page: 1,
-					per_page: 50,
-					total_pages: 1,
-					count: 1,
-					total_count: 1
-				})
+				)
 			}
 
 			if (url.includes('/accounts/acc_123/storage/kv/namespaces?page=1&per_page=50')) {
-				return jsonResponse([
+				return jsonResponse(
+					[
+						{
+							id: 'kv-next',
+							title: 'cache-kv-next'
+						}
+					],
 					{
-						id: 'kv-next',
-						title: 'cache-kv-next'
+						page: 1,
+						per_page: 50,
+						total_pages: 1,
+						count: 1,
+						total_count: 1
 					}
-				], {
-					page: 1,
-					per_page: 50,
-					total_pages: 1,
-					count: 1,
-					total_count: 1
-				})
+				)
 			}
 
 			throw new Error(`Unexpected fetch URL: ${url}`)
@@ -181,11 +221,28 @@ describe('previews command', () => {
 		const renderedMessages = renderMessages(logger)
 
 		expect(result.exitCode).toBe(0)
-		expect(renderedMessages.some((message) => message.includes('preview scope next (--scope)'))).toBe(true)
-		expect(renderedMessages.some((message) => message.includes('Preview cleanup dry run complete with 2 candidates across 1 preview scope'))).toBe(true)
-		expect(renderedMessages.some((message) => message.includes('Candidates: Workers 1 · KV 1'))).toBe(true)
+		expect(
+			renderedMessages.some((message) => message.includes('preview scope next (--scope)'))
+		).toBe(true)
+		expect(
+			renderedMessages.some((message) =>
+				message.includes(
+					'Preview cleanup dry run complete with 2 candidates across 1 preview scope'
+				)
+			)
+		).toBe(true)
+		expect(
+			renderedMessages.some((message) => message.includes('Candidates: Workers 1 · KV 1'))
+		).toBe(true)
 		expect(renderedMessages.some((message) => message.includes('scope breakdown'))).toBe(true)
-		expect(renderedMessages.some((message) => message.includes('next') && message.includes('dedicated workers') && message.includes('Workers 1'))).toBe(true)
+		expect(
+			renderedMessages.some(
+				(message) =>
+					message.includes('next') &&
+					message.includes('dedicated workers') &&
+					message.includes('Workers 1')
+			)
+		).toBe(true)
 	})
 
 	test('cleanup uses --all to clean every live discovered preview scope', async () => {
@@ -201,39 +258,45 @@ describe('previews command', () => {
 			}
 
 			if (url.includes('/accounts/acc_123/workers/scripts?page=1&per_page=50')) {
-				return jsonResponse([
+				return jsonResponse(
+					[
+						{
+							id: 'demo-preview-cleanup-all-next',
+							created_on: '2026-04-08T00:00:00.000Z',
+							modified_on: '2026-04-08T00:00:00.000Z'
+						},
+						{
+							id: 'demo-preview-cleanup-all-pr-1',
+							created_on: '2026-04-08T00:00:00.000Z',
+							modified_on: '2026-04-08T00:00:00.000Z'
+						}
+					],
 					{
-						id: 'demo-preview-cleanup-all-next',
-						created_on: '2026-04-08T00:00:00.000Z',
-						modified_on: '2026-04-08T00:00:00.000Z'
-					},
-					{
-						id: 'demo-preview-cleanup-all-pr-1',
-						created_on: '2026-04-08T00:00:00.000Z',
-						modified_on: '2026-04-08T00:00:00.000Z'
+						page: 1,
+						per_page: 50,
+						total_pages: 1,
+						count: 2,
+						total_count: 2
 					}
-				], {
-					page: 1,
-					per_page: 50,
-					total_pages: 1,
-					count: 2,
-					total_count: 2
-				})
+				)
 			}
 
 			if (url.includes('/accounts/acc_123/storage/kv/namespaces?page=1&per_page=50')) {
-				return jsonResponse([
+				return jsonResponse(
+					[
+						{
+							id: 'kv-next',
+							title: 'cache-kv-next'
+						}
+					],
 					{
-						id: 'kv-next',
-						title: 'cache-kv-next'
+						page: 1,
+						per_page: 50,
+						total_pages: 1,
+						count: 1,
+						total_count: 1
 					}
-				], {
-					page: 1,
-					per_page: 50,
-					total_pages: 1,
-					count: 1,
-					total_count: 1
-				})
+				)
 			}
 
 			throw new Error(`Unexpected fetch URL: ${url}`)
@@ -255,13 +318,41 @@ describe('previews command', () => {
 		const renderedMessages = renderMessages(logger)
 
 		expect(result.exitCode).toBe(0)
-		expect(renderedMessages.some((message) => message.includes('preview scopes next, pr-1 (--all)'))).toBe(true)
-		expect(renderedMessages.some((message) => message.includes('Preview cleanup dry run complete with 3 candidates across 2 preview scopes'))).toBe(true)
-		expect(renderedMessages.some((message) => message.includes('Candidates: Workers 2 · KV 1'))).toBe(true)
+		expect(
+			renderedMessages.some((message) => message.includes('preview scopes next, pr-1 (--all)'))
+		).toBe(true)
+		expect(
+			renderedMessages.some((message) =>
+				message.includes(
+					'Preview cleanup dry run complete with 3 candidates across 2 preview scopes'
+				)
+			)
+		).toBe(true)
+		expect(
+			renderedMessages.some((message) => message.includes('Candidates: Workers 2 · KV 1'))
+		).toBe(true)
 		expect(renderedMessages.some((message) => message.includes('scope breakdown'))).toBe(true)
-		expect(renderedMessages.some((message) => message.includes('next') && message.includes('dedicated workers') && message.includes('Workers 1'))).toBe(true)
-		expect(renderedMessages.some((message) => message.includes('pr-1') && message.includes('dedicated workers') && message.includes('Workers 1'))).toBe(true)
-		expect(renderedMessages.some((message) => message.includes('preview') && message.includes('default preview scope'))).toBe(false)
+		expect(
+			renderedMessages.some(
+				(message) =>
+					message.includes('next') &&
+					message.includes('dedicated workers') &&
+					message.includes('Workers 1')
+			)
+		).toBe(true)
+		expect(
+			renderedMessages.some(
+				(message) =>
+					message.includes('pr-1') &&
+					message.includes('dedicated workers') &&
+					message.includes('Workers 1')
+			)
+		).toBe(true)
+		expect(
+			renderedMessages.some(
+				(message) => message.includes('preview') && message.includes('default preview scope')
+			)
+		).toBe(false)
 	})
 
 	test('cleanup deletes preview worker consumers before preview service providers', async () => {
@@ -280,49 +371,62 @@ describe('previews command', () => {
 			}
 
 			if (url.includes('/accounts/acc_123/workers/scripts?page=1&per_page=50')) {
-				return jsonResponse([
+				return jsonResponse(
+					[
+						{
+							id: 'demo-auth-service-next',
+							created_on: '2026-04-08T00:00:00.000Z',
+							modified_on: '2026-04-08T00:00:00.000Z'
+						},
+						{
+							id: 'demo-worker-next',
+							created_on: '2026-04-08T00:00:00.000Z',
+							modified_on: '2026-04-08T00:00:00.000Z'
+						}
+					],
 					{
-						id: 'demo-auth-service-next',
-						created_on: '2026-04-08T00:00:00.000Z',
-						modified_on: '2026-04-08T00:00:00.000Z'
-					},
-					{
-						id: 'demo-worker-next',
-						created_on: '2026-04-08T00:00:00.000Z',
-						modified_on: '2026-04-08T00:00:00.000Z'
+						page: 1,
+						per_page: 50,
+						total_pages: 1,
+						count: 2,
+						total_count: 2
 					}
-				], {
-					page: 1,
-					per_page: 50,
-					total_pages: 1,
-					count: 2,
-					total_count: 2
-				})
+				)
 			}
 
-			if (url.endsWith('/accounts/acc_123/workers/scripts/demo-worker-next') && init?.method === 'DELETE') {
+			if (
+				url.endsWith('/accounts/acc_123/workers/scripts/demo-worker-next') &&
+				init?.method === 'DELETE'
+			) {
 				mainWorkerDeleted = true
 				deletedWorkers.push('demo-worker-next')
 				return jsonResponse({})
 			}
 
-			if (url.endsWith('/accounts/acc_123/workers/scripts/demo-auth-service-next') && init?.method === 'DELETE') {
+			if (
+				url.endsWith('/accounts/acc_123/workers/scripts/demo-auth-service-next') &&
+				init?.method === 'DELETE'
+			) {
 				if (!mainWorkerDeleted) {
-					return new Response(JSON.stringify({
-						success: false,
-						errors: [
-							{
-								message: "Cannot delete service 'demo-auth-service-next' because it is still referenced by service bindings in Workers 'demo-worker-next'. Please remove bindings pointing to it and try again."
+					return new Response(
+						JSON.stringify({
+							success: false,
+							errors: [
+								{
+									message:
+										"Cannot delete service 'demo-auth-service-next' because it is still referenced by service bindings in Workers 'demo-worker-next'. Please remove bindings pointing to it and try again."
+								}
+							],
+							messages: [],
+							result: null
+						}),
+						{
+							status: 400,
+							headers: {
+								'Content-Type': 'application/json'
 							}
-						],
-						messages: [],
-						result: null
-					}), {
-						status: 400,
-						headers: {
-							'Content-Type': 'application/json'
 						}
-					})
+					)
 				}
 
 				deletedWorkers.push('demo-auth-service-next')
@@ -350,6 +454,10 @@ describe('previews command', () => {
 
 		expect(result.exitCode).toBe(0)
 		expect(deletedWorkers).toEqual(['demo-worker-next', 'demo-auth-service-next'])
-		expect(renderedMessages.some((message) => message.includes('Deleted 2 preview-only cleanup candidates across 1 preview scope'))).toBe(true)
+		expect(
+			renderedMessages.some((message) =>
+				message.includes('Deleted 2 preview-only cleanup candidates across 1 preview scope')
+			)
+		).toBe(true)
 	})
 })

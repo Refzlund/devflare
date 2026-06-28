@@ -1,14 +1,14 @@
-import { type ConsolaInstance } from 'consola'
+import type { ConsolaInstance } from 'consola'
 import {
 	ConfigResourceResolutionError,
+	type DevflareConfig,
 	loadConfig,
 	loadResolvedConfig,
 	resolveConfigEnvVars,
-	resolveResources,
-	type DevflareConfig
+	resolveResources
 } from '../../config'
 import { compileBuildConfig, compileConfig } from '../../config/compiler'
-import type { ParsedArgs, CliOptions, CliResult } from '../index'
+import type { CliOptions, CliResult, ParsedArgs } from '../index'
 
 function isSupportedFormat(value: string): value is 'devflare' | 'wrangler' {
 	return value === 'devflare' || value === 'wrangler'
@@ -65,9 +65,10 @@ export async function runConfigCommand(
 	const subcommand = parsed.args[0] ?? 'print'
 	const formatOption = parsed.options.format as string | undefined
 	const format = formatOption ?? 'devflare'
-	const phaseOption = parsed.options.local === true
-		? 'local'
-		: (parsed.options.phase as string | undefined) ?? 'deploy'
+	const phaseOption =
+		parsed.options.local === true
+			? 'local'
+			: ((parsed.options.phase as string | undefined) ?? 'deploy')
 
 	if (subcommand !== 'print') {
 		logger.error(`Unknown config subcommand: ${subcommand}`)
@@ -94,11 +95,12 @@ export async function runConfigCommand(
 			environment,
 			phase: phaseOption
 		})
-		const output = format === 'wrangler'
-			? phaseOption === 'build'
-				? compileBuildConfig(resolvedConfig, undefined, { alreadyResolved: true })
-				: compileConfig(resolvedConfig as Parameters<typeof compileConfig>[0])
-			: resolvedConfig
+		const output =
+			format === 'wrangler'
+				? phaseOption === 'build'
+					? compileBuildConfig(resolvedConfig, undefined, { alreadyResolved: true })
+					: compileConfig(resolvedConfig as Parameters<typeof compileConfig>[0])
+				: resolvedConfig
 		const text = JSON.stringify(output, null, '\t')
 
 		if (!options.silent) {
@@ -113,7 +115,9 @@ export async function runConfigCommand(
 		if (error instanceof Error) {
 			logger.error('Config command failed:', error.message)
 			if (error instanceof ConfigResourceResolutionError) {
-				logger.info('For offline inspection, run `devflare config --phase local` or `devflare config --phase build --format wrangler`.')
+				logger.info(
+					'For offline inspection, run `devflare config --phase local` or `devflare config --phase build --format wrangler`.'
+				)
 			}
 		}
 		return { exitCode: 1 }

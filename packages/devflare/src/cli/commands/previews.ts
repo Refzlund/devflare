@@ -1,11 +1,8 @@
 import type { ConsolaInstance } from 'consola'
-import {
-	account,
-	type APIClientOptions
-} from '../../cloudflare'
+import { type APIClientOptions, account } from '../../cloudflare'
 import { loadResolvedConfig, resolvePreviewIdentifier } from '../../config'
-import { cleanupPreviewScopedResources } from '../../config/preview-resources'
 import { ConfigNotFoundError, loadConfig, resolveConfigPath } from '../../config/loader'
+import { cleanupPreviewScopedResources } from '../../config/preview-resources'
 import {
 	asOptionalString,
 	resolveCloudflareAccountId,
@@ -30,17 +27,17 @@ import {
 } from './previews-support/family'
 import {
 	showBindingAssociations,
-	showWorkspaceWorkerFamilyOverviewFromLiveWorkers,
-	showWorkerFamilyOverviewFromLiveWorkers
+	showWorkerFamilyOverviewFromLiveWorkers,
+	showWorkspaceWorkerFamilyOverviewFromLiveWorkers
 } from './previews-support/render'
 import { dim, green, logLine, shouldUseColor } from './previews-support/theme'
 import {
 	type ConfiguredWorkerFamilyMember,
 	PREVIEW_SUBCOMMANDS,
-	type PreviewCommandContext,
-	type PreviewConfiguredFamilyGroup,
 	type PreviewCleanupExecution,
+	type PreviewCommandContext,
 	type PreviewConfigSummary,
+	type PreviewConfiguredFamilyGroup,
 	type PreviewListDiscovery,
 	type PreviewOutputTheme,
 	type PreviewScopeSelection,
@@ -171,9 +168,7 @@ async function discoverPreviewListConfigs(
 		await loadAndCollect(configFile)
 	} else {
 		const directConfigPath = await resolveConfigPath(cwd)
-		const loadedDirectly = directConfigPath
-			? await loadAndCollect()
-			: false
+		const loadedDirectly = directConfigPath ? await loadAndCollect() : false
 		if (!loadedDirectly) {
 			const configPaths = await findConfigPathsUnderDirectory(cwd)
 			for (const configPath of configPaths) {
@@ -196,8 +191,8 @@ function resolvePreviewScopeSelection(
 	parsed: ParsedArgs,
 	environment: string | undefined
 ): PreviewScopeSelection {
-	const explicitScope = asOptionalString(parsed.options.scope)
-		|| asOptionalString(parsed.options.identifier)
+	const explicitScope =
+		asOptionalString(parsed.options.scope) || asOptionalString(parsed.options.identifier)
 
 	if (explicitScope) {
 		return {
@@ -354,7 +349,9 @@ async function resolveContext(
 		})
 
 		if (!accountId) {
-			throw new Error('No Cloudflare account could be resolved. Use --account or configure accountId in devflare.config.*.')
+			throw new Error(
+				'No Cloudflare account could be resolved. Use --account or configure accountId in devflare.config.*.'
+			)
 		}
 
 		return {
@@ -366,20 +363,22 @@ async function resolveContext(
 		}
 	}
 
-	const needsConfig = subcommand === 'cleanup'
-		|| subcommand === 'bindings'
-		|| !explicitAccountId
+	const needsConfig = subcommand === 'cleanup' || subcommand === 'bindings' || !explicitAccountId
 	const config = await loadLocalConfig(cwd, configFile, needsConfig)
 
 	if (needsConfig && !config) {
-		throw new Error('Preview commands now inspect and clean dedicated preview workers for the current package. Run inside a configured package or pass --config <path>.')
+		throw new Error(
+			'Preview commands now inspect and clean dedicated preview workers for the current package. Run inside a configured package or pass --config <path>.'
+		)
 	}
 
 	const accountId = await resolveAccountId(parsed, config)
 	const workerSelection = resolveWorkerName(parsed, config)
 
 	if (!accountId) {
-		throw new Error('No Cloudflare account could be resolved. Use --account or configure accountId in devflare.config.*.')
+		throw new Error(
+			'No Cloudflare account could be resolved. Use --account or configure accountId in devflare.config.*.'
+		)
 	}
 
 	return {
@@ -435,8 +434,8 @@ async function runCleanupSubcommand(
 ): Promise<CliResult> {
 	const cwd = options.cwd ?? process.cwd()
 	const resolvedEnvironment = environment ?? 'preview'
-	const explicitScope = asOptionalString(parsed.options.scope)
-		|| asOptionalString(parsed.options.identifier)
+	const explicitScope =
+		asOptionalString(parsed.options.scope) || asOptionalString(parsed.options.identifier)
 
 	if (includeAll && explicitScope) {
 		logger.error('Choose either --scope <name> or --all for preview cleanup, not both.')
@@ -447,22 +446,33 @@ async function runCleanupSubcommand(
 	const config = await loadConfig({ cwd, configFile })
 	const configuredFamilies = collectConfiguredWorkerFamilies(config, resolvedEnvironment)
 	const liveWorkers = await account.workers(context.accountId, CLI_API_OPTIONS)
-	const workerCandidatesByScope = buildPreviewWorkerCandidatesByScope(configuredFamilies, liveWorkers)
+	const workerCandidatesByScope = buildPreviewWorkerCandidatesByScope(
+		configuredFamilies,
+		liveWorkers
+	)
 	const cleanupTargets = includeAll
 		? buildPreviewCleanupTargets(workerCandidatesByScope, resolvedEnvironment)
 		: previewScope.identifier
-			? [buildPreviewCleanupTarget(previewScope.identifier, workerCandidatesByScope, resolvedEnvironment)]
+			? [
+					buildPreviewCleanupTarget(
+						previewScope.identifier,
+						workerCandidatesByScope,
+						resolvedEnvironment
+					)
+				]
 			: []
 	const cleanupRuns = includeAll
 		? cleanupTargets.map((target) => ({
-			scope: target.scope,
-			target
-		}))
+				scope: target.scope,
+				target
+			}))
 		: previewScope.identifier
-			? [{
-				scope: previewScope.identifier,
-				target: cleanupTargets[0]
-			}]
+			? [
+					{
+						scope: previewScope.identifier,
+						target: cleanupTargets[0]
+					}
+				]
 			: []
 	const applyCleanup = parsed.options.apply === true
 	const executions: PreviewCleanupExecution[] = []
@@ -476,7 +486,11 @@ async function runCleanupSubcommand(
 	for (const cleanupRun of cleanupRuns) {
 		if (applyCleanup) {
 			const orderedWorkerNames = cleanupRun.target
-				? orderPreviewWorkerNamesForDeletion(cleanupRun.target.workerNames, cleanupRun.target.scope, configuredFamilies)
+				? orderPreviewWorkerNamesForDeletion(
+						cleanupRun.target.workerNames,
+						cleanupRun.target.scope,
+						configuredFamilies
+					)
 				: []
 
 			for (const workerName of orderedWorkerNames) {
@@ -500,19 +514,38 @@ async function runCleanupSubcommand(
 	const totalWorkerCandidates = executions.reduce((sum, execution) => {
 		return sum + (execution.target?.workerNames.length ?? 0)
 	}, 0)
-	const totalKvCandidates = executions.reduce((sum, execution) => sum + execution.result.candidates.kv.length, 0)
-	const totalD1Candidates = executions.reduce((sum, execution) => sum + execution.result.candidates.d1.length, 0)
-	const totalR2Candidates = executions.reduce((sum, execution) => sum + execution.result.candidates.r2.length, 0)
-	const totalQueueCandidates = executions.reduce((sum, execution) => sum + execution.result.candidates.queues.length, 0)
-	const totalVectorizeCandidates = executions.reduce((sum, execution) => sum + execution.result.candidates.vectorize.length, 0)
-	const totalHyperdriveCandidates = executions.reduce((sum, execution) => sum + execution.result.candidates.hyperdrive.length, 0)
+	const totalKvCandidates = executions.reduce(
+		(sum, execution) => sum + execution.result.candidates.kv.length,
+		0
+	)
+	const totalD1Candidates = executions.reduce(
+		(sum, execution) => sum + execution.result.candidates.d1.length,
+		0
+	)
+	const totalR2Candidates = executions.reduce(
+		(sum, execution) => sum + execution.result.candidates.r2.length,
+		0
+	)
+	const totalQueueCandidates = executions.reduce(
+		(sum, execution) => sum + execution.result.candidates.queues.length,
+		0
+	)
+	const totalVectorizeCandidates = executions.reduce(
+		(sum, execution) => sum + execution.result.candidates.vectorize.length,
+		0
+	)
+	const totalHyperdriveCandidates = executions.reduce(
+		(sum, execution) => sum + execution.result.candidates.hyperdrive.length,
+		0
+	)
 	const totalResourceCandidates = executions.reduce((sum, execution) => {
 		return sum + getPreviewCleanupResourceCandidateCount(execution.result)
 	}, 0)
 	const totalCandidates = totalWorkerCandidates + totalResourceCandidates
-	const scopeCountSuffix = cleanupRuns.length > 0
-		? ` across ${cleanupRuns.length} preview scope${cleanupRuns.length === 1 ? '' : 's'}`
-		: ''
+	const scopeCountSuffix =
+		cleanupRuns.length > 0
+			? ` across ${cleanupRuns.length} preview scope${cleanupRuns.length === 1 ? '' : 's'}`
+			: ''
 
 	logger.success(
 		applyCleanup
@@ -556,7 +589,9 @@ async function runListSubcommand(
 ): Promise<CliResult> {
 	const discoveredFamilyGroups = context.listDiscovery?.familyGroups ?? []
 	if (discoveredFamilyGroups.length === 0) {
-		throw new Error('Preview listing needs a resolvable devflare config in the current package or workspace so Devflare can identify worker families.')
+		throw new Error(
+			'Preview listing needs a resolvable devflare config in the current package or workspace so Devflare can identify worker families.'
+		)
 	}
 
 	const matchingFamilyGroups = discoveredFamilyGroups.filter((group) => {
@@ -593,7 +628,9 @@ async function runListSubcommand(
 	return { exitCode: 0 }
 }
 
-function resolvePreviewSubcommand(rawSubcommand: string | undefined): PreviewSubcommand | undefined {
+function resolvePreviewSubcommand(
+	rawSubcommand: string | undefined
+): PreviewSubcommand | undefined {
 	if (!rawSubcommand) {
 		return undefined
 	}
@@ -637,7 +674,15 @@ export async function runPreviewsCommand(
 
 		switch (subcommand) {
 			case 'bindings':
-				return runBindingsSubcommand(parsed, context, logger, options, environment, configFile, theme)
+				return runBindingsSubcommand(
+					parsed,
+					context,
+					logger,
+					options,
+					environment,
+					configFile,
+					theme
+				)
 
 			case 'cleanup':
 				return runCleanupSubcommand(
@@ -651,7 +696,6 @@ export async function runPreviewsCommand(
 					theme
 				)
 
-			case 'list':
 			default:
 				return runListSubcommand(context, logger, theme)
 		}

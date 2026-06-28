@@ -1,8 +1,5 @@
 import { afterEach, describe, expect, mock, test } from 'bun:test'
-import {
-	getWorkerVersionDetail,
-	listWorkerVersions
-} from '../../../src/cloudflare/account-workers'
+import { getWorkerVersionDetail, listWorkerVersions } from '../../../src/cloudflare/account-workers'
 import { jsonResponse } from '../../helpers/cloudflare-api'
 
 const originalFetch = globalThis.fetch
@@ -15,7 +12,9 @@ describe('account-workers version metadata parsing', () => {
 	test('listWorkerVersions preserves Cloudflare has_preview metadata', async () => {
 		globalThis.fetch = mock(async (input: RequestInfo | URL) => {
 			const url = String(input)
-			if (!url.includes('/accounts/acc_123/workers/scripts/demo-worker/versions?page=1&per_page=100')) {
+			if (
+				!url.includes('/accounts/acc_123/workers/scripts/demo-worker/versions?page=1&per_page=100')
+			) {
 				throw new Error(`Unexpected fetch URL: ${url}`)
 			}
 

@@ -8,14 +8,14 @@
 // boundary between "what's running" (state) and "how to drive it" (hooks).
 // =============================================================================
 
-import type { BrowserShim } from '../browser-shim'
+import type { Miniflare as MiniflareType } from 'miniflare'
 import { isIgnorableMiniflareDisposeError } from '../bridge/miniflare'
-import type { DOBundler, DOBundleResult } from '../bundler'
+import type { BrowserShim } from '../browser-shim'
+import type { DOBundleResult, DOBundler } from '../bundler'
 import type { DevflareConfig } from '../config'
 import type { resolveServiceBindings } from '../test/resolve-service-bindings'
-import type { RouteDiscoveryResult } from '../worker-entry/routes'
-import type { Miniflare as MiniflareType } from 'miniflare'
 import { clearLocalSendEmailBindings } from '../utils/send-email'
+import type { RouteDiscoveryResult } from '../worker-entry/routes'
 import { stopSpawnedProcessTree } from './vite-utils'
 import type { WorkerSurfacePaths } from './worker-surface-paths'
 

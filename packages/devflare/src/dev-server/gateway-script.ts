@@ -1,5 +1,5 @@
-import type { WsRouteConfig } from '../config'
 import { GATEWAY_RUNTIME_JS } from '../bridge/gateway-runtime'
+import type { WsRouteConfig } from '../config'
 
 /**
  * Generates the dev-server gateway worker script inline.

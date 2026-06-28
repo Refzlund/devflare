@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { drainWaitUntilErrors, type Platform } from '../../../src/sveltekit/platform'
+import { type Platform, drainWaitUntilErrors } from '../../../src/sveltekit/platform'
 
 function buildTestPlatform(): Platform {
 	const pendingErrors: unknown[] = []
@@ -9,7 +9,7 @@ function buildTestPlatform(): Platform {
 				pendingErrors.push(err)
 			})
 		},
-		passThroughOnException: () => { }
+		passThroughOnException: () => {}
 	} as ExecutionContext
 
 	return {

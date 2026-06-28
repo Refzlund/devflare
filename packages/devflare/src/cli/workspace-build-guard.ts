@@ -1,6 +1,6 @@
-import { readdir, readFile, stat } from 'node:fs/promises'
-import { dirname, join } from 'pathe'
+import { readFile, readdir, stat } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
+import { dirname, join } from 'pathe'
 
 export interface LocalWorkspaceBuildStatus {
 	state: 'not-applicable' | 'fresh' | 'missing-dist' | 'stale'
@@ -60,7 +60,7 @@ async function findLocalDevflarePackageRoot(startDirectory: string): Promise<str
 }
 
 async function getLatestModifiedTime(path: string): Promise<number | undefined> {
-	if (!await pathExists(path)) {
+	if (!(await pathExists(path))) {
 		return undefined
 	}
 
@@ -90,11 +90,14 @@ async function getLatestModifiedTime(path: string): Promise<number | undefined> 
 	return newestModifiedTime > 0 ? newestModifiedTime : entry.mtimeMs
 }
 
-export async function getLocalWorkspaceBuildStatus(options: {
-	packageRoot?: string
-} = {}): Promise<LocalWorkspaceBuildStatus> {
-	const packageRoot = options.packageRoot
-		?? await findLocalDevflarePackageRoot(dirname(fileURLToPath(import.meta.url)))
+export async function getLocalWorkspaceBuildStatus(
+	options: {
+		packageRoot?: string
+	} = {}
+): Promise<LocalWorkspaceBuildStatus> {
+	const packageRoot =
+		options.packageRoot ??
+		(await findLocalDevflarePackageRoot(dirname(fileURLToPath(import.meta.url))))
 
 	if (!packageRoot) {
 		return {
@@ -103,7 +106,7 @@ export async function getLocalWorkspaceBuildStatus(options: {
 	}
 
 	const sourceDirectory = join(packageRoot, 'src')
-	if (!await pathExists(sourceDirectory)) {
+	if (!(await pathExists(sourceDirectory))) {
 		return {
 			state: 'not-applicable',
 			packageRoot
@@ -111,14 +114,12 @@ export async function getLocalWorkspaceBuildStatus(options: {
 	}
 
 	const distDirectory = join(packageRoot, 'dist')
-	if (!await pathExists(distDirectory)) {
+	if (!(await pathExists(distDirectory))) {
 		const sourceNewestAt = await getLatestModifiedTime(sourceDirectory)
 		return {
 			state: 'missing-dist',
 			packageRoot,
-			...(typeof sourceNewestAt === 'number'
-				? { sourceNewestAt: new Date(sourceNewestAt) }
-				: {})
+			...(typeof sourceNewestAt === 'number' ? { sourceNewestAt: new Date(sourceNewestAt) } : {})
 		}
 	}
 

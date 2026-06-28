@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, test } from 'bun:test'
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'pathe'
 import { env } from '../../../src'
@@ -19,12 +19,21 @@ describe('createTestContext sendEmail bindings', () => {
 		tempDirs.push(projectDir)
 
 		await mkdir(projectDir, { recursive: true })
-		await writeFile(join(projectDir, 'package.json'), JSON.stringify({
-			name: 'test-context-send-email-project',
-			private: true,
-			type: 'module'
-		}, null, 2))
-		await writeFile(join(projectDir, 'devflare.config.ts'), `
+		await writeFile(
+			join(projectDir, 'package.json'),
+			JSON.stringify(
+				{
+					name: 'test-context-send-email-project',
+					private: true,
+					type: 'module'
+				},
+				null,
+				2
+			)
+		)
+		await writeFile(
+			join(projectDir, 'devflare.config.ts'),
+			`
 export default {
 	name: 'test-context-send-email-project',
 	compatibilityDate: '2026-03-17',
@@ -37,7 +46,8 @@ export default {
 		}
 	}
 }
-`.trim())
+`.trim()
+		)
 
 		const runtimeEnv = env as unknown as {
 			EMAIL: {
@@ -54,12 +64,14 @@ export default {
 		await createTestContext(join(projectDir, 'devflare.config.ts'))
 
 		try {
-			await expect(runtimeEnv.EMAIL.send({
-				from: 'sender@example.com',
-				to: 'recipient@example.com',
-				subject: 'Bridge send email',
-				text: 'Hello from the send email binding'
-			})).resolves.toBeUndefined()
+			await expect(
+				runtimeEnv.EMAIL.send({
+					from: 'sender@example.com',
+					to: 'recipient@example.com',
+					subject: 'Bridge send email',
+					text: 'Hello from the send email binding'
+				})
+			).resolves.toBeUndefined()
 		} finally {
 			await runtimeEnv.dispose()
 		}

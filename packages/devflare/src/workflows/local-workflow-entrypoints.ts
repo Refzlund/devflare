@@ -1,8 +1,8 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
-import { dirname, join, relative, resolve } from 'pathe'
 import type { ConsolaInstance } from 'consola'
+import { dirname, join, relative, resolve } from 'pathe'
 import { bundleWorkerEntry } from '../bundler'
-import { normalizeWorkflowBinding, type DevflareConfig } from '../config'
+import { type DevflareConfig, normalizeWorkflowBinding } from '../config'
 import { DEFAULT_WORKFLOW_PATTERN, findFiles } from '../utils/glob'
 
 interface LocalWorkflowEntrypoint {
@@ -38,9 +38,8 @@ async function discoverWorkflowClasses(
 ): Promise<Map<string, string>> {
 	const classToFilePath = new Map<string, string>()
 	const workflowPatternConfig = config.files?.workflows
-	const workflowPattern = typeof workflowPatternConfig === 'string'
-		? workflowPatternConfig
-		: DEFAULT_WORKFLOW_PATTERN
+	const workflowPattern =
+		typeof workflowPatternConfig === 'string' ? workflowPatternConfig : DEFAULT_WORKFLOW_PATTERN
 
 	if (workflowPatternConfig === false) {
 		return classToFilePath
@@ -82,8 +81,8 @@ async function resolveLocalWorkflowEntrypoints(
 		const scriptPath = classToFilePath.get(normalized.className)
 		if (!scriptPath) {
 			throw new Error(
-				`Workflow binding ${bindingName} (className: '${normalized.className}') not found.\n`
-				+ `Either set files.workflows to match the workflow source file, or set scriptName when the workflow lives in another worker.`
+				`Workflow binding ${bindingName} (className: '${normalized.className}') not found.\n` +
+					`Either set files.workflows to match the workflow source file, or set scriptName when the workflow lives in another worker.`
 			)
 		}
 
@@ -97,7 +96,10 @@ async function resolveLocalWorkflowEntrypoints(
 	return entrypoints
 }
 
-function buildWorkflowVirtualEntry(entrypoints: LocalWorkflowEntrypoint[], entryDir: string): string {
+function buildWorkflowVirtualEntry(
+	entrypoints: LocalWorkflowEntrypoint[],
+	entryDir: string
+): string {
 	const imports = entrypoints.map((entrypoint, index) => {
 		const importName = `__DevflareWorkflow${index}`
 		const importPath = toImportSpecifier(entryDir, entrypoint.scriptPath)

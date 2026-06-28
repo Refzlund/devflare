@@ -1,13 +1,13 @@
 import type {
-	DevflareDeploymentRecord,
-	DevflarePreviewScopeRecord,
-	DevflarePreviewRecord,
-	DevflareRecordSource
-} from './registry-schema'
-import type {
 	ReconcilePreviewRegistryOptions,
 	RetirePreviewRegistryOptions
 } from './preview-registry-types'
+import type {
+	DevflareDeploymentRecord,
+	DevflarePreviewRecord,
+	DevflarePreviewScopeRecord,
+	DevflareRecordSource
+} from './registry-schema'
 
 export function toIsoString(date: Date | undefined): string | null {
 	return date ? date.toISOString() : null
@@ -54,10 +54,7 @@ export function getDeploymentRecordId(workerName: string, deploymentId: string):
 
 export function hasRetireSelector(options: RetirePreviewRegistryOptions): boolean {
 	return Boolean(
-		options.branchName
-		|| options.previewScope
-		|| options.versionId
-		|| options.commitSha
+		options.branchName || options.previewScope || options.versionId || options.commitSha
 	)
 }
 
@@ -70,10 +67,12 @@ function matchesRetireSelector(
 		commitSha?: string | null
 	}
 ): boolean {
-	return (options.branchName !== undefined && candidate.branchName === options.branchName)
-		|| (options.previewScope !== undefined && candidate.previewScope === options.previewScope)
-		|| (options.versionId !== undefined && candidate.versionId === options.versionId)
-		|| (options.commitSha !== undefined && candidate.commitSha === options.commitSha)
+	return (
+		(options.branchName !== undefined && candidate.branchName === options.branchName) ||
+		(options.previewScope !== undefined && candidate.previewScope === options.previewScope) ||
+		(options.versionId !== undefined && candidate.versionId === options.versionId) ||
+		(options.commitSha !== undefined && candidate.commitSha === options.commitSha)
+	)
 }
 
 function getPreviewRetireCandidate(record: {
@@ -113,17 +112,22 @@ export function matchesPreviewDeploymentRetireTarget(
 	record: DevflareDeploymentRecord,
 	options: RetirePreviewRegistryOptions
 ): boolean {
-	return record.channel === 'preview'
-		&& matchesRetireSelector(options, {
+	return (
+		record.channel === 'preview' &&
+		matchesRetireSelector(options, {
 			versionId: record.versionId,
 			commitSha: record.commitSha
 		})
+	)
 }
 
 export function getExplicitPreviewSyncOverrides(
 	options: ReconcilePreviewRegistryOptions,
 	versionId: string
-): Pick<ReconcilePreviewRegistryOptions, 'previewScope' | 'previewUrl' | 'previewScopeUrl' | 'branchName' | 'commitSha'> {
+): Pick<
+	ReconcilePreviewRegistryOptions,
+	'previewScope' | 'previewUrl' | 'previewScopeUrl' | 'branchName' | 'commitSha'
+> {
 	if (versionId !== options.versionId) {
 		return {}
 	}

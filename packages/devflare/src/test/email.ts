@@ -3,7 +3,7 @@
 // =============================================================================
 // Usage:
 //   import { email } from 'devflare/test'
-//   
+//
 //   // Send a raw email through the helper
 //   await email.send({
 //     from: 'sender@example.com',
@@ -78,12 +78,14 @@ let testEnvGetter: (() => Record<string, unknown>) | null = null
  * Configure the email test helper
  * @internal
  */
-export function configureEmail(options: {
-	port?: number
-	handlerPath?: string | null
-	configDir?: string
-	getEnv?: () => Record<string, unknown>
-} = {}): void {
+export function configureEmail(
+	options: {
+		port?: number
+		handlerPath?: string | null
+		configDir?: string
+		getEnv?: () => Record<string, unknown>
+	} = {}
+): void {
 	if (options.port) {
 		miniflarePort = options.port
 	}
@@ -161,13 +163,17 @@ function createRawEmailStream(rawEmail: string): ReadableStream<Uint8Array> {
 	})
 }
 
-function resolveEmailHandler(module: Record<string, unknown>): ((event: unknown) => Promise<unknown> | unknown) | null {
+function resolveEmailHandler(
+	module: Record<string, unknown>
+): ((event: unknown) => Promise<unknown> | unknown) | null {
 	if (typeof module.default === 'function') {
 		return module.default as (event: unknown) => Promise<unknown> | unknown
 	}
 
 	if (module.default && typeof (module.default as Record<string, unknown>).email === 'function') {
-		return ((module.default as Record<string, unknown>).email as Function).bind(module.default) as (event: unknown) => Promise<unknown> | unknown
+		return ((module.default as Record<string, unknown>).email as Function).bind(module.default) as (
+			event: unknown
+		) => Promise<unknown> | unknown
 	}
 
 	if (typeof module.email === 'function') {
@@ -194,8 +200,8 @@ function getRecordedRawContent(raw: unknown): string | undefined {
  *
  * When `createTestContext()` has configured an email handler, this imports and
  * invokes that handler directly and waits for queued `waitUntil()` work.
-	 * Otherwise it attempts the local `/cdn-cgi/handler/email` endpoint exposed by
-	 * compatible local runtimes.
+ * Otherwise it attempts the local `/cdn-cgi/handler/email` endpoint exposed by
+ * compatible local runtimes.
  */
 async function send(options: EmailSendOptions): Promise<Response> {
 	const raw = buildRawEmail(options)
@@ -208,7 +214,7 @@ async function send(options: EmailSendOptions): Promise<Response> {
 		if (!emailHandler) {
 			throw new Error(
 				`Email handler at "${emailHandlerPath}" must export a default function or named "email" export.\n` +
-				+ `Expected: export async function email(message) { ... }`
+					+`Expected: export async function email(message) { ... }`
 			)
 		}
 
@@ -217,7 +223,7 @@ async function send(options: EmailSendOptions): Promise<Response> {
 			waitUntil(promise: Promise<unknown>) {
 				waitUntilPromises.push(promise)
 			},
-			passThroughOnException() { },
+			passThroughOnException() {},
 			props: {}
 		}
 
@@ -254,10 +260,7 @@ async function send(options: EmailSendOptions): Promise<Response> {
 
 		const emailEvent = createEmailEvent(message, runtimeEnv, ctx)
 
-		await runWithEventContext(
-			emailEvent,
-			() => emailHandler(emailEvent)
-		)
+		await runWithEventContext(emailEvent, () => emailHandler(emailEvent))
 
 		await Promise.all(waitUntilPromises)
 
@@ -310,8 +313,8 @@ function clearSentEmails(): void {
 
 /**
  * Add a sent email to the history
-	 * @internal Called by helper paths that explicitly record outgoing email
-	 * (currently direct `forward()`/`reply()` test flows).
+ * @internal Called by helper paths that explicitly record outgoing email
+ * (currently direct `forward()`/`reply()` test flows).
  */
 export function recordSentEmail(email: ReceivedEmail): void {
 	sentEmails.push(email)

@@ -39,24 +39,26 @@ function buildBaseInput(overrides: Record<string, unknown> = {}) {
 
 describe('buildMiniflareDevConfig', () => {
 	test('includes resolved ref service workers in the same Miniflare runtime', () => {
-		const mfConfig = buildMiniflareDevConfig(buildBaseInput({
-			serviceBindingResolution: {
-				primaryServiceBindings: {
-					VOICESTORY_API: {
-						name: 'voicestory-api',
-						entrypoint: 'VoiceStoryApi'
-					}
-				},
-				workers: [
-					{
-						name: 'voicestory-api',
-						modules: true,
-						script: 'export class VoiceStoryApi { async ping() { return "pong" } }',
-						compatibilityDate: '2026-04-28'
-					}
-				]
-			}
-		}))
+		const mfConfig = buildMiniflareDevConfig(
+			buildBaseInput({
+				serviceBindingResolution: {
+					primaryServiceBindings: {
+						VOICESTORY_API: {
+							name: 'voicestory-api',
+							entrypoint: 'VoiceStoryApi'
+						}
+					},
+					workers: [
+						{
+							name: 'voicestory-api',
+							modules: true,
+							script: 'export class VoiceStoryApi { async ping() { return "pong" } }',
+							compatibilityDate: '2026-04-28'
+						}
+					]
+				}
+			})
+		)
 
 		const workerNames = mfConfig.workers.map((worker: { name: string }) => worker.name)
 		expect(workerNames).toContain('gateway')
@@ -74,10 +76,12 @@ describe('buildMiniflareDevConfig', () => {
 	})
 
 	test('binds to the provided miniflareHost and miniflarePort', () => {
-		const mfConfig = buildMiniflareDevConfig(buildBaseInput({
-			miniflareHost: '0.0.0.0',
-			miniflarePort: 3000
-		}))
+		const mfConfig = buildMiniflareDevConfig(
+			buildBaseInput({
+				miniflareHost: '0.0.0.0',
+				miniflarePort: 3000
+			})
+		)
 		expect(mfConfig.host).toBe('0.0.0.0')
 		expect(mfConfig.port).toBe(3000)
 	})

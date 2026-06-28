@@ -54,12 +54,12 @@ the orchestrator pulls the bot's version-bump commit before the next phase.
 - D5 ✅/📝 Permission-groups generated UUIDs — sharpened the display-name fallback warning to point at the refresh script instead of a misleading "add the id" instruction (`src/cloudflare/tokens.ts`); documented the empty-table story, the mint-time scope+name-prefix path, and the maintainer refresh step — `docs/DEPLOY_AND_SECRETS.md`
 
 ### Phase E — Test & CI quality gates
-- E1 ⬜ 🔴 Enforce lint/format in CI + reduce biome violations (2236 repo / 646 in src)
-- E2 ⬜ 🔴 Un-exclude `@devflare/case5-multi-worker` from the CI test lane (or document the blocker)
-- E3 ⬜ Run CI on the `next` branch (currently PRs + push-to-main only)
-- E4 ⬜ Add coverage measurement
-- E5 ⬜ Serial-only integration suites — document / isolate
-- E6 ⬜ Skipped tests: custom-config-path loader, win-only preferences cleanup
+- E1 ✅ Lint/format enforced on the published package: applied biome safe auto-fixes (formatter + organizeImports + safe lint) across `packages/devflare/src` + `tests`, hand-fixed 21 genuine correctness issues (`noUselessElse`/`noUnnecessaryContinue`/`noSwitchDeclarations`/`noUselessSwitchCase`/`noGlobalIsNan`/`noUselessTernary`), and downgraded the high-volume/intentional/false-positive rules to `warn` in `biome.json` (`noExplicitAny` — intentional in the RPC proxy; `noControlCharactersInRegex` — intentional ANSI matching; `noThenProperty` — intentional thenable; `noDelete`/`useTemplate`/`useNodejsImportProtocol`/`noUnusedTemplateLiteral`/`noBannedTypes`/`noAssignInExpressions`/`noShadowRestrictedNames`/`noImplicitAnyLet`/`useConst` — unsafe-stylistic or biome false-positives). `biome check packages/devflare` now exits 0 (0 errors, warnings only). New `lint:devflare` script runs first in the `devflare:ci` chain → enforced by `workspace-ci.yml`. **Follow-up:** whole-repo lint of `cases/**` and `apps/**` (unshipped code) is still only available via `lint:root` (`biome check .`) and is NOT gated — deferred for 1.0.
+- E2 ✅ Re-included `@devflare/case5-multi-worker` in `devflare:test` after fixing the underlying product bug: `findDefaultServiceWorkerEntrypoint` (`src/test/resolve-service-bindings.ts`) only looked for the default service-binding RPC surface at `src/worker.{ts,js}`, so case5's root-level `math-service/worker.ts` was never bundled and `MATH_SERVICE` had no default export. Now also looks for the root `worker.{ts,js}` convention. NOTE: deliberately does NOT honor `files.fetch` — the fetch handler is a separate surface that must not be bundled as the RPC default (locked in by the existing `resolveServiceBindings` unit tests).
+- E3 ✅ CI now runs on `next` (added to `workspace-ci.yml` push branches) alongside the existing PR + push-to-main triggers.
+- E4 ✅ Added `test:coverage` (`bun test tests/unit --coverage`) for measurement (no threshold gate by design); documented in `CONTRIBUTING.md`.
+- E5 📝 Documented in `CONTRIBUTING.md` why the integration suites run `--parallel=1 --max-concurrency=1` (they bind real OS ports + start Miniflare/workerd; the bridge lane runs one process per file). No code change — the serial constraint is load-bearing.
+- E6 ✅/📝 Fixed the loader custom-config-path skip (`loadConfig` now resolves an absolute `configFile`; test un-skipped); the win-only `preferences` rename-cleanup skip is intentional and platform-correct (exercised on Linux CI) — documented, no change.
 
 ### Phase F — Architecture & docs debt (from INCONSISTENCIES.md)
 - F1 ⬜ Confirm/close one canonical phased `resolveResources({ phase })` across compile/Vite/deploy
@@ -125,3 +125,16 @@ the orchestrator pulls the bot's version-bump commit before the next phase.
 - D5 nuance corrected vs the initial premise: `matchesKnownPermissionGroup`/`KNOWN_PERMISSION_GROUP_IDS` are consumed only by the refresh script + tests; the live `tokens --new` mint path selects by scope + name-prefix allowlist (`DEVFLARE_PERMISSION_GROUP_NAME_PATTERNS`), so the empty generated table does not affect minting. The doc says so explicitly.
 
 **Verification:** typecheck ✅ · `wrangler-v4-compat` ✅ (no removed-v4 tokens in the new doc or the edited source) · docs suite ✅ · cli + cloudflare unit suites ✅ (tokens fallback-warning test still green).
+
+### Phase E — Test & CI quality gates ✅
+
+**Done.** Lint enforced on the published package + a pre-publish test gate + CI on `next` + case5 re-included (via a real bugfix) + coverage + skipped tests resolved.
+
+**Highlights / findings**
+- **E2 was a genuine product bug, not just a flaky exclusion.** `@devflare/case5-multi-worker` was excluded because `findDefaultServiceWorkerEntrypoint` (`src/test/resolve-service-bindings.ts`) only discovered the default service-binding RPC surface at `src/worker.{ts,js}`, so case5's root-level `math-service/worker.ts` was never bundled (`MATH_SERVICE` had no default export). Fixed by also honoring the root `worker.{ts,js}` convention (deliberately NOT `files.fetch` — a separate surface). case5 now runs in CI (13/13).
+- **E1 lint is a deliberate ratchet, not a full clean.** `biome check packages/devflare` exits 0 (0 errors) but **~556 warnings remain** (234 `noExplicitAny` at RPC/proxy boundaries, 96 `noUnusedTemplateLiteral`, 88 pre-existing complexity, 68 `noDelete`, etc.). The gate enforces formatting + import-order + every non-downgraded `recommended` rule (incl. correctness/security/a11y); high-volume/intentional/behavior-risky rules (`noDelete`, `noExplicitAny`) are `warn` rather than auto-rewritten (the `--unsafe` `noDelete` fix would change `'x' in obj` semantics). Promoting warnings back to error as they're cleaned is the follow-up. Whole-repo lint of unshipped `cases/**`/`apps/**` stays available via `lint:root` but is NOT gated for 1.0.
+- **Publish is now test-gated.** `publish.yml` runs `devflare:typecheck` + unit tests BEFORE versioning, so a broken commit on `next` can never be released (OIDC mechanics untouched).
+
+**Verification:** `biome check packages/devflare` 0 errors ✅ · typecheck ✅ · full unit 1051 pass / 1 skip / 0 fail ✅ · bridge + dev-server integration spot-checks ✅ · case5 13/0 ✅ · both workflow YAMLs parse ✅ · 3 adversarial reviews VERDICT: PASS.
+
+**Scope note:** the formatting reformat touched ~377 files but is behavior-preserving (full unit + integration green). No forbidden-v4 tokens introduced.

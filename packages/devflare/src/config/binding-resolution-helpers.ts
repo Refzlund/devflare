@@ -11,10 +11,10 @@
 // =============================================================================
 
 import {
+	type DevflareConfig,
 	normalizeD1Binding,
 	normalizeHyperdriveBinding,
-	normalizeKVBinding,
-	type DevflareConfig
+	normalizeKVBinding
 } from './schema'
 
 export interface NormalizedNameBinding {
@@ -82,10 +82,11 @@ export function materializeHyperdriveIdBindings(
 			return [
 				bindingName,
 				{
-					id: normalized.configurationId
-						?? idsByName?.get(normalized.name ?? '')
-						?? normalized.name
-						?? '',
+					id:
+						normalized.configurationId ??
+						idsByName?.get(normalized.name ?? '') ??
+						normalized.name ??
+						'',
 					...(normalized.localConnectionString && {
 						localConnectionString: normalized.localConnectionString
 					})
@@ -109,9 +110,9 @@ export function collectPendingNameBindings<TBinding>(
 			return normalized.id
 				? null
 				: {
-					bindingName,
-					resourceName: normalized.name ?? ''
-				}
+						bindingName,
+						resourceName: normalized.name ?? ''
+					}
 		})
 		.filter((binding): binding is PendingNameBinding => binding !== null)
 }

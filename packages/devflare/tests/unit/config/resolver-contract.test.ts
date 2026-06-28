@@ -56,16 +56,12 @@ const cloudflareMocks = () => ({
 		accountId: 'effective-account',
 		source: 'workspace' as const
 	})),
-	listKVNamespaces: mock(async () => ([
-		{ id: 'resolved-cache-kv-id', name: 'cache-kv' }
-	])),
+	listKVNamespaces: mock(async () => [{ id: 'resolved-cache-kv-id', name: 'cache-kv' }]),
 	createKVNamespace: mock(async (_account: string, name: string) => ({
 		id: `created-${name}-id`,
 		name
 	})),
-	listD1Databases: mock(async () => ([
-		{ id: 'resolved-main-db-id', name: 'main-db' }
-	])),
+	listD1Databases: mock(async () => [{ id: 'resolved-main-db-id', name: 'main-db' }]),
 	createD1Database: mock(async (_account: string, name: string) => ({
 		id: `created-${name}-id`,
 		name
@@ -80,9 +76,7 @@ const cloudflareMocks = () => ({
 		id: `queue-${name}`,
 		name
 	})),
-	listHyperdrives: mock(async () => ([
-		{ id: 'resolved-postgres-id', name: 'devflare-postgres' }
-	])),
+	listHyperdrives: mock(async () => [{ id: 'resolved-postgres-id', name: 'devflare-postgres' }]),
 	listVectorizeIndexes: mock(async () => [])
 })
 
@@ -98,9 +92,7 @@ describe('cross-phase resolver contract', () => {
 			{ binding: 'DB', database_name: 'main-db' },
 			{ binding: 'AUDIT', database_id: 'audit-db-id' }
 		])
-		expect(wranglerConfig.hyperdrive).toEqual([
-			{ binding: 'POSTGRES', name: 'devflare-postgres' }
-		])
+		expect(wranglerConfig.hyperdrive).toEqual([{ binding: 'POSTGRES', name: 'devflare-postgres' }])
 	})
 
 	test('dev/vite path uses local stable identifiers without Cloudflare lookup', () => {
@@ -117,9 +109,7 @@ describe('cross-phase resolver contract', () => {
 			{ binding: 'DB', database_id: 'main-db' },
 			{ binding: 'AUDIT', database_id: 'audit-db-id' }
 		])
-		expect(wranglerConfig.hyperdrive).toEqual([
-			{ binding: 'POSTGRES', id: 'devflare-postgres' }
-		])
+		expect(wranglerConfig.hyperdrive).toEqual([{ binding: 'POSTGRES', id: 'devflare-postgres' }])
 	})
 
 	test('deploy phase resolves name bindings to the verified Cloudflare ids returned by the API', async () => {

@@ -2,11 +2,11 @@
 // CLI Entry Point — Command parsing and routing
 // =============================================================================
 
-import { createConsola, type ConsolaInstance } from 'consola'
+import { type ConsolaInstance, createConsola } from 'consola'
+import { COMMANDS, type Command, renderHelp } from './help'
 import { getPackageVersion } from './package-metadata'
-import { COMMANDS, renderHelp, type Command } from './help'
-import { getLocalWorkspaceBuildGuardMessage } from './workspace-build-guard'
 import { createCliTheme, cyanBold, dim, logLine } from './ui'
+import { getLocalWorkspaceBuildGuardMessage } from './workspace-build-guard'
 
 // =============================================================================
 // Types
@@ -114,10 +114,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
 /**
  * Main CLI entry point
  */
-export async function runCli(
-	argv: string[],
-	options: CliOptions = {}
-): Promise<CliResult> {
+export async function runCli(argv: string[], options: CliOptions = {}): Promise<CliResult> {
 	const logger = createConsola({
 		level: options.silent ? -999 : 3,
 		formatOptions: {
@@ -136,11 +133,12 @@ export async function runCli(
 	}
 
 	const wantsHelp = parsed.options.help === true
-	const helpPath = parsed.command === 'help'
-		? parsed.args
-		: wantsHelp
-			? [parsed.command, ...parsed.args]
-			: undefined
+	const helpPath =
+		parsed.command === 'help'
+			? parsed.args
+			: wantsHelp
+				? [parsed.command, ...parsed.args]
+				: undefined
 
 	if (helpPath) {
 		const renderedHelp = renderHelp(helpPath, parsed.options)
@@ -163,10 +161,11 @@ export async function runCli(
 
 	// Route to command handler
 	switch (parsed.command) {
-		case 'version':
+		case 'version': {
 			const version = await getPackageVersion()
 			logLine(logger, `${cyanBold('devflare', theme)} ${dim(`v${version}`, theme)}`)
 			return { exitCode: 0, output: version }
+		}
 
 		case 'init':
 			return runInit(parsed, logger, options)

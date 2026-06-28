@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, mock, test } from 'bun:test'
 import { runLoginCommand } from '../../../src/cli/commands/login'
-import { clearDependencies, setDependencies, type CliDependencies } from '../../../src/cli/dependencies'
+import {
+	type CliDependencies,
+	clearDependencies,
+	setDependencies
+} from '../../../src/cli/dependencies'
 import { jsonResponse } from '../../helpers/cloudflare-api'
 import { createLogger, stripAnsi } from '../../helpers/mock-logger'
 
@@ -9,19 +13,22 @@ const originalToken = process.env.CLOUDFLARE_API_TOKEN
 const originalAccountId = process.env.CLOUDFLARE_ACCOUNT_ID
 
 function createAccountListResponse(): Response {
-	return jsonResponse([
+	return jsonResponse(
+		[
+			{
+				id: 'acc_123',
+				name: 'Devflare Account',
+				type: 'standard'
+			}
+		],
 		{
-			id: 'acc_123',
-			name: 'Devflare Account',
-			type: 'standard'
+			page: 1,
+			per_page: 50,
+			total_pages: 1,
+			count: 1,
+			total_count: 1
 		}
-	], {
-		page: 1,
-		per_page: 50,
-		total_pages: 1,
-		count: 1,
-		total_count: 1
-	})
+	)
 }
 
 function createExecDependencies(
@@ -83,8 +90,8 @@ async function runLoginScenario(
 			args: [],
 			options: options.force
 				? {
-					force: true
-				}
+						force: true
+					}
 				: {}
 		},
 		logger as any,
@@ -143,7 +150,9 @@ describe('login command', () => {
 				args: ['wrangler', 'login']
 			}
 		])
-		expect(renderedMessages.some((message) => message.includes('Authenticated with Cloudflare'))).toBe(true)
+		expect(
+			renderedMessages.some((message) => message.includes('Authenticated with Cloudflare'))
+		).toBe(true)
 	})
 
 	test('falls back to the configured account when account enumeration is unavailable', async () => {
@@ -152,17 +161,20 @@ describe('login command', () => {
 		globalThis.fetch = mock(async (input: RequestInfo | URL) => {
 			const url = String(input)
 			if (url.includes('/accounts?page=1&per_page=50')) {
-				return new Response(JSON.stringify({
-					success: false,
-					errors: [{ code: 6003, message: 'Invalid request headers' }],
-					messages: [],
-					result: null
-				}), {
-					status: 400,
-					headers: {
-						'Content-Type': 'application/json'
+				return new Response(
+					JSON.stringify({
+						success: false,
+						errors: [{ code: 6003, message: 'Invalid request headers' }],
+						messages: [],
+						result: null
+					}),
+					{
+						status: 400,
+						headers: {
+							'Content-Type': 'application/json'
+						}
 					}
-				})
+				)
 			}
 
 			if (url.endsWith('/accounts/acc_123')) {
@@ -198,6 +210,10 @@ describe('login command', () => {
 		const renderedMessages = renderMessages(logger)
 
 		expect(result.exitCode).toBe(0)
-		expect(renderedMessages.some((message) => message.includes('Configured account: Configured Account (acc_123)'))).toBe(true)
+		expect(
+			renderedMessages.some((message) =>
+				message.includes('Configured account: Configured Account (acc_123)')
+			)
+		).toBe(true)
 	})
 })

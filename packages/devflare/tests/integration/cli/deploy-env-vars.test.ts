@@ -5,13 +5,13 @@ import { join } from 'pathe'
 import { runDeployCommand } from '../../../src/cli/commands/deploy'
 import { clearDependencies, setDependencies } from '../../../src/cli/dependencies'
 import {
+	type ExecInvocation,
 	createCliDependencies,
 	createLogger,
 	createProcessRunner,
 	disableCloudflareAccountResolution,
 	readGeneratedDeployConfig,
-	successResult,
-	type ExecInvocation
+	successResult
 } from './build-deploy-worker-only.test-utils'
 
 const DEPLOY_ENV_NAME = 'DEVFLARE_TEST_DEPLOY_GEMINI_API_KEY'
@@ -19,15 +19,24 @@ const DEPLOY_ENV_NAME = 'DEVFLARE_TEST_DEPLOY_GEMINI_API_KEY'
 async function writeEnvDescriptorProject(projectDir: string): Promise<void> {
 	await mkdir(join(projectDir, 'src'), { recursive: true })
 	await writeFile(join(projectDir, '.env'), `${DEPLOY_ENV_NAME}=gemini-from-dotenv\n`)
-	await writeFile(join(projectDir, 'package.json'), JSON.stringify({
-		name: 'worker-deploy-env-test',
-		private: true,
-		type: 'module',
-		devDependencies: {
-			devflare: '^1.0.0'
-		}
-	}, null, '\t'))
-	await writeFile(join(projectDir, 'devflare.config.ts'), `
+	await writeFile(
+		join(projectDir, 'package.json'),
+		JSON.stringify(
+			{
+				name: 'worker-deploy-env-test',
+				private: true,
+				type: 'module',
+				devDependencies: {
+					devflare: '^1.0.0'
+				}
+			},
+			null,
+			'\t'
+		)
+	)
+	await writeFile(
+		join(projectDir, 'devflare.config.ts'),
+		`
 export default {
 	name: 'worker-deploy-env-test',
 	compatibilityDate: '2026-05-01',
@@ -46,12 +55,16 @@ export default {
 		}
 	}
 }
-`.trim())
-	await writeFile(join(projectDir, 'src', 'fetch.ts'), `
+`.trim()
+	)
+	await writeFile(
+		join(projectDir, 'src', 'fetch.ts'),
+		`
 export async function fetch(): Promise<Response> {
 	return new Response('ok')
 }
-`.trim())
+`.trim()
+	)
 }
 
 describe('deploy env var descriptors', () => {

@@ -14,13 +14,23 @@ import {
 const originalEnvironment = capturePreviewTestEnvironmentSnapshot()
 const temporaryCacheDirectories = createTrackedTempDirectories()
 
-function writePreviewProject(projectDir: string, projectName: string, accountId: string = 'acc_123'): void {
+function writePreviewProject(projectDir: string, projectName: string, accountId = 'acc_123'): void {
 	const previewScopedValue = `__DEVFLARE_PREVIEW_SCOPE__:${JSON.stringify({ baseName: 'cache-kv', separator: '-' })}`
-	writeFileSync(join(projectDir, 'package.json'), JSON.stringify({
-		name: projectName,
-		type: 'module'
-	}, null, '\t'), 'utf-8')
-	writeFileSync(join(projectDir, 'devflare.config.ts'), `
+	writeFileSync(
+		join(projectDir, 'package.json'),
+		JSON.stringify(
+			{
+				name: projectName,
+				type: 'module'
+			},
+			null,
+			'\t'
+		),
+		'utf-8'
+	)
+	writeFileSync(
+		join(projectDir, 'devflare.config.ts'),
+		`
 		export default {
 			name: ${JSON.stringify(projectName)},
 			accountId: ${JSON.stringify(accountId)},
@@ -31,7 +41,9 @@ function writePreviewProject(projectDir: string, projectName: string, accountId:
 				}
 			}
 		}
-	`, 'utf-8')
+	`,
+		'utf-8'
+	)
 }
 
 afterEach(() => {
@@ -56,8 +68,16 @@ describe('previews command', () => {
 		)
 
 		expect(result.exitCode).toBe(1)
-		expect(logger.messages.some((message) => message.args.join(' ').includes('Unknown previews subcommand: demo-worker'))).toBe(true)
-		expect(logger.messages.some((message) => message.args.join(' ').includes('Available previews subcommands: list, bindings, cleanup'))).toBe(true)
+		expect(
+			logger.messages.some((message) =>
+				message.args.join(' ').includes('Unknown previews subcommand: demo-worker')
+			)
+		).toBe(true)
+		expect(
+			logger.messages.some((message) =>
+				message.args.join(' ').includes('Available previews subcommands: list, bindings, cleanup')
+			)
+		).toBe(true)
 	})
 
 	test('cleanup performs a dry run by default', async () => {
@@ -116,18 +136,28 @@ describe('previews command', () => {
 		const renderedMessages = renderMessages(logger)
 
 		expect(result.exitCode).toBe(0)
-		expect(renderedMessages.some((message) => message.includes('Preview cleanup dry run complete'))).toBe(true)
+		expect(
+			renderedMessages.some((message) => message.includes('Preview cleanup dry run complete'))
+		).toBe(true)
 	})
 
 	test('lists every configured worker family when run from a monorepo root', async () => {
 		process.env.CLOUDFLARE_API_TOKEN = 'cf_test_token'
 		const workspaceDir = temporaryCacheDirectories.create('devflare-previews-workspace-')
-		writeFileSync(join(workspaceDir, 'package.json'), JSON.stringify({
-			name: 'preview-workspace',
-			private: true,
-			type: 'module',
-			workspaces: ['apps/*']
-		}, null, '\t'), 'utf-8')
+		writeFileSync(
+			join(workspaceDir, 'package.json'),
+			JSON.stringify(
+				{
+					name: 'preview-workspace',
+					private: true,
+					type: 'module',
+					workspaces: ['apps/*']
+				},
+				null,
+				'\t'
+			),
+			'utf-8'
+		)
 
 		const docsDir = join(workspaceDir, 'apps', 'docs')
 		const testingDir = join(workspaceDir, 'apps', 'testing')
@@ -140,34 +170,37 @@ describe('previews command', () => {
 			const url = String(input)
 
 			if (url.includes('/accounts/acc_123/workers/scripts?page=1&per_page=50')) {
-				return jsonResponse([
+				return jsonResponse(
+					[
+						{
+							id: 'docs-worker',
+							created_on: '2026-04-12T10:00:00.000Z',
+							modified_on: '2026-04-12T10:05:00.000Z'
+						},
+						{
+							id: 'docs-worker-pr-42',
+							created_on: '2026-04-12T10:01:00.000Z',
+							modified_on: '2026-04-12T10:06:00.000Z'
+						},
+						{
+							id: 'testing-worker',
+							created_on: '2026-04-12T10:02:00.000Z',
+							modified_on: '2026-04-12T10:07:00.000Z'
+						},
+						{
+							id: 'testing-worker-next',
+							created_on: '2026-04-12T10:03:00.000Z',
+							modified_on: '2026-04-12T10:08:00.000Z'
+						}
+					],
 					{
-						id: 'docs-worker',
-						created_on: '2026-04-12T10:00:00.000Z',
-						modified_on: '2026-04-12T10:05:00.000Z'
-					},
-					{
-						id: 'docs-worker-pr-42',
-						created_on: '2026-04-12T10:01:00.000Z',
-						modified_on: '2026-04-12T10:06:00.000Z'
-					},
-					{
-						id: 'testing-worker',
-						created_on: '2026-04-12T10:02:00.000Z',
-						modified_on: '2026-04-12T10:07:00.000Z'
-					},
-					{
-						id: 'testing-worker-next',
-						created_on: '2026-04-12T10:03:00.000Z',
-						modified_on: '2026-04-12T10:08:00.000Z'
+						page: 1,
+						per_page: 50,
+						total_pages: 1,
+						count: 4,
+						total_count: 4
 					}
-				], {
-					page: 1,
-					per_page: 50,
-					total_pages: 1,
-					count: 4,
-					total_count: 4
-				})
+				)
 			}
 
 			if (url.endsWith('/accounts/acc_123/workers/subdomain')) {
@@ -192,22 +225,42 @@ describe('previews command', () => {
 		const renderedMessages = renderMessages(logger)
 
 		expect(result.exitCode).toBe(0)
-		expect(renderedMessages.some((message) => message.includes('configured worker families 2'))).toBe(true)
-		expect(renderedMessages.some((message) => message.includes('worker family docs-worker'))).toBe(true)
-		expect(renderedMessages.some((message) => message.includes('worker family testing-worker'))).toBe(true)
-		expect(renderedMessages.some((message) => message.includes('docs-worker.demo-subdomain.workers.dev'))).toBe(true)
-		expect(renderedMessages.some((message) => message.includes('testing-worker-next.demo-subdomain.workers.dev'))).toBe(true)
+		expect(
+			renderedMessages.some((message) => message.includes('configured worker families 2'))
+		).toBe(true)
+		expect(renderedMessages.some((message) => message.includes('worker family docs-worker'))).toBe(
+			true
+		)
+		expect(
+			renderedMessages.some((message) => message.includes('worker family testing-worker'))
+		).toBe(true)
+		expect(
+			renderedMessages.some((message) => message.includes('docs-worker.demo-subdomain.workers.dev'))
+		).toBe(true)
+		expect(
+			renderedMessages.some((message) =>
+				message.includes('testing-worker-next.demo-subdomain.workers.dev')
+			)
+		).toBe(true)
 	})
 
 	test('requires --account when a monorepo root discovers multiple Cloudflare accounts', async () => {
 		process.env.CLOUDFLARE_API_TOKEN = 'cf_test_token'
 		const workspaceDir = temporaryCacheDirectories.create('devflare-previews-workspace-accounts-')
-		writeFileSync(join(workspaceDir, 'package.json'), JSON.stringify({
-			name: 'preview-workspace-accounts',
-			private: true,
-			type: 'module',
-			workspaces: ['apps/*']
-		}, null, '\t'), 'utf-8')
+		writeFileSync(
+			join(workspaceDir, 'package.json'),
+			JSON.stringify(
+				{
+					name: 'preview-workspace-accounts',
+					private: true,
+					type: 'module',
+					workspaces: ['apps/*']
+				},
+				null,
+				'\t'
+			),
+			'utf-8'
+		)
 
 		const docsDir = join(workspaceDir, 'apps', 'docs')
 		const testingDir = join(workspaceDir, 'apps', 'testing')
@@ -228,8 +281,12 @@ describe('previews command', () => {
 		)
 
 		expect(result.exitCode).toBe(1)
-		expect(logger.messages.some((message) => {
-			return message.args.join(' ').includes('Multiple Cloudflare account ids were discovered across local Devflare configs')
-		})).toBe(true)
+		expect(
+			logger.messages.some((message) => {
+				return message.args
+					.join(' ')
+					.includes('Multiple Cloudflare account ids were discovered across local Devflare configs')
+			})
+		).toBe(true)
 	})
 })

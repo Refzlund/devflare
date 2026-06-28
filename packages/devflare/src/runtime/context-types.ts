@@ -28,19 +28,21 @@ export type FetchEvent<
 	TEnv = unknown,
 	TParams extends Record<string, string> = Record<string, string>,
 	TLocals extends Record<string, unknown> = Record<string, unknown>
-> = Omit<Request, 'url'> & EventContext<TEnv, TLocals> & {
-	readonly type: 'fetch'
-	readonly url: URL
-	readonly request: Request
-	readonly ctx: ExecutionContext
-	readonly params: TParams
-}
+> = Omit<Request, 'url'> &
+	EventContext<TEnv, TLocals> & {
+		readonly type: 'fetch'
+		readonly url: URL
+		readonly request: Request
+		readonly ctx: ExecutionContext
+		readonly params: TParams
+	}
 
 export interface QueueEvent<
 	TMessage = unknown,
 	TEnv = unknown,
 	TLocals extends Record<string, unknown> = Record<string, unknown>
-> extends MessageBatch<TMessage>, EventContext<TEnv, TLocals> {
+> extends MessageBatch<TMessage>,
+		EventContext<TEnv, TLocals> {
 	readonly type: 'queue'
 	readonly batch: MessageBatch<TMessage>
 	readonly ctx: ExecutionContext
@@ -49,7 +51,8 @@ export interface QueueEvent<
 export interface ScheduledEvent<
 	TEnv = unknown,
 	TLocals extends Record<string, unknown> = Record<string, unknown>
-> extends ScheduledController, EventContext<TEnv, TLocals> {
+> extends ScheduledController,
+		EventContext<TEnv, TLocals> {
 	readonly type: 'scheduled'
 	readonly controller: ScheduledController
 	readonly ctx: ExecutionContext
@@ -58,7 +61,8 @@ export interface ScheduledEvent<
 export interface EmailEvent<
 	TEnv = unknown,
 	TLocals extends Record<string, unknown> = Record<string, unknown>
-> extends ForwardableEmailMessage, EventContext<TEnv, TLocals> {
+> extends ForwardableEmailMessage,
+		EventContext<TEnv, TLocals> {
 	readonly type: 'email'
 	readonly message: ForwardableEmailMessage
 	readonly ctx: ExecutionContext
@@ -67,7 +71,8 @@ export interface EmailEvent<
 export interface TailEvent<
 	TEnv = unknown,
 	TLocals extends Record<string, unknown> = Record<string, unknown>
-> extends Array<TraceItem>, EventContext<TEnv, TLocals> {
+> extends Array<TraceItem>,
+		EventContext<TEnv, TLocals> {
 	readonly type: 'tail'
 	readonly events: TraceItem[]
 	readonly ctx: ExecutionContext
@@ -86,19 +91,21 @@ export interface DurableObjectEventContext<
 export interface DurableObjectFetchEvent<
 	TEnv = unknown,
 	TLocals extends Record<string, unknown> = Record<string, unknown>
-> extends Request, DurableObjectEventContext<'durable-object-fetch', TEnv, TLocals> {
+> extends Request,
+		DurableObjectEventContext<'durable-object-fetch', TEnv, TLocals> {
 	readonly request: Request
 }
 
 export interface DurableObjectAlarmEvent<
 	TEnv = unknown,
 	TLocals extends Record<string, unknown> = Record<string, unknown>
-> extends DurableObjectEventContext<'durable-object-alarm', TEnv, TLocals> { }
+> extends DurableObjectEventContext<'durable-object-alarm', TEnv, TLocals> {}
 
 export interface DurableObjectWebSocketMessageEvent<
 	TEnv = unknown,
 	TLocals extends Record<string, unknown> = Record<string, unknown>
-> extends WebSocket, DurableObjectEventContext<'durable-object-websocket-message', TEnv, TLocals> {
+> extends WebSocket,
+		DurableObjectEventContext<'durable-object-websocket-message', TEnv, TLocals> {
 	readonly ws: WebSocket
 	readonly message: string | ArrayBuffer
 }
@@ -106,7 +113,8 @@ export interface DurableObjectWebSocketMessageEvent<
 export interface DurableObjectWebSocketCloseEvent<
 	TEnv = unknown,
 	TLocals extends Record<string, unknown> = Record<string, unknown>
-> extends WebSocket, DurableObjectEventContext<'durable-object-websocket-close', TEnv, TLocals> {
+> extends WebSocket,
+		DurableObjectEventContext<'durable-object-websocket-close', TEnv, TLocals> {
 	readonly ws: WebSocket
 	readonly code: number
 	readonly reason: string
@@ -116,7 +124,8 @@ export interface DurableObjectWebSocketCloseEvent<
 export interface DurableObjectWebSocketErrorEvent<
 	TEnv = unknown,
 	TLocals extends Record<string, unknown> = Record<string, unknown>
-> extends WebSocket, DurableObjectEventContext<'durable-object-websocket-error', TEnv, TLocals> {
+> extends WebSocket,
+		DurableObjectEventContext<'durable-object-websocket-error', TEnv, TLocals> {
 	readonly ws: WebSocket
 	readonly error: unknown
 }
@@ -162,7 +171,9 @@ export type EventAccessor<TEvent> = (() => TEvent) & {
 	safe: () => TEvent | null
 }
 
-export interface EventInitOptions<TLocals extends Record<string, unknown> = Record<string, unknown>> {
+export interface EventInitOptions<
+	TLocals extends Record<string, unknown> = Record<string, unknown>
+> {
 	locals?: TLocals
 }
 

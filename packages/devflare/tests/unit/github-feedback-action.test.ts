@@ -168,7 +168,9 @@ describe('devflare-github-feedback action', () => {
 
 		await expect(main()).resolves.toBeUndefined()
 
-		expect(postedCommentBody).toContain('Preview URL: [https://devflare-docs-pr-1.refz.workers.dev](https://devflare-docs-pr-1.refz.workers.dev)')
+		expect(postedCommentBody).toContain(
+			'Preview URL: [https://devflare-docs-pr-1.refz.workers.dev](https://devflare-docs-pr-1.refz.workers.dev)'
+		)
 		expect(postedCommentBody).not.toContain('Production URL')
 		expect(postedCommentBody).not.toContain('https://devflare-docs.refz.workers.dev')
 	})

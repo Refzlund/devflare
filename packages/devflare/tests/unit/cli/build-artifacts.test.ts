@@ -1,16 +1,16 @@
 import { describe, expect, mock, test } from 'bun:test'
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'pathe'
 import {
 	cleanupViteBuildOutputs,
 	createDeferredCleanupPath,
 	findWorkspaceLocalBinary,
-	isolateViteBuildOutputPaths,
+	getViteBuildCleanupTargets,
 	isRunningUnderBun,
+	isolateViteBuildOutputPaths,
 	removePathWithRetries,
-	resolveLocalViteExecutable,
-	getViteBuildCleanupTargets
+	resolveLocalViteExecutable
 } from '../../../src/cli/commands/build-artifacts'
 import type { FileSystem } from '../../../src/cli/dependencies'
 import type { WranglerConfig } from '../../../src/config/compiler'
@@ -40,15 +40,19 @@ describe('build artifact cleanup helpers', () => {
 			await mkdir(outputDir, { recursive: true })
 			await writeFile(workerPath, 'export default {}')
 
-			await cleanupViteBuildOutputs(projectDir, {
-				name: 'documentation',
-				compatibility_date: '2026-04-08',
-				main: '.adapter-cloudflare/_worker.js',
-				assets: {
-					directory: '.adapter-cloudflare',
-					binding: 'ASSETS'
-				}
-			} satisfies WranglerConfig, createLogger() as never)
+			await cleanupViteBuildOutputs(
+				projectDir,
+				{
+					name: 'documentation',
+					compatibility_date: '2026-04-08',
+					main: '.adapter-cloudflare/_worker.js',
+					assets: {
+						directory: '.adapter-cloudflare',
+						binding: 'ASSETS'
+					}
+				} satisfies WranglerConfig,
+				createLogger() as never
+			)
 
 			expect(await Bun.file(outputDir).exists()).toBe(false)
 			expect(await Bun.file(workerPath).exists()).toBe(false)
@@ -61,9 +65,9 @@ describe('build artifact cleanup helpers', () => {
 	})
 
 	test('creates stable deferred cleanup paths when moving locked outputs aside', () => {
-		expect(
-			createDeferredCleanupPath('C:/project/.adapter-cloudflare', 'fixed-suffix')
-		).toBe('C:/project/.adapter-cloudflare.devflare-stale-fixed-suffix')
+		expect(createDeferredCleanupPath('C:/project/.adapter-cloudflare', 'fixed-suffix')).toBe(
+			'C:/project/.adapter-cloudflare.devflare-stale-fixed-suffix'
+		)
 	})
 
 	test('isolates Vite-backed adapter outputs inside .devflare during builds', () => {
@@ -86,27 +90,24 @@ describe('build artifact cleanup helpers', () => {
 		const busyError = Object.assign(new Error('busy'), {
 			code: 'EBUSY'
 		})
-		const access = mock(async (_path: string) => { })
-		const rename = mock(async (_oldPath: string, _newPath: string) => { })
-		const rm = mock(async (targetPath: string, _options: { recursive: boolean; force: boolean }) => {
-			if (targetPath.includes('.devflare-stale-')) {
-				return
-			}
+		const access = mock(async (_path: string) => {})
+		const rename = mock(async (_oldPath: string, _newPath: string) => {})
+		const rm = mock(
+			async (targetPath: string, _options: { recursive: boolean; force: boolean }) => {
+				if (targetPath.includes('.devflare-stale-')) {
+					return
+				}
 
-			throw busyError
-		})
+				throw busyError
+			}
+		)
 
 		await expect(
-			removePathWithRetries(
-				'C:/project/.adapter-cloudflare',
-				logger as never,
-				2,
-				{
-					access,
-					rename,
-					rm
-				}
-			)
+			removePathWithRetries('C:/project/.adapter-cloudflare', logger as never, 2, {
+				access,
+				rename,
+				rm
+			})
 		).resolves.toBeUndefined()
 
 		expect(rename).toHaveBeenCalledTimes(1)
@@ -126,7 +127,7 @@ describe('build artifact cleanup helpers', () => {
 		const busyError = Object.assign(new Error('busy'), {
 			code: 'EBUSY'
 		})
-		const access = mock(async () => { })
+		const access = mock(async () => {})
 		const rename = mock(async () => {
 			throw busyError
 		})
@@ -135,16 +136,11 @@ describe('build artifact cleanup helpers', () => {
 		})
 
 		await expect(
-			removePathWithRetries(
-				'C:/project/.adapter-cloudflare',
-				logger as never,
-				2,
-				{
-					access,
-					rename,
-					rm
-				}
-			)
+			removePathWithRetries('C:/project/.adapter-cloudflare', logger as never, 2, {
+				access,
+				rename,
+				rm
+			})
 		).resolves.toBeUndefined()
 
 		expect(
@@ -159,23 +155,18 @@ describe('build artifact cleanup helpers', () => {
 		const deniedError = Object.assign(new Error('denied'), {
 			code: 'EACCES'
 		})
-		const access = mock(async () => { })
-		const rename = mock(async () => { })
+		const access = mock(async () => {})
+		const rename = mock(async () => {})
 		const rm = mock(async () => {
 			throw deniedError
 		})
 
 		await expect(
-			removePathWithRetries(
-				'C:/project/.adapter-cloudflare',
-				logger as never,
-				2,
-				{
-					access,
-					rename,
-					rm
-				}
-			)
+			removePathWithRetries('C:/project/.adapter-cloudflare', logger as never, 2, {
+				access,
+				rename,
+				rm
+			})
 		).rejects.toMatchObject({
 			code: 'EACCES'
 		})
@@ -265,9 +256,9 @@ describe('vite executable resolution', () => {
 				}
 			}
 
-			await expect(
-				resolveLocalViteExecutable(root, fs as FileSystem)
-			).rejects.toThrow(/Could not resolve a local Vite CLI/)
+			await expect(resolveLocalViteExecutable(root, fs as FileSystem)).rejects.toThrow(
+				/Could not resolve a local Vite CLI/
+			)
 		} finally {
 			await rm(root, { recursive: true, force: true })
 		}

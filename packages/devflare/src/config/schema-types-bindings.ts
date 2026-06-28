@@ -1,4 +1,16 @@
 import type {
+	AnalyticsBindingInput,
+	ArtifactsBindingInput,
+	BrowserBindingInput,
+	DispatchNamespaceBindingInput,
+	ImagesBindingInput,
+	MediaBindingInput,
+	MtlsCertificateBindingInput,
+	PipelineBindingInput,
+	SendEmailBindingInput,
+	WorkflowBindingInput
+} from './schema-types-bindings-platform'
+import type {
 	AiBindingInput,
 	AiSearchInstanceBindingInput,
 	AiSearchNamespaceBindingInput,
@@ -15,18 +27,6 @@ import type {
 	VersionMetadataBindingInput,
 	WorkerLoaderBindingInput
 } from './schema-types-bindings-resources'
-import type {
-	AnalyticsBindingInput,
-	ArtifactsBindingInput,
-	BrowserBindingInput,
-	DispatchNamespaceBindingInput,
-	ImagesBindingInput,
-	MediaBindingInput,
-	MtlsCertificateBindingInput,
-	PipelineBindingInput,
-	SendEmailBindingInput,
-	WorkflowBindingInput
-} from './schema-types-bindings-platform'
 
 export interface BindingsConfigInput {
 	/**

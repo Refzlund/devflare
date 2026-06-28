@@ -79,13 +79,7 @@ describe('transport v2 — binary frame encoder/decoder', () => {
 	test('round-trips a ws data frame with TEXT and ABORT flags combined', () => {
 		const payload = new TextEncoder().encode('aborted text frame')
 		const flags = TransportV2BinaryFlags.TEXT | TransportV2BinaryFlags.ABORT
-		const encoded = encodeTransportV2BinaryFrame(
-			TransportV2BinaryKind.WsData,
-			1,
-			0,
-			flags,
-			payload
-		)
+		const encoded = encodeTransportV2BinaryFrame(TransportV2BinaryKind.WsData, 1, 0, flags, payload)
 		const decoded = decodeTransportV2BinaryFrame(encoded)
 
 		expect(decoded.kind).toBe(TransportV2BinaryKind.WsData)
@@ -176,8 +170,9 @@ describe('transport v2 — control message parser', () => {
 	})
 
 	test('rejects unknown control types (including v1 message kinds)', () => {
-		expect(() => parseTransportV2ControlMsg('{"t":"rpc.call","id":"x","method":"m","params":[]}'))
-			.toThrow(/unknown type "rpc\.call"/)
+		expect(() =>
+			parseTransportV2ControlMsg('{"t":"rpc.call","id":"x","method":"m","params":[]}')
+		).toThrow(/unknown type "rpc\.call"/)
 	})
 
 	test('rejects hello/welcome with the wrong protocolVersion', () => {

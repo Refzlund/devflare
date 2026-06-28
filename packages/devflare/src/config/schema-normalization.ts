@@ -1,6 +1,4 @@
 import {
-	formatBrowserBindingLimitMessage,
-	getBrowserBindingNames,
 	type ArtifactsBinding,
 	type BrowserBindings,
 	type D1Binding,
@@ -13,7 +11,9 @@ import {
 	type MtlsCertificateBinding,
 	type PipelineBinding,
 	type SecretsStoreBinding,
-	type WorkflowBinding
+	type WorkflowBinding,
+	formatBrowserBindingLimitMessage,
+	getBrowserBindingNames
 } from './schema-bindings'
 
 // Re-exported so call sites can format the same message Zod uses without
@@ -149,7 +149,9 @@ export interface NormalizedSecretsStoreBinding {
  * Zod (e.g. by casting raw input as `DevflareConfig`) should re-validate
  * via `browserBindingSchema.parse()` before relying on this selector.
  */
-export function getSingleBrowserBindingName(bindings: BrowserBindings | undefined): string | undefined {
+export function getSingleBrowserBindingName(
+	bindings: BrowserBindings | undefined
+): string | undefined {
 	const bindingNames = getBrowserBindingNames(bindings)
 
 	if (bindingNames.length === 0) {
@@ -169,7 +171,7 @@ export function normalizeDOBinding(config: DurableObjectBinding): NormalizedDOBi
 
 	const scriptName = config.scriptName
 	const __ref = (config as { __ref?: unknown }).__ref
-	const kind: 'local' | 'cross-worker' = (scriptName || __ref) ? 'cross-worker' : 'local'
+	const kind: 'local' | 'cross-worker' = scriptName || __ref ? 'cross-worker' : 'local'
 
 	return {
 		className: config.className,
@@ -220,11 +222,12 @@ export function normalizeHyperdriveBinding(config: HyperdriveBinding): Normalize
 		return { name: config }
 	}
 
-	const localConnectionString = 'localConnectionString' in config
-		? config.localConnectionString
-		: 'previewLocalConnectionString' in config
-			? config.previewLocalConnectionString
-			: undefined
+	const localConnectionString =
+		'localConnectionString' in config
+			? config.localConnectionString
+			: 'previewLocalConnectionString' in config
+				? config.previewLocalConnectionString
+				: undefined
 
 	if ('id' in config) {
 		return {
@@ -288,9 +291,7 @@ export function normalizeDispatchNamespaceBinding(
 /**
  * Normalize a Workflow binding to its object form.
  */
-export function normalizeWorkflowBinding(
-	config: WorkflowBinding
-): NormalizedWorkflowBinding {
+export function normalizeWorkflowBinding(config: WorkflowBinding): NormalizedWorkflowBinding {
 	return {
 		name: config.name,
 		className: config.className,
@@ -307,9 +308,7 @@ export function normalizeWorkflowBinding(
 /**
  * Normalize a Pipeline binding to its object form.
  */
-export function normalizePipelineBinding(
-	config: PipelineBinding
-): NormalizedPipelineBinding {
+export function normalizePipelineBinding(config: PipelineBinding): NormalizedPipelineBinding {
 	if (typeof config === 'string') {
 		return { pipeline: config }
 	}
@@ -357,9 +356,7 @@ export function normalizeMediaBinding(
 /**
  * Normalize an Artifacts binding to its object form.
  */
-export function normalizeArtifactsBinding(
-	config: ArtifactsBinding
-): NormalizedArtifactsBinding {
+export function normalizeArtifactsBinding(config: ArtifactsBinding): NormalizedArtifactsBinding {
 	if (typeof config === 'string') {
 		return { namespace: config }
 	}

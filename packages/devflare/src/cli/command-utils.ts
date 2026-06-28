@@ -6,9 +6,7 @@ import { loadConfig, resolveConfigPath } from '../config/loader'
 export type NamedSelectionSource = 'option' | 'arg' | 'config' | 'none'
 
 export function asOptionalString(value: string | boolean | undefined): string | undefined {
-	return typeof value === 'string' && value.trim()
-		? value.trim()
-		: undefined
+	return typeof value === 'string' && value.trim() ? value.trim() : undefined
 }
 
 export function resolveNamedSelection(options: {

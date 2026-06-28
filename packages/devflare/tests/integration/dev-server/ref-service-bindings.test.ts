@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'pathe'
-import { createDevServer, type DevServer } from '../../../src/dev-server'
+import { type DevServer, createDevServer } from '../../../src/dev-server'
 import { getAvailablePort } from '../helpers/built-devflare.helpers'
 import { createCapturedLogger } from './worker-only-multi-surface.helpers'
 
@@ -27,23 +27,26 @@ async function waitForJson<T>(url: string, timeoutMs = 20_000): Promise<T> {
 		await Bun.sleep(250)
 	}
 
-	throw lastError instanceof Error
-		? lastError
-		: new Error(`Timed out waiting for ${url}`)
+	throw lastError instanceof Error ? lastError : new Error(`Timed out waiting for ${url}`)
 }
 
 async function writeFixture(projectDir: string): Promise<void> {
 	await mkdir(join(projectDir, 'src'), { recursive: true })
 	await mkdir(join(projectDir, 'api', 'src'), { recursive: true })
 
-	await writeFile(join(projectDir, 'src', 'fetch.ts'), `
+	await writeFile(
+		join(projectDir, 'src', 'fetch.ts'),
+		`
 export default async function fetch(request: Request, env: any, ctx: ExecutionContext): Promise<Response> {
 	const result = await env.API.ping()
 	return Response.json({ result })
 }
-`.trim())
+`.trim()
+	)
 
-	await writeFile(join(projectDir, 'api', 'src', 'ep.api.ts'), `
+	await writeFile(
+		join(projectDir, 'api', 'src', 'ep.api.ts'),
+		`
 import { WorkerEntrypoint } from 'cloudflare:workers'
 
 export class ApiEntrypoint extends WorkerEntrypoint {
@@ -56,9 +59,12 @@ export class ApiEntrypoint extends WorkerEntrypoint {
 		return [row.value, await env.CACHE.get('last'), await counter.ping(), env.FEATURE_FLAG].join(':')
 	}
 }
-`.trim())
+`.trim()
+	)
 
-	await writeFile(join(projectDir, 'api', 'src', 'do.counter.ts'), `
+	await writeFile(
+		join(projectDir, 'api', 'src', 'do.counter.ts'),
+		`
 import { DurableObject } from 'cloudflare:workers'
 
 export class Counter extends DurableObject {
@@ -66,9 +72,12 @@ export class Counter extends DurableObject {
 		return 'DO_PONG'
 	}
 }
-`.trim())
+`.trim()
+	)
 
-	await writeFile(join(projectDir, 'api', 'devflare.config.ts'), `
+	await writeFile(
+		join(projectDir, 'api', 'devflare.config.ts'),
+		`
 export default {
 	name: 'api-worker',
 	compatibilityDate: '2026-04-28',
@@ -92,9 +101,12 @@ export default {
 		}
 	}
 }
-`.trim())
+`.trim()
+	)
 
-	await writeFile(join(projectDir, 'devflare.config.ts'), `
+	await writeFile(
+		join(projectDir, 'devflare.config.ts'),
+		`
 const apiConfig = {
 	name: 'api-worker',
 	compatibilityDate: '2026-04-28',
@@ -155,7 +167,8 @@ export default {
 		}
 	}
 }
-`.trim())
+`.trim()
+	)
 }
 
 describe('dev server referenced service bindings', () => {
@@ -188,9 +201,13 @@ describe('dev server referenced service bindings', () => {
 		}
 	}, TEST_TIMEOUT_MS)
 
-	test('serves RPC from a referenced worker with its own local bindings', async () => {
-		const payload = await waitForJson<{ result: string }>(`http://127.0.0.1:${miniflarePort}/`)
+	test(
+		'serves RPC from a referenced worker with its own local bindings',
+		async () => {
+			const payload = await waitForJson<{ result: string }>(`http://127.0.0.1:${miniflarePort}/`)
 
-		expect(payload).toEqual({ result: 'PONG:PONG:DO_PONG:enabled' })
-	}, TEST_TIMEOUT_MS)
+			expect(payload).toEqual({ result: 'PONG:PONG:DO_PONG:enabled' })
+		},
+		TEST_TIMEOUT_MS
+	)
 })

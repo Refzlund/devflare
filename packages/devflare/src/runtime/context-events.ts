@@ -26,10 +26,7 @@ function createLocals<TLocals extends Record<string, unknown>>(locals?: TLocals)
  * (with SendEmail bindings proxied) plus a locals bag. Every event type layers
  * its specific fields on top of this shell.
  */
-function prepareEventShell<
-	TEnv,
-	TLocals extends Record<string, unknown> = Record<string, unknown>
->(
+function prepareEventShell<TEnv, TLocals extends Record<string, unknown> = Record<string, unknown>>(
 	env: TEnv,
 	options: { locals?: TLocals } = {}
 ): { env: TEnv; locals: TLocals } {
@@ -58,10 +55,7 @@ function createAugmentedTarget<TTarget extends object, TExtra extends object>(
 		},
 
 		ownKeys(target) {
-			return Array.from(new Set([
-				...Reflect.ownKeys(target),
-				...Reflect.ownKeys(extra)
-			]))
+			return Array.from(new Set([...Reflect.ownKeys(target), ...Reflect.ownKeys(extra)]))
 		},
 
 		getOwnPropertyDescriptor(target, prop) {

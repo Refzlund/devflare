@@ -1,5 +1,5 @@
-import type { Plugin as RolldownPlugin } from 'rolldown'
 import MagicString from 'magic-string'
+import type { Plugin as RolldownPlugin } from 'rolldown'
 import ts from 'typescript'
 
 interface ImportWrapper {
@@ -17,7 +17,8 @@ interface ImportReplacement {
 	text: string
 }
 
-const WORKER_DYNAMIC_IMPORT_ERROR = 'Devflare worker bundles cannot contain unresolved dynamic import() expressions because Miniflare/workerd reject dynamic module specifiers'
+const WORKER_DYNAMIC_IMPORT_ERROR =
+	'Devflare worker bundles cannot contain unresolved dynamic import() expressions because Miniflare/workerd reject dynamic module specifiers'
 
 function getScriptKind(id: string): ts.ScriptKind {
 	if (id.endsWith('.tsx')) {
@@ -44,12 +45,17 @@ function hasExportModifier(node: ts.Node): boolean {
 		return false
 	}
 
-	return ts.getModifiers(node)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword) ?? false
+	return (
+		ts.getModifiers(node)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword) ??
+		false
+	)
 }
 
 function isConstVariableStatement(statement: ts.Statement): statement is ts.VariableStatement {
-	return ts.isVariableStatement(statement)
-		&& (statement.declarationList.flags & ts.NodeFlags.Const) !== 0
+	return (
+		ts.isVariableStatement(statement) &&
+		(statement.declarationList.flags & ts.NodeFlags.Const) !== 0
+	)
 }
 
 function quoteString(value: string): string {
@@ -107,7 +113,10 @@ function unwrapDynamicImportExpression(expression: ts.Expression): ts.CallExpres
 		return unwrapDynamicImportExpression(expression.expression)
 	}
 
-	if (!ts.isCallExpression(expression) || expression.expression.kind !== ts.SyntaxKind.ImportKeyword) {
+	if (
+		!ts.isCallExpression(expression) ||
+		expression.expression.kind !== ts.SyntaxKind.ImportKeyword
+	) {
 		return null
 	}
 
@@ -171,11 +180,11 @@ function collectImportWrappers(sourceFile: ts.SourceFile): Map<string, ImportWra
 
 	for (const statement of sourceFile.statements) {
 		if (
-			ts.isFunctionDeclaration(statement)
-			&& statement.name
-			&& !hasExportModifier(statement)
-			&& statement.parameters.length === 1
-			&& ts.isIdentifier(statement.parameters[0]?.name)
+			ts.isFunctionDeclaration(statement) &&
+			statement.name &&
+			!hasExportModifier(statement) &&
+			statement.parameters.length === 1 &&
+			ts.isIdentifier(statement.parameters[0]?.name)
 		) {
 			const wrapper = createImportWrapper(
 				statement.name.text,
@@ -198,13 +207,16 @@ function collectImportWrappers(sourceFile: ts.SourceFile): Map<string, ImportWra
 				continue
 			}
 
-			if (!ts.isArrowFunction(declaration.initializer) && !ts.isFunctionExpression(declaration.initializer)) {
+			if (
+				!ts.isArrowFunction(declaration.initializer) &&
+				!ts.isFunctionExpression(declaration.initializer)
+			) {
 				continue
 			}
 
 			if (
-				declaration.initializer.parameters.length !== 1
-				|| !ts.isIdentifier(declaration.initializer.parameters[0]?.name)
+				declaration.initializer.parameters.length !== 1 ||
+				!ts.isIdentifier(declaration.initializer.parameters[0]?.name)
 			) {
 				continue
 			}
@@ -253,7 +265,10 @@ function collectWrapperCallSpecifiers(
 	visit(sourceFile)
 }
 
-function createImportIdentifier(specifierToIdentifier: Map<string, string>, specifier: string): string {
+function createImportIdentifier(
+	specifierToIdentifier: Map<string, string>,
+	specifier: string
+): string {
 	const existing = specifierToIdentifier.get(specifier)
 	if (existing) {
 		return existing
@@ -325,10 +340,10 @@ function transformWorkerDynamicImports(
 		if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
 			const containingWrapper = findContainingWrapper(node, transformableWrappers, sourceFile)
 			if (
-				containingWrapper
-				&& node.arguments.length === 1
-				&& ts.isIdentifier(node.arguments[0])
-				&& node.arguments[0].text === containingWrapper.parameterName
+				containingWrapper &&
+				node.arguments.length === 1 &&
+				ts.isIdentifier(node.arguments[0]) &&
+				node.arguments[0].text === containingWrapper.parameterName
 			) {
 				return
 			}
@@ -363,7 +378,9 @@ function transformWorkerDynamicImports(
 		s.overwrite(replacement.start, replacement.end, replacement.text)
 	}
 
-	for (const wrapper of transformableWrappers.sort((left, right) => right.bodyStart - left.bodyStart)) {
+	for (const wrapper of transformableWrappers.sort(
+		(left, right) => right.bodyStart - left.bodyStart
+	)) {
 		s.overwrite(
 			wrapper.bodyStart,
 			wrapper.bodyEnd,
@@ -431,21 +448,20 @@ export async function assertWorkerBundleHasNoDynamicImports(bundlePath: string):
 		.map((callExpression) => {
 			const start = callExpression.getStart(sourceFile)
 			const { line, character } = sourceFile.getLineAndCharacterOfPosition(start)
-			const snippet = code
-				.slice(start, callExpression.getEnd())
-				.replace(/\s+/g, ' ')
-				.trim()
+			const snippet = code.slice(start, callExpression.getEnd()).replace(/\s+/g, ' ').trim()
 
 			return `- ${line + 1}:${character + 1} ${snippet}`
 		})
 		.join('\n')
 
-	throw new Error([
-		WORKER_DYNAMIC_IMPORT_ERROR,
-		`Bundle: ${bundlePath}`,
-		`Examples:\n${examples}`,
-		'Devflare can normalize literal import() calls and simple helper wrappers whose call sites are literal strings, but truly runtime-computed specifiers must be converted to static imports for worker bundles.'
-	].join('\n\n'))
+	throw new Error(
+		[
+			WORKER_DYNAMIC_IMPORT_ERROR,
+			`Bundle: ${bundlePath}`,
+			`Examples:\n${examples}`,
+			'Devflare can normalize literal import() calls and simple helper wrappers whose call sites are literal strings, but truly runtime-computed specifiers must be converted to static imports for worker bundles.'
+		].join('\n\n')
+	)
 }
 
 export function createWorkerDynamicImportPlugin(): RolldownPlugin {

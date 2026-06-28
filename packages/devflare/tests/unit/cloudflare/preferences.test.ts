@@ -1,6 +1,14 @@
-import { describe, test, expect, beforeEach, afterEach } from 'bun:test'
-import { mkdtempSync, readFileSync, readdirSync, rmSync, existsSync, mkdirSync, chmodSync } from 'node:fs'
-import { tmpdir, platform } from 'node:os'
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
+import {
+	chmodSync,
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	readdirSync,
+	rmSync
+} from 'node:fs'
+import { platform, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { writeFileAtomic } from '../../../src/cloudflare/preferences'
 
@@ -66,7 +74,9 @@ describe('writeFileAtomic', () => {
 
 		expect(() => writeFileAtomic(target, 'payload')).toThrow()
 
-		const leftovers = readdirSync(join(dir, 'readonly-subdir')).filter((name) => name.includes('.tmp-'))
+		const leftovers = readdirSync(join(dir, 'readonly-subdir')).filter((name) =>
+			name.includes('.tmp-')
+		)
 		expect(leftovers).toEqual([])
 
 		// cleanup

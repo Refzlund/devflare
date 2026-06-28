@@ -64,23 +64,23 @@ export async function resolveWorkerHandlerPath(
 		} catch {
 			if (looksLikeBuildArtifactPath(configuredPath)) {
 				throw new Error(
-					`Configured ${surfaceName} handler "${configuredPath}" was not found.\n`
-					+ `\n`
-					+ `This path looks like a framework build output (e.g. SvelteKit / Vite / Next).\n`
-					+ `Devflare resolves handler paths BEFORE your framework runs its build, so the file\n`
-					+ `does not exist yet at this stage.\n`
-					+ `\n`
-					+ `Recommended fix — point devflare at the build artifact via wrangler passthrough\n`
-					+ `instead of files.${surfaceName}, so devflare skips composition and lets your\n`
-					+ `framework write the worker entry that wrangler/vite then picks up:\n`
-					+ `\n`
-					+ `    files: { ${surfaceName}: false },\n`
-					+ `    wrangler: {\n`
-					+ `        passthrough: { main: '${configuredPath}' }\n`
-					+ `    }\n`
-					+ `\n`
-					+ `Alternatively, run your framework build (e.g. \`vite build\`) before \`devflare build\`,\n`
-					+ `or move the handler to a source file that exists at config time.`
+					`Configured ${surfaceName} handler "${configuredPath}" was not found.\n` +
+						`\n` +
+						`This path looks like a framework build output (e.g. SvelteKit / Vite / Next).\n` +
+						`Devflare resolves handler paths BEFORE your framework runs its build, so the file\n` +
+						`does not exist yet at this stage.\n` +
+						`\n` +
+						`Recommended fix — point devflare at the build artifact via wrangler passthrough\n` +
+						`instead of files.${surfaceName}, so devflare skips composition and lets your\n` +
+						`framework write the worker entry that wrangler/vite then picks up:\n` +
+						`\n` +
+						`    files: { ${surfaceName}: false },\n` +
+						`    wrangler: {\n` +
+						`        passthrough: { main: '${configuredPath}' }\n` +
+						`    }\n` +
+						`\n` +
+						`Alternatively, run your framework build (e.g. \`vite build\`) before \`devflare build\`,\n` +
+						`or move the handler to a source file that exists at config time.`
 				)
 			}
 			throw new Error(`Configured ${surfaceName} handler "${configuredPath}" was not found`)
@@ -93,7 +93,7 @@ export async function resolveWorkerHandlerPath(
 			await fs.access(absolutePath)
 			return absolutePath
 		} catch {
-			continue
+			// Default entry not present — try the next one.
 		}
 	}
 
@@ -105,14 +105,36 @@ export async function resolveWorkerSurfacePaths(
 	config: DevflareConfig
 ): Promise<WorkerSurfacePaths> {
 	return {
-		fetch: await resolveWorkerHandlerPath(cwd, config.files?.fetch, DEFAULT_FETCH_ENTRY_FILES, 'fetch'),
-		queue: await resolveWorkerHandlerPath(cwd, config.files?.queue, DEFAULT_QUEUE_ENTRY_FILES, 'queue'),
-		scheduled: await resolveWorkerHandlerPath(cwd, config.files?.scheduled, DEFAULT_SCHEDULED_ENTRY_FILES, 'scheduled'),
-		email: await resolveWorkerHandlerPath(cwd, config.files?.email, DEFAULT_EMAIL_ENTRY_FILES, 'email'),
+		fetch: await resolveWorkerHandlerPath(
+			cwd,
+			config.files?.fetch,
+			DEFAULT_FETCH_ENTRY_FILES,
+			'fetch'
+		),
+		queue: await resolveWorkerHandlerPath(
+			cwd,
+			config.files?.queue,
+			DEFAULT_QUEUE_ENTRY_FILES,
+			'queue'
+		),
+		scheduled: await resolveWorkerHandlerPath(
+			cwd,
+			config.files?.scheduled,
+			DEFAULT_SCHEDULED_ENTRY_FILES,
+			'scheduled'
+		),
+		email: await resolveWorkerHandlerPath(
+			cwd,
+			config.files?.email,
+			DEFAULT_EMAIL_ENTRY_FILES,
+			'email'
+		),
 		tail: await resolveWorkerHandlerPath(cwd, config.files?.tail, DEFAULT_TAIL_ENTRY_FILES, 'tail')
 	}
 }
 
 export function hasWorkerSurfacePaths(surfacePaths: WorkerSurfacePaths): boolean {
-	return Object.values(surfacePaths).some((surfacePath) => typeof surfacePath === 'string' && surfacePath.length > 0)
+	return Object.values(surfacePaths).some(
+		(surfacePath) => typeof surfacePath === 'string' && surfacePath.length > 0
+	)
 }

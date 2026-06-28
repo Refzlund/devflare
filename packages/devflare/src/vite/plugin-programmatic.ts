@@ -7,21 +7,17 @@
 // =============================================================================
 
 import { relative } from 'pathe'
-import {
-	loadResolvedConfig,
-	resolveConfigEnvVars,
-	resolveResources
-} from '../config'
-import { loadConfig } from '../config/loader'
+import { loadResolvedConfig, resolveConfigEnvVars, resolveResources } from '../config'
 import { compileConfig, compileToProgrammaticConfig } from '../config/compiler'
+import { loadConfig } from '../config/loader'
+import { resolveServiceBindings } from '../test/resolve-service-bindings'
 import { DEFAULT_DO_PATTERN } from '../utils/glob'
 import { prepareComposedWorkerEntrypoint } from '../worker-entry/composed-worker'
 import {
+	type AuxiliaryWorkerConfig,
 	createAuxiliaryWorkerConfig,
-	discoverDurableObjects,
-	type AuxiliaryWorkerConfig
+	discoverDurableObjects
 } from './plugin-durable-objects'
-import { resolveServiceBindings } from '../test/resolve-service-bindings'
 import { createAuxiliaryServiceWorkerConfigs } from './plugin-service-bindings'
 
 interface ProgrammaticConfigOptions {
@@ -39,16 +35,17 @@ interface ProgrammaticConfigOptions {
 async function loadProgrammaticDevflareConfig(options: ProgrammaticConfigOptions) {
 	const cwd = options.cwd ?? process.cwd()
 	const strategy = options.resolve ?? 'offline-local'
-	const resourceResolvedConfig = strategy === 'remote'
-		? await loadResolvedConfig({
-			cwd,
-			configFile: options.configPath,
-			environment: options.environment
-		})
-		: await resolveResources(
-			await loadConfig({ cwd, configFile: options.configPath }),
-			{ phase: 'local', environment: options.environment }
-		)
+	const resourceResolvedConfig =
+		strategy === 'remote'
+			? await loadResolvedConfig({
+					cwd,
+					configFile: options.configPath,
+					environment: options.environment
+				})
+			: await resolveResources(await loadConfig({ cwd, configFile: options.configPath }), {
+					phase: 'local',
+					environment: options.environment
+				})
 	const devflareConfig = await resolveConfigEnvVars(resourceResolvedConfig, {
 		cwd,
 		configPath: options.configPath,
@@ -83,9 +80,8 @@ async function buildProgrammaticArtifacts(
 	const composedMainEntry = await prepareComposedWorkerEntrypoint(cwd, devflareConfig)
 
 	const wranglerConfig = compileConfig(devflareConfig)
-	const cloudflareConfig: Record<string, unknown> = mode === 'programmatic'
-		? compileToProgrammaticConfig(devflareConfig)
-		: { ...wranglerConfig }
+	const cloudflareConfig: Record<string, unknown> =
+		mode === 'programmatic' ? compileToProgrammaticConfig(devflareConfig) : { ...wranglerConfig }
 
 	if (composedMainEntry) {
 		const relativeMain = relative(cwd, composedMainEntry)
@@ -103,7 +99,9 @@ async function buildProgrammaticArtifacts(
 
 		if (discovery.files.size > 0) {
 			if (cloudflareConfig.durable_objects) {
-				const doConfig = cloudflareConfig.durable_objects as { bindings: Array<{ script_name?: string }> }
+				const doConfig = cloudflareConfig.durable_objects as {
+					bindings: Array<{ script_name?: string }>
+				}
 				for (const binding of doConfig.bindings) {
 					binding.script_name = doWorkerName
 				}
@@ -119,7 +117,14 @@ async function buildProgrammaticArtifacts(
 		)
 	}
 
-	return { cwd, devflareConfig, composedMainEntry, wranglerConfig, cloudflareConfig, auxiliaryWorkers }
+	return {
+		cwd,
+		devflareConfig,
+		composedMainEntry,
+		wranglerConfig,
+		cloudflareConfig,
+		auxiliaryWorkers
+	}
 }
 
 /**
@@ -154,12 +159,13 @@ export async function getCloudflareConfig(
  * })
  * ```
  */
-export async function getDevflareConfigs(
-	options: ProgrammaticConfigOptions = {}
-): Promise<{
+export async function getDevflareConfigs(options: ProgrammaticConfigOptions = {}): Promise<{
 	cloudflareConfig: Record<string, unknown>
 	auxiliaryWorkers: AuxiliaryWorkerConfig[]
 }> {
-	const { cloudflareConfig, auxiliaryWorkers } = await buildProgrammaticArtifacts(options, 'wrangler')
+	const { cloudflareConfig, auxiliaryWorkers } = await buildProgrammaticArtifacts(
+		options,
+		'wrangler'
+	)
 	return { cloudflareConfig, auxiliaryWorkers }
 }

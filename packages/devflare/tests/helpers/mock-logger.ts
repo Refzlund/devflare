@@ -28,9 +28,10 @@ export function createLogger(options: CreateLoggerOptions = {}): TestLogger {
 	const includeLog = options.includeLog !== false
 	const messages: Array<{ level: string; args: unknown[] }> = []
 
-	const createMethod = (level: string) => mock((...args: unknown[]) => {
-		messages.push({ level, args })
-	})
+	const createMethod = (level: string) =>
+		mock((...args: unknown[]) => {
+			messages.push({ level, args })
+		})
 
 	return {
 		info: createMethod('info'),

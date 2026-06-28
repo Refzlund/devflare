@@ -18,11 +18,7 @@ import { createRemoteCloudflareClient } from './remote-cloudflare'
 export function createRemoteVectorize(indexName: string, accountId?: string): VectorizeIndex {
 	const cloudflare = createRemoteCloudflareClient(accountId)
 
-	async function apiRequest<T>(
-		method: string,
-		endpoint: string,
-		body?: unknown
-	): Promise<T> {
+	async function apiRequest<T>(method: string, endpoint: string, body?: unknown): Promise<T> {
 		return cloudflare.jsonRequest<T>({
 			method,
 			path: `/vectorize/v2/indexes/${indexName}${endpoint}`,
@@ -31,10 +27,7 @@ export function createRemoteVectorize(indexName: string, accountId?: string): Ve
 		})
 	}
 
-	async function ndjsonRequest<T>(
-		endpoint: string,
-		vectors: VectorizeVector[]
-	): Promise<T> {
+	async function ndjsonRequest<T>(endpoint: string, vectors: VectorizeVector[]): Promise<T> {
 		// Vectorize uses NDJSON for insert/upsert
 		const ndjson = vectors.map((v) => JSON.stringify(v)).join('\n')
 
@@ -71,7 +64,10 @@ export function createRemoteVectorize(indexName: string, accountId?: string): Ve
 		},
 
 		async insert(vectors: VectorizeVector[]): Promise<VectorizeVectorMutation> {
-			const result = await ndjsonRequest<{ mutationId: string; count: number; ids?: string[] }>('/insert', vectors)
+			const result = await ndjsonRequest<{ mutationId: string; count: number; ids?: string[] }>(
+				'/insert',
+				vectors
+			)
 			return {
 				count: result.count,
 				ids: result.ids || vectors.map((v) => v.id)
@@ -79,7 +75,10 @@ export function createRemoteVectorize(indexName: string, accountId?: string): Ve
 		},
 
 		async upsert(vectors: VectorizeVector[]): Promise<VectorizeVectorMutation> {
-			const result = await ndjsonRequest<{ mutationId: string; count: number; ids?: string[] }>('/upsert', vectors)
+			const result = await ndjsonRequest<{ mutationId: string; count: number; ids?: string[] }>(
+				'/upsert',
+				vectors
+			)
 			return {
 				count: result.count,
 				ids: result.ids || vectors.map((v) => v.id)
@@ -87,7 +86,11 @@ export function createRemoteVectorize(indexName: string, accountId?: string): Ve
 		},
 
 		async deleteByIds(ids: string[]): Promise<VectorizeVectorMutation> {
-			const result = await apiRequest<{ mutationId: string; count: number }>('POST', '/delete-by-ids', { ids })
+			const result = await apiRequest<{ mutationId: string; count: number }>(
+				'POST',
+				'/delete-by-ids',
+				{ ids }
+			)
 			return {
 				count: result.count,
 				ids

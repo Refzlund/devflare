@@ -4,10 +4,10 @@
 
 import { describe, expect, test } from 'bun:test'
 import {
-	transformDurableObject,
 	findDurableObjectClasses,
 	findDurableObjectClassesDetailed,
-	generateWrapper
+	generateWrapper,
+	transformDurableObject
 } from '../../../src/transform/durable-object'
 
 describe('findDurableObjectClasses', () => {

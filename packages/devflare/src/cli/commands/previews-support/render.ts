@@ -1,9 +1,9 @@
 import type { ConsolaInstance } from 'consola'
 import type { WorkerInfo } from '../../../cloudflare'
-import { inspectBindingAssociations, type BindingAssociationRow } from '../../preview-bindings'
+import type { BindingAssociationRow, inspectBindingAssociations } from '../../preview-bindings'
 import {
 	buildPreviewScopeRowsFromLiveWorkers,
-	buildStableWorkerRowsFromLiveWorkers,
+	buildStableWorkerRowsFromLiveWorkers
 } from './family'
 import {
 	bold,
@@ -33,9 +33,15 @@ function logWorkerFamilyHeader(
 	const primaryFamily = families.find((family) => family.role === 'primary') ?? families[0]
 	const relatedFamilies = families.filter((family) => family.role !== 'primary')
 
-	logLine(logger, `${dim('worker family', theme)} ${green(primaryFamily?.baseName ?? 'unknown', theme)}`)
+	logLine(
+		logger,
+		`${dim('worker family', theme)} ${green(primaryFamily?.baseName ?? 'unknown', theme)}`
+	)
 	if (relatedFamilies.length > 0) {
-		logLine(logger, `${dim('related workers', theme)} ${whiteDim(String(relatedFamilies.length), theme)}`)
+		logLine(
+			logger,
+			`${dim('related workers', theme)} ${whiteDim(String(relatedFamilies.length), theme)}`
+		)
 	}
 	logLine(logger)
 }
@@ -152,15 +158,24 @@ function buildSectionLines<Row>(
 	}
 
 	const widths = columns.map((column) => column.width)
-	const coloredTitle = title === 'Preview scopes'
-		? cyanBold(title, theme)
-		: title === 'Stable workers'
-			? bold(title, theme)
-			: yellowBold(title, theme)
+	const coloredTitle =
+		title === 'Preview scopes'
+			? cyanBold(title, theme)
+			: title === 'Stable workers'
+				? bold(title, theme)
+				: yellowBold(title, theme)
 	return [
 		`${coloredTitle} ${dim(`(${records.length})`, theme)}`,
-		formatTableLine(columns.map((column) => dim(column.label, theme)), widths),
-		...records.map((record) => formatTableLine(columns.map((column) => column.value(record)), widths))
+		formatTableLine(
+			columns.map((column) => dim(column.label, theme)),
+			widths
+		),
+		...records.map((record) =>
+			formatTableLine(
+				columns.map((column) => column.value(record)),
+				widths
+			)
+		)
 	]
 }
 
@@ -174,8 +189,20 @@ export function showWorkerFamilyOverviewFromLiveWorkers(
 	logLine(logger)
 	logLiveWorkerFamilyOverview(logger, families, workers, workersSubdomain, theme)
 	logLine(logger)
-	logLine(logger, dim('Preview scopes are derived from live dedicated preview Worker names and the current config family.', theme))
-	logLine(logger, dim('Use `devflare previews cleanup --scope <name>` to delete one scope or `--all` to clean every discovered scope.', theme))
+	logLine(
+		logger,
+		dim(
+			'Preview scopes are derived from live dedicated preview Worker names and the current config family.',
+			theme
+		)
+	)
+	logLine(
+		logger,
+		dim(
+			'Use `devflare previews cleanup --scope <name>` to delete one scope or `--all` to clean every discovered scope.',
+			theme
+		)
+	)
 	logLine(logger)
 }
 
@@ -187,7 +214,10 @@ export function showWorkspaceWorkerFamilyOverviewFromLiveWorkers(
 	theme: PreviewOutputTheme
 ): void {
 	logLine(logger)
-	logLine(logger, `${dim('configured worker families', theme)} ${whiteDim(String(familyGroups.length), theme)}`)
+	logLine(
+		logger,
+		`${dim('configured worker families', theme)} ${whiteDim(String(familyGroups.length), theme)}`
+	)
 	logLine(logger)
 
 	for (const [index, families] of familyGroups.entries()) {
@@ -199,12 +229,26 @@ export function showWorkspaceWorkerFamilyOverviewFromLiveWorkers(
 	}
 
 	logLine(logger)
-	logLine(logger, dim('Preview scopes are derived from live dedicated preview Worker names and each discovered config family.', theme))
-	logLine(logger, dim('Run inside a configured package or pass `--config <path>` to narrow the summary or clean one family.', theme))
+	logLine(
+		logger,
+		dim(
+			'Preview scopes are derived from live dedicated preview Worker names and each discovered config family.',
+			theme
+		)
+	)
+	logLine(
+		logger,
+		dim(
+			'Run inside a configured package or pass `--config <path>` to narrow the summary or clean one family.',
+			theme
+		)
+	)
 	logLine(logger)
 }
 
-function buildBindingAssociationColumns(theme: PreviewOutputTheme): TableColumn<BindingAssociationRow>[] {
+function buildBindingAssociationColumns(
+	theme: PreviewOutputTheme
+): TableColumn<BindingAssociationRow>[] {
 	return [
 		{
 			label: 'Reference',
@@ -229,13 +273,12 @@ function buildBindingAssociationColumns(theme: PreviewOutputTheme): TableColumn<
 		{
 			label: 'Notes',
 			width: 28,
-			value: (row) => row.notes.length > 0 ? row.notes.join(' · ') : dim('—', theme)
+			value: (row) => (row.notes.length > 0 ? row.notes.join(' · ') : dim('—', theme))
 		},
 		{
 			label: 'Connected workers',
-			value: (row) => row.connectedWorkers.length > 0
-				? row.connectedWorkers.join(', ')
-				: dim('—', theme)
+			value: (row) =>
+				row.connectedWorkers.length > 0 ? row.connectedWorkers.join(', ') : dim('—', theme)
 		}
 	]
 }
@@ -247,12 +290,21 @@ export function showBindingAssociations(
 ): void {
 	logLine(logger)
 	logLine(logger, `${dim('worker family', theme)} ${green(inspection.workerName, theme)}`)
-	logLine(logger, `${dim('resolved targets', theme)} ${whiteDim(String(inspection.targets), theme)}`)
-	logLine(logger, `${dim('active deployments scanned', theme)} ${whiteDim(String(inspection.scannedWorkers.length), theme)}`)
+	logLine(
+		logger,
+		`${dim('resolved targets', theme)} ${whiteDim(String(inspection.targets), theme)}`
+	)
+	logLine(
+		logger,
+		`${dim('active deployments scanned', theme)} ${whiteDim(String(inspection.scannedWorkers.length), theme)}`
+	)
 
 	if (inspection.rows.length === 0) {
 		logLine(logger)
-		logLine(logger, dim('No binding or resource targets were resolved from the current config.', theme))
+		logLine(
+			logger,
+			dim('No binding or resource targets were resolved from the current config.', theme)
+		)
 		logLine(logger)
 		return
 	}

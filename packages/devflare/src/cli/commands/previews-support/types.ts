@@ -1,9 +1,9 @@
 import type { PreviewIdentifierSource } from '../../../config'
-import { cleanupPreviewScopedResources } from '../../../config/preview-resources'
+import type { cleanupPreviewScopedResources } from '../../../config/preview-resources'
 
 export const PREVIEW_SUBCOMMANDS = ['list', 'bindings', 'cleanup'] as const
 
-export type PreviewSubcommand = typeof PREVIEW_SUBCOMMANDS[number]
+export type PreviewSubcommand = (typeof PREVIEW_SUBCOMMANDS)[number]
 export type WorkerNameSource = 'option' | 'arg' | 'config' | 'none'
 export type PreviewScopeSource = PreviewIdentifierSource | 'scope-option'
 

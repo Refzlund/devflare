@@ -159,10 +159,7 @@ function streamBodyIfPresent(
 	return { ref, streamPromise }
 }
 
-function bodyFromRef(
-	ref: TransportV2BodyRef | null,
-	codec: TransportV2Codec
-): BodyInit | null {
+function bodyFromRef(ref: TransportV2BodyRef | null, codec: TransportV2Codec): BodyInit | null {
 	if (ref === null || ref.type === 'empty') return null
 	return codec.openBodyReader(ref.bid) as unknown as BodyInit
 }

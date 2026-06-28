@@ -90,6 +90,16 @@ jobs:
           fi
           echo "Pending (unconsumed) changesets: $count"
 
+      # Fail-fast quality gate: typecheck + fast unit tests BEFORE any version
+      # bump or npm publish, so a broken commit on `next` can never be released.
+      # Intentionally excludes the heavy integration suites (they bind real
+      # ports + start Miniflare/workerd) — those run in workspace-ci.
+      - name: Pre-publish gate (typecheck + unit tests)
+        if: steps.changesets.outputs.has == 'true' || github.event_name == 'workflow_dispatch'
+        run: |
+          bun run devflare:typecheck
+          bun --cwd packages/devflare run test:unit
+
       - name: Version packages
         if: steps.changesets.outputs.has == 'true'
         run: bunx changeset version

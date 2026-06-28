@@ -41,9 +41,7 @@ export function buildInlineBridgeMfConfig(
 		? buildLocalSecretWrappedBindingConfig(config, options.cwd)
 		: undefined
 	const localBindingShimServiceConfig = buildLocalBindingShimServiceConfig(config)
-	const localSecretBindingNames = new Set(
-		localSecretWrappedBindingConfig?.localBindingNames ?? []
-	)
+	const localSecretBindingNames = new Set(localSecretWrappedBindingConfig?.localBindingNames ?? [])
 	const mfConfig: any = {
 		modules: true,
 		compatibilityDate: config.compatibilityDate ?? '2025-01-01',
@@ -151,9 +149,7 @@ export function buildInlineBridgeMfConfig(
 				const normalized = normalizePipelineBinding(binding)
 				return [
 					bindingName,
-					typeof binding === 'string'
-						? normalized.pipeline
-						: { pipeline: normalized.pipeline }
+					typeof binding === 'string' ? normalized.pipeline : { pipeline: normalized.pipeline }
 				]
 			})
 		)
@@ -225,13 +221,15 @@ export function buildInlineBridgeMfConfig(
 				}
 
 				const normalized = normalizeSecretsStoreBinding(binding, config.secretsStoreId, bindingName)
-				return [[
-					bindingName,
-					{
-						store_id: normalized.storeId,
-						secret_name: normalized.secretName
-					}
-				]]
+				return [
+					[
+						bindingName,
+						{
+							store_id: normalized.storeId,
+							secret_name: normalized.secretName
+						}
+					]
+				]
 			}
 		)
 

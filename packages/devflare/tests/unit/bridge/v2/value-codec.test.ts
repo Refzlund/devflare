@@ -7,17 +7,17 @@
 // values (Request/Response/ReadableStream) require a live codec.
 // =============================================================================
 
-import { describe, test, expect } from 'bun:test'
+import { describe, expect, test } from 'bun:test'
 import {
-	serializeTransportV2Value,
-	deserializeTransportV2Value,
-	serializeTransportV2DOId,
-	deserializeTransportV2DOId,
 	TRANSPORT_V2_DO_ID_TYPE,
-	base64Encode,
 	base64Decode,
+	base64Encode,
+	deserializeTransportV2DOId,
+	deserializeTransportV2Value,
 	serializeR2Object,
-	serializeR2ObjectBody
+	serializeR2ObjectBody,
+	serializeTransportV2DOId,
+	serializeTransportV2Value
 } from '../../../../src/bridge/v2/value-codec'
 
 async function jsonRoundTrip<T>(value: T): Promise<unknown> {
@@ -68,7 +68,9 @@ describe('v2 value codec — special values', () => {
 		const result = (await jsonRoundTrip(new Set<Date>([d1, d2]))) as Set<Date>
 		expect(result).toBeInstanceOf(Set)
 		expect(result.size).toBe(2)
-		const isos = Array.from(result).map((d) => d.toISOString()).sort()
+		const isos = Array.from(result)
+			.map((d) => d.toISOString())
+			.sort()
 		expect(isos).toEqual([d1.toISOString(), d2.toISOString()])
 	})
 
@@ -134,7 +136,15 @@ describe('v2 value codec — DurableObjectId helpers', () => {
 
 	test('deserializeTransportV2DOId rejects unknown shapes', () => {
 		const ns = { idFromString: () => null } as unknown as DurableObjectNamespace
-		expect(() => deserializeTransportV2DOId({ __type: 'wrong', hex: 'x' } as unknown as { __type: typeof TRANSPORT_V2_DO_ID_TYPE; hex: string }, ns)).toThrow('Invalid DOId format')
+		expect(() =>
+			deserializeTransportV2DOId(
+				{ __type: 'wrong', hex: 'x' } as unknown as {
+					__type: typeof TRANSPORT_V2_DO_ID_TYPE
+					hex: string
+				},
+				ns
+			)
+		).toThrow('Invalid DOId format')
 	})
 })
 
@@ -192,7 +202,8 @@ describe('v2 value codec — R2 helpers', () => {
 			range: undefined,
 			storageClass: 'Standard',
 			body: new ReadableStream(),
-			arrayBuffer: async () => body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength) as ArrayBuffer
+			arrayBuffer: async () =>
+				body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength) as ArrayBuffer
 		} as unknown as R2ObjectBody
 		const wire = (await serializeR2ObjectBody(obj)) as Record<string, unknown>
 		expect(wire.__type).toBe('R2ObjectBody')
@@ -214,7 +225,8 @@ describe('v2 value codec — R2 helpers', () => {
 			range: undefined,
 			storageClass: 'Standard',
 			body: new ReadableStream(),
-			arrayBuffer: async () => body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength) as ArrayBuffer
+			arrayBuffer: async () =>
+				body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength) as ArrayBuffer
 		} as unknown as R2ObjectBody)
 
 		const transported = JSON.parse(JSON.stringify(wire))

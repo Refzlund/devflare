@@ -1,11 +1,11 @@
 import { mkdirSync, writeFileSync } from 'fs'
-import { readFile } from 'fs/promises'
 import { dirname, join } from 'path'
-import { loadConfig, normalizeDOBinding, type DevflareConfig } from '../config'
+import { readFile } from 'fs/promises'
+import { type DevflareConfig, loadConfig, normalizeDOBinding } from '../config'
 import { DEFAULT_DO_PATTERN, findFiles } from '../utils/glob'
+import { bundleWorkflowEntrypointScript } from '../workflows/local-workflow-entrypoints'
 import { buildGatewayScript } from './simple-context-gateway-script'
 import { getBunRuntime } from './simple-context-paths'
-import { bundleWorkflowEntrypointScript } from '../workflows/local-workflow-entrypoints'
 
 /**
  * Find all exported class names in a TypeScript/JavaScript file.
@@ -23,7 +23,9 @@ function findExportedClasses(code: string): string[] {
 }
 
 function classSupportsNativeDurableObjectRpc(code: string, className: string): boolean {
-	const nativeRpcPattern = new RegExp(`export\\s+class\\s+${className}\\s+extends\\s+DurableObject\\b`)
+	const nativeRpcPattern = new RegExp(
+		`export\\s+class\\s+${className}\\s+extends\\s+DurableObject\\b`
+	)
 	return nativeRpcPattern.test(code)
 }
 
@@ -105,10 +107,10 @@ async function resolveLocalDurableObjects(
 			const discoveredClass = classToFilePath.get(doInfo.className)
 			if (!discoveredClass) {
 				throw new Error(
-					`Durable object ${name} (className: '${doInfo.className}') not found.\n`
-					+ `Either:\n`
-					+ `  1. Set files.durableObjects pattern in config (e.g., 'src/do.*.ts')\n`
-					+ `  2. Use explicit scriptName: { className: '${doInfo.className}', scriptName: 'do.file.ts' }`
+					`Durable object ${name} (className: '${doInfo.className}') not found.\n` +
+						`Either:\n` +
+						`  1. Set files.durableObjects pattern in config (e.g., 'src/do.*.ts')\n` +
+						`  2. Use explicit scriptName: { className: '${doInfo.className}', scriptName: 'do.file.ts' }`
 				)
 			}
 
@@ -139,7 +141,8 @@ async function resolveLocalDurableObjects(
 function buildWrapperCode(doInfos: LocalDurableObjectInfo[]): string {
 	return doInfos
 		.filter((info) => !info.nativeRpc)
-		.map((info) => `
+		.map((info) =>
+			`
 export class ${info.runtimeClassName} {
 	constructor(state, env) {
 		this.__instance = new ${info.className}(state, env)
@@ -183,7 +186,8 @@ export class ${info.runtimeClassName} {
 			})
 		}
 	}
-}`.trim())
+}`.trim()
+		)
 		.join('\n\n')
 }
 
@@ -202,7 +206,9 @@ async function bundleDurableObjectModules(
 	}
 
 	for (const info of doInfos) {
-		virtualImports.push(`import { ${info.className} } from '${info.scriptPath.replace(/\\/g, '/')}'`)
+		virtualImports.push(
+			`import { ${info.className} } from '${info.scriptPath.replace(/\\/g, '/')}'`
+		)
 		virtualExports.push(`export { ${info.className} }`)
 	}
 
@@ -235,7 +241,11 @@ async function bundleDurableObjectModules(
 	return await result.outputs[0].text()
 }
 
-export async function buildDurableObjectGateway(config: DevflareConfig, configDir: string, transportFile: string | null): Promise<{
+export async function buildDurableObjectGateway(
+	config: DevflareConfig,
+	configDir: string,
+	transportFile: string | null
+): Promise<{
 	durableObjects?: Record<string, string>
 	script: string
 }> {
@@ -251,9 +261,7 @@ export async function buildDurableObjectGateway(config: DevflareConfig, configDi
 	const bundledCode = await bundleDurableObjectModules(configDir, doInfos, transportFile)
 	const wrapperCode = buildWrapperCode(doInfos)
 	const entrypointCode = [workflowEntrypointScript, bundledCode].filter(Boolean).join('\n\n')
-	const nativeRpcBindingNames = doInfos
-		.filter((info) => info.nativeRpc)
-		.map((info) => info.name)
+	const nativeRpcBindingNames = doInfos.filter((info) => info.nativeRpc).map((info) => info.name)
 
 	return {
 		durableObjects: doConfig,

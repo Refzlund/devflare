@@ -2,16 +2,16 @@
 // Account Preferences Module
 // =============================================================================
 // Stores and retrieves account preferences (global default, etc.)
-// 
+//
 // Storage Locations:
 // - Global default: Stored in devflare KV namespace in user's Cloudflare account
 //                   AND cached locally in ~/.devflare/preferences.json
 // - Workspace default: Stored in package.json as "devflare.accountId"
 // =============================================================================
 
+import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { existsSync, readFileSync, writeFileSync, mkdirSync, renameSync, unlinkSync } from 'node:fs'
 import { kvDelete, kvGet, kvPut } from './api'
 import { DEVFLARE_KV_NAMESPACE_TITLE, getOrCreateNamedKVNamespace } from './kv-namespace'
 
@@ -205,16 +205,14 @@ async function getOrCreatePreferencesNamespace(accountId: string): Promise<strin
 
 /**
  * Get the global default account ID
- * 
+ *
  * Priority:
  * 1. Local cache (fast, no network)
  * 2. Cloud KV (if local cache is missing)
- * 
+ *
  * Returns null if no default is set
  */
-export async function getGlobalDefaultAccountId(
-	fallbackAccountId: string
-): Promise<string | null> {
+export async function getGlobalDefaultAccountId(fallbackAccountId: string): Promise<string | null> {
 	// 1. Check local cache first (fast)
 	const local = readLocalPreferences()
 	if (local.defaultAccountId) {
@@ -236,7 +234,10 @@ export async function getGlobalDefaultAccountId(
 			return value
 		}
 	} catch (error) {
-		console.debug('[devflare preferences] cloud KV sync failed:', error instanceof Error ? error.message : String(error))
+		console.debug(
+			'[devflare preferences] cloud KV sync failed:',
+			error instanceof Error ? error.message : String(error)
+		)
 	}
 
 	return null
@@ -245,7 +246,7 @@ export async function getGlobalDefaultAccountId(
 /**
  * Set the global default account ID
  * Saves to both local cache and cloud KV
- * 
+ *
  * @param accountId - The account ID to set as default
  * @param anyAccountId - Any account ID to use for accessing KV (can be the same)
  */
@@ -268,18 +269,21 @@ export async function setGlobalDefaultAccountId(
 		const namespaceId = await getOrCreatePreferencesNamespace(kvAccountId)
 		await kvPut(kvAccountId, namespaceId, GLOBAL_ACCOUNT_KEY, accountId)
 	} catch (error) {
-		console.debug('[devflare preferences] cloud KV sync failed:', error instanceof Error ? error.message : String(error))
+		console.debug(
+			'[devflare preferences] cloud KV sync failed:',
+			error instanceof Error ? error.message : String(error)
+		)
 	}
 }
 
 /**
  * Get the effective account ID to use
- * 
+ *
  * Priority:
  * 1. Workspace (package.json) - highest priority
  * 2. Global default (local cache + cloud KV)
  * 3. Primary account (first account in list)
- * 
+ *
  * @param primaryAccountId - The primary account ID to use as fallback
  */
 export async function getEffectiveAccountId(
@@ -304,9 +308,7 @@ export async function getEffectiveAccountId(
 /**
  * Clear the global default account ID (both local and cloud)
  */
-export async function clearGlobalDefaultAccountId(
-	anyAccountId: string
-): Promise<void> {
+export async function clearGlobalDefaultAccountId(anyAccountId: string): Promise<void> {
 	// Clear local cache
 	const local = readLocalPreferences()
 	delete local.defaultAccountId
@@ -318,6 +320,9 @@ export async function clearGlobalDefaultAccountId(
 		const namespaceId = await getOrCreatePreferencesNamespace(anyAccountId)
 		await kvDelete(anyAccountId, namespaceId, GLOBAL_ACCOUNT_KEY)
 	} catch (error) {
-		console.debug('[devflare preferences] cloud KV sync failed:', error instanceof Error ? error.message : String(error))
+		console.debug(
+			'[devflare preferences] cloud KV sync failed:',
+			error instanceof Error ? error.message : String(error)
+		)
 	}
 }

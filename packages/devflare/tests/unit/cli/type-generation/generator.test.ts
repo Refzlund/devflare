@@ -116,7 +116,7 @@ describe('generateBindingTypes — P1-codegen fixture', () => {
 	})
 
 	test('imports the workers-types it actually uses', () => {
-		expect(generated).toContain("import type {")
+		expect(generated).toContain('import type {')
 		expect(generated).toContain("from '@cloudflare/workers-types'")
 		expect(generated).toContain("import type { Pipeline } from 'cloudflare:pipelines'")
 		expect(generated).toContain('KVNamespace')

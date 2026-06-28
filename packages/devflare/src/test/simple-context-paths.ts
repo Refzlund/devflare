@@ -17,20 +17,22 @@ const CURRENT_PACKAGE_ROOT = findPackageRoot(dirname(fileURLToPath(import.meta.u
  * Access Bun global via globalThis to avoid shadowing richer @types/bun
  * when available. Returns undefined if not running in Bun.
  */
-export function getBunRuntime(): {
-	main: string
-	build: (options: {
-		entrypoints: string[]
-		target: string
-		format: string
-		minify: boolean
-		external?: string[]
-	}) => Promise<{
-		success: boolean
-		logs: string[]
-		outputs: Array<{ path: string; text: () => Promise<string> }>
-	}>
-} | undefined {
+export function getBunRuntime():
+	| {
+			main: string
+			build: (options: {
+				entrypoints: string[]
+				target: string
+				format: string
+				minify: boolean
+				external?: string[]
+			}) => Promise<{
+				success: boolean
+				logs: string[]
+				outputs: Array<{ path: string; text: () => Promise<string> }>
+			}>
+	  }
+	| undefined {
 	const g = globalThis as { Bun?: unknown }
 	if (typeof g.Bun === 'object' && g.Bun !== null) {
 		return g.Bun as ReturnType<typeof getBunRuntime>
@@ -69,12 +71,12 @@ function getStackCallerDirectory(): string | null {
 		for (const site of stack ?? []) {
 			const filename = site.getFileName?.()
 			if (
-				filename
-				&& !isInsideCurrentPackage(filename)
-				&& !filename.includes('simple-context')
-				&& !filename.includes('node_modules')
-				&& !filename.includes('[')
-				&& existsSync(filename)
+				filename &&
+				!isInsideCurrentPackage(filename) &&
+				!filename.includes('simple-context') &&
+				!filename.includes('node_modules') &&
+				!filename.includes('[') &&
+				existsSync(filename)
 			) {
 				return dirname(filename)
 			}
@@ -107,8 +109,10 @@ function isInsideCurrentPackage(filePath: string): boolean {
 	const normalizedFilePath = filePath.replace(/\\/g, '/')
 	const normalizedPackageRoot = CURRENT_PACKAGE_ROOT.replace(/\\/g, '/')
 
-	return normalizedFilePath === normalizedPackageRoot
-		|| normalizedFilePath.startsWith(`${normalizedPackageRoot}/`)
+	return (
+		normalizedFilePath === normalizedPackageRoot ||
+		normalizedFilePath.startsWith(`${normalizedPackageRoot}/`)
+	)
 }
 
 /**
@@ -157,7 +161,10 @@ export async function getAvailablePort(): Promise<number> {
 	})
 }
 
-export function resolveTransportFile(configDir: string, configuredPath: string | null | undefined): string | null {
+export function resolveTransportFile(
+	configDir: string,
+	configuredPath: string | null | undefined
+): string | null {
 	if (typeof configuredPath === 'string') {
 		return configuredPath
 	}

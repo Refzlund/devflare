@@ -14,8 +14,8 @@
 //   await cf.queue.send({ type: 'process', data: { x: 1 } })
 // =============================================================================
 
-import type { MessageBatch, Message } from '@cloudflare/workers-types'
 import { join } from 'path'
+import type { Message, MessageBatch } from '@cloudflare/workers-types'
 import { createQueueEvent, runWithEventContext } from '../runtime'
 
 // -----------------------------------------------------------------------------
@@ -176,7 +176,7 @@ async function trigger<T = unknown>(
 	if (!queueHandlerPath) {
 		throw new Error(
 			'Queue handler not configured. Make sure your devflare.config.ts has files.queue set, ' +
-			'and the file exists at the specified path (default: src/queue.ts)'
+				'and the file exists at the specified path (default: src/queue.ts)'
 		)
 	}
 
@@ -195,7 +195,7 @@ async function trigger<T = unknown>(
 	if (typeof queueHandler !== 'function') {
 		throw new Error(
 			`Queue handler at "${queueHandlerPath}" must export a default function or named "queue" export.\n` +
-			+ `Expected: export async function queue(event) { ... }`
+				+`Expected: export async function queue(event) { ... }`
 		)
 	}
 
@@ -219,7 +219,7 @@ async function trigger<T = unknown>(
 		waitUntil(promise: Promise<unknown>) {
 			waitUntilPromises.push(promise)
 		},
-		passThroughOnException() { },
+		passThroughOnException() {},
 		props: {}
 	}
 
@@ -228,10 +228,7 @@ async function trigger<T = unknown>(
 	const queueEvent = createQueueEvent(batch, env, ctx)
 
 	// Call the handler
-	await runWithEventContext(
-		queueEvent,
-		() => queueHandler(queueEvent)
-	)
+	await runWithEventContext(queueEvent, () => queueHandler(queueEvent))
 
 	// Wait for all waitUntil promises
 	await Promise.all(waitUntilPromises)
@@ -275,9 +272,7 @@ async function trigger<T = unknown>(
  * await cf.queue.send({ type: 'process', data: { x: 1 } })
  * ```
  */
-async function send<T = unknown>(
-	message: QueueMessageOptions<T> | T
-): Promise<QueueTriggerResult> {
+async function send<T = unknown>(message: QueueMessageOptions<T> | T): Promise<QueueTriggerResult> {
 	return trigger([message])
 }
 

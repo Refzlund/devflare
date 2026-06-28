@@ -1,6 +1,7 @@
 const ANSI_ESCAPE_REGEX = /\u001B\[[0-9;]*m/g
 
-const COMPATIBILITY_DATE_FALLBACK_REGEX = /^The latest compatibility date supported by the installed Cloudflare Workers Runtime is "([^"]+)", but you've requested "([^"]+)"\. Falling back to "([^"]+)"\.\.\.$/
+const COMPATIBILITY_DATE_FALLBACK_REGEX =
+	/^The latest compatibility date supported by the installed Cloudflare Workers Runtime is "([^"]+)", but you've requested "([^"]+)"\. Falling back to "([^"]+)"\.\.\.$/
 
 export interface MiniflareCompatibilityLogger {
 	info(message: string): void
@@ -21,10 +22,7 @@ type MiniflareLogLevelName = keyof typeof MINIFLARE_LOG_LEVEL_FALLBACKS
 type MiniflareLogLevelExport = Partial<Record<MiniflareLogLevelName, number>> | undefined
 
 function normalizeMiniflareMessage(message: string): string {
-	return message
-		.replace(ANSI_ESCAPE_REGEX, '')
-		.replace(/\s+/g, ' ')
-		.trim()
+	return message.replace(ANSI_ESCAPE_REGEX, '').replace(/\s+/g, ' ').trim()
 }
 
 export function formatCompatibilityDateFallbackNotice(message: string): string | null {

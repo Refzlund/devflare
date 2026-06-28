@@ -19,7 +19,8 @@ const commitShaSchema = z.string().regex(/^[a-f0-9]{7,40}$/i, {
 	message: 'Commit SHA must be 7 to 40 hexadecimal characters'
 })
 const previewScopeSchema = z.string().regex(/^[a-z][a-z0-9-]*$/, {
-	message: 'Preview names must start with a lowercase letter and contain only lowercase letters, numbers, and dashes'
+	message:
+		'Preview names must start with a lowercase letter and contain only lowercase letters, numbers, and dashes'
 })
 
 // Cloudflare's API surfaces author/user identifiers as strings, but accepting a
@@ -27,17 +28,23 @@ const previewScopeSchema = z.string().regex(/^[a-z][a-z0-9-]*$/, {
 // materialize user ids from numeric storage or UI forms.
 export const cloudflareUserIdSchema = z.union([
 	z.string().min(1),
-	z.number().int().nonnegative().transform((value) => String(value))
+	z
+		.number()
+		.int()
+		.nonnegative()
+		.transform((value) => String(value))
 ])
 
-export const devflareAccountRecordSchema = z.object({
-	id: recordIdSchema,
-	ver: z.number().int().min(1),
-	createdAt: timestampSchema,
-	updatedAt: timestampSchema.optional(),
-	deletedAt: timestampSchema.optional(),
-	createdBy: cloudflareUserIdSchema
-}).strict()
+export const devflareAccountRecordSchema = z
+	.object({
+		id: recordIdSchema,
+		ver: z.number().int().min(1),
+		createdAt: timestampSchema,
+		updatedAt: timestampSchema.optional(),
+		deletedAt: timestampSchema.optional(),
+		createdBy: cloudflareUserIdSchema
+	})
+	.strict()
 
 export function createDevflareAccountRecordSchema<const Shape extends z.ZodRawShape>(shape: Shape) {
 	return devflareAccountRecordSchema.extend(shape)
@@ -51,23 +58,11 @@ export const devflareRecordSourceSchema = z.enum([
 	'unknown'
 ])
 
-export const devflarePreviewStatusSchema = z.enum([
-	'active',
-	'superseded',
-	'orphaned',
-	'deleted'
-])
+export const devflarePreviewStatusSchema = z.enum(['active', 'superseded', 'orphaned', 'deleted'])
 
-export const devflarePreviewScopeStatusSchema = z.enum([
-	'active',
-	'reassigned',
-	'deleted'
-])
+export const devflarePreviewScopeStatusSchema = z.enum(['active', 'reassigned', 'deleted'])
 
-export const devflareDeploymentChannelSchema = z.enum([
-	'production',
-	'preview'
-])
+export const devflareDeploymentChannelSchema = z.enum(['production', 'preview'])
 
 export const devflareDeploymentStatusSchema = z.enum([
 	'active',

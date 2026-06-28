@@ -31,8 +31,8 @@
 //   wf.*.ts      — Workflows (classes extending Workflow)
 // =============================================================================
 
-import type { DevflareConfigInput } from './schema'
 import type { TypedConfig } from './define'
+import type { DevflareConfigInput } from './schema'
 
 // -----------------------------------------------------------------------------
 // Types
@@ -50,15 +50,16 @@ type ExtractEntrypoints<TConfig> = TConfig extends TypedConfig<infer E> ? E : st
  */
 type ExtractConfig<TImport> = TImport extends () => Promise<infer TModule>
 	? TModule extends { default: infer TConfig }
-	? TConfig
-	: TModule
+		? TConfig
+		: TModule
 	: DevflareConfigInput
 
 /**
  * Dynamic import function type for config modules
  */
-type ConfigImport<T extends DevflareConfigInput = DevflareConfigInput> =
-	() => Promise<{ default: T } | T>
+type ConfigImport<T extends DevflareConfigInput = DevflareConfigInput> = () => Promise<
+	{ default: T } | T
+>
 
 /**
  * Worker binding reference - returned by ref().worker or ref().worker('entrypoint')
@@ -197,9 +198,7 @@ const PENDING_REF_VALUE = '<pending>'
  * Throws a clear error instead of returning a silent placeholder when the
  * function source is not in a recognized shape.
  */
-function extractConfigPathFromImportFn(
-	fn: (...args: unknown[]) => unknown
-): string {
+function extractConfigPathFromImportFn(fn: (...args: unknown[]) => unknown): string {
 	let source: string
 	try {
 		source = Function.prototype.toString.call(fn)
@@ -224,10 +223,10 @@ function extractConfigPathFromImportFn(
 
 	if (!raw || raw.length === 0) {
 		throw new Error(
-			'ref() could not extract a config path from the import function source. '
-			+ 'The specifier must be a static string literal — dynamic or computed '
-			+ 'specifiers (e.g. template literals with expressions) are not supported. '
-			+ 'If this input has been minified, pass an unminified config source.'
+			'ref() could not extract a config path from the import function source. ' +
+				'The specifier must be a static string literal — dynamic or computed ' +
+				'specifiers (e.g. template literals with expressions) are not supported. ' +
+				'If this input has been minified, pass an unminified config source.'
 		)
 	}
 
@@ -235,9 +234,9 @@ function extractConfigPathFromImportFn(
 	// path is dynamic and can only be resolved at runtime.
 	if (match?.[1] === '`' && /\$\{/.test(raw)) {
 		throw new Error(
-			'ref() import specifier is a template literal with an embedded expression. '
-			+ 'The specifier must be a static string literal so the config path can '
-			+ 'be resolved ahead of time.'
+			'ref() import specifier is a template literal with an embedded expression. ' +
+				'The specifier must be a static string literal so the config path can ' +
+				'be resolved ahead of time.'
 		)
 	}
 
@@ -246,9 +245,9 @@ function extractConfigPathFromImportFn(
 	// original literal. Refuse to guess.
 	if (raw.length < 2 && !/[./]/.test(raw)) {
 		throw new Error(
-			`ref() extracted a suspiciously short config path (${JSON.stringify(raw)}). `
-			+ 'This usually indicates a minified bundle where the original specifier '
-			+ 'was rewritten. Pass an unminified config source.'
+			`ref() extracted a suspiciously short config path (${JSON.stringify(raw)}). ` +
+				'This usually indicates a minified bundle where the original specifier ' +
+				'was rewritten. Pass an unminified config source.'
 		)
 	}
 
@@ -284,14 +283,12 @@ function extractConfigPathFromImportFn(
  * // With name override
  * const mathWorker = ref('custom-math', () => import('./math-worker/devflare.config'))
  */
-export function ref<TImport extends () => Promise<{ default: DevflareConfigInput } | DevflareConfigInput>>(
-	nameOrImport: string | TImport,
-	maybeImport?: TImport
-): RefResult<ExtractConfig<TImport>>
-export function ref<TImport extends () => Promise<{ default: DevflareConfigInput } | DevflareConfigInput>>(
-	nameOrImport: string | TImport,
-	maybeImport?: TImport
-): RefResult<ExtractConfig<TImport>> {
+export function ref<
+	TImport extends () => Promise<{ default: DevflareConfigInput } | DevflareConfigInput>
+>(nameOrImport: string | TImport, maybeImport?: TImport): RefResult<ExtractConfig<TImport>>
+export function ref<
+	TImport extends () => Promise<{ default: DevflareConfigInput } | DevflareConfigInput>
+>(nameOrImport: string | TImport, maybeImport?: TImport): RefResult<ExtractConfig<TImport>> {
 	type TConfig = ExtractConfig<TImport>
 	const nameOverride = typeof nameOrImport === 'string' ? nameOrImport : undefined
 	let importFn: ConfigImport<TConfig> | undefined
@@ -364,7 +361,7 @@ export function ref<TImport extends () => Promise<{ default: DevflareConfigInput
 		if (cached) return cached
 		throw new Error(
 			'ref() not yet resolved. Call ref().resolve() first, or use top-level await ' +
-			'in your config file to resolve all refs before exporting.'
+				'in your config file to resolve all refs before exporting.'
 		)
 	}
 
@@ -387,22 +384,19 @@ export function ref<TImport extends () => Promise<{ default: DevflareConfigInput
 	}
 
 	// Worker accessor using a Proxy to defer property access
-	const workerAccessor = new Proxy(
-		(entrypoint: string) => createWorkerBinding(entrypoint),
-		{
-			get(target, prop) {
-				if (prop === 'service') {
-					const cached = resolvedCache.get(proxy) as ResolvedData<TConfig> | undefined
-					if (cached) return cached.name
-					if (nameOverride) return nameOverride
-					return PENDING_REF_VALUE
-				}
-				if (prop === 'entrypoint') return undefined
-				if (prop === '__ref') return proxy
-				return Reflect.get(target, prop)
+	const workerAccessor = new Proxy((entrypoint: string) => createWorkerBinding(entrypoint), {
+		get(target, prop) {
+			if (prop === 'service') {
+				const cached = resolvedCache.get(proxy) as ResolvedData<TConfig> | undefined
+				if (cached) return cached.name
+				if (nameOverride) return nameOverride
+				return PENDING_REF_VALUE
 			}
+			if (prop === 'entrypoint') return undefined
+			if (prop === '__ref') return proxy
+			return Reflect.get(target, prop)
 		}
-	) as WorkerBindingAccessor
+	}) as WorkerBindingAccessor
 
 	// Create DO binding for cross-worker access
 	function createDOBinding(bindingName: string): DOBindingRef {
@@ -420,7 +414,8 @@ export function ref<TImport extends () => Promise<{ default: DevflareConfigInput
 					const doConfig = doBindings[bindingName]
 					if (typeof doConfig === 'string') {
 						return doConfig
-					} else if (doConfig && typeof doConfig === 'object' && 'className' in doConfig) {
+					}
+					if (doConfig && typeof doConfig === 'object' && 'className' in doConfig) {
 						return (doConfig as { className: string }).className
 					}
 				}
@@ -442,12 +437,25 @@ export function ref<TImport extends () => Promise<{ default: DevflareConfigInput
 	}
 
 	// Known properties on RefResult (not DO bindings)
-	const knownProps = new Set(['name', 'config', 'configPath', 'worker', '__import', '__nameOverride', 'resolve', 'then'])
+	const knownProps = new Set([
+		'name',
+		'config',
+		'configPath',
+		'worker',
+		'__import',
+		'__nameOverride',
+		'resolve',
+		'then'
+	])
 
 	// Create the proxy object with dynamic DO binding support
 	const proxyTarget = {
-		get name() { return getResolved().name },
-		get config() { return getResolved().config },
+		get name() {
+			return getResolved().name
+		},
+		get config() {
+			return getResolved().config
+		},
 		configPath,
 		worker: workerAccessor,
 		__import: resolvedImportFn,

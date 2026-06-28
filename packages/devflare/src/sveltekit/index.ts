@@ -7,17 +7,14 @@
 export {
 	// Pre-configured handle — just re-export for simplest usage
 	handle,
-
 	// Factory for custom configuration
 	createDevflarePlatform,
 	createHandle,
-
 	// Utilities
 	resetPlatform,
 	resetConfigCache,
 	isDevflareDev,
 	getBridgePort,
-
 	// Types
 	type Platform,
 	type DevflarePlatformOptions,

@@ -1,13 +1,7 @@
-import {
-	normalizeHyperdriveBinding,
-	type DevflareConfig
-} from '../config'
+import { type DevflareConfig, normalizeHyperdriveBinding } from '../config'
 import { buildLocalSecretNodeBindings } from '../secrets/local-secrets'
-import {
-	createLocalImagesBinding,
-	createLocalMediaBinding
-} from '../shims/local-media-bindings'
 import { createLocalHyperdrive } from '../shims/local-hyperdrive'
+import { createLocalImagesBinding, createLocalMediaBinding } from '../shims/local-media-bindings'
 import { createLocalWorkerLoaderBinding } from '../shims/local-worker-loader'
 import { createLocalSendEmailBinding } from '../utils/send-email'
 
@@ -70,14 +64,10 @@ export function overlayLocalBindings(
 			return Reflect.get(target, prop, receiver)
 		},
 		has(target, prop) {
-			return (typeof prop === 'string' && prop in localBindings)
-				|| Reflect.has(target, prop)
+			return (typeof prop === 'string' && prop in localBindings) || Reflect.has(target, prop)
 		},
 		ownKeys(target) {
-			return Array.from(new Set([
-				...Reflect.ownKeys(target),
-				...Reflect.ownKeys(localBindings)
-			]))
+			return Array.from(new Set([...Reflect.ownKeys(target), ...Reflect.ownKeys(localBindings)]))
 		},
 		getOwnPropertyDescriptor(target, prop) {
 			if (typeof prop === 'string' && prop in localBindings) {

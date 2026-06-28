@@ -24,7 +24,11 @@ function trackedTextFiles(): string[] {
 		.split(/\r?\n/)
 		.filter(Boolean)
 		.filter((file) => file !== thisFile)
-		.filter((file) => /\.(?:ts|tsx|js|mjs|cjs|json|jsonc|toml|ya?ml|md|sh)$/.test(file) || /(^|\/)Makefile$/.test(file))
+		.filter(
+			(file) =>
+				/\.(?:ts|tsx|js|mjs|cjs|json|jsonc|toml|ya?ml|md|sh)$/.test(file) ||
+				/(^|\/)Makefile$/.test(file)
+		)
 }
 
 function scan(patterns: Array<{ name: string; regex: RegExp }>): ScanFinding[] {
@@ -72,18 +76,27 @@ describe('Wrangler v4 compatibility audit', () => {
 
 	test('does not rely on Wrangler v3 remote defaults for KV or R2 object commands', () => {
 		const findings = scan([
-			{ name: 'wrangler kv key without mode', regex: /\bwrangler\s+kv\s+key\s+(?:get|put|delete|list)\b(?!.*--(?:local|remote)\b)/ },
-			{ name: 'wrangler kv bulk without mode', regex: /\bwrangler\s+kv\s+bulk\s+(?:put|delete)\b(?!.*--(?:local|remote)\b)/ },
-			{ name: 'wrangler r2 object without mode', regex: /\bwrangler\s+r2\s+object\s+(?:get|put|delete)\b(?!.*--(?:local|remote)\b)/ }
+			{
+				name: 'wrangler kv key without mode',
+				regex: /\bwrangler\s+kv\s+key\s+(?:get|put|delete|list)\b(?!.*--(?:local|remote)\b)/
+			},
+			{
+				name: 'wrangler kv bulk without mode',
+				regex: /\bwrangler\s+kv\s+bulk\s+(?:put|delete)\b(?!.*--(?:local|remote)\b)/
+			},
+			{
+				name: 'wrangler r2 object without mode',
+				regex: /\bwrangler\s+r2\s+object\s+(?:get|put|delete)\b(?!.*--(?:local|remote)\b)/
+			}
 		])
 
 		expect(findings).toEqual([])
 	})
 
 	test('keeps the package Node engine compatible with Wrangler v4', () => {
-		const packageJson = JSON.parse(
-			readFileSync(join(packageRoot, 'package.json'), 'utf8')
-		) as { engines?: Record<string, string> }
+		const packageJson = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8')) as {
+			engines?: Record<string, string>
+		}
 
 		expect(packageJson.engines?.node).toBe('>=20')
 	})

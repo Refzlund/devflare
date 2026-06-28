@@ -23,9 +23,4 @@ export const SUPPORTED_WORKER_EXTENSIONS = [
 ] as const
 
 /** Subset of {@link SUPPORTED_WORKER_EXTENSIONS} that may host TypeScript-only syntax. */
-export const TS_WORKER_EXTENSIONS = [
-	'.ts',
-	'.tsx',
-	'.mts',
-	'.cts'
-] as const
+export const TS_WORKER_EXTENSIONS = ['.ts', '.tsx', '.mts', '.cts'] as const

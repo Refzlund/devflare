@@ -1,6 +1,6 @@
-import type { ParsedArgs } from './index'
 import { resolvePreviewIdentifier } from '../config'
 import { asOptionalString } from './command-utils'
+import type { ParsedArgs } from './index'
 
 export type DeployTargetMode = 'implicit' | 'production' | 'preview-upload' | 'preview-scope'
 
@@ -82,9 +82,10 @@ export function resolveDeployTarget(
 			)
 		}
 
-		const previewScope = resolvePreviewIdentifier({
-			identifier: previewScopeRaw
-		}).identifier ?? 'preview'
+		const previewScope =
+			resolvePreviewIdentifier({
+				identifier: previewScopeRaw
+			}).identifier ?? 'preview'
 
 		return {
 			mode: 'preview-scope',

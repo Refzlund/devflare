@@ -30,17 +30,20 @@ describe('account command', () => {
 			const url = String(input)
 
 			if (url.includes('/accounts?page=1&per_page=50')) {
-				return new Response(JSON.stringify({
-					success: false,
-					errors: [{ code: 6003, message: 'Invalid request headers' }],
-					messages: [],
-					result: []
-				}), {
-					status: 400,
-					headers: {
-						'Content-Type': 'application/json'
+				return new Response(
+					JSON.stringify({
+						success: false,
+						errors: [{ code: 6003, message: 'Invalid request headers' }],
+						messages: [],
+						result: []
+					}),
+					{
+						status: 400,
+						headers: {
+							'Content-Type': 'application/json'
+						}
 					}
-				})
+				)
 			}
 
 			if (url.endsWith('/accounts/acc_123')) {
@@ -70,7 +73,13 @@ describe('account command', () => {
 		)
 
 		expect(result.exitCode).toBe(0)
-		expect(logger.messages.some((message) => message.args.join(' ').includes('Using the configured account directly'))).toBe(true)
-		expect(logger.messages.some((message) => message.args.join(' ').includes('Configured Account'))).toBe(true)
+		expect(
+			logger.messages.some((message) =>
+				message.args.join(' ').includes('Using the configured account directly')
+			)
+		).toBe(true)
+		expect(
+			logger.messages.some((message) => message.args.join(' ').includes('Configured Account'))
+		).toBe(true)
 	})
 })

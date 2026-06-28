@@ -19,13 +19,13 @@
 // - `--log-temp` → Log all output to `.log` file (overwritten) AND terminal
 // =============================================================================
 
-import { createConsola, type ConsolaInstance } from 'consola'
+import { type ConsolaInstance, createConsola } from 'consola'
 import { relative, resolve } from 'pathe'
-import type { ParsedArgs, CliOptions, CliResult } from '../index'
 import { loadConfig } from '../../config/loader'
 import { createDevServer } from '../../dev-server'
 import { detectViteProject } from '../../dev-server/vite-utils'
 import { resolveEffectiveViteProject } from '../../vite'
+import type { CliOptions, CliResult, ParsedArgs } from '../index'
 import { createCliTheme, cyanBold, dim, logLine, yellow } from '../ui'
 
 // =============================================================================
@@ -70,18 +70,16 @@ export function resolveDevRuntimePort(
 	env: NodeJS.ProcessEnv = process.env,
 	configPort?: number
 ): number {
-	return resolveSinglePort(
-		readStringOption(options['runtime-port']),
-		readStringOption(options['bridge-port']),
-		'CLI'
+	return (
+		resolveSinglePort(
+			readStringOption(options['runtime-port']),
+			readStringOption(options['bridge-port']),
+			'CLI'
+		) ??
+		resolveSinglePort(env.DEVFLARE_RUNTIME_PORT, env.DEVFLARE_BRIDGE_PORT, 'environment') ??
+		configPort ??
+		8787
 	)
-		?? resolveSinglePort(
-			env.DEVFLARE_RUNTIME_PORT,
-			env.DEVFLARE_BRIDGE_PORT,
-			'environment'
-		)
-		?? configPort
-		?? 8787
 }
 
 /**
@@ -96,10 +94,12 @@ export function resolveDevRuntimeHost(
 	configHost?: string
 ): string {
 	const envHost = env.DEVFLARE_RUNTIME_HOST?.trim()
-	return readStringOption(options['runtime-host'])
-		?? (envHost ? envHost : undefined)
-		?? configHost
-		?? '127.0.0.1'
+	return (
+		readStringOption(options['runtime-host']) ??
+		(envHost ? envHost : undefined) ??
+		configHost ??
+		'127.0.0.1'
+	)
 }
 
 /**
@@ -121,10 +121,7 @@ async function createLogWriter(
 		logPath = resolve(cwd, '.log')
 	} else {
 		const now = new Date()
-		const timestamp = now.toISOString()
-			.replace(/[:.]/g, '-')
-			.replace('T', '_')
-			.slice(0, 19)
+		const timestamp = now.toISOString().replace(/[:.]/g, '-').replace('T', '_').slice(0, 19)
 		logPath = resolve(cwd, `.log-${timestamp}`)
 	}
 
@@ -181,10 +178,7 @@ export async function runDevCommand(
 		return { exitCode: 1 }
 	}
 
-	const viteProject = resolveEffectiveViteProject(
-		await detectViteProject(cwd),
-		config
-	)
+	const viteProject = resolveEffectiveViteProject(await detectViteProject(cwd), config)
 
 	// Create log writer if logging is enabled
 	const logWriter = await createLogWriter(cwd, {
@@ -238,7 +232,9 @@ export async function runDevCommand(
 			logLine(logger, '   └─ Vite: Disabled (no effective Vite config found)')
 
 			if (viteProject.wantsViteIntegration) {
-				logger.warn('Vite-related settings were detected, but no effective Vite config was available')
+				logger.warn(
+					'Vite-related settings were detected, but no effective Vite config was available'
+				)
 				logger.warn('Skipping Vite startup and running in worker-only mode')
 			}
 		}
@@ -248,7 +244,7 @@ export async function runDevCommand(
 		const devServer = createDevServer({
 			cwd,
 			configPath,
-			vitePort: port ? parseInt(port, 10) : 5173,
+			vitePort: port ? Number.parseInt(port, 10) : 5173,
 			miniflarePort,
 			miniflareHost,
 			enableVite: viteProject.shouldStartVite,
@@ -278,9 +274,7 @@ export async function runDevCommand(
 			removeCleanupHandlers()
 
 			if (reason) {
-				const message = reason instanceof Error
-					? reason.stack ?? reason.message
-					: String(reason)
+				const message = reason instanceof Error ? (reason.stack ?? reason.message) : String(reason)
 				logger.error(message)
 			}
 
@@ -320,7 +314,7 @@ export async function runDevCommand(
 		await devServer.start()
 
 		// Keep process running
-		await new Promise(() => { })
+		await new Promise(() => {})
 
 		return { exitCode: 0 }
 	} catch (error) {

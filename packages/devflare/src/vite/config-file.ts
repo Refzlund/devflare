@@ -1,8 +1,8 @@
 import type { ConfigEnv, Plugin, PluginOption, UserConfig } from 'vite'
-import { loadConfig, type DevflareConfig } from '../config'
+import { type DevflareConfig, loadConfig } from '../config'
 import { resolveConfigForEnvironment } from '../config/resolve'
-import { type ViteProjectDetection } from '../dev-server/vite-utils'
-import { devflarePlugin, type DevflarePluginOptions } from './plugin'
+import type { ViteProjectDetection } from '../dev-server/vite-utils'
+import { type DevflarePluginOptions, devflarePlugin } from './plugin'
 
 const CONFIG_DIR = '.devflare'
 const GENERATED_VITE_CONFIG_FILENAME = 'vite.config.mjs'
@@ -33,12 +33,11 @@ export function resolveEffectiveViteProject(
 	}
 }
 
-
 function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
 	return (
-		(typeof value === 'object' || typeof value === 'function')
-		&& value !== null
-		&& typeof (value as PromiseLike<unknown>).then === 'function'
+		(typeof value === 'object' || typeof value === 'function') &&
+		value !== null &&
+		typeof (value as PromiseLike<unknown>).then === 'function'
 	)
 }
 
@@ -108,16 +107,16 @@ export async function resolveViteUserConfig(
 	const inlineViteConfig = (resolvedDevflareConfig.vite ?? {}) as UserConfig
 
 	const localConfig = options.localConfigPath
-		? (await loadConfigFromFile(configEnv, options.localConfigPath, cwd))?.config ?? {}
+		? ((await loadConfigFromFile(configEnv, options.localConfigPath, cwd))?.config ?? {})
 		: {}
 
 	const mergedConfig = mergeConfig(localConfig, inlineViteConfig)
 	const normalizedConfig = mergedConfig.root
 		? mergedConfig
 		: {
-			...mergedConfig,
-			root: cwd
-		}
+				...mergedConfig,
+				root: cwd
+			}
 
 	return withInjectedDevflarePlugin(normalizedConfig, {
 		configPath: options.configPath,
@@ -183,9 +182,7 @@ async function resolveGeneratedViteImportPath(configDir: string): Promise<string
 		: resolve(packageRoot, `src/vite/index${currentExtension}`)
 	const relativeImportPath = relative(configDir, viteEntryPath)
 
-	return relativeImportPath.startsWith('.')
-		? relativeImportPath
-		: `./${relativeImportPath}`
+	return relativeImportPath.startsWith('.') ? relativeImportPath : `./${relativeImportPath}`
 }
 
 export async function writeGeneratedViteConfig(options: {

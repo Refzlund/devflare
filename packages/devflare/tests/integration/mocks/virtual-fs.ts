@@ -2,7 +2,7 @@
 // Virtual File System — Deep mock for fs/promises
 // =============================================================================
 
-import type { PathLike, MakeDirectoryOptions, Stats } from 'node:fs'
+import type { MakeDirectoryOptions, PathLike, Stats } from 'node:fs'
 
 /**
  * In-memory file system node
@@ -27,7 +27,7 @@ export class VirtualFileSystem {
 		mode: 0o755
 	}
 
-	private cwd: string = '/'
+	private cwd = '/'
 
 	// Track all operations for assertions
 	public operations: Array<{
@@ -80,10 +80,7 @@ export class VirtualFileSystem {
 	/**
 	 * Navigate to a node, optionally creating directories
 	 */
-	private getNode(
-		p: string,
-		create: boolean = false
-	): FSNode | null {
+	private getNode(p: string, create = false): FSNode | null {
 		const parts = this.getPathParts(p)
 		let current = this.root
 
@@ -195,10 +192,7 @@ export class VirtualFileSystem {
 		})
 	}
 
-	async mkdir(
-		path: PathLike,
-		options?: MakeDirectoryOptions
-	): Promise<string | undefined> {
+	async mkdir(path: PathLike, options?: MakeDirectoryOptions): Promise<string | undefined> {
 		const normalPath = this.normalizePath(path)
 		this.operations.push({
 			op: 'mkdir',
@@ -301,7 +295,9 @@ export class VirtualFileSystem {
 	async readdir(
 		path: PathLike,
 		options?: { withFileTypes?: boolean }
-	): Promise<string[] | Array<{ name: string; isDirectory: () => boolean; isFile: () => boolean }>> {
+	): Promise<
+		string[] | Array<{ name: string; isDirectory: () => boolean; isFile: () => boolean }>
+	> {
 		const normalPath = this.normalizePath(path)
 		this.operations.push({ op: 'readdir', path: normalPath })
 
@@ -328,10 +324,7 @@ export class VirtualFileSystem {
 		return entries
 	}
 
-	async rm(
-		path: PathLike,
-		options?: { recursive?: boolean; force?: boolean }
-	): Promise<void> {
+	async rm(path: PathLike, options?: { recursive?: boolean; force?: boolean }): Promise<void> {
 		const normalPath = this.normalizePath(path)
 		this.operations.push({ op: 'rm', path: normalPath, args: [options] })
 
@@ -515,9 +508,7 @@ export class VirtualFileSystem {
 	/**
 	 * Get all recorded operations, optionally filtered
 	 */
-	getOperations(
-		opFilter?: string
-	): Array<{ type: string; path: string; args?: unknown[] }> {
+	getOperations(opFilter?: string): Array<{ type: string; path: string; args?: unknown[] }> {
 		const ops = this.operations.map((o) => ({
 			type: o.op,
 			path: o.path,

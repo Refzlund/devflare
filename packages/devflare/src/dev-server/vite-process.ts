@@ -1,4 +1,4 @@
-import { spawn, type ChildProcess } from 'node:child_process'
+import { type ChildProcess, spawn } from 'node:child_process'
 import type { ConsolaInstance } from 'consola'
 import { waitForViteReady } from './vite-utils'
 
@@ -15,14 +15,7 @@ export interface StartViteProcessOptions {
  * Start the Vite dev server process.
  */
 export async function startViteProcess(options: StartViteProcessOptions): Promise<ChildProcess> {
-	const {
-		cwd,
-		configPath,
-		vitePort,
-		miniflarePort,
-		generatedViteConfigPath,
-		logger
-	} = options
+	const { cwd, configPath, vitePort, miniflarePort, generatedViteConfigPath, logger } = options
 
 	const args = ['vite', 'dev', '--port', String(vitePort)]
 	if (generatedViteConfigPath) {

@@ -21,8 +21,8 @@
 //   export { Worker as default }
 // =============================================================================
 
-import ts from 'typescript'
 import MagicString from 'magic-string'
+import ts from 'typescript'
 import { SUPPORTED_WORKER_EXTENSIONS, TS_WORKER_EXTENSIONS } from '../worker-entry/extensions'
 
 // -----------------------------------------------------------------------------
@@ -167,9 +167,11 @@ export function findExportedFunctions(code: string): ExportedFunction[] {
 
 						if (funcExpr) {
 							const modifiersArr = ts.getModifiers(funcExpr)
-							const isAsync = modifiersArr?.some((m) => m.kind === ts.SyntaxKind.AsyncKeyword)
-								?? (ts.isArrowFunction(funcExpr) && funcExpr.modifiers?.some((m) => m.kind === ts.SyntaxKind.AsyncKeyword))
-								?? false
+							const isAsync =
+								modifiersArr?.some((m) => m.kind === ts.SyntaxKind.AsyncKeyword) ??
+								(ts.isArrowFunction(funcExpr) &&
+									funcExpr.modifiers?.some((m) => m.kind === ts.SyntaxKind.AsyncKeyword)) ??
+								false
 							const params = funcExpr.parameters
 								.map((p) => code.substring(p.getStart(sourceFile), p.getEnd()))
 								.join(', ')
@@ -320,11 +322,7 @@ export function transformWorkerEntrypoint(
 						if (defaultMod) {
 							s.remove(defaultMod.getStart(sourceFile), defaultMod.getEnd())
 						}
-						s.overwrite(
-							node.name.getStart(sourceFile),
-							node.name.getEnd(),
-							internal
-						)
+						s.overwrite(node.name.getStart(sourceFile), node.name.getEnd(), internal)
 					}
 				}
 			}
@@ -335,17 +333,12 @@ export function transformWorkerEntrypoint(
 				let rewroteAny = false
 				for (const decl of node.declarationList.declarations) {
 					if (
-						ts.isIdentifier(decl.name)
-						&& decl.initializer
-						&& (ts.isFunctionExpression(decl.initializer)
-							|| ts.isArrowFunction(decl.initializer))
+						ts.isIdentifier(decl.name) &&
+						decl.initializer &&
+						(ts.isFunctionExpression(decl.initializer) || ts.isArrowFunction(decl.initializer))
 					) {
 						const internal = internalNameFor(decl.name.text)
-						s.overwrite(
-							decl.name.getStart(sourceFile),
-							decl.name.getEnd(),
-							internal
-						)
+						s.overwrite(decl.name.getStart(sourceFile), decl.name.getEnd(), internal)
 						rewroteAny = true
 					}
 				}
@@ -467,10 +460,7 @@ function extractParamNames(params: string): string {
  * Generate TypeScript interface for RPC methods
  * This is useful for creating type-safe service binding contracts
  */
-export function generateRpcInterface(
-	functions: ExportedFunction[],
-	interfaceName: string
-): string {
+export function generateRpcInterface(functions: ExportedFunction[], interfaceName: string): string {
 	const rpcMethods = functions.filter((f) => f.name !== 'fetch')
 
 	if (rpcMethods.length === 0) {
@@ -482,9 +472,7 @@ export function generateRpcInterface(
 	for (const fn of rpcMethods) {
 		const returnType = fn.returnType ?? 'unknown'
 		// All RPC methods return Promises at the service binding level
-		const promiseReturn = returnType.startsWith('Promise<')
-			? returnType
-			: `Promise<${returnType}>`
+		const promiseReturn = returnType.startsWith('Promise<') ? returnType : `Promise<${returnType}>`
 
 		output += `\t${fn.name}(${fn.params}): ${promiseReturn}\n`
 	}

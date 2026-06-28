@@ -22,9 +22,9 @@ export class ServiceBindingValidationError extends Error {
 
 	constructor(missing: readonly string[], accountId: string) {
 		super(
-			`Service binding(s) reference worker(s) that do not exist in Cloudflare account ${accountId}: `
-			+ missing.join(', ')
-			+ `. Check the 'services' map in devflare.config.ts for typos or deploy the target worker(s) first.`
+			`Service binding(s) reference worker(s) that do not exist in Cloudflare account ${accountId}: ` +
+				missing.join(', ') +
+				`. Check the 'services' map in devflare.config.ts for typos or deploy the target worker(s) first.`
 		)
 		this.name = 'ServiceBindingValidationError'
 		this.missing = missing
@@ -57,7 +57,11 @@ export function collectReferencedServiceNames(config: DevflareConfig): string[] 
 
 	const names = new Set<string>()
 	for (const binding of Object.values(services)) {
-		if (binding && typeof binding === 'object' && typeof (binding as { service?: unknown }).service === 'string') {
+		if (
+			binding &&
+			typeof binding === 'object' &&
+			typeof (binding as { service?: unknown }).service === 'string'
+		) {
 			const name = (binding as { service: string }).service.trim()
 			if (name.length > 0) {
 				names.add(name)
@@ -86,9 +90,7 @@ export async function validateServiceBindings(
 	}
 
 	const selfName = options.selfWorkerName?.trim()
-	const toValidate = selfName
-		? referenced.filter((name) => name !== selfName)
-		: referenced
+	const toValidate = selfName ? referenced.filter((name) => name !== selfName) : referenced
 
 	if (toValidate.length === 0) {
 		return

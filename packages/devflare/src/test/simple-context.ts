@@ -11,21 +11,34 @@
 //   })
 // =============================================================================
 
-import { BridgeClient } from '../bridge/client'
-import { createEnvProxy, setBindingHints, type BindingHints } from '../bridge/proxy'
+import type { BridgeClient } from '../bridge/client'
+import { type BindingHints, createEnvProxy, setBindingHints } from '../bridge/proxy'
 import { __setTestContext } from '../env'
-import { hasCrossWorkerDOs, hasServiceBindings, resolveDOBindings, resolveServiceBindings } from './resolve-service-bindings'
-import { buildDurableObjectGateway } from './simple-context-durable-objects'
-import { resolveTransportFile } from './simple-context-paths'
 import { extractBindingHints } from './binding-hints'
+import {
+	hasCrossWorkerDOs,
+	hasServiceBindings,
+	resolveDOBindings,
+	resolveServiceBindings
+} from './resolve-service-bindings'
 import { buildRemoteAndStaticBindings } from './simple-context-bindings'
-import { configureSurfaceHandlers, createBridgeEnvAccessor, createMultiWorkerEnvAccessor } from './simple-context-env'
+import { buildDurableObjectGateway } from './simple-context-durable-objects'
+import {
+	configureSurfaceHandlers,
+	createBridgeEnvAccessor,
+	createMultiWorkerEnvAccessor
+} from './simple-context-env'
 import { resolveHandlerPaths } from './simple-context-handlers'
 import { createDisposeContext, resolveTestContextConfig } from './simple-context-lifecycle'
-import { bootTestRuntime } from './simple-context-runtime'
-import { decodeTransportValue, loadTransportDecoders, type TransportDecoderMap } from './simple-context-transport'
-import { applyMultiWorkerConfig } from './simple-context-multi-worker'
 import { buildInlineBridgeMfConfig } from './simple-context-mfconfig'
+import { applyMultiWorkerConfig } from './simple-context-multi-worker'
+import { resolveTransportFile } from './simple-context-paths'
+import { bootTestRuntime } from './simple-context-runtime'
+import {
+	type TransportDecoderMap,
+	decodeTransportValue,
+	loadTransportDecoders
+} from './simple-context-transport'
 
 // Handler helper configuration
 // -----------------------------------------------------------------------------
@@ -75,7 +88,8 @@ export async function createTestContext(configPath?: string): Promise<void> {
 
 	const hints = extractBindingHints(config)
 
-	const decodeTransport = (value: unknown): unknown => decodeTransportValue(state.transportDecode, value)
+	const decodeTransport = (value: unknown): unknown =>
+		decodeTransportValue(state.transportDecode, value)
 
 	const needsMultiWorkerForServices = hasServiceBindings(config)
 	const needsMultiWorkerForDOs = hasCrossWorkerDOs(config)
@@ -105,7 +119,8 @@ export async function createTestContext(configPath?: string): Promise<void> {
 		mfConfig.durableObjects = gateway.durableObjects
 	}
 
-	const hasMultiWorkerServices = serviceBindingResolution && serviceBindingResolution.workers.length > 0
+	const hasMultiWorkerServices =
+		serviceBindingResolution && serviceBindingResolution.workers.length > 0
 	const hasMultiWorkerDOs = doBindingResolution && doBindingResolution.workers.length > 0
 
 	if (hasMultiWorkerServices || hasMultiWorkerDOs) {
@@ -122,30 +137,33 @@ export async function createTestContext(configPath?: string): Promise<void> {
 	const disposeContext = createDisposeContext(state)
 
 	const getTestEnv = (): Record<string, unknown> => {
-		return new Proxy({}, {
-			get(_, prop: string) {
-				if (state.remoteBindings && prop in state.remoteBindings) {
-					return state.remoteBindings[prop]
+		return new Proxy(
+			{},
+			{
+				get(_, prop: string) {
+					if (state.remoteBindings && prop in state.remoteBindings) {
+						return state.remoteBindings[prop]
+					}
+					if (hints[prop] === 'sendEmail' && state.envProxy && prop in state.envProxy) {
+						return state.envProxy[prop]
+					}
+					if (state.miniflareBindings && prop in state.miniflareBindings) {
+						return state.miniflareBindings[prop]
+					}
+					if (state.envProxy && prop in state.envProxy) {
+						return state.envProxy[prop]
+					}
+					return undefined
+				},
+				has(_, prop: string) {
+					return Boolean(
+						(state.remoteBindings && prop in state.remoteBindings) ||
+							(state.miniflareBindings && prop in state.miniflareBindings) ||
+							(state.envProxy && prop in state.envProxy)
+					)
 				}
-				if (hints[prop] === 'sendEmail' && state.envProxy && prop in state.envProxy) {
-					return state.envProxy[prop]
-				}
-				if (state.miniflareBindings && prop in state.miniflareBindings) {
-					return state.miniflareBindings[prop]
-				}
-				if (state.envProxy && prop in state.envProxy) {
-					return state.envProxy[prop]
-				}
-				return undefined
-			},
-			has(_, prop: string) {
-				return Boolean(
-					(state.remoteBindings && prop in state.remoteBindings)
-					|| (state.miniflareBindings && prop in state.miniflareBindings)
-					|| (state.envProxy && prop in state.envProxy)
-				)
 			}
-		}) as Record<string, unknown>
+		) as Record<string, unknown>
 	}
 
 	const handlerPaths = await resolveHandlerPaths(configDir, config)
@@ -174,10 +192,7 @@ export async function createTestContext(configPath?: string): Promise<void> {
 		transformResult: (result: unknown) => decodeTransport(result)
 	})
 
-	__setTestContext(
-		createBridgeEnvAccessor(state, hints, shouldPreferBridgeBinding),
-		disposeContext
-	)
+	__setTestContext(createBridgeEnvAccessor(state, hints, shouldPreferBridgeBinding), disposeContext)
 }
 
 /**

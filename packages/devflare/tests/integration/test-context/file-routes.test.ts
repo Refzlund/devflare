@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, test } from 'bun:test'
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'pathe'
 import { env } from '../../../src'
@@ -20,32 +20,51 @@ describe('createTestContext file routes', () => {
 
 		await mkdir(join(projectDir, 'src', 'routes', 'users'), { recursive: true })
 		await mkdir(join(projectDir, 'src', 'routes', 'blog'), { recursive: true })
-		await writeFile(join(projectDir, 'package.json'), JSON.stringify({
-			name: 'file-routes-test-context',
-			private: true,
-			type: 'module'
-		}, null, 2))
-		await writeFile(join(projectDir, 'devflare.config.ts'), `
+		await writeFile(
+			join(projectDir, 'package.json'),
+			JSON.stringify(
+				{
+					name: 'file-routes-test-context',
+					private: true,
+					type: 'module'
+				},
+				null,
+				2
+			)
+		)
+		await writeFile(
+			join(projectDir, 'devflare.config.ts'),
+			`
 export default {
 	name: 'file-routes-test-context',
 	compatibilityDate: '2026-03-17'
 }
-`.trim())
-		await writeFile(join(projectDir, 'src', 'routes', 'index.ts'), `
+`.trim()
+		)
+		await writeFile(
+			join(projectDir, 'src', 'routes', 'index.ts'),
+			`
 export async function GET(): Promise<Response> {
 	return new Response('root')
 }
-`.trim())
-		await writeFile(join(projectDir, 'src', 'routes', 'users', '[id].ts'), `
+`.trim()
+		)
+		await writeFile(
+			join(projectDir, 'src', 'routes', 'users', '[id].ts'),
+			`
 export async function GET(event): Promise<Response> {
 	return new Response(String(event.params.id))
 }
-`.trim())
-		await writeFile(join(projectDir, 'src', 'routes', 'blog', '[...slug].ts'), `
+`.trim()
+		)
+		await writeFile(
+			join(projectDir, 'src', 'routes', 'blog', '[...slug].ts'),
+			`
 export async function GET(event): Promise<Response> {
 	return new Response(String(event.params.slug))
 }
-`.trim())
+`.trim()
+		)
 
 		await createTestContext(join(projectDir, 'devflare.config.ts'))
 

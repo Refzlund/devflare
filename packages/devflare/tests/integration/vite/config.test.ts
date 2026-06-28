@@ -2,25 +2,14 @@
 // Vite Plugin Config Hook — Integration Tests
 // =============================================================================
 
-import { describe, expect, test, beforeEach, afterEach, mock } from 'bun:test'
-import { access, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test'
+import { access, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'pathe'
-import { compileConfig } from '../../../src/config/compiler'
-import type { DevflareConfig, DevflareConfigInput } from '../../../src/config/schema'
-import { configSchema } from '../../../src/config/schema'
-import { brandAsLocalConfig, type LocalConfig } from '../../../src/config/resolve-phased'
+import { clearDependencies, setDependencies } from '../../../src/cli/dependencies'
 import { resolveViteUserConfig } from '../../../src/vite'
 import { devflarePlugin, getPluginContext } from '../../../src/vite/plugin'
-import { createTestHarness, createMockProcessRunner, type TestHarness } from '../mocks'
-import { setDependencies, clearDependencies } from '../../../src/cli/dependencies'
-
-/**
- * Helper to parse and validate config from input
- */
-function parseConfig(input: DevflareConfigInput): LocalConfig {
-	return brandAsLocalConfig(configSchema.parse(input))
-}
+import { type TestHarness, createMockProcessRunner, createTestHarness } from '../mocks'
 
 describe('vite plugin config generation', () => {
 	let harness: TestHarness
@@ -51,11 +40,18 @@ describe('vite plugin config generation', () => {
 
 		try {
 			await mkdir(join(projectDir, 'src'), { recursive: true })
-			await writeFile(join(projectDir, 'package.json'), JSON.stringify({
-				name: 'vite-config-test',
-				private: true,
-				type: 'module'
-			}, null, 2))
+			await writeFile(
+				join(projectDir, 'package.json'),
+				JSON.stringify(
+					{
+						name: 'vite-config-test',
+						private: true,
+						type: 'module'
+					},
+					null,
+					2
+				)
+			)
 			await writeFile(join(projectDir, 'devflare.config.ts'), options.configSource.trim())
 
 			for (const [relativePath, content] of Object.entries(options.files)) {
@@ -78,247 +74,6 @@ describe('vite plugin config generation', () => {
 		}
 	}
 
-	describe('compileConfig', () => {
-		test('compiles minimal config', () => {
-			const config: DevflareConfigInput = {
-				name: 'test-worker',
-				compatibilityDate: '2024-01-01'
-			}
-
-			const result = compileConfig(parseConfig(config))
-
-			expect(result.name).toBe('test-worker')
-			expect(result.compatibility_date).toBe('2024-01-01')
-		})
-
-		test('compiles KV bindings configured with explicit ids', () => {
-			const config: DevflareConfigInput = {
-				name: 'test-worker',
-				compatibilityDate: '2024-01-01',
-				bindings: {
-					kv: {
-						CACHE: { id: 'cache-namespace-id' },
-						STORE: { id: 'store-namespace-id' }
-					}
-				}
-			}
-
-			const result = compileConfig(parseConfig(config))
-
-			expect(result.kv_namespaces).toBeDefined()
-			expect(result.kv_namespaces).toHaveLength(2)
-		})
-
-		test('compiles D1 bindings', () => {
-			const config: DevflareConfigInput = {
-				name: 'test-worker',
-				compatibilityDate: '2024-01-01',
-				bindings: {
-					d1: {
-						DB: { id: 'database-id' }
-					}
-				}
-			}
-
-			const result = compileConfig(parseConfig(config))
-
-			expect(result.d1_databases).toBeDefined()
-			expect(result.d1_databases).toHaveLength(1)
-			expect(result.d1_databases![0].binding).toBe('DB')
-		})
-
-		test('compiles R2 bindings', () => {
-			const config: DevflareConfigInput = {
-				name: 'test-worker',
-				compatibilityDate: '2024-01-01',
-				bindings: {
-					r2: {
-						BUCKET: 'bucket-name'
-					}
-				}
-			}
-
-			const result = compileConfig(parseConfig(config))
-
-			expect(result.r2_buckets).toBeDefined()
-			expect(result.r2_buckets).toHaveLength(1)
-		})
-
-		test('compiles Durable Object bindings', () => {
-			const config: DevflareConfigInput = {
-				name: 'test-worker',
-				compatibilityDate: '2024-01-01',
-				bindings: {
-					durableObjects: {
-						COUNTER: { className: 'Counter' }
-					}
-				}
-			}
-
-			const result = compileConfig(parseConfig(config))
-
-			expect(result.durable_objects).toBeDefined()
-			expect(result.durable_objects?.bindings).toHaveLength(1)
-			expect(result.durable_objects?.bindings?.[0].name).toBe('COUNTER')
-			expect(result.durable_objects?.bindings?.[0].class_name).toBe('Counter')
-		})
-
-		test('compiles vars', () => {
-			const config: DevflareConfigInput = {
-				name: 'test-worker',
-				compatibilityDate: '2024-01-01',
-				vars: {
-					API_URL: 'https://api.example.com',
-					DEBUG: 'true'
-				}
-			}
-
-			const result = compileConfig(parseConfig(config))
-
-			expect(result.vars).toBeDefined()
-			expect(result.vars?.API_URL).toBe('https://api.example.com')
-			expect(result.vars?.DEBUG).toBe('true')
-		})
-
-		test('compiles cron triggers', () => {
-			const config: DevflareConfigInput = {
-				name: 'test-worker',
-				compatibilityDate: '2024-01-01',
-				triggers: {
-					crons: ['0 * * * *', '0 0 * * *']
-				}
-			}
-
-			const result = compileConfig(parseConfig(config))
-
-			expect(result.triggers).toBeDefined()
-			expect(result.triggers?.crons).toEqual(['0 * * * *', '0 0 * * *'])
-		})
-
-		test('compiles with environment override', () => {
-			const config: DevflareConfigInput = {
-				name: 'test-worker',
-				compatibilityDate: '2024-01-01',
-				vars: {
-					API_URL: 'https://api.dev.example.com'
-				},
-				env: {
-					production: {
-						vars: {
-							API_URL: 'https://api.example.com'
-						}
-					}
-				}
-			}
-
-			const result = compileConfig(parseConfig(config), 'production')
-
-			expect(result.vars?.API_URL).toBe('https://api.example.com')
-		})
-
-		test('merges compatibility flags', () => {
-			const config: DevflareConfigInput = {
-				name: 'test-worker',
-				compatibilityDate: '2024-01-01',
-				compatibilityFlags: ['nodejs_compat']
-			}
-
-			const result = compileConfig(parseConfig(config))
-
-			expect(result.compatibility_flags).toContain('nodejs_compat')
-		})
-	})
-
-	describe('stringifyConfig', () => {
-		test('produces valid JSON with header comment', () => {
-			const { stringifyConfig } = require('../../../src/config/compiler')
-
-			const wranglerConfig = {
-				name: 'test-worker',
-				compatibility_date: '2024-01-01'
-			}
-
-			const content = stringifyConfig(wranglerConfig)
-
-			expect(content).toContain('// Generated by devflare')
-			expect(content).toContain('test-worker')
-		})
-
-		test('formats output as JSON with tabs', () => {
-			const { stringifyConfig } = require('../../../src/config/compiler')
-
-			const wranglerConfig = {
-				name: 'test-worker',
-				compatibility_date: '2024-01-01',
-				vars: { API_URL: 'https://api.example.com' }
-			}
-
-			const content = stringifyConfig(wranglerConfig)
-
-			// Remove comment lines and parse
-			const jsonContent = content
-				.split('\n')
-				.filter((line: string) => !line.trim().startsWith('//'))
-				.join('\n')
-
-			const parsed = JSON.parse(jsonContent)
-			expect(parsed.name).toBe('test-worker')
-			expect(parsed.vars.API_URL).toBe('https://api.example.com')
-		})
-
-		test('includes all bindings in output', () => {
-			const { stringifyConfig } = require('../../../src/config/compiler')
-
-			const wranglerConfig = {
-				name: 'test-worker',
-				compatibility_date: '2024-01-01',
-				kv_namespaces: [{ binding: 'CACHE', id: 'cache-ns' }],
-				d1_databases: [{ binding: 'DB', database_id: 'db-id' }]
-			}
-
-			const content = stringifyConfig(wranglerConfig)
-
-			expect(content).toContain('kv_namespaces')
-			expect(content).toContain('CACHE')
-			expect(content).toContain('d1_databases')
-			expect(content).toContain('DB')
-		})
-	})
-
-	describe('config with all bindings', () => {
-		test('compiles complex config with multiple bindings', () => {
-			const config: DevflareConfigInput = {
-				name: 'full-worker',
-				compatibilityDate: '2024-01-01',
-				compatibilityFlags: ['nodejs_compat'],
-				bindings: {
-					kv: { CACHE: { id: 'cache-ns' } },
-					d1: { DB: { id: 'database-id' } },
-					r2: { BUCKET: 'bucket-name' },
-					durableObjects: { COUNTER: { className: 'Counter' } },
-					services: { AUTH: { service: 'auth-worker' } }
-				},
-				vars: {
-					API_URL: 'https://api.example.com'
-				},
-				triggers: {
-					crons: ['0 * * * *']
-				}
-			}
-
-			const result = compileConfig(parseConfig(config))
-
-			expect(result.name).toBe('full-worker')
-			expect(result.kv_namespaces).toHaveLength(1)
-			expect(result.d1_databases).toHaveLength(1)
-			expect(result.r2_buckets).toHaveLength(1)
-			expect(result.durable_objects?.bindings).toHaveLength(1)
-			expect(result.services).toHaveLength(1)
-			expect(result.vars?.API_URL).toBe('https://api.example.com')
-			expect(result.triggers?.crons).toHaveLength(1)
-		})
-	})
-
 	describe('plugin configResolved output', () => {
 		test('preserves a direct fetch entry for build-mode wrangler output', async () => {
 			await withResolvedPluginOutput({
@@ -335,9 +90,14 @@ describe('vite plugin config generation', () => {
 					'src/fetch.ts': `export async function fetch(): Promise<Response> { return new Response('ok') }`
 				},
 				assert: async (projectDir) => {
-					const wranglerConfig = await readFile(join(projectDir, '.devflare', 'wrangler.jsonc'), 'utf8')
+					const wranglerConfig = await readFile(
+						join(projectDir, '.devflare', 'wrangler.jsonc'),
+						'utf8'
+					)
 					expect(wranglerConfig).toContain('"main": "../src/fetch.ts"')
-					await expect(access(join(projectDir, '.devflare', 'worker-entrypoints', 'main.ts'))).rejects.toThrow()
+					await expect(
+						access(join(projectDir, '.devflare', 'worker-entrypoints', 'main.ts'))
+					).rejects.toThrow()
 				}
 			})
 		})
@@ -378,12 +138,17 @@ describe('vite plugin config generation', () => {
 					'src/email.ts': `export async function email() { return undefined }`
 				},
 				assert: async (projectDir) => {
-					const wranglerConfig = await readFile(join(projectDir, '.devflare', 'wrangler.jsonc'), 'utf8')
+					const wranglerConfig = await readFile(
+						join(projectDir, '.devflare', 'wrangler.jsonc'),
+						'utf8'
+					)
 					expect(wranglerConfig).toContain('"main": "../src/fetch.ts"')
 					expect(wranglerConfig).toContain('"binding": "TASK_QUEUE"')
 					expect(wranglerConfig).toContain('"queue": "task-queue"')
 					expect(wranglerConfig).toContain('"crons": [')
-					await expect(access(join(projectDir, '.devflare', 'worker-entrypoints', 'main.ts'))).rejects.toThrow()
+					await expect(
+						access(join(projectDir, '.devflare', 'worker-entrypoints', 'main.ts'))
+					).rejects.toThrow()
 				}
 			})
 		})
@@ -393,12 +158,21 @@ describe('vite plugin config generation', () => {
 
 			try {
 				await mkdir(join(projectDir, 'src'), { recursive: true })
-				await writeFile(join(projectDir, 'package.json'), JSON.stringify({
-					name: 'vite-config-test',
-					private: true,
-					type: 'module'
-				}, null, 2))
-				await writeFile(join(projectDir, 'devflare.config.ts'), `
+				await writeFile(
+					join(projectDir, 'package.json'),
+					JSON.stringify(
+						{
+							name: 'vite-config-test',
+							private: true,
+							type: 'module'
+						},
+						null,
+						2
+					)
+				)
+				await writeFile(
+					join(projectDir, 'devflare.config.ts'),
+					`
 export default {
 	name: 'vite-config-test',
 	compatibilityDate: '2026-03-17',
@@ -414,12 +188,28 @@ export default {
 		}
 	}
 }
-`.trim())
-				await writeFile(join(projectDir, 'src', 'fetch.ts'), `export async function fetch(): Promise<Response> { return new Response('ok') }`)
-				await writeFile(join(projectDir, 'src', 'queue.ts'), `export async function queue(): Promise<void> { return undefined }`)
-				await writeFile(join(projectDir, 'src', 'scheduled.ts'), `export async function scheduled(): Promise<void> { return undefined }`)
-				await writeFile(join(projectDir, 'src', 'email.ts'), `export async function email() { return undefined }`)
-				await writeFile(join(projectDir, 'src', 'custom-main.ts'), `export async function fetch(): Promise<Response> { return new Response('custom') }`)
+`.trim()
+				)
+				await writeFile(
+					join(projectDir, 'src', 'fetch.ts'),
+					`export async function fetch(): Promise<Response> { return new Response('ok') }`
+				)
+				await writeFile(
+					join(projectDir, 'src', 'queue.ts'),
+					`export async function queue(): Promise<void> { return undefined }`
+				)
+				await writeFile(
+					join(projectDir, 'src', 'scheduled.ts'),
+					`export async function scheduled(): Promise<void> { return undefined }`
+				)
+				await writeFile(
+					join(projectDir, 'src', 'email.ts'),
+					`export async function email() { return undefined }`
+				)
+				await writeFile(
+					join(projectDir, 'src', 'custom-main.ts'),
+					`export async function fetch(): Promise<Response> { return new Response('custom') }`
+				)
 
 				const plugin = devflarePlugin()
 				if (!plugin.configResolved) {
@@ -431,9 +221,14 @@ export default {
 					command: 'build'
 				} as any)
 
-				const wranglerConfig = await readFile(join(projectDir, '.devflare', 'wrangler.jsonc'), 'utf8')
+				const wranglerConfig = await readFile(
+					join(projectDir, '.devflare', 'wrangler.jsonc'),
+					'utf8'
+				)
 				expect(wranglerConfig).toContain('"main": "../src/custom-main.ts"')
-				await expect(access(join(projectDir, '.devflare', 'worker-entrypoints', 'main.ts'))).rejects.toThrow()
+				await expect(
+					access(join(projectDir, '.devflare', 'worker-entrypoints', 'main.ts'))
+				).rejects.toThrow()
 			} finally {
 				await rm(projectDir, { recursive: true, force: true })
 			}
@@ -445,12 +240,21 @@ export default {
 
 			try {
 				await mkdir(join(firstProjectDir, 'src'), { recursive: true })
-				await writeFile(join(firstProjectDir, 'package.json'), JSON.stringify({
-					name: 'vite-do-config-test',
-					private: true,
-					type: 'module'
-				}, null, 2))
-				await writeFile(join(firstProjectDir, 'devflare.config.ts'), `
+				await writeFile(
+					join(firstProjectDir, 'package.json'),
+					JSON.stringify(
+						{
+							name: 'vite-do-config-test',
+							private: true,
+							type: 'module'
+						},
+						null,
+						2
+					)
+				)
+				await writeFile(
+					join(firstProjectDir, 'devflare.config.ts'),
+					`
 export default {
 	name: 'vite-do-config-test',
 	compatibilityDate: '2026-03-17',
@@ -465,13 +269,20 @@ export default {
 		}
 	}
 }
-`.trim())
-				await writeFile(join(firstProjectDir, 'src', 'fetch.ts'), `export async function fetch(): Promise<Response> { return new Response('ok') }`)
-				await writeFile(join(firstProjectDir, 'src', 'do.counter.ts'), `
+`.trim()
+				)
+				await writeFile(
+					join(firstProjectDir, 'src', 'fetch.ts'),
+					`export async function fetch(): Promise<Response> { return new Response('ok') }`
+				)
+				await writeFile(
+					join(firstProjectDir, 'src', 'do.counter.ts'),
+					`
 import { DurableObject } from 'cloudflare:workers'
 
 export class Counter extends DurableObject {}
-`.trim())
+`.trim()
+				)
 
 				const firstPlugin = devflarePlugin()
 				if (!firstPlugin.configResolved) {
@@ -487,12 +298,21 @@ export class Counter extends DurableObject {}
 				expect(getPluginContext().durableObjects?.files.size).toBe(1)
 
 				await mkdir(join(secondProjectDir, 'src'), { recursive: true })
-				await writeFile(join(secondProjectDir, 'package.json'), JSON.stringify({
-					name: 'vite-no-do-config-test',
-					private: true,
-					type: 'module'
-				}, null, 2))
-				await writeFile(join(secondProjectDir, 'devflare.config.ts'), `
+				await writeFile(
+					join(secondProjectDir, 'package.json'),
+					JSON.stringify(
+						{
+							name: 'vite-no-do-config-test',
+							private: true,
+							type: 'module'
+						},
+						null,
+						2
+					)
+				)
+				await writeFile(
+					join(secondProjectDir, 'devflare.config.ts'),
+					`
 export default {
 	name: 'vite-no-do-config-test',
 	compatibilityDate: '2026-03-17',
@@ -501,8 +321,12 @@ export default {
 		durableObjects: false
 	}
 }
-`.trim())
-				await writeFile(join(secondProjectDir, 'src', 'fetch.ts'), `export async function fetch(): Promise<Response> { return new Response('ok') }`)
+`.trim()
+				)
+				await writeFile(
+					join(secondProjectDir, 'src', 'fetch.ts'),
+					`export async function fetch(): Promise<Response> { return new Response('ok') }`
+				)
 
 				const secondPlugin = devflarePlugin()
 				if (!secondPlugin.configResolved) {
@@ -529,12 +353,21 @@ export default {
 			try {
 				await mkdir(join(projectDir, 'src'), { recursive: true })
 				await mkdir(join(projectDir, 'api', 'src'), { recursive: true })
-				await writeFile(join(projectDir, 'package.json'), JSON.stringify({
-					name: 'vite-ref-services-test',
-					private: true,
-					type: 'module'
-				}, null, 2))
-				await writeFile(join(projectDir, 'api', 'src', 'ep.api.ts'), `
+				await writeFile(
+					join(projectDir, 'package.json'),
+					JSON.stringify(
+						{
+							name: 'vite-ref-services-test',
+							private: true,
+							type: 'module'
+						},
+						null,
+						2
+					)
+				)
+				await writeFile(
+					join(projectDir, 'api', 'src', 'ep.api.ts'),
+					`
 import { WorkerEntrypoint } from 'cloudflare:workers'
 
 export class ApiEntrypoint extends WorkerEntrypoint {
@@ -542,8 +375,11 @@ export class ApiEntrypoint extends WorkerEntrypoint {
 		return 'PONG'
 	}
 }
-`.trim())
-				await writeFile(join(projectDir, 'api', 'src', 'do.counter.ts'), `
+`.trim()
+				)
+				await writeFile(
+					join(projectDir, 'api', 'src', 'do.counter.ts'),
+					`
 import { DurableObject } from 'cloudflare:workers'
 
 export class Counter extends DurableObject {
@@ -551,9 +387,15 @@ export class Counter extends DurableObject {
 		return 'DO_PONG'
 	}
 }
-`.trim())
-				await writeFile(join(projectDir, 'src', 'fetch.ts'), `export async function fetch(): Promise<Response> { return new Response('ok') }`)
-				await writeFile(join(projectDir, 'devflare.config.ts'), `
+`.trim()
+				)
+				await writeFile(
+					join(projectDir, 'src', 'fetch.ts'),
+					`export async function fetch(): Promise<Response> { return new Response('ok') }`
+				)
+				await writeFile(
+					join(projectDir, 'devflare.config.ts'),
+					`
 const apiConfig = {
 	name: 'api-worker',
 	compatibilityDate: '2026-04-28',
@@ -608,11 +450,14 @@ export default {
 		}
 	}
 }
-`.trim())
+`.trim()
+				)
 
 				const plugin = devflarePlugin()
 				if (!plugin.configResolved || !plugin.resolveId || !plugin.load) {
-					throw new Error('Expected devflare Vite plugin to expose configResolved(), resolveId(), and load()')
+					throw new Error(
+						'Expected devflare Vite plugin to expose configResolved(), resolveId(), and load()'
+					)
 				}
 
 				await (plugin.configResolved as any)({
@@ -622,22 +467,30 @@ export default {
 
 				const pluginContext = getPluginContext()
 				const auxiliaryConfigs = pluginContext.auxiliaryWorkerConfigs.map((worker) => worker.config)
-				const apiWorkerConfig = auxiliaryConfigs.find((config) => config.name === 'api-worker') as Record<string, any>
-				const doWorkerConfig = auxiliaryConfigs.find((config) => config.name === 'api-worker-durable-objects') as Record<string, any>
+				const apiWorkerConfig = auxiliaryConfigs.find(
+					(config) => config.name === 'api-worker'
+				) as Record<string, any>
+				const doWorkerConfig = auxiliaryConfigs.find(
+					(config) => config.name === 'api-worker-durable-objects'
+				) as Record<string, any>
 
 				expect(apiWorkerConfig).toBeDefined()
 				expect(doWorkerConfig).toBeDefined()
 				expect(apiWorkerConfig.services).toEqual(undefined)
 				expect(apiWorkerConfig.d1_databases?.[0]?.database_id).toBe('api-db')
-				expect(apiWorkerConfig.durable_objects?.bindings).toEqual([{
-					name: 'COUNTER',
-					class_name: 'Counter',
-					script_name: 'api-worker-durable-objects'
-				}])
-				expect(doWorkerConfig.durable_objects?.bindings).toEqual([{
-					name: 'COUNTER',
-					class_name: 'Counter'
-				}])
+				expect(apiWorkerConfig.durable_objects?.bindings).toEqual([
+					{
+						name: 'COUNTER',
+						class_name: 'Counter',
+						script_name: 'api-worker-durable-objects'
+					}
+				])
+				expect(doWorkerConfig.durable_objects?.bindings).toEqual([
+					{
+						name: 'COUNTER',
+						class_name: 'Counter'
+					}
+				])
 
 				const resolvedId = await (plugin.resolveId as any)(apiWorkerConfig.main)
 				const source = await (plugin.load as any)(resolvedId)
@@ -654,12 +507,21 @@ export default {
 
 			try {
 				await mkdir(join(projectDir, 'src'), { recursive: true })
-				await writeFile(join(projectDir, 'package.json'), JSON.stringify({
-					name: 'vite-config-watch-test',
-					private: true,
-					type: 'module'
-				}, null, 2))
-				await writeFile(join(projectDir, 'devflare.config.mts'), `
+				await writeFile(
+					join(projectDir, 'package.json'),
+					JSON.stringify(
+						{
+							name: 'vite-config-watch-test',
+							private: true,
+							type: 'module'
+						},
+						null,
+						2
+					)
+				)
+				await writeFile(
+					join(projectDir, 'devflare.config.mts'),
+					`
 export default {
 	name: 'vite-config-watch-test',
 	compatibilityDate: '2026-03-17',
@@ -667,22 +529,27 @@ export default {
 		fetch: 'src/fetch.ts'
 	}
 }
-`.trim())
-				await writeFile(join(projectDir, 'src', 'fetch.ts'), `export async function fetch(): Promise<Response> { return new Response('ok') }`)
+`.trim()
+				)
+				await writeFile(
+					join(projectDir, 'src', 'fetch.ts'),
+					`export async function fetch(): Promise<Response> { return new Response('ok') }`
+				)
 
 				const addedPaths: string[] = []
 				const changeHandlers: Array<(changedPath: string) => unknown> = []
 				const plugin = devflarePlugin()
 
 				if (!plugin.configResolved || !plugin.configureServer) {
-					throw new Error('Expected devflare Vite plugin to expose configResolved() and configureServer()')
+					throw new Error(
+						'Expected devflare Vite plugin to expose configResolved() and configureServer()'
+					)
 				}
 
 				await (plugin.configResolved as any)({
 					root: projectDir,
 					command: 'serve'
 				} as any)
-
 				;(plugin.configureServer as any)({
 					watcher: {
 						add(path: string) {
@@ -695,7 +562,7 @@ export default {
 						}
 					},
 					ws: {
-						send: mock(() => { })
+						send: mock(() => {})
 					}
 				} as any)
 
@@ -713,12 +580,21 @@ export default {
 
 			try {
 				await mkdir(join(projectDir, 'src'), { recursive: true })
-				await writeFile(join(projectDir, 'package.json'), JSON.stringify({
-					name: 'vite-resolve-test',
-					private: true,
-					type: 'module'
-				}, null, 2))
-				await writeFile(join(projectDir, 'devflare.config.ts'), `
+				await writeFile(
+					join(projectDir, 'package.json'),
+					JSON.stringify(
+						{
+							name: 'vite-resolve-test',
+							private: true,
+							type: 'module'
+						},
+						null,
+						2
+					)
+				)
+				await writeFile(
+					join(projectDir, 'devflare.config.ts'),
+					`
 const inlinePlugin = {
 	name: 'inline-plugin'
 }
@@ -738,8 +614,11 @@ export default {
 		plugins: [inlinePlugin]
 	}
 }
-`.trim())
-				await writeFile(join(projectDir, 'vite.config.ts'), `
+`.trim()
+				)
+				await writeFile(
+					join(projectDir, 'vite.config.ts'),
+					`
 const localPlugin = {
 	name: 'local-plugin'
 }
@@ -752,24 +631,32 @@ export default {
 	},
 	plugins: [localPlugin]
 }
-`.trim())
+`.trim()
+				)
 
-				const resolvedConfig = await resolveViteUserConfig({
-					command: 'build',
-					mode: 'production'
-				} as any, {
-					cwd: projectDir,
-					localConfigPath: join(projectDir, 'vite.config.ts')
-				})
+				const resolvedConfig = await resolveViteUserConfig(
+					{
+						command: 'build',
+						mode: 'production'
+					} as any,
+					{
+						cwd: projectDir,
+						localConfigPath: join(projectDir, 'vite.config.ts')
+					}
+				)
 
 				expect(resolvedConfig.root).toBe(projectDir)
 				expect((resolvedConfig.resolve as Record<string, unknown>)?.alias).toMatchObject({
 					local: '/local',
 					inline: '/inline'
 				})
-				expect((resolvedConfig.define as Record<string, unknown>)?.__INLINE__).toBe(JSON.stringify('yes'))
+				expect((resolvedConfig.define as Record<string, unknown>)?.__INLINE__).toBe(
+					JSON.stringify('yes')
+				)
 
-				const pluginNames = (resolvedConfig.plugins as Array<{ name?: string }> | undefined)?.map((plugin) => plugin.name)
+				const pluginNames = (resolvedConfig.plugins as Array<{ name?: string }> | undefined)?.map(
+					(plugin) => plugin.name
+				)
 				expect(pluginNames).toContain('devflare')
 				expect(pluginNames).toContain('local-plugin')
 				expect(pluginNames).toContain('inline-plugin')
@@ -783,18 +670,30 @@ export default {
 
 			try {
 				await mkdir(join(projectDir, 'src'), { recursive: true })
-				await writeFile(join(projectDir, 'package.json'), JSON.stringify({
-					name: 'vite-resolve-async-test',
-					private: true,
-					type: 'module'
-				}, null, 2))
-				await writeFile(join(projectDir, 'devflare.config.ts'), `
+				await writeFile(
+					join(projectDir, 'package.json'),
+					JSON.stringify(
+						{
+							name: 'vite-resolve-async-test',
+							private: true,
+							type: 'module'
+						},
+						null,
+						2
+					)
+				)
+				await writeFile(
+					join(projectDir, 'devflare.config.ts'),
+					`
 export default {
 	name: 'vite-resolve-async-test',
 	compatibilityDate: '2026-03-17'
 }
-`.trim())
-				await writeFile(join(projectDir, 'vite.config.ts'), `
+`.trim()
+				)
+				await writeFile(
+					join(projectDir, 'vite.config.ts'),
+					`
 const localPlugin = {
 	name: 'local-plugin'
 }
@@ -806,30 +705,42 @@ const asyncPlugin = Promise.resolve({
 export default {
 	plugins: [localPlugin, asyncPlugin]
 }
-`.trim())
+`.trim()
+				)
 
-				const resolvedConfig = await resolveViteUserConfig({
-					command: 'build',
-					mode: 'production'
-				} as any, {
-					cwd: projectDir,
-					localConfigPath: join(projectDir, 'vite.config.ts')
-				})
+				const resolvedConfig = await resolveViteUserConfig(
+					{
+						command: 'build',
+						mode: 'production'
+					} as any,
+					{
+						cwd: projectDir,
+						localConfigPath: join(projectDir, 'vite.config.ts')
+					}
+				)
 
 				const pluginEntries = (resolvedConfig.plugins ?? []) as Array<unknown>
-				expect(pluginEntries.some((plugin) => typeof (plugin as PromiseLike<unknown>)?.then === 'function')).toBe(true)
+				expect(
+					pluginEntries.some(
+						(plugin) => typeof (plugin as PromiseLike<unknown>)?.then === 'function'
+					)
+				).toBe(true)
 
-				const resolvedPlugins = await Promise.all(pluginEntries.map(async (plugin) => {
-					if (typeof (plugin as PromiseLike<unknown>)?.then === 'function') {
-						return await plugin as unknown
-					}
+				const resolvedPlugins = await Promise.all(
+					pluginEntries.map(async (plugin) => {
+						if (typeof (plugin as PromiseLike<unknown>)?.then === 'function') {
+							return (await plugin) as unknown
+						}
 
-					return plugin
-				}))
+						return plugin
+					})
+				)
 
 				const pluginNames = resolvedPlugins
-					.flatMap((plugin) => Array.isArray(plugin) ? plugin : [plugin])
-					.filter((plugin): plugin is { name?: string } => typeof plugin === 'object' && plugin !== null)
+					.flatMap((plugin) => (Array.isArray(plugin) ? plugin : [plugin]))
+					.filter(
+						(plugin): plugin is { name?: string } => typeof plugin === 'object' && plugin !== null
+					)
 					.map((plugin) => plugin.name)
 
 				expect(pluginNames).toContain('devflare')

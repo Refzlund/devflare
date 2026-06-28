@@ -1,10 +1,10 @@
 import { describe, expect, test } from 'bun:test'
 import {
+	devflareAccountLayerRecordSchema,
 	devflareAccountRecordSchema,
-	devflarePreviewRecordSchema,
-	devflarePreviewScopeRecordSchema,
 	devflareDeploymentRecordSchema,
-	devflareAccountLayerRecordSchema
+	devflarePreviewRecordSchema,
+	devflarePreviewScopeRecordSchema
 } from '../../../src/cloudflare/registry-schema'
 
 const TEST_ACCOUNT_ID = 'test-account-id'

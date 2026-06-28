@@ -2,17 +2,17 @@
 // Bridge Serialization — Special Value Round-Trip Tests
 // =============================================================================
 
-import { describe, test, expect } from 'bun:test'
+import { describe, expect, test } from 'bun:test'
 import {
-	serializeValue,
-	deserializeValue,
-	serializeRequest,
-	deserializeRequest,
-	serializeResponse,
-	deserializeResponse,
-	serializeDOId,
+	DO_ID_TYPE,
 	deserializeDOId,
-	DO_ID_TYPE
+	deserializeRequest,
+	deserializeResponse,
+	deserializeValue,
+	serializeDOId,
+	serializeRequest,
+	serializeResponse,
+	serializeValue
 } from '../../../src/bridge/v2/value-serialization'
 
 async function roundTrip<T>(value: T): Promise<unknown> {
@@ -68,7 +68,9 @@ describe('serializeValue / deserializeValue — special objects', () => {
 		expect(result).toBeInstanceOf(Set)
 		const resSet = result as Set<Date>
 		expect(resSet.size).toBe(2)
-		const isoValues = Array.from(resSet).map((d) => d.toISOString()).sort()
+		const isoValues = Array.from(resSet)
+			.map((d) => d.toISOString())
+			.sort()
 		expect(isoValues).toEqual([d1.toISOString(), d2.toISOString()])
 	})
 
@@ -207,8 +209,14 @@ describe('serializeDOId / deserializeDOId \u2014 canonical wire shape', () => {
 	})
 
 	test('deserializeDOId rejects unknown shapes', () => {
-		const ns = { idFromString: () => { throw new Error('should not be called') } } as unknown as DurableObjectNamespace
-		expect(() => deserializeDOId({ type: 'do-id', hexId: 'x' } as never, ns)).toThrow(/Invalid DOId format/)
+		const ns = {
+			idFromString: () => {
+				throw new Error('should not be called')
+			}
+		} as unknown as DurableObjectNamespace
+		expect(() => deserializeDOId({ type: 'do-id', hexId: 'x' } as never, ns)).toThrow(
+			/Invalid DOId format/
+		)
 	})
 })
 

@@ -12,14 +12,21 @@ const TEST_DIR = join(import.meta.dirname, '../.fixtures/do-bundler')
 describe('createDOBundler', () => {
 	beforeEach(async () => {
 		await mkdir(join(TEST_DIR, 'src'), { recursive: true })
-		await writeFile(join(TEST_DIR, 'tsconfig.json'), JSON.stringify({
-			compilerOptions: {
-				target: 'ES2022',
-				module: 'ESNext',
-				moduleResolution: 'Bundler',
-				strict: true
-			}
-		}, null, '\t'))
+		await writeFile(
+			join(TEST_DIR, 'tsconfig.json'),
+			JSON.stringify(
+				{
+					compilerOptions: {
+						target: 'ES2022',
+						module: 'ESNext',
+						moduleResolution: 'Bundler',
+						strict: true
+					}
+				},
+				null,
+				'\t'
+			)
+		)
 	})
 
 	afterEach(async () => {
@@ -27,11 +34,16 @@ describe('createDOBundler', () => {
 	})
 
 	test('applies user Rolldown plugins to Durable Object bundles', async () => {
-		await writeFile(join(TEST_DIR, 'src/Greeting.svelte'), `
+		await writeFile(
+			join(TEST_DIR, 'src/Greeting.svelte'),
+			`
 <h1>Hello from Svelte</h1>
-		`.trim())
+		`.trim()
+		)
 
-		await writeFile(join(TEST_DIR, 'src/do.greeter.ts'), `
+		await writeFile(
+			join(TEST_DIR, 'src/do.greeter.ts'),
+			`
 import { DurableObject } from 'cloudflare:workers'
 import renderGreeting from './Greeting.svelte'
 
@@ -40,7 +52,8 @@ export class Greeter extends DurableObject {
 		return new Response(renderGreeting())
 	}
 }
-		`.trim())
+		`.trim()
+		)
 
 		const bundler = createDOBundler({
 			cwd: TEST_DIR,
@@ -48,21 +61,23 @@ export class Greeter extends DurableObject {
 			outDir: join(TEST_DIR, '.devflare/do-bundles'),
 			sourcemap: true,
 			rolldownOptions: {
-				plugins: [{
-					name: 'test-svelte-transform',
-					transform(code, id) {
-						if (!id.endsWith('.svelte')) {
-							return null
-						}
+				plugins: [
+					{
+						name: 'test-svelte-transform',
+						transform(code, id) {
+							if (!id.endsWith('.svelte')) {
+								return null
+							}
 
-						const heading = code.match(/<h1>(.*?)<\/h1>/)?.[1] ?? 'Hello from Svelte'
+							const heading = code.match(/<h1>(.*?)<\/h1>/)?.[1] ?? 'Hello from Svelte'
 
-						return {
-							code: `export default function renderGreeting() { return ${JSON.stringify(heading)} }`,
-							map: null
+							return {
+								code: `export default function renderGreeting() { return ${JSON.stringify(heading)} }`,
+								map: null
+							}
 						}
 					}
-				}]
+				]
 			}
 		})
 
@@ -86,7 +101,9 @@ export class Greeter extends DurableObject {
 	})
 
 	test('injects the Durable Object event wrapper into bundled outputs', async () => {
-		await writeFile(join(TEST_DIR, 'src/do.logger.ts'), `
+		await writeFile(
+			join(TEST_DIR, 'src/do.logger.ts'),
+			`
 import { DurableObject } from 'cloudflare:workers'
 
 export class Logger extends DurableObject {
@@ -94,7 +111,8 @@ export class Logger extends DurableObject {
 		return new Response(request.url)
 	}
 }
-		`.trim())
+		`.trim()
+		)
 
 		const bundler = createDOBundler({
 			cwd: TEST_DIR,

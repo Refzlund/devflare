@@ -105,15 +105,12 @@ export async function runDeployCommand(
 						mode: 'build'
 					}
 				)
-				const deploymentStrategy = applyDeploymentStrategy(
-					config,
-					{
-						environment,
-						preview,
-						branchName,
-						previewBranch: process.env.DEVFLARE_PREVIEW_BRANCH
-					}
-				)
+				const deploymentStrategy = applyDeploymentStrategy(config, {
+					environment,
+					preview,
+					branchName,
+					previewBranch: process.env.DEVFLARE_PREVIEW_BRANCH
+				})
 				const wranglerConfig = compileBuildConfig(deploymentStrategy.config, undefined, {
 					alreadyResolved: true
 				})

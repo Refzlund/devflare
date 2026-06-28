@@ -41,10 +41,9 @@ export async function runWorkerEntryTransform(
 		return null
 	}
 
-	const {
-		shouldTransformWorker,
-		transformWorkerEntrypoint
-	} = await import('../transform/worker-entrypoint')
+	const { shouldTransformWorker, transformWorkerEntrypoint } = await import(
+		'../transform/worker-entrypoint'
+	)
 
 	if (!shouldTransformWorker(code, id)) {
 		return null

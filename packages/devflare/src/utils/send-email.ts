@@ -37,17 +37,18 @@ function isSendEmailBinding(value: unknown): value is SendEmail {
 	}
 
 	try {
-		return typeof value.send === 'function'
-			&& typeof value.sendBatch !== 'function'
+		return typeof value.send === 'function' && typeof value.sendBatch !== 'function'
 	} catch {
 		return false
 	}
 }
 
 function isComposableSendEmailMessage(message: unknown): message is ComposedSendEmailMessage {
-	return isRecord(message)
-		&& typeof message.from === 'string'
-		&& (typeof message.to === 'string' || Array.isArray(message.to))
+	return (
+		isRecord(message) &&
+		typeof message.from === 'string' &&
+		(typeof message.to === 'string' || Array.isArray(message.to))
+	)
 }
 
 function formatEmailAddress(value: string | EmailAddress | undefined): string | undefined {
@@ -70,7 +71,10 @@ function normalizeBodyText(value: string): string {
 	return value.replace(/\r?\n/g, '\r\n')
 }
 
-function buildMultipartAlternativeBody(message: ComposedSendEmailMessage, boundary: string): string {
+function buildMultipartAlternativeBody(
+	message: ComposedSendEmailMessage,
+	boundary: string
+): string {
 	const parts: string[] = []
 
 	if (message.text) {
@@ -164,9 +168,7 @@ export function createEmailMessageRaw(raw: unknown): string | ReadableStream<Uin
 	throw new Error('Unsupported EmailMessage raw payload')
 }
 
-export function normalizeSendEmailMessage(
-	message: unknown
-): Parameters<SendEmail['send']>[0] {
+export function normalizeSendEmailMessage(message: unknown): Parameters<SendEmail['send']>[0] {
 	if (!isComposableSendEmailMessage(message)) {
 		return message as Parameters<SendEmail['send']>[0]
 	}
@@ -230,24 +232,21 @@ export function createLocalSendEmailBinding(
 						: []
 
 				if (
-					from
-					&& config.allowedSenderAddresses
-					&& !config.allowedSenderAddresses.includes(from)
+					from &&
+					config.allowedSenderAddresses &&
+					!config.allowedSenderAddresses.includes(from)
 				) {
 					throw new Error(`email from ${from} not allowed`)
 				}
 
 				for (const recipient of recipients) {
-					if (
-						config.destinationAddress !== undefined
-						&& recipient !== config.destinationAddress
-					) {
+					if (config.destinationAddress !== undefined && recipient !== config.destinationAddress) {
 						throw new Error(`email to ${recipient} not allowed`)
 					}
 
 					if (
-						config.allowedDestinationAddresses !== undefined
-						&& !config.allowedDestinationAddresses.includes(recipient)
+						config.allowedDestinationAddresses !== undefined &&
+						!config.allowedDestinationAddresses.includes(recipient)
 					) {
 						throw new Error(`email to ${recipient} not allowed`)
 					}
@@ -313,14 +312,12 @@ export function wrapEnvSendEmailBindings<TEnv>(env: TEnv): TEnv {
 			return isSendEmailBinding(value) ? wrapSendEmailBinding(value) : value
 		},
 		has(target, prop) {
-			return Reflect.has(target, prop)
-				|| (typeof prop === 'string' && localSendEmailBindings.has(prop))
+			return (
+				Reflect.has(target, prop) || (typeof prop === 'string' && localSendEmailBindings.has(prop))
+			)
 		},
 		ownKeys(target) {
-			return Array.from(new Set([
-				...Reflect.ownKeys(target),
-				...localSendEmailBindings.keys()
-			]))
+			return Array.from(new Set([...Reflect.ownKeys(target), ...localSendEmailBindings.keys()]))
 		},
 		getOwnPropertyDescriptor(target, prop) {
 			if (typeof prop === 'string' && localSendEmailBindings.has(prop)) {

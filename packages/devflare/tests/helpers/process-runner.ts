@@ -7,7 +7,7 @@ export interface ExecInvocation {
 	options?: Record<string, unknown>
 }
 
-export function successResult(stdout: string = ''): ExecResult {
+export function successResult(stdout = ''): ExecResult {
 	return {
 		exitCode: 0,
 		stdout,
@@ -18,7 +18,11 @@ export function successResult(stdout: string = ''): ExecResult {
 }
 
 export function createProcessRunner(
-	handler: (command: string, args: string[], options?: Record<string, unknown>) => Promise<ExecResult> | ExecResult,
+	handler: (
+		command: string,
+		args: string[],
+		options?: Record<string, unknown>
+	) => Promise<ExecResult> | ExecResult,
 	executions: ExecInvocation[],
 	options: {
 		spawnErrorMessage?: string

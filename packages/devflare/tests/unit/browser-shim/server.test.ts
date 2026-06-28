@@ -1,9 +1,9 @@
-import { describe, test, expect } from 'bun:test'
+import { describe, expect, test } from 'bun:test'
 import {
 	DEFAULT_CHROME_FLAGS,
 	NO_SANDBOX_FLAGS,
-	resolveChromeFlags,
-	createDownloadProgressLogger
+	createDownloadProgressLogger,
+	resolveChromeFlags
 } from '../../../src/browser-shim/server'
 
 describe('browser-shim chrome flags', () => {
@@ -78,7 +78,7 @@ describe('browser-shim download progress logger', () => {
 		const { logger, lines } = makeLogger()
 		const tracker = createDownloadProgressLogger(logger, 'Chrome')
 
-		for (let i = 0;i <= 100;i += 1) {
+		for (let i = 0; i <= 100; i += 1) {
 			tracker.onProgress(i, 100)
 		}
 

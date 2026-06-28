@@ -7,13 +7,13 @@
 // sendEmail bindings.
 // =============================================================================
 
-import type { DevflareConfig } from '../config'
 import { isRemoteModeActive } from '../cloudflare/remote-config'
+import type { DevflareConfig } from '../config'
+import { createLocalWorkerLoaderBinding } from '../shims/local-worker-loader'
+import { createLocalSendEmailBinding } from '../utils/send-email'
 import { createRemoteAI } from './remote-ai'
 import { createRemoteVectorize } from './remote-vectorize'
-import { createLocalSendEmailBinding } from '../utils/send-email'
 import { createMockVersionMetadata } from './utilities'
-import { createLocalWorkerLoaderBinding } from '../shims/local-worker-loader'
 
 /**
  * Build the initial remote/static binding map for a test context.
@@ -36,10 +36,7 @@ export function buildRemoteAndStaticBindings(config: DevflareConfig): Record<str
 
 		if (config.bindings?.vectorize) {
 			for (const [name, vectorConfig] of Object.entries(config.bindings.vectorize)) {
-				remoteBindings[name] = createRemoteVectorize(
-					vectorConfig.indexName,
-					config.accountId
-				)
+				remoteBindings[name] = createRemoteVectorize(vectorConfig.indexName, config.accountId)
 			}
 		}
 	}

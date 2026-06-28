@@ -13,10 +13,26 @@
 		"rules": {
 			"recommended": true,
 			"complexity": {
-				"noExcessiveCognitiveComplexity": "warn"
+				"noExcessiveCognitiveComplexity": "warn",
+				"noBannedTypes": "warn"
+			},
+			"performance": {
+				"noDelete": "warn"
 			},
 			"style": {
-				"noNonNullAssertion": "off"
+				"noNonNullAssertion": "off",
+				"useConst": "warn",
+				"useTemplate": "warn",
+				"useNodejsImportProtocol": "warn",
+				"noUnusedTemplateLiteral": "warn"
+			},
+			"suspicious": {
+				"noExplicitAny": "warn",
+				"noControlCharactersInRegex": "warn",
+				"noAssignInExpressions": "warn",
+				"noShadowRestrictedNames": "warn",
+				"noImplicitAnyLet": "warn",
+				"noThenProperty": "warn"
 			}
 		}
 	},

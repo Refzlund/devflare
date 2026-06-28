@@ -6,57 +6,75 @@
 // =============================================================================
 
 import {
-	getAccounts,
-	getPrimaryAccount,
+	checkAuth,
+	createD1Database,
+	deleteWorker,
 	getAccountById,
 	getAccountSummary,
-	getWorkersSubdomain,
-	listWorkers,
-	renameWorker,
-	deleteWorker,
-	listWorkerVersions,
+	getAccounts,
+	getAllServiceStatus,
+	getPrimaryAccount,
+	getServiceStatus,
 	getWorkerVersionDetail,
-	listWorkerDeployments,
-	listKVNamespaces,
+	getWorkersSubdomain,
+	hasService,
+	listAIModels,
 	listD1Databases,
-	createD1Database,
-	queryD1Database,
-	rawD1DatabaseQuery,
+	listKVNamespaces,
 	listR2Buckets,
 	listVectorizeIndexes,
-	listAIModels,
-	getServiceStatus,
-	getAllServiceStatus,
-	hasService,
-	checkAuth
+	listWorkerDeployments,
+	listWorkerVersions,
+	listWorkers,
+	queryD1Database,
+	rawD1DatabaseQuery,
+	renameWorker
 } from './account'
 
 import {
+	canProceedWithTest,
+	getAllUsageSummaries,
+	getLimits,
 	getUsage,
+	getUsageSummary,
+	isWithinLimits,
+	recordTestUsage,
 	recordUsage,
 	resetUsage,
-	getLimits,
 	setLimits,
 	setLimitsEnabled,
-	isWithinLimits,
-	getUsageSummary,
-	getAllUsageSummaries,
-	canProceedWithTest,
-	recordTestUsage,
 	shouldSkip
 } from './usage'
 
 import {
-	getGlobalDefaultAccountId,
-	setGlobalDefaultAccountId,
-	getWorkspaceAccountId,
-	setWorkspaceAccountId,
+	clearGlobalDefaultAccountId,
 	getEffectiveAccountId,
-	clearGlobalDefaultAccountId
+	getGlobalDefaultAccountId,
+	getWorkspaceAccountId,
+	setGlobalDefaultAccountId,
+	setWorkspaceAccountId
 } from './preferences'
 
-import { getApiToken, isAuthenticated, getWranglerAuth, hasWranglerConfig, invalidateToken } from './auth'
-import { CloudflareAPIError, AuthenticationError, type APIClientOptions } from './api'
+import { type APIClientOptions, AuthenticationError, CloudflareAPIError } from './api'
+import {
+	getApiToken,
+	getWranglerAuth,
+	hasWranglerConfig,
+	invalidateToken,
+	isAuthenticated
+} from './auth'
+import {
+	DEVFLARE_PREVIEW_REGISTRY_DATABASE,
+	cleanupPreviewRegistry,
+	ensurePreviewRegistry,
+	getPreviewRegistryContext,
+	listTrackedDeploymentRecords,
+	listTrackedPreviewRecords,
+	listTrackedPreviewScopeRecords,
+	listTrackedRegistryState,
+	reconcilePreviewRegistry,
+	retirePreviewRegistry
+} from './preview-registry'
 import {
 	createAccountOwnedAPIToken,
 	deleteAccountOwnedAPIToken,
@@ -64,18 +82,6 @@ import {
 	listAccountTokenPermissionGroups,
 	normalizeDevflareTokenName
 } from './tokens'
-import {
-	ensurePreviewRegistry,
-	getPreviewRegistryContext,
-	listTrackedRegistryState,
-	listTrackedPreviewRecords,
-	listTrackedPreviewScopeRecords,
-	listTrackedDeploymentRecords,
-	reconcilePreviewRegistry,
-	cleanupPreviewRegistry,
-	retirePreviewRegistry,
-	DEVFLARE_PREVIEW_REGISTRY_DATABASE
-} from './preview-registry'
 
 export {
 	devflareAccountRecordSchema,
@@ -97,20 +103,20 @@ export {
 
 /**
  * Main account API object
- * 
+ *
  * Usage:
  * ```ts
  * import { account } from 'devflare/cloudflare'
- * 
+ *
  * // Check authentication
  * const isLoggedIn = await account.isAuthenticated()
- * 
+ *
  * // Get primary account
  * const primary = await account.getPrimaryAccount()
- * 
+ *
  * // List resources (requires accountId)
  * const workers = await account.workers(accountId)
- * 
+ *
  * // Check usage limits before testing
  * const { allowed } = await account.canProceedWithTest(accountId, 'ai')
  * ```
@@ -259,7 +265,7 @@ export const account = {
 	 * Check if tests for a service should be skipped
 	 * Returns true if tests should be SKIPPED (not authenticated, no account, or limits exceeded)
 	 * Automatically logs the skip reason to console.
-	 * 
+	 *
 	 * Usage: `const skipAI = await account.shouldSkip('ai')`
 	 */
 	shouldSkip,

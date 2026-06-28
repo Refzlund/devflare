@@ -2,10 +2,10 @@
 // Package Specifier Resolution — Resolves package specifiers to filesystem paths
 // =============================================================================
 
-import { resolve, dirname } from 'pathe'
-import { readFileSync, existsSync } from 'node:fs'
-import { fileURLToPath, pathToFileURL } from 'node:url'
+import { existsSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+import { dirname, resolve } from 'pathe'
 
 const NOT_FOUND_CODES = new Set(['MODULE_NOT_FOUND', 'ERR_MODULE_NOT_FOUND'])
 
@@ -74,11 +74,17 @@ export function resolvePackageSpecifier(specifier: string, fromDir: string): str
 	// For scoped packages like @scope/pkg/subpath, we need to find the package root
 	// and then navigate to the subpath
 	const parts = specifier.startsWith('@')
-		? specifier.split('/').slice(0, 2).join('/') // @scope/pkg
+		? specifier
+				.split('/')
+				.slice(0, 2)
+				.join('/') // @scope/pkg
 		: specifier.split('/')[0] // pkg
 
 	const subpath = specifier.startsWith('@')
-		? specifier.split('/').slice(2).join('/') // subpath after @scope/pkg
+		? specifier
+				.split('/')
+				.slice(2)
+				.join('/') // subpath after @scope/pkg
 		: specifier.split('/').slice(1).join('/') // subpath after pkg
 
 	// Try to find the package's package.json via ESM-first resolution.
@@ -99,7 +105,8 @@ export function resolvePackageSpecifier(specifier: string, fromDir: string): str
 
 		if (exportPath) {
 			// Handle export map (can be string or object)
-			const targetPath = typeof exportPath === 'string' ? exportPath : exportPath.default || exportPath.import
+			const targetPath =
+				typeof exportPath === 'string' ? exportPath : exportPath.default || exportPath.import
 			return resolve(pkgDir, targetPath)
 		}
 

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, mock, test } from 'bun:test'
-import { apiGet, apiGetAll, CloudflareAPIError, kvDelete } from '../../../src/cloudflare/api'
+import { CloudflareAPIError, apiGet, apiGetAll, kvDelete } from '../../../src/cloudflare/api'
 import { jsonResponse } from '../../helpers/cloudflare-api'
 import { installTrackedTimeouts } from '../../helpers/tracked-timeouts'
 
@@ -26,10 +26,7 @@ describe('apiGetAll', () => {
 			const url = String(input)
 
 			if (url.endsWith('/items?page=1&per_page=50')) {
-				return jsonResponse([
-					{ id: 'one' },
-					{ id: 'two' }
-				], {
+				return jsonResponse([{ id: 'one' }, { id: 'two' }], {
 					page: 1,
 					per_page: 50,
 					total_pages: 2,
@@ -39,9 +36,7 @@ describe('apiGetAll', () => {
 			}
 
 			if (url.endsWith('/items?page=2&per_page=50')) {
-				return jsonResponse([
-					{ id: 'three' }
-				], {
+				return jsonResponse([{ id: 'three' }], {
 					page: 2,
 					per_page: 50,
 					total_pages: 2,
@@ -55,11 +50,7 @@ describe('apiGetAll', () => {
 
 		const result = await apiGetAll<{ id: string }>('/items', { token: 'cf_test_token' })
 
-		expect(result).toEqual([
-			{ id: 'one' },
-			{ id: 'two' },
-			{ id: 'three' }
-		])
+		expect(result).toEqual([{ id: 'one' }, { id: 'two' }, { id: 'three' }])
 	})
 
 	test('accepts object-wrapped array results like the R2 bucket list API', async () => {
@@ -77,9 +68,12 @@ describe('apiGetAll', () => {
 			})
 		}) as unknown as typeof fetch
 
-		const result = await apiGetAll<{ name: string; creation_date: string }>('/accounts/test-account/r2/buckets', {
-			token: 'cf_test_token'
-		})
+		const result = await apiGetAll<{ name: string; creation_date: string }>(
+			'/accounts/test-account/r2/buckets',
+			{
+				token: 'cf_test_token'
+			}
+		)
 
 		expect(result.map((bucket) => bucket.name)).toEqual(['preview-assets', 'preview-archive'])
 	})
@@ -89,32 +83,37 @@ describe('apiGetAll', () => {
 			const url = String(input)
 
 			if (url.endsWith('/accounts/test-account/r2/buckets?page=1&per_page=50')) {
-				return jsonResponse({
-					buckets: [
-						{ name: 'preview-assets', creation_date: '2026-04-11T00:00:00.000Z' }
-					]
-				}, {
-					cursor: 'next-page',
-					per_page: 50
-				})
+				return jsonResponse(
+					{
+						buckets: [{ name: 'preview-assets', creation_date: '2026-04-11T00:00:00.000Z' }]
+					},
+					{
+						cursor: 'next-page',
+						per_page: 50
+					}
+				)
 			}
 
 			if (url.endsWith('/accounts/test-account/r2/buckets?cursor=next-page&per_page=50')) {
-				return jsonResponse({
-					buckets: [
-						{ name: 'preview-archive', creation_date: '2026-04-11T00:00:00.000Z' }
-					]
-				}, {
-					per_page: 50
-				})
+				return jsonResponse(
+					{
+						buckets: [{ name: 'preview-archive', creation_date: '2026-04-11T00:00:00.000Z' }]
+					},
+					{
+						per_page: 50
+					}
+				)
 			}
 
 			throw new Error(`Unexpected fetch URL: ${url}`)
 		}) as unknown as typeof fetch
 
-		const result = await apiGetAll<{ name: string; creation_date: string }>('/accounts/test-account/r2/buckets', {
-			token: 'cf_test_token'
-		})
+		const result = await apiGetAll<{ name: string; creation_date: string }>(
+			'/accounts/test-account/r2/buckets',
+			{
+				token: 'cf_test_token'
+			}
+		)
 
 		expect(result.map((bucket) => bucket.name)).toEqual(['preview-assets', 'preview-archive'])
 	})
@@ -128,9 +127,7 @@ describe('apiGetAll', () => {
 				throw new Error(`Unexpected fetch URL: ${url}`)
 			}
 
-			return jsonResponse([
-				{ id: 'one' }
-			], {
+			return jsonResponse([{ id: 'one' }], {
 				page: 1,
 				per_page: 50,
 				total_pages: 1,
@@ -165,23 +162,23 @@ describe('apiGetAll', () => {
 				})
 			}
 
-			return new Response(JSON.stringify({
-				success: false,
-				errors: [{ code: 10000, message: 'authentication error' }],
-				messages: [],
-				result: null
-			}), {
-				status: 401,
-				headers: {
-					'Content-Type': 'application/json'
+			return new Response(
+				JSON.stringify({
+					success: false,
+					errors: [{ code: 10000, message: 'authentication error' }],
+					messages: [],
+					result: null
+				}),
+				{
+					status: 401,
+					headers: {
+						'Content-Type': 'application/json'
+					}
 				}
-			})
+			)
 		}) as unknown as typeof fetch
 
-		const results = await Promise.allSettled([
-			apiGet<null>('/items'),
-			apiGet<null>('/items')
-		])
+		const results = await Promise.allSettled([apiGet<null>('/items'), apiGet<null>('/items')])
 
 		expect(fetchCalls).toBe(4)
 		for (const result of results) {
@@ -196,12 +193,15 @@ describe('apiGetAll', () => {
 	test('throws a typed CloudflareAPIError when the API returns invalid JSON', async () => {
 		process.env.CLOUDFLARE_API_TOKEN = 'cf_test_token'
 
-		globalThis.fetch = mock(async () => new Response('<html>bad gateway</html>', {
-			status: 502,
-			headers: {
-				'Content-Type': 'text/html'
-			}
-		})) as unknown as typeof fetch
+		globalThis.fetch = mock(
+			async () =>
+				new Response('<html>bad gateway</html>', {
+					status: 502,
+					headers: {
+						'Content-Type': 'text/html'
+					}
+				})
+		) as unknown as typeof fetch
 
 		await expect(apiGet('/items')).rejects.toMatchObject({
 			name: 'CloudflareAPIError',
@@ -213,16 +213,21 @@ describe('apiGetAll', () => {
 	test('throws a clear error when a JSON response is not the v4 envelope shape', async () => {
 		process.env.CLOUDFLARE_API_TOKEN = 'cf_test_token'
 
-		globalThis.fetch = mock(async () => new Response(JSON.stringify({ data: [1, 2, 3] }), {
-			status: 200,
-			headers: {
-				'Content-Type': 'application/json'
-			}
-		})) as unknown as typeof fetch
+		globalThis.fetch = mock(
+			async () =>
+				new Response(JSON.stringify({ data: [1, 2, 3] }), {
+					status: 200,
+					headers: {
+						'Content-Type': 'application/json'
+					}
+				})
+		) as unknown as typeof fetch
 
 		await expect(apiGet('/items')).rejects.toMatchObject({
 			name: 'CloudflareAPIError',
-			message: expect.stringContaining('Cloudflare GET /items returned a non-envelope JSON response.'),
+			message: expect.stringContaining(
+				'Cloudflare GET /items returned a non-envelope JSON response.'
+			),
 			code: 200
 		})
 	})
@@ -230,28 +235,37 @@ describe('apiGetAll', () => {
 	test('surfaces the first envelope error code and message when success is false', async () => {
 		process.env.CLOUDFLARE_API_TOKEN = 'cf_test_token'
 
-		globalThis.fetch = mock(async () => new Response(JSON.stringify({
-			success: false,
-			errors: [
-				{ code: 7003, message: 'Could not route to the requested resource' },
-				{ code: 7000, message: 'ignored secondary error' }
-			],
-			messages: [],
-			result: null
-		}), {
-			status: 400,
-			headers: {
-				'Content-Type': 'application/json'
-			}
-		})) as unknown as typeof fetch
+		globalThis.fetch = mock(
+			async () =>
+				new Response(
+					JSON.stringify({
+						success: false,
+						errors: [
+							{ code: 7003, message: 'Could not route to the requested resource' },
+							{ code: 7000, message: 'ignored secondary error' }
+						],
+						messages: [],
+						result: null
+					}),
+					{
+						status: 400,
+						headers: {
+							'Content-Type': 'application/json'
+						}
+					}
+				)
+		) as unknown as typeof fetch
 
-		const failure = await apiGet('/items').catch((error) => error) as CloudflareAPIError
+		const failure = (await apiGet('/items').catch((error) => error)) as CloudflareAPIError
 
 		expect(failure).toBeInstanceOf(CloudflareAPIError)
 		expect(failure.message).toContain('7003')
 		expect(failure.message).toContain('Could not route to the requested resource')
 		expect(failure.code).toBe(400)
-		expect(failure.errors[0]).toEqual({ code: 7003, message: 'Could not route to the requested resource' })
+		expect(failure.errors[0]).toEqual({
+			code: 7003,
+			message: 'Could not route to the requested resource'
+		})
 	})
 })
 
@@ -268,17 +282,20 @@ describe('kvDelete', () => {
 				authorization: headers.get('authorization')
 			})
 
-			return new Response(JSON.stringify({
-				success: true,
-				errors: [],
-				messages: [],
-				result: null
-			}), {
-				status: 200,
-				headers: {
-					'Content-Type': 'application/json'
+			return new Response(
+				JSON.stringify({
+					success: true,
+					errors: [],
+					messages: [],
+					result: null
+				}),
+				{
+					status: 200,
+					headers: {
+						'Content-Type': 'application/json'
+					}
 				}
-			})
+			)
 		}) as unknown as typeof fetch
 
 		await expect(
@@ -287,7 +304,9 @@ describe('kvDelete', () => {
 
 		expect(calls).toHaveLength(1)
 		expect(calls[0].method).toBe('DELETE')
-		expect(calls[0].url).toBe('https://api.cloudflare.com/client/v4/accounts/acct-123/storage/kv/namespaces/ns-abc/values/settings%3AdefaultAccountId')
+		expect(calls[0].url).toBe(
+			'https://api.cloudflare.com/client/v4/accounts/acct-123/storage/kv/namespaces/ns-abc/values/settings%3AdefaultAccountId'
+		)
 		expect(calls[0].authorization).toBe('Bearer cf_test_token')
 	})
 })

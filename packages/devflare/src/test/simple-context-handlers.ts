@@ -9,7 +9,7 @@
 
 import { join } from 'path'
 import type { DevflareConfig } from '../config'
-import { discoverRoutes, type RouteDiscoveryResult } from '../worker-entry/routes'
+import { type RouteDiscoveryResult, discoverRoutes } from '../worker-entry/routes'
 
 const DEFAULT_FETCH_PATH = 'src/fetch.ts'
 const DEFAULT_QUEUE_PATH = 'src/queue.ts'

@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, test } from 'bun:test'
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { dirname, join } from 'pathe'
@@ -33,7 +33,11 @@ async function writeProjectFiles(projectDir: string, files: Record<string, strin
 	}
 }
 
-async function runProjectScript(projectDir: string, scriptRelativePath: string, scriptContents: string): Promise<string> {
+async function runProjectScript(
+	projectDir: string,
+	scriptRelativePath: string,
+	scriptContents: string
+): Promise<string> {
 	const scriptPath = join(projectDir, scriptRelativePath)
 	await writeProjectFiles(projectDir, {
 		[scriptRelativePath]: scriptContents
@@ -52,17 +56,21 @@ async function runProjectScript(projectDir: string, scriptRelativePath: string, 
 	])
 
 	if (exitCode !== 0) {
-		throw new Error([
-			'Expected createTestContext() project script to succeed',
-			stdout.trim(),
-			stderr.trim()
-		].filter(Boolean).join('\n\n'))
+		throw new Error(
+			['Expected createTestContext() project script to succeed', stdout.trim(), stderr.trim()]
+				.filter(Boolean)
+				.join('\n\n')
+		)
 	}
 
 	return stdout
 }
 
-async function runProjectTests(projectDir: string, testRelativePath: string, testContents: string): Promise<string> {
+async function runProjectTests(
+	projectDir: string,
+	testRelativePath: string,
+	testContents: string
+): Promise<string> {
 	await writeProjectFiles(projectDir, {
 		[testRelativePath]: testContents
 	})
@@ -80,11 +88,11 @@ async function runProjectTests(projectDir: string, testRelativePath: string, tes
 	])
 
 	if (exitCode !== 0) {
-		throw new Error([
-			'Expected createTestContext() bun test project to succeed',
-			stdout.trim(),
-			stderr.trim()
-		].filter(Boolean).join('\n\n'))
+		throw new Error(
+			['Expected createTestContext() bun test project to succeed', stdout.trim(), stderr.trim()]
+				.filter(Boolean)
+				.join('\n\n')
+		)
 	}
 
 	return [stdout.trim(), stderr.trim()].filter(Boolean).join('\n')
@@ -96,7 +104,7 @@ function extractResult<T>(stdout: string): T {
 		.map((line) => line.trim())
 		.filter(Boolean)
 
-	for (let index = lines.length - 1;index >= 0;index -= 1) {
+	for (let index = lines.length - 1; index >= 0; index -= 1) {
 		const line = lines[index]
 		if (line.startsWith('RESULT:')) {
 			return JSON.parse(line.slice('RESULT:'.length)) as T
@@ -106,19 +114,27 @@ function extractResult<T>(stdout: string): T {
 	throw new Error(`Expected RESULT line in stdout:\n${stdout}`)
 }
 
-async function createTransportProject(projectDir: string, transportMode: 'auto' | 'disabled'): Promise<void> {
-	const transportConfig = transportMode === 'disabled'
-		? `files: {
+async function createTransportProject(
+	projectDir: string,
+	transportMode: 'auto' | 'disabled'
+): Promise<void> {
+	const transportConfig =
+		transportMode === 'disabled'
+			? `files: {
 	transport: null
 },`
-		: ''
+			: ''
 
 	await writeProjectFiles(projectDir, {
-		'package.json': JSON.stringify({
-			name: `transport-${transportMode}-project`,
-			private: true,
-			type: 'module'
-		}, null, 2),
+		'package.json': JSON.stringify(
+			{
+				name: `transport-${transportMode}-project`,
+				private: true,
+				type: 'module'
+			},
+			null,
+			2
+		),
 		'devflare.config.ts': `
 export default {
 	name: 'transport-${transportMode}-project',
@@ -175,11 +191,15 @@ describe('createTestContext config autodiscovery', () => {
 		tempDirs.push(projectDir)
 
 		await writeProjectFiles(projectDir, {
-			'package.json': JSON.stringify({
-				name: 'test-context-mts-project',
-				private: true,
-				type: 'module'
-			}, null, 2),
+			'package.json': JSON.stringify(
+				{
+					name: 'test-context-mts-project',
+					private: true,
+					type: 'module'
+				},
+				null,
+				2
+			),
 			'devflare.config.mts': `
 export default {
 	name: 'test-context-mts-project',
@@ -188,14 +208,18 @@ export default {
 `.trim()
 		})
 
-		const stdout = await runProjectScript(projectDir, 'tests/autodiscovery-script.mjs', `
+		const stdout = await runProjectScript(
+			projectDir,
+			'tests/autodiscovery-script.mjs',
+			`
 import { createTestContext } from '${devflareTestImportPath}'
 import { env } from '${devflareImportPath}'
 
 await createTestContext()
 await env.dispose()
 console.log('auto-discovered-mts-config')
-`)
+`
+		)
 
 		expect(stdout.trim()).toContain('auto-discovered-mts-config')
 	})
@@ -205,11 +229,15 @@ console.log('auto-discovered-mts-config')
 		tempDirs.push(projectDir)
 
 		await writeProjectFiles(projectDir, {
-			'package.json': JSON.stringify({
-				name: 'test-context-bun-test-project',
-				private: true,
-				type: 'module'
-			}, null, 2),
+			'package.json': JSON.stringify(
+				{
+					name: 'test-context-bun-test-project',
+					private: true,
+					type: 'module'
+				},
+				null,
+				2
+			),
 			'devflare.config.ts': `
 export default {
 	name: 'test-context-bun-test-project',
@@ -229,7 +257,10 @@ export async function fetch(): Promise<Response> {
 `.trim()
 		})
 
-		const output = await runProjectTests(projectDir, 'tests/autodiscovery-bun.test.ts', `
+		const output = await runProjectTests(
+			projectDir,
+			'tests/autodiscovery-bun.test.ts',
+			`
 import { afterAll, beforeAll, expect, test } from 'bun:test'
 import { createTestContext } from '${devflareTestImportPath}'
 import { env } from '${devflareImportPath}'
@@ -245,7 +276,8 @@ afterAll(async () => {
 test('auto-discovers config during bun test hooks', () => {
 	expect(env.TEST_VALUE).toBe('auto-discovered')
 })
-`)
+`
+		)
 
 		expect(output).toContain('1 pass')
 	})
@@ -257,11 +289,15 @@ test('auto-discovers config during bun test hooks', () => {
 		await ensurePackageBuilt()
 
 		await writeProjectFiles(projectDir, {
-			'package.json': JSON.stringify({
-				name: 'test-context-built-dist-project',
-				private: true,
-				type: 'module'
-			}, null, 2),
+			'package.json': JSON.stringify(
+				{
+					name: 'test-context-built-dist-project',
+					private: true,
+					type: 'module'
+				},
+				null,
+				2
+			),
 			'devflare.config.ts': `
 export default {
 	name: 'test-context-built-dist-project',
@@ -281,7 +317,10 @@ export async function fetch(): Promise<Response> {
 `.trim()
 		})
 
-		const output = await runProjectTests(projectDir, 'tests/autodiscovery-built-dist.test.ts', `
+		const output = await runProjectTests(
+			projectDir,
+			'tests/autodiscovery-built-dist.test.ts',
+			`
 import { afterAll, beforeAll, expect, test } from 'bun:test'
 import { createTestContext } from '${builtDevflareTestImportPath}'
 import { env } from '${builtDevflareImportPath}'
@@ -297,7 +336,8 @@ afterAll(async () => {
 test('auto-discovers config during bun test hooks from built dist entry', () => {
 	expect(env.TEST_VALUE).toBe('built-dist-auto-discovered')
 })
-`)
+`
+		)
 
 		expect(output).toContain('1 pass')
 	})
@@ -308,7 +348,10 @@ test('auto-discovers config during bun test hooks from built dist entry', () => 
 
 		await createTransportProject(projectDir, 'auto')
 
-		const stdout = await runProjectScript(projectDir, 'tests/transport-autodiscovery-script.mjs', `
+		const stdout = await runProjectScript(
+			projectDir,
+			'tests/transport-autodiscovery-script.mjs',
+			`
 import { createTestContext } from '${devflareTestImportPath}'
 import { env } from '${devflareImportPath}'
 import { DoubleableNumber } from '../src/DoubleableNumber'
@@ -330,7 +373,8 @@ try {
 }
 
 console.log('RESULT:' + JSON.stringify(summary))
-`)
+`
+		)
 
 		const result = extractResult<TransportResult>(stdout)
 		expect(result.value).toBe(2)
@@ -345,7 +389,10 @@ console.log('RESULT:' + JSON.stringify(summary))
 
 		await createTransportProject(projectDir, 'disabled')
 
-		const stdout = await runProjectScript(projectDir, 'tests/transport-disabled-script.mjs', `
+		const stdout = await runProjectScript(
+			projectDir,
+			'tests/transport-disabled-script.mjs',
+			`
 import { createTestContext } from '${devflareTestImportPath}'
 import { env } from '${devflareImportPath}'
 import { DoubleableNumber } from '../src/DoubleableNumber'
@@ -367,7 +414,8 @@ try {
 }
 
 console.log('RESULT:' + JSON.stringify(summary))
-`)
+`
+		)
 
 		const result = extractResult<TransportResult>(stdout)
 		expect(result.value).toBe(2)

@@ -71,10 +71,10 @@ function createLocalWorkerStub(
 			// shim can run the loaded worker's fetch entrypoint, but cannot hand
 			// back a standalone Durable Object class reference.
 			throw new Error(
-				'Worker Loader local shim cannot materialise a dynamic Durable Object class. '
-				+ 'getDurableObjectClass() returns an opaque facet-spawning reference that workerd '
-				+ 'only exposes inside the runtime. Use createTestContext() (a real Miniflare worker) '
-				+ 'for Durable Object behavior, or createMockWorkerLoader({ stub }) to inject a stub.'
+				'Worker Loader local shim cannot materialise a dynamic Durable Object class. ' +
+					'getDurableObjectClass() returns an opaque facet-spawning reference that workerd ' +
+					'only exposes inside the runtime. Use createTestContext() (a real Miniflare worker) ' +
+					'for Durable Object behavior, or createMockWorkerLoader({ stub }) to inject a stub.'
 			)
 		}
 	} as unknown as WorkerStub
@@ -98,7 +98,9 @@ export async function disposeLocalWorkerLoaderBindings(): Promise<void> {
 	const runtimes = Array.from(activeWorkerLoaderRuntimes)
 	activeWorkerLoaderRuntimes.clear()
 
-	await Promise.all(runtimes.map(async (runtime) => {
-		await runtime.dispose()
-	}))
+	await Promise.all(
+		runtimes.map(async (runtime) => {
+			await runtime.dispose()
+		})
+	)
 }

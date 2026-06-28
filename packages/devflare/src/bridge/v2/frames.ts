@@ -98,7 +98,7 @@ export const TransportV2BinaryKind = {
 } as const
 
 export type TransportV2BinaryKind =
-	typeof TransportV2BinaryKind[keyof typeof TransportV2BinaryKind]
+	(typeof TransportV2BinaryKind)[keyof typeof TransportV2BinaryKind]
 
 /** Binary frame flags for v2. */
 export const TransportV2BinaryFlags = {
@@ -170,9 +170,11 @@ export function decodeTransportV2BinaryFrame(frame: Uint8Array): TransportV2Deco
 	const view = new DataView(frame.buffer, frame.byteOffset, frame.byteLength)
 	const kind = view.getUint8(0)
 
-	if (kind !== TransportV2BinaryKind.StreamChunk
-		&& kind !== TransportV2BinaryKind.WsData
-		&& kind !== TransportV2BinaryKind.BodyChunk) {
+	if (
+		kind !== TransportV2BinaryKind.StreamChunk &&
+		kind !== TransportV2BinaryKind.WsData &&
+		kind !== TransportV2BinaryKind.BodyChunk
+	) {
 		throw new Error(`Invalid transport v2 binary frame: unknown kind ${kind}`)
 	}
 
@@ -204,13 +206,7 @@ export function transportV2IsAbort(flags: number): boolean {
 // Control plane — parse / stringify
 // -----------------------------------------------------------------------------
 
-const KNOWN_V2_CONTROL_TYPES = new Set([
-	'hello',
-	'welcome',
-	'body.open',
-	'body.end',
-	'body.abort'
-])
+const KNOWN_V2_CONTROL_TYPES = new Set(['hello', 'welcome', 'body.open', 'body.end', 'body.abort'])
 
 /**
  * Parse a JSON string as a v2-specific control message. Returns the typed

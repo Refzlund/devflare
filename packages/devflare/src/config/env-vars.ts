@@ -140,12 +140,11 @@ export type DevflareVarInput =
  */
 export type DevflareVarsInput = Record<string, DevflareVarInput>
 
-export type InferEnvVarDescriptor<T> =
-	T extends EnvVarDescriptor<infer TValue, infer TOptional>
-		? TOptional extends true
-			? TValue | undefined
-			: TValue
-		: never
+export type InferEnvVarDescriptor<T> = T extends EnvVarDescriptor<infer TValue, infer TOptional>
+	? TOptional extends true
+		? TValue | undefined
+		: TValue
+	: never
 
 type InferOptionalKeys<T extends Record<string, unknown>> = {
 	[K in keyof T]-?: undefined extends InferConfigVars<T[K]> ? K : never
@@ -170,10 +169,9 @@ type InferRequiredKeys<T extends Record<string, unknown>> = Exclude<keyof T, Inf
  * }>
  * ```
  */
-export type InferConfigVars<T> =
-	T extends { readonly __vars?: infer TVars }
-		? TVars
-		: T extends EnvVarDescriptor<unknown, boolean>
+export type InferConfigVars<T> = T extends { readonly __vars?: infer TVars }
+	? TVars
+	: T extends EnvVarDescriptor<unknown, boolean>
 		? InferEnvVarDescriptor<T>
 		: T extends readonly (infer TItem)[]
 			? InferConfigVars<TItem>[]
@@ -281,9 +279,9 @@ export const env: Record<string, EnvVarDescriptor<string, false>> = new Proxy(
  */
 export function isEnvVarDescriptor(value: unknown): value is EnvVarDescriptor<unknown, boolean> {
 	return Boolean(
-		value
-		&& typeof value === 'object'
-		&& (value as { [ENV_DESCRIPTOR_FLAG]?: unknown })[ENV_DESCRIPTOR_FLAG] === true
+		value &&
+			typeof value === 'object' &&
+			(value as { [ENV_DESCRIPTOR_FLAG]?: unknown })[ENV_DESCRIPTOR_FLAG] === true
 	)
 }
 
@@ -292,9 +290,9 @@ function parseEnvValue(rawValue: string): string {
 	const quote = trimmed[0]
 
 	if (
-		(quote === '"' || quote === "'" || quote === '`')
-		&& trimmed.endsWith(quote)
-		&& trimmed.length >= 2
+		(quote === '"' || quote === "'" || quote === '`') &&
+		trimmed.endsWith(quote) &&
+		trimmed.length >= 2
 	) {
 		const inner = trimmed.slice(1, -1)
 		if (quote !== '"') {
@@ -440,7 +438,9 @@ export async function loadDevflareDotenv(startDir: string): Promise<LoadDevflare
  * await loadDevflareDotenvIntoProcess(process.cwd())
  * ```
  */
-export async function loadDevflareDotenvIntoProcess(startDir: string): Promise<LoadDevflareDotenvResult> {
+export async function loadDevflareDotenvIntoProcess(
+	startDir: string
+): Promise<LoadDevflareDotenvResult> {
 	const loaded = await loadDevflareDotenv(startDir)
 
 	for (const [key, value] of Object.entries(loaded.values)) {
@@ -508,11 +508,9 @@ export class EnvVarResolutionError extends Error {
 		public readonly missing: MissingEnvVar[],
 		public readonly mode: EnvResolutionMode
 	) {
-		super([
-			'These environment variables are missing:',
-			'',
-			formatMissingEnvTree(missing)
-		].join('\n'))
+		super(
+			['These environment variables are missing:', '', formatMissingEnvTree(missing)].join('\n')
+		)
 		this.name = 'EnvVarResolutionError'
 	}
 }
@@ -526,8 +524,8 @@ export class EnvVarParseError extends Error {
 		cause: unknown
 	) {
 		super(
-			`Could not parse environment variable ${variableName} for vars.${path.join('.')}.\n`
-			+ `Parser error: ${cause instanceof Error ? cause.message : String(cause)}`
+			`Could not parse environment variable ${variableName} for vars.${path.join('.')}.\n` +
+				`Parser error: ${cause instanceof Error ? cause.message : String(cause)}`
 		)
 		this.name = 'EnvVarParseError'
 	}
@@ -622,9 +620,7 @@ function resolveVarsObject(
 	}
 
 	const resolved = resolveVarValue(vars, sources, [], mode, missing)
-	return resolved === OMIT_VALUE
-		? undefined
-		: resolved as DevflareConfig['vars']
+	return resolved === OMIT_VALUE ? undefined : (resolved as DevflareConfig['vars'])
 }
 
 export interface ResolveConfigEnvVarsOptions {
@@ -668,7 +664,9 @@ export async function resolveConfigEnvVars<TConfig extends DevflareConfig>(
 	config: TConfig,
 	options: ResolveConfigEnvVarsOptions
 ): Promise<TConfig> {
-	const startDir = options.configPath ? dirname(resolve(options.cwd, options.configPath)) : options.cwd
+	const startDir = options.configPath
+		? dirname(resolve(options.cwd, options.configPath))
+		: options.cwd
 	const dotenv = await loadDevflareDotenv(startDir)
 	const sources: Record<string, string | undefined> = {
 		...dotenv.values,
@@ -683,8 +681,8 @@ export async function resolveConfigEnvVars<TConfig extends DevflareConfig>(
 
 	return vars === config.vars
 		? config
-		: {
+		: ({
 				...config,
 				vars
-			} as TConfig
+			} as TConfig)
 }

@@ -1,5 +1,5 @@
-import type { ConsolaInstance } from 'consola'
 import { createHash } from 'node:crypto'
+import type { ConsolaInstance } from 'consola'
 import { resolve } from 'pathe'
 import type { DevflareConfig } from '../config'
 
@@ -66,7 +66,7 @@ async function applyMigrationsToBinding(options: {
 	const { bindingName, statements, files, miniflarePort, logger } = options
 	let lastError: unknown
 
-	for (let attempt = 0;attempt <= MIGRATION_RETRY_DELAYS_MS.length;attempt++) {
+	for (let attempt = 0; attempt <= MIGRATION_RETRY_DELAYS_MS.length; attempt++) {
 		if (attempt > 0) {
 			await waitForRetry(MIGRATION_RETRY_DELAYS_MS[attempt - 1])
 		}
@@ -83,7 +83,7 @@ async function applyMigrationsToBinding(options: {
 				throw new Error(`HTTP ${response.status}: ${text}`)
 			}
 
-			const result = await response.json() as MigrationResponse
+			const result = (await response.json()) as MigrationResponse
 			if (result.success) {
 				if (Array.isArray(result.warnings)) {
 					for (const warning of result.warnings) {
@@ -188,7 +188,9 @@ export async function runD1Migrations(options: RunD1MigrationsOptions): Promise<
 			// An empty per-binding directory intentionally skips the binding
 			// — the shared fallback is NOT used when an explicit directory exists.
 			if (perBindingFiles.length === 0) {
-				logger?.debug(`No SQL migration files in migrations/${bindingName}/, skipping ${bindingName}`)
+				logger?.debug(
+					`No SQL migration files in migrations/${bindingName}/, skipping ${bindingName}`
+				)
 				continue
 			}
 

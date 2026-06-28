@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, test } from 'bun:test'
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { join } from 'pathe'
@@ -30,12 +30,21 @@ describe('createTestContext event accessors', () => {
 		}
 
 		await mkdir(join(projectDir, 'src'), { recursive: true })
-		await writeFile(join(projectDir, 'package.json'), JSON.stringify({
-			name: 'test-context-event-accessors',
-			private: true,
-			type: 'module'
-		}, null, 2))
-		await writeFile(join(projectDir, 'devflare.config.ts'), `
+		await writeFile(
+			join(projectDir, 'package.json'),
+			JSON.stringify(
+				{
+					name: 'test-context-event-accessors',
+					private: true,
+					type: 'module'
+				},
+				null,
+				2
+			)
+		)
+		await writeFile(
+			join(projectDir, 'devflare.config.ts'),
+			`
 export default {
 	name: 'test-context-event-accessors',
 	compatibilityDate: '2026-03-17',
@@ -54,8 +63,11 @@ export default {
 		crons: ['0 * * * *']
 	}
 }
-`.trim())
-		await writeFile(join(projectDir, 'src', 'fetch.ts'), `
+`.trim()
+		)
+		await writeFile(
+			join(projectDir, 'src', 'fetch.ts'),
+			`
 import { getFetchEvent } from '${runtimeImportPath}'
 import type { FetchEvent } from '${runtimeImportPath}'
 
@@ -70,8 +82,11 @@ export async function fetch({ url, request }: FetchEvent) {
 		safeUrl: getFetchEvent.safe()?.url.href ?? null
 	})
 }
-`.trim())
-		await writeFile(join(projectDir, 'src', 'queue.ts'), `
+`.trim()
+		)
+		await writeFile(
+			join(projectDir, 'src', 'queue.ts'),
+			`
 import { getQueueEvent } from '${runtimeImportPath}'
 
 export async function queue(event) {
@@ -79,35 +94,45 @@ export async function queue(event) {
 	await event.env.RESULTS.put('queue', event.messages[0].body.value + ':' + activeEvent.batch.queue)
 	activeEvent.messages[0].ack()
 }
-`.trim())
-		await writeFile(join(projectDir, 'src', 'scheduled.ts'), `
+`.trim()
+		)
+		await writeFile(
+			join(projectDir, 'src', 'scheduled.ts'),
+			`
 import { getScheduledEvent } from '${runtimeImportPath}'
 
 export async function scheduled(event) {
 	await event.env.RESULTS.put('scheduled', getScheduledEvent().controller.cron || 'missing-cron')
 }
-`.trim())
-		await writeFile(join(projectDir, 'src', 'email.ts'), `
+`.trim()
+		)
+		await writeFile(
+			join(projectDir, 'src', 'email.ts'),
+			`
 import { getEmailEvent } from '${runtimeImportPath}'
 
 export async function email(event) {
 	await event.env.RESULTS.put('email', event.message.from + '->' + getEmailEvent().to)
 }
-`.trim())
-		await writeFile(join(projectDir, 'src', 'tail.ts'), `
+`.trim()
+		)
+		await writeFile(
+			join(projectDir, 'src', 'tail.ts'),
+			`
 import { getTailEvent } from '${runtimeImportPath}'
 
 export async function tail(event) {
 	await event.env.RESULTS.put('tail', getTailEvent().events[0].scriptName + ':' + event.events.length)
 }
-`.trim())
+`.trim()
+		)
 
 		await createTestContext(join(projectDir, 'devflare.config.ts'))
 
 		try {
 			const fetchResponse = await cf.worker.get('/inspect')
 			expect(fetchResponse.status).toBe(200)
-			const fetchPayload = await fetchResponse.json() as {
+			const fetchPayload = (await fetchResponse.json()) as {
 				requestUrl: string
 				eventUrl: string
 				sameRequest: boolean
