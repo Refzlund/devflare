@@ -66,3 +66,11 @@ differently — keep them straight:
   entry.
 - **Runtime behavior of remote-gated bindings** — Cloudflare owns the product
   behavior of remote-only bindings; see the support matrix in the docs.
+- **The `browser` export-condition surface** — the bare `devflare` entry has a
+  `browser` condition (`dist/browser.js`) for bundlers targeting a browser
+  environment. It re-exposes the Node-only symbols as throwing stubs that emit a
+  helpful "use `devflare/runtime` / `devflare/test` instead" message, plus a few
+  genuine browser-only exports. The frozen TYPE surface (`index.d.ts`) is the
+  same regardless of condition; the *enumerable runtime* shape of the browser
+  bundle (the set of throwing stubs) is an implementation detail and not part of
+  the guarantee.

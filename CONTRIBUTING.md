@@ -51,6 +51,23 @@ day-to-day workflow is:
 3. **Pull** the bot's `chore(release): version packages` commit before
    continuing work on `next`.
 
+### Before the stable `1.0.0` cut
+
+Run the package-distribution linters against a fresh build and resolve (or
+deliberately document) anything they flag, then consider gating them in CI:
+
+```bash
+bun run --cwd packages/devflare build
+cd packages/devflare && bunx publint && bunx @arethetypeswrong/cli --pack
+```
+
+`publint` validates the `exports`/`types`/`files` manifest, and
+`@arethetypeswrong/cli` checks every entrypoint resolves its `.d.ts` correctly
+under each module-resolution mode (including the `browser` condition, which has
+no separate `types` condition). These need a correct build, so run them in an
+environment whose Bun version matches CI (the `--splitting` output is
+Bun-patch-version-sensitive).
+
 ## Local checks
 
 Before pushing, run the package checks:

@@ -81,8 +81,9 @@ export async function serializeRequest(
 			// A request body above the inline threshold would have to ride as a
 			// stream from client → gateway, but the real dev gateway does not yet
 			// consume streamed request bodies (it has no stream.* handlers). Fail
-			// loudly rather than silently dropping the body. Responses (gateway →
-			// client) ARE streamed — see serializeResponse below.
+			// loudly rather than silently dropping the body. (Oversized responses
+			// are likewise capped: the inlined dev gateway-runtime throws above the
+			// threshold; the typed reference `server.ts` path streams them.)
 			throw new Error(
 				'Request body exceeds the bridge inline limit (~512 KB) and large request-body streaming is not yet supported over the local bridge. ' +
 					'Send the payload in smaller chunks or via an R2 binding for now.'
