@@ -160,6 +160,15 @@ export const rootConfigShape = {
 	/** Whether Wrangler should preserve bundled file names. */
 	preserveFileNames: z.boolean().optional(),
 
+	/** Send Trace Events from this Worker to Workers Logpush. Does not create a Logpush job. */
+	logpush: z.boolean().optional(),
+
+	/** Include source maps when uploading this Worker. */
+	uploadSourceMaps: z.boolean().optional(),
+
+	/** Keep dashboard-managed vars when Wrangler deploys this Worker. */
+	keepVars: z.boolean().optional(),
+
 	/** Tail Workers that consume traces from this Worker. */
 	tailConsumers: z.array(tailConsumerSchema).optional(),
 

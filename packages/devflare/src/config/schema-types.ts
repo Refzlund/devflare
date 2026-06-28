@@ -230,6 +230,43 @@ export interface DevflareConfigInput {
 	preserveFileNames?: boolean
 
 	/**
+	 * Send Trace Events from this Worker to Workers Logpush. Devflare does not
+	 * create a corresponding Logpush job automatically.
+	 *
+	 * @default Wrangler default behavior.
+	 *
+	 * @example
+	 * ```ts
+	 * logpush: true
+	 * ```
+	 */
+	logpush?: boolean
+
+	/**
+	 * Whether to include source maps when uploading this Worker.
+	 *
+	 * @default Wrangler default behavior.
+	 *
+	 * @example
+	 * ```ts
+	 * uploadSourceMaps: true
+	 * ```
+	 */
+	uploadSourceMaps?: boolean
+
+	/**
+	 * Whether to keep dashboard-managed vars when Wrangler deploys this Worker.
+	 *
+	 * @default `false`
+	 *
+	 * @example
+	 * ```ts
+	 * keepVars: true
+	 * ```
+	 */
+	keepVars?: boolean
+
+	/**
 	 * Tail Workers that receive traces emitted by this Worker.
 	 *
 	 * @example

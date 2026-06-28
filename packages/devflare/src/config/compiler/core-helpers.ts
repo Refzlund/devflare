@@ -34,6 +34,18 @@ export function compileModuleOptions(config: DevflareConfig, result: WranglerCon
 	if (config.preserveFileNames !== undefined) {
 		result.preserve_file_names = config.preserveFileNames
 	}
+
+	if (config.logpush !== undefined) {
+		result.logpush = config.logpush
+	}
+
+	if (config.uploadSourceMaps !== undefined) {
+		result.upload_source_maps = config.uploadSourceMaps
+	}
+
+	if (config.keepVars !== undefined) {
+		result.keep_vars = config.keepVars
+	}
 }
 
 export function compileContainers(config: DevflareConfig, result: WranglerConfig): void {

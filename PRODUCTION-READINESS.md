@@ -41,10 +41,10 @@ the orchestrator pulls the bot's version-bump commit before the next phase.
 - B7 📝 Hyperdrive raw `connect()` — de-duplicated both copies into a shared `src/shims/local-hyperdrive.ts` with one documented message; `cloudflare:sockets` semantics can't be faithfully emulated over `node:net`, connection fields stay populated (use `connectionString` with a driver)
 
 ### Phase C — Cloudflare / Wrangler coverage
-- C1 ⬜ Python Workers: model or document the passthrough deferral (`schema-runtime.ts:255`)
-- C2 ⬜ Model high-value **v4-valid** unmodeled top-level wrangler options (`logpush`, `keep_bindings`, `upload_source_maps`, `minify`, `define`, `keep_vars`). Note: the Workers-Unbound usage-model key and Workers Sites (`site`) were removed/deprecated in Wrangler v4 — intentionally NOT modeled (the `wrangler-v4-compat` audit enforces this)
-- C3 ⬜ Document remote-only bindings (`ai`, `vectorize`, `ai_gateway`, `builds`) — no local sim (inherent)
-- C4 ⬜ Document partial-local bindings (Browser advanced, Images hosted, Media, Pipelines, mTLS, Dispatch, Artifacts, AI Search)
+- C1 📝 Python Workers — documented the `wrangler.passthrough` + Python module-rule recipe in `docs/CLOUDFLARE_SUPPORT_MATRIX.md` (not first-classed: Python Workers are still beta upstream)
+- C2 ✅ Modeled 3 v4-valid top-level options first-class: `logpush`, `uploadSourceMaps`, `keepVars` (booleans, camelCase author → snake_case compile, per-env overridable, `!== undefined` guard so explicit `false` emits). Deferred `minify` (collides with the existing `rolldown.minify` bundler knob) and `define` (collides with Vite `define` + Wrangler's per-env non-inheritance) to `wrangler.passthrough` — reasons recorded. Removed-in-v4 keys (the Workers-Unbound usage-model key, legacy compat shims, Workers Sites) intentionally NOT modeled; the `wrangler-v4-compat` audit enforces this.
+- C3 📝 Remote-only bindings (`ai`, `vectorize`, `ai_gateway`, `builds`) documented in the support matrix as inherent Cloudflare platform boundaries (no local sim)
+- C4 📝 Partial-local bindings (Browser advanced, Images hosted, Media, Pipelines, mTLS, Dispatch, Artifacts, AI Search, Hyperdrive socket, Workflows) documented with exact "what needs Cloudflare" notes
 
 ### Phase D — Deploy / preview / secrets maturity
 - D1 ⬜ Document auto-provisioning coverage (KV/D1/R2/Queues create; Hyperdrive/Vectorize resolve-only; rest reference-only)
@@ -98,3 +98,17 @@ the orchestrator pulls the bot's version-bump commit before the next phase.
 **Verification:** typecheck ✅ · full unit 1046 pass / 0 fail (+23 new) · bridge integration (proxy 7, r2-transfer 10, DO 7) ✅ · `wrangler-v4-compat` ✅ · both adversarial reviews VERDICT: PASS.
 
 **Carried forward to later phases:** the bridge "two stacks / three gateways" duplication and the unwired streaming stack are architecture debt (Phase F candidates); a generic large-request body channel + a server-side `event` producer are post-1.0 enhancements.
+
+### Phase C — Cloudflare / Wrangler coverage ✅
+
+**Done.** Modeled the 3 highest-value v4-valid deploy-policy options first-class (C2); authored `docs/CLOUDFLARE_SUPPORT_MATRIX.md` covering remote-only (C3) + partial-local (C4) bindings and the Python-Workers-via-passthrough recipe (C1).
+
+**Key decisions**
+- Kept the modeled set deliberately SMALL (3 options) because the public API is freezing — only options that map 1:1 to a Wrangler boolean and don't collide with an existing devflare subsystem qualified. `minify`/`define` were rejected with reasons (devflare already owns bundling via `rolldown` and build-time substitution via Vite `define`; first-classing them would create two overlapping knobs / break the env-merge model).
+- Confirmed against the pinned `wrangler@4.85.0` schema that the modeled keys are real v4 top-level options.
+
+**New missing items discovered**
+- A pre-existing flaky timeout: `tests/unit/docs/social-cards.test.ts` "can force social card regeneration" did a 2× Svelte compile under a 5 s default timeout and tripped under load. Fixed here (30 s timeout) — a stability item that properly belongs to Phase E; logged so E doesn't re-flag it.
+- Reinforced the Phase-B token constraint: the `wrangler-v4-compat` audit reads tracked-file CONTENT from the working tree, so even uncommitted edits to a tracked doc that contain a removed-v4 token fail it. All Phase-C docs use descriptive language for removed features.
+
+**Verification:** typecheck ✅ · config→wrangler compile of all 3 flags (incl. explicit `false`) ✅ · config+docs+compat 344/0 ✅ · full unit 1050 pass / 0 fail · both adversarial reviews VERDICT: PASS.

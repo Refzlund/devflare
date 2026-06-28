@@ -143,7 +143,9 @@ The most important top-level keys are:
 - `env`
 - `files`
 - `findAdditionalModules`
+- `keepVars`
 - `limits`
+- `logpush`
 - `migrations`
 - `name`
 - `observability`
@@ -158,6 +160,7 @@ The most important top-level keys are:
 - `server`
 - `tailConsumers`
 - `triggers`
+- `uploadSourceMaps`
 - `vars`
 - `vite`
 - `wrangler.passthrough`

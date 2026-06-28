@@ -155,6 +155,35 @@ describe('configSchema', () => {
 		})
 	})
 
+	describe('deploy policy flags', () => {
+		test('accepts logpush, uploadSourceMaps, and keepVars booleans', () => {
+			const result = configSchema.safeParse({
+				name: 'my-worker',
+				compatibilityDate: '2025-01-07',
+				logpush: true,
+				uploadSourceMaps: true,
+				keepVars: false
+			})
+
+			expect(result.success).toBe(true)
+			if (result.success) {
+				expect(result.data.logpush).toBe(true)
+				expect(result.data.uploadSourceMaps).toBe(true)
+				expect(result.data.keepVars).toBe(false)
+			}
+		})
+
+		test('rejects non-boolean deploy policy flag values', () => {
+			const result = configSchema.safeParse({
+				name: 'my-worker',
+				compatibilityDate: '2025-01-07',
+				logpush: 'yes'
+			})
+
+			expect(result.success).toBe(false)
+		})
+	})
+
 	describe('file handlers', () => {
 		test('accepts file handler paths', () => {
 			const result = configSchema.safeParse({

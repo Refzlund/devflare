@@ -11,6 +11,9 @@ export interface WranglerConfig {
 	find_additional_modules?: boolean
 	base_dir?: string
 	preserve_file_names?: boolean
+	logpush?: boolean
+	upload_source_maps?: boolean
+	keep_vars?: boolean
 	preview_urls?: boolean
 	workers_dev?: boolean
 

@@ -2336,6 +2336,9 @@ export default defineConfig({
 		enabled: true,
 		head_sampling_rate: 1
 	},
+	logpush: true,
+	uploadSourceMaps: true,
+	keepVars: false,
 	migrations: [
 		{
 			tag: 'v1',
@@ -2372,7 +2375,7 @@ export default defineConfig({
 	},
 	wrangler: {
 		passthrough: {
-			logpush: true
+			send_metrics: false
 		}
 	}
 })

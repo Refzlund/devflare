@@ -48,4 +48,27 @@ describe('compileConfig', () => {
 			expect(result.preserve_file_names).toBe(true)
 		})
 	})
+
+	describe('deploy policy flags', () => {
+		test('compiles logpush, uploadSourceMaps, and keepVars to wrangler keys', () => {
+			const result = compileConfig({
+				...baseConfig,
+				logpush: true,
+				uploadSourceMaps: true,
+				keepVars: false
+			})
+
+			expect(result.logpush).toBe(true)
+			expect(result.upload_source_maps).toBe(true)
+			expect(result.keep_vars).toBe(false)
+		})
+
+		test('omits deploy policy flags when unset', () => {
+			const result = compileConfig({ ...baseConfig })
+
+			expect(result.logpush).toBeUndefined()
+			expect(result.upload_source_maps).toBeUndefined()
+			expect(result.keep_vars).toBeUndefined()
+		})
+	})
 })
