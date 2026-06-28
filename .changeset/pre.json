@@ -28,5 +28,7 @@
     "@devflare/case9-shared": "0.0.1",
     "devflare": "1.0.0-next.27"
   },
-  "changesets": []
+  "changesets": [
+    "dev-server-host-port"
+  ]
 }
