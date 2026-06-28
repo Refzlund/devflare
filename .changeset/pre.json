@@ -41,6 +41,7 @@
     "phase-f-docs-debt",
     "remove-context-unavailable-error",
     "rolldown-build-fix",
-    "test-ci-quality"
+    "test-ci-quality",
+    "typescript-runtime-dep"
   ]
 }
