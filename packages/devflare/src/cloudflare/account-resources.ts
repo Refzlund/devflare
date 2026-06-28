@@ -57,7 +57,10 @@ export async function deleteKVNamespace(
 	options?: APIClientOptions
 ): Promise<void> {
 	const encodedNamespaceId = encodeURIComponent(namespaceId)
-	await apiDelete<{}>(`/accounts/${accountId}/storage/kv/namespaces/${encodedNamespaceId}`, options)
+	await apiDelete<Record<string, never>>(
+		`/accounts/${accountId}/storage/kv/namespaces/${encodedNamespaceId}`,
+		options
+	)
 }
 
 export async function listD1Databases(
@@ -110,7 +113,10 @@ export async function deleteD1Database(
 	options?: APIClientOptions
 ): Promise<void> {
 	const encodedDatabaseId = encodeURIComponent(databaseId)
-	await apiDelete<{}>(`/accounts/${accountId}/d1/database/${encodedDatabaseId}`, options)
+	await apiDelete<Record<string, never>>(
+		`/accounts/${accountId}/d1/database/${encodedDatabaseId}`,
+		options
+	)
 }
 
 export async function queryD1Database<T = Record<string, unknown>>(
@@ -201,7 +207,7 @@ export async function deleteQueue(
 	options?: APIClientOptions
 ): Promise<void> {
 	const encodedQueueId = encodeURIComponent(queueId)
-	await apiDelete<{}>(`/accounts/${accountId}/queues/${encodedQueueId}`, options)
+	await apiDelete<Record<string, never>>(`/accounts/${accountId}/queues/${encodedQueueId}`, options)
 }
 
 export async function listR2Buckets(
@@ -248,7 +254,10 @@ export async function deleteR2Bucket(
 	options?: APIClientOptions
 ): Promise<void> {
 	const encodedBucketName = encodeURIComponent(bucketName)
-	await apiDelete<{}>(`/accounts/${accountId}/r2/buckets/${encodedBucketName}`, options)
+	await apiDelete<Record<string, never>>(
+		`/accounts/${accountId}/r2/buckets/${encodedBucketName}`,
+		options
+	)
 }
 
 export async function listHyperdrives(
@@ -274,7 +283,10 @@ export async function deleteHyperdrive(
 	options?: APIClientOptions
 ): Promise<void> {
 	const encodedHyperdriveId = encodeURIComponent(hyperdriveId)
-	await apiDelete<{}>(`/accounts/${accountId}/hyperdrive/configs/${encodedHyperdriveId}`, options)
+	await apiDelete<Record<string, never>>(
+		`/accounts/${accountId}/hyperdrive/configs/${encodedHyperdriveId}`,
+		options
+	)
 }
 
 export async function listVectorizeIndexes(
@@ -342,7 +354,10 @@ export async function deleteVectorizeIndex(
 	options?: APIClientOptions
 ): Promise<void> {
 	const encodedIndexName = encodeURIComponent(indexName)
-	await apiDelete<{}>(`/accounts/${accountId}/vectorize/v2/indexes/${encodedIndexName}`, options)
+	await apiDelete<Record<string, never>>(
+		`/accounts/${accountId}/vectorize/v2/indexes/${encodedIndexName}`,
+		options
+	)
 }
 
 export async function listAIModels(

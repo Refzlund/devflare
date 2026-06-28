@@ -100,7 +100,7 @@ async function resolveLookupAccountId(
 		return explicitAccountId
 	}
 
-	let primaryAccount
+	let primaryAccount: Awaited<ReturnType<typeof cloudflareApi.getPrimaryAccount>>
 	try {
 		primaryAccount = await cloudflareApi.getPrimaryAccount()
 	} catch (error) {

@@ -117,7 +117,10 @@ function createMessage<T>(options: QueueMessageOptions<T>): Message<T> & {
 		retryAll() {
 			state = 'retried'
 		},
-		// Undocumented but exists — marks as failed with no retry
+		// NOTE: The Cloudflare queue Message API only exposes ack/retry, so the
+		// mock never transitions to 'failed'. The 'failed' state and the matching
+		// QueueTriggerResult.failed array are reserved for that contract and stay
+		// empty today — they are not produced by ack()/retry()/retryAll().
 		get _state() {
 			return state
 		}
@@ -195,7 +198,7 @@ async function trigger<T = unknown>(
 	if (typeof queueHandler !== 'function') {
 		throw new Error(
 			`Queue handler at "${queueHandlerPath}" must export a default function or named "queue" export.\n` +
-				+`Expected: export async function queue(event) { ... }`
+				`Expected: export async function queue(event) { ... }`
 		)
 	}
 

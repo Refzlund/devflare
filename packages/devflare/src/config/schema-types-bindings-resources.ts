@@ -296,7 +296,7 @@ export interface VersionMetadataBindingInput {
 /**
  * Worker Loader binding configuration for Dynamic Workers.
  */
-export type WorkerLoaderBindingInput = {}
+export type WorkerLoaderBindingInput = Record<string, never>
 
 /**
  * Secrets Store binding by shorthand secret name or explicit store object.

@@ -228,7 +228,7 @@ function resolveTsconfigOption(options: {
 	cwd: string
 	userTsconfig: InputOptions['tsconfig']
 	defaultMode: 'always' | 'if-present'
-}): Pick<InputOptions, 'tsconfig'> | {} {
+}): Pick<InputOptions, 'tsconfig'> | Record<string, never> {
 	if (options.userTsconfig) {
 		return { tsconfig: options.userTsconfig }
 	}

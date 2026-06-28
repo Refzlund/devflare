@@ -305,8 +305,8 @@ export async function transformDurableObject(
 				'g'
 			)
 
-			let match: RegExpExecArray | null
-			while ((match = exportPattern.exec(code)) !== null) {
+			let match: RegExpExecArray | null = exportPattern.exec(code)
+			while (match !== null) {
 				// Change "export class X" to "class __OriginalX"
 				const start = match.index
 				const exportKeywordEnd = start + 'export '.length
@@ -318,6 +318,7 @@ export async function transformDurableObject(
 				const classNameStart = start + match[0].indexOf(className)
 				const classNameEnd = classNameStart + className.length
 				s.overwrite(classNameStart, classNameEnd, `__Original${className}`)
+				match = exportPattern.exec(code)
 			}
 		} else if (classInfo.hasDecorator) {
 			// Class has @durableObject decorator but doesn't extend DurableObject
@@ -331,8 +332,8 @@ export async function transformDurableObject(
 				'g'
 			)
 
-			let match: RegExpExecArray | null
-			while ((match = decoratorPattern.exec(code)) !== null) {
+			let match: RegExpExecArray | null = decoratorPattern.exec(code)
+			while (match !== null) {
 				const start = match.index
 				const existingBaseClass = match[1]
 
@@ -355,6 +356,7 @@ export async function transformDurableObject(
 					// Doesn't extend anything, add extends DurableObject
 					s.overwrite(classNameStart, classDefEnd, `__Original${className} extends DurableObject`)
 				}
+				match = decoratorPattern.exec(code)
 			}
 		}
 	}

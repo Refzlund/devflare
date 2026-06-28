@@ -14,7 +14,7 @@
 			"recommended": true,
 			"complexity": {
 				"noExcessiveCognitiveComplexity": "warn",
-				"noBannedTypes": "warn"
+				"noBannedTypes": "error"
 			},
 			"performance": {
 				"noDelete": "warn"
@@ -29,9 +29,9 @@
 			"suspicious": {
 				"noExplicitAny": "warn",
 				"noControlCharactersInRegex": "warn",
-				"noAssignInExpressions": "warn",
-				"noShadowRestrictedNames": "warn",
-				"noImplicitAnyLet": "warn",
+				"noAssignInExpressions": "error",
+				"noShadowRestrictedNames": "error",
+				"noImplicitAnyLet": "error",
 				"noThenProperty": "warn"
 			}
 		}

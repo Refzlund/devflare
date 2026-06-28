@@ -171,9 +171,11 @@ function resolveEmailHandler(
 	}
 
 	if (module.default && typeof (module.default as Record<string, unknown>).email === 'function') {
-		return ((module.default as Record<string, unknown>).email as Function).bind(module.default) as (
-			event: unknown
-		) => Promise<unknown> | unknown
+		return (
+			(module.default as Record<string, unknown>).email as (
+				event: unknown
+			) => Promise<unknown> | unknown
+		).bind(module.default) as (event: unknown) => Promise<unknown> | unknown
 	}
 
 	if (typeof module.email === 'function') {
@@ -214,7 +216,7 @@ async function send(options: EmailSendOptions): Promise<Response> {
 		if (!emailHandler) {
 			throw new Error(
 				`Email handler at "${emailHandlerPath}" must export a default function or named "email" export.\n` +
-					+`Expected: export async function email(message) { ... }`
+					`Expected: export async function email(message) { ... }`
 			)
 		}
 

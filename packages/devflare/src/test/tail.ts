@@ -192,7 +192,7 @@ async function trigger(items: Array<TraceItem | TraceItemOptions>): Promise<Tail
 	if (typeof tailHandler !== 'function') {
 		throw new Error(
 			`Tail handler at "${tailHandlerPath}" must export a default function or named "tail" export.\n` +
-				+`Expected: export async function tail(event) { ... } or export default { tail(events, env, ctx) { ... } }`
+				`Expected: export async function tail(event) { ... } or export default { tail(events, env, ctx) { ... } }`
 		)
 	}
 

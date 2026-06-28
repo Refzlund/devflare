@@ -19,9 +19,10 @@ function findExportedClasses(code: string): string[] {
 	const classes: string[] = []
 	const classPattern = /export\s+class\s+(\w+)/g
 
-	let match: RegExpExecArray | null
-	while ((match = classPattern.exec(code)) !== null) {
+	let match: RegExpExecArray | null = classPattern.exec(code)
+	while (match !== null) {
 		classes.push(match[1])
+		match = classPattern.exec(code)
 	}
 
 	return classes

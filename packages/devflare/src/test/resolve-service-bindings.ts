@@ -578,7 +578,11 @@ async function bundleAllEntrypoints(
 
 	const bun = getBunRuntime()
 	if (!bun) {
-		console.warn('[devflare] Bun runtime required for bundling worker scripts')
+		console.warn(
+			`[devflare] Cannot bundle service worker "${workerName}" — the Bun runtime is required to bundle worker scripts, ` +
+				'but this process is not running under Bun. The service binding will be left unresolved. ' +
+				'Run your tests with `bun test` (or the devflare test runner) to enable multi-worker service bindings.'
+		)
 		return null
 	}
 
@@ -861,7 +865,11 @@ async function bundleDOClasses(
 
 	const bun = getBunRuntime()
 	if (!bun) {
-		console.warn('[devflare] Bun runtime required for bundling DO classes')
+		console.warn(
+			`[devflare] Cannot bundle Durable Object worker "${workerName}" — the Bun runtime is required to bundle DO classes, ` +
+				'but this process is not running under Bun. The Durable Object binding will be left unresolved. ' +
+				'Run your tests with `bun test` (or the devflare test runner) to enable cross-worker Durable Objects.'
+		)
 		return null
 	}
 

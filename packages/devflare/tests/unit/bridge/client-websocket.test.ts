@@ -3,7 +3,7 @@ import { resolveBridgeWebSocketConstructor } from '../../../src/bridge/client'
 
 describe('resolveBridgeWebSocketConstructor', () => {
 	test('falls back to ws when the runtime does not expose a global WebSocket', async () => {
-		const constructor = await resolveBridgeWebSocketConstructor(undefined)
-		expect(typeof constructor).toBe('function')
+		const wsConstructor = await resolveBridgeWebSocketConstructor(undefined)
+		expect(typeof wsConstructor).toBe('function')
 	})
 })

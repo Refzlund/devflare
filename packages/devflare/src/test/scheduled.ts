@@ -134,7 +134,7 @@ async function trigger(
 	if (typeof scheduledHandler !== 'function') {
 		throw new Error(
 			`Scheduled handler at "${scheduledHandlerPath}" must export a default function or named "scheduled" export.\n` +
-				+`Expected: export async function scheduled(event) { ... }`
+				`Expected: export async function scheduled(event) { ... }`
 		)
 	}
 

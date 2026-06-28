@@ -108,8 +108,16 @@ export async function cleanupTempDirs(tempDirs: string[]): Promise<void> {
 	}
 }
 
-export async function getAvailablePort(): Promise<number> {
-	return await new Promise((resolvePromise, rejectPromise) => {
+// Ports handed out earlier in this process. The OS ephemeral allocation can
+// return the same just-freed port to two back-to-back getAvailablePort() calls
+// (each probe closes its server before the next probe runs), so a test that
+// needs two ports — e.g. a Vite port and a Miniflare port — could deterministically
+// get the same number and fail to bind. Remembering issued ports closes that
+// (the common, in-process) half of the check-then-use window.
+const issuedPorts = new Set<number>()
+
+function probeEphemeralPort(): Promise<number> {
+	return new Promise((resolvePromise, rejectPromise) => {
 		const server = createServer()
 
 		server.on('error', rejectPromise)
@@ -131,6 +139,28 @@ export async function getAvailablePort(): Promise<number> {
 			})
 		})
 	})
+}
+
+export async function getAvailablePort(): Promise<number> {
+	// Re-probe (bounded) until we get a port we have not already handed out this
+	// run. This cannot remove the cross-process race inherent to ephemeral
+	// allocation, but it removes the deterministic same-port collision between
+	// consecutive calls in the same suite.
+	const maxAttempts = 20
+	let lastPort = 0
+	for (let attempt = 0; attempt < maxAttempts; attempt++) {
+		const port = await probeEphemeralPort()
+		lastPort = port
+		if (!issuedPorts.has(port)) {
+			issuedPorts.add(port)
+			return port
+		}
+	}
+
+	// Fall back to the last probed port rather than failing the test outright —
+	// 20 consecutive duplicates is effectively impossible, but never throw here.
+	issuedPorts.add(lastPort)
+	return lastPort
 }
 
 export async function waitForText(

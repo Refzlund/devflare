@@ -78,18 +78,18 @@ async function importWsPackageConstructor(): Promise<WebSocketConstructor> {
 			}>
 			const wsModule = await dynamicImport('ws')
 			const defaultExport = wsModule.default as { WebSocket?: unknown } | unknown
-			const constructor =
+			const wsConstructor =
 				wsModule.WebSocket ??
 				(typeof defaultExport === 'object' && defaultExport !== null
 					? (defaultExport as { WebSocket?: unknown }).WebSocket
 					: undefined) ??
 				defaultExport
 
-			if (typeof constructor !== 'function') {
+			if (typeof wsConstructor !== 'function') {
 				throw new Error('Could not load a WebSocket client implementation from the ws package')
 			}
 
-			return constructor as WebSocketConstructor
+			return wsConstructor as WebSocketConstructor
 		})()
 	}
 
@@ -109,8 +109,8 @@ function getRuntimeWebSocketConstructor(
 export async function resolveBridgeWebSocketConstructor(
 	runtimeWebSocket: unknown = globalThis.WebSocket
 ): Promise<WebSocketConstructor> {
-	const constructor = getRuntimeWebSocketConstructor(runtimeWebSocket)
-	if (constructor) return constructor
+	const runtimeConstructor = getRuntimeWebSocketConstructor(runtimeWebSocket)
+	if (runtimeConstructor) return runtimeConstructor
 
 	return importWsPackageConstructor()
 }

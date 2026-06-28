@@ -42,9 +42,10 @@ export function findEntrypointClasses(code: string): string[] {
 	// Reset regex state for reuse
 	ENTRYPOINT_CLASS_PATTERN.lastIndex = 0
 
-	let match
-	while ((match = ENTRYPOINT_CLASS_PATTERN.exec(code)) !== null) {
+	let match: RegExpExecArray | null = ENTRYPOINT_CLASS_PATTERN.exec(code)
+	while (match !== null) {
 		classes.push(match[1])
+		match = ENTRYPOINT_CLASS_PATTERN.exec(code)
 	}
 
 	return classes
