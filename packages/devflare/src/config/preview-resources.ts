@@ -32,7 +32,7 @@ import {
 	materializePreviewScopedString
 } from './preview'
 import { mergeConfigForEnvironment } from './resolve'
-import type { DevflareConfig } from './schema'
+import { type DevflareConfig, normalizeQueueProducer, normalizeR2Binding } from './schema'
 
 export interface PreviewScopedResourceRef {
 	bindingName?: string
@@ -427,7 +427,11 @@ export function collectPreviewScopedResourcePlan(
 	if (bindings.r2) {
 		plan.r2 = Object.entries(bindings.r2)
 			.map(([bindingName, bindingConfig]) => {
-				return createPreviewScopedResourceRef(bindingConfig, bindingName, options)
+				return createPreviewScopedResourceRef(
+					normalizeR2Binding(bindingConfig).bucketName,
+					bindingName,
+					options
+				)
 			})
 			.filter((ref): ref is PreviewScopedResourceRef => ref !== null)
 	}
@@ -435,8 +439,8 @@ export function collectPreviewScopedResourcePlan(
 	if (bindings.queues) {
 		const queueRefs = new Map<string, PreviewScopedResourceRef>()
 
-		for (const queueName of Object.values(bindings.queues.producers ?? {})) {
-			upsertPreviewScopedQueueRef(queueRefs, queueName, options)
+		for (const producer of Object.values(bindings.queues.producers ?? {})) {
+			upsertPreviewScopedQueueRef(queueRefs, normalizeQueueProducer(producer).queue, options)
 		}
 
 		for (const consumer of bindings.queues.consumers ?? []) {

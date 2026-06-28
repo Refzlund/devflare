@@ -10,6 +10,8 @@ import {
 	type MediaBinding,
 	type MtlsCertificateBinding,
 	type PipelineBinding,
+	type QueueProducer,
+	type R2Binding,
 	type SecretsStoreBinding,
 	type WorkflowBinding,
 	formatBrowserBindingLimitMessage,
@@ -50,6 +52,14 @@ export interface NormalizedD1Binding {
 	databaseId?: string
 	/** Stable D1 database name when the binding is configured by name */
 	name?: string
+	/** D1 database ID used during `wrangler dev`; compiles to `preview_database_id` */
+	previewDatabaseId?: string
+	/** Name of the migrations table; compiles to `migrations_table` */
+	migrationsTable?: string
+	/** Path to the migrations directory; compiles to `migrations_dir` */
+	migrationsDir?: string
+	/** Wrangler local-development remote-binding preference */
+	remote?: boolean
 }
 
 export interface NormalizedKVBinding {
@@ -57,6 +67,28 @@ export interface NormalizedKVBinding {
 	namespaceId?: string
 	/** Stable KV namespace name when the binding is configured by name */
 	name?: string
+	/** KV namespace ID used during `wrangler dev`; compiles to `preview_id` */
+	previewId?: string
+	/** Wrangler local-development remote-binding preference */
+	remote?: boolean
+}
+
+export interface NormalizedR2Binding {
+	/** R2 bucket name at the edge */
+	bucketName: string
+	/** R2 bucket name used during `wrangler dev`; compiles to `preview_bucket_name` */
+	previewBucketName?: string
+	/** Jurisdiction the bucket exists in; compiles to `jurisdiction` */
+	jurisdiction?: string
+	/** Wrangler local-development remote-binding preference */
+	remote?: boolean
+}
+
+export interface NormalizedQueueProducer {
+	/** Queue name this producer writes to */
+	queue: string
+	/** Wrangler local-development remote-binding preference */
+	remote?: boolean
 }
 
 export interface NormalizedHyperdriveBinding {
@@ -190,11 +222,18 @@ export function normalizeD1Binding(config: D1Binding): NormalizedD1Binding {
 		return { name: config }
 	}
 
-	if ('id' in config) {
-		return { databaseId: config.id }
+	const extras = {
+		...(config.previewDatabaseId !== undefined && { previewDatabaseId: config.previewDatabaseId }),
+		...(config.migrationsTable !== undefined && { migrationsTable: config.migrationsTable }),
+		...(config.migrationsDir !== undefined && { migrationsDir: config.migrationsDir }),
+		...(config.remote !== undefined && { remote: config.remote })
 	}
 
-	return { name: config.name }
+	if ('id' in config) {
+		return { databaseId: config.id, ...extras }
+	}
+
+	return { name: config.name, ...extras }
 }
 
 /**
@@ -206,11 +245,50 @@ export function normalizeKVBinding(config: KVBinding): NormalizedKVBinding {
 		return { name: config }
 	}
 
-	if ('id' in config) {
-		return { namespaceId: config.id }
+	const extras = {
+		...(config.previewId !== undefined && { previewId: config.previewId }),
+		...(config.remote !== undefined && { remote: config.remote })
 	}
 
-	return { name: config.name }
+	if ('id' in config) {
+		return { namespaceId: config.id, ...extras }
+	}
+
+	return { name: config.name, ...extras }
+}
+
+/**
+ * Normalize an R2 binding to a consistent object form.
+ * String bindings are treated as bucket names.
+ */
+export function normalizeR2Binding(config: R2Binding): NormalizedR2Binding {
+	if (typeof config === 'string') {
+		return { bucketName: config }
+	}
+
+	return {
+		bucketName: config.bucketName,
+		...(config.previewBucketName !== undefined && {
+			previewBucketName: config.previewBucketName
+		}),
+		...(config.jurisdiction !== undefined && { jurisdiction: config.jurisdiction }),
+		...(config.remote !== undefined && { remote: config.remote })
+	}
+}
+
+/**
+ * Normalize a queue producer binding to a consistent object form.
+ * String bindings are treated as queue names.
+ */
+export function normalizeQueueProducer(config: QueueProducer): NormalizedQueueProducer {
+	if (typeof config === 'string') {
+		return { queue: config }
+	}
+
+	return {
+		queue: config.queue,
+		...(config.remote !== undefined && { remote: config.remote })
+	}
 }
 
 /**

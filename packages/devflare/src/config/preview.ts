@@ -243,7 +243,12 @@ export function materializePreviewScopedConfig(
 			...(bindings.r2
 				? {
 						r2: mapRecordValues(bindings.r2, (binding) => {
-							return materializePreviewScopedString(binding, options)
+							return typeof binding === 'string'
+								? materializePreviewScopedString(binding, options)
+								: {
+										...binding,
+										bucketName: materializePreviewScopedString(binding.bucketName, options)
+									}
 						})
 					}
 				: {}),
@@ -253,8 +258,13 @@ export function materializePreviewScopedConfig(
 							...bindings.queues,
 							...(bindings.queues.producers
 								? {
-										producers: mapRecordValues(bindings.queues.producers, (queueName) => {
-											return materializePreviewScopedString(queueName, options)
+										producers: mapRecordValues(bindings.queues.producers, (producer) => {
+											return typeof producer === 'string'
+												? materializePreviewScopedString(producer, options)
+												: {
+														...producer,
+														queue: materializePreviewScopedString(producer.queue, options)
+													}
 										})
 									}
 								: {}),

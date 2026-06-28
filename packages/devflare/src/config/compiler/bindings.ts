@@ -15,6 +15,8 @@ import {
 	normalizeMediaBinding,
 	normalizeMtlsCertificateBinding,
 	normalizePipelineBinding,
+	normalizeQueueProducer,
+	normalizeR2Binding,
 	normalizeSecretsStoreBinding,
 	normalizeWorkflowBinding
 } from '../schema'
@@ -32,17 +34,30 @@ export function getWranglerD1DatabaseBinding(
 	options: CompileConfigOptions = {}
 ): WranglerD1DatabaseBinding {
 	const normalized = normalizeD1Binding(bindingConfig)
+	const extras = {
+		...(normalized.previewDatabaseId !== undefined && {
+			preview_database_id: normalized.previewDatabaseId
+		}),
+		...(normalized.migrationsTable !== undefined && {
+			migrations_table: normalized.migrationsTable
+		}),
+		...(normalized.migrationsDir !== undefined && { migrations_dir: normalized.migrationsDir }),
+		...(normalized.remote !== undefined && { remote: normalized.remote })
+	}
+
 	if (normalized.databaseId) {
 		return {
 			binding: bindingName,
-			database_id: normalized.databaseId
+			database_id: normalized.databaseId,
+			...extras
 		}
 	}
 
 	if (options.preserveNamedBindings && normalized.name) {
 		return {
 			binding: bindingName,
-			database_name: normalized.name
+			database_name: normalized.name,
+			...extras
 		}
 	}
 
@@ -57,17 +72,24 @@ export function getWranglerKVNamespaceBinding(
 	options: CompileConfigOptions = {}
 ): WranglerKVNamespaceBinding {
 	const normalized = normalizeKVBinding(bindingConfig)
+	const extras = {
+		...(normalized.previewId !== undefined && { preview_id: normalized.previewId }),
+		...(normalized.remote !== undefined && { remote: normalized.remote })
+	}
+
 	if (normalized.namespaceId) {
 		return {
 			binding: bindingName,
-			id: normalized.namespaceId
+			id: normalized.namespaceId,
+			...extras
 		}
 	}
 
 	if (options.preserveNamedBindings && normalized.name) {
 		return {
 			binding: bindingName,
-			name: normalized.name
+			name: normalized.name,
+			...extras
 		}
 	}
 
@@ -158,10 +180,18 @@ export function compileBindings(
 
 	// R2 Buckets
 	if (bindings.r2) {
-		result.r2_buckets = Object.entries(bindings.r2).map(([binding, bucket_name]) => ({
-			binding,
-			bucket_name
-		}))
+		result.r2_buckets = Object.entries(bindings.r2).map(([binding, config]) => {
+			const normalized = normalizeR2Binding(config)
+			return {
+				binding,
+				bucket_name: normalized.bucketName,
+				...(normalized.previewBucketName !== undefined && {
+					preview_bucket_name: normalized.previewBucketName
+				}),
+				...(normalized.jurisdiction !== undefined && { jurisdiction: normalized.jurisdiction }),
+				...(normalized.remote !== undefined && { remote: normalized.remote })
+			}
+		})
 	}
 
 	// Durable Objects
@@ -187,7 +217,14 @@ export function compileBindings(
 
 		if (bindings.queues.producers) {
 			result.queues.producers = Object.entries(bindings.queues.producers).map(
-				([binding, queue]) => ({ binding, queue })
+				([binding, config]) => {
+					const normalized = normalizeQueueProducer(config)
+					return {
+						binding,
+						queue: normalized.queue,
+						...(normalized.remote !== undefined && { remote: normalized.remote })
+					}
+				}
 			)
 		}
 
@@ -342,7 +379,8 @@ export function compileBindings(
 			binding,
 			service: config.service,
 			...(config.entrypoint && { entrypoint: config.entrypoint }),
-			...(config.environment && { environment: config.environment })
+			...(config.environment && { environment: config.environment }),
+			...(config.remote !== undefined && { remote: config.remote })
 		}))
 	}
 

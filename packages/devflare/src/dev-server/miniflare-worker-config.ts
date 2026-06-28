@@ -8,7 +8,11 @@
 
 import { resolve } from 'pathe'
 import type { DevflareConfig } from '../config'
-import { getLocalD1DatabaseIdentifier, getLocalKVNamespaceIdentifier } from '../config/schema'
+import {
+	getLocalD1DatabaseIdentifier,
+	getLocalKVNamespaceIdentifier,
+	normalizeR2Binding
+} from '../config/schema'
 import type { LocalSecretWrappedBindingConfig } from '../secrets/local-secrets'
 import type {
 	buildAiSearchInstancesConfig,
@@ -178,7 +182,13 @@ export function makeMiniflareWorker(
 				})
 			)
 		}),
-		...(bindings.r2 && { r2Buckets: bindings.r2 }),
+		...(bindings.r2 && {
+			r2Buckets: Object.fromEntries(
+				Object.entries(bindings.r2).map(([bindingName, bindingConfig]) => {
+					return [bindingName, normalizeR2Binding(bindingConfig).bucketName]
+				})
+			)
+		}),
 		...(bindings.d1 && {
 			d1Databases: Object.fromEntries(
 				Object.entries(bindings.d1).map(([bindingName, bindingConfig]) => {

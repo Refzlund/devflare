@@ -16,6 +16,7 @@ import {
 	normalizeMediaBinding,
 	normalizeMtlsCertificateBinding,
 	normalizePipelineBinding,
+	normalizeQueueProducer,
 	normalizeSecretsStoreBinding,
 	normalizeWorkflowBinding
 } from '../config'
@@ -30,8 +31,8 @@ export function buildQueueProducers(
 	}
 
 	const producers: Record<string, { queueName: string }> = {}
-	for (const [bindingName, queueName] of Object.entries(bindings.queues.producers)) {
-		producers[bindingName] = { queueName }
+	for (const [bindingName, producer] of Object.entries(bindings.queues.producers)) {
+		producers[bindingName] = { queueName: normalizeQueueProducer(producer).queue }
 	}
 
 	return producers

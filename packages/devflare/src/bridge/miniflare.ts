@@ -16,6 +16,7 @@ import {
 	normalizeMediaBinding,
 	normalizeMtlsCertificateBinding,
 	normalizePipelineBinding,
+	normalizeR2Binding,
 	normalizeSecretsStoreBinding,
 	normalizeWorkflowBinding,
 	resolveConfigEnvVars
@@ -751,7 +752,13 @@ export async function startMiniflareFromConfig(
 					})
 				)
 			: undefined,
-		r2Buckets: bindings.r2 ? bindings.r2 : undefined,
+		r2Buckets: bindings.r2
+			? Object.fromEntries(
+					Object.entries(bindings.r2).map(([bindingName, bindingConfig]) => {
+						return [bindingName, normalizeR2Binding(bindingConfig).bucketName]
+					})
+				)
+			: undefined,
 		d1Databases: bindings.d1
 			? Object.fromEntries(
 					Object.entries(bindings.d1).map(([bindingName, bindingConfig]) => {

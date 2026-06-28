@@ -20,6 +20,7 @@ import type {
 	KVBindingInput,
 	QueueConsumerInput,
 	QueuesConfigInput,
+	R2BindingInput,
 	RateLimitBindingInput,
 	SecretsStoreBindingInput,
 	ServiceBindingInput,
@@ -57,7 +58,7 @@ export interface BindingsConfigInput {
 	 * r2: { BUCKET: 'uploads-local' }
 	 * ```
 	 */
-	r2?: Record<string, string>
+	r2?: Record<string, R2BindingInput>
 
 	/**
 	 * Durable Object bindings keyed by runtime binding name.

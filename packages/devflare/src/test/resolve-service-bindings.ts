@@ -14,7 +14,8 @@ import {
 	configSchema,
 	getLocalD1DatabaseIdentifier,
 	getLocalKVNamespaceIdentifier,
-	normalizeDOBinding
+	normalizeDOBinding,
+	normalizeR2Binding
 } from '../config'
 import type { RefResult, WorkerBinding } from '../config/ref'
 import {
@@ -258,7 +259,14 @@ function buildReferencedWorkerRuntimeConfig(config: DevflareConfig): Partial<Res
 				])
 			)
 		}),
-		...(bindings.r2 && { r2Buckets: bindings.r2 }),
+		...(bindings.r2 && {
+			r2Buckets: Object.fromEntries(
+				Object.entries(bindings.r2).map(([bindingName, bindingConfig]) => [
+					bindingName,
+					normalizeR2Binding(bindingConfig).bucketName
+				])
+			)
+		}),
 		...(bindings.d1 && {
 			d1Databases: Object.fromEntries(
 				Object.entries(bindings.d1).map(([bindingName, bindingConfig]) => [

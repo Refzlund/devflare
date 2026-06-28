@@ -135,6 +135,74 @@ describe('schema validation', () => {
 			}
 		})
 
+		test('accepts R2 object form with remote/previewBucketName/jurisdiction', () => {
+			const result = configSchema.safeParse({
+				name: 'my-worker',
+				compatibilityDate: '2025-01-07',
+				bindings: {
+					r2: {
+						BUCKET: {
+							bucketName: 'my-bucket',
+							previewBucketName: 'my-bucket-preview',
+							jurisdiction: 'eu',
+							remote: true
+						}
+					}
+				}
+			})
+
+			expect(result.success).toBe(true)
+			if (result.success) {
+				expect(result.data.bindings?.r2?.BUCKET).toEqual({
+					bucketName: 'my-bucket',
+					previewBucketName: 'my-bucket-preview',
+					jurisdiction: 'eu',
+					remote: true
+				})
+			}
+		})
+
+		test('accepts KV preview/remote and D1 preview/migration/remote fields', () => {
+			const result = configSchema.safeParse({
+				name: 'my-worker',
+				compatibilityDate: '2025-01-07',
+				bindings: {
+					kv: { CACHE: { id: 'kv-id', previewId: 'kv-preview', remote: true } },
+					d1: {
+						DB: {
+							id: 'd1-id',
+							previewDatabaseId: 'd1-preview',
+							migrationsTable: 'my_migrations',
+							migrationsDir: './migrations',
+							remote: false
+						}
+					}
+				}
+			})
+
+			expect(result.success).toBe(true)
+		})
+
+		test('accepts queue producer object form and service remote flag', () => {
+			const result = configSchema.safeParse({
+				name: 'my-worker',
+				compatibilityDate: '2025-01-07',
+				bindings: {
+					queues: {
+						producers: {
+							JOBS: { queue: 'jobs-queue', remote: true },
+							MAIL: 'mail-queue'
+						}
+					},
+					services: {
+						AUTH: { service: 'auth-worker', remote: true }
+					}
+				}
+			})
+
+			expect(result.success).toBe(true)
+		})
+
 		test('accepts Durable Object bindings', () => {
 			const result = configSchema.safeParse({
 				name: 'my-worker',

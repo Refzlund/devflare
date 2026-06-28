@@ -20,7 +20,13 @@ export interface WranglerConfig {
 	// Bindings
 	kv_namespaces?: WranglerKVNamespaceBinding[]
 	d1_databases?: WranglerD1DatabaseBinding[]
-	r2_buckets?: Array<{ binding: string; bucket_name: string }>
+	r2_buckets?: Array<{
+		binding: string
+		bucket_name: string
+		preview_bucket_name?: string
+		jurisdiction?: string
+		remote?: boolean
+	}>
 	durable_objects?: {
 		bindings: Array<{
 			name: string
@@ -29,7 +35,7 @@ export interface WranglerConfig {
 		}>
 	}
 	queues?: {
-		producers?: Array<{ binding: string; queue: string }>
+		producers?: Array<{ binding: string; queue: string; remote?: boolean }>
 		consumers?: Array<{
 			queue: string
 			max_batch_size?: number
@@ -94,6 +100,7 @@ export interface WranglerConfig {
 		service: string
 		entrypoint?: string
 		environment?: string
+		remote?: boolean
 	}>
 	ai?: { binding: string; remote?: boolean; staging?: boolean }
 	ai_search_namespaces?: Array<{ binding: string; namespace: string; remote?: boolean }>

@@ -16,6 +16,7 @@ import {
 	normalizeMediaBinding,
 	normalizeMtlsCertificateBinding,
 	normalizePipelineBinding,
+	normalizeQueueProducer,
 	normalizeSecretsStoreBinding,
 	normalizeWorkflowBinding
 } from '../config'
@@ -68,8 +69,8 @@ export function buildInlineBridgeMfConfig(
 
 	if (config.bindings?.queues?.producers) {
 		const queueProducers: Record<string, { queueName: string }> = {}
-		for (const [bindingName, queueName] of Object.entries(config.bindings.queues.producers)) {
-			queueProducers[bindingName] = { queueName }
+		for (const [bindingName, producer] of Object.entries(config.bindings.queues.producers)) {
+			queueProducers[bindingName] = { queueName: normalizeQueueProducer(producer).queue }
 		}
 		mfConfig.queueProducers = queueProducers
 	}

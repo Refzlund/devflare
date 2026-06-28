@@ -22,6 +22,32 @@ export interface KVBindingByIdInput {
 	 * ```
 	 */
 	id: string
+
+	/**
+	 * KV namespace ID used during `wrangler dev` (preview). Compiles to
+	 * wrangler's `preview_id`.
+	 *
+	 * @default No dedicated preview namespace.
+	 *
+	 * @example
+	 * ```ts
+	 * kv: { CACHE: { id: 'namespace-id', previewId: 'preview-namespace-id' } }
+	 * ```
+	 */
+	previewId?: string
+
+	/**
+	 * Whether Wrangler local development should connect this KV namespace to
+	 * the remote namespace.
+	 *
+	 * @default Wrangler default behavior.
+	 *
+	 * @example
+	 * ```ts
+	 * kv: { CACHE: { id: 'namespace-id', remote: true } }
+	 * ```
+	 */
+	remote?: boolean
 }
 
 /**
@@ -37,6 +63,32 @@ export interface KVBindingByNameInput {
 	 * ```
 	 */
 	name: string
+
+	/**
+	 * KV namespace ID used during `wrangler dev` (preview). Compiles to
+	 * wrangler's `preview_id`.
+	 *
+	 * @default No dedicated preview namespace.
+	 *
+	 * @example
+	 * ```ts
+	 * kv: { CACHE: { name: 'cache-local', previewId: 'preview-namespace-id' } }
+	 * ```
+	 */
+	previewId?: string
+
+	/**
+	 * Whether Wrangler local development should connect this KV namespace to
+	 * the remote namespace.
+	 *
+	 * @default Wrangler default behavior.
+	 *
+	 * @example
+	 * ```ts
+	 * kv: { CACHE: { name: 'cache-local', remote: true } }
+	 * ```
+	 */
+	remote?: boolean
 }
 
 /**
@@ -50,9 +102,67 @@ export interface KVBindingByNameInput {
 export type D1BindingInput = string | D1BindingByIdInput | D1BindingByNameInput
 
 /**
+ * D1 preview, migration, and remote-development fields shared by the
+ * by-id and by-name D1 binding forms.
+ */
+export interface D1BindingExtraInput {
+	/**
+	 * D1 database ID used during `wrangler dev` (preview). Compiles to
+	 * wrangler's `preview_database_id`.
+	 *
+	 * @default No dedicated preview database.
+	 *
+	 * @example
+	 * ```ts
+	 * d1: { DB: { id: 'database-id', previewDatabaseId: 'preview-database-id' } }
+	 * ```
+	 */
+	previewDatabaseId?: string
+
+	/**
+	 * Name of the migrations table for this D1 database. Compiles to
+	 * wrangler's `migrations_table`.
+	 *
+	 * @default `d1_migrations`
+	 *
+	 * @example
+	 * ```ts
+	 * d1: { DB: { id: 'database-id', migrationsTable: 'my_migrations' } }
+	 * ```
+	 */
+	migrationsTable?: string
+
+	/**
+	 * Path to the directory of migrations for this D1 database. Compiles to
+	 * wrangler's `migrations_dir`.
+	 *
+	 * @default `./migrations`
+	 *
+	 * @example
+	 * ```ts
+	 * d1: { DB: { id: 'database-id', migrationsDir: './db/migrations' } }
+	 * ```
+	 */
+	migrationsDir?: string
+
+	/**
+	 * Whether Wrangler local development should connect this D1 database to
+	 * the remote database.
+	 *
+	 * @default Wrangler default behavior.
+	 *
+	 * @example
+	 * ```ts
+	 * d1: { DB: { id: 'database-id', remote: true } }
+	 * ```
+	 */
+	remote?: boolean
+}
+
+/**
  * D1 database binding by explicit database ID.
  */
-export interface D1BindingByIdInput {
+export interface D1BindingByIdInput extends D1BindingExtraInput {
 	/**
 	 * Explicit D1 database ID.
 	 *
@@ -67,7 +177,7 @@ export interface D1BindingByIdInput {
 /**
  * D1 database binding by stable database name.
  */
-export interface D1BindingByNameInput {
+export interface D1BindingByNameInput extends D1BindingExtraInput {
 	/**
 	 * Stable D1 database name to resolve at config, build, or deploy time.
 	 *
@@ -77,6 +187,75 @@ export interface D1BindingByNameInput {
 	 * ```
 	 */
 	name: string
+}
+
+/**
+ * R2 bucket binding by bucket name or object form.
+ *
+ * The string shorthand is the bucket name. The object form additionally
+ * exposes the `remote` local-development flag plus preview-bucket and
+ * jurisdiction fields.
+ *
+ * @example
+ * ```ts
+ * r2: { BUCKET: 'uploads-local' }
+ * r2: { BUCKET: { bucketName: 'uploads-local', remote: true, jurisdiction: 'eu' } }
+ * ```
+ */
+export type R2BindingInput = string | R2BindingObjectInput
+
+/**
+ * R2 bucket binding object form.
+ */
+export interface R2BindingObjectInput {
+	/**
+	 * R2 bucket name at the edge.
+	 *
+	 * @example
+	 * ```ts
+	 * r2: { BUCKET: { bucketName: 'uploads-local' } }
+	 * ```
+	 */
+	bucketName: string
+
+	/**
+	 * R2 bucket name used during `wrangler dev` (preview). Compiles to
+	 * wrangler's `preview_bucket_name`.
+	 *
+	 * @default No dedicated preview bucket.
+	 *
+	 * @example
+	 * ```ts
+	 * r2: { BUCKET: { bucketName: 'uploads-local', previewBucketName: 'uploads-preview' } }
+	 * ```
+	 */
+	previewBucketName?: string
+
+	/**
+	 * Jurisdiction the bucket exists in. Compiles to wrangler's
+	 * `jurisdiction`.
+	 *
+	 * @default Default jurisdiction.
+	 *
+	 * @example
+	 * ```ts
+	 * r2: { BUCKET: { bucketName: 'uploads-local', jurisdiction: 'eu' } }
+	 * ```
+	 */
+	jurisdiction?: string
+
+	/**
+	 * Whether Wrangler local development should connect this R2 bucket to the
+	 * remote bucket.
+	 *
+	 * @default Wrangler default behavior.
+	 *
+	 * @example
+	 * ```ts
+	 * r2: { BUCKET: { bucketName: 'uploads-local', remote: true } }
+	 * ```
+	 */
+	remote?: boolean
 }
 
 /**
@@ -117,6 +296,48 @@ export interface DurableObjectBindingObjectInput {
 }
 
 /**
+ * Queue producer binding by queue name or object form.
+ *
+ * The string shorthand is the queue name. The object form additionally
+ * exposes the `remote` local-development flag.
+ *
+ * @example
+ * ```ts
+ * producers: { TASK_QUEUE: 'tasks-local' }
+ * producers: { TASK_QUEUE: { queue: 'tasks-local', remote: true } }
+ * ```
+ */
+export type QueueProducerInput = string | QueueProducerObjectInput
+
+/**
+ * Queue producer binding object form.
+ */
+export interface QueueProducerObjectInput {
+	/**
+	 * Queue name this producer writes to.
+	 *
+	 * @example
+	 * ```ts
+	 * producers: { TASK_QUEUE: { queue: 'tasks-local' } }
+	 * ```
+	 */
+	queue: string
+
+	/**
+	 * Whether Wrangler local development should connect this queue producer
+	 * to the remote queue.
+	 *
+	 * @default Wrangler default behavior.
+	 *
+	 * @example
+	 * ```ts
+	 * producers: { TASK_QUEUE: { queue: 'tasks-local', remote: true } }
+	 * ```
+	 */
+	remote?: boolean
+}
+
+/**
  * Queue producer and consumer configuration.
  */
 export interface QueuesConfigInput {
@@ -128,7 +349,7 @@ export interface QueuesConfigInput {
 	 * producers: { TASK_QUEUE: 'tasks-local' }
 	 * ```
 	 */
-	producers?: Record<string, string>
+	producers?: Record<string, QueueProducerInput>
 
 	/**
 	 * Queue consumer configurations used to process messages from queues.
@@ -365,6 +586,19 @@ export interface ServiceBindingInput {
 	 * ```
 	 */
 	readonly entrypoint?: string
+
+	/**
+	 * Whether Wrangler local development should connect this service binding
+	 * to the remote service.
+	 *
+	 * @default Wrangler default behavior.
+	 *
+	 * @example
+	 * ```ts
+	 * services: { API: { service: 'api-worker', remote: true } }
+	 * ```
+	 */
+	readonly remote?: boolean
 
 	/**
 	 * Internal marker used by `ref()` service bindings.

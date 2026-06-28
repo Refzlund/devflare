@@ -1,4 +1,11 @@
-import type { D1Binding, DurableObjectBinding, HyperdriveBinding, KVBinding } from '../../../config'
+import type {
+	D1Binding,
+	DurableObjectBinding,
+	HyperdriveBinding,
+	KVBinding,
+	QueueProducer,
+	R2Binding
+} from '../../../config'
 import type { DiscoveredEntrypoint } from '../../../utils/entrypoint-discovery'
 import { generateImportPath } from './discovery'
 import type {
@@ -17,9 +24,9 @@ interface TypeGenerationConfig {
 	bindings?: {
 		kv?: Record<string, KVBinding>
 		d1?: Record<string, D1Binding>
-		r2?: Record<string, string>
+		r2?: Record<string, R2Binding>
 		durableObjects?: Record<string, { className?: string; scriptName?: string }>
-		queues?: { producers?: Record<string, string>; consumers?: unknown[] }
+		queues?: { producers?: Record<string, QueueProducer>; consumers?: unknown[] }
 		rateLimits?: Record<
 			string,
 			{

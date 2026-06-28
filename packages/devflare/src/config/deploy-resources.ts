@@ -36,7 +36,9 @@ import { ConfigResourceResolutionError } from './resource-resolution'
 import {
 	type DevflareConfig,
 	getLocalD1DatabaseIdentifier,
-	getLocalKVNamespaceIdentifier
+	getLocalKVNamespaceIdentifier,
+	normalizeQueueProducer,
+	normalizeR2Binding
 } from './schema'
 
 interface DeployResourcePreparationApi {
@@ -193,7 +195,9 @@ function collectQueueNames(config: DevflareConfig): string[] {
 	}
 
 	return resolveUniqueNames([
-		...Object.values(queues.producers ?? {}),
+		...Object.values(queues.producers ?? {}).map(
+			(producer) => normalizeQueueProducer(producer).queue
+		),
 		...(queues.consumers ?? []).flatMap((consumer) => [consumer.queue, consumer.deadLetterQueue])
 	])
 }
@@ -392,7 +396,11 @@ export async function prepareMaterializedConfigResourcesForDeploy(
 	const kvBindings = resolvedConfig.bindings?.kv
 	const d1Bindings = resolvedConfig.bindings?.d1
 	const hyperdriveBindings = resolvedConfig.bindings?.hyperdrive
-	const r2Names = resolveUniqueNames(Object.values(resolvedConfig.bindings?.r2 ?? {}))
+	const r2Names = resolveUniqueNames(
+		Object.values(resolvedConfig.bindings?.r2 ?? {}).map(
+			(bucket) => normalizeR2Binding(bucket).bucketName
+		)
+	)
 	const queueNames = collectQueueNames(resolvedConfig)
 	const vectorizeNames = collectVectorizeIndexNames(resolvedConfig)
 

@@ -807,3 +807,154 @@ describe('compileConfig', () => {
 		})
 	})
 })
+
+describe('CF-1 remote/preview/jurisdiction/migration binding fields', () => {
+	test('compiles KV preview_id and remote (by id)', () => {
+		const result = compileConfig({
+			...baseConfig,
+			bindings: {
+				kv: { CACHE: { id: 'kv-id-123', previewId: 'kv-preview-456', remote: true } }
+			}
+		})
+
+		expect(result.kv_namespaces).toEqual([
+			{ binding: 'CACHE', id: 'kv-id-123', preview_id: 'kv-preview-456', remote: true }
+		])
+	})
+
+	test('compiles KV preview_id and remote on the build (by name) path', () => {
+		const result = compileBuildConfig({
+			...baseConfig,
+			bindings: {
+				kv: { CACHE: { name: 'cache-kv', previewId: 'kv-preview-456', remote: false } }
+			}
+		})
+
+		expect(result.kv_namespaces).toEqual([
+			{ binding: 'CACHE', name: 'cache-kv', preview_id: 'kv-preview-456', remote: false }
+		])
+	})
+
+	test('compiles D1 preview/migration/remote fields (by id)', () => {
+		const result = compileConfig({
+			...baseConfig,
+			bindings: {
+				d1: {
+					DB: {
+						id: 'd1-id-789',
+						previewDatabaseId: 'd1-preview-000',
+						migrationsTable: 'my_migrations',
+						migrationsDir: './db/migrations',
+						remote: true
+					}
+				}
+			}
+		})
+
+		expect(result.d1_databases).toEqual([
+			{
+				binding: 'DB',
+				database_id: 'd1-id-789',
+				preview_database_id: 'd1-preview-000',
+				migrations_table: 'my_migrations',
+				migrations_dir: './db/migrations',
+				remote: true
+			}
+		])
+	})
+
+	test('compiles D1 migration fields on the build (by name) path', () => {
+		const result = compileBuildConfig({
+			...baseConfig,
+			bindings: {
+				d1: { DB: { name: 'main-database', migrationsDir: './migrations' } }
+			}
+		})
+
+		expect(result.d1_databases).toEqual([
+			{ binding: 'DB', database_name: 'main-database', migrations_dir: './migrations' }
+		])
+	})
+
+	test('compiles R2 object form with remote, preview_bucket_name, jurisdiction', () => {
+		const result = compileConfig({
+			...baseConfig,
+			bindings: {
+				r2: {
+					B: {
+						bucketName: 'x',
+						remote: true,
+						jurisdiction: 'eu',
+						previewBucketName: 'x-preview'
+					}
+				}
+			}
+		})
+
+		expect(result.r2_buckets).toEqual([
+			{
+				binding: 'B',
+				bucket_name: 'x',
+				preview_bucket_name: 'x-preview',
+				jurisdiction: 'eu',
+				remote: true
+			}
+		])
+	})
+
+	test('keeps R2 string shorthand working', () => {
+		const result = compileConfig({
+			...baseConfig,
+			bindings: { r2: { BUCKET: 'my-bucket' } }
+		})
+
+		expect(result.r2_buckets).toEqual([{ binding: 'BUCKET', bucket_name: 'my-bucket' }])
+	})
+
+	test('compiles queue producer object form with remote and keeps string shorthand', () => {
+		const result = compileConfig({
+			...baseConfig,
+			bindings: {
+				queues: {
+					producers: {
+						JOBS: { queue: 'jobs-queue', remote: true },
+						MAIL: 'mail-queue'
+					}
+				}
+			}
+		})
+
+		expect(result.queues?.producers).toEqual([
+			{ binding: 'JOBS', queue: 'jobs-queue', remote: true },
+			{ binding: 'MAIL', queue: 'mail-queue' }
+		])
+	})
+
+	test('compiles service binding remote flag', () => {
+		const result = compileConfig({
+			...baseConfig,
+			bindings: {
+				services: {
+					AUTH: { service: 'auth-worker', remote: true }
+				}
+			}
+		})
+
+		expect(result.services).toEqual([{ binding: 'AUTH', service: 'auth-worker', remote: true }])
+	})
+
+	test('omits the new fields when they are not provided', () => {
+		const result = compileConfig({
+			...baseConfig,
+			bindings: {
+				kv: { CACHE: { id: 'kv-id-123' } },
+				r2: { BUCKET: 'my-bucket' },
+				services: { AUTH: { service: 'auth-worker' } }
+			}
+		})
+
+		expect(result.kv_namespaces).toEqual([{ binding: 'CACHE', id: 'kv-id-123' }])
+		expect(result.r2_buckets).toEqual([{ binding: 'BUCKET', bucket_name: 'my-bucket' }])
+		expect(result.services).toEqual([{ binding: 'AUTH', service: 'auth-worker' }])
+	})
+})

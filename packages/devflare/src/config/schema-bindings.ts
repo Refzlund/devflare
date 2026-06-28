@@ -72,15 +72,31 @@ export const queueConsumerSchema = z.object({
 })
 
 /**
+ * Queue producer binding schema.
+ * Accepts the queue-name string shorthand or an object form exposing `remote`.
+ */
+export const queueProducerSchema = z.union([
+	z.string(),
+	z
+		.object({
+			/** Queue name this producer writes to */
+			queue: z.string().min(1),
+			/** Ask Wrangler local development to connect this producer to the remote queue */
+			remote: z.boolean().optional()
+		})
+		.strict()
+])
+
+/**
  * Queues configuration for producers and consumers.
  */
 export const queuesConfigSchema = z.object({
 	/**
 	 * Queue producer bindings.
-	 * Maps binding name to queue name.
+	 * Maps binding name to queue name or an object form exposing `remote`.
 	 * @example { TASK_QUEUE: 'task-queue' }
 	 */
-	producers: z.record(z.string(), z.string()).optional(),
+	producers: z.record(z.string(), queueProducerSchema).optional(),
 	/**
 	 * Queue consumer configurations.
 	 * Array of consumer configs for processing queue messages.
@@ -146,7 +162,7 @@ export const secretsStoreBindingSchema = z.union([
  * Binds to another Worker for RPC-style communication.
  * Accepts plain objects or WorkerBinding from ref().worker.
  */
-const serviceBindingKeys = new Set(['service', 'environment', 'entrypoint', '__ref'])
+const serviceBindingKeys = new Set(['service', 'environment', 'entrypoint', 'remote', '__ref'])
 
 function isServiceBindingValue(val: unknown): boolean {
 	if ((typeof val !== 'object' && typeof val !== 'function') || val === null) {
@@ -172,6 +188,10 @@ function isServiceBindingValue(val: unknown): boolean {
 		return false
 	}
 
+	if (obj.remote !== undefined && typeof obj.remote !== 'boolean') {
+		return false
+	}
+
 	if (typeof val === 'object') {
 		for (const key of Object.keys(obj)) {
 			if (!serviceBindingKeys.has(key)) {
@@ -190,11 +210,13 @@ export const serviceBindingSchema = z.custom<{
 	environment?: string
 	/** Optional entrypoint class name for named exports */
 	entrypoint?: string
+	/** Ask Wrangler local development to connect this binding to the remote service */
+	remote?: boolean
 	/** @internal Reference marker for ref() bindings */
 	__ref?: unknown
 }>(isServiceBindingValue, {
 	message:
-		'Expected service binding object with { service: string, environment?: string, entrypoint?: string } or ref().worker'
+		'Expected service binding object with { service: string, environment?: string, entrypoint?: string, remote?: boolean } or ref().worker'
 })
 
 /**
@@ -362,37 +384,81 @@ export const sendEmailBindingSchema = z
 		}
 	)
 
+/** Preview, migration, and remote-development fields shared by D1 binding forms. */
+const d1BindingExtraShape = {
+	/** D1 database ID used during `wrangler dev`; compiles to `preview_database_id` */
+	previewDatabaseId: z.string().optional(),
+	/** Name of the migrations table; compiles to `migrations_table` */
+	migrationsTable: z.string().optional(),
+	/** Path to the migrations directory; compiles to `migrations_dir` */
+	migrationsDir: z.string().optional(),
+	/** Ask Wrangler local development to connect this binding to the remote database */
+	remote: z.boolean().optional()
+}
+
 export const d1BindingByIdSchema = z
 	.object({
 		/** Explicit D1 database ID */
-		id: z.string()
+		id: z.string(),
+		...d1BindingExtraShape
 	})
 	.strict()
 
 export const d1BindingByNameSchema = z
 	.object({
 		/** Stable D1 database name to resolve to an ID at config/build/deploy time */
-		name: z.string()
+		name: z.string(),
+		...d1BindingExtraShape
 	})
 	.strict()
 
 export const d1BindingSchema = z.union([z.string(), d1BindingByIdSchema, d1BindingByNameSchema])
 
+/** Preview and remote-development fields shared by KV binding forms. */
+const kvBindingExtraShape = {
+	/** KV namespace ID used during `wrangler dev`; compiles to `preview_id` */
+	previewId: z.string().optional(),
+	/** Ask Wrangler local development to connect this binding to the remote namespace */
+	remote: z.boolean().optional()
+}
+
 export const kvBindingByIdSchema = z
 	.object({
 		/** Explicit KV namespace ID */
-		id: z.string()
+		id: z.string(),
+		...kvBindingExtraShape
 	})
 	.strict()
 
 export const kvBindingByNameSchema = z
 	.object({
 		/** Stable KV namespace name to resolve to an ID at config/build/deploy time */
-		name: z.string()
+		name: z.string(),
+		...kvBindingExtraShape
 	})
 	.strict()
 
 export const kvBindingSchema = z.union([z.string(), kvBindingByIdSchema, kvBindingByNameSchema])
+
+/**
+ * R2 bucket binding schema.
+ * Accepts the bucket-name string shorthand or an object form exposing
+ * `remote`, `previewBucketName`, and `jurisdiction`.
+ */
+export const r2BindingObjectSchema = z
+	.object({
+		/** R2 bucket name at the edge */
+		bucketName: z.string().min(1),
+		/** R2 bucket name used during `wrangler dev`; compiles to `preview_bucket_name` */
+		previewBucketName: z.string().optional(),
+		/** Jurisdiction the bucket exists in; compiles to `jurisdiction` */
+		jurisdiction: z.string().optional(),
+		/** Ask Wrangler local development to connect this binding to the remote bucket */
+		remote: z.boolean().optional()
+	})
+	.strict()
+
+export const r2BindingSchema = z.union([z.string(), r2BindingObjectSchema])
 
 export const mtlsCertificateBindingByIdSchema = z
 	.object({
@@ -528,9 +594,9 @@ export const bindingsSchema = z
 
 		/**
 		 * R2 Bucket bindings.
-		 * Maps binding name to R2 bucket name.
+		 * Maps binding name to an R2 bucket name or an explicit object form.
 		 */
-		r2: z.record(z.string(), z.string()).optional(),
+		r2: z.record(z.string(), r2BindingSchema).optional(),
 
 		/**
 		 * Durable Object bindings.
@@ -692,6 +758,8 @@ export type D1Binding = z.infer<typeof d1BindingSchema>
 export type DurableObjectBinding = z.infer<typeof durableObjectBindingSchema>
 export type HyperdriveBinding = z.infer<typeof hyperdriveBindingSchema>
 export type KVBinding = z.infer<typeof kvBindingSchema>
+export type R2Binding = z.infer<typeof r2BindingSchema>
+export type QueueProducer = z.infer<typeof queueProducerSchema>
 export type QueueConsumer = z.infer<typeof queueConsumerSchema>
 export type QueuesConfig = z.infer<typeof queuesConfigSchema>
 export type RateLimitBinding = z.infer<typeof rateLimitBindingSchema>

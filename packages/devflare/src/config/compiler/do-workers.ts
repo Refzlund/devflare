@@ -1,6 +1,6 @@
 import { resolve } from 'pathe'
 import { resolveConfigForEnvironment } from '../resolve'
-import { type DevflareConfig, normalizeDOBinding } from '../schema'
+import { type DevflareConfig, normalizeDOBinding, normalizeR2Binding } from '../schema'
 import {
 	getWranglerBrowserBinding,
 	getWranglerD1DatabaseBinding,
@@ -178,12 +178,18 @@ export function compileDOWorkerConfig(
 		}
 
 		if (resolvedConfig.bindings?.r2) {
-			result.r2_buckets = Object.entries(resolvedConfig.bindings.r2).map(
-				([binding, bucket_name]) => ({
+			result.r2_buckets = Object.entries(resolvedConfig.bindings.r2).map(([binding, config]) => {
+				const normalized = normalizeR2Binding(config)
+				return {
 					binding,
-					bucket_name
-				})
-			)
+					bucket_name: normalized.bucketName,
+					...(normalized.previewBucketName !== undefined && {
+						preview_bucket_name: normalized.previewBucketName
+					}),
+					...(normalized.jurisdiction !== undefined && { jurisdiction: normalized.jurisdiction }),
+					...(normalized.remote !== undefined && { remote: normalized.remote })
+				}
+			})
 		}
 
 		const browserBinding = getWranglerBrowserBinding(resolvedConfig.bindings?.browser)
