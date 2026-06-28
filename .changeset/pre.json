@@ -29,6 +29,7 @@
     "devflare": "1.0.0-next.27"
   },
   "changesets": [
+    "ci-quality-gates",
     "cloudflare-deploy-policy-flags",
     "deploy-secrets-guide",
     "dev-server-host-port",
