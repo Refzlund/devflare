@@ -29,6 +29,7 @@
     "devflare": "1.0.0-next.27"
   },
   "changesets": [
+    "bridge-do-websocket-fix",
     "ci-quality-gates",
     "cloudflare-deploy-policy-flags",
     "deploy-secrets-guide",
