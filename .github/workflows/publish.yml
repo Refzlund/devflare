@@ -62,14 +62,28 @@ jobs:
       - name: Detect pending changesets
         id: changesets
         run: |
-          count=$(find .changeset -maxdepth 1 -name '*.md' ! -name 'README.md' | wc -l | tr -d ' ')
+          # In prerelease (pre) mode, consumed changeset files persist on disk
+          # and are tracked in .changeset/pre.json. Only UNconsumed changesets
+          # represent a pending release, so exclude the ones already applied.
+          count=$(bun -e '
+            import { existsSync, readFileSync, readdirSync } from "node:fs"
+            const consumed = new Set(
+              existsSync(".changeset/pre.json")
+                ? (JSON.parse(readFileSync(".changeset/pre.json", "utf8")).changesets ?? [])
+                : []
+            )
+            const pending = readdirSync(".changeset").filter(
+              (f) => f.endsWith(".md") && f !== "README.md" && !consumed.has(f.slice(0, -3))
+            )
+            process.stdout.write(String(pending.length))
+          ')
           echo "count=$count" >> "$GITHUB_OUTPUT"
           if [ "$count" -gt 0 ]; then
             echo "has=true" >> "$GITHUB_OUTPUT"
           else
             echo "has=false" >> "$GITHUB_OUTPUT"
           fi
-          echo "Pending changesets: $count"
+          echo "Pending (unconsumed) changesets: $count"
 
       - name: Version packages
         if: steps.changesets.outputs.has == 'true'
@@ -92,11 +106,13 @@ jobs:
         if: steps.changesets.outputs.has == 'true' || github.event_name == 'workflow_dispatch'
         run: bunx turbo run build --filter=devflare
 
-      # Publishes any package whose version is not yet on npm (idempotent), so a
-      # manual re-run recovers a bump that was committed but failed to publish.
+      # No --tag: in pre mode `changeset publish` always uses the pre tag
+      # (`next`) as the npm dist-tag, and passing --tag is rejected. It publishes
+      # any package whose version is not yet on npm (idempotent), so a manual
+      # re-run recovers a bump that was committed but failed to publish.
       - name: Publish to npm (trusted publishing / OIDC)
         if: steps.changesets.outputs.has == 'true' || github.event_name == 'workflow_dispatch'
-        run: bunx changeset publish --tag next
+        run: bunx changeset publish
 
       - name: Push release git tags
         if: steps.changesets.outputs.has == 'true' || github.event_name == 'workflow_dispatch'
