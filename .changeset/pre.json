@@ -39,6 +39,7 @@
     "packaging-license-hygiene",
     "phase-b-code-paths",
     "phase-f-docs-debt",
-    "remove-context-unavailable-error"
+    "remove-context-unavailable-error",
+    "test-ci-quality"
   ]
 }
