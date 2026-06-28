@@ -549,6 +549,49 @@ function addAISearchNamespaceBindings(
 	}
 }
 
+/**
+ * Core storage and wiring bindings (kv/d1/r2/queues/durableObjects/services)
+ * have no pure-offline fixture: they need a real Miniflare runtime, which only
+ * `createTestContext()` provides. `createOfflineBindings()` therefore cannot
+ * populate them, and leaving them silently absent from `env` is a surprise.
+ * Surface each one in `missingFixtures` (with `env` left unset rather than a fake)
+ * so callers see exactly which bindings require `createTestContext()` /
+ * `createMock*()` instead of getting an `undefined` lookup at use time.
+ */
+const OFFLINE_UNAVAILABLE_STORAGE_BINDINGS = [
+	'kv',
+	'd1',
+	'r2',
+	'durableObjects',
+	'services'
+] as const
+
+function addUnsupportedStorageBindings(
+	bindings: OfflineConfig['bindings'],
+	missingFixtures: OfflineMissingFixture[]
+) {
+	for (const service of OFFLINE_UNAVAILABLE_STORAGE_BINDINGS) {
+		const group = bindings?.[service]
+		for (const name of Object.keys(group ?? {})) {
+			missingFixtures.push({
+				service,
+				binding: name,
+				reason: `${service} binding "${name}" needs a real Miniflare runtime and is not created by createOfflineBindings(); it will be undefined. Use createTestContext() (Miniflare-backed) or a createMock* helper for this binding.`
+			})
+		}
+	}
+
+	const queues = bindings?.queues
+	const queueProducers = queues?.producers ?? {}
+	for (const name of Object.keys(queueProducers)) {
+		missingFixtures.push({
+			service: 'queues',
+			binding: name,
+			reason: `queues producer binding "${name}" needs a real Miniflare runtime and is not created by createOfflineBindings(); it will be undefined. Use createTestContext() or createMockQueue() for this binding.`
+		})
+	}
+}
+
 function addRemoteBoundaries(
 	remoteBoundaries: OfflineRemoteBoundary[],
 	bindings: OfflineConfig['bindings']
@@ -574,6 +617,16 @@ function addRemoteBoundaries(
 
 /**
  * Builds a deterministic, pure-test env object from Devflare config.
+ *
+ * Covers the bindings that have a pure-offline simulator or fixture (rate
+ * limits, version metadata, hyperdrive, worker loaders, mTLS, dispatch
+ * namespaces, workflows, pipelines, images, media, artifacts, secrets store,
+ * AI Search). It does **not** create the core storage/wiring bindings
+ * (`kv`, `d1`, `r2`, `queues`, `durableObjects`, `services`) — those require a
+ * real Miniflare runtime, which only `createTestContext()` provides. When such a
+ * binding is present in config it is reported in the returned `missingFixtures`
+ * (its `env` entry is left unset rather than silently faked); use
+ * `createTestContext()` or a `createMock*()` helper for those bindings.
  */
 export function createOfflineBindings(
 	config: OfflineConfig,
@@ -604,6 +657,7 @@ export function createOfflineBindings(
 	addSecretsStoreBindings(env, bindings, fixtures, localSecretValues, missingFixtures)
 	addAISearchBindings(env, bindings, fixtures)
 	addAISearchNamespaceBindings(env, bindings, fixtures)
+	addUnsupportedStorageBindings(bindings, missingFixtures)
 	addRemoteBoundaries(remoteBoundaries, bindings)
 
 	if (fixtures.custom) {
@@ -620,6 +674,12 @@ export function createOfflineBindings(
 
 /**
  * Convenience wrapper for callers that only need the derived env object.
+ *
+ * Note: the core storage/wiring bindings (`kv`, `d1`, `r2`, `queues`,
+ * `durableObjects`, `services`) are **not** created here and will be
+ * `undefined` in the returned env — they need a real Miniflare runtime. Use
+ * `createTestContext()` or a `createMock*()` helper for them, or call
+ * `createOfflineBindings()` to inspect `missingFixtures` for the exact list.
  */
 export function createOfflineEnv(
 	config: OfflineConfig,

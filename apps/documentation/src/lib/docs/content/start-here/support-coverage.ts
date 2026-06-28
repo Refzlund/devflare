@@ -68,24 +68,24 @@ export const cloudflarePlatformSupportCards: DocCard[] = [
 		href: docsLink('bindings/vectorize')
 	}),
 	supportCard({
-		label: 'Full',
+		label: 'Limited',
 		meta: 'Database path',
 		title: 'Hyperdrive',
-		body: 'Config, name resolution, local connection strings, and Miniflare-backed Hyperdrive bindings support ordinary app queries without Cloudflare. Hosted pooling, placement, credentials, and production routing remain Cloudflare behavior.',
+		body: 'Config, name resolution, local connection strings, and Miniflare-backed Hyperdrive bindings support ordinary app queries through the populated connection fields. The raw socket `connect()` is the one named gap — the local shim throws there, and Miniflare establishes real Hyperdrive sockets only inside a `createTestContext()` run. Hosted pooling, placement, credentials, and production routing remain Cloudflare behavior.',
 		href: docsLink('bindings/hyperdrive')
 	}),
 	supportCard({
-		label: 'Full',
+		label: 'Limited',
 		meta: 'Browser runtime',
 		title: 'Browser Rendering',
-		body: 'Native config, generated typing, route examples, and bridge-backed dev-server support through the local browser-rendering shim. Cloudflare still owns hosted session limits, live/HITL behavior, recordings, and billing.',
+		body: 'Native config, generated typing, route examples, and bridge-backed dev-server support through the local browser-rendering shim. Live view, human-in-the-loop, recordings, and external CDP stay hosted, so the local contract is intentionally narrower than the deployed product.',
 		href: docsLink('bindings/browser-rendering')
 	}),
 	supportCard({
-		label: 'Remote',
+		label: 'Limited',
 		meta: 'Analytics',
 		title: 'Analytics Engine',
-		body: 'Dataset bindings are configured in Devflare, and app code can be thin-tested around `writeDataPoint()`. Production ingestion and analytics behavior remain hosted.',
+		body: 'Dataset bindings are configured in Devflare and compiled for deploy. Local delivery is not yet wired into the dev/test Miniflare config; Miniflare ships a native Analytics Engine plugin whose `writeDataPoint()` is a write-shape-only no-op (it records nothing), so it is not an inherent remote boundary — production ingestion and query behavior remain hosted.',
 		href: docsLink('bindings/analytics-engine')
 	}),
 	supportCard({
@@ -110,10 +110,10 @@ export const cloudflarePlatformSupportCards: DocCard[] = [
 		href: docsLink('bindings/version-metadata')
 	}),
 	supportCard({
-		label: 'Full',
+		label: 'Limited',
 		meta: 'Dynamic workers',
 		title: 'Worker Loaders',
-		body: 'Devflare wires Worker Loader bindings through Miniflare and pure test stubs, so local apps can load explicit Worker payloads without Cloudflare. Upload, discovery, and hosted lifecycle stay on the platform.',
+		body: 'Devflare wires Worker Loader `fetch` entrypoints through Miniflare and pure test stubs, so local apps can load explicit Worker payloads without Cloudflare. The named gap is `getDurableObjectClass()`: the local shim throws because that opaque facet-spawning reference only exists inside the runtime. Upload, discovery, and hosted lifecycle stay on the platform.',
 		href: docsLink('bindings/worker-loaders')
 	}),
 	supportCard({
@@ -159,17 +159,17 @@ export const cloudflarePlatformSupportCards: DocCard[] = [
 		href: docsLink('bindings/pipelines')
 	}),
 	supportCard({
-		label: 'Full',
+		label: 'Limited',
 		meta: 'Image processing',
 		title: 'Images',
-		body: 'Native singleton config, Miniflare image bindings, persisted local state, and deterministic pure mocks cover Worker image transform flows. Hosted storage, variants, delivery rules, billing, and final transform fidelity remain remote.',
+		body: 'Native singleton config, Miniflare image bindings, and a low-fidelity deterministic pure mock cover Worker `info()`/transform chain shapes. The named gap is the hosted storage API (`hosted.image()` / `.upload()` / `.list()`), which throws locally. Hosted storage, variants, delivery rules, billing, and final transform fidelity remain remote.',
 		href: docsLink('bindings/images')
 	}),
 	supportCard({
-		label: 'Full',
+		label: 'Limited',
 		meta: 'Media processing',
 		title: 'Media Transformations',
-		body: 'Native config, Miniflare media bindings, and deterministic pure mocks cover Worker media transform chains locally. Real codecs, output fidelity, duration handling, cache behavior, and billing remain hosted Cloudflare behavior.',
+		body: 'Native config, Miniflare media bindings, and a deterministic passthrough pure mock cover Worker media transform chain shapes locally. Real codecs, output fidelity, duration handling, cache behavior, and billing remain hosted Cloudflare behavior, so the local contract is narrower than the deployed product.',
 		href: docsLink('bindings/media-transformations')
 	}),
 	supportCard({

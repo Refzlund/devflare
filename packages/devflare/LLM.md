@@ -324,21 +324,21 @@ Every native binding or platform lane in the binding docs is listed here with it
 - **Services** — `ref()` service bindings, typed worker-to-worker env contracts, local multi-worker runtime, and tests that call the same service binding the app uses. ([link](/docs/bindings/services))
 - **AI** — Native config, generated types, deploy support, and AI Gateway method coverage are present. Real inference, model behavior, billing, and most meaningful tests remain Cloudflare remote behavior. ([link](/docs/bindings/ai))
 - **Vectorize** — Native config, generated types, preview-aware resource naming, and remote-mode tests are supported. Real index semantics and similarity results require Cloudflare. ([link](/docs/bindings/vectorize))
-- **Hyperdrive** — Config, name resolution, local connection strings, and Miniflare-backed Hyperdrive bindings support ordinary app queries without Cloudflare. Hosted pooling, placement, credentials, and production routing remain Cloudflare behavior. ([link](/docs/bindings/hyperdrive))
-- **Browser Rendering** — Native config, generated typing, route examples, and bridge-backed dev-server support through the local browser-rendering shim. Cloudflare still owns hosted session limits, live/HITL behavior, recordings, and billing. ([link](/docs/bindings/browser-rendering))
-- **Analytics Engine** — Dataset bindings are configured in Devflare, and app code can be thin-tested around `writeDataPoint()`. Production ingestion and analytics behavior remain hosted. ([link](/docs/bindings/analytics-engine))
+- **Hyperdrive** — Config, name resolution, local connection strings, and Miniflare-backed Hyperdrive bindings support ordinary app queries through the populated connection fields. The raw socket `connect()` is the one named gap — the local shim throws there, and Miniflare establishes real Hyperdrive sockets only inside a `createTestContext()` run. Hosted pooling, placement, credentials, and production routing remain Cloudflare behavior. ([link](/docs/bindings/hyperdrive))
+- **Browser Rendering** — Native config, generated typing, route examples, and bridge-backed dev-server support through the local browser-rendering shim. Live view, human-in-the-loop, recordings, and external CDP stay hosted, so the local contract is intentionally narrower than the deployed product. ([link](/docs/bindings/browser-rendering))
+- **Analytics Engine** — Dataset bindings are configured in Devflare and compiled for deploy. Local delivery is not yet wired into the dev/test Miniflare config; Miniflare ships a native Analytics Engine plugin whose `writeDataPoint()` is a write-shape-only no-op (it records nothing), so it is not an inherent remote boundary — production ingestion and query behavior remain hosted. ([link](/docs/bindings/analytics-engine))
 - **Send Email** — Outbound email bindings have native config, local support, and test access through the env binding. Inbound email handlers are a separate Worker surface. ([link](/docs/bindings/send-email))
 - **Rate Limiting** — Native fixed-window config, Miniflare-backed local behavior, generated typing, and pure mocks support deterministic application-level rate-limit tests. ([link](/docs/bindings/rate-limiting))
 - **Version Metadata** — Native config, deterministic local metadata, and test helpers support version-aware responses and diagnostics without requiring Cloudflare state. ([link](/docs/bindings/version-metadata))
-- **Worker Loaders** — Devflare wires Worker Loader bindings through Miniflare and pure test stubs, so local apps can load explicit Worker payloads without Cloudflare. Upload, discovery, and hosted lifecycle stay on the platform. ([link](/docs/bindings/worker-loaders))
+- **Worker Loaders** — Devflare wires Worker Loader `fetch` entrypoints through Miniflare and pure test stubs, so local apps can load explicit Worker payloads without Cloudflare. The named gap is `getDurableObjectClass()`: the local shim throws because that opaque facet-spawning reference only exists inside the runtime. Upload, discovery, and hosted lifecycle stay on the platform. ([link](/docs/bindings/worker-loaders))
 - **Secrets Store** — Native config, Miniflare wiring, and explicit local fixtures cover app code that reads Secrets Store values. Devflare still does not read, provision, or sync account secret values. ([link](/docs/bindings/secrets-store))
 - **AI Search** — Native instance and namespace config plus deterministic fixtures can test application flow. Crawling, indexing, ranking, and hosted model behavior stay in Cloudflare. ([link](/docs/bindings/ai-search))
 - **mTLS Certificates** — Native config and Fetcher-shaped local fixtures are supported. Real client-certificate presentation and certificate lifecycle remain Wrangler and Cloudflare remote behavior. ([link](/docs/bindings/mtls-certificates))
 - **Dispatch Namespaces** — Native dispatch namespace bindings and tenant Fetcher fixtures are supported. Devflare does not upload tenant Workers or emulate the Workers for Platforms control plane. ([link](/docs/bindings/dispatch-namespaces))
 - **Workflows** — Native config, Miniflare workflow bindings, deterministic mocks, and real WorkflowEntrypoint examples cover the local app loop. Production lifecycle, durability, retries, and scheduling remain Cloudflare-owned. ([link](/docs/bindings/workflows))
 - **Pipelines** — Native config and local send-recording tests are supported for producer code. Pipeline creation, batching, transformations, sinks, and delivery are Cloudflare-managed. ([link](/docs/bindings/pipelines))
-- **Images** — Native singleton config, Miniflare image bindings, persisted local state, and deterministic pure mocks cover Worker image transform flows. Hosted storage, variants, delivery rules, billing, and final transform fidelity remain remote. ([link](/docs/bindings/images))
-- **Media Transformations** — Native config, Miniflare media bindings, and deterministic pure mocks cover Worker media transform chains locally. Real codecs, output fidelity, duration handling, cache behavior, and billing remain hosted Cloudflare behavior. ([link](/docs/bindings/media-transformations))
+- **Images** — Native singleton config, Miniflare image bindings, and a low-fidelity deterministic pure mock cover Worker `info()`/transform chain shapes. The named gap is the hosted storage API (`hosted.image()` / `.upload()` / `.list()`), which throws locally. Hosted storage, variants, delivery rules, billing, and final transform fidelity remain remote. ([link](/docs/bindings/images))
+- **Media Transformations** — Native config, Miniflare media bindings, and a deterministic passthrough pure mock cover Worker media transform chain shapes locally. Real codecs, output fidelity, duration handling, cache behavior, and billing remain hosted Cloudflare behavior, so the local contract is narrower than the deployed product. ([link](/docs/bindings/media-transformations))
 - **Artifacts** — Native config and in-memory repo or token fixtures are supported for app flow. Durable storage, Git-over-HTTPS remotes, namespace creation, and permissions are Cloudflare-owned. ([link](/docs/bindings/artifacts))
 - **Containers** — Native top-level container config has full local support through Docker or Podman: Devflare can build Dockerfile paths offline-first, run prebuilt image tags, and interact with launched instances. Deployed rollout, registry availability, SSH, scaling, and hosted platform behavior remain Cloudflare-owned. ([link](/docs/bindings/containers))
 
@@ -10058,11 +10058,11 @@ export async function fetch(): Promise<Response> {
 
 #### Local and Remote Support
 
-Devflare can run useful Hyperdrive application behavior locally for ordinary development and tests. Cloudflare still owns production limits, quotas, billing, and deployed account behavior.
+Devflare has a real lane for Hyperdrive, but the local contract is intentionally narrower than Cloudflare's hosted product. The docs call out the supported local path and the remote boundary separately.
 
-Full local support when Devflare has a local database connection string for the binding. Start locally with `createTestContext()` or `createOfflineEnv()` with `localConnectionString`; that lane should cover the normal Hyperdrive application flow without requiring a Cloudflare connection.
+Full local support when Devflare has a local database connection string for the binding. Use the documented local lane only for the behavior Devflare explicitly models, and keep the narrower boundary visible in code review.
 
-Use Cloudflare when the assertion depends on deployed limits, account state, lifecycle behavior, billing, or other production-only Hyperdrive details.
+Use Cloudflare when the app depends on real preview isolation or actual postgres query behavior. This is the lane for full Hyperdrive product fidelity, remote state, lifecycle behavior, and platform-specific limits.
 
 #### When this binding fits best
 
@@ -10416,11 +10416,11 @@ export async function fetch(): Promise<Response> {
 
 #### Local and Remote Support
 
-Devflare can run useful Browser Rendering application behavior locally for ordinary development and tests. Cloudflare still owns production limits, quotas, billing, and deployed account behavior.
+Devflare has a real lane for Browser Rendering, but the local contract is intentionally narrower than Cloudflare's hosted product. The docs call out the supported local path and the remote boundary separately.
 
 Local support is the Devflare browser-rendering shim: the dev server starts a loopback-only browser bridge and binding worker that browser libraries can call during local development. Treat it as a practical local/dev path, then use Cloudflare for hosted Browser Rendering limits, session behavior, and product fidelity.
 
-Use Cloudflare when the assertion depends on deployed limits, account state, lifecycle behavior, billing, or other production-only Browser Rendering details.
+Use Cloudflare when a real browser workflow is mission-critical or too heavy for ordinary test runs. This is the lane for full Browser Rendering product fidelity, remote state, lifecycle behavior, and platform-specific limits.
 
 #### When this binding fits best
 
@@ -10765,9 +10765,9 @@ export async function fetch(): Promise<Response> {
 
 #### Local and Remote Support
 
-Devflare supports the config, generated env shape, docs, and local application-flow work, but full fidelity requires Cloudflare remote infrastructure. Use local shims or fixtures for code your app owns, then connect to Cloudflare when the product behavior is the assertion.
+Devflare has a real lane for Analytics Engine, but the local contract is intentionally narrower than Cloudflare's hosted product. The docs call out the supported local path and the remote boundary separately.
 
-Supported, but usually tested through integration or thin mocks. Keep local coverage focused on deterministic application flow through fixtures, mocks, shims, or Miniflare-backed wiring instead of pretending to reproduce Cloudflare-hosted product behavior.
+Supported, but usually tested through integration or thin mocks. Use the documented local lane only for the behavior Devflare explicitly models, and keep the narrower boundary visible in code review.
 
 Use Cloudflare when analytics delivery itself is a release-critical guarantee. This is the lane for full Analytics Engine product fidelity, remote state, lifecycle behavior, and platform-specific limits.
 
@@ -12152,11 +12152,11 @@ export async function fetch(request: Request): Promise<Response> {
 
 #### Local and Remote Support
 
-Devflare can run useful Worker Loaders application behavior locally for ordinary development and tests. Cloudflare still owns production limits, quotas, billing, and deployed account behavior.
+Devflare has a real lane for Worker Loaders, but the local contract is intentionally narrower than Cloudflare's hosted product. The docs call out the supported local path and the remote boundary separately.
 
-Full local support through Miniflare Worker Loader bindings and explicit pure-test Worker stubs. Start locally with `createTestContext()` with explicit Worker payloads or a pure stub; that lane should cover the normal Worker Loaders application flow without requiring a Cloudflare connection.
+Full local support through Miniflare Worker Loader bindings and explicit pure-test Worker stubs. Use the documented local lane only for the behavior Devflare explicitly models, and keep the narrower boundary visible in code review.
 
-Use Cloudflare when the assertion depends on deployed limits, account state, lifecycle behavior, billing, or other production-only Worker Loaders details.
+Use Cloudflare when the assertion depends on cloudflare-hosted product behavior rather than the app calling the binding correctly. This is the lane for full Worker Loaders product fidelity, remote state, lifecycle behavior, and platform-specific limits.
 
 #### When this binding fits best
 
@@ -14546,11 +14546,11 @@ export async function fetch(request: Request): Promise<Response> {
 
 #### Local and Remote Support
 
-Devflare can run useful Images application behavior locally for ordinary development and tests. Cloudflare still owns production limits, quotas, billing, and deployed account behavior.
+Devflare has a real lane for Images, but the local contract is intentionally narrower than Cloudflare's hosted product. The docs call out the supported local path and the remote boundary separately.
 
-Full local support through Miniflare image bindings, persisted local state, and deterministic pure mocks. Start locally with `createTestContext()` or `createOfflineEnv()`; that lane should cover the normal Images application flow without requiring a Cloudflare connection.
+Full local support through Miniflare image bindings, persisted local state, and deterministic pure mocks. Use the documented local lane only for the behavior Devflare explicitly models, and keep the narrower boundary visible in code review.
 
-Use Cloudflare when the assertion depends on deployed limits, account state, lifecycle behavior, billing, or other production-only Images details.
+Use Cloudflare when the assertion depends on cloudflare-hosted product behavior rather than the app calling the binding correctly. This is the lane for full Images product fidelity, remote state, lifecycle behavior, and platform-specific limits.
 
 #### When this binding fits best
 
@@ -14878,11 +14878,11 @@ export async function fetch(request: Request): Promise<Response> {
 
 #### Local and Remote Support
 
-Devflare can run useful Media Transformations application behavior locally for ordinary development and tests. Cloudflare still owns production limits, quotas, billing, and deployed account behavior.
+Devflare has a real lane for Media Transformations, but the local contract is intentionally narrower than Cloudflare's hosted product. The docs call out the supported local path and the remote boundary separately.
 
-Full local support through Miniflare media bindings and deterministic pure mocks for transform chains. Start locally with `createTestContext()` or `createOfflineEnv()` with media fixtures; that lane should cover the normal Media Transformations application flow without requiring a Cloudflare connection.
+Full local support through Miniflare media bindings and deterministic pure mocks for transform chains. Use the documented local lane only for the behavior Devflare explicitly models, and keep the narrower boundary visible in code review.
 
-Use Cloudflare when the assertion depends on deployed limits, account state, lifecycle behavior, billing, or other production-only Media Transformations details.
+Use Cloudflare when the assertion depends on cloudflare-hosted product behavior rather than the app calling the binding correctly. This is the lane for full Media Transformations product fidelity, remote state, lifecycle behavior, and platform-specific limits.
 
 #### When this binding fits best
 
