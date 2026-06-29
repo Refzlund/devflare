@@ -42,6 +42,7 @@
     "cf15-server-livereload-cf",
     "cf17-streaming-tail-environment-fix",
     "cf19-do-environment-subfield",
+    "cf21-service-environment-fold",
     "cf9-config-coverage-gaps",
     "ci-quality-gates",
     "cloudflare-deploy-policy-flags",
