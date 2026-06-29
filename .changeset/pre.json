@@ -31,6 +31,7 @@
   "changesets": [
     "bridge-do-websocket-fix",
     "cf-binding-remote-preview-fields",
+    "cf-stream-vpc-flagship-bindings",
     "ci-quality-gates",
     "cloudflare-deploy-policy-flags",
     "cloudflare-matrix-accuracy",
