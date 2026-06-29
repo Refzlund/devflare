@@ -132,7 +132,20 @@ export const serverConfigSchema = z
 		/** Port the V8 inspector (DevTools) binds to. Maps to Miniflare's `inspectorPort`. */
 		inspectorPort: z.number().int().min(1).max(65535).optional(),
 		/** Origin to proxy unmatched requests to (and to base the request URL on). Maps to Miniflare's `upstream`. */
-		upstream: z.string().min(1).optional()
+		upstream: z.string().min(1).optional(),
+		/**
+		 * Inject Miniflare's in-browser live-reload script into HTML responses so
+		 * the page auto-refreshes when the dev runtime reloads. Maps to Miniflare's
+		 * `liveReload`. Local-dev only; complements Devflare's own source watcher.
+		 */
+		liveReload: z.boolean().optional(),
+		/**
+		 * Override the `request.cf` object (IncomingRequestCfProperties) the local
+		 * runtime serves: `false` omits it, a string is a path to a JSON file, and
+		 * an object injects custom cf metadata (colo, country, TLS, bot management,
+		 * …). Maps to Miniflare's `cf`. Local-dev only — no deploy effect.
+		 */
+		cf: z.union([z.boolean(), z.string().min(1), z.record(z.string(), z.unknown())]).optional()
 	})
 	.strict()
 	.optional()

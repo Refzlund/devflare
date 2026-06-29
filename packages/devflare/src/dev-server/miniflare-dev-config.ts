@@ -129,7 +129,9 @@ export function buildMiniflareDevConfig(input: BuildMiniflareDevConfigInput): an
 		...(serverConfig?.inspectorPort !== undefined && {
 			inspectorPort: serverConfig.inspectorPort
 		}),
-		...(serverConfig?.upstream !== undefined && { upstream: serverConfig.upstream })
+		...(serverConfig?.upstream !== undefined && { upstream: serverConfig.upstream }),
+		...(serverConfig?.liveReload !== undefined && { liveReload: serverConfig.liveReload }),
+		...(serverConfig?.cf !== undefined && { cf: serverConfig.cf })
 	}
 
 	const localBindingShimServiceConfig = buildLocalBindingShimServiceConfig(loadedConfig)

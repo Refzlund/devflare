@@ -103,6 +103,36 @@ export interface ServerConfigInput {
 	 * ```
 	 */
 	upstream?: string
+
+	/**
+	 * Inject Miniflare's in-browser live-reload script into HTML responses so the
+	 * page auto-refreshes when the local dev runtime reloads. Maps to Miniflare's
+	 * `liveReload`. Local-dev only; complements Devflare's own source watcher.
+	 *
+	 * @default `false`
+	 *
+	 * @example
+	 * ```ts
+	 * server: { liveReload: true }
+	 * ```
+	 */
+	liveReload?: boolean
+
+	/**
+	 * Override the `request.cf` object (`IncomingRequestCfProperties`) the local
+	 * dev runtime serves to your Worker. `false` omits it, a string is a path to
+	 * a JSON file, and an object injects custom cf metadata (colo, country, TLS,
+	 * bot management, …). Maps to Miniflare's `cf`. Local-dev only — no deploy
+	 * effect.
+	 *
+	 * @default Miniflare's default `cf` values.
+	 *
+	 * @example
+	 * ```ts
+	 * server: { cf: { colo: 'SFO', country: 'US' } }
+	 * ```
+	 */
+	cf?: boolean | string | Record<string, unknown>
 }
 
 /**

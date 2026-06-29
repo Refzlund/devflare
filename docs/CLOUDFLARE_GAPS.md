@@ -151,6 +151,15 @@ loop is recorded below.
   not auto-wired into the pure-offline `createOfflineEnv()` path (nor classified
   in the offline `SUPPORT_MATRIX`). Implemented in **Batch CF-13** below. No
   rejected candidates this pass.
+- **Fourth pass** (after CF-13 shipped, same dependency grounding): only **2 low**
+  gaps surfaced, both the same class — unthreaded Miniflare `CoreSharedOptions`
+  local-dev knobs (`server.liveReload`, `server.cf`), direct siblings of the
+  `server.https`/`inspectorPort`/`upstream` added in CF-9. Implemented in **Batch
+  CF-15** below. Rejected (correctly): top-level `cloudchamber` (rides
+  `wrangler.passthrough`) and queue-consumer `type` (already dispositioned as
+  not-applicable). One survey area (binding-subfields) did not return a result
+  this pass (a survey agent aborted); it was fully addressed in CF-9 and returned
+  zero in the second and third passes, and is re-covered in the next pass.
 
 ## Batch CF-9 — CF-8 confirmed gaps (implemented)
 
@@ -250,7 +259,26 @@ How covered (CF-13):
   the last DX inconsistency — every mockable binding is now both auto-wired offline
   and classified.
 
-A **fourth** re-investigation pass after CF-13 is the convergence check; the loop
+## Batch CF-15 — CF-14 convergence gaps (implemented)
+
+The 2 low gaps from the CF-8 fourth pass, shipped.
+
+| Gap | Dimensions | The devflare-way fix | Status |
+| --- | --- | --- | --- |
+| `server.liveReload` not modeled/wired for local dev | local-dev | Add `server.liveReload` to the dev-server config, threaded into Miniflare `CoreSharedOptions`. | ✅ |
+| `server.cf` not modeled/wired for local dev | local-dev | Add `server.cf` (`boolean \| string \| object`) to the dev-server config, threaded into Miniflare `CoreSharedOptions`. | ✅ |
+
+How covered (CF-15): both are pure local-dev Miniflare `CoreSharedOptions` knobs,
+direct siblings of the `server.https`/`inspectorPort`/`upstream` added in CF-9 —
+added to `serverConfigSchema` + `ServerConfigInput` and threaded into the dev
+Miniflare `sharedOptions` (`miniflare-dev-config.ts`) with the same
+`serverConfig?.x !== undefined && { x }` pattern. `liveReload` injects Miniflare's
+in-browser auto-reload (complementing Devflare's source watcher); `cf` overrides
+the local `request.cf` (`false` to omit, a JSON file path, or an object injecting
+colo/country/TLS/bot-management). Deploy-inert; tested in
+`miniflare-dev-config.test.ts`.
+
+A **fifth** re-investigation pass after CF-15 is the convergence check; the loop
 ends when a pass returns zero real gaps.
 
 ---

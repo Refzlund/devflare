@@ -86,7 +86,7 @@ describe('buildMiniflareDevConfig', () => {
 		expect(mfConfig.port).toBe(3000)
 	})
 
-	test('threads the dev server block (https/inspectorPort/upstream) into shared options', () => {
+	test('threads the dev server block (https/inspectorPort/upstream/liveReload/cf) into shared options', () => {
 		const mfConfig = buildMiniflareDevConfig(
 			buildBaseInput({
 				config: {
@@ -97,7 +97,9 @@ describe('buildMiniflareDevConfig', () => {
 						httpsKeyPath: './certs/key.pem',
 						httpsCertPath: './certs/cert.pem',
 						inspectorPort: 9229,
-						upstream: 'https://example.com'
+						upstream: 'https://example.com',
+						liveReload: true,
+						cf: { colo: 'SFO', country: 'US' }
 					}
 				}
 			})
@@ -108,6 +110,8 @@ describe('buildMiniflareDevConfig', () => {
 		expect(mfConfig.httpsCertPath).toBe('./certs/cert.pem')
 		expect(mfConfig.inspectorPort).toBe(9229)
 		expect(mfConfig.upstream).toBe('https://example.com')
+		expect(mfConfig.liveReload).toBe(true)
+		expect(mfConfig.cf).toEqual({ colo: 'SFO', country: 'US' })
 	})
 
 	test('omits the dev server block options when no server config is set', () => {
@@ -115,6 +119,8 @@ describe('buildMiniflareDevConfig', () => {
 		expect(mfConfig.https).toBeUndefined()
 		expect(mfConfig.inspectorPort).toBeUndefined()
 		expect(mfConfig.upstream).toBeUndefined()
+		expect(mfConfig.liveReload).toBeUndefined()
+		expect(mfConfig.cf).toBeUndefined()
 	})
 
 	test('sets cachePersist alongside the sibling *Persist options when persisting', () => {
