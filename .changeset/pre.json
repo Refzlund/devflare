@@ -31,6 +31,7 @@
   "changesets": [
     "bridge-do-websocket-fix",
     "cf-binding-remote-preview-fields",
+    "cf-deploy-lifecycle",
     "cf-local-dev-wiring",
     "cf-stale-claims",
     "cf-stream-vpc-flagship-bindings",
