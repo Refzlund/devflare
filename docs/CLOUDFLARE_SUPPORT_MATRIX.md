@@ -451,6 +451,24 @@ wrangler: {
 As with the other legacy globals, there is no local Miniflare wiring or type
 generation — it is merged into the Wrangler config for deploy only.
 
+### esbuild bundling flags (`minify` / `define` / `alias` / `jsx_factory` / …)
+
+Wrangler's esbuild bundling-step flags — `minify`, `define`, `alias`,
+`no_bundle`, `keep_names`, `jsx_factory`, `jsx_fragment`, and any others Wrangler
+adds — are **not** modeled in `defineConfig`: they govern Wrangler's own bundler,
+which sits outside Devflare's schema. Devflare's native bundling control is
+`config.rolldown`. If you need a Wrangler bundling flag specifically, it is
+passthrough-reachable for deploy (no local effect):
+
+```ts
+wrangler: {
+  passthrough: {
+    jsx_factory: 'h',
+    jsx_fragment: 'Fragment'
+  }
+}
+```
+
 ## Cross-reference: two "remote-only" classifications
 
 The key nuance for reading this page: `media`, `mtls_certificates`, `artifacts`,

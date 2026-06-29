@@ -132,10 +132,13 @@ loop is recorded below.
       `python_modules`, `preview_urls`. Each is reachable verbatim through the
       passthrough escape hatch (the same path documented for Python Workers /
       `unsafe` / legacy globals).
-    - **Inherent bundling boundary (documented passthrough boundary)** — the
-      `minify`, `define`, `alias`, and `no_bundle` bundling flags. These belong
-      to Wrangler's own bundling step, which sits outside Devflare's schema; they
-      are the documented passthrough boundary, not a model gap.
+    - **Inherent bundling boundary (documented passthrough boundary)** — **all**
+      of Wrangler's esbuild bundling-step flags, such as `minify`, `define`,
+      `alias`, `no_bundle`, `keep_names`, `jsx_factory`, and `jsx_fragment` (the
+      list is open-ended — any esbuild bundling flag Wrangler adds belongs to this
+      class). These belong to Wrangler's own bundling step, which sits outside
+      Devflare's schema; they are the documented passthrough boundary, not a model
+      gap. Devflare's native bundling control is `config.rolldown`.
     - **Not applicable** — `unsafeEphemeralDurableObjects` and the
       queue-consumer `type` const. Neither corresponds to a real Devflare-modeled
       behavior to add.
@@ -187,6 +190,15 @@ loop is recorded below.
   queue-consumer `type` const (not-applicable, already dispositioned). The
   contested service-vs-DO `environment` fact was settled by reading wrangler
   4.85.0's `config-schema.json` directly (services: no; DO/dispatch/tail: yes).
+- **Eighth pass** (after CF-21 shipped, same dependency grounding): **7 of 8**
+  survey areas returned zero; the lone finding was **documentation-completeness
+  only** — the bundling-boundary enumeration above was a *closed* four-item list
+  (`minify`/`define`/`alias`/`no_bundle`) that omitted same-class esbuild flags
+  (`jsx_factory`/`jsx_fragment`/`keep_names`), all already passthrough-reachable
+  with no missing capability. Fixed in **Batch CF-23** by making that boundary
+  enumeration **open-ended** (covering all current and future esbuild flags in one
+  stroke). Rejected (correctly): `send_metrics` and Browser Rendering (both
+  already-covered). No capability/correctness gap surfaced.
 
 ## Batch CF-9 — CF-8 confirmed gaps (implemented)
 
@@ -385,6 +397,27 @@ This was the convergence loop's second **correctness** finding and required
 settling a contested cross-pass fact (does wrangler accept service `environment`?)
 by reading the installed schema directly. An **eighth** pass after CF-21 is the
 next convergence check; the loop ends when a pass returns zero real gaps.
+
+## Batch CF-23 — CF-22 documentation-completeness fix (implemented)
+
+The 1 low, documentation-only finding from the CF-8 eighth pass, shipped.
+
+| Gap | Dimensions | The devflare-way fix | Status |
+| --- | --- | --- | --- |
+| The bundling-boundary enumeration was a closed list omitting same-class esbuild flags (`jsx_factory`/`jsx_fragment`/`keep_names`) | docs | Make the boundary enumeration **open-ended** (all esbuild bundling flags), not a closed four-item list; add a matrix subsection. | ✅ |
+
+How covered (CF-23): no capability was missing — every esbuild bundling flag is
+already passthrough-reachable (`wrangler.passthrough` → `compiler.ts` merge) and
+Devflare's native bundling control is `config.rolldown`. The only gap was that the
+"inherent bundling boundary" bullet named exactly four flags as a *closed* list,
+so a JSX-Worker porter had no documented landing spot. Generalized the bullet to
+cover **all** esbuild bundling-step flags (naming `minify`/`define`/`alias`/
+`no_bundle`/`keep_names`/`jsx_factory`/`jsx_fragment` as examples, explicitly
+open-ended) and added an "esbuild bundling flags" subsection to the matrix's
+passthrough section. This closes the whole class, not just the two named flags.
+
+A **ninth** pass after CF-23 is the next convergence check; the loop ends when a
+pass returns zero real gaps.
 
 ---
 
