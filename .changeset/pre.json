@@ -37,6 +37,7 @@
     "cf-stale-claims",
     "cf-stream-vpc-flagship-bindings",
     "cf-test-dx",
+    "cf11-deployments-subcommand",
     "cf9-config-coverage-gaps",
     "ci-quality-gates",
     "cloudflare-deploy-policy-flags",
