@@ -86,7 +86,7 @@ describe('buildMiniflareDevConfig', () => {
 		expect(mfConfig.port).toBe(3000)
 	})
 
-	test('threads the dev server block (https/inspectorPort/inspectorHost/upstream/liveReload/verbose/logRequests/cf) into shared options', () => {
+	test('threads the dev server block (https/inspectorPort/inspectorHost/upstream/liveReload/verbose/logRequests/cf/publicUrl) into shared options', () => {
 		const mfConfig = buildMiniflareDevConfig(
 			buildBaseInput({
 				config: {
@@ -102,7 +102,8 @@ describe('buildMiniflareDevConfig', () => {
 						liveReload: true,
 						verbose: true,
 						logRequests: false,
-						cf: { colo: 'SFO', country: 'US' }
+						cf: { colo: 'SFO', country: 'US' },
+						publicUrl: 'https://my-worker.example.com'
 					}
 				}
 			})
@@ -118,6 +119,7 @@ describe('buildMiniflareDevConfig', () => {
 		expect(mfConfig.verbose).toBe(true)
 		expect(mfConfig.logRequests).toBe(false)
 		expect(mfConfig.cf).toEqual({ colo: 'SFO', country: 'US' })
+		expect(mfConfig.publicUrl).toBe('https://my-worker.example.com')
 	})
 
 	test('omits the dev server block options when no server config is set', () => {
@@ -130,6 +132,7 @@ describe('buildMiniflareDevConfig', () => {
 		expect(mfConfig.verbose).toBeUndefined()
 		expect(mfConfig.logRequests).toBeUndefined()
 		expect(mfConfig.cf).toBeUndefined()
+		expect(mfConfig.publicUrl).toBeUndefined()
 	})
 
 	test('sets cachePersist alongside the sibling *Persist options when persisting', () => {

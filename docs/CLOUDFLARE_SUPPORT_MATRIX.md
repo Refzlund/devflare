@@ -240,17 +240,20 @@ These knobs shape the **local** dev/test runtime rather than the deployed Worker
 
 - **`server` options** — beyond `host`/`port`, the `server` config also accepts
   `https`, `httpsKeyPath`, `httpsCertPath`, `inspectorPort`, `inspectorHost`,
-  `upstream`, `liveReload`, `cf`, `verbose`, and `logRequests`, all threaded into
-  Miniflare's `CoreSharedOptions`. This enables local **HTTPS** dev (with your own
-  key/cert), a custom **inspector port/host** for the DevTools/debugger, a custom
-  **upstream** host, Miniflare's in-browser **live-reload** script (`liveReload:
-  true`, complementing Devflare's own source watcher), a dev-time **`request.cf`
-  override** (`cf: false` to omit it, a JSON file path, or an object injecting
-  colo/country/TLS/bot-management metadata), and runtime-log controls (`verbose`,
-  `logRequests`). They have no deploy effect — they configure the local runtime
-  only. (Devflare's own internal Miniflare knobs — log level via the CLI
-  `--verbose`/`--debug`, persist roots, telemetry, unsafe/dev-registry options —
-  are managed by Devflare and intentionally not surfaced as `server` config.)
+  `upstream`, `liveReload`, `cf`, `verbose`, `logRequests`, and `publicUrl`, all
+  threaded into Miniflare's `CoreSharedOptions`. This enables local **HTTPS** dev
+  (with your own key/cert), a custom **inspector port/host** for the
+  DevTools/debugger, a custom **upstream** host, Miniflare's in-browser
+  **live-reload** script (`liveReload: true`, complementing Devflare's own source
+  watcher), a dev-time **`request.cf` override** (`cf: false` to omit it, a JSON
+  file path, or an object injecting colo/country/TLS/bot-management metadata),
+  runtime-log controls (`verbose`, `logRequests`), and a **public-URL** the local
+  runtime advertises for itself (`publicUrl`, for when dev sits behind a reverse
+  proxy/tunnel/custom domain — served on Miniflare's `/core/public-url` loopback).
+  They have no deploy effect — they configure the local runtime only. (Devflare's
+  own internal Miniflare knobs — log level via the CLI `--verbose`/`--debug`,
+  persist roots, telemetry, unsafe/dev-registry options — are managed by Devflare
+  and intentionally not surfaced as `server` config.)
 - **Cache API (`caches` global)** — works **locally by default** through
   Miniflare (no binding to declare; `caches.default` and `caches.open(...)` are
   available in dev/test). Cache contents now **persist across dev-server

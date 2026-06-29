@@ -136,7 +136,8 @@ export function buildMiniflareDevConfig(input: BuildMiniflareDevConfigInput): an
 		...(serverConfig?.liveReload !== undefined && { liveReload: serverConfig.liveReload }),
 		...(serverConfig?.verbose !== undefined && { verbose: serverConfig.verbose }),
 		...(serverConfig?.logRequests !== undefined && { logRequests: serverConfig.logRequests }),
-		...(serverConfig?.cf !== undefined && { cf: serverConfig.cf })
+		...(serverConfig?.cf !== undefined && { cf: serverConfig.cf }),
+		...(serverConfig?.publicUrl !== undefined && { publicUrl: serverConfig.publicUrl })
 	}
 
 	const localBindingShimServiceConfig = buildLocalBindingShimServiceConfig(loadedConfig)

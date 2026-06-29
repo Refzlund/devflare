@@ -173,6 +173,23 @@ export interface ServerConfigInput {
 	 * ```
 	 */
 	cf?: boolean | string | Record<string, unknown>
+
+	/**
+	 * Public-facing URL the local dev runtime advertises for itself (served on
+	 * Miniflare's `/core/public-url` loopback; otherwise the runtime entry URL).
+	 * Set this when the dev runtime sits behind a reverse proxy, tunnel, or
+	 * custom domain so the Worker reports the externally-visible origin. Maps to
+	 * Miniflare's `publicUrl`. Local-dev only — no deploy effect (no wrangler
+	 * analogue).
+	 *
+	 * @default The runtime entry URL.
+	 *
+	 * @example
+	 * ```ts
+	 * server: { publicUrl: 'https://my-worker.example.com' }
+	 * ```
+	 */
+	publicUrl?: string
 }
 
 /**

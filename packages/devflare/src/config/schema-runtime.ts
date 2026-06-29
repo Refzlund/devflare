@@ -153,7 +153,16 @@ export const serverConfigSchema = z
 		 * an object injects custom cf metadata (colo, country, TLS, bot management,
 		 * …). Maps to Miniflare's `cf`. Local-dev only — no deploy effect.
 		 */
-		cf: z.union([z.boolean(), z.string().min(1), z.record(z.string(), z.unknown())]).optional()
+		cf: z.union([z.boolean(), z.string().min(1), z.record(z.string(), z.unknown())]).optional(),
+		/**
+		 * Public-facing URL the local runtime advertises for itself (served on
+		 * Miniflare's `/core/public-url` loopback, otherwise the runtime entry
+		 * URL). Set this when the dev runtime sits behind a reverse proxy, tunnel,
+		 * or custom domain so the worker reports the externally-visible origin.
+		 * Maps to Miniflare's `publicUrl`. Local-dev only — no deploy effect (no
+		 * wrangler analogue).
+		 */
+		publicUrl: z.string().url().optional()
 	})
 	.strict()
 	.optional()

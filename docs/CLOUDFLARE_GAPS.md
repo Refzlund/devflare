@@ -449,19 +449,92 @@ How covered (CF-25):
   those flags when `custom_domain` is not set (validate-locally ≡ deploy-valid),
   and the compiler emits them only for custom-domain routes. Verified by direct
   `safeParse` probes (reject on zone routes, accept on custom-domain/plain-zone).
-- **`server.inspectorHost` / `server.verbose` / `server.logRequests`** — the last
+- **`server.inspectorHost` / `server.verbose` / `server.logRequests`** — three more
   user-facing Miniflare `CoreSharedOptions` local-dev knobs, added to the `server`
   config and threaded into the dev `sharedOptions` (siblings of the CF-9/CF-15
-  `https`/`inspectorPort`/`upstream`/`liveReload`/`cf` set). The full
-  `CoreSharedOptions` list was enumerated to **close the class**: the remaining
+  `https`/`inspectorPort`/`upstream`/`liveReload`/`cf` set). The
+  `CoreSharedOptions` list was enumerated to close the class; the remaining
   fields (`rootPath`, raw `httpsKey`/`httpsCert`, `log`/`handleRuntimeStdio`/
   `handleStructuredLogs`/`structuredWorkerdLogs`, the `unsafe*`/dev-registry
   options, `defaultPersistRoot`, `telemetry`/`deviceId`) are deliberately left
   unmodeled as internal / Devflare-managed (CLI `--verbose`/`--debug` already
   drives the Miniflare `log` level; persist roots are managed by Devflare).
+  **⚠ Correction (CF-28):** that "the last user-facing knob" framing was *stale* —
+  the enumeration overlooked `publicUrl` (the final field in the schema, after
+  `telemetry`), which IS user-facing and has no wrangler analogue. It is wired in
+  CF-28 below; with it the user-facing `CoreSharedOptions` set is genuinely
+  exhausted.
 
 A **tenth** pass after CF-25 is the next convergence check; the loop ends when a
 pass returns zero real gaps.
+
+## Batch CF-26 — tenth re-investigation (ZERO confirmed gaps)
+
+The tenth convergence pass ran the full CF-8 re-investigation harness: **8 parallel
+survey agents** grounded in the installed `@cloudflare/workers-types@4.20260426.1`,
+`miniflare@4.20260424.0`, and wrangler `config-schema.json`, each scoped to one
+Cloudflare surface (binding-types, binding-subfields, top-level config,
+dev/Miniflare wiring, deploy/CLI lifecycle, test-DX mocks, env type-generation,
+triggers/routes/observability) → dedup → independent Opus verify → synthesize.
+
+**Result: zero confirmed real gaps.** Seven of the eight surveys returned an empty
+candidate set. The single surfaced candidate — "Browser Rendering (`browser`
+config) has no test-DX `createMock*` helper" — was independently verified as
+`already_covered`: `browser` is offline-native via `src/browser-shim/*`, in the
+**same class** as Durable Objects / services / containers, all of which
+deliberately ship **no** pure `createMock*` helper (`offline-bindings.ts:149-164`).
+The "absence" is intentional pattern-parity, not a gap; it was already recorded as
+rejected in the fifth and eighth passes (`:173-174`, `:200-201`). This is the
+third time the same non-gap has been raised-and-rejected, which is itself evidence
+the surface is exhausted.
+
+An **eleventh** pass (CF-27) runs as an *independent confirmation* — two
+consecutive clean passes establish the fixpoint. The loop ends when (and only
+when) a pass returns zero real gaps; CF-26 is the first such pass.
+
+## Batch CF-27 — eleventh re-investigation (1 confirmed gap → not converged)
+
+The independent confirmation pass did **not** come back clean: it surfaced one
+real, low-severity gap that CF-26's pass (and CF-25's "close the class"
+enumeration) had missed — **`server.publicUrl`**. Seven of the eight surveys were
+empty; the `dev-miniflare` survey found `publicUrl`, and an independent Opus
+verify confirmed it `real_gap` by reading the installed
+`miniflare@4.20260424.0/dist/src/index.d.ts:2785` (it is the final field in
+`CoreSharedOptionsSchema`, after `telemetry`), the runtime consumer
+(`index.js:87607`/`:87318`, served on the `/core/public-url` loopback), and the
+absence of any wrangler `publicUrl`/`public_url` analogue (Miniflare-local only).
+
+This is exactly why the loop requires **two consecutive** clean passes: a single
+clean pass (CF-26) was not a true fixpoint — a sibling-class field had been
+overlooked. CF-27 resets the consecutive-clean counter to zero. Fixed in CF-28;
+the next pass after CF-28 must again return zero (twice) to converge.
+
+## Batch CF-28 — CF-27 confirmed gap (implemented)
+
+The 1 low gap from the CF-8 eleventh pass, shipped.
+
+| Gap | Dimensions | The devflare-way fix | Status |
+| --- | --- | --- | --- |
+| `server.publicUrl` not modeled/wired (final overlooked `CoreSharedOptions` knob) | local-dev, docs | Add `publicUrl` to `serverConfigSchema`/`ServerConfigInput` + thread to Miniflare `CoreSharedOptions`; correct the CF-25 stale "last knob" claim. | ✅ |
+
+How covered (CF-28): the last user-facing Miniflare `CoreSharedOptions` local-dev
+knob, a direct sibling of the CF-15-wired `upstream`/`cf`/`liveReload` and validated
+by Miniflare as a URL (`z.string().url()`). It advertises the public-facing origin
+the local runtime reports for itself (served on Miniflare's `/core/public-url`
+loopback; otherwise the runtime entry URL) — the knob you set when the dev runtime
+sits behind a reverse proxy, tunnel, or custom domain. Added to
+`serverConfigSchema` (`schema-runtime.ts`) and `ServerConfigInput`
+(`schema-types-runtime-server.ts`), threaded in `miniflare-dev-config.ts`
+`sharedOptions` via the same `serverConfig?.publicUrl !== undefined && { publicUrl }`
+pattern as its siblings, covered by the existing dev-config sibling-knob tests
+(present + omitted), and documented in the matrix. **No wrangler analogue** (verified
+absent in both wrangler v3 and v4 `config-schema.json`) → local-dev only, no deploy
+effect; this is the genuine close of the user-facing `CoreSharedOptions` class the
+CF-25 note claimed prematurely.
+
+A **twelfth** pass (CF-29) after CF-28 is the next convergence check, and a
+**thirteenth** (CF-30) must confirm it: the loop now requires two consecutive
+zero-gap passes before declaring the fixpoint (CF-27 proved one is insufficient).
 
 ---
 
