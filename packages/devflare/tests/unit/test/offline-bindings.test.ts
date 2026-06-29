@@ -42,7 +42,8 @@ describe('offline support matrix', () => {
 		expect(matrix.flagship.tier).toBe('offline-native')
 		expect(matrix.mtlsCertificates.tier).toBe('offline-fixture')
 		expect(matrix.ai.tier).toBe('remote-boundary')
-		expect(matrix.vectorize.tier).toBe('remote-boundary')
+		expect(matrix.vectorize.tier).toBe('offline-fixture')
+		expect(matrix.analyticsEngine.tier).toBe('offline-fixture')
 		expect(matrix.vpcServices.tier).toBe('remote-boundary')
 		expect(matrix.vpcNetworks.tier).toBe('remote-boundary')
 		expect(matrix.builds.tier).toBe('remote-boundary')
@@ -233,7 +234,10 @@ describe('createOfflineBindings', () => {
 		expect(multi.chunks[0].instance_id).toBe('docs')
 
 		expect(result.remoteBoundaries.map((boundary) => boundary.service)).toContain('ai')
-		expect(result.remoteBoundaries.map((boundary) => boundary.service)).toContain('vectorize')
+		// Vectorize now has an offline mock, so it is no longer a remote boundary.
+		expect(result.remoteBoundaries.map((boundary) => boundary.service)).not.toContain('vectorize')
+		const vectorize = result.env.DOCUMENTS as VectorizeIndex
+		expect(typeof vectorize.query).toBe('function')
 		expect(result.missingFixtures).toEqual([])
 	})
 
@@ -328,5 +332,88 @@ describe('createOfflineBindings', () => {
 		// VPC bindings are proxy-only, so they are not materialized in env.
 		expect(result.env.DB).toBeUndefined()
 		expect(result.env.NET).toBeUndefined()
+	})
+
+	test('auto-wires KV/D1/R2/queue mocks instead of reporting them missing', async () => {
+		const result = createOfflineBindings({
+			name: 'storage-worker',
+			bindings: {
+				kv: { CACHE: 'cache-namespace' },
+				d1: { DB: 'app' },
+				r2: { BUCKET: 'bucket' },
+				queues: { producers: { TASKS: 'tasks' } }
+			}
+		})
+
+		const kv = result.env.CACHE as KVNamespace
+		await kv.put('k', 'v')
+		expect(await kv.get('k')).toBe('v')
+
+		expect(typeof (result.env.DB as D1Database).prepare).toBe('function')
+		expect(typeof (result.env.BUCKET as R2Bucket).put).toBe('function')
+
+		const queue = result.env.TASKS as Queue & { _getMessages(): unknown[] }
+		await queue.send({ id: 1 })
+		expect(queue._getMessages()).toEqual([{ body: { id: 1 }, options: undefined }])
+
+		// Storage bindings are auto-provided, so none of them land in missingFixtures.
+		expect(result.missingFixtures).toEqual([])
+	})
+
+	test('explicit storage fixtures override the auto-created mocks', () => {
+		const explicitKV = { marker: 'explicit' } as unknown as KVNamespace
+		const result = createOfflineBindings(
+			{
+				name: 'storage-worker',
+				bindings: {
+					kv: { CACHE: 'cache-namespace' }
+				}
+			},
+			{ kv: { CACHE: explicitKV } }
+		)
+
+		expect(result.env.CACHE).toBe(explicitKV)
+	})
+
+	test('reports durableObjects/services (but not kv/d1/r2/queues) as missing', () => {
+		const result = createOfflineBindings({
+			name: 'wiring-worker',
+			bindings: {
+				kv: { CACHE: 'cache-namespace' },
+				durableObjects: { COUNTER: 'Counter' },
+				services: { API: { service: 'api-worker' } }
+			}
+		})
+
+		const missing = result.missingFixtures.map((entry) => entry.service)
+		expect(missing).toContain('durableObjects')
+		expect(missing).toContain('services')
+		expect(missing).not.toContain('kv')
+		expect(result.env.CACHE).toBeDefined()
+	})
+
+	test('auto-wires Vectorize and Analytics Engine offline mocks', async () => {
+		const result = createOfflineBindings({
+			name: 'vectors-worker',
+			bindings: {
+				vectorize: { DOCS: { indexName: 'docs' } },
+				analyticsEngine: { EVENTS: { dataset: 'worker_events' } }
+			}
+		})
+
+		const index = result.env.DOCS as VectorizeIndex
+		await index.insert([{ id: 'a', values: [1, 0, 0] }])
+		const matches = await index.query([1, 0, 0], { topK: 1 })
+		expect(matches.matches[0].id).toBe('a')
+
+		const dataset = result.env.EVENTS as AnalyticsEngineDataset & {
+			writtenDataPoints: unknown[]
+		}
+		dataset.writeDataPoint({ blobs: ['hit'] })
+		expect(dataset.writtenDataPoints).toEqual([{ blobs: ['hit'] }])
+
+		// Neither is a remote boundary anymore.
+		expect(result.remoteBoundaries.map((b) => b.service)).not.toContain('vectorize')
+		expect(result.missingFixtures).toEqual([])
 	})
 })

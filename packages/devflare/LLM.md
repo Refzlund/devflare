@@ -4411,6 +4411,8 @@ That is the main reason the built-in harness scales: the same config and file co
 
 These helpers are runtime-shaped and context-accurate for handler logic, but they do not try to recreate every internal Cloudflare dispatch step byte for byte. Their timing rules are documented explicitly instead of being left to guesswork.
 
+Each surface is also exported standalone for tree-shaking — `cf.alarm.trigger()` is the same function as the named `alarm` export, just as `cf.queue` mirrors `queue`. The Durable Object `alarm` helper takes a DO instance you construct in the test (not a handler file path), mirroring how the runtime wrapper invokes `alarm()`.
+
 ##### Reference table
 
 | Helper | Current behavior |
@@ -4420,6 +4422,7 @@ These helpers are runtime-shaped and context-accurate for handler logic, but the
 | `cf.scheduled.trigger()` | Waits for scheduled background work before it returns. |
 | `cf.email.send()` | In `createTestContext()` tests, directly invokes the configured local email handler and waits for its queued `waitUntil()` work; otherwise it falls back to the local email endpoint. |
 | `cf.tail.trigger()` | Works when `src/tail.ts` exists, supports a default or named `tail` export, and waits for the handler plus its `waitUntil()` work before it returns. |
+| `cf.alarm.trigger(instance)` | Fires a Durable Object instance’s `alarm()` handler under a `durable-object-alarm` event context (the standalone `alarm` export is the same trigger) and awaits it, returning `{ success, error? }`. |
 
 > **Warning — Do not assert the wrong timing contract**
 >
@@ -4739,8 +4742,8 @@ The `devflare/test` entrypoint intentionally has multiple lanes: runtime-shaped 
 | Export family | Smallest use | Status |
 | --- | --- | --- |
 | `createTestContext`, `env`, `cf` | Runtime-shaped Worker tests with cleanup. | Recommended |
-| `cf.worker`, `cf.queue`, `cf.scheduled`, `cf.email`, `cf.tail` | Trigger the matching Worker surface directly. | Recommended |
-| `worker`, `queue`, `scheduled`, `email`, `tail` | Direct helper modules behind the unified `cf` API. | Advanced |
+| `cf.worker`, `cf.queue`, `cf.scheduled`, `cf.email`, `cf.tail`, `cf.alarm` | Trigger the matching Worker (or Durable Object alarm) surface directly. | Recommended |
+| `worker`, `queue`, `scheduled`, `email`, `tail`, `alarm` | Direct helper modules behind the unified `cf` API. | Advanced |
 | `createOfflineEnv`, `createOfflineBindings`, `describeOfflineSupport`, `getOfflineSupportMatrix` | Pure config-derived binding fixtures without runtime startup. | Recommended for offline-first unit tests |
 | `createMockKV`, `createMockD1`, `createMockR2`, `createMockQueue`, `createMockEnv` | Small pure unit tests without Miniflare. | Recommended when runtime dispatch is irrelevant |
 | `createMockRateLimit`, `createMockVersionMetadata`, `createMockWorkerLoader`, `createMockSecretsStoreSecret` | Pure fixture for one platform-shaped binding. | Recommended |
@@ -4758,12 +4761,13 @@ The `devflare/test` entrypoint intentionally has multiple lanes: runtime-shaped 
 | --- | --- |
 | `createTestContext` | Boot the nearest Devflare config in the test harness. |
 | `env` | Read bindings and call `env.dispose()` in harness tests. |
-| `cf` | Unified Worker, queue, scheduled, email, and tail trigger API. |
+| `cf` | Unified Worker, queue, scheduled, email, tail, and DO alarm trigger API. |
 | `worker` | Direct Worker fetch helper behind `cf.worker`. |
 | `queue` | Direct queue helper behind `cf.queue`. |
 | `scheduled` | Direct scheduled helper behind `cf.scheduled`. |
 | `email` | Direct email helper behind `cf.email`. |
 | `tail` | Direct tail helper behind `cf.tail`. |
+| `alarm` | Direct Durable Object alarm helper behind `cf.alarm`. |
 | `shouldSkip` | Skip Cloudflare-auth, paid, remote, or local engine tests explicitly. |
 | `containers` | Default Docker/Podman-backed container manager. |
 | `createContainerManager` | Create an isolated container manager for tests. |
@@ -4794,6 +4798,8 @@ The `devflare/test` entrypoint intentionally has multiple lanes: runtime-shaped 
 | `createMockStreamBinding` | Mock a Stream binding. |
 | `createMockFlagshipBinding` | Mock a Flagship feature-flag binding. |
 | `createMockArtifacts` | Mock Artifacts repo APIs. |
+| `createMockVectorize` | Mock a Vectorize index (in-memory cosine query). |
+| `createMockAnalyticsEngine` | Mock an Analytics Engine dataset (write-only recording stub). |
 | `createMockSecretsStoreSecret` | Mock a Secrets Store secret. |
 | `createMockEnv` | Create a pure env with selected mock bindings. |
 | `hasServiceBindings` | Advanced/internal service-binding resolution predicate. |
@@ -9921,7 +9927,7 @@ describe.skipIf(skipVectorize)('Vectorize binding', () => {
 
 - Use `shouldSkip.vectorize` so missing remote prerequisites are explicit instead of noisy.
 - Keep the vector size and index name close to the test so the contract remains visible.
-- If the surrounding app only needs a demo path locally, mock above the worker boundary instead of pretending the remote index was exercised.
+- For app-level paths, `createMockVectorize()` (or `createMockEnv({ vectorize })` / `createOfflineEnv()`) is a deterministic in-memory index: `insert`/`upsert`/`delete`/`getByIds` plus a real cosine-ranked `query()` honoring `topK`, `returnValues`, `returnMetadata`, `namespace`, and metadata `filter`. It models the binding shape and ranking math, not Cloudflare’s hosted indexing/relevance/scale — use the remote smoke test for those.
 
 #### When to move beyond the default harness
 
@@ -10821,7 +10827,7 @@ Use Cloudflare when analytics delivery itself is a release-critical guarantee. T
 
 ##### Key points
 
-- The repo does not show a dedicated analytics helper surface comparable to `cf.queue.trigger()` or `env.DB.prepare()`.
+- For app-level tests, `createMockAnalyticsEngine()` (or `createMockEnv({ analyticsEngine })` / `createOfflineEnv()`) is a write-only recording stub: it records every `writeDataPoint()` into `.writtenDataPoints` so you can assert what the worker emitted. Analytics Engine has no in-worker read API, so the stub records writes — it does not query.
 - Preview-scoped dataset names can be materialized, but Devflare does not provision or delete datasets because Analytics Engine creates them on first write.
 - Tests should focus on event-producing behavior rather than pretending you need a full local analytics backend.
 
@@ -10966,17 +10972,16 @@ If you later need stronger end-to-end confidence, add a higher-level integration
 
 ```ts
 import { expect, test } from 'bun:test'
-
-const writes: unknown[] = []
-const analytics = {
-	writeDataPoint(point: unknown) {
-		writes.push(point)
-	}
-}
+import { createMockAnalyticsEngine } from 'devflare/test'
 
 test('records an analytics point', () => {
+	const analytics = createMockAnalyticsEngine()
+
 	analytics.writeDataPoint({ indexes: ['search'], blobs: ['devflare'] })
-	expect(writes).toHaveLength(1)
+
+	expect(analytics.writtenDataPoints).toEqual([
+		{ indexes: ['search'], blobs: ['devflare'] }
+	])
 })
 ```
 

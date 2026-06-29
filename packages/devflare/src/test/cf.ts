@@ -24,6 +24,7 @@
 //   await cf.tail.trigger([{ scriptName: 'my-worker', logs: [...] }])
 // =============================================================================
 
+import { alarm } from './alarm'
 import { email } from './email'
 import { queue } from './queue'
 import { scheduled } from './scheduled'
@@ -31,6 +32,7 @@ import { tail } from './tail'
 import { worker } from './worker'
 
 // Re-export individual helpers for tree-shaking
+export { alarm } from './alarm'
 export { email } from './email'
 export { queue } from './queue'
 export { scheduled } from './scheduled'
@@ -38,6 +40,7 @@ export { worker } from './worker'
 export { tail } from './tail'
 
 // Re-export types
+export type { AlarmTriggerTarget, AlarmTriggerOptions, AlarmTriggerResult } from './alarm'
 export type { EmailSendOptions, ReceivedEmail, EmailReceiveCallback } from './email'
 export type { QueueMessageOptions, QueueTriggerResult } from './queue'
 export type { ScheduledTriggerOptions, ScheduledTriggerResult } from './scheduled'
@@ -53,6 +56,7 @@ export type { TraceItemOptions, TailTriggerResult } from './tail'
  * - `cf.scheduled` — Cron/scheduled handler testing
  * - `cf.worker` — Fetch handler testing
  * - `cf.tail` — Tail helper surface (uses `files.tail`, or auto-detects `src/tail.ts` when present)
+ * - `cf.alarm` — Durable Object alarm handler testing (fires a DO instance's `alarm()`)
  *
  * The helpers use the real Miniflare-backed bindings created by `createTestContext()`,
  * but several helper surfaces still synthesize event/controller objects around those
@@ -159,5 +163,23 @@ export const cf = {
 	 * When `createTestContext()` finds `files.tail` or `src/tail.ts`,
 	 * `cf.tail.trigger()` is wired automatically.
 	 */
-	tail
+	tail,
+
+	/**
+	 * Durable Object alarm handler testing.
+	 *
+	 * - `cf.alarm.trigger(instance, options?)` — Fire a DO instance's `alarm()`
+	 *   handler under a `durable-object-alarm` event context and assert effects.
+	 *
+	 * Unlike the other surfaces this operates directly on a Durable Object
+	 * instance you construct in the test (it does not resolve a handler file),
+	 * mirroring how the Devflare DO wrapper invokes `alarm()` at runtime.
+	 *
+	 * @example
+	 * const counter = new Counter(state, env)
+	 * await counter.scheduleAlarm()
+	 * const result = await cf.alarm.trigger(counter)
+	 * expect(result.success).toBe(true)
+	 */
+	alarm
 }

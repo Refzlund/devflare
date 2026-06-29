@@ -154,7 +154,7 @@ describe.skipIf(skipVectorize)('Vectorize binding', () => {
 			helperBullets: [
 				'Use `shouldSkip.vectorize` so missing remote prerequisites are explicit instead of noisy.',
 				'Keep the vector size and index name close to the test so the contract remains visible.',
-				'If the surrounding app only needs a demo path locally, mock above the worker boundary instead of pretending the remote index was exercised.'
+				'For app-level paths, `createMockVectorize()` (or `createMockEnv({ vectorize })` / `createOfflineEnv()`) is a deterministic in-memory index: `insert`/`upsert`/`delete`/`getByIds` plus a real cosine-ranked `query()` honoring `topK`, `returnValues`, `returnMetadata`, `namespace`, and metadata `filter`. It models the binding shape and ranking math, not Cloudflare’s hosted indexing/relevance/scale — use the remote smoke test for those.'
 			],
 			caveatBullets: [
 				'Running Vectorize tests everywhere is rarely necessary; put them where the signal is worth the cost.',

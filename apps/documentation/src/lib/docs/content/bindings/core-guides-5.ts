@@ -283,7 +283,7 @@ export default defineConfig({
 				'If the data is really application state, it probably belongs in D1 or another durable store instead of analytics.'
 			],
 			caveatBullets: [
-				'The repo does not show a dedicated analytics helper surface comparable to `cf.queue.trigger()` or `env.DB.prepare()`.',
+				'For app-level tests, `createMockAnalyticsEngine()` (or `createMockEnv({ analyticsEngine })` / `createOfflineEnv()`) is a write-only recording stub: it records every `writeDataPoint()` into `.writtenDataPoints` so you can assert what the worker emitted. Analytics Engine has no in-worker read API, so the stub records writes — it does not query.',
 				'Preview-scoped dataset names can be materialized, but Devflare does not provision or delete datasets because Analytics Engine creates them on first write.',
 				'Tests should focus on event-producing behavior rather than pretending you need a full local analytics backend.'
 			],
@@ -357,17 +357,16 @@ export default defineConfig({
 				title: 'A thin analytics smoke check',
 				language: 'ts',
 				code: String.raw`import { expect, test } from 'bun:test'
-
-const writes: unknown[] = []
-const analytics = {
-	writeDataPoint(point: unknown) {
-		writes.push(point)
-	}
-}
+import { createMockAnalyticsEngine } from 'devflare/test'
 
 test('records an analytics point', () => {
+	const analytics = createMockAnalyticsEngine()
+
 	analytics.writeDataPoint({ indexes: ['search'], blobs: ['devflare'] })
-	expect(writes).toHaveLength(1)
+
+	expect(analytics.writtenDataPoints).toEqual([
+		{ indexes: ['search'], blobs: ['devflare'] }
+	])
 })`
 			},
 			helperBullets: [

@@ -53,17 +53,23 @@ How covered (CF-1):
 
 | Gap | Dimensions | The devflare-way fix | Status |
 | --- | --- | --- | --- |
-| No `createMockVectorize` (aiSearch has mocks; vectors are deterministically mockable) | test | In-memory `Map<id, vector+metadata>` + cosine `query()` + insert/upsert/delete/getByIds; `vectorize?` on `OfflineBindingFixtures`; export; reclassify matrix → offline-fixture. | ⬜ |
-| No `createMockAnalyticsEngine` (write-only recording stub) | test | Recording stub like `createMockQueue`; `analyticsEngine?` on `MockEnvOptions`; export; matrix entry. | ⬜ |
-| No `cf.alarm.trigger()` DO-alarm test helper (alarm event modeled, trigger missing) | test | `src/test/alarm.ts` `cf.alarm.trigger(state?, env?, opts?)` mirroring `cf.scheduled`; export from `cf.ts`/`index.ts`. | ⬜ |
-| `createOfflineBindings()` doesn't auto-wire KV/D1/R2/queues (mocks exist; land in `missingFixtures`) | test | Auto-create the existing mocks when the binding is in config and no fixture is given (mirror `addImagesBindings`). | ⬜ |
+| No `createMockVectorize` (aiSearch has mocks; vectors are deterministically mockable) | test | In-memory `Map<id, vector+metadata>` + cosine `query()` + insert/upsert/delete/getByIds; `vectorize?` on `OfflineBindingFixtures`; export; reclassify matrix → offline-fixture. | ✅ |
+| No `createMockAnalyticsEngine` (write-only recording stub) | test | Recording stub like `createMockQueue`; `analyticsEngine?` on `MockEnvOptions`; export; matrix entry. | ✅ |
+| No `cf.alarm.trigger()` DO-alarm test helper (alarm event modeled, trigger missing) | test | `src/test/alarm.ts` `cf.alarm.trigger(state?, env?, opts?)` mirroring `cf.scheduled`; export from `cf.ts`/`index.ts`. | ✅ |
+| `createOfflineBindings()` doesn't auto-wire KV/D1/R2/queues (mocks exist; land in `missingFixtures`) | test | Auto-create the existing mocks when the binding is in config and no fixture is given (mirror `addImagesBindings`). | ✅ |
+
+How covered (CF-4):
+- **`createMockVectorize`** (`src/test/utilities/vectorize.ts`): in-memory `Map<id, VectorizeVector>` implementing the workers-types beta `VectorizeIndex` — `insert` (throws on duplicate id), `upsert` (replaces), `deleteByIds` (+ a `delete()` alias), `getByIds`, `describe`, and a real cosine-similarity `query()` honoring `topK`, `returnValues`, `returnMetadata`, `namespace`, and the metadata `filter` grammar (`$eq/$ne/$lt/$lte/$gt/$gte/$in/$nin`); deterministic score-desc, id-asc ordering. Vector storage + cosine query are deterministic (a real mock); hosted indexing/ANN ranking/scale stay remote.
+- **`createMockAnalyticsEngine`** (`src/test/utilities/analytics-engine.ts`): write-only recording stub mirroring `createMockQueue`; `writeDataPoint()` deep-snapshots each point into the inspectable `.writtenDataPoints` (alias `.points`) with a `clear()`. Honest: Analytics Engine has no in-worker read API, so it records writes and offers no query.
+- **`cf.alarm.trigger(instance, { state?, env? })`** (`src/test/alarm.ts`): fires a DO instance's `alarm()` under a `durable-object-alarm` event installed via `runWithEventContext(createDurableObjectAlarmEvent(env, state), …)` — exactly how the DO transform wrapper invokes it — returning `{ success, error? }`; wired into `cf` (`src/test/cf.ts`) and exported (standalone `alarm`) from `src/test/index.ts`. No simple-context registration needed (it operates on a constructed DO instance, not a handler file).
+- **Auto-wire**: `createOfflineBindings()` now auto-creates `createMockKV/D1/R2/Queue` (plus the new Vectorize/Analytics Engine mocks) for declared bindings; explicit `fixtures.{kv,d1,r2,queues,vectorize,analyticsEngine}` override. `OfflineBindingFixtures` gained those fields; `kv/d1/r2/queues` no longer land in `missingFixtures` (only `durableObjects`/`services` remain, as they require Miniflare). `MockEnvOptions` gained `vectorize`/`analyticsEngine`. Vectorize matrix reclassified `remote-boundary` → `offline-fixture` and a new `analyticsEngine` `offline-fixture` entry added.
 
 ## Batch CF-5 — stale/inaccurate coverage corrections
 
 | Gap | Dimensions | The devflare-way fix | Status |
 | --- | --- | --- | --- |
 | Matrix mis-classifies **Durable Objects & Services** as `remote-boundary` (they work under `createTestContext()`) | docs/test | `SUPPORT_MATRIX` `offline-fixture` entries pointing at `createTestContext()`; fix `describeOfflineSupport()`. | ⬜ |
-| **Vectorize** matrix `remote-boundary` once a mock exists | docs/test | Reclassify to `offline-fixture` after CF-4. | ⬜ |
+| **Vectorize** matrix `remote-boundary` once a mock exists | docs/test | Reclassify to `offline-fixture` after CF-4. | ✅ (done in CF-4: `createMockVectorize` + matrix reclassified `offline-fixture`) |
 | **Containers** notableGaps wording implies a missing binding (there is none — DO-attached `Container` is a runtime interface) | docs | Correct the wording; confirm containers config compiles. | ⬜ |
 
 ## Batch CF-6 — CLI / deploy lifecycle parity

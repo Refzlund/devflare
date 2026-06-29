@@ -1,4 +1,5 @@
 import type { Pipeline } from 'cloudflare:pipelines'
+import { createMockAnalyticsEngine } from './analytics-engine'
 import { type MockArtifactsOptions, createMockArtifacts, isArtifactsBinding } from './artifacts'
 import { createMockD1 } from './d1'
 import { createMockKV } from './kv'
@@ -18,6 +19,7 @@ import {
 } from './platform'
 import { createMockQueue } from './queue'
 import { createMockR2 } from './r2'
+import { type MockVectorizeOptions, createMockVectorize } from './vectorize'
 import { type MockWorkflowOptions, createMockPipeline, createMockWorkflow } from './workflows'
 
 export interface MockEnvOptions {
@@ -36,11 +38,43 @@ export interface MockEnvOptions {
 	images?: string | ImagesBinding
 	media?: string | MediaBinding
 	artifacts?: string[] | Record<string, MockArtifactsOptions | Artifacts>
+	vectorize?: string[] | Record<string, MockVectorizeOptions | VectorizeIndex>
+	analyticsEngine?: string[]
 	secretsStore?: Record<string, string>
 	durableObjects?: string[]
 	vars?: Record<string, string>
 	secrets?: Record<string, string>
 	custom?: Record<string, unknown>
+}
+
+function isVectorizeBinding(value: MockVectorizeOptions | VectorizeIndex): value is VectorizeIndex {
+	return typeof (value as { query?: unknown }).query === 'function'
+}
+
+function addVectorizeMockBindings(
+	env: Record<string, unknown>,
+	vectorize: MockEnvOptions['vectorize']
+): void {
+	if (Array.isArray(vectorize)) {
+		for (const name of vectorize) {
+			env[name] = createMockVectorize()
+		}
+		return
+	}
+	if (vectorize) {
+		for (const [name, value] of Object.entries(vectorize)) {
+			env[name] = isVectorizeBinding(value) ? value : createMockVectorize(value)
+		}
+	}
+}
+
+function addAnalyticsEngineMockBindings(
+	env: Record<string, unknown>,
+	analyticsEngine: MockEnvOptions['analyticsEngine']
+): void {
+	for (const name of analyticsEngine ?? []) {
+		env[name] = createMockAnalyticsEngine()
+	}
 }
 
 // =============================================================================
@@ -191,6 +225,12 @@ export function createMockEnv(options: MockEnvOptions = {}): Record<string, unkn
 				: createMockArtifacts(artifactsOptions)
 		}
 	}
+
+	// Add Vectorize bindings
+	addVectorizeMockBindings(env, options.vectorize)
+
+	// Add Analytics Engine bindings (write-only recording stubs)
+	addAnalyticsEngineMockBindings(env, options.analyticsEngine)
 
 	// Add Secrets Store bindings
 	if (options.secretsStore) {

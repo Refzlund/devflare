@@ -22,11 +22,13 @@ Cloudflare's local development runtime (`workerd` via Miniflare) faithfully
 emulates the storage and edge primitives — KV, D1, R2, Queues, Durable Objects,
 service bindings — so Devflare can run those entirely offline. But some products
 are **hosted services with no local implementation**: Workers AI inference runs
-on Cloudflare's GPUs, Vectorize indexes live in Cloudflare's vector store, AI
-Gateway routing and logs are account resources, and Cloudflare Builds is CI/CD
-orchestration rather than a Worker runtime binding. There is no code Devflare
-could run on your machine that would reproduce them, so those bindings are
-remote-only by nature.
+on Cloudflare's GPUs, AI Gateway routing and logs are account resources, and
+Cloudflare Builds is CI/CD orchestration rather than a Worker runtime binding.
+There is no code Devflare could run on your machine that would reproduce them, so
+those bindings are remote-only by nature. (Vectorize is a partial case: vector
+storage and cosine-similarity query are deterministically mockable offline via
+`createMockVectorize`, while Cloudflare's hosted indexing, ANN ranking, and scale
+stay remote.)
 
 A second category is **partial**: the binding's call shape is local-testable, but
 one capability is genuinely hosted. Hyperdrive exposes connection fields locally
@@ -45,8 +47,8 @@ not to conflate them:
   Media Transformations, mTLS Certificates, Artifacts, Cloudflare Builds, and
   Vectorize.
 - **Binding offline tier** — the *per-binding* boundary. Only Workers AI, AI
-  Gateway, Vectorize, and Cloudflare Builds are true no-local-fixture boundaries.
-  Media Transformations, mTLS Certificates, Artifacts, and AI Search are
+  Gateway, and Cloudflare Builds are true no-local-fixture boundaries.
+  Media Transformations, mTLS Certificates, Artifacts, AI Search, and Vectorize are
   remote-only for *running their integration tests* but still have local
   fixtures/mocks you can use for app-level (call-shape and routing) tests.
 
@@ -113,6 +115,7 @@ secrets store.
 | Artifacts | `artifacts` | Repo metadata and token flows can be modeled in memory (`createMockArtifacts`). | The Git protocol and namespace access are Cloudflare-managed remotes. **Test execution is remote-only gated.** | No. |
 | AI Search (instance) | `aiSearch` | Application flows can use deterministic in-memory instances and namespaces (`createMockAISearchInstance`). | Indexing, ranking, and crawling are hosted Cloudflare behavior. **Test execution is remote-only gated.** | No. |
 | AI Search (namespace) | `aiSearchNamespaces` | Namespace management can be backed by an explicit in-memory instance registry (`fixtures.aiSearchNamespaces`). | Same hosted indexing/ranking boundary as the instance. | No. |
+| Vectorize | `vectorize` | `createMockVectorize()` (and `createMockEnv({ vectorize })` / `createOfflineEnv()`) is a deterministic in-memory index — `insert`/`upsert`/`delete`/`getByIds` plus a real cosine-ranked `query()` honoring `topK`, `returnValues`, `returnMetadata`, `namespace`, and metadata `filter`. | Cloudflare's hosted indexing, ANN ranking, and scale are remote; the mock models storage + cosine math, not production relevance. **Test execution is remote-only gated** (`shouldSkip.vectorize`). | **Resolve-only.** Devflare can only auto-provision *preview-scoped* indexes by cloning a base index; for normal deploys, create the index first. A missing index errors. |
 | Browser Rendering | `browser` | Browser Run is locally simulatable through Cloudflare/Wrangler's browser local dev. | Live view, human-in-the-loop, recordings, and external CDP remain hosted features that need remote tests. | No — exactly one browser binding allowed per Worker (a Wrangler limit). |
 
 ### Remote-only — no local simulation (🌐)
@@ -121,7 +124,6 @@ secrets store.
 | --- | --- | --- | --- |
 | Workers AI | `ai` | Inference has no local simulation in Cloudflare local development. Use remote mode or inject a custom fake. | Not a provisioned resource (model inference). |
 | AI Gateway | reached via the `ai` binding (no own key) | Gateway routing and logs are Cloudflare account resources reached through the Workers AI binding. Remote-mode helpers only. | Not a provisioned resource. |
-| Vectorize | `vectorize` | Cloudflare lists Vectorize with no local simulation. Use remote mode for real indexes or inject a fake. | **Resolve-only.** Devflare can only auto-provision *preview-scoped* indexes by cloning a base index; for normal deploys, create the index first. A missing index errors. |
 | Cloudflare Builds | not a binding (CI/CD service) | Git-connected Workers / Builds are CI/CD orchestration, not a Worker runtime binding. Run Devflare in your own CI. | Not a runtime binding. |
 
 ### Analytics Engine and Send Email
@@ -143,8 +145,12 @@ their local situations differ and neither is an inherent remote boundary:
   (`writeDataPoint()` records nothing), so the local path validates the call
   shape and no longer crashes (`env.<DATASET>.writeDataPoint()` is bound in
   dev), but it does not persist or query data points. For `writeDataPoint()`
-  argument assertions, use a custom fake. Production ingestion and querying
-  remain hosted.
+  argument assertions, use **`createMockAnalyticsEngine()`** (or
+  `createMockEnv({ analyticsEngine })` / `createOfflineEnv()`) — a write-only
+  recording stub that captures every data point into `.writtenDataPoints` so you
+  can assert exactly what the worker emitted. It records writes and (honestly)
+  offers no query, because Analytics Engine has no in-worker read API.
+  Production ingestion and querying remain hosted.
 
 ## Platform config (not bindings): deploy-only vs locally wired
 
@@ -158,6 +164,7 @@ dev/test Miniflare worker.
 | Static Assets | `assets` | **No** — deploy-only locally | The `assets` config compiles into the Wrangler config (directory/binding/routing) for deploy, but it is **not** wired into the dev Miniflare worker — there is no Miniflare `assets` plugin wiring and no local `ASSETS` fetcher. Static assets are not served by the local dev runtime; serve them through your own dev tooling (e.g. Vite) until local asset serving is wired. |
 | Tail consumers | `tailConsumers` → `tail_consumers` | **Yes** (when the consumer Worker is present locally) | The `tailConsumers` config compiles to `tail_consumers` for deploy **and** is now passed to Miniflare's per-worker `tails` (an array of consumer service names). A tail consumer references **another** Worker by service name, so local cross-Worker tail-consumer *delivery* works **when that consumer Worker is also run in the same local Miniflare instance**; when it is absent the designator resolves to nothing and the local runtime degrades cleanly (no crash). This is distinct from `files.tail` — the tail *handler* surface on the Worker itself **is** fully wired and locally testable regardless (see `cf.tail.trigger()`); this change adds the cross-Worker *delivery* path where the consumer Worker is available locally. |
 | Cron triggers | `triggers.crons` | **Yes** (handler invocation) | `triggers.crons` is passed to Miniflare's per-worker `triggers` in dev, and the scheduled handler can be invoked locally through the test layer (`cf.scheduled.trigger(cron?)` / the `scheduled()` helper). Devflare does not run the cron *schedule* on a wall clock locally — you invoke `scheduled()` explicitly — so cron-driven code is locally testable while real timed delivery remains a Cloudflare behavior. |
+| Durable Object alarms | `durableObjects` (`@durableObject({ alarms: true })`) | **Yes** (handler invocation) | A DO's `alarm()` handler is locally testable via `cf.alarm.trigger(instance, { state?, env? })`, which fires the handler under a `durable-object-alarm` event context exactly as the runtime DO wrapper does and returns `{ success, error? }`. As with cron, Devflare does not run the alarm *clock* locally — you invoke `cf.alarm.trigger()` explicitly; real timed alarm delivery remains a Cloudflare behavior. |
 
 ## Containers (offline-first)
 
@@ -282,10 +289,10 @@ Steps:
 ## Cross-reference: two "remote-only" classifications
 
 The key nuance for reading this page: `media`, `mtls_certificates`, `artifacts`,
-and `ai_search` are remote-only for **running their integration tests**, but they
-are **not** remote-only as bindings — they have local fixtures/mocks for
-app-level (call-shape and routing) tests. Only Workers AI, AI Gateway, Vectorize,
-and Cloudflare Builds are true no-local-fixture boundaries.
+`ai_search`, and `vectorize` are remote-only for **running their integration
+tests**, but they are **not** remote-only as bindings — they have local
+fixtures/mocks for app-level (call-shape and routing) tests. Only Workers AI, AI
+Gateway, and Cloudflare Builds are true no-local-fixture boundaries.
 
 | Service | In the test-execution gate? | Binding offline tier |
 | --- | --- | --- |
@@ -296,6 +303,6 @@ and Cloudflare Builds are true no-local-fixture boundaries.
 | mTLS Certificates | Yes | Fixture-backed |
 | Artifacts | Yes | Fixture-backed |
 | Cloudflare Builds | Yes | Remote boundary |
-| Vectorize | Yes | Remote boundary |
+| Vectorize | Yes | Has an in-memory mock (`createMockVectorize`, app-level testable) |
 | Browser Rendering | No | Local mock, with hosted-feature gaps |
 | Hyperdrive | No | Local, with the `connect()` gap |

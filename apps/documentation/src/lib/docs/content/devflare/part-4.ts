@@ -103,11 +103,16 @@ export const devflareDocsPart4: DocPage[] = [
 						[
 							'`cf.tail.trigger()`',
 							'Works when `src/tail.ts` exists, supports a default or named `tail` export, and waits for the handler plus its `waitUntil()` work before it returns.'
+						],
+						[
+							'`cf.alarm.trigger(instance)`',
+							'Fires a Durable Object instance’s `alarm()` handler under a `durable-object-alarm` event context (the standalone `alarm` export is the same trigger) and awaits it, returning `{ success, error? }`.'
 						]
 					]
 				},
 				paragraphs: [
-					'These helpers are runtime-shaped and context-accurate for handler logic, but they do not try to recreate every internal Cloudflare dispatch step byte for byte. Their timing rules are documented explicitly instead of being left to guesswork.'
+					'These helpers are runtime-shaped and context-accurate for handler logic, but they do not try to recreate every internal Cloudflare dispatch step byte for byte. Their timing rules are documented explicitly instead of being left to guesswork.',
+					'Each surface is also exported standalone for tree-shaking — `cf.alarm.trigger()` is the same function as the named `alarm` export, just as `cf.queue` mirrors `queue`. The Durable Object `alarm` helper takes a DO instance you construct in the test (not a handler file path), mirroring how the runtime wrapper invokes `alarm()`.'
 				],
 				callouts: [
 					{

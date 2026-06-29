@@ -12,6 +12,7 @@ export {
 
 // Cloudflare test helpers — unified API for triggering all handler types
 export { cf } from './cf'
+export { alarm } from './alarm'
 export { email } from './email'
 export { queue } from './queue'
 export { scheduled } from './scheduled'
@@ -19,6 +20,7 @@ export { worker } from './worker'
 export { tail } from './tail'
 
 // Helper types
+export type { AlarmTriggerTarget, AlarmTriggerOptions, AlarmTriggerResult } from './alarm'
 export type { EmailSendOptions, ReceivedEmail, EmailReceiveCallback } from './email'
 export type { QueueMessageOptions, QueueTriggerResult } from './queue'
 export type { ScheduledTriggerOptions, ScheduledTriggerResult } from './scheduled'
@@ -105,6 +107,8 @@ export {
 	createMockStreamBinding,
 	createMockFlagshipBinding,
 	createMockArtifacts,
+	createMockVectorize,
+	createMockAnalyticsEngine,
 	createMockSecretsStoreSecret,
 	createMockEnv,
 	withTestContext,
@@ -123,5 +127,8 @@ export {
 	type MockMediaBindingOptions,
 	type MockStreamBindingOptions,
 	type MockFlagshipBindingOptions,
-	type MockArtifactsOptions
+	type MockArtifactsOptions,
+	type MockVectorizeOptions,
+	type MockVectorizeIndex,
+	type MockAnalyticsEngineDataset
 } from './utilities'

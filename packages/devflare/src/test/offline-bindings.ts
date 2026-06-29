@@ -22,19 +22,26 @@ import {
 	type MockImagesBindingOptions,
 	type MockMediaBindingOptions,
 	type MockStreamBindingOptions,
+	type MockVectorizeOptions,
 	type MockWorkerLoaderOptions,
 	type MockWorkflowOptions,
+	createMockAnalyticsEngine,
 	createMockArtifacts,
+	createMockD1,
 	createMockDispatchNamespace,
 	createMockFlagshipBinding,
 	createMockHyperdrive,
 	createMockImagesBinding,
+	createMockKV,
 	createMockMTLSCertificate,
 	createMockMediaBinding,
 	createMockPipeline,
+	createMockQueue,
+	createMockR2,
 	createMockRateLimit,
 	createMockSecretsStoreSecret,
 	createMockStreamBinding,
+	createMockVectorize,
 	createMockVersionMetadata,
 	createMockWorkerLoader,
 	createMockWorkflow
@@ -63,6 +70,36 @@ export interface OfflineMissingFixture {
 }
 
 export interface OfflineBindingFixtures {
+	/**
+	 * Explicit KV namespace bindings. Any KV binding in config without an entry
+	 * here is auto-created with `createMockKV()`.
+	 */
+	kv?: Record<string, KVNamespace>
+	/**
+	 * Explicit D1 database bindings. Any D1 binding in config without an entry
+	 * here is auto-created with `createMockD1()`.
+	 */
+	d1?: Record<string, D1Database>
+	/**
+	 * Explicit R2 bucket bindings. Any R2 binding in config without an entry here
+	 * is auto-created with `createMockR2()`.
+	 */
+	r2?: Record<string, R2Bucket>
+	/**
+	 * Explicit queue-producer bindings. Any queue producer in config without an
+	 * entry here is auto-created with `createMockQueue()`.
+	 */
+	queues?: Record<string, Queue>
+	/**
+	 * Vectorize index bindings. Any vectorize binding in config without an entry
+	 * here is auto-created with `createMockVectorize()`.
+	 */
+	vectorize?: Record<string, MockVectorizeOptions | VectorizeIndex>
+	/**
+	 * Analytics Engine dataset bindings. Any analyticsEngine binding in config
+	 * without an entry here is auto-created with `createMockAnalyticsEngine()`.
+	 */
+	analyticsEngine?: Record<string, AnalyticsEngineDataset>
 	secretsStore?: Record<string, string>
 	workerLoaders?: Record<string, MockWorkerLoaderOptions>
 	mtlsCertificates?: Record<string, MockFetcherHandler>
@@ -259,10 +296,19 @@ const SUPPORT_MATRIX: Record<string, OfflineSupportEntry> = {
 	},
 	vectorize: {
 		service: 'vectorize',
-		tier: 'remote-boundary',
-		reason: 'Cloudflare lists Vectorize with no local simulation.',
+		tier: 'offline-fixture',
+		reason:
+			"Vector storage and cosine-similarity query are deterministic in-memory; Cloudflare's real indexing/ranking/scale are hosted — use remote mode for those.",
 		recommendation:
-			'Use DEVFLARE_REMOTE=1/devflare remote enable for real indexes, or inject a fake Vectorize binding for pure tests.'
+			'Use createMockVectorize() or createOfflineEnv() for app-level vector tests; use DEVFLARE_REMOTE=1/devflare remote enable for real index relevance and scale.'
+	},
+	analyticsEngine: {
+		service: 'analyticsEngine',
+		tier: 'offline-fixture',
+		reason:
+			'Analytics Engine writes are recordable in-memory (createMockAnalyticsEngine), but there is no in-worker read API — querying is the hosted SQL API/dashboard.',
+		recommendation:
+			'Use createMockAnalyticsEngine() to assert recorded writeDataPoint() calls; query analytics through the hosted SQL API/dashboard.'
 	},
 	builds: {
 		service: 'builds',
@@ -373,6 +419,12 @@ function isAISearchInstance(
 	return typeof (value as { search?: unknown } | undefined)?.search === 'function'
 }
 
+function isVectorizeBinding(
+	value: MockVectorizeOptions | VectorizeIndex | undefined
+): value is VectorizeIndex {
+	return typeof (value as { query?: unknown } | undefined)?.query === 'function'
+}
+
 function isAISearchNamespace(
 	value: MockAISearchNamespaceOptions | AiSearchNamespace | undefined
 ): value is AiSearchNamespace {
@@ -402,6 +454,67 @@ function addStaticBindings(env: Record<string, unknown>, config: OfflineConfig) 
 function addRateLimitBindings(env: Record<string, unknown>, bindings: OfflineConfig['bindings']) {
 	for (const [name, binding] of Object.entries(bindings?.rateLimits ?? {})) {
 		env[name] = createMockRateLimit(binding.simple)
+	}
+}
+
+function addKVBindings(
+	env: Record<string, unknown>,
+	bindings: OfflineConfig['bindings'],
+	fixtures: OfflineBindingFixtures
+) {
+	for (const name of Object.keys(bindings?.kv ?? {})) {
+		env[name] = fixtures.kv?.[name] ?? createMockKV()
+	}
+}
+
+function addD1Bindings(
+	env: Record<string, unknown>,
+	bindings: OfflineConfig['bindings'],
+	fixtures: OfflineBindingFixtures
+) {
+	for (const name of Object.keys(bindings?.d1 ?? {})) {
+		env[name] = fixtures.d1?.[name] ?? createMockD1()
+	}
+}
+
+function addR2Bindings(
+	env: Record<string, unknown>,
+	bindings: OfflineConfig['bindings'],
+	fixtures: OfflineBindingFixtures
+) {
+	for (const name of Object.keys(bindings?.r2 ?? {})) {
+		env[name] = fixtures.r2?.[name] ?? createMockR2()
+	}
+}
+
+function addQueueBindings(
+	env: Record<string, unknown>,
+	bindings: OfflineConfig['bindings'],
+	fixtures: OfflineBindingFixtures
+) {
+	for (const name of Object.keys(bindings?.queues?.producers ?? {})) {
+		env[name] = fixtures.queues?.[name] ?? createMockQueue()
+	}
+}
+
+function addVectorizeBindings(
+	env: Record<string, unknown>,
+	bindings: OfflineConfig['bindings'],
+	fixtures: OfflineBindingFixtures
+) {
+	for (const name of Object.keys(bindings?.vectorize ?? {})) {
+		const fixture = fixtures.vectorize?.[name]
+		env[name] = isVectorizeBinding(fixture) ? fixture : createMockVectorize(fixture)
+	}
+}
+
+function addAnalyticsEngineBindings(
+	env: Record<string, unknown>,
+	bindings: OfflineConfig['bindings'],
+	fixtures: OfflineBindingFixtures
+) {
+	for (const name of Object.keys(bindings?.analyticsEngine ?? {})) {
+		env[name] = fixtures.analyticsEngine?.[name] ?? createMockAnalyticsEngine()
 	}
 }
 
@@ -622,21 +735,18 @@ function addAISearchNamespaceBindings(
 }
 
 /**
- * Core storage and wiring bindings (kv/d1/r2/queues/durableObjects/services)
- * have no pure-offline fixture: they need a real Miniflare runtime, which only
- * `createTestContext()` provides. `createOfflineBindings()` therefore cannot
- * populate them, and leaving them silently absent from `env` is a surprise.
- * Surface each one in `missingFixtures` (with `env` left unset rather than a fake)
- * so callers see exactly which bindings require `createTestContext()` /
- * `createMock*()` instead of getting an `undefined` lookup at use time.
+ * Wiring bindings (durableObjects/services) have no pure-offline fixture: they
+ * need a real Miniflare runtime, which only `createTestContext()` provides.
+ * `createOfflineBindings()` therefore cannot populate them, and leaving them
+ * silently absent from `env` is a surprise. Surface each one in
+ * `missingFixtures` (with `env` left unset rather than a fake) so callers see
+ * exactly which bindings require `createTestContext()` / a cross-worker setup
+ * instead of getting an `undefined` lookup at use time.
+ *
+ * Storage bindings (kv/d1/r2/queues) DO have deterministic in-memory mocks, so
+ * `createOfflineBindings()` auto-creates them — they are not listed here.
  */
-const OFFLINE_UNAVAILABLE_STORAGE_BINDINGS = [
-	'kv',
-	'd1',
-	'r2',
-	'durableObjects',
-	'services'
-] as const
+const OFFLINE_UNAVAILABLE_STORAGE_BINDINGS = ['durableObjects', 'services'] as const
 
 function addUnsupportedStorageBindings(
 	bindings: OfflineConfig['bindings'],
@@ -648,19 +758,9 @@ function addUnsupportedStorageBindings(
 			missingFixtures.push({
 				service,
 				binding: name,
-				reason: `${service} binding "${name}" needs a real Miniflare runtime and is not created by createOfflineBindings(); it will be undefined. Use createTestContext() (Miniflare-backed) or a createMock* helper for this binding.`
+				reason: `${service} binding "${name}" needs a real Miniflare runtime and is not created by createOfflineBindings(); it will be undefined. Use createTestContext() (Miniflare-backed) for this binding.`
 			})
 		}
-	}
-
-	const queues = bindings?.queues
-	const queueProducers = queues?.producers ?? {}
-	for (const name of Object.keys(queueProducers)) {
-		missingFixtures.push({
-			service: 'queues',
-			binding: name,
-			reason: `queues producer binding "${name}" needs a real Miniflare runtime and is not created by createOfflineBindings(); it will be undefined. Use createTestContext() or createMockQueue() for this binding.`
-		})
 	}
 }
 
@@ -674,15 +774,6 @@ function addRemoteBoundaries(
 			'ai',
 			bindings.ai.binding || 'AI',
 			'Workers AI inference is not available in offline local simulations.'
-		)
-	}
-
-	for (const name of Object.keys(bindings?.vectorize ?? {})) {
-		addBoundary(
-			remoteBoundaries,
-			'vectorize',
-			name,
-			'Vectorize has no offline local simulation in Cloudflare local development.'
 		)
 	}
 
@@ -708,15 +799,17 @@ function addRemoteBoundaries(
 /**
  * Builds a deterministic, pure-test env object from Devflare config.
  *
- * Covers the bindings that have a pure-offline simulator or fixture (rate
- * limits, version metadata, hyperdrive, worker loaders, mTLS, dispatch
- * namespaces, workflows, pipelines, images, media, stream, flagship, artifacts,
- * secrets store, AI Search). It does **not** create the core storage/wiring bindings
- * (`kv`, `d1`, `r2`, `queues`, `durableObjects`, `services`) — those require a
- * real Miniflare runtime, which only `createTestContext()` provides. When such a
- * binding is present in config it is reported in the returned `missingFixtures`
- * (its `env` entry is left unset rather than silently faked); use
- * `createTestContext()` or a `createMock*()` helper for those bindings.
+ * Covers the bindings that have a pure-offline simulator or fixture: the core
+ * storage mocks (`kv`, `d1`, `r2`, `queues`) are **auto-created** from the
+ * existing `createMock*()` helpers (an explicit `fixtures.{kv,d1,r2,queues}`
+ * entry overrides the auto-mock), alongside rate limits, version metadata,
+ * hyperdrive, worker loaders, mTLS, dispatch namespaces, workflows, pipelines,
+ * images, media, stream, flagship, artifacts, secrets store, AI Search,
+ * Vectorize, and Analytics Engine. It does **not** create the wiring bindings
+ * (`durableObjects`, `services`) — those require a real Miniflare runtime, which
+ * only `createTestContext()` provides. When such a binding is present in config
+ * it is reported in the returned `missingFixtures` (its `env` entry is left
+ * unset rather than silently faked); use `createTestContext()` for those.
  */
 export function createOfflineBindings(
 	config: OfflineConfig,
@@ -733,6 +826,12 @@ export function createOfflineBindings(
 			: {}
 
 	addStaticBindings(env, config)
+	addKVBindings(env, bindings, fixtures)
+	addD1Bindings(env, bindings, fixtures)
+	addR2Bindings(env, bindings, fixtures)
+	addQueueBindings(env, bindings, fixtures)
+	addVectorizeBindings(env, bindings, fixtures)
+	addAnalyticsEngineBindings(env, bindings, fixtures)
 	addRateLimitBindings(env, bindings)
 	addVersionMetadataBinding(env, bindings)
 	addHyperdriveBindings(env, bindings, fixtures, missingFixtures)
@@ -767,11 +866,11 @@ export function createOfflineBindings(
 /**
  * Convenience wrapper for callers that only need the derived env object.
  *
- * Note: the core storage/wiring bindings (`kv`, `d1`, `r2`, `queues`,
- * `durableObjects`, `services`) are **not** created here and will be
- * `undefined` in the returned env — they need a real Miniflare runtime. Use
- * `createTestContext()` or a `createMock*()` helper for them, or call
- * `createOfflineBindings()` to inspect `missingFixtures` for the exact list.
+ * Note: the storage mocks (`kv`, `d1`, `r2`, `queues`) are auto-created here, but
+ * the wiring bindings (`durableObjects`, `services`) are **not** — they need a
+ * real Miniflare runtime and will be `undefined` in the returned env. Use
+ * `createTestContext()` for them, or call `createOfflineBindings()` to inspect
+ * `missingFixtures` for the exact list.
  */
 export function createOfflineEnv(
 	config: OfflineConfig,

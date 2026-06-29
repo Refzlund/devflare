@@ -151,12 +151,12 @@ export const workerStyle = markWorkerStyle((request, env) => {
 							'Recommended'
 						],
 						[
-							'`cf.worker`, `cf.queue`, `cf.scheduled`, `cf.email`, `cf.tail`',
-							'Trigger the matching Worker surface directly.',
+							'`cf.worker`, `cf.queue`, `cf.scheduled`, `cf.email`, `cf.tail`, `cf.alarm`',
+							'Trigger the matching Worker (or Durable Object alarm) surface directly.',
 							'Recommended'
 						],
 						[
-							'`worker`, `queue`, `scheduled`, `email`, `tail`',
+							'`worker`, `queue`, `scheduled`, `email`, `tail`, `alarm`',
 							'Direct helper modules behind the unified `cf` API.',
 							'Advanced'
 						],
@@ -211,12 +211,13 @@ export const workerStyle = markWorkerStyle((request, env) => {
 					rows: [
 						['`createTestContext`', 'Boot the nearest Devflare config in the test harness.'],
 						['`env`', 'Read bindings and call `env.dispose()` in harness tests.'],
-						['`cf`', 'Unified Worker, queue, scheduled, email, and tail trigger API.'],
+						['`cf`', 'Unified Worker, queue, scheduled, email, tail, and DO alarm trigger API.'],
 						['`worker`', 'Direct Worker fetch helper behind `cf.worker`.'],
 						['`queue`', 'Direct queue helper behind `cf.queue`.'],
 						['`scheduled`', 'Direct scheduled helper behind `cf.scheduled`.'],
 						['`email`', 'Direct email helper behind `cf.email`.'],
 						['`tail`', 'Direct tail helper behind `cf.tail`.'],
+						['`alarm`', 'Direct Durable Object alarm helper behind `cf.alarm`.'],
 						[
 							'`shouldSkip`',
 							'Skip Cloudflare-auth, paid, remote, or local engine tests explicitly.'
@@ -250,6 +251,11 @@ export const workerStyle = markWorkerStyle((request, env) => {
 						['`createMockStreamBinding`', 'Mock a Stream binding.'],
 						['`createMockFlagshipBinding`', 'Mock a Flagship feature-flag binding.'],
 						['`createMockArtifacts`', 'Mock Artifacts repo APIs.'],
+						['`createMockVectorize`', 'Mock a Vectorize index (in-memory cosine query).'],
+						[
+							'`createMockAnalyticsEngine`',
+							'Mock an Analytics Engine dataset (write-only recording stub).'
+						],
 						['`createMockSecretsStoreSecret`', 'Mock a Secrets Store secret.'],
 						['`createMockEnv`', 'Create a pure env with selected mock bindings.'],
 						['`hasServiceBindings`', 'Advanced/internal service-binding resolution predicate.'],
