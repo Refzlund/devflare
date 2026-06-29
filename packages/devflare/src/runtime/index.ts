@@ -85,6 +85,7 @@ export {
 	defineScheduledHandler,
 	markResolveStyle,
 	markWorkerStyle,
+	assertExplicit2ArgStyle,
 	assertExplicitQueueHandlerStyle,
 	assertExplicitScheduledHandlerStyle,
 	type Awaitable,

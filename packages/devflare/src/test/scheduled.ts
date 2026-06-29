@@ -13,6 +13,7 @@
 
 import { join } from 'path'
 import type { ScheduledController } from '@cloudflare/workers-types'
+import { assertValidCronExpression } from '../config/cron'
 import { createScheduledEvent, runWithEventContext } from '../runtime'
 
 // -----------------------------------------------------------------------------
@@ -118,6 +119,13 @@ async function trigger(
 	// Normalize options
 	const options: ScheduledTriggerOptions =
 		typeof cronOrOptions === 'string' ? { cron: cronOrOptions } : (cronOrOptions ?? {})
+
+	// Reject an explicitly-passed invalid cron expression with a helpful message,
+	// so a typo'd cron in a test fails loudly instead of pretending to fire. An
+	// omitted cron falls back to the always-valid `* * * * *`.
+	if (options.cron !== undefined) {
+		assertValidCronExpression(options.cron)
+	}
 
 	const cron = options.cron ?? '* * * * *'
 	const scheduledTime =

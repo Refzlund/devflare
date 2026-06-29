@@ -147,7 +147,7 @@ function isResolveStyleFunction(handler: AnyFunction): boolean {
  * `markResolveStyle` / `markWorkerStyle` / `sequence(...)`) so dispatch is
  * unambiguous and minification-safe.
  */
-function assertExplicit2ArgStyle(handler: AnyFunction): void {
+export function assertExplicit2ArgStyle(handler: AnyFunction): void {
 	if (handler.length !== 2) {
 		return
 	}

@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { formatInvalidCronMessage, isValidCronExpression } from './cron'
+
 /** Regex pattern for YYYY-MM-DD date format */
 const dateRegex = /^\d{4}-\d{2}-\d{2}$/
 
@@ -55,10 +57,29 @@ export const tailConsumerSchema = z.union([
 
 /**
  * Trigger configuration for scheduled (cron) events.
+ *
+ * Each cron expression is validated against the Cloudflare 5-field cron grammar
+ * at config-parse time, so a typo fails before deploy instead of silently never
+ * firing in production.
  */
 export const triggersSchema = z
 	.object({
 		crons: z.array(z.string()).optional()
+	})
+	.superRefine((triggers, ctx) => {
+		if (!triggers.crons) {
+			return
+		}
+
+		triggers.crons.forEach((cron, index) => {
+			if (!isValidCronExpression(cron)) {
+				ctx.addIssue({
+					code: z.ZodIssueCode.custom,
+					path: ['crons', index],
+					message: formatInvalidCronMessage(cron)
+				})
+			}
+		})
 	})
 	.optional()
 

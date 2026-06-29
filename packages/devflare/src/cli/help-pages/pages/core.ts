@@ -272,7 +272,8 @@ export const CORE_HELP_PAGES: HelpPage[] = [
 		],
 		notes: [
 			'Local values are stored in `.devflare/secrets.local.json`, which is ignored by the repository template.',
-			'Command output prints store/name references only; it does not echo secret values.'
+			'Command output prints store/name references only; it does not echo secret values.',
+			'Runtime secrets are local-only here: set production secret values with `wrangler secret put` or the Cloudflare dashboard. Devflare never sends secret values to Cloudflare — deploy emits Secrets Store references only.'
 		]
 	},
 	{

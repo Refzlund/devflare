@@ -10,6 +10,7 @@ import {
 	looksLikeBuildArtifactPath,
 	resolveWorkerSurfacePaths
 } from './surface-paths'
+import { validateFetchHandlerStyle } from './validate-fetch-style'
 
 interface GeneratedRouteModuleImport {
 	identifier: string
@@ -557,6 +558,10 @@ export async function prepareComposedWorkerEntrypoint(
 	if (!needsComposedWorkerEntrypoint(cwd, surfacePaths, resolvedConfig, routeDiscovery)) {
 		return null
 	}
+
+	// Build/dev-time guard: fail fast on an ambiguous unmarked 2-arg fetch
+	// handler now (dev start / build), instead of waiting for the first request.
+	await validateFetchHandlerStyle(surfacePaths.fetch)
 
 	const fs = await import('node:fs/promises')
 	const entryDir = resolve(cwd, '.devflare', 'worker-entrypoints')

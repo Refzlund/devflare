@@ -323,6 +323,11 @@ validation aid, compiled into a `{ required: [...] }` list.
 The boundary in one line: **Devflare owns local-dev secret values and remote
 binding wiring; it never sends secret values to Cloudflare.**
 
+After a successful **production** deploy, `devflare deploy` prints a one-line
+reminder of this boundary — that production runtime secret *values* are set with
+`wrangler secret put` or the Cloudflare dashboard, while Devflare emits Secrets
+Store references only. The same pointer is shown in `devflare secrets --help`.
+
 ### Per-environment secret scoping
 
 Environment overrides are a **deep merge** over the root config, so secret-store

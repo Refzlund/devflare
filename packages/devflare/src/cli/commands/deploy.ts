@@ -699,6 +699,18 @@ export async function runDeployCommand(
 				exitCode: 0
 			})
 			logger.success('Deployed successfully!')
+			if (!preview && !isBranchScopedPreviewDeployment) {
+				logLine(
+					logger,
+					dim(
+						'Runtime secrets: set production secret values with `wrangler secret put` or the ' +
+							'Cloudflare dashboard. Devflare manages local secret values (`devflare secrets ' +
+							'--local`) and emits Secrets Store references only — it never sends secret values ' +
+							'to Cloudflare.',
+						theme
+					)
+				)
+			}
 			return { exitCode: 0, output: structuredOutput }
 		})
 	} catch (error) {
