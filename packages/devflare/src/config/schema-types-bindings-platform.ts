@@ -75,6 +75,19 @@ export interface SendEmailBindingInput {
 	 * ```
 	 */
 	allowedSenderAddresses?: string[]
+
+	/**
+	 * Whether Wrangler local development should connect this binding to the
+	 * remote Email Routing service.
+	 *
+	 * @default Wrangler default behavior.
+	 *
+	 * @example
+	 * ```ts
+	 * remote: true
+	 * ```
+	 */
+	remote?: boolean
 }
 
 /**

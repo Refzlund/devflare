@@ -226,7 +226,10 @@ export function compileBindings(
 					return {
 						binding,
 						queue: normalized.queue,
-						...(normalized.remote !== undefined && { remote: normalized.remote })
+						...(normalized.remote !== undefined && { remote: normalized.remote }),
+						...(normalized.deliveryDelay !== undefined && {
+							delivery_delay: normalized.deliveryDelay
+						})
 					}
 				}
 			)
@@ -240,7 +243,10 @@ export function compileBindings(
 				...(consumer.maxRetries && { max_retries: consumer.maxRetries }),
 				...(consumer.deadLetterQueue && { dead_letter_queue: consumer.deadLetterQueue }),
 				...(consumer.maxConcurrency && { max_concurrency: consumer.maxConcurrency }),
-				...(consumer.retryDelay && { retry_delay: consumer.retryDelay })
+				...(consumer.retryDelay && { retry_delay: consumer.retryDelay }),
+				...(consumer.visibilityTimeoutMs && {
+					visibility_timeout_ms: consumer.visibilityTimeoutMs
+				})
 			}))
 		}
 	}
@@ -441,7 +447,8 @@ export function compileBindings(
 			service: config.service,
 			...(config.entrypoint && { entrypoint: config.entrypoint }),
 			...(config.environment && { environment: config.environment }),
-			...(config.remote !== undefined && { remote: config.remote })
+			...(config.remote !== undefined && { remote: config.remote }),
+			...(config.props !== undefined && { props: config.props })
 		}))
 	}
 
@@ -517,7 +524,8 @@ export function compileBindings(
 			}),
 			...(config.allowedSenderAddresses && {
 				allowed_sender_addresses: config.allowedSenderAddresses
-			})
+			}),
+			...(config.remote !== undefined && { remote: config.remote })
 		}))
 	}
 }

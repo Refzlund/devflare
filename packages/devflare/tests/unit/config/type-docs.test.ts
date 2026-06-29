@@ -12,7 +12,8 @@ const schemaTypesPaths = [
 	'src/config/schema-types-bindings-platform.ts',
 	'src/config/schema-types-bindings-resources.ts',
 	'src/config/schema-types-build.ts',
-	'src/config/schema-types-runtime.ts'
+	'src/config/schema-types-runtime.ts',
+	'src/config/schema-types-runtime-server.ts'
 ].map((path) => resolve(devflareRoot, path))
 
 const fixtureSource = `

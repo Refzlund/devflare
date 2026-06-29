@@ -112,6 +112,15 @@ const fixtureConfig = {
 				remote: true
 			}
 		},
+		vectorize: {
+			MY_VECTORIZE: { indexName: 'my-index' }
+		},
+		hyperdrive: {
+			MY_HYPERDRIVE: { id: 'hyperdrive-id' }
+		},
+		analyticsEngine: {
+			MY_ANALYTICS: { dataset: 'events' }
+		},
 		browser: {
 			MY_BROWSER: {
 				remote: true
@@ -157,6 +166,9 @@ describe('generateBindingTypes — P1-codegen fixture', () => {
 		expect(generated).toContain('Ai')
 		expect(generated).toContain('AiSearchNamespace')
 		expect(generated).toContain('AiSearchInstance')
+		expect(generated).toContain('VectorizeIndex')
+		expect(generated).toContain('Hyperdrive')
+		expect(generated).toContain('AnalyticsEngineDataset')
 		expect(generated).toContain('Fetcher')
 	})
 
@@ -189,6 +201,9 @@ describe('generateBindingTypes — P1-codegen fixture', () => {
 		expect(generated).toContain('API_TOKEN: SecretsStoreSecret')
 		expect(generated).toContain('AI_SEARCH: AiSearchNamespace')
 		expect(generated).toContain('DOCS_SEARCH: AiSearchInstance')
+		expect(generated).toContain('MY_VECTORIZE: VectorizeIndex')
+		expect(generated).toContain('MY_HYPERDRIVE: Hyperdrive')
+		expect(generated).toContain('MY_ANALYTICS: AnalyticsEngineDataset')
 		expect(generated).toContain('MY_BROWSER: Fetcher')
 		expect(generated).toContain('MY_SECRET: string')
 	})

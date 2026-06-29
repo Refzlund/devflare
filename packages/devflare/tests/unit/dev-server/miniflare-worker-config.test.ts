@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import {
 	type MakeMiniflareWorkerContext,
+	buildServiceBindings,
 	makeMiniflareWorker
 } from '../../../src/dev-server/miniflare-worker-config'
 
@@ -178,6 +179,62 @@ describe('makeMiniflareWorker', () => {
 		expect(workerConfig.tails).toEqual(['trace-worker'])
 		expect(workerConfig.mtlsCertificates).toEqual({
 			CLIENT_CERT: { certificate_id: 'cert-uuid', remote: true }
+		})
+	})
+
+	test('sets streamingTails and outboundService on the worker config', () => {
+		const context: MakeMiniflareWorkerContext = {
+			cwd: 'C:/project',
+			loadedConfig: {
+				name: 'app-worker',
+				compatibilityDate: '2026-04-26',
+				compatibilityFlags: []
+			} as any,
+			bindings: {},
+			sendEmailConfig: undefined,
+			rateLimitsConfig: undefined,
+			versionMetadataConfig: undefined,
+			workerLoadersConfig: undefined,
+			mtlsCertificatesConfig: undefined,
+			dispatchNamespacesConfig: undefined,
+			workflowsConfig: undefined,
+			pipelinesConfig: undefined,
+			hyperdrivesConfig: undefined,
+			imagesConfig: undefined,
+			mediaConfig: undefined,
+			streamConfig: undefined,
+			flagshipConfig: undefined,
+			analyticsEngineConfig: undefined,
+			tailConsumersConfig: undefined,
+			streamingTailConsumersConfig: ['stream-worker'],
+			aiSearchNamespacesConfig: undefined,
+			aiSearchInstancesConfig: undefined,
+			artifactsConfig: undefined,
+			secretsStoreConfig: undefined,
+			queueProducers: undefined
+		}
+
+		const workerConfig = makeMiniflareWorker(context, {
+			name: 'app-worker',
+			script: 'export default {}',
+			outboundService: { name: 'egress-mock' }
+		})
+
+		expect(workerConfig.streamingTails).toEqual(['stream-worker'])
+		expect(workerConfig.outboundService).toEqual({ name: 'egress-mock' })
+	})
+})
+
+describe('buildServiceBindings', () => {
+	test('carries props onto the Miniflare service designator', () => {
+		const result = buildServiceBindings({
+			services: {
+				AUTH: { service: 'auth-worker', entrypoint: 'AuthApi', props: { tier: 'gold' } }
+			}
+		} as any)
+
+		expect(result).toEqual({
+			AUTH: { name: 'auth-worker', entrypoint: 'AuthApi', props: { tier: 'gold' } }
 		})
 	})
 })

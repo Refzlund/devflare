@@ -36,6 +36,7 @@ import {
 	buildSecretsStoreConfig,
 	buildSendEmailConfig,
 	buildStreamConfig,
+	buildStreamingTailConsumersConfig,
 	buildTailConsumersConfig,
 	buildVersionMetadataConfig,
 	buildWorkerLoadersConfig,
@@ -108,16 +109,27 @@ export function buildMiniflareDevConfig(input: BuildMiniflareDevConfigInput): an
 	const queueProducers = buildQueueProducers(bindings)
 	const queueConsumers = buildQueueConsumers(bindings)
 
+	const serverConfig = loadedConfig.server
 	const sharedOptions: any = {
 		port: miniflarePort,
 		host: miniflareHost,
 		kvPersist: persist ? `${persistPath}/kv` : undefined,
 		r2Persist: persist ? `${persistPath}/r2` : undefined,
 		d1Persist: persist ? `${persistPath}/d1` : undefined,
+		cachePersist: persist ? `${persistPath}/cache` : undefined,
 		durableObjectsPersist: persist ? `${persistPath}/do` : undefined,
 		workflowsPersist: persist ? `${persistPath}/workflows` : undefined,
 		imagesPersist: persist ? `${persistPath}/images` : undefined,
-		streamPersist: persist ? `${persistPath}/stream` : undefined
+		streamPersist: persist ? `${persistPath}/stream` : undefined,
+		...(serverConfig?.https !== undefined && { https: serverConfig.https }),
+		...(serverConfig?.httpsKeyPath !== undefined && { httpsKeyPath: serverConfig.httpsKeyPath }),
+		...(serverConfig?.httpsCertPath !== undefined && {
+			httpsCertPath: serverConfig.httpsCertPath
+		}),
+		...(serverConfig?.inspectorPort !== undefined && {
+			inspectorPort: serverConfig.inspectorPort
+		}),
+		...(serverConfig?.upstream !== undefined && { upstream: serverConfig.upstream })
 	}
 
 	const localBindingShimServiceConfig = buildLocalBindingShimServiceConfig(loadedConfig)
@@ -143,6 +155,7 @@ export function buildMiniflareDevConfig(input: BuildMiniflareDevConfigInput): an
 	const flagshipConfig = buildFlagshipConfig(bindings)
 	const analyticsEngineConfig = buildAnalyticsEngineConfig(bindings)
 	const tailConsumersConfig = buildTailConsumersConfig(loadedConfig)
+	const streamingTailConsumersConfig = buildStreamingTailConsumersConfig(loadedConfig)
 	const artifactsConfig = buildArtifactsConfig(bindings)
 	const aiSearchNamespacesConfig = buildAiSearchNamespacesConfig(bindings)
 	const aiSearchInstancesConfig = buildAiSearchInstancesConfig(bindings)
@@ -173,6 +186,7 @@ export function buildMiniflareDevConfig(input: BuildMiniflareDevConfigInput): an
 		flagshipConfig,
 		analyticsEngineConfig,
 		tailConsumersConfig,
+		streamingTailConsumersConfig,
 		artifactsConfig,
 		aiSearchNamespacesConfig,
 		aiSearchInstancesConfig,

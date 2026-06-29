@@ -85,4 +85,46 @@ describe('buildMiniflareDevConfig', () => {
 		expect(mfConfig.host).toBe('0.0.0.0')
 		expect(mfConfig.port).toBe(3000)
 	})
+
+	test('threads the dev server block (https/inspectorPort/upstream) into shared options', () => {
+		const mfConfig = buildMiniflareDevConfig(
+			buildBaseInput({
+				config: {
+					name: 'site-worker',
+					compatibilityDate: '2026-04-28',
+					server: {
+						https: true,
+						httpsKeyPath: './certs/key.pem',
+						httpsCertPath: './certs/cert.pem',
+						inspectorPort: 9229,
+						upstream: 'https://example.com'
+					}
+				}
+			})
+		)
+
+		expect(mfConfig.https).toBe(true)
+		expect(mfConfig.httpsKeyPath).toBe('./certs/key.pem')
+		expect(mfConfig.httpsCertPath).toBe('./certs/cert.pem')
+		expect(mfConfig.inspectorPort).toBe(9229)
+		expect(mfConfig.upstream).toBe('https://example.com')
+	})
+
+	test('omits the dev server block options when no server config is set', () => {
+		const mfConfig = buildMiniflareDevConfig(buildBaseInput())
+		expect(mfConfig.https).toBeUndefined()
+		expect(mfConfig.inspectorPort).toBeUndefined()
+		expect(mfConfig.upstream).toBeUndefined()
+	})
+
+	test('sets cachePersist alongside the sibling *Persist options when persisting', () => {
+		const mfConfig = buildMiniflareDevConfig(buildBaseInput({ persist: true }))
+		expect(mfConfig.cachePersist).toBe(mfConfig.kvPersist.replace(/\/kv$/, '/cache'))
+		expect(typeof mfConfig.cachePersist).toBe('string')
+	})
+
+	test('leaves cachePersist undefined when not persisting', () => {
+		const mfConfig = buildMiniflareDevConfig(buildBaseInput({ persist: false }))
+		expect(mfConfig.cachePersist).toBeUndefined()
+	})
 })

@@ -30,6 +30,7 @@ import type {
 	buildSecretsStoreConfig,
 	buildSendEmailConfig,
 	buildStreamConfig,
+	buildStreamingTailConsumersConfig,
 	buildTailConsumersConfig,
 	buildVersionMetadataConfig,
 	buildWorkerLoadersConfig,
@@ -52,13 +53,18 @@ type StreamConfig = ReturnType<typeof buildStreamConfig>
 type FlagshipConfig = ReturnType<typeof buildFlagshipConfig>
 type AnalyticsEngineConfig = ReturnType<typeof buildAnalyticsEngineConfig>
 type TailConsumersConfig = ReturnType<typeof buildTailConsumersConfig>
+type StreamingTailConsumersConfig = ReturnType<typeof buildStreamingTailConsumersConfig>
 type ArtifactsConfig = ReturnType<typeof buildArtifactsConfig>
 type AiSearchNamespacesConfig = ReturnType<typeof buildAiSearchNamespacesConfig>
 type AiSearchInstancesConfig = ReturnType<typeof buildAiSearchInstancesConfig>
 type SecretsStoreConfig = ReturnType<typeof buildSecretsStoreConfig>
 type ModuleRule = NonNullable<DevflareConfig['rules']>[number]
 
-export type MiniflareServiceBinding = { name: string; entrypoint?: string }
+export type MiniflareServiceBinding = {
+	name: string
+	entrypoint?: string
+	props?: Record<string, unknown>
+}
 
 const DEFAULT_MODULE_RULES = [
 	{ type: 'ESModule', include: ['**/*.ts', '**/*.tsx', '**/*.mts', '**/*.mjs'] },
@@ -93,7 +99,8 @@ export function buildServiceBindings(
 		for (const [bindingName, serviceConfig] of Object.entries(bindings.services)) {
 			serviceBindings[bindingName] = {
 				name: serviceConfig.service,
-				...(serviceConfig.entrypoint && { entrypoint: serviceConfig.entrypoint })
+				...(serviceConfig.entrypoint && { entrypoint: serviceConfig.entrypoint }),
+				...(serviceConfig.props !== undefined && { props: serviceConfig.props })
 			}
 		}
 	}
@@ -113,6 +120,13 @@ export interface MakeMiniflareWorkerOptions {
 	serviceBindings?: Record<string, MiniflareServiceBinding>
 	queueConsumers?: Record<string, Record<string, unknown>>
 	triggers?: { crons?: string[] }
+	/**
+	 * Dev/test-only: route this worker's outbound `fetch()` to a named service.
+	 * Maps to Miniflare's per-worker `outboundService` option. This is NOT a
+	 * wrangler config field, so it is only meaningful for local dev/test
+	 * orchestration (e.g. routing a worker's egress to a mock service).
+	 */
+	outboundService?: MiniflareServiceBinding | string
 }
 
 export interface MakeMiniflareWorkerContext {
@@ -134,12 +148,13 @@ export interface MakeMiniflareWorkerContext {
 	flagshipConfig: FlagshipConfig
 	analyticsEngineConfig: AnalyticsEngineConfig
 	tailConsumersConfig: TailConsumersConfig
+	streamingTailConsumersConfig?: StreamingTailConsumersConfig
 	artifactsConfig: ArtifactsConfig
 	aiSearchNamespacesConfig: AiSearchNamespacesConfig
 	aiSearchInstancesConfig: AiSearchInstancesConfig
 	secretsStoreConfig: SecretsStoreConfig
 	localSecretWrappedBindingConfig?: LocalSecretWrappedBindingConfig
-	queueProducers: Record<string, { queueName: string }> | undefined
+	queueProducers: Record<string, { queueName: string; deliveryDelay?: number }> | undefined
 }
 
 /**
@@ -169,6 +184,7 @@ export function makeMiniflareWorker(
 		flagshipConfig,
 		analyticsEngineConfig,
 		tailConsumersConfig,
+		streamingTailConsumersConfig,
 		artifactsConfig,
 		aiSearchNamespacesConfig,
 		aiSearchInstancesConfig,
@@ -228,6 +244,7 @@ export function makeMiniflareWorker(
 		...(flagshipConfig && { flagship: flagshipConfig }),
 		...(analyticsEngineConfig && { analyticsEngineDatasets: analyticsEngineConfig }),
 		...(tailConsumersConfig && { tails: tailConsumersConfig }),
+		...(streamingTailConsumersConfig && { streamingTails: streamingTailConsumersConfig }),
 		...(artifactsConfig && { artifacts: artifactsConfig }),
 		...(aiSearchNamespacesConfig && { aiSearchNamespaces: aiSearchNamespacesConfig }),
 		...(aiSearchInstancesConfig && { aiSearchInstances: aiSearchInstancesConfig }),
@@ -257,6 +274,10 @@ export function makeMiniflareWorker(
 
 	if (options.serviceBindings && Object.keys(options.serviceBindings).length > 0) {
 		workerConfig.serviceBindings = options.serviceBindings
+	}
+
+	if (options.outboundService !== undefined) {
+		workerConfig.outboundService = options.outboundService
 	}
 
 	return workerConfig

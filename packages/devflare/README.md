@@ -140,6 +140,7 @@ The most important top-level keys are:
 - `bindings`
 - `compatibilityDate`
 - `compatibilityFlags`
+- `complianceRegion`
 - `containers`
 - `env`
 - `files`
@@ -159,11 +160,13 @@ The most important top-level keys are:
 - `secrets`
 - `secretsStoreId`
 - `server`
+- `streamingTailConsumers`
 - `tailConsumers`
 - `triggers`
 - `uploadSourceMaps`
 - `vars`
 - `vite`
+- `workersDev`
 - `wrangler.passthrough`
 - `wsRoutes`
 

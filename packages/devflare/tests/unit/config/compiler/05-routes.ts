@@ -33,5 +33,28 @@ describe('compileConfig', () => {
 
 			expect(result.routes).toEqual([{ pattern: 'example.com/*', zone_name: 'example.com' }])
 		})
+
+		test('compiles custom-domain route enabled and previews_enabled', () => {
+			const result = compileConfig({
+				...baseConfig,
+				routes: [
+					{
+						pattern: 'worker.example.com',
+						custom_domain: true,
+						enabled: true,
+						previews_enabled: false
+					}
+				]
+			})
+
+			expect(result.routes).toEqual([
+				{
+					pattern: 'worker.example.com',
+					custom_domain: true,
+					enabled: true,
+					previews_enabled: false
+				}
+			])
+		})
 	})
 })

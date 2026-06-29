@@ -12,39 +12,11 @@ export interface PreviewConfigInput {
 	includeCrons?: boolean
 }
 
-/**
- * Dev server configuration for `devflare dev`.
- *
- * Controls the host and port the local Miniflare runtime instance binds to.
- * Development-only; never emitted to compiled Wrangler output. CLI flags
- * (`--runtime-port`, `--runtime-host`) and environment variables
- * (`DEVFLARE_RUNTIME_PORT`, `DEVFLARE_RUNTIME_HOST`) take precedence.
- */
-export interface ServerConfigInput {
-	/**
-	 * Host the local dev runtime binds to.
-	 *
-	 * @default `'127.0.0.1'`
-	 *
-	 * @example
-	 * ```ts
-	 * server: { host: '0.0.0.0' }
-	 * ```
-	 */
-	host?: string
-
-	/**
-	 * Port the local dev runtime binds to.
-	 *
-	 * @default `8787`
-	 *
-	 * @example
-	 * ```ts
-	 * server: { port: 3000 }
-	 * ```
-	 */
-	port?: number
-}
+export type {
+	ServerConfigInput,
+	StreamingTailConsumerConfigInput,
+	StreamingTailConsumerObjectConfigInput
+} from './schema-types-runtime-server'
 
 /**
  * Source file discovery for Worker handlers and generated support files.
@@ -365,6 +337,35 @@ export interface RouteConfigInput {
 	 * ```
 	 */
 	custom_domain?: boolean
+
+	/**
+	 * Whether the custom-domain route is enabled. Compiles to `enabled`.
+	 *
+	 * @default Cloudflare default behavior.
+	 *
+	 * @example
+	 * ```ts
+	 * routes: [
+	 *   { pattern: 'worker.example.com', custom_domain: true, enabled: true }
+	 * ]
+	 * ```
+	 */
+	enabled?: boolean
+
+	/**
+	 * Whether previews are enabled for the custom-domain route. Compiles to
+	 * `previews_enabled`.
+	 *
+	 * @default Cloudflare default behavior.
+	 *
+	 * @example
+	 * ```ts
+	 * routes: [
+	 *   { pattern: 'worker.example.com', custom_domain: true, previews_enabled: false }
+	 * ]
+	 * ```
+	 */
+	previews_enabled?: boolean
 }
 
 /**

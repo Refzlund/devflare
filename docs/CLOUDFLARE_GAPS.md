@@ -122,7 +122,75 @@ gaps as a new batch and repeat until the analysis returns zero real gaps. Each
 loop is recorded below.
 
 ### Re-investigation log
-- (pending first pass)
+- **First pass** (grounded in `wrangler@4.85.0`, `miniflare@4.20260424.0`,
+  `@cloudflare/workers-types@4.20260426.1`): surfaced **13 distinct confirmed
+  real gaps** — **2 medium**, **11 low**. These are implemented in **Batch CF-9**
+  below (12 features + the legacy `site` docs note).
+  - **Correctly-triaged rejected candidates** (not real gaps):
+    - **Already covered via documented `wrangler.passthrough`** — `build`,
+      `tsconfig`, `logfwdr`, `first_party_worker`, `legacy_env`,
+      `python_modules`, `preview_urls`. Each is reachable verbatim through the
+      passthrough escape hatch (the same path documented for Python Workers /
+      `unsafe` / legacy globals).
+    - **Inherent bundling boundary (documented passthrough boundary)** — the
+      `minify`, `define`, `alias`, and `no_bundle` bundling flags. These belong
+      to Wrangler's own bundling step, which sits outside Devflare's schema; they
+      are the documented passthrough boundary, not a model gap.
+    - **Not applicable** — `unsafeEphemeralDurableObjects` and the
+      queue-consumer `type` const. Neither corresponds to a real Devflare-modeled
+      behavior to add.
+
+## Batch CF-9 — CF-8 confirmed gaps (implemented)
+
+The 13 confirmed gaps from the CF-8 first pass, shipped. Each is covered the
+devflare-way: **deploy-only** (compiled into the Wrangler config, no local
+Miniflare analogue), **local-wired** (compiled **and** threaded into the dev/test
+Miniflare worker), **dev-only** (a local-runtime knob with no Wrangler field), or
+**docs** (passthrough-reachable, documented).
+
+| Gap | Dimensions | The devflare-way fix | Status |
+| --- | --- | --- | --- |
+| Queue consumer `visibilityTimeoutMs` unmodeled | schema, deploy | **Deploy-only.** Emit `visibilityTimeoutMs` → `visibility_timeout_ms`. Miniflare has no local consumer-visibility option, so it is compiled for deploy with no local effect. | ✅ |
+| Top-level `complianceRegion` unmodeled | schema, deploy | **Deploy-only.** `complianceRegion` (`'public'` \| `'fedramp_high'`) → `compliance_region`. Account/region metadata, no local-runtime analogue. | ✅ |
+| `workersDev` hardcoded `true` (no toggle) | schema, deploy | **Deploy-only.** `workersDev` → `workers_dev` is now a toggle (still defaults `true`). Controls the `*.workers.dev` edge route; no local effect. | ✅ |
+| Custom-domain route `enabled` / `previewsEnabled` unmodeled | schema, deploy | **Deploy-only.** Route `enabled` → `enabled`, `previewsEnabled` → `previews_enabled` route metadata. Governs Cloudflare routing/preview; no local effect. | ✅ |
+| Queue producer `deliveryDelay` unmodeled | schema, deploy, local-dev | **Local-wired.** `deliveryDelay` → `delivery_delay` for deploy **and** threaded into Miniflare `QueueProducerOptions.deliveryDelay`, so delayed delivery is exercised locally. | ✅ |
+| Service binding `props` unmodeled | schema, deploy, local-dev | **Local-wired.** Accept + emit `props` (read via `ctx.props`) **and** thread it into Miniflare `serviceBindings`, so cross-service `props` delivery is testable in dev/test. | ✅ |
+| `streamingTailConsumers` unmodeled | schema, deploy, local-dev, docs | **Local-wired (full twin of `tailConsumers`).** Compile to `streaming_tail_consumers` for deploy **and** thread into Miniflare `streamingTails`; cross-Worker delivery works when the consumer Worker is present locally, degrades cleanly otherwise. | ✅ |
+| `server` config missing `https`/`inspectorPort`/`upstream` | schema, local-dev | **Local-wired (dev-runtime).** `server` now also accepts `https`/`httpsKeyPath`/`httpsCertPath`/`inspectorPort`/`upstream`, threaded into Miniflare `CoreSharedOptions` — local HTTPS dev, custom inspector port, custom upstream. No deploy effect. | ✅ |
+| Cache API contents don't persist across dev-server restarts | local-dev | **Local-wired (dev-runtime).** `cachePersist` persists the Cache API (`caches` global, on by default) across restarts, alongside the sibling kv/r2/d1/DO persist options. | ✅ |
+| No local outbound-fetch routing to a named service | local-dev | **Dev-only.** New `outboundService` (not a Wrangler field) routes a Worker's outbound `fetch()` to a named service for local cross-service testing. No deploy analogue. | ✅ |
+| `send_email` `remote` flag unmodeled | schema, deploy, docs | **Deploy-only (honest nuance).** Accept a `remote?` flag on the `sendEmail` binding and emit it into the Wrangler config for deploy. Miniflare's local `send_email` has **no** `remote` field (only an internal remote-proxy connection string, exactly like mTLS), so the flag is a **deploy-time directive stripped locally** — no local remote behavior is claimed. | ✅ |
+| Legacy Worker **`site`** (static assets) undocumented | docs | **Docs.** Legacy `site` is superseded by `assets`; passthrough-reachable via `wrangler.passthrough` for verbatim porting (deploy-only, no local wiring). Documented in the matrix "Passthrough-only / legacy module globals" section alongside `wasm_modules`/`text_blobs`/`data_blobs` (CF-8 gap #8). | ✅ |
+
+How covered (CF-9):
+- **Deploy-only (compiled into the Wrangler config, no local Miniflare effect):**
+  queue consumer `visibilityTimeoutMs` → `visibility_timeout_ms` (Miniflare has
+  no local consumer-visibility option); top-level `complianceRegion` →
+  `compliance_region`; top-level `workersDev` → `workers_dev` (was hardcoded
+  `true`, now a toggle that still defaults `true`); custom-domain route `enabled`
+  + `previewsEnabled` → `enabled` / `previews_enabled`.
+- **Local-wired (compiled **and** wired into dev/test Miniflare):** queue
+  producer `deliveryDelay` → `delivery_delay` (Miniflare
+  `QueueProducerOptions.deliveryDelay`); service binding `props` (object, exposed
+  via `ctx.props`) — accepted, emitted, and wired to Miniflare `serviceBindings`;
+  `streamingTailConsumers` → `streaming_tail_consumers`, wired to Miniflare
+  `streamingTails` (the full twin of the existing `tailConsumers`); the `server`
+  config's `https`/`httpsKeyPath`/`httpsCertPath`/`inspectorPort`/`upstream`,
+  threaded into Miniflare `CoreSharedOptions`; `cachePersist`, which persists the
+  Cache API across dev-server restarts alongside the sibling kv/r2/d1/DO persist
+  options.
+- **Dev-only (a local-runtime knob, not a Wrangler field):** `outboundService`
+  routes a Worker's outbound `fetch()` to a named service for local cross-service
+  testing.
+- **Honest nuance — `send_email` `remote`:** devflare accepts a `remote?` flag on
+  the `sendEmail` binding and emits it for deploy, but Miniflare's local
+  `send_email` has no `remote` field (only an internal remote-proxy connection
+  string, exactly like mTLS), so the flag is a deploy-time directive and is
+  stripped locally — **no local remote `send_email` behavior is claimed.**
+- **Docs — legacy `site`:** added to the matrix "Passthrough-only / legacy module
+  globals" section: `site` is superseded by `assets` and passthrough-reachable
+  via `wrangler.passthrough` for verbatim porting (deploy-only, no local wiring).
 
 ---
 

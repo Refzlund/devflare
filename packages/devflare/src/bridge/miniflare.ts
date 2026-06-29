@@ -22,6 +22,10 @@ import {
 	resolveConfigEnvVars
 } from '../config'
 import { applyLocalDevVarsToConfig } from '../config/local-dev-vars'
+import {
+	buildStreamingTailConsumersConfig,
+	buildTailConsumersConfig
+} from '../dev-server/miniflare-bindings'
 import { createMiniflareLog } from '../dev-server/miniflare-log'
 import {
 	type LocalSecretWrappedBindingConfig,
@@ -99,12 +103,7 @@ export interface MiniflareOptions {
 	/** Workflow bindings */
 	workflows?: Record<
 		string,
-		{
-			name: string
-			className: string
-			scriptName?: string
-			stepLimit?: number
-		}
+		{ name: string; className: string; scriptName?: string; stepLimit?: number }
 	>
 	/** Pipeline bindings */
 	pipelines?: Record<string, string | { pipeline: string }>
@@ -116,6 +115,8 @@ export interface MiniflareOptions {
 	analyticsEngine?: Record<string, { dataset: string }>
 	/** Tail consumer service names (cross-Worker tail delivery) */
 	tailConsumers?: string[]
+	/** Streaming tail consumer service names (cross-Worker streaming tail delivery) */
+	streamingTailConsumers?: string[]
 	/** Artifacts bindings */
 	artifacts?: Record<string, { namespace: string }>
 	/** Secrets Store bindings */
@@ -127,6 +128,7 @@ export interface MiniflareOptions {
 			destinationAddress?: string
 			allowedDestinationAddresses?: string[]
 			allowedSenderAddresses?: string[]
+			remote?: boolean
 		}
 	>
 	/** Environment variables */
@@ -157,6 +159,7 @@ interface MiniflareSendEmailConfig {
 		destination_address?: string
 		allowed_destination_addresses?: string[]
 		allowed_sender_addresses?: string[]
+		remote?: boolean
 	}>
 }
 
@@ -171,7 +174,7 @@ type MfOptionsWithEmail = MfOptions & {
 	email?: MiniflareSendEmailConfig
 	kvNamespaces?: MiniflareOptions['kvNamespaces']
 	kvPersist?: string
-	queueProducers?: Record<string, { queueName: string }>
+	queueProducers?: Record<string, { queueName: string; deliveryDelay?: number }>
 	ratelimits?: MiniflareOptions['rateLimits']
 	versionMetadata?: string
 	workerLoaders?: MiniflareOptions['workerLoaders']
@@ -185,6 +188,7 @@ type MfOptionsWithEmail = MfOptions & {
 	media?: MiniflareOptions['media']
 	analyticsEngineDatasets?: MiniflareOptions['analyticsEngine']
 	tails?: MiniflareOptions['tailConsumers']
+	streamingTails?: MiniflareOptions['streamingTailConsumers']
 	artifacts?: MiniflareOptions['artifacts']
 	secretsStoreSecrets?: MiniflareOptions['secretsStore']
 	serviceBindings?: MiniflareOptions['serviceBindings']
@@ -374,7 +378,8 @@ function applySendEmailConfig(
 			}),
 			...(emailConfig.allowedSenderAddresses && {
 				allowed_sender_addresses: emailConfig.allowedSenderAddresses
-			})
+			}),
+			...(emailConfig.remote !== undefined && { remote: emailConfig.remote })
 		}))
 	}
 }
@@ -513,17 +518,6 @@ function applyAnalyticsEngineConfig(
 	config.analyticsEngineDatasets = analyticsEngine
 }
 
-function applyTailConsumersConfig(
-	config: MfOptionsWithEmail,
-	tailConsumers: MiniflareOptions['tailConsumers']
-): void {
-	if (!tailConsumers || tailConsumers.length === 0) {
-		return
-	}
-
-	config.tails = tailConsumers
-}
-
 function applyArtifactsConfig(
 	config: MfOptionsWithEmail,
 	artifacts: MiniflareOptions['artifacts']
@@ -636,7 +630,12 @@ function createMiniflareConfig(
 	applyImagesConfig(config, options.images, persistPath)
 	applyMediaConfig(config, options.media)
 	applyAnalyticsEngineConfig(config, options.analyticsEngine)
-	applyTailConsumersConfig(config, options.tailConsumers)
+	if (options.tailConsumers && options.tailConsumers.length > 0) {
+		config.tails = options.tailConsumers
+	}
+	if (options.streamingTailConsumers && options.streamingTailConsumers.length > 0) {
+		config.streamingTails = options.streamingTailConsumers
+	}
 	applyArtifactsConfig(config, options.artifacts)
 	applySecretsStoreConfig(config, options.secretsStore)
 	applyServiceBindingsConfig(config, options.serviceBindings)
@@ -900,12 +899,8 @@ export async function startMiniflareFromConfig(
 					])
 				)
 			: undefined,
-		tailConsumers:
-			runtimeConfig.tailConsumers && runtimeConfig.tailConsumers.length > 0
-				? runtimeConfig.tailConsumers.map((consumer) =>
-						typeof consumer === 'string' ? consumer : consumer.service
-					)
-				: undefined,
+		tailConsumers: buildTailConsumersConfig(runtimeConfig),
+		streamingTailConsumers: buildStreamingTailConsumersConfig(runtimeConfig),
 		artifacts: bindings.artifacts
 			? Object.fromEntries(
 					Object.entries(bindings.artifacts).map(([bindingName, binding]) => {

@@ -18,6 +18,7 @@ import type {
 	RouteConfigInput,
 	SecretConfigInput,
 	ServerConfigInput,
+	StreamingTailConsumerConfigInput,
 	TailConsumerConfigInput,
 	TriggersConfigInput,
 	WsRouteConfigInput
@@ -243,6 +244,32 @@ export interface DevflareConfigInput {
 	logpush?: boolean
 
 	/**
+	 * Cloudflare compliance region this Worker is deployed under. Compiles to
+	 * `compliance_region`.
+	 *
+	 * @default Cloudflare default (`public`).
+	 *
+	 * @example
+	 * ```ts
+	 * complianceRegion: 'fedramp_high'
+	 * ```
+	 */
+	complianceRegion?: 'public' | 'fedramp_high'
+
+	/**
+	 * Whether the Worker is reachable on its `*.workers.dev` subdomain. Compiles
+	 * to `workers_dev` (defaults to `true` when omitted).
+	 *
+	 * @default `true`
+	 *
+	 * @example
+	 * ```ts
+	 * workersDev: false
+	 * ```
+	 */
+	workersDev?: boolean
+
+	/**
 	 * Whether to include source maps when uploading this Worker.
 	 *
 	 * @default Wrangler default behavior.
@@ -275,6 +302,17 @@ export interface DevflareConfigInput {
 	 * ```
 	 */
 	tailConsumers?: TailConsumerConfigInput[]
+
+	/**
+	 * Tail Workers that receive a live event stream from this Worker. Compiles
+	 * to `streaming_tail_consumers`.
+	 *
+	 * @example
+	 * ```ts
+	 * streamingTailConsumers: ['stream-worker']
+	 * ```
+	 */
+	streamingTailConsumers?: StreamingTailConsumerConfigInput[]
 
 	/**
 	 * Runtime variables exposed on `env` and on the typed `vars` helper.

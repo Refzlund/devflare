@@ -201,5 +201,118 @@ describe('schema validation', () => {
 
 			expect(result.success).toBe(false)
 		})
+
+		test('accepts the expanded dev server block', () => {
+			const result = configSchema.safeParse({
+				name: 'my-worker',
+				compatibilityDate: '2026-04-26',
+				server: {
+					host: '0.0.0.0',
+					port: 3000,
+					https: true,
+					httpsKeyPath: './certs/key.pem',
+					httpsCertPath: './certs/cert.pem',
+					inspectorPort: 9229,
+					upstream: 'https://example.com'
+				}
+			})
+
+			expect(result.success).toBe(true)
+			if (result.success) {
+				expect(result.data.server).toEqual({
+					host: '0.0.0.0',
+					port: 3000,
+					https: true,
+					httpsKeyPath: './certs/key.pem',
+					httpsCertPath: './certs/cert.pem',
+					inspectorPort: 9229,
+					upstream: 'https://example.com'
+				})
+			}
+		})
+
+		test('accepts compliance_region and workers_dev toggles', () => {
+			const result = configSchema.safeParse({
+				name: 'my-worker',
+				compatibilityDate: '2026-04-26',
+				complianceRegion: 'fedramp_high',
+				workersDev: false
+			})
+
+			expect(result.success).toBe(true)
+			if (result.success) {
+				expect(result.data.complianceRegion).toBe('fedramp_high')
+				expect(result.data.workersDev).toBe(false)
+			}
+		})
+
+		test('rejects an unknown compliance_region', () => {
+			const result = configSchema.safeParse({
+				name: 'my-worker',
+				compatibilityDate: '2026-04-26',
+				complianceRegion: 'eu_only'
+			})
+
+			expect(result.success).toBe(false)
+		})
+
+		test('accepts custom-domain route enabled and previews_enabled', () => {
+			const result = configSchema.safeParse({
+				name: 'my-worker',
+				compatibilityDate: '2026-04-26',
+				routes: [
+					{
+						pattern: 'worker.example.com',
+						custom_domain: true,
+						enabled: true,
+						previews_enabled: false
+					}
+				]
+			})
+
+			expect(result.success).toBe(true)
+		})
+
+		test('accepts streamingTailConsumers in string and object form', () => {
+			const result = configSchema.safeParse({
+				name: 'my-worker',
+				compatibilityDate: '2026-04-26',
+				streamingTailConsumers: [
+					'stream-worker',
+					{ service: 'staging-stream', environment: 'staging' }
+				]
+			})
+
+			expect(result.success).toBe(true)
+			if (result.success) {
+				expect(result.data.streamingTailConsumers).toEqual([
+					'stream-worker',
+					{ service: 'staging-stream', environment: 'staging' }
+				])
+			}
+		})
+
+		test('accepts the new strict binding sub-fields', () => {
+			const result = configSchema.safeParse({
+				name: 'my-worker',
+				compatibilityDate: '2026-04-26',
+				bindings: {
+					queues: {
+						producers: { JOBS: { queue: 'jobs-queue', deliveryDelay: 60 } },
+						consumers: [{ queue: 'jobs-queue', visibilityTimeoutMs: 30000 }]
+					},
+					sendEmail: { EMAIL: { destinationAddress: 'admin@example.com', remote: true } },
+					services: { AUTH: { service: 'auth-worker', props: { tier: 'gold' } } }
+				}
+			})
+
+			expect(result.success).toBe(true)
+			if (result.success) {
+				expect(result.data.bindings?.services?.AUTH).toEqual({
+					service: 'auth-worker',
+					props: { tier: 'gold' }
+				})
+			}
+		})
 	})
 })

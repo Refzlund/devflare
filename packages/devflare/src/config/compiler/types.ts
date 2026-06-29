@@ -16,6 +16,7 @@ export interface WranglerConfig {
 	keep_vars?: boolean
 	preview_urls?: boolean
 	workers_dev?: boolean
+	compliance_region?: 'public' | 'fedramp_high'
 
 	// Bindings
 	kv_namespaces?: WranglerKVNamespaceBinding[]
@@ -35,7 +36,12 @@ export interface WranglerConfig {
 		}>
 	}
 	queues?: {
-		producers?: Array<{ binding: string; queue: string; remote?: boolean }>
+		producers?: Array<{
+			binding: string
+			queue: string
+			remote?: boolean
+			delivery_delay?: number
+		}>
 		consumers?: Array<{
 			queue: string
 			max_batch_size?: number
@@ -44,6 +50,7 @@ export interface WranglerConfig {
 			dead_letter_queue?: string
 			max_concurrency?: number
 			retry_delay?: number
+			visibility_timeout_ms?: number
 		}>
 	}
 	ratelimits?: Array<{
@@ -101,6 +108,7 @@ export interface WranglerConfig {
 		entrypoint?: string
 		environment?: string
 		remote?: boolean
+		props?: Record<string, unknown>
 	}>
 	ai?: { binding: string; remote?: boolean; staging?: boolean }
 	ai_search_namespaces?: Array<{ binding: string; namespace: string; remote?: boolean }>
@@ -156,6 +164,7 @@ export interface WranglerConfig {
 		destination_address?: string
 		allowed_destination_addresses?: string[]
 		allowed_sender_addresses?: string[]
+		remote?: boolean
 	}>
 
 	// Triggers
@@ -163,6 +172,10 @@ export interface WranglerConfig {
 		crons?: string[]
 	}
 	tail_consumers?: Array<{
+		service: string
+		environment?: string
+	}>
+	streaming_tail_consumers?: Array<{
 		service: string
 		environment?: string
 	}>
@@ -179,6 +192,8 @@ export interface WranglerConfig {
 		zone_name?: string
 		zone_id?: string
 		custom_domain?: boolean
+		enabled?: boolean
+		previews_enabled?: boolean
 	}>
 
 	// Assets

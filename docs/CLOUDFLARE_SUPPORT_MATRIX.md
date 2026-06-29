@@ -68,7 +68,23 @@ matrix — they are the offline baseline.
 | R2 | `r2` | ✅ Full | Miniflare-emulated bucket. | **Yes** — created if missing. |
 | Queues | `queues` | ✅ Full | Producers + consumers via Miniflare. | **Yes** — created if missing (collects producer, consumer, and dead-letter-queue names). |
 | Durable Objects | `durableObjects` | ✅ Full | Miniflare runs DO classes locally; string or `{ className, scriptName }`. | Provisioned via migrations, not a create API. |
-| Service bindings | `services` | ✅ Full | Worker-to-worker RPC; `{ service, environment?, entrypoint? }`. | No — the target Worker is deployed separately. |
+| Service bindings | `services` | ✅ Full | Worker-to-worker RPC; `{ service, environment?, entrypoint?, props? }`. | No — the target Worker is deployed separately. |
+
+**Queue producer/consumer options.** Queue **producers** support
+`deliveryDelay` (→ `delivery_delay`), which is wired **locally** into Miniflare's
+`QueueProducerOptions.deliveryDelay` so delayed delivery is exercised in dev/test.
+Queue **consumers** support `visibilityTimeoutMs` (→ `visibility_timeout_ms`),
+which is **deploy-only** — Miniflare exposes no local consumer-visibility option,
+so the field is compiled for deploy but has no local effect. One caveat for the
+**cross-process bridge** (`devflare/test` across processes / SvelteKit
+`platform.env`): that path registers queue producers by queue name without
+per-producer `deliveryDelay`, so delivery-delay fidelity applies to `devflare dev`
+and the in-process test context; the field is always compiled for deploy.
+
+**Service binding `props`.** A service binding may carry a `props` object (→ the
+Wrangler `props` field) that the target Worker reads via `ctx.props`. This is
+wired **locally** into Miniflare's `serviceBindings`, so cross-service `props`
+delivery is testable in dev/test.
 
 **Bridge response-size limit (cross-process access only).** When a Durable
 Object or service binding is reached *through the bridge* — i.e. from
@@ -170,7 +186,12 @@ their local situations differ and neither is an inherent remote boundary:
   are a Cloudflare **dashboard** service, not a Wrangler config field, so they
   are not expressed in `defineConfig`. Devflare covers both the outbound
   `send_email` binding and the inbound email handler; the routing-rule
-  provisioning itself stays in the dashboard.
+  provisioning itself stays in the dashboard. A `remote?` flag on the `sendEmail`
+  binding is **accepted and emitted into the Wrangler config for deploy**, but it
+  is a **deploy-time directive only**: Miniflare's local `send_email` has no
+  `remote` field (only an internal remote-proxy connection string, exactly like
+  mTLS), so the flag is **stripped locally** and does not change local behavior.
+  Do not rely on local remote `send_email` behavior.
 - **Analytics Engine** — **not** an inherent remote-only boundary, and now
   **wired into the dev/test Miniflare config as a write-only no-op stub**.
   Devflare compiles `analytics_engine_datasets` for deploy and also passes
@@ -189,9 +210,10 @@ their local situations differ and neither is an inherent remote boundary:
 ## Platform config (not bindings): deploy-only vs locally wired
 
 Some top-level config keys are not Cloudflare *bindings* but still have a local
-support story worth stating exactly. The compiler emits all three into the
-Wrangler config for deploy; what differs is whether they are also wired into the
-dev/test Miniflare worker.
+support story worth stating exactly. The compiler emits each into the Wrangler
+config for deploy; what differs is whether it is also wired into the dev/test
+Miniflare worker. Deploy-only rows are real Cloudflare config that simply has no
+local-runtime analogue (account/region/edge-routing metadata).
 
 | Config key | Compiled for deploy | Wired into local dev/test Miniflare? | Notes |
 | --- | --- | --- | --- |
@@ -199,6 +221,29 @@ dev/test Miniflare worker.
 | Tail consumers | `tailConsumers` → `tail_consumers` | **Yes** (when the consumer Worker is present locally) | The `tailConsumers` config compiles to `tail_consumers` for deploy **and** is now passed to Miniflare's per-worker `tails` (an array of consumer service names). A tail consumer references **another** Worker by service name, so local cross-Worker tail-consumer *delivery* works **when that consumer Worker is also run in the same local Miniflare instance**; when it is absent the designator resolves to nothing and the local runtime degrades cleanly (no crash). This is distinct from `files.tail` — the tail *handler* surface on the Worker itself **is** fully wired and locally testable regardless (see `cf.tail.trigger()`); this change adds the cross-Worker *delivery* path where the consumer Worker is available locally. |
 | Cron triggers | `triggers.crons` | **Yes** (handler invocation) | `triggers.crons` is passed to Miniflare's per-worker `triggers` in dev, and the scheduled handler can be invoked locally through the test layer (`cf.scheduled.trigger(cron?)` / the `scheduled()` helper). Devflare does not run the cron *schedule* on a wall clock locally — you invoke `scheduled()` explicitly — so cron-driven code is locally testable while real timed delivery remains a Cloudflare behavior. |
 | Durable Object alarms | `durableObjects` (`@durableObject({ alarms: true })`) | **Yes** (handler invocation) | A DO's `alarm()` handler is locally testable via `cf.alarm.trigger(instance, { state?, env? })`, which fires the handler under a `durable-object-alarm` event context exactly as the runtime DO wrapper does and returns `{ success, error? }`. As with cron, Devflare does not run the alarm *clock* locally — you invoke `cf.alarm.trigger()` explicitly; real timed alarm delivery remains a Cloudflare behavior. |
+| Streaming tail consumers | `streamingTailConsumers` → `streaming_tail_consumers` | **Yes** (when the consumer Worker is present locally) | The full twin of `tailConsumers`: compiles to `streaming_tail_consumers` for deploy **and** is passed to Miniflare's per-worker `streamingTails`. Cross-Worker streaming-tail delivery works **when the consumer Worker is also run in the same local Miniflare instance**; when it is absent the designator resolves to nothing and the local runtime degrades cleanly (no crash). |
+| Compliance region | `complianceRegion` → `compliance_region` | **No** — deploy-only | `complianceRegion` (`'public'` \| `'fedramp_high'`) compiles into the Wrangler config for deploy. It is account/region metadata with no local Miniflare effect, so it is not wired into the dev/test runtime. |
+| `workers.dev` toggle | `workersDev` → `workers_dev` | **No** — deploy-only | `workersDev` compiles to `workers_dev` for deploy (still defaults to `true`; previously hardcoded `true`, now a toggle). It controls the `*.workers.dev` route on Cloudflare's edge and has no local Miniflare effect. |
+| Custom-domain route flags | route `enabled` / `previewsEnabled` → `enabled` / `previews_enabled` | **No** — deploy-only | A custom-domain route's `enabled` and `previewsEnabled` compile to `enabled` / `previews_enabled` route metadata for deploy. They govern Cloudflare's routing/preview behavior and have no local Miniflare effect. |
+
+## Dev server (`server`) and local-runtime options
+
+These knobs shape the **local** dev/test runtime rather than the deployed Worker.
+
+- **`server` options** — beyond `host`/`port`, the `server` config also accepts
+  `https`, `httpsKeyPath`, `httpsCertPath`, `inspectorPort`, and `upstream`, all
+  threaded into Miniflare's `CoreSharedOptions`. This enables local **HTTPS** dev
+  (with your own key/cert), a custom **inspector port** for the DevTools/debugger,
+  and a custom **upstream** host. They have no deploy effect — they configure the
+  local runtime only.
+- **Cache API (`caches` global)** — works **locally by default** through
+  Miniflare (no binding to declare; `caches.default` and `caches.open(...)` are
+  available in dev/test). Cache contents now **persist across dev-server
+  restarts** when you set `cachePersist`, alongside the sibling
+  `kvPersist`/`r2Persist`/`d1Persist`/`durableObjectsPersist` options.
+- **`outboundService`** — a **dev/test-only** option (not a Wrangler config
+  field) that routes a Worker's outbound `fetch()` to a named service, so you can
+  exercise cross-service calls locally. It has no deploy analogue.
 
 ## Containers (offline-first)
 
@@ -376,6 +421,24 @@ wrangler: {
 
 As with all passthrough, there is no local Miniflare wiring or type generation
 for these — they are merged into the Wrangler config for deploy only.
+
+### Legacy `site` (Workers Sites static assets)
+
+Wrangler's legacy **`site`** (Workers Sites) is the predecessor to the modern
+**`assets`** field — prefer `assets` for static assets. Devflare does not model
+`site`; if you must use it (for example, porting an old Worker verbatim), it is
+passthrough-reachable for deploy with no local wiring:
+
+```ts
+wrangler: {
+  passthrough: {
+    site: { bucket: './public' }
+  }
+}
+```
+
+As with the other legacy globals, there is no local Miniflare wiring or type
+generation — it is merged into the Wrangler config for deploy only.
 
 ## Cross-reference: two "remote-only" classifications
 

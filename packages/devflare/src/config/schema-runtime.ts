@@ -56,6 +56,22 @@ export const tailConsumerSchema = z.union([
 ])
 
 /**
+ * Streaming Tail Consumer configuration.
+ *
+ * Twin of {@link tailConsumerSchema} for the wrangler `streaming_tail_consumers`
+ * field. A streaming tail consumer receives a live event stream from this Worker.
+ */
+export const streamingTailConsumerSchema = z.union([
+	z.string().min(1),
+	z
+		.object({
+			service: z.string().min(1),
+			environment: z.string().min(1).optional()
+		})
+		.strict()
+])
+
+/**
  * Trigger configuration for scheduled (cron) events.
  *
  * Each cron expression is validated against the Cloudflare 5-field cron grammar
@@ -106,7 +122,17 @@ export const serverConfigSchema = z
 		/** Host the dev runtime binds to. @default '127.0.0.1' */
 		host: z.string().min(1).optional(),
 		/** Port the dev runtime binds to. @default 8787 */
-		port: z.number().int().min(1).max(65535).optional()
+		port: z.number().int().min(1).max(65535).optional(),
+		/** Serve the dev runtime over HTTPS (Miniflare self-signs unless key/cert paths are given). */
+		https: z.boolean().optional(),
+		/** Path to a TLS private key (PEM) used when `https` is enabled. Maps to Miniflare's `httpsKeyPath`. */
+		httpsKeyPath: z.string().min(1).optional(),
+		/** Path to a TLS certificate chain (PEM) used when `https` is enabled. Maps to Miniflare's `httpsCertPath`. */
+		httpsCertPath: z.string().min(1).optional(),
+		/** Port the V8 inspector (DevTools) binds to. Maps to Miniflare's `inspectorPort`. */
+		inspectorPort: z.number().int().min(1).max(65535).optional(),
+		/** Origin to proxy unmatched requests to (and to base the request URL on). Maps to Miniflare's `upstream`. */
+		upstream: z.string().min(1).optional()
 	})
 	.strict()
 	.optional()
@@ -126,7 +152,11 @@ export const routeConfigSchema = z
 		pattern: z.string(),
 		zone_name: z.string().optional(),
 		zone_id: z.string().optional(),
-		custom_domain: z.boolean().optional()
+		custom_domain: z.boolean().optional(),
+		/** Whether the custom-domain route is enabled; compiles to `enabled` */
+		enabled: z.boolean().optional(),
+		/** Whether previews are enabled for the custom-domain route; compiles to `previews_enabled` */
+		previews_enabled: z.boolean().optional()
 	})
 	.superRefine((route, ctx) => {
 		if (!route.custom_domain) {
@@ -353,4 +383,5 @@ export type PreviewConfig = z.output<typeof previewsConfigSchema>
 export type RouteConfig = z.infer<typeof routeConfigSchema>
 export type ServerConfig = z.infer<typeof serverConfigSchema>
 export type TailConsumerConfig = z.infer<typeof tailConsumerSchema>
+export type StreamingTailConsumerConfig = z.infer<typeof streamingTailConsumerSchema>
 export type WsRouteConfig = z.infer<typeof wsRouteConfigSchema>

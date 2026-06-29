@@ -27,14 +27,18 @@ type Bindings = NonNullable<DevflareConfig['bindings']>
 
 export function buildQueueProducers(
 	bindings: Bindings
-): Record<string, { queueName: string }> | undefined {
+): Record<string, { queueName: string; deliveryDelay?: number }> | undefined {
 	if (!bindings.queues?.producers) {
 		return undefined
 	}
 
-	const producers: Record<string, { queueName: string }> = {}
+	const producers: Record<string, { queueName: string; deliveryDelay?: number }> = {}
 	for (const [bindingName, producer] of Object.entries(bindings.queues.producers)) {
-		producers[bindingName] = { queueName: normalizeQueueProducer(producer).queue }
+		const normalized = normalizeQueueProducer(producer)
+		producers[bindingName] = {
+			queueName: normalized.queue,
+			...(normalized.deliveryDelay !== undefined && { deliveryDelay: normalized.deliveryDelay })
+		}
 	}
 
 	return producers
@@ -398,6 +402,7 @@ export function buildSendEmailConfig(bindings: Bindings):
 				destination_address?: string
 				allowed_destination_addresses?: string[]
 				allowed_sender_addresses?: string[]
+				remote?: boolean
 			}>
 	  }
 	| undefined {
@@ -416,7 +421,8 @@ export function buildSendEmailConfig(bindings: Bindings):
 			}),
 			...(binding.allowedSenderAddresses && {
 				allowed_sender_addresses: binding.allowedSenderAddresses
-			})
+			}),
+			...(binding.remote !== undefined && { remote: binding.remote })
 		}))
 	}
 }
@@ -444,4 +450,24 @@ export function buildTailConsumersConfig(
 	)
 
 	return tails.length > 0 ? tails : undefined
+}
+
+/**
+ * Translate the top-level `streamingTailConsumers` config into Miniflare's
+ * per-worker `streamingTails` option (an array of service designators). This is
+ * the streaming twin of {@link buildTailConsumersConfig}; the same
+ * present-only-when-the-consumer-Worker-is-run-locally delivery semantics apply.
+ */
+export function buildStreamingTailConsumersConfig(
+	config: Pick<DevflareConfig, 'streamingTailConsumers'>
+): string[] | undefined {
+	if (!config.streamingTailConsumers || config.streamingTailConsumers.length === 0) {
+		return undefined
+	}
+
+	const streamingTails = config.streamingTailConsumers.map((consumer) =>
+		typeof consumer === 'string' ? consumer : consumer.service
+	)
+
+	return streamingTails.length > 0 ? streamingTails : undefined
 }

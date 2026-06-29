@@ -7,7 +7,10 @@ import {
 	buildFlagshipConfig,
 	buildHyperdrivesConfig,
 	buildMtlsCertificatesConfig,
+	buildQueueProducers,
+	buildSendEmailConfig,
 	buildStreamConfig,
+	buildStreamingTailConsumersConfig,
 	buildTailConsumersConfig
 } from '../../../src/dev-server/miniflare-bindings'
 
@@ -204,5 +207,58 @@ describe('buildMtlsCertificatesConfig', () => {
 
 	test('returns undefined when no mTLS binding is configured', () => {
 		expect(buildMtlsCertificatesConfig({} as Bindings)).toBeUndefined()
+	})
+})
+
+describe('buildQueueProducers', () => {
+	test('carries deliveryDelay onto the Miniflare producer designator', () => {
+		const bindings = {
+			queues: {
+				producers: {
+					JOBS: { queue: 'jobs-queue', deliveryDelay: 60 },
+					MAIL: 'mail-queue'
+				}
+			}
+		} as unknown as Bindings
+
+		expect(buildQueueProducers(bindings)).toEqual({
+			JOBS: { queueName: 'jobs-queue', deliveryDelay: 60 },
+			MAIL: { queueName: 'mail-queue' }
+		})
+	})
+})
+
+describe('buildSendEmailConfig', () => {
+	test('carries the remote flag onto the Miniflare send_email designator', () => {
+		const bindings = {
+			sendEmail: {
+				EMAIL: { destinationAddress: 'admin@example.com', remote: true }
+			}
+		} as unknown as Bindings
+
+		expect(buildSendEmailConfig(bindings)).toEqual({
+			send_email: [{ name: 'EMAIL', destination_address: 'admin@example.com', remote: true }]
+		})
+	})
+})
+
+describe('buildStreamingTailConsumersConfig', () => {
+	test('maps string streaming tail consumers to the Miniflare streamingTails array', () => {
+		expect(
+			buildStreamingTailConsumersConfig({ streamingTailConsumers: ['stream-worker', 'logs'] })
+		).toEqual(['stream-worker', 'logs'])
+	})
+
+	test('maps object streaming tail consumers to their service names', () => {
+		expect(
+			buildStreamingTailConsumersConfig({
+				streamingTailConsumers: [{ service: 'stream-worker', environment: 'production' }]
+			})
+		).toEqual(['stream-worker'])
+	})
+
+	test('returns undefined when no streaming tail consumers are configured', () => {
+		expect(buildStreamingTailConsumersConfig({})).toBeUndefined()
+		expect(buildStreamingTailConsumersConfig({ streamingTailConsumers: [] })).toBeUndefined()
 	})
 })

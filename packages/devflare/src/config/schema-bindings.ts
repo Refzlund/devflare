@@ -68,7 +68,9 @@ export const queueConsumerSchema = z.object({
 	/** Maximum concurrent batch invocations */
 	maxConcurrency: z.number().optional(),
 	/** Delay in seconds between retries */
-	retryDelay: z.number().optional()
+	retryDelay: z.number().optional(),
+	/** Milliseconds to wait for pulled messages to become visible again; compiles to `visibility_timeout_ms` */
+	visibilityTimeoutMs: z.number().optional()
 })
 
 /**
@@ -82,7 +84,9 @@ export const queueProducerSchema = z.union([
 			/** Queue name this producer writes to */
 			queue: z.string().min(1),
 			/** Ask Wrangler local development to connect this producer to the remote queue */
-			remote: z.boolean().optional()
+			remote: z.boolean().optional(),
+			/** Number of seconds to delay messages sent by this producer; compiles to `delivery_delay` */
+			deliveryDelay: z.number().optional()
 		})
 		.strict()
 ])
@@ -162,7 +166,14 @@ export const secretsStoreBindingSchema = z.union([
  * Binds to another Worker for RPC-style communication.
  * Accepts plain objects or WorkerBinding from ref().worker.
  */
-const serviceBindingKeys = new Set(['service', 'environment', 'entrypoint', 'remote', '__ref'])
+const serviceBindingKeys = new Set([
+	'service',
+	'environment',
+	'entrypoint',
+	'remote',
+	'props',
+	'__ref'
+])
 
 function isServiceBindingValue(val: unknown): boolean {
 	if ((typeof val !== 'object' && typeof val !== 'function') || val === null) {
@@ -192,6 +203,13 @@ function isServiceBindingValue(val: unknown): boolean {
 		return false
 	}
 
+	if (
+		obj.props !== undefined &&
+		(typeof obj.props !== 'object' || obj.props === null || Array.isArray(obj.props))
+	) {
+		return false
+	}
+
 	if (typeof val === 'object') {
 		for (const key of Object.keys(obj)) {
 			if (!serviceBindingKeys.has(key)) {
@@ -212,11 +230,13 @@ export const serviceBindingSchema = z.custom<{
 	entrypoint?: string
 	/** Ask Wrangler local development to connect this binding to the remote service */
 	remote?: boolean
+	/** Arbitrary props made available to the target worker via `ctx.props` */
+	props?: Record<string, unknown>
 	/** @internal Reference marker for ref() bindings */
 	__ref?: unknown
 }>(isServiceBindingValue, {
 	message:
-		'Expected service binding object with { service: string, environment?: string, entrypoint?: string, remote?: boolean } or ref().worker'
+		'Expected service binding object with { service: string, environment?: string, entrypoint?: string, remote?: boolean, props?: Record<string, unknown> } or ref().worker'
 })
 
 /**
@@ -371,7 +391,9 @@ export const sendEmailBindingSchema = z
 		/** Restrict this binding to a set of verified destination addresses */
 		allowedDestinationAddresses: z.array(z.string()).optional(),
 		/** Restrict this binding to a set of verified sender addresses */
-		allowedSenderAddresses: z.array(z.string()).optional()
+		allowedSenderAddresses: z.array(z.string()).optional(),
+		/** Ask Wrangler local development to connect this binding to the remote Email Routing service */
+		remote: z.boolean().optional()
 	})
 	.refine(
 		(binding) => {

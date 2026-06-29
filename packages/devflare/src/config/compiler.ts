@@ -72,7 +72,10 @@ function compileConfigInternal(
 		name: mergedConfig.name,
 		compatibility_date: mergedConfig.compatibilityDate,
 		preview_urls: true,
-		workers_dev: true
+		workers_dev: mergedConfig.workersDev ?? true,
+		...(mergedConfig.complianceRegion !== undefined && {
+			compliance_region: mergedConfig.complianceRegion
+		})
 	}
 
 	if (mergedConfig.accountId) {
@@ -109,6 +112,17 @@ function compileConfigInternal(
 		)
 	}
 
+	if (mergedConfig.streamingTailConsumers && mergedConfig.streamingTailConsumers.length > 0) {
+		result.streaming_tail_consumers = mergedConfig.streamingTailConsumers.map((consumer) =>
+			typeof consumer === 'string'
+				? { service: consumer }
+				: {
+						service: consumer.service,
+						...(consumer.environment && { environment: consumer.environment })
+					}
+		)
+	}
+
 	if (mergedConfig.vars && Object.keys(mergedConfig.vars).length > 0) {
 		result.vars = mergedConfig.vars
 	}
@@ -123,7 +137,9 @@ function compileConfigInternal(
 			pattern: route.pattern,
 			...(route.zone_name && { zone_name: route.zone_name }),
 			...(route.zone_id && { zone_id: route.zone_id }),
-			...(route.custom_domain !== undefined && { custom_domain: route.custom_domain })
+			...(route.custom_domain !== undefined && { custom_domain: route.custom_domain }),
+			...(route.enabled !== undefined && { enabled: route.enabled }),
+			...(route.previews_enabled !== undefined && { previews_enabled: route.previews_enabled })
 		}))
 	}
 

@@ -24,6 +24,7 @@ import type { DevflareConfig } from '../config'
 import {
 	buildAnalyticsEngineConfig,
 	buildHyperdrivesConfig,
+	buildStreamingTailConsumersConfig,
 	buildTailConsumersConfig
 } from '../dev-server/miniflare-bindings'
 import { buildLocalSecretWrappedBindingConfig } from '../secrets/local-secrets'
@@ -72,9 +73,13 @@ export function buildInlineBridgeMfConfig(
 	}
 
 	if (config.bindings?.queues?.producers) {
-		const queueProducers: Record<string, { queueName: string }> = {}
+		const queueProducers: Record<string, { queueName: string; deliveryDelay?: number }> = {}
 		for (const [bindingName, producer] of Object.entries(config.bindings.queues.producers)) {
-			queueProducers[bindingName] = { queueName: normalizeQueueProducer(producer).queue }
+			const normalized = normalizeQueueProducer(producer)
+			queueProducers[bindingName] = {
+				queueName: normalized.queue,
+				...(normalized.deliveryDelay !== undefined && { deliveryDelay: normalized.deliveryDelay })
+			}
 		}
 		mfConfig.queueProducers = queueProducers
 	}
@@ -193,6 +198,11 @@ export function buildInlineBridgeMfConfig(
 		mfConfig.tails = tailConsumersConfig
 	}
 
+	const streamingTailConsumersConfig = buildStreamingTailConsumersConfig(config)
+	if (streamingTailConsumersConfig) {
+		mfConfig.streamingTails = streamingTailConsumersConfig
+	}
+
 	if (config.bindings?.artifacts) {
 		mfConfig.artifacts = Object.fromEntries(
 			Object.entries(config.bindings.artifacts).map(([bindingName, binding]) => {
@@ -293,7 +303,8 @@ export function buildInlineBridgeMfConfig(
 				}),
 				...(binding.allowedSenderAddresses && {
 					allowed_sender_addresses: binding.allowedSenderAddresses
-				})
+				}),
+				...(binding.remote !== undefined && { remote: binding.remote })
 			}))
 		}
 	}

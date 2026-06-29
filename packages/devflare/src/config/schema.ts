@@ -32,6 +32,7 @@ import {
 	routeConfigSchema,
 	secretConfigSchema,
 	serverConfigSchema,
+	streamingTailConsumerSchema,
 	tailConsumerSchema,
 	triggersSchema,
 	wranglerConfigSchema,
@@ -162,6 +163,18 @@ export const rootConfigShape = {
 	/** Send Trace Events from this Worker to Workers Logpush. Does not create a Logpush job. */
 	logpush: z.boolean().optional(),
 
+	/**
+	 * Cloudflare compliance region this Worker is deployed under.
+	 * Compiles to `compliance_region`.
+	 */
+	complianceRegion: z.enum(['public', 'fedramp_high']).optional(),
+
+	/**
+	 * Whether the Worker is reachable on its `*.workers.dev` subdomain.
+	 * Compiles to `workers_dev` (defaults to `true` when omitted).
+	 */
+	workersDev: z.boolean().optional(),
+
 	/** Include source maps when uploading this Worker. */
 	uploadSourceMaps: z.boolean().optional(),
 
@@ -170,6 +183,9 @@ export const rootConfigShape = {
 
 	/** Tail Workers that consume traces from this Worker. */
 	tailConsumers: z.array(tailConsumerSchema).optional(),
+
+	/** Tail Workers that consume a live event stream from this Worker. */
+	streamingTailConsumers: z.array(streamingTailConsumerSchema).optional(),
 
 	/** Environment variables. */
 	vars: z.record(z.string(), varValueSchema).optional(),
@@ -308,6 +324,8 @@ export type {
 	SmartPlacementConfigInput,
 	StreamBindingInput,
 	StreamBindingObjectInput,
+	StreamingTailConsumerConfigInput,
+	StreamingTailConsumerObjectConfigInput,
 	TailConsumerConfigInput,
 	TailConsumerObjectConfigInput,
 	TargetedHostPlacementConfigInput,
@@ -371,6 +389,7 @@ export type {
 	PreviewConfig,
 	RouteConfig,
 	ServerConfig,
+	StreamingTailConsumerConfig,
 	TailConsumerConfig,
 	WsRouteConfig
 } from './schema-runtime'

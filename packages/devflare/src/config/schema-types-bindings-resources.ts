@@ -335,6 +335,19 @@ export interface QueueProducerObjectInput {
 	 * ```
 	 */
 	remote?: boolean
+
+	/**
+	 * Number of seconds to delay messages sent by this producer. Compiles to
+	 * `delivery_delay`.
+	 *
+	 * @default Cloudflare Queues default behavior.
+	 *
+	 * @example
+	 * ```ts
+	 * producers: { TASK_QUEUE: { queue: 'tasks-local', deliveryDelay: 30 } }
+	 * ```
+	 */
+	deliveryDelay?: number
 }
 
 /**
@@ -447,6 +460,19 @@ export interface QueueConsumerInput {
 	 * ```
 	 */
 	retryDelay?: number
+
+	/**
+	 * Milliseconds to wait for pulled messages to become visible again.
+	 * Compiles to `visibility_timeout_ms`. Deploy-only (no local emulation).
+	 *
+	 * @default Cloudflare Queues default behavior.
+	 *
+	 * @example
+	 * ```ts
+	 * { queue: 'tasks-local', visibilityTimeoutMs: 30000 }
+	 * ```
+	 */
+	visibilityTimeoutMs?: number
 }
 
 /**
@@ -599,6 +625,18 @@ export interface ServiceBindingInput {
 	 * ```
 	 */
 	readonly remote?: boolean
+
+	/**
+	 * Arbitrary props made available to the target worker via `ctx.props`.
+	 *
+	 * @default No props.
+	 *
+	 * @example
+	 * ```ts
+	 * services: { API: { service: 'api-worker', props: { tier: 'gold' } } }
+	 * ```
+	 */
+	readonly props?: Record<string, unknown>
 
 	/**
 	 * Internal marker used by `ref()` service bindings.

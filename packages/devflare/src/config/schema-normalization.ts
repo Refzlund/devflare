@@ -93,6 +93,8 @@ export interface NormalizedQueueProducer {
 	queue: string
 	/** Wrangler local-development remote-binding preference */
 	remote?: boolean
+	/** Number of seconds to delay messages sent by this producer */
+	deliveryDelay?: number
 }
 
 export interface NormalizedHyperdriveBinding {
@@ -321,7 +323,8 @@ export function normalizeQueueProducer(config: QueueProducer): NormalizedQueuePr
 
 	return {
 		queue: config.queue,
-		...(config.remote !== undefined && { remote: config.remote })
+		...(config.remote !== undefined && { remote: config.remote }),
+		...(config.deliveryDelay !== undefined && { deliveryDelay: config.deliveryDelay })
 	}
 }
 

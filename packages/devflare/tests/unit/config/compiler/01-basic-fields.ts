@@ -100,5 +100,50 @@ describe('compileConfig', () => {
 				required: ['API_TOKEN']
 			})
 		})
+
+		test('emits compliance_region when set', () => {
+			const result = compileConfig({
+				...baseConfig,
+				complianceRegion: 'fedramp_high'
+			})
+
+			expect(result.compliance_region).toBe('fedramp_high')
+		})
+
+		test('omits compliance_region when not set', () => {
+			const result = compileConfig(baseConfig)
+
+			expect(result.compliance_region).toBeUndefined()
+		})
+
+		test('emits workers_dev: false when workersDev is false', () => {
+			const result = compileConfig({
+				...baseConfig,
+				workersDev: false
+			})
+
+			expect(result.workers_dev).toBe(false)
+		})
+
+		test('defaults workers_dev to true when workersDev is omitted', () => {
+			const result = compileConfig(baseConfig)
+
+			expect(result.workers_dev).toBe(true)
+		})
+
+		test('compiles streaming_tail_consumers', () => {
+			const result = compileConfig({
+				...baseConfig,
+				streamingTailConsumers: [
+					'stream-worker',
+					{ service: 'staging-stream-worker', environment: 'staging' }
+				]
+			})
+
+			expect(result.streaming_tail_consumers).toEqual([
+				{ service: 'stream-worker' },
+				{ service: 'staging-stream-worker', environment: 'staging' }
+			])
+		})
 	})
 })
