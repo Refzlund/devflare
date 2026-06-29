@@ -38,6 +38,7 @@
     "cf-stream-vpc-flagship-bindings",
     "cf-test-dx",
     "cf11-deployments-subcommand",
+    "cf13-sendemail-offline-parity",
     "cf9-config-coverage-gaps",
     "ci-quality-gates",
     "cloudflare-deploy-policy-flags",
