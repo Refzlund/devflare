@@ -81,6 +81,34 @@ they use a dedicated HTTP transfer side-channel. DO WebSocket relaying
 (`stub.connect()`) is unaffected. Inside the Worker (the normal runtime path)
 there is no such cap.
 
+### Durable Object WebSocket Hibernation
+
+The DO **WebSocket Hibernation** API works locally. Because Miniflare runs your
+DO classes in real `workerd`, the hibernation surface on `DurableObjectState` is
+present and functional inside a Devflare-managed DO:
+
+- `state.acceptWebSocket(ws, tags?)`, `state.getWebSockets(tag?)`,
+  `state.getTags(ws)`, and `state.setWebSocketAutoResponse(...)` /
+  `getWebSocketAutoResponse()`, plus the per-socket
+  `ws.serializeAttachment(...)` / `ws.deserializeAttachment()`, all run locally.
+- The hibernation **handlers** — `webSocketMessage`, `webSocketClose`, and
+  `webSocketError` — are relayed by Devflare's DO wrapper under the normal event
+  context, exactly like `fetch`/`alarm`, so they fire locally.
+
+Worked example: `cases/case18` ships a `ChatRoom` DO that uses `acceptWebSocket`
++ `serializeAttachment` + `getWebSockets` + `webSocketMessage`/`webSocketClose`,
+and its bridge integration test (`tests/integration/bridge/case18-do.test.ts`)
+drives that DO — including the hibernation-backed `getWebSockets()` count —
+through the cross-process bridge.
+
+One nuance for the **cross-process bridge** only: when you open a WebSocket to a
+DO *from another process* (e.g. `stub.connect()` from `devflare/test`), the
+socket is a live relay across the bridge for the lifetime of the connection. The
+DO's own hibernation state (accepted sockets, attachments, auto-response) lives
+in the real local Miniflare runtime and behaves normally — the relay only
+carries frames. Inside the Worker (the normal runtime path) there is nothing
+special to account for.
+
 ## Edge and product bindings
 
 Columns: the binding, its config key in `defineConfig`, the local support level,
@@ -136,7 +164,13 @@ their local situations differ and neither is an inherent remote boundary:
 
 - **Send Email** — wired into the dev/test Miniflare worker config (the compiled
   `send_email` list is passed to Miniflare's per-worker `email` option), so the
-  binding shape runs locally.
+  binding shape runs locally. The **inbound** email handler is also fully wired
+  and locally testable via `cf.email.trigger()`. Note the boundary: Email Routing
+  **rules** — which addresses on your domain route inbound mail to the Worker —
+  are a Cloudflare **dashboard** service, not a Wrangler config field, so they
+  are not expressed in `defineConfig`. Devflare covers both the outbound
+  `send_email` binding and the inbound email handler; the routing-rule
+  provisioning itself stays in the dashboard.
 - **Analytics Engine** — **not** an inherent remote-only boundary, and now
   **wired into the dev/test Miniflare config as a write-only no-op stub**.
   Devflare compiles `analytics_engine_datasets` for deploy and also passes
@@ -285,6 +319,63 @@ Steps:
   compile into the same Wrangler config and run, but binding *type generation* and
   the offline test helpers (`createOfflineEnv`, etc.) target JavaScript/TypeScript
   and will not generate Python types.
+
+## Passthrough-only: `unsafe` bindings and legacy module globals
+
+Two more Wrangler surfaces are intentionally **not** modeled in `defineConfig`
+and are reachable only through the same `wrangler.passthrough` escape hatch used
+for Python Workers above. Both are deploy-time passthroughs with **no local
+Miniflare wiring** — Devflare merges them into the emitted Wrangler config as the
+last step and Wrangler/`workerd` handle them.
+
+### `unsafe` bindings and metadata
+
+Wrangler's `unsafe.bindings` / `unsafe.metadata` exist for Cloudflare products
+that ship before they have a stable, first-class binding type. Devflare does not
+model them (the binding schema is `.strict()`, so an `unsafe` binding cannot be
+declared as a normal binding), and Miniflare has no `unsafe` plugin, so there is
+**no local emulation** — an `unsafe` binding will not exist on `env` during
+`devflare dev` or in the offline test layer. To deploy one, put it in
+`wrangler.passthrough`:
+
+```ts
+export default defineConfig({
+  name: 'my-worker',
+  compatibilityDate: '2024-01-01',
+  wrangler: {
+    passthrough: {
+      unsafe: {
+        bindings: [{ name: 'MY_BETA', type: 'some_beta_type' }],
+        metadata: { /* arbitrary upload metadata */ }
+      }
+    }
+  }
+})
+```
+
+The generated `env` types will not include it; reference it with your own typing
+and test it with a custom fake injected through `createMockEnv({ custom })`.
+
+### Legacy `wasm_modules` / `text_blobs` / `data_blobs`
+
+These are Wrangler's **legacy** global module bindings. The modern, first-class
+path is Devflare's `rules` (the `CompiledWasm`, `Text`, and `Data` module-rule
+types Devflare already models) together with normal ES-module `import`s — prefer
+those. If you must use the legacy global form (for example, porting an old Worker
+verbatim), it is passthrough-reachable:
+
+```ts
+wrangler: {
+  passthrough: {
+    wasm_modules: { MY_MODULE: 'src/lib/add.wasm' },
+    text_blobs: { MY_TEXT: 'src/data/config.txt' },
+    data_blobs: { MY_DATA: 'src/data/blob.bin' }
+  }
+}
+```
+
+As with all passthrough, there is no local Miniflare wiring or type generation
+for these — they are merged into the Wrangler config for deploy only.
 
 ## Cross-reference: two "remote-only" classifications
 

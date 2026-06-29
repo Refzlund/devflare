@@ -104,10 +104,16 @@ How covered (CF-6b):
 
 | Gap | Dimensions | The devflare-way fix | Status |
 | --- | --- | --- | --- |
-| DO **WebSocket Hibernation** (`acceptWebSocket`/`getWebSockets`/`serializeAttachment`) not in DO context/bridge | local-dev/test/docs | Extend the DO event context + bridge relay to carry the hibernation surface, or document precisely that hibernation needs direct state access outside the bridge. | ⬜ |
-| `unsafe` bindings/metadata/capnp are passthrough-only, undocumented | docs | A matrix section (like the Python Workers one) stating unsafe is passthrough-only, no local wiring. | ⬜ |
-| Legacy `wasm_modules`/`text_blobs`/`data_blobs` superseded by `rules`, undocumented for porters | docs | A short note that these are passthrough-reachable and `rules` is the modern path. | ⬜ |
-| Email Routing **rules** are a dashboard service (not wrangler) — set expectations | docs | A note that `send_email` + the email handler are full; inbound routing rules live in the CF dashboard. | ⬜ |
+| DO **WebSocket Hibernation** (`acceptWebSocket`/`getWebSockets`/`serializeAttachment`) — claimed "not in DO context/bridge" | local-dev/test/docs | **Stale claim corrected.** Hibernation already works locally; document it precisely with the worked example and the one cross-process-bridge nuance. | ✅ |
+| `unsafe` bindings/metadata are passthrough-only, undocumented | docs | A matrix section (like the Python Workers one) stating unsafe is passthrough-only, no local wiring. | ✅ |
+| Legacy `wasm_modules`/`text_blobs`/`data_blobs` superseded by `rules`, undocumented for porters | docs | A short note that these are passthrough-reachable and `rules` is the modern path. | ✅ |
+| Email Routing **rules** are a dashboard service (not wrangler) — set expectations | docs | A note that `send_email` + the email handler are full; inbound routing rules live in the CF dashboard. | ✅ |
+
+How covered (CF-7), all in `docs/CLOUDFLARE_SUPPORT_MATRIX.md`:
+- **DO WebSocket Hibernation** — the original gap statement ("not in DO context/bridge") was a **stale claim**: hibernation works locally because Miniflare runs the DO class in real `workerd`, so `state.acceptWebSocket`/`getWebSockets`/`getTags`/`setWebSocketAutoResponse` + `ws.serializeAttachment`/`deserializeAttachment` all function, and Devflare's DO wrapper (`src/transform/durable-object.ts`) relays the `webSocketMessage`/`webSocketClose`/`webSocketError` handlers under the normal event context. Verified by `cases/case18`'s `ChatRoom` DO (full hibernation API) whose bridge test (`tests/integration/bridge/case18-do.test.ts`) drives the hibernation-backed `getWebSockets()` count through the cross-process bridge. Added a **### Durable Object WebSocket Hibernation** subsection documenting this plus the single nuance: a WebSocket opened to a DO *from another process* via `stub.connect()` is a live relay across the bridge, while the DO's own hibernation state lives in real local Miniflare and behaves normally.
+- **`unsafe` bindings/metadata** — added a **## Passthrough-only** section: the binding schema is `.strict()` (so `unsafe` cannot be a normal binding) and Miniflare has no `unsafe` plugin, so there is **no local emulation**; it is reachable for deploy through `wrangler.passthrough` (verified merge point: `src/config/compiler.ts:164` `Object.assign(result, mergedConfig.wrangler.passthrough)`), typed by the user and faked via `createMockEnv({ custom })`.
+- **Legacy `wasm_modules`/`text_blobs`/`data_blobs`** — documented in the same section: the modern first-class path is Devflare's `rules` (`CompiledWasm`/`Text`/`Data` module-rule types Devflare already models) plus ES-module imports; the legacy global form is `wrangler.passthrough`-reachable for deploy with no local wiring.
+- **Email Routing rules** — extended the Send Email bullet: the outbound `send_email` binding and the inbound email handler (`cf.email.trigger()`) are fully covered; Email Routing **rules** (which addresses route inbound mail to the Worker) are a Cloudflare **dashboard** service, not a Wrangler config field, and stay in the dashboard.
 
 ## Batch CF-8 — re-investigate
 
