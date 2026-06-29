@@ -8,6 +8,7 @@
 import type { Pipeline } from 'cloudflare:pipelines'
 import { type DevflareConfig, normalizeHyperdriveBinding } from '../config'
 import { resolveLocalSecretValuesForBindings } from '../secrets/local-secrets'
+import type { LocalSendEmailBindingConfig } from '../utils/send-email'
 import {
 	type MockAISearchInstanceOptions,
 	type MockAISearchNamespaceOptions,
@@ -40,6 +41,7 @@ import {
 	createMockR2,
 	createMockRateLimit,
 	createMockSecretsStoreSecret,
+	createMockSendEmail,
 	createMockStreamBinding,
 	createMockVectorize,
 	createMockVersionMetadata,
@@ -100,6 +102,13 @@ export interface OfflineBindingFixtures {
 	 * without an entry here is auto-created with `createMockAnalyticsEngine()`.
 	 */
 	analyticsEngine?: Record<string, AnalyticsEngineDataset>
+	/**
+	 * SendEmail bindings. Any sendEmail binding in config without an entry here
+	 * is auto-created with `createMockSendEmail()` using the binding's configured
+	 * sender/destination allow-lists, so dispatched mail is recorded for
+	 * assertions. Provide a `SendEmail` to inject a fully custom fake.
+	 */
+	sendEmail?: Record<string, SendEmail | LocalSendEmailBindingConfig>
 	secretsStore?: Record<string, string>
 	workerLoaders?: Record<string, MockWorkerLoaderOptions>
 	mtlsCertificates?: Record<string, MockFetcherHandler>
@@ -326,6 +335,14 @@ const SUPPORT_MATRIX: Record<string, OfflineSupportEntry> = {
 		recommendation:
 			'Use createMockAnalyticsEngine() to assert recorded writeDataPoint() calls; query analytics through the hosted SQL API/dashboard.'
 	},
+	sendEmail: {
+		service: 'sendEmail',
+		tier: 'offline-native',
+		reason:
+			'SendEmail is send-only (Email Routing has no in-worker read API), so Devflare provides a complete pure mock: send() enforces the configured sender/destination allow-lists locally and records dispatched mail. Real delivery is Cloudflare Email Routing.',
+		recommendation:
+			'Use createOfflineEnv() or createMockSendEmail() to assert dispatched mail in pure tests; use Cloudflare Email Routing for real delivery.'
+	},
 	builds: {
 		service: 'builds',
 		tier: 'remote-boundary',
@@ -441,6 +458,12 @@ function isVectorizeBinding(
 	return typeof (value as { query?: unknown } | undefined)?.query === 'function'
 }
 
+function isSendEmailBinding(
+	value: SendEmail | LocalSendEmailBindingConfig | undefined
+): value is SendEmail {
+	return typeof (value as { send?: unknown } | undefined)?.send === 'function'
+}
+
 function isAISearchNamespace(
 	value: MockAISearchNamespaceOptions | AiSearchNamespace | undefined
 ): value is AiSearchNamespace {
@@ -531,6 +554,17 @@ function addAnalyticsEngineBindings(
 ) {
 	for (const name of Object.keys(bindings?.analyticsEngine ?? {})) {
 		env[name] = fixtures.analyticsEngine?.[name] ?? createMockAnalyticsEngine()
+	}
+}
+
+function addSendEmailBindings(
+	env: Record<string, unknown>,
+	bindings: OfflineConfig['bindings'],
+	fixtures: OfflineBindingFixtures
+) {
+	for (const [name, binding] of Object.entries(bindings?.sendEmail ?? {})) {
+		const fixture = fixtures.sendEmail?.[name]
+		env[name] = isSendEmailBinding(fixture) ? fixture : createMockSendEmail(fixture ?? binding)
 	}
 }
 
@@ -821,7 +855,8 @@ function addRemoteBoundaries(
  * entry overrides the auto-mock), alongside rate limits, version metadata,
  * hyperdrive, worker loaders, mTLS, dispatch namespaces, workflows, pipelines,
  * images, media, stream, flagship, artifacts, secrets store, AI Search,
- * Vectorize, and Analytics Engine. It does **not** create the wiring bindings
+ * Vectorize, Analytics Engine, and SendEmail. It does **not** create the wiring
+ * bindings
  * (`durableObjects`, `services`) — those require a real Miniflare runtime, which
  * only `createTestContext()` provides. When such a binding is present in config
  * it is reported in the returned `missingFixtures` (its `env` entry is left
@@ -848,6 +883,7 @@ export function createOfflineBindings(
 	addQueueBindings(env, bindings, fixtures)
 	addVectorizeBindings(env, bindings, fixtures)
 	addAnalyticsEngineBindings(env, bindings, fixtures)
+	addSendEmailBindings(env, bindings, fixtures)
 	addRateLimitBindings(env, bindings)
 	addVersionMetadataBinding(env, bindings)
 	addHyperdriveBindings(env, bindings, fixtures, missingFixtures)

@@ -4800,6 +4800,8 @@ The `devflare/test` entrypoint intentionally has multiple lanes: runtime-shaped 
 | `createMockArtifacts` | Mock Artifacts repo APIs. |
 | `createMockVectorize` | Mock a Vectorize index (in-memory cosine query). |
 | `createMockAnalyticsEngine` | Mock an Analytics Engine dataset (write-only recording stub). |
+| `createMockSendEmail` | Mock a SendEmail binding (records dispatched mail, enforces allow-lists). |
+| `createLocalSendEmailBinding` | Underlying pure SendEmail simulator (non-recording). |
 | `createMockSecretsStoreSecret` | Mock a Secrets Store secret. |
 | `createMockEnv` | Create a pure env with selected mock bindings. |
 | `hasServiceBindings` | Advanced/internal service-binding resolution predicate. |
@@ -11351,6 +11353,7 @@ test('sends an outbound transactional email', async () => {
 
 - Use the outbound binding directly when the worker is sending mail.
 - Use the inbound `email` helper surface (`cf.email.send(...)` from `devflare/test`) when the worker is handling inbound email in `src/email.ts`.
+- For pure offline tests, `createMockSendEmail()` (or `createMockEnv({ sendEmail })` / `createOfflineEnv()`) records every dispatched message into `.sentEmails` while still enforcing the configured sender/destination allow-lists; `createLocalSendEmailBinding()` is the underlying non-recording simulator.
 - Keep address restrictions visible in tests when those restrictions are part of the safety story.
 
 #### When to move beyond the default harness

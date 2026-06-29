@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import type { Pipeline } from 'cloudflare:pipelines'
 import { writeLocalSecret } from '../../../src/secrets/local-secrets'
 import {
+	createMockSendEmail,
 	createOfflineBindings,
 	createOfflineEnv,
 	describeOfflineSupport,
@@ -46,6 +47,7 @@ describe('offline support matrix', () => {
 		expect(matrix.ai.tier).toBe('remote-boundary')
 		expect(matrix.vectorize.tier).toBe('offline-fixture')
 		expect(matrix.analyticsEngine.tier).toBe('offline-fixture')
+		expect(matrix.sendEmail.tier).toBe('offline-native')
 		expect(matrix.vpcServices.tier).toBe('remote-boundary')
 		expect(matrix.vpcNetworks.tier).toBe('remote-boundary')
 		expect(matrix.builds.tier).toBe('remote-boundary')
@@ -69,6 +71,15 @@ describe('offline support matrix', () => {
 		expect(support.tier).toBe('remote-boundary')
 		expect(support.reason).toContain('No offline support classification')
 		expect(support.recommendation).toContain('remote')
+	})
+
+	test('classifies sendEmail as a pure offline mock, not a remote boundary', () => {
+		const support = describeOfflineSupport('sendEmail')
+
+		expect(support.tier).toBe('offline-native')
+		expect(support.tier).not.toBe('remote-boundary')
+		expect(support.reason).not.toContain('No offline support classification')
+		expect(support.recommendation).toContain('createMockSendEmail()')
 	})
 
 	test('exports skip getters for documented remote-boundary integration tests', async () => {
@@ -429,5 +440,71 @@ describe('createOfflineBindings', () => {
 		// Neither is a remote boundary anymore.
 		expect(result.remoteBoundaries.map((b) => b.service)).not.toContain('vectorize')
 		expect(result.missingFixtures).toEqual([])
+	})
+
+	test('auto-wires a working SendEmail binding that records dispatched mail', async () => {
+		const result = createOfflineBindings({
+			name: 'mailer-worker',
+			bindings: {
+				sendEmail: {
+					EMAIL: { allowedSenderAddresses: ['sender@example.com'] }
+				}
+			}
+		})
+
+		const email = result.env.EMAIL as SendEmail & {
+			sentEmails: Parameters<SendEmail['send']>[0][]
+		}
+
+		await email.send({
+			from: 'sender@example.com',
+			to: 'recipient@example.com',
+			subject: 'Hello',
+			text: 'Sent offline'
+		} as Parameters<SendEmail['send']>[0])
+
+		expect(email.sentEmails).toHaveLength(1)
+		expect(email.sentEmails[0].to).toBe('recipient@example.com')
+		// A pure mock is always available — nothing is reported missing.
+		expect(result.missingFixtures).toEqual([])
+
+		// The configured sender allow-list is honored offline.
+		await expect(
+			email.send({
+				from: 'imposter@example.com',
+				to: 'recipient@example.com'
+			} as Parameters<SendEmail['send']>[0])
+		).rejects.toThrow('not allowed')
+	})
+
+	test('createOfflineEnv exposes a working SendEmail binding', async () => {
+		const env = createOfflineEnv({
+			name: 'mailer-worker',
+			bindings: {
+				sendEmail: { EMAIL: {} }
+			}
+		})
+
+		const email = env.EMAIL as SendEmail & {
+			sentEmails: Parameters<SendEmail['send']>[0][]
+		}
+		await email.send({
+			from: 'sender@example.com',
+			to: 'recipient@example.com'
+		} as Parameters<SendEmail['send']>[0])
+		expect(email.sentEmails).toHaveLength(1)
+	})
+
+	test('a fixtures.sendEmail override replaces the auto-created binding', async () => {
+		const customMock = createMockSendEmail()
+		const result = createOfflineBindings(
+			{
+				name: 'mailer-worker',
+				bindings: { sendEmail: { EMAIL: {} } }
+			},
+			{ sendEmail: { EMAIL: customMock } }
+		)
+
+		expect(result.env.EMAIL).toBe(customMock)
 	})
 })

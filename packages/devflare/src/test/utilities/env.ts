@@ -1,4 +1,5 @@
 import type { Pipeline } from 'cloudflare:pipelines'
+import type { LocalSendEmailBindingConfig } from '../../utils/send-email'
 import { createMockAnalyticsEngine } from './analytics-engine'
 import { type MockArtifactsOptions, createMockArtifacts, isArtifactsBinding } from './artifacts'
 import { createMockD1 } from './d1'
@@ -19,6 +20,7 @@ import {
 } from './platform'
 import { createMockQueue } from './queue'
 import { createMockR2 } from './r2'
+import { createMockSendEmail } from './send-email'
 import { type MockVectorizeOptions, createMockVectorize } from './vectorize'
 import { type MockWorkflowOptions, createMockPipeline, createMockWorkflow } from './workflows'
 
@@ -40,6 +42,7 @@ export interface MockEnvOptions {
 	artifacts?: string[] | Record<string, MockArtifactsOptions | Artifacts>
 	vectorize?: string[] | Record<string, MockVectorizeOptions | VectorizeIndex>
 	analyticsEngine?: string[]
+	sendEmail?: string[] | Record<string, SendEmail | LocalSendEmailBindingConfig>
 	secretsStore?: Record<string, string>
 	durableObjects?: string[]
 	vars?: Record<string, string>
@@ -74,6 +77,27 @@ function addAnalyticsEngineMockBindings(
 ): void {
 	for (const name of analyticsEngine ?? []) {
 		env[name] = createMockAnalyticsEngine()
+	}
+}
+
+function isSendEmailBinding(value: SendEmail | LocalSendEmailBindingConfig): value is SendEmail {
+	return typeof (value as { send?: unknown }).send === 'function'
+}
+
+function addSendEmailMockBindings(
+	env: Record<string, unknown>,
+	sendEmail: MockEnvOptions['sendEmail']
+): void {
+	if (Array.isArray(sendEmail)) {
+		for (const name of sendEmail) {
+			env[name] = createMockSendEmail()
+		}
+		return
+	}
+	if (sendEmail) {
+		for (const [name, value] of Object.entries(sendEmail)) {
+			env[name] = isSendEmailBinding(value) ? value : createMockSendEmail(value)
+		}
 	}
 }
 
@@ -231,6 +255,9 @@ export function createMockEnv(options: MockEnvOptions = {}): Record<string, unkn
 
 	// Add Analytics Engine bindings (write-only recording stubs)
 	addAnalyticsEngineMockBindings(env, options.analyticsEngine)
+
+	// Add SendEmail bindings (record dispatched mail for assertions)
+	addSendEmailMockBindings(env, options.sendEmail)
 
 	// Add Secrets Store bindings
 	if (options.secretsStore) {

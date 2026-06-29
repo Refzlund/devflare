@@ -180,7 +180,12 @@ their local situations differ and neither is an inherent remote boundary:
 
 - **Send Email** — wired into the dev/test Miniflare worker config (the compiled
   `send_email` list is passed to Miniflare's per-worker `email` option), so the
-  binding shape runs locally. The **inbound** email handler is also fully wired
+  binding shape runs locally. It is also a **pure-offline** binding: `createOfflineEnv()`
+  / `createMockEnv({ sendEmail })` auto-wire a deterministic `createMockSendEmail()`
+  that records every dispatched message into `.sentEmails` while enforcing the
+  configured sender/destination allow-lists (so `env.MY_EMAIL.send(...)` is
+  assertable without Miniflare); `describeOfflineSupport('sendEmail')` reports
+  `offline-native`. The **inbound** email handler is also fully wired
   and locally testable via `cf.email.trigger()`. Note the boundary: Email Routing
   **rules** — which addresses on your domain route inbound mail to the Worker —
   are a Cloudflare **dashboard** service, not a Wrangler config field, so they

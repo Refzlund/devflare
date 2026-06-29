@@ -109,6 +109,8 @@ export {
 	createMockArtifacts,
 	createMockVectorize,
 	createMockAnalyticsEngine,
+	createMockSendEmail,
+	createLocalSendEmailBinding,
 	createMockSecretsStoreSecret,
 	createMockEnv,
 	withTestContext,
@@ -130,5 +132,7 @@ export {
 	type MockArtifactsOptions,
 	type MockVectorizeOptions,
 	type MockVectorizeIndex,
-	type MockAnalyticsEngineDataset
+	type MockAnalyticsEngineDataset,
+	type MockSendEmailBinding,
+	type LocalSendEmailBindingConfig
 } from './utilities'

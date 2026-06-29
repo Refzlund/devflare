@@ -256,6 +256,14 @@ export const workerStyle = markWorkerStyle((request, env) => {
 							'`createMockAnalyticsEngine`',
 							'Mock an Analytics Engine dataset (write-only recording stub).'
 						],
+						[
+							'`createMockSendEmail`',
+							'Mock a SendEmail binding (records dispatched mail, enforces allow-lists).'
+						],
+						[
+							'`createLocalSendEmailBinding`',
+							'Underlying pure SendEmail simulator (non-recording).'
+						],
 						['`createMockSecretsStoreSecret`', 'Mock a Secrets Store secret.'],
 						['`createMockEnv`', 'Create a pure env with selected mock bindings.'],
 						['`hasServiceBindings`', 'Advanced/internal service-binding resolution predicate.'],

@@ -154,6 +154,7 @@ test('sends an outbound transactional email', async () => {
 			helperBullets: [
 				'Use the outbound binding directly when the worker is sending mail.',
 				'Use the inbound `email` helper surface (`cf.email.send(...)` from `devflare/test`) when the worker is handling inbound email in `src/email.ts`.',
+				'For pure offline tests, `createMockSendEmail()` (or `createMockEnv({ sendEmail })` / `createOfflineEnv()`) records every dispatched message into `.sentEmails` while still enforcing the configured sender/destination allow-lists; `createLocalSendEmailBinding()` is the underlying non-recording simulator.',
 				'Keep address restrictions visible in tests when those restrictions are part of the safety story.'
 			],
 			caveatBullets: [

@@ -145,6 +145,12 @@ loop is recorded below.
   capability, no inherent boundary): the `productions deployments` history
   subcommand and the undocumented `observability` config tier. Both are
   implemented in **Batch CF-11** below. No rejected candidates this pass.
+- **Third pass** (after CF-11 shipped, same dependency grounding): **7 of 8
+  survey areas returned zero candidates**. Only **1 medium** gap surfaced — the
+  `sendEmail` binding was the one mockable family with a pure local mock that was
+  not auto-wired into the pure-offline `createOfflineEnv()` path (nor classified
+  in the offline `SUPPORT_MATRIX`). Implemented in **Batch CF-13** below. No
+  rejected candidates this pass.
 
 ## Batch CF-9 — CF-8 confirmed gaps (implemented)
 
@@ -222,7 +228,29 @@ How covered (CF-11):
   table; added as deploy-only rows so their support tier is discoverable
   (mirroring the CF-9 `complianceRegion`/`workersDev`/route-flag rows).
 
-A **third** re-investigation pass after CF-11 is the convergence check; the loop
+## Batch CF-13 — CF-12 convergence gap (implemented)
+
+The 1 medium gap from the CF-8 third pass, shipped.
+
+| Gap | Dimensions | The devflare-way fix | Status |
+| --- | --- | --- | --- |
+| `sendEmail` had a pure local mock but was not auto-wired into the pure-offline test path | test/docs | Auto-wire it into `createOfflineEnv()` / `createMockEnv` and classify it in the offline `SUPPORT_MATRIX`, at parity with every other mockable binding. | ✅ |
+
+How covered (CF-13):
+- **`sendEmail` offline parity** — new public `createMockSendEmail()` (a recording
+  SendEmail mock that captures dispatched mail into `.sentEmails` while enforcing
+  the configured sender/destination allow-lists), auto-wired in
+  `createOfflineBindings()` right after `analyticsEngine` so `createOfflineEnv()`
+  / `createMockEnv({ sendEmail })` expose a working `env.MY_EMAIL.send(...)`
+  without Miniflare; a `SUPPORT_MATRIX.sendEmail` entry classified
+  **`offline-native`** (send-only with a complete local mock, like `pipelines`),
+  so `describeOfflineSupport('sendEmail')` no longer falls through to the false
+  `remote-boundary`; `createMockSendEmail` + the underlying
+  `createLocalSendEmailBinding` are re-exported from `devflare/test`. This closes
+  the last DX inconsistency — every mockable binding is now both auto-wired offline
+  and classified.
+
+A **fourth** re-investigation pass after CF-13 is the convergence check; the loop
 ends when a pass returns zero real gaps.
 
 ---
