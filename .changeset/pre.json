@@ -39,6 +39,7 @@
     "cf-test-dx",
     "cf11-deployments-subcommand",
     "cf13-sendemail-offline-parity",
+    "cf15-server-livereload-cf",
     "cf9-config-coverage-gaps",
     "ci-quality-gates",
     "cloudflare-deploy-policy-flags",
