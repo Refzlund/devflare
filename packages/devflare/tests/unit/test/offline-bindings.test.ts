@@ -32,6 +32,8 @@ describe('offline support matrix', () => {
 	test('classifies services by honest offline support tier', () => {
 		const matrix = getOfflineSupportMatrix()
 
+		expect(matrix.durableObjects.tier).toBe('offline-native')
+		expect(matrix.services.tier).toBe('offline-native')
 		expect(matrix.containers.tier).toBe('offline-native')
 		expect(matrix.hyperdrive.tier).toBe('offline-native')
 		expect(matrix.workerLoaders.tier).toBe('offline-native')
@@ -47,6 +49,18 @@ describe('offline support matrix', () => {
 		expect(matrix.vpcServices.tier).toBe('remote-boundary')
 		expect(matrix.vpcNetworks.tier).toBe('remote-boundary')
 		expect(matrix.builds.tier).toBe('remote-boundary')
+	})
+
+	test('classifies Durable Objects and Services as offline-native via createTestContext()', () => {
+		for (const service of ['durableObjects', 'services'] as const) {
+			const support = describeOfflineSupport(service)
+
+			expect(support.tier).toBe('offline-native')
+			expect(support.tier).not.toBe('remote-boundary')
+			expect(support.reason).not.toContain('No offline support classification')
+			expect(support.reason).toContain('Miniflare')
+			expect(support.recommendation).toContain('createTestContext()')
+		}
 	})
 
 	test('describes unknown services as remote-boundary instead of guessing', () => {

@@ -137,6 +137,22 @@ type OfflineConfig = Partial<DevflareConfig> & {
 }
 
 const SUPPORT_MATRIX: Record<string, OfflineSupportEntry> = {
+	durableObjects: {
+		service: 'durableObjects',
+		tier: 'offline-native',
+		reason:
+			'Miniflare executes Durable Object classes locally, so createTestContext() runs them fully offline. There is no pure in-memory createMockEnv() mock for a DO (a real instance needs the Miniflare runtime).',
+		recommendation:
+			'Use createTestContext() (Miniflare-backed) to run Durable Objects locally; there is no standalone createMockEnv() DO fixture.'
+	},
+	services: {
+		service: 'services',
+		tier: 'offline-native',
+		reason:
+			'Miniflare resolves service bindings worker-to-worker locally, so createTestContext() runs them fully offline. There is no pure in-memory createMockEnv() mock (a real service binding needs the Miniflare runtime to wire the target Worker).',
+		recommendation:
+			'Use createTestContext() (Miniflare-backed) for worker-to-worker service bindings; there is no standalone createMockEnv() service fixture.'
+	},
 	rateLimits: {
 		service: 'rateLimits',
 		tier: 'offline-native',
