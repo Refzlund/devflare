@@ -56,8 +56,8 @@ function createReadonlyProxy<T extends object>(
  *
  * @throws {ContextAccessError} When accessed outside an active Devflare-managed handler trail
  */
-export const env: Readonly<DevflareEnv> = createReadonlyProxy(
-	() => getContextOrNull()?.env as Record<string, unknown> | undefined,
+export const env: Readonly<DevflareEnv> = createReadonlyProxy<DevflareEnv>(
+	() => getContextOrNull()?.env as DevflareEnv | undefined,
 	'env'
 )
 
@@ -87,8 +87,8 @@ export const env: Readonly<DevflareEnv> = createReadonlyProxy(
  *
  * @throws {ContextAccessError} When accessed outside an active Devflare-managed handler trail
  */
-export const vars: Readonly<DevflareVars> = createReadonlyProxy(
-	() => getContextOrNull()?.env as Record<string, unknown> | undefined,
+export const vars: Readonly<DevflareVars> = createReadonlyProxy<DevflareVars>(
+	() => getContextOrNull()?.env as DevflareVars | undefined,
 	'vars'
 )
 
