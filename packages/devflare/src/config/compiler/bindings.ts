@@ -203,12 +203,22 @@ export function compileBindings(
 		result.durable_objects = {
 			bindings: Object.entries(bindings.durableObjects).map(([name, config]) => {
 				const normalized = normalizeDOBinding(config)
-				const binding: { name: string; class_name: string; script_name?: string } = {
+				const binding: {
+					name: string
+					class_name: string
+					script_name?: string
+					environment?: string
+				} = {
 					name,
 					class_name: normalized.className
 				}
 				if (normalized.kind === 'cross-worker' && normalized.scriptName) {
 					binding.script_name = normalized.scriptName
+					// `environment` is the service-environment of the cross-worker
+					// script; it is only valid alongside `script_name`.
+					if (normalized.environment !== undefined) {
+						binding.environment = normalized.environment
+					}
 				}
 				return binding
 			})

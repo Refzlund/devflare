@@ -67,7 +67,7 @@ matrix — they are the offline baseline.
 | D1 | `d1` | ✅ Full | Miniflare-emulated SQLite database. | **Yes** — created if missing. |
 | R2 | `r2` | ✅ Full | Miniflare-emulated bucket. | **Yes** — created if missing. |
 | Queues | `queues` | ✅ Full | Producers + consumers via Miniflare. | **Yes** — created if missing (collects producer, consumer, and dead-letter-queue names). |
-| Durable Objects | `durableObjects` | ✅ Full | Miniflare runs DO classes locally; string or `{ className, scriptName }`. | Provisioned via migrations, not a create API. |
+| Durable Objects | `durableObjects` | ✅ Full | Miniflare runs DO classes locally; string or `{ className, scriptName, environment? }`. A cross-worker binding (`scriptName` set) may also carry `environment` — the deploy-only service-environment of the target script (compiled to `durable_objects.bindings[].environment`, no local-dev effect). | Provisioned via migrations, not a create API. |
 | Service bindings | `services` | ✅ Full | Worker-to-worker RPC; `{ service, environment?, entrypoint?, props? }`. | No — the target Worker is deployed separately. |
 
 **Queue producer/consumer options.** Queue **producers** support

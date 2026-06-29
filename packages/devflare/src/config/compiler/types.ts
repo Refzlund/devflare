@@ -33,6 +33,7 @@ export interface WranglerConfig {
 			name: string
 			class_name: string
 			script_name?: string
+			environment?: string
 		}>
 	}
 	queues?: {

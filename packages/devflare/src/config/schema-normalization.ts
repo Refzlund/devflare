@@ -41,6 +41,11 @@ export interface NormalizedDOBinding {
 	 * `scriptName` only when you need the actual script identifier.
 	 */
 	scriptName?: string
+	/**
+	 * Service environment of the cross-worker `scriptName` to bind to
+	 * (deploy-only; only meaningful for cross-worker DOs).
+	 */
+	environment?: string
 	/** Reference result for cross-worker DOs (from ref().DO_NAME) */
 	__ref?: unknown
 	/**
@@ -244,6 +249,7 @@ export function normalizeDOBinding(config: DurableObjectBinding): NormalizedDOBi
 	return {
 		className: config.className,
 		scriptName,
+		...(config.environment !== undefined && { environment: config.environment }),
 		__ref,
 		kind
 	}

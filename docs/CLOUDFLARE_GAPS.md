@@ -169,6 +169,13 @@ loop is recorded below.
   yet fail at deploy. Fixed in **Batch CF-17** below. Rejected (correctly):
   Browser Rendering "no local mock/wiring" (already fully wired —
   `src/browser-shim/*` + `offline-native` tier, like DO/services/containers).
+- **Sixth pass** (after CF-17 shipped, same dependency grounding): **7 of 8**
+  survey areas returned zero. **1 low** gap — the Durable Objects binding did not
+  model wrangler's optional `environment` sub-field (the service-environment of a
+  cross-worker `scriptName`); since the DO predicate isn't `.strict()`, a
+  user-set `environment` was silently dropped before deploy (validate-locally ≢
+  deploy-valid, the mirror of CF-17). Fixed in **Batch CF-19** below. No rejected
+  candidates this pass.
 
 ## Batch CF-9 — CF-8 confirmed gaps (implemented)
 
@@ -311,6 +318,30 @@ asserts service-only output.
 This is the convergence loop's first **correctness** finding (vs. coverage) — a
 self-introduced regression caught by the same grounded re-investigation. A
 **sixth** pass after CF-17 is the next convergence check; the loop ends when a
+pass returns zero real gaps.
+
+## Batch CF-19 — CF-18 convergence gap (implemented)
+
+The 1 low gap from the CF-8 sixth pass, shipped.
+
+| Gap | Dimensions | The devflare-way fix | Status |
+| --- | --- | --- | --- |
+| Durable Objects binding did not model wrangler's `environment` sub-field (cross-worker DOs) | schema, normalization, compiler, docs | Model `environment?` on the DO binding, thread it through normalization, and emit it for cross-worker DOs (`script_name` present) — mirroring how service bindings carry `environment`. | ✅ |
+
+How covered (CF-19): added `environment?: string` to `DurableObjectBindingInput`
+and `NormalizedDOBinding`, carried it through `normalizeDOBinding`, and emitted it
+in `compiler/bindings.ts` **only when `script_name` is present** (a local DO drops
+it, since `environment` is the service-environment of a cross-worker target).
+Deploy-only (no local-dev analogue), mirroring the existing service-binding /
+dispatch-namespace `environment` support. This closes the validate-locally ≢
+deploy-valid leak (the field was silently dropped before, the mirror of CF-17's
+fix). Compiler tests assert the cross-worker round-trip and the local-DO drop.
+This is the **last** wrangler-accepted per-binding `environment` field; with
+service bindings (have it), dispatch outbound (have it), streaming tail consumers
+(correctly removed in CF-17), and DOs (added here), per-binding `environment`
+support now exactly matches wrangler.
+
+A **seventh** pass after CF-19 is the next convergence check; the loop ends when a
 pass returns zero real gaps.
 
 ---

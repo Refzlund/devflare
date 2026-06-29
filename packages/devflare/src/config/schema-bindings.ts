@@ -15,6 +15,13 @@ export type DurableObjectBindingInput =
 			 * For cross-worker DOs: worker name (e.g., 'do-service')
 			 */
 			readonly scriptName?: string
+			/**
+			 * Service environment of the cross-worker `scriptName` to bind to.
+			 * Deploy-only (no local-dev analogue) and only meaningful alongside
+			 * `scriptName`; maps to wrangler's
+			 * `durable_objects.bindings[].environment`.
+			 */
+			readonly environment?: string
 			/** @internal Reference marker for cross-worker DO bindings */
 			readonly __ref?: unknown
 	  }
@@ -37,7 +44,7 @@ export const durableObjectBindingSchema = z.custom<DurableObjectBindingInput>(
 		return false
 	},
 	{
-		message: 'Expected string or { className: string, scriptName?: string }'
+		message: 'Expected string or { className: string, scriptName?: string, environment?: string }'
 	}
 )
 
