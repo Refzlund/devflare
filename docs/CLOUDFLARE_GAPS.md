@@ -536,6 +536,51 @@ A **twelfth** pass (CF-29) after CF-28 is the next convergence check, and a
 **thirteenth** (CF-30) must confirm it: the loop now requires two consecutive
 zero-gap passes before declaring the fixpoint (CF-27 proved one is insufficient).
 
+## Batch CF-29 — twelfth re-investigation (ZERO confirmed gaps — clean #1 of 2)
+
+The first convergence pass after CF-28. The 8 surveys surfaced **6 candidates**;
+all 6 were independently verified (Opus) and **rejected** — zero confirmed gaps:
+
+| # | Candidate | Verdict | Why not a gap |
+| --- | --- | --- | --- |
+| 1 | wrangler `dev` config block (`local_protocol`/`local_port`/…) | already_covered | The local-dev surface is devflare's `server` block (CF-9/15/25/28) threaded into Miniflare; wrangler's `dev` shape doesn't map 1:1 and the cited sub-fields were partly hallucinated. |
+| 2 | `send_metrics` top-level flag | already_covered | Reachable via `wrangler.passthrough`; internal-telemetry boundary (eighth pass). |
+| 3 | `generate_types` (`dev` sub-field) | not_applicable | Dev-only convenience; devflare's equivalent is the `devflare types` command + config-change reload. Not a binding/runtime/remote capability. |
+| 4 | `secret bulk` CLI | already_covered | Deliberate local-first boundary — devflare never transmits secret values; `devflare deploy` prints the wrangler `secret put/bulk` pointer (CF-6b). |
+| 5 | dispatch-namespace lifecycle CLI | already_covered | Platform-managed; deliberately excluded from provisioning (matrix). |
+| 6 | `deployments status` subcommand | already_covered | Current production state is `devflare productions list` (default) (CF-11). |
+
+The triage is internally consistent — each rejection cites a specific ledger
+line, matrix row, or implementation site, and none masks a real gap. This is the
+**first** of the two consecutive clean passes required for the fixpoint.
+
+## Batch CF-30 — thirteenth re-investigation (CONVERGENCE CONFIRMED)
+
+The second consecutive clean pass — and the cleanest yet: **all 8 surveys returned
+zero candidates** (CF-29 surfaced 6 and rejected all; CF-30 surfaced none at all),
+so there was nothing even to verify. Combined with CF-29, this is **two consecutive
+zero-gap passes**, the fixpoint criterion the loop requires (CF-27 proved a single
+clean pass is insufficient).
+
+### ✅ Convergence reached — the gap-investigation loop is closed
+
+Across CF-1 … CF-30 the loop ran **thirteen** independent multi-agent
+re-investigation passes (each: 8 dep-grounded surveys → dedup → independent Opus
+verification → synthesis). It implemented every confirmed real gap, corrected
+every stale claim it found (CF-5, CF-17, CF-21, CF-23, CF-25, CF-28), and closed
+whole classes rather than single instances (per-binding `remote`/preview/
+jurisdiction/migrations; the `environment` sub-field across all binding subtypes;
+the full user-facing Miniflare `CoreSharedOptions` local-dev knob set; the
+field-on-wrong-subtype deploy-validity class). The two most recent passes confirm
+the surface is exhausted: every remaining uncovered item is either already tracked,
+an intentional honest boundary (see below), or an out-of-scope dev convenience.
+
+**Steady-state maintenance:** if a future Cloudflare/wrangler/Miniflare dependency
+bump adds new surface, re-run this same harness
+(`workflows/scripts/cf8-gap-reinvestigation-*.js`) as a fresh pass — the loop's
+discipline (dep-grounded survey → independent verify → fix-and-document → two
+consecutive clean confirmations) carries forward unchanged.
+
 ---
 
 ⛔ **Inherent boundaries — confirmed correctly signaled (NOT gaps; do not fake):**
