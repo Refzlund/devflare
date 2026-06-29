@@ -33,6 +33,7 @@
     "cf-binding-remote-preview-fields",
     "cf-local-dev-wiring",
     "cf-stream-vpc-flagship-bindings",
+    "cf-test-dx",
     "ci-quality-gates",
     "cloudflare-deploy-policy-flags",
     "cloudflare-matrix-accuracy",
