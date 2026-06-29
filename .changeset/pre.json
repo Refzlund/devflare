@@ -44,6 +44,7 @@
     "cf19-do-environment-subfield",
     "cf21-service-environment-fold",
     "cf25-route-flags-and-dev-knobs",
+    "cf28-server-public-url",
     "cf9-config-coverage-gaps",
     "ci-quality-gates",
     "cloudflare-deploy-policy-flags",
