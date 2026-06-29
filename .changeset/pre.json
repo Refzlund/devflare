@@ -43,6 +43,7 @@
     "deploy-secrets-guide",
     "dev-server-host-port",
     "docs-contract-honesty",
+    "fix-typed-env-vars-proxy-assignability",
     "packaging-license-hygiene",
     "phase-b-code-paths",
     "phase-f-docs-debt",
