@@ -43,6 +43,7 @@
     "cf17-streaming-tail-environment-fix",
     "cf19-do-environment-subfield",
     "cf21-service-environment-fold",
+    "cf25-route-flags-and-dev-knobs",
     "cf9-config-coverage-gaps",
     "ci-quality-gates",
     "cloudflare-deploy-policy-flags",
