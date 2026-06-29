@@ -177,7 +177,6 @@ export interface WranglerConfig {
 	}>
 	streaming_tail_consumers?: Array<{
 		service: string
-		environment?: string
 	}>
 
 	// Variables

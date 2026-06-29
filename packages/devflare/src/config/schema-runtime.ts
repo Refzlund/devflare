@@ -58,15 +58,17 @@ export const tailConsumerSchema = z.union([
 /**
  * Streaming Tail Consumer configuration.
  *
- * Twin of {@link tailConsumerSchema} for the wrangler `streaming_tail_consumers`
- * field. A streaming tail consumer receives a live event stream from this Worker.
+ * For the wrangler `streaming_tail_consumers` field. A streaming tail consumer
+ * receives a live event stream from this Worker. Unlike `tail_consumers`,
+ * wrangler's `StreamingTailConsumer` accepts **only** `service` (no
+ * `environment`), so the object form is intentionally narrower than
+ * {@link tailConsumerSchema} to keep local validation honest with deploy.
  */
 export const streamingTailConsumerSchema = z.union([
 	z.string().min(1),
 	z
 		.object({
-			service: z.string().min(1),
-			environment: z.string().min(1).optional()
+			service: z.string().min(1)
 		})
 		.strict()
 ])

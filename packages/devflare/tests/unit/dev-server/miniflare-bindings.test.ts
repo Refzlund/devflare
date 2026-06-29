@@ -252,7 +252,7 @@ describe('buildStreamingTailConsumersConfig', () => {
 	test('maps object streaming tail consumers to their service names', () => {
 		expect(
 			buildStreamingTailConsumersConfig({
-				streamingTailConsumers: [{ service: 'stream-worker', environment: 'production' }]
+				streamingTailConsumers: [{ service: 'stream-worker' }]
 			})
 		).toEqual(['stream-worker'])
 	})

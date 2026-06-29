@@ -160,6 +160,15 @@ loop is recorded below.
   not-applicable). One survey area (binding-subfields) did not return a result
   this pass (a survey agent aborted); it was fully addressed in CF-9 and returned
   zero in the second and third passes, and is re-covered in the next pass.
+- **Fifth pass** (after CF-15 shipped, same dependency grounding; binding-subfields
+  re-covered → zero): **7 of 8** survey areas returned zero. **1 medium**
+  correctness defect surfaced — a regression introduced by CF-9: the
+  `streamingTailConsumers` object form carried an `environment` field (copied from
+  `tailConsumers`), but wrangler's `StreamingTailConsumer` is `service`-only
+  (`additionalProperties: false`), so a config setting it would validate locally
+  yet fail at deploy. Fixed in **Batch CF-17** below. Rejected (correctly):
+  Browser Rendering "no local mock/wiring" (already fully wired —
+  `src/browser-shim/*` + `offline-native` tier, like DO/services/containers).
 
 ## Batch CF-9 — CF-8 confirmed gaps (implemented)
 
@@ -177,7 +186,7 @@ Miniflare worker), **dev-only** (a local-runtime knob with no Wrangler field), o
 | Custom-domain route `enabled` / `previewsEnabled` unmodeled | schema, deploy | **Deploy-only.** Route `enabled` → `enabled`, `previewsEnabled` → `previews_enabled` route metadata. Governs Cloudflare routing/preview; no local effect. | ✅ |
 | Queue producer `deliveryDelay` unmodeled | schema, deploy, local-dev | **Local-wired.** `deliveryDelay` → `delivery_delay` for deploy **and** threaded into Miniflare `QueueProducerOptions.deliveryDelay`, so delayed delivery is exercised locally. | ✅ |
 | Service binding `props` unmodeled | schema, deploy, local-dev | **Local-wired.** Accept + emit `props` (read via `ctx.props`) **and** thread it into Miniflare `serviceBindings`, so cross-service `props` delivery is testable in dev/test. | ✅ |
-| `streamingTailConsumers` unmodeled | schema, deploy, local-dev, docs | **Local-wired (full twin of `tailConsumers`).** Compile to `streaming_tail_consumers` for deploy **and** thread into Miniflare `streamingTails`; cross-Worker delivery works when the consumer Worker is present locally, degrades cleanly otherwise. | ✅ |
+| `streamingTailConsumers` unmodeled | schema, deploy, local-dev, docs | **Local-wired** (like `tailConsumers` but **service-only** — see CF-17). Compile to `streaming_tail_consumers` for deploy **and** thread into Miniflare `streamingTails`; cross-Worker delivery works when the consumer Worker is present locally, degrades cleanly otherwise. | ✅ |
 | `server` config missing `https`/`inspectorPort`/`upstream` | schema, local-dev | **Local-wired (dev-runtime).** `server` now also accepts `https`/`httpsKeyPath`/`httpsCertPath`/`inspectorPort`/`upstream`, threaded into Miniflare `CoreSharedOptions` — local HTTPS dev, custom inspector port, custom upstream. No deploy effect. | ✅ |
 | Cache API contents don't persist across dev-server restarts | local-dev | **Local-wired (dev-runtime).** `cachePersist` persists the Cache API (`caches` global, on by default) across restarts, alongside the sibling kv/r2/d1/DO persist options. | ✅ |
 | No local outbound-fetch routing to a named service | local-dev | **Dev-only.** New `outboundService` (not a Wrangler field) routes a Worker's outbound `fetch()` to a named service for local cross-service testing. No deploy analogue. | ✅ |
@@ -196,7 +205,8 @@ How covered (CF-9):
   `QueueProducerOptions.deliveryDelay`); service binding `props` (object, exposed
   via `ctx.props`) — accepted, emitted, and wired to Miniflare `serviceBindings`;
   `streamingTailConsumers` → `streaming_tail_consumers`, wired to Miniflare
-  `streamingTails` (the full twin of the existing `tailConsumers`); the `server`
+  `streamingTails` (like the existing `tailConsumers`, but service-only — see
+  CF-17 for the `environment`-asymmetry correction); the `server`
   config's `https`/`httpsKeyPath`/`httpsCertPath`/`inspectorPort`/`upstream`,
   threaded into Miniflare `CoreSharedOptions`; `cachePersist`, which persists the
   Cache API across dev-server restarts alongside the sibling kv/r2/d1/DO persist
@@ -278,8 +288,30 @@ the local `request.cf` (`false` to omit, a JSON file path, or an object injectin
 colo/country/TLS/bot-management). Deploy-inert; tested in
 `miniflare-dev-config.test.ts`.
 
-A **fifth** re-investigation pass after CF-15 is the convergence check; the loop
-ends when a pass returns zero real gaps.
+## Batch CF-17 — CF-16 correctness fix (implemented)
+
+The 1 medium defect from the CF-8 fifth pass, shipped.
+
+| Gap | Dimensions | The devflare-way fix | Status |
+| --- | --- | --- | --- |
+| `streamingTailConsumers` accepted an `environment` field that wrangler rejects at deploy | schema, compiler, docs | Remove `environment` from the streaming-tail schema/types/compiler so it is rejected at config-parse time — keeping validate-locally ≡ deploy-valid. | ✅ |
+
+How covered (CF-17): a CF-9 regression — `streamingTailConsumers` was modeled as a
+"full twin of `tailConsumers`" including an optional `environment`, but wrangler's
+`StreamingTailConsumer` is **`service`-only** (`additionalProperties: false`,
+deliberately asymmetric from `TailConsumer`). A config setting `environment`
+validated locally but would fail at deploy. Fixed by dropping `environment` from
+`streamingTailConsumerSchema`, `StreamingTailConsumerObjectConfigInput`, the
+compiler output type, and the compiler emit, so it is now **rejected at
+config-parse time** with a clear error (validate-locally ≡ deploy-valid). The
+docs' "full twin" wording is corrected to "service-only." A new
+`runtime-config.ts` test asserts `environment` is rejected; the compiler test
+asserts service-only output.
+
+This is the convergence loop's first **correctness** finding (vs. coverage) — a
+self-introduced regression caught by the same grounded re-investigation. A
+**sixth** pass after CF-17 is the next convergence check; the loop ends when a
+pass returns zero real gaps.
 
 ---
 

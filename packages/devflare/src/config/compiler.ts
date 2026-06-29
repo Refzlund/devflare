@@ -113,13 +113,10 @@ function compileConfigInternal(
 	}
 
 	if (mergedConfig.streamingTailConsumers && mergedConfig.streamingTailConsumers.length > 0) {
+		// wrangler's StreamingTailConsumer accepts only `service` (no `environment`,
+		// unlike tail_consumers), so emit service-only to stay deploy-valid.
 		result.streaming_tail_consumers = mergedConfig.streamingTailConsumers.map((consumer) =>
-			typeof consumer === 'string'
-				? { service: consumer }
-				: {
-						service: consumer.service,
-						...(consumer.environment && { environment: consumer.environment })
-					}
+			typeof consumer === 'string' ? { service: consumer } : { service: consumer.service }
 		)
 	}
 

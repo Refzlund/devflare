@@ -142,6 +142,10 @@ export type StreamingTailConsumerConfigInput = string | StreamingTailConsumerObj
 
 /**
  * Streaming Tail Worker consumer object form.
+ *
+ * Note: unlike a (regular) tail consumer, wrangler's `StreamingTailConsumer`
+ * accepts only `service` — there is no `environment` field, so none is modeled
+ * here (a value would be rejected by wrangler at deploy).
  */
 export interface StreamingTailConsumerObjectConfigInput {
 	/**
@@ -153,16 +157,4 @@ export interface StreamingTailConsumerObjectConfigInput {
 	 * ```
 	 */
 	service: string
-
-	/**
-	 * Optional Streaming Tail Worker environment.
-	 *
-	 * @default Target worker default environment.
-	 *
-	 * @example
-	 * ```ts
-	 * environment: 'production'
-	 * ```
-	 */
-	environment?: string
 }

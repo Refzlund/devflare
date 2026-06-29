@@ -273,23 +273,32 @@ describe('schema validation', () => {
 			expect(result.success).toBe(true)
 		})
 
-		test('accepts streamingTailConsumers in string and object form', () => {
+		test('accepts streamingTailConsumers in string and object form (service-only)', () => {
 			const result = configSchema.safeParse({
 				name: 'my-worker',
 				compatibilityDate: '2026-04-26',
-				streamingTailConsumers: [
-					'stream-worker',
-					{ service: 'staging-stream', environment: 'staging' }
-				]
+				streamingTailConsumers: ['stream-worker', { service: 'staging-stream' }]
 			})
 
 			expect(result.success).toBe(true)
 			if (result.success) {
 				expect(result.data.streamingTailConsumers).toEqual([
 					'stream-worker',
-					{ service: 'staging-stream', environment: 'staging' }
+					{ service: 'staging-stream' }
 				])
 			}
+		})
+
+		test('rejects environment on a streaming tail consumer (wrangler StreamingTailConsumer has only service)', () => {
+			const result = configSchema.safeParse({
+				name: 'my-worker',
+				compatibilityDate: '2026-04-26',
+				// environment is valid on tail_consumers but NOT streaming_tail_consumers;
+				// the strict schema must reject it so it never reaches a failing deploy.
+				streamingTailConsumers: [{ service: 'staging-stream', environment: 'staging' }]
+			})
+
+			expect(result.success).toBe(false)
 		})
 
 		test('accepts the new strict binding sub-fields', () => {

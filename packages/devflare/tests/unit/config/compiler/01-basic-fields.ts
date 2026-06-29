@@ -131,18 +131,15 @@ describe('compileConfig', () => {
 			expect(result.workers_dev).toBe(true)
 		})
 
-		test('compiles streaming_tail_consumers', () => {
+		test('compiles streaming_tail_consumers (service-only; no environment, unlike tail_consumers)', () => {
 			const result = compileConfig({
 				...baseConfig,
-				streamingTailConsumers: [
-					'stream-worker',
-					{ service: 'staging-stream-worker', environment: 'staging' }
-				]
+				streamingTailConsumers: ['stream-worker', { service: 'staging-stream-worker' }]
 			})
 
 			expect(result.streaming_tail_consumers).toEqual([
 				{ service: 'stream-worker' },
-				{ service: 'staging-stream-worker', environment: 'staging' }
+				{ service: 'staging-stream-worker' }
 			])
 		})
 	})
