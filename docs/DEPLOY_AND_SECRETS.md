@@ -141,6 +141,70 @@ prints `(resolved view unavailable: <message>)`. The dry run still exits `0`.
 > of every resource that must exist. Confirm any Hyperdrive config and any
 > production Vectorize index exist separately.
 
+## Gradual / percentage deployments
+
+`devflare deploy --prod --percentage <n>` performs a Cloudflare **gradual
+deployment** (a canary rollout) instead of shipping the new code to 100% of
+traffic at once. It is production-only and is rejected if combined with
+`--preview`.
+
+It is expressed faithfully on Wrangler's version-based rollout model — Devflare
+does not invent any traffic-splitting of its own:
+
+1. **`wrangler versions upload`** uploads the new code as an **inactive** Worker
+   version. No production traffic is shifted yet. (A normal `wrangler deploy` has
+   no percentage flag and would immediately serve the new version to everyone.)
+2. Devflare resolves the new version id, then runs
+   **`wrangler versions deploy <new-version-id>@<n> --name <worker> --yes`** to
+   route **n%** of production traffic to the new version. `--yes` accepts
+   Wrangler's non-interactive defaults so the rollout works in CI.
+
+```
+devflare deploy --prod --percentage 10
+```
+
+routes 10% of traffic to the freshly uploaded version and leaves the rest on the
+currently-live version. Pass `--version <current-version-id>` to pin which live
+version keeps the remaining `100 − n%` (Devflare then emits the fully-specified
+split `<new>@<n> <current>@<rest>`); otherwise Wrangler distributes the
+remainder itself.
+
+- A deploy message (`--message`) is forwarded to `wrangler versions deploy`.
+- `--dry-run` describes the rollout (the percentage and which version keeps the
+  rest) without uploading or shifting any traffic.
+- If the upload succeeds but Devflare cannot resolve the new version id, or
+  `wrangler versions deploy` fails, the command **fails loudly** and tells you
+  the version was uploaded so you can retry or finish the split manually — it
+  never reports a rollout that did not happen.
+
+**What this covers vs. raw Wrangler.** `--percentage` covers *initiating* a
+rollout at a chosen percentage in one command (including a two-version split).
+**Advancing** an existing rollout (e.g. `10% → 50% → 100%`) without uploading new
+code is a pure `wrangler versions deploy <version-id>@<percentage>` call — run
+that directly, because re-running `devflare deploy --percentage` uploads a fresh
+version each time.
+
+## Streaming live logs (`devflare tail`)
+
+`devflare tail [worker]` streams live request logs and exceptions from a Worker
+that is **already deployed** to Cloudflare, via Cloudflare's Workers Trace (tail)
+API. It is inherently a remote, operate-deployed-Worker command — there is no
+local emulation of deployed traffic (use `devflare dev` and the
+`cf.tail.trigger()` test helper for local/offline tail-*handler* testing).
+
+```
+devflare tail                  # tail the Worker named in the current config
+devflare tail my-worker        # tail an explicitly named Worker
+devflare tail --format json    # raw JSON trace events for piping
+```
+
+It requires Cloudflare authentication (`devflare login` or
+`CLOUDFLARE_API_TOKEN`) and a resolvable account id (`--account`, config
+`accountId`, or `CLOUDFLARE_ACCOUNT_ID`). It mints a short-lived tail session,
+connects over a WebSocket, prints each event (timestamp, trigger, outcome, logs,
+exceptions) in `--format pretty` (default) or `--format json`, and deletes the
+tail session + closes the socket on Ctrl-C.
+
 ## Preview & branch deploys
 
 When the deploy environment is `preview`, Devflare runs a **two-stage** pipeline:

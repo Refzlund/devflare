@@ -25,6 +25,7 @@ export const CORE_HELP_PAGES: HelpPage[] = [
 			entry('worker', 'Rename and manage Worker control-plane operations'),
 			entry('tokens', 'Manage Devflare-managed Cloudflare API tokens'),
 			entry('secrets', 'Manage local Secrets Store values'),
+			entry('tail', 'Stream live logs from a deployed Worker'),
 			entry('ai', 'View Workers AI pricing information'),
 			entry('remote', 'Manage remote test mode for paid Cloudflare features'),
 			entry('help', 'Show command overview or a command-specific help page'),
@@ -157,6 +158,7 @@ export const CORE_HELP_PAGES: HelpPage[] = [
 			'devflare deploy --production [--config <path>] [--build <path>] [--message <text>] [--tag <text>] [--debug]',
 			'devflare deploy --preview <name> [--config <path>] [--build <path>] [--message <text>] [--tag <text>]',
 			'devflare deploy --preview [--config <path>] [--build <path>] [--branch-name <branch>] [--message <text>] [--tag <text>]',
+			'devflare deploy --prod --percentage <n> [--version <current-version-id>] [--config <path>] [--message <text>]',
 			'devflare deploy --prod --dry-run [--config <path>]',
 			'devflare deploy --preview <name> --dry-run [--config <path>]',
 			'devflare deploy --preview --dry-run [--config <path>]'
@@ -187,6 +189,14 @@ export const CORE_HELP_PAGES: HelpPage[] = [
 			),
 			entry('--message <text>', 'Attach an explicit Wrangler deployment/version message'),
 			entry('--tag <text>', 'Attach an explicit Wrangler version tag'),
+			entry(
+				'--percentage <n>',
+				'Production gradual rollout: upload a new version and route n% (0-100) of traffic to it via `wrangler versions deploy`'
+			),
+			entry(
+				'--version <id>',
+				'With --percentage, the currently-live version id that keeps the remaining traffic (otherwise Wrangler distributes it)'
+			),
 			entry('--debug', 'Print stack traces when deployment orchestration fails')
 		],
 		examples: [
@@ -211,10 +221,15 @@ export const CORE_HELP_PAGES: HelpPage[] = [
 			entry(
 				'devflare deploy --preview next --dry-run',
 				'Inspect the generated named-preview Wrangler config without deploying'
+			),
+			entry(
+				'devflare deploy --prod --percentage 10',
+				'Upload a new version and route 10% of production traffic to it (canary)'
 			)
 		],
 		notes: [
 			'`devflare deploy` without an explicit target is rejected from the CLI so production and preview destinations stay unmistakable.',
+			'`--percentage <n>` performs a Cloudflare gradual deployment: Devflare runs `wrangler versions upload` (no traffic shift) and then `wrangler versions deploy <new-version-id>@<n> --yes`, routing n% of production traffic to the new version. Pass `--version <id>` to keep the remaining traffic on a specific currently-live version; otherwise Wrangler distributes the rest. To advance an existing rollout (e.g. 10% → 50% → 100%) without re-uploading, drive `wrangler versions deploy` directly. `--percentage` is production-only and rejected with `--preview`.',
 			'`--prod` / `--production` clear preview-scope environment overrides such as `DEVFLARE_PREVIEW_BRANCH` so production deploys stay pointed at stable Worker names.',
 			'Named preview deploys automatically provision preview-scoped resources before building and deploying.',
 			'When a build artifact still contains name-based bindings, deploy resolves or provisions the concrete Cloudflare resources and rewrites the generated Wrangler config with the IDs Wrangler requires.',

@@ -209,6 +209,9 @@ export async function runCli(argv: string[], options: CliOptions = {}): Promise<
 		case 'secrets':
 			return runSecrets(parsed, logger, options)
 
+		case 'tail':
+			return runTail(parsed, logger, options)
+
 		case 'ai':
 			return runAI()
 
@@ -352,6 +355,15 @@ async function runSecrets(
 ): Promise<CliResult> {
 	const { runSecretsCommand } = await import('./commands/secrets')
 	return runSecretsCommand(parsed, logger, options)
+}
+
+async function runTail(
+	parsed: ParsedArgs,
+	logger: ConsolaInstance,
+	options: CliOptions
+): Promise<CliResult> {
+	const { runTailCommand } = await import('./commands/tail')
+	return runTailCommand(parsed, logger, options)
 }
 
 async function runAI(): Promise<CliResult> {

@@ -140,6 +140,21 @@ describe('parseArgs', () => {
 		expect(result.options.value).toBe('local-secret')
 	})
 
+	test('parses tail command', () => {
+		const result = parseArgs(['tail', 'my-worker', '--format', 'json'])
+		expect(result.command).toBe('tail')
+		expect(result.args).toEqual(['my-worker'])
+		expect(result.options.format).toBe('json')
+	})
+
+	test('parses deploy percentage rollout flags', () => {
+		const result = parseArgs(['deploy', '--prod', '--percentage', '10', '--version', 'abc-123'])
+		expect(result.command).toBe('deploy')
+		expect(result.options.prod).toBe(true)
+		expect(result.options.percentage).toBe('10')
+		expect(result.options.version).toBe('abc-123')
+	})
+
 	test('parses login command', () => {
 		const result = parseArgs(['login', '--force'])
 		expect(result.command).toBe('login')
@@ -372,6 +387,10 @@ describe('runCli', () => {
 			{
 				argv: ['secrets', '--help'],
 				snippet: 'devflare secrets Manage local Secrets Store values'
+			},
+			{
+				argv: ['tail', '--help'],
+				snippet: 'devflare tail Stream live logs from a deployed Worker'
 			},
 			{ argv: ['ai', '--help'], snippet: 'devflare ai Show Workers AI pricing information' },
 			{

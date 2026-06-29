@@ -101,6 +101,44 @@ export const MISC_HELP_PAGES: HelpPage[] = [
 		]
 	},
 	{
+		path: ['tail'],
+		summary: 'Stream live logs from a deployed Worker',
+		usage: [
+			'devflare tail [worker] [--worker <name>] [--format <pretty|json>] [--account <id>] [--config <path>]'
+		],
+		description: [
+			'Streams live request logs and exceptions from a Worker that is already deployed to Cloudflare, using Cloudflare’s Workers Trace (tail) API.',
+			'This command is inherently remote: it opens a real tail session against your live Worker. There is no local emulation of deployed traffic — use `devflare dev` and `cf.tail.trigger()` for local/offline tail-handler testing.'
+		],
+		arguments: [
+			entry('[worker]', 'Worker name to tail (defaults to --worker, then the config `name`)')
+		],
+		options: [
+			entry('--worker <name>', 'Worker name to tail instead of the configured `name`'),
+			entry(
+				'--format <pretty|json>',
+				'Output format: human-readable lines (default) or raw JSON events'
+			),
+			entry('--account <id>', 'Use a specific Cloudflare account instead of the resolved default'),
+			entry(
+				'--config <path>',
+				'Use a specific devflare config file to resolve the Worker name/account'
+			)
+		],
+		examples: [
+			entry('devflare tail', 'Stream logs from the Worker named in the current config'),
+			entry('devflare tail my-worker', 'Stream logs from an explicitly named Worker'),
+			entry(
+				'devflare tail --format json',
+				'Stream raw JSON tail events for piping into other tools'
+			)
+		],
+		notes: [
+			'Requires Cloudflare authentication (`devflare login` or CLOUDFLARE_API_TOKEN) and a resolvable account id.',
+			'Press Ctrl-C to stop; Devflare deletes the tail session and closes the WebSocket on exit. Cloudflare also expires idle tail sessions on its own.'
+		]
+	},
+	{
 		path: ['ai'],
 		summary: 'Show Workers AI pricing information',
 		usage: ['devflare ai'],

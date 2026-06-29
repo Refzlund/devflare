@@ -22,6 +22,7 @@ import {
 	resolveDeployTarget,
 	withTemporaryEnvironment
 } from '../deploy-target'
+import { buildGradualDeployInvocation, parseDeployPercentage } from '../gradual-deploy'
 import type { CliOptions, CliResult, ParsedArgs } from '../index'
 import {
 	formatWorkersDevUrl,
@@ -68,6 +69,8 @@ export async function runDeployCommand(
 	let deployMessage: string | undefined
 	let deployTag: string | undefined
 	let previewScopeName: string | undefined
+	let rolloutPercentage: number | undefined
+	let rolloutPreviousVersionId: string | undefined
 	let requireFreshProductionDeployment = false
 	let resolvedPreviewScopeName = process.env.DEVFLARE_PREVIEW_BRANCH?.trim() || undefined
 	const theme = createCliTheme(parsed.options)
@@ -87,6 +90,16 @@ export async function runDeployCommand(
 		branchName = resolvedParsed.options['branch-name'] as string | undefined
 		deployMessage = resolvedParsed.options.message as string | undefined
 		deployTag = resolvedParsed.options.tag as string | undefined
+		rolloutPercentage = parseDeployPercentage(resolvedParsed.options.percentage)
+		rolloutPreviousVersionId =
+			typeof resolvedParsed.options.version === 'string'
+				? resolvedParsed.options.version.trim() || undefined
+				: undefined
+		if (rolloutPercentage !== undefined && deployTarget.mode !== 'production') {
+			throw new Error(
+				'--percentage is a production gradual rollout and is only valid with an explicit production target. Run `devflare deploy --prod --percentage <n>` (it cannot be combined with --preview or a named/branch preview deploy).'
+			)
+		}
 		previewScopeName = branchName?.trim() || deployTarget.previewScopeRaw || undefined
 		resolvedPreviewScopeName =
 			previewScopeName || process.env.DEVFLARE_PREVIEW_BRANCH?.trim() || undefined
@@ -116,6 +129,19 @@ export async function runDeployCommand(
 				})
 
 				logLine(logger, `${yellow('dry run', theme)} ${dim('Skipping actual deployment', theme)}`)
+				if (rolloutPercentage !== undefined) {
+					logLine(
+						logger,
+						dim(
+							`Would upload a new Worker version and route ${rolloutPercentage}% of production traffic to it via \`wrangler versions deploy\`${
+								rolloutPreviousVersionId
+									? `, keeping ${100 - rolloutPercentage}% on version ${rolloutPreviousVersionId}`
+									: ''
+							}.`,
+							theme
+						)
+					)
+				}
 				const deploymentStrategyMessage = describeDeploymentStrategy(deploymentStrategy)
 				if (deploymentStrategyMessage) {
 					logLine(logger, dim(deploymentStrategyMessage, theme))
@@ -237,11 +263,22 @@ export async function runDeployCommand(
 				}
 			}
 
+			// A production percentage rollout uploads an inactive version first
+			// (no traffic shift) and then splits traffic with `wrangler versions
+			// deploy` once the new version id is known.
+			const usePercentageRollout =
+				!preview && !isBranchScopedPreviewDeployment && rolloutPercentage !== undefined
+			const uploadVersionOnly = preview || usePercentageRollout
+
 			// Deploy with wrangler
 			logLine(
 				logger,
 				dim(
-					preview ? 'Uploading preview version with Wrangler…' : 'Deploying with Wrangler…',
+					preview
+						? 'Uploading preview version with Wrangler…'
+						: usePercentageRollout
+							? 'Uploading new Worker version with Wrangler…'
+							: 'Deploying with Wrangler…',
 					theme
 				)
 			)
@@ -255,7 +292,7 @@ export async function runDeployCommand(
 			await deps.fs.mkdir(wranglerOutputDirectory, { recursive: true })
 
 			const wranglerCommand = localWranglerExecutable ? 'node' : 'bunx'
-			const wranglerArgs = preview
+			const wranglerArgs = uploadVersionOnly
 				? localWranglerExecutable
 					? [localWranglerExecutable, 'versions', 'upload']
 					: ['wrangler', 'versions', 'upload']
@@ -418,7 +455,19 @@ export async function runDeployCommand(
 				}
 			}
 
-			if (!preview && !isBranchScopedPreviewDeployment && !resolvedVersionId && resolvedAccountId) {
+			// Deployment-based fallbacks resolve the id from the live/current
+			// deployment, which is the OLD version when a percentage rollout has
+			// only uploaded an inactive version (no deployment yet). For a rollout
+			// the freshly-uploaded version must come from the version-list path
+			// above, so these deployment fallbacks are skipped to avoid rolling
+			// out the wrong (current) version.
+			if (
+				!preview &&
+				!isBranchScopedPreviewDeployment &&
+				!usePercentageRollout &&
+				!resolvedVersionId &&
+				resolvedAccountId
+			) {
 				try {
 					const fallbackDeployment = await resolveVersionIdFromLatestProductionDeployment({
 						accountId: resolvedAccountId,
@@ -444,7 +493,13 @@ export async function runDeployCommand(
 				}
 			}
 
-			if (!preview && !isBranchScopedPreviewDeployment && !resolvedVersionId && resolvedAccountId) {
+			if (
+				!preview &&
+				!isBranchScopedPreviewDeployment &&
+				!usePercentageRollout &&
+				!resolvedVersionId &&
+				resolvedAccountId
+			) {
 				try {
 					const currentDeployment = await resolveVersionIdFromCurrentProductionDeployment({
 						accountId: resolvedAccountId,
@@ -527,7 +582,13 @@ export async function runDeployCommand(
 						accountId: resolvedAccountId,
 						workerName: prepared.config.name,
 						versionId: resolvedVersionId,
-						preview,
+						// A percentage rollout has only uploaded an inactive version
+						// at this point — no deployment references it until the
+						// `wrangler versions deploy` step below runs. Verify the
+						// version exists (version-only check), like a preview upload;
+						// the rollout step is the deployment and fails loudly on its
+						// own if it does not succeed.
+						preview: preview || usePercentageRollout,
 						logger,
 						theme
 					})
@@ -541,6 +602,70 @@ export async function runDeployCommand(
 					logger.error(`Deployment verification failed: ${message}`)
 					return { exitCode: 1, output: structuredOutput }
 				}
+			}
+
+			if (usePercentageRollout) {
+				if (!resolvedVersionId) {
+					const recoveryDetails =
+						versionRecoveryDiagnostics.length > 0
+							? ` Cloudflare fallback checks also failed: ${versionRecoveryDiagnostics.join(' | ')}`
+							: ''
+					const rolloutError = `A new Worker version was uploaded, but Devflare could not resolve its version id, so it could not start the ${rolloutPercentage}% gradual rollout. Re-run \`devflare deploy --prod --percentage ${rolloutPercentage}\`, or split traffic manually with \`wrangler versions deploy\`.${recoveryDetails}`
+					await persistDeployMetadata({
+						status: 'failure',
+						exitCode: 1,
+						error: rolloutError
+					})
+					logger.error(rolloutError)
+					return { exitCode: 1, output: structuredOutput }
+				}
+
+				const rolloutInvocation = buildGradualDeployInvocation(
+					{
+						versionId: resolvedVersionId,
+						percentage: rolloutPercentage as number,
+						previousVersionId: rolloutPreviousVersionId,
+						workerName: prepared.config.name,
+						message: deployMessage?.trim() || undefined
+					},
+					localWranglerExecutable
+				)
+
+				logLine(
+					logger,
+					dim(
+						`Routing ${rolloutPercentage}% of production traffic to the new version with Wrangler…`,
+						theme
+					)
+				)
+
+				const rolloutProc = await deps.exec.exec(
+					rolloutInvocation.command,
+					rolloutInvocation.args,
+					{
+						cwd,
+						stdio: 'inherit',
+						env: {
+							...process.env,
+							FORCE_COLOR: process.env.FORCE_COLOR ?? '0'
+						}
+					}
+				)
+
+				if (rolloutProc.exitCode !== 0) {
+					const rolloutError = `The new Worker version ${resolvedVersionId} was uploaded, but \`wrangler versions deploy\` failed to route ${rolloutPercentage}% of production traffic to it. Re-run the rollout, or split traffic manually with \`wrangler versions deploy\`.`
+					await persistDeployMetadata({
+						status: 'failure',
+						exitCode: 1,
+						error: rolloutProc.stderr || rolloutProc.stdout || rolloutError
+					})
+					logger.error(rolloutError)
+					return { exitCode: 1, output: structuredOutput }
+				}
+
+				logger.success(
+					`Routed ${rolloutPercentage}% of production traffic to version ${resolvedVersionId}`
+				)
 			}
 
 			if (resolvedAccountId) {

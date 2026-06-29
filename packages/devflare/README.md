@@ -188,6 +188,7 @@ for examples with file paths.
 | `devflare productions` | inspect or manage production Worker versions |
 | `devflare remote` | manage remote test mode |
 | `devflare secrets` | manage local Secrets Store values |
+| `devflare tail` | stream live logs from a deployed Worker |
 | `devflare tokens` | create and manage Devflare-scoped API tokens |
 | `devflare types` | generate `env.d.ts` |
 | `devflare version` | print the installed version |

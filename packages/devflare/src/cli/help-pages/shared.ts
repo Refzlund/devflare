@@ -15,6 +15,7 @@ export const COMMANDS = [
 	'worker',
 	'tokens',
 	'secrets',
+	'tail',
 	'ai',
 	'remote',
 	'help',
