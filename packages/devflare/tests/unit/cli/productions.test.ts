@@ -234,6 +234,91 @@ describe('productions command', () => {
 		expect(renderedMessages.some((message) => message.includes('stored'))).toBe(true)
 	})
 
+	test('lists the full production deployment history for a worker', async () => {
+		process.env.CLOUDFLARE_API_TOKEN = 'cf_test_token'
+		globalThis.fetch = mock(async (input: RequestInfo | URL) => {
+			const url = String(input)
+
+			if (url.endsWith('/accounts/acc_123/workers/scripts/demo-worker/deployments')) {
+				return jsonResponse({
+					deployments: [
+						{
+							id: 'deployment-older',
+							created_on: '2026-04-11T09:00:00.000Z',
+							source: 'dashboard',
+							strategy: 'percentage',
+							versions: [
+								{
+									percentage: 100,
+									version_id: '33333333-3333-4333-8333-333333333333'
+								}
+							],
+							annotations: {
+								'workers/message': 'Initial production rollout',
+								'workers/triggered_by': 'alice@example.com'
+							},
+							author_email: 'alice@example.com'
+						},
+						{
+							id: 'deployment-newer',
+							created_on: '2026-04-12T11:05:00.000Z',
+							source: 'wrangler',
+							strategy: 'percentage',
+							versions: [
+								{
+									percentage: 80,
+									version_id: '11111111-1111-4111-8111-111111111111'
+								},
+								{
+									percentage: 20,
+									version_id: '22222222-2222-4222-8222-222222222222'
+								}
+							],
+							annotations: {
+								'workers/message': 'Gradual rollout to 80/20',
+								'workers/triggered_by': 'bob@example.com'
+							},
+							author_email: 'bob@example.com'
+						}
+					]
+				})
+			}
+
+			throw new Error(`Unexpected fetch URL: ${url}`)
+		}) as unknown as typeof fetch
+
+		const logger = createLogger()
+		const result = await runProductionsCommand(
+			{
+				command: 'productions',
+				args: ['deployments'],
+				options: {
+					account: 'acc_123',
+					worker: 'demo-worker'
+				}
+			},
+			logger as any,
+			{}
+		)
+		const renderedMessages = renderMessages(logger)
+
+		expect(result.exitCode).toBe(0)
+		expect(renderedMessages.some((message) => message.includes('worker demo-worker'))).toBe(true)
+		// Both deployments rendered in the history table.
+		expect(renderedMessages.some((message) => message.includes('Deployments (2)'))).toBe(true)
+		// Strategy surfaced.
+		expect(renderedMessages.some((message) => message.includes('percentage'))).toBe(true)
+		// Per-version traffic split surfaced (80% / 20% of the gradual rollout).
+		expect(renderedMessages.some((message) => message.includes('80% →'))).toBe(true)
+		expect(renderedMessages.some((message) => message.includes('20% →'))).toBe(true)
+		// Deployment message surfaced.
+		expect(renderedMessages.some((message) => message.includes('Gradual rollout to 80/20'))).toBe(
+			true
+		)
+		// Triggered-by surfaced.
+		expect(renderedMessages.some((message) => message.includes('bob@example.com'))).toBe(true)
+	})
+
 	test('rolls a worker back with Wrangler when apply is set', async () => {
 		process.env.CLOUDFLARE_API_TOKEN = 'cf_test_token'
 		const executions: Array<{ command: string; args: string[] }> = []

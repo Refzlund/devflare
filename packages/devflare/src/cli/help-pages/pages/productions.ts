@@ -8,16 +8,21 @@ export const PRODUCTION_HELP_PAGES: HelpPage[] = [
 		usage: [
 			'devflare productions [--config <path>] [--env <name>] [--account <id>] [--worker <name>]',
 			'devflare productions versions [--config <path>] [--env <name>] [--account <id>] [--worker <name>]',
+			'devflare productions deployments [--config <path>] [--env <name>] [--account <id>] [--worker <name>]',
 			'devflare productions rollback [--config <path>] [--account <id>] [--worker <name>] [--version-id <id>] [--message <text>] [--apply]',
 			'devflare productions delete [--config <path>] [--account <id>] [--worker <name>] [--apply]'
 		],
 		description: [
 			'The default view inspects live Cloudflare production deployment state for locally configured Workers, or for one explicitly selected Worker.',
-			'Other subcommands list recent production versions or mutate a single Worker by rolling back or deleting its live production script.'
+			'Other subcommands list recent production versions, show the full deployment history, or mutate a single Worker by rolling back or deleting its live production script.'
 		],
 		subcommands: [
 			entry('list', 'List live production Workers and their active deployments (default)'),
 			entry('versions', 'Show recent stored production versions and which one is currently active'),
+			entry(
+				'deployments',
+				'Show the full chronological production deployment history with traffic splits'
+			),
 			entry('rollback', 'Roll a Worker back to the previous or specified production version'),
 			entry('delete', 'Delete a live production Worker script')
 		],
@@ -118,6 +123,36 @@ export const PRODUCTION_HELP_PAGES: HelpPage[] = [
 				'Show recent stored production versions for `my-worker`'
 			)
 		]
+	),
+	createProductionsSubcommandPage(
+		'deployments',
+		'Show the full chronological production deployment history',
+		[
+			'devflare productions deployments [--config <path>] [--env <name>] [--account <id>] [--worker <name>]'
+		],
+		[
+			'Lists every production deployment for the selected Worker set in reverse-chronological order, including each deployment id, strategy, per-version traffic split, source, who triggered it, and the deployment message.'
+		],
+		[
+			entry('--config <path>', 'Use a specific devflare config file'),
+			entry(
+				'--env <name>',
+				'Resolve `config.env[name]` while discovering related production Workers (defaults to `production`)'
+			),
+			entry('--account <id>', 'Use a specific Cloudflare account'),
+			entry('--worker <name>', 'Target a specific Worker instead of the locally configured set')
+		],
+		[
+			entry(
+				'devflare productions deployments',
+				'Show the full production deployment history for the resolved Workers'
+			),
+			entry(
+				'devflare productions deployments --worker my-worker',
+				'Show the full production deployment history for `my-worker`'
+			)
+		],
+		['This view is read-only and is backed by live Cloudflare deployment history.']
 	),
 	createProductionsSubcommandPage(
 		'rollback',

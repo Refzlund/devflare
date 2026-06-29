@@ -139,6 +139,12 @@ loop is recorded below.
     - **Not applicable** — `unsafeEphemeralDurableObjects` and the
       queue-consumer `type` const. Neither corresponds to a real Devflare-modeled
       behavior to add.
+- **Second pass** (after CF-9 shipped, same dependency grounding): **6 of 8
+  survey areas returned zero candidates** — strong convergence. Only **2 low**
+  gaps surfaced, both documentation/DX on already-working backends (no missing
+  capability, no inherent boundary): the `productions deployments` history
+  subcommand and the undocumented `observability` config tier. Both are
+  implemented in **Batch CF-11** below. No rejected candidates this pass.
 
 ## Batch CF-9 — CF-8 confirmed gaps (implemented)
 
@@ -191,6 +197,33 @@ How covered (CF-9):
 - **Docs — legacy `site`:** added to the matrix "Passthrough-only / legacy module
   globals" section: `site` is superseded by `assets` and passthrough-reachable
   via `wrangler.passthrough` for verbatim porting (deploy-only, no local wiring).
+
+## Batch CF-11 — CF-10 convergence gaps (implemented)
+
+The 2 low gaps from the CF-8 second pass, shipped.
+
+| Gap | Dimensions | The devflare-way fix | Status |
+| --- | --- | --- | --- |
+| Full deployment history not surfaced as a CLI command | deploy-cli | Add a read-only `devflare productions deployments` subcommand rendering the existing `account.workerDeployments` history (no new API/write surface). | ✅ |
+| `observability` (and `placement` / `limits`) config tier missing from the support matrix | docs | Add deploy-only rows to the matrix "Platform config" table. | ✅ |
+
+How covered (CF-11):
+- **`productions deployments` subcommand** — `src/cli/commands/productions.ts` now
+  lists the full chronological deployment history (Deployed · Deployment id ·
+  Strategy · Traffic split `pct% → versionId` · Source · Triggered by · Message)
+  via the already-wired `account.workerDeployments` read API — the same
+  account-resolution path `list`/`versions` use, kept strictly read-only. Help
+  page + unit test added. (`list` still shows the latest deployment summary;
+  `versions` lists per-version; `deployments` adds the full multi-deployment
+  history with strategy/split/message/triggeredBy that was previously unexposed.)
+- **`observability` / `placement` / `limits` matrix rows** — these three
+  first-class top-level keys are modeled, typed, and compiled for deploy but had
+  no local Miniflare analogue and were missing from the matrix's deploy-only
+  table; added as deploy-only rows so their support tier is discoverable
+  (mirroring the CF-9 `complianceRegion`/`workersDev`/route-flag rows).
+
+A **third** re-investigation pass after CF-11 is the convergence check; the loop
+ends when a pass returns zero real gaps.
 
 ---
 

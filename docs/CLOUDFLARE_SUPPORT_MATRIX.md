@@ -225,6 +225,9 @@ local-runtime analogue (account/region/edge-routing metadata).
 | Compliance region | `complianceRegion` → `compliance_region` | **No** — deploy-only | `complianceRegion` (`'public'` \| `'fedramp_high'`) compiles into the Wrangler config for deploy. It is account/region metadata with no local Miniflare effect, so it is not wired into the dev/test runtime. |
 | `workers.dev` toggle | `workersDev` → `workers_dev` | **No** — deploy-only | `workersDev` compiles to `workers_dev` for deploy (still defaults to `true`; previously hardcoded `true`, now a toggle). It controls the `*.workers.dev` route on Cloudflare's edge and has no local Miniflare effect. |
 | Custom-domain route flags | route `enabled` / `previewsEnabled` → `enabled` / `previews_enabled` | **No** — deploy-only | A custom-domain route's `enabled` and `previewsEnabled` compile to `enabled` / `previews_enabled` route metadata for deploy. They govern Cloudflare's routing/preview behavior and have no local Miniflare effect. |
+| Observability | `observability` | **No** — deploy-only | `observability` (`enabled` / `head_sampling_rate` plus nested `logs` and `traces`) compiles into the Wrangler config for deploy. It configures Cloudflare's Workers Logs/Traces ingestion and sampling — a hosted edge feature with no local Miniflare analogue. |
+| Smart Placement | `placement` | **No** — deploy-only | `placement` (`mode: 'off' \| 'smart'`, optional `hint`) compiles for deploy. Smart Placement is a Cloudflare edge-scheduling decision with no local-runtime effect. |
+| Resource limits | `limits` | **No** — deploy-only | `limits` (`cpu_ms`) compiles for deploy. The CPU-time limit is enforced by Cloudflare's runtime, not the local Miniflare worker. |
 
 ## Dev server (`server`) and local-runtime options
 

@@ -498,6 +498,11 @@ describe('runCli', () => {
 					'devflare productions versions Show recent stored production versions and the current active version'
 			},
 			{
+				argv: ['productions', 'deployments', '--help'],
+				snippet:
+					'devflare productions deployments Show the full chronological production deployment history'
+			},
+			{
 				argv: ['productions', 'rollback', '--help'],
 				snippet:
 					'devflare productions rollback Roll a Worker back to the previous or specified production version'

@@ -34,7 +34,7 @@ import { collectConfiguredWorkerFamilies } from './previews-support/family'
 import type { ConfiguredWorkerFamilyMember } from './previews-support/types'
 
 const CLI_API_OPTIONS: APIClientOptions = { timeout: 10000 }
-const PRODUCTION_SUBCOMMANDS = ['list', 'versions', 'rollback', 'delete'] as const
+const PRODUCTION_SUBCOMMANDS = ['list', 'versions', 'deployments', 'rollback', 'delete'] as const
 const VERSION_LIST_LIMIT = 10
 
 type ProductionSubcommand = (typeof PRODUCTION_SUBCOMMANDS)[number]
@@ -78,6 +78,21 @@ interface WorkerVersionOverview {
 	rows: ProductionVersionRow[]
 }
 
+interface ProductionDeploymentRow {
+	createdOn: Date
+	deploymentId: string
+	strategy: string
+	split: string
+	source: string
+	message?: string
+	triggeredBy?: string
+}
+
+interface WorkerDeploymentOverview {
+	workerName: string
+	rows: ProductionDeploymentRow[]
+}
+
 function isProductionSubcommand(value: string): value is ProductionSubcommand {
 	return PRODUCTION_SUBCOMMANDS.includes(value as ProductionSubcommand)
 }
@@ -91,6 +106,16 @@ function selectDeploymentVersionId(deployment: WorkerDeploymentInfo): string | u
 		deployment.versions.find((version) => version.percentage === 100)?.versionId ??
 		deployment.versions[0]?.versionId
 	)
+}
+
+function formatDeploymentSplit(deployment: WorkerDeploymentInfo): string {
+	if (deployment.versions.length === 0) {
+		return 'N/A'
+	}
+
+	return deployment.versions
+		.map((version) => `${version.percentage}% → ${shortenVersionId(version.versionId, 8)}`)
+		.join(', ')
 }
 
 function getWorkerVersionTimestamp(version: WorkerVersionInfo): Date | undefined {
@@ -532,7 +557,7 @@ function showProductionOverview(
 	logLine(
 		logger,
 		dim(
-			'Use `devflare productions versions` for recent production versions, or `rollback` / `delete` to mutate one Worker.',
+			'Use `devflare productions versions` for recent production versions, `deployments` for the full deployment history, or `rollback` / `delete` to mutate one Worker.',
 			theme
 		)
 	)
@@ -567,6 +592,105 @@ function showWorkerVersions(
 			title: 'Versions',
 			rows: overview.rows,
 			columns: buildVersionColumns(theme),
+			theme,
+			titleAccent: 'cyan'
+		})
+	}
+
+	logLine(logger)
+}
+
+function buildDeploymentColumns(theme: CliTheme): CliTableColumn<ProductionDeploymentRow>[] {
+	return [
+		{
+			label: 'Deployed',
+			width: 19,
+			value: (row) => whiteDim(formatRecordDate(row.createdOn), theme)
+		},
+		{
+			label: 'Deployment',
+			width: 12,
+			value: (row) => shortenVersionId(row.deploymentId, 11)
+		},
+		{
+			label: 'Strategy',
+			width: 12,
+			value: (row) => row.strategy || dim('N/A', theme)
+		},
+		{
+			label: 'Traffic split',
+			width: 28,
+			value: (row) => row.split
+		},
+		{
+			label: 'Source',
+			width: 12,
+			value: (row) => row.source || dim('N/A', theme)
+		},
+		{
+			label: 'Triggered by',
+			width: 18,
+			value: (row) => (row.triggeredBy ? whiteDim(row.triggeredBy, theme) : dim('N/A', theme))
+		},
+		{
+			label: 'Message',
+			value: (row) => (row.message ? row.message : dim('N/A', theme))
+		}
+	]
+}
+
+async function loadWorkerDeploymentHistory(
+	accountId: string,
+	workerName: string,
+	apiOptions: APIClientOptions
+): Promise<WorkerDeploymentOverview> {
+	const deployments = await account.workerDeployments(accountId, workerName, apiOptions)
+	const sorted = [...deployments].sort(
+		(left, right) => right.createdOn.getTime() - left.createdOn.getTime()
+	)
+
+	return {
+		workerName,
+		rows: sorted.map((deployment) => ({
+			createdOn: deployment.createdOn,
+			deploymentId: deployment.id,
+			strategy: deployment.strategy,
+			split: formatDeploymentSplit(deployment),
+			source: deployment.source,
+			message: deployment.message,
+			triggeredBy: deployment.triggeredBy ?? deployment.authorEmail
+		}))
+	}
+}
+
+function showWorkerDeployments(
+	logger: ConsolaInstance,
+	overviews: WorkerDeploymentOverview[],
+	theme: CliTheme
+): void {
+	logLine(logger)
+
+	if (overviews.length === 0) {
+		logLine(logger, dim('No production deployments were found for the current selection.', theme))
+		logLine(logger)
+		return
+	}
+
+	for (const [index, overview] of overviews.entries()) {
+		if (index > 0) {
+			logLine(logger)
+		}
+
+		logLine(logger, `${bold('worker', theme)} ${green(overview.workerName, theme)}`)
+		if (overview.rows.length === 0) {
+			logLine(logger, dim('No production deployments were found for this Worker.', theme))
+			continue
+		}
+
+		logTable(logger, {
+			title: 'Deployments',
+			rows: overview.rows,
+			columns: buildDeploymentColumns(theme),
 			theme,
 			titleAccent: 'cyan'
 		})
@@ -671,6 +795,17 @@ async function runDelete(
 	return { exitCode: 0 }
 }
 
+function resolveSelectedWorkerNames(
+	context: ProductionCommandContext,
+	selectedFamilies: ConfiguredWorkerFamilyMember[]
+): string[] {
+	return Array.from(
+		new Set(
+			context.workerName ? [context.workerName] : selectedFamilies.map((family) => family.baseName)
+		)
+	).sort((left, right) => left.localeCompare(right))
+}
+
 export async function runProductionsCommand(
 	parsed: ParsedArgs,
 	logger: ConsolaInstance,
@@ -713,14 +848,7 @@ export async function runProductionsCommand(
 
 		switch (subcommand) {
 			case 'versions': {
-				const workerNames = Array.from(
-					new Set(
-						context.workerName
-							? [context.workerName]
-							: selectedFamilies.map((family) => family.baseName)
-					)
-				).sort((left, right) => left.localeCompare(right))
-
+				const workerNames = resolveSelectedWorkerNames(context, selectedFamilies)
 				if (workerNames.length === 0) {
 					logger.error(
 						'No production Workers could be resolved. Use --worker or run inside a configured package.'
@@ -734,6 +862,24 @@ export async function runProductionsCommand(
 					)
 				)
 				showWorkerVersions(logger, overviews, theme)
+				return { exitCode: 0 }
+			}
+
+			case 'deployments': {
+				const workerNames = resolveSelectedWorkerNames(context, selectedFamilies)
+				if (workerNames.length === 0) {
+					logger.error(
+						'No production Workers could be resolved. Use --worker or run inside a configured package.'
+					)
+					return { exitCode: 1 }
+				}
+
+				const overviews = await Promise.all(
+					workerNames.map((workerName) =>
+						loadWorkerDeploymentHistory(context.accountId, workerName, CLI_API_OPTIONS)
+					)
+				)
+				showWorkerDeployments(logger, overviews, theme)
 				return { exitCode: 0 }
 			}
 
