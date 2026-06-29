@@ -133,6 +133,12 @@ export const serverConfigSchema = z
 		httpsCertPath: z.string().min(1).optional(),
 		/** Port the V8 inspector (DevTools) binds to. Maps to Miniflare's `inspectorPort`. */
 		inspectorPort: z.number().int().min(1).max(65535).optional(),
+		/** Host the V8 inspector (DevTools) binds to. Maps to Miniflare's `inspectorHost`. */
+		inspectorHost: z.string().min(1).optional(),
+		/** Emit verbose Miniflare runtime logs. Maps to Miniflare's `verbose`. Local-dev only. */
+		verbose: z.boolean().optional(),
+		/** Log each incoming request handled by the dev runtime. Maps to Miniflare's `logRequests`. Local-dev only. */
+		logRequests: z.boolean().optional(),
 		/** Origin to proxy unmatched requests to (and to base the request URL on). Maps to Miniflare's `upstream`. */
 		upstream: z.string().min(1).optional(),
 		/**
@@ -174,6 +180,32 @@ export const routeConfigSchema = z
 		previews_enabled: z.boolean().optional()
 	})
 	.superRefine((route, ctx) => {
+		// `enabled`/`previews_enabled` are accepted by wrangler ONLY on a
+		// CustomDomainRoute; its ZoneIdRoute/ZoneNameRoute are
+		// additionalProperties:false and reject them. Reject the bad combo at
+		// parse time so it never validates locally but fails deploy.
+		if (
+			(route.enabled !== undefined || route.previews_enabled !== undefined) &&
+			!route.custom_domain
+		) {
+			if (route.enabled !== undefined) {
+				ctx.addIssue({
+					code: z.ZodIssueCode.custom,
+					path: ['enabled'],
+					message:
+						'`enabled`/`previews_enabled` are only valid on a custom-domain route (set `custom_domain: true`)'
+				})
+			}
+			if (route.previews_enabled !== undefined) {
+				ctx.addIssue({
+					code: z.ZodIssueCode.custom,
+					path: ['previews_enabled'],
+					message:
+						'`enabled`/`previews_enabled` are only valid on a custom-domain route (set `custom_domain: true`)'
+				})
+			}
+		}
+
 		if (!route.custom_domain) {
 			return
 		}

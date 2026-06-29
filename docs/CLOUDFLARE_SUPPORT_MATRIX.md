@@ -229,7 +229,7 @@ local-runtime analogue (account/region/edge-routing metadata).
 | Streaming tail consumers | `streamingTailConsumers` → `streaming_tail_consumers` | **Yes** (when the consumer Worker is present locally) | Like `tailConsumers` but **service-only**: wrangler's `StreamingTailConsumer` accepts only `service` (no `environment`), so the object form is `{ service }` and `environment` is rejected at config-parse time to stay deploy-valid. Compiles to `streaming_tail_consumers` for deploy **and** is passed to Miniflare's per-worker `streamingTails`. Cross-Worker streaming-tail delivery works **when the consumer Worker is also run in the same local Miniflare instance**; when it is absent the designator resolves to nothing and the local runtime degrades cleanly (no crash). |
 | Compliance region | `complianceRegion` → `compliance_region` | **No** — deploy-only | `complianceRegion` (`'public'` \| `'fedramp_high'`) compiles into the Wrangler config for deploy. It is account/region metadata with no local Miniflare effect, so it is not wired into the dev/test runtime. |
 | `workers.dev` toggle | `workersDev` → `workers_dev` | **No** — deploy-only | `workersDev` compiles to `workers_dev` for deploy (still defaults to `true`; previously hardcoded `true`, now a toggle). It controls the `*.workers.dev` route on Cloudflare's edge and has no local Miniflare effect. |
-| Custom-domain route flags | route `enabled` / `previewsEnabled` → `enabled` / `previews_enabled` | **No** — deploy-only | A custom-domain route's `enabled` and `previewsEnabled` compile to `enabled` / `previews_enabled` route metadata for deploy. They govern Cloudflare's routing/preview behavior and have no local Miniflare effect. |
+| Custom-domain route flags | route `enabled` / `previews_enabled` | **No** — deploy-only | `enabled` and `previews_enabled` are valid **only on a custom-domain route** (`custom_domain: true`) — wrangler's `zone_id`/`zone_name` route shapes reject them, so Devflare rejects them at config-parse time on non-custom-domain routes and emits them only for custom-domain routes. They govern Cloudflare's routing/preview behavior and have no local Miniflare effect. |
 | Observability | `observability` | **No** — deploy-only | `observability` (`enabled` / `head_sampling_rate` plus nested `logs` and `traces`) compiles into the Wrangler config for deploy. It configures Cloudflare's Workers Logs/Traces ingestion and sampling — a hosted edge feature with no local Miniflare analogue. |
 | Smart Placement | `placement` | **No** — deploy-only | `placement` (`mode: 'off' \| 'smart'`, optional `hint`) compiles for deploy. Smart Placement is a Cloudflare edge-scheduling decision with no local-runtime effect. |
 | Resource limits | `limits` | **No** — deploy-only | `limits` (`cpu_ms`) compiles for deploy. The CPU-time limit is enforced by Cloudflare's runtime, not the local Miniflare worker. |
@@ -239,14 +239,18 @@ local-runtime analogue (account/region/edge-routing metadata).
 These knobs shape the **local** dev/test runtime rather than the deployed Worker.
 
 - **`server` options** — beyond `host`/`port`, the `server` config also accepts
-  `https`, `httpsKeyPath`, `httpsCertPath`, `inspectorPort`, `upstream`,
-  `liveReload`, and `cf`, all threaded into Miniflare's `CoreSharedOptions`. This
-  enables local **HTTPS** dev (with your own key/cert), a custom **inspector
-  port** for the DevTools/debugger, a custom **upstream** host, Miniflare's
-  in-browser **live-reload** script (`liveReload: true`, complementing Devflare's
-  own source watcher), and a dev-time **`request.cf` override** (`cf: false` to
-  omit it, a JSON file path, or an object injecting colo/country/TLS/bot-management
-  metadata). They have no deploy effect — they configure the local runtime only.
+  `https`, `httpsKeyPath`, `httpsCertPath`, `inspectorPort`, `inspectorHost`,
+  `upstream`, `liveReload`, `cf`, `verbose`, and `logRequests`, all threaded into
+  Miniflare's `CoreSharedOptions`. This enables local **HTTPS** dev (with your own
+  key/cert), a custom **inspector port/host** for the DevTools/debugger, a custom
+  **upstream** host, Miniflare's in-browser **live-reload** script (`liveReload:
+  true`, complementing Devflare's own source watcher), a dev-time **`request.cf`
+  override** (`cf: false` to omit it, a JSON file path, or an object injecting
+  colo/country/TLS/bot-management metadata), and runtime-log controls (`verbose`,
+  `logRequests`). They have no deploy effect — they configure the local runtime
+  only. (Devflare's own internal Miniflare knobs — log level via the CLI
+  `--verbose`/`--debug`, persist roots, telemetry, unsafe/dev-registry options —
+  are managed by Devflare and intentionally not surfaced as `server` config.)
 - **Cache API (`caches` global)** — works **locally by default** through
   Miniflare (no binding to declare; `caches.default` and `caches.open(...)` are
   available in dev/test). Cache contents now **persist across dev-server

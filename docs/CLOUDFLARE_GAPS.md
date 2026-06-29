@@ -199,6 +199,18 @@ loop is recorded below.
   enumeration **open-ended** (covering all current and future esbuild flags in one
   stroke). Rejected (correctly): `send_metrics` and Browser Rendering (both
   already-covered). No capability/correctness gap surfaced.
+- **Ninth pass** (after CF-23 shipped, same dependency grounding): **3 gaps** (1
+  medium, 2 low). MEDIUM — another field-on-wrong-subtype leak from CF-9: route
+  `enabled`/`previews_enabled` were emitted on **any** route, but wrangler's
+  `ZoneIdRoute`/`ZoneNameRoute` are `additionalProperties:false` (only
+  `CustomDomainRoute` accepts them) → deploy-invalid. LOW — the last two unthreaded
+  `CoreSharedOptions` local-dev knobs (`inspectorHost`, `verbose`; plus
+  `logRequests` added proactively to close the class). All fixed in **Batch CF-25**
+  below; the full `CoreSharedOptions` set was enumerated and the remaining fields
+  (rootPath, raw httpsKey/Cert, log/handle*/structuredWorkerdLogs, unsafe*,
+  defaultPersistRoot, telemetry/deviceId) deliberately left unmodeled as
+  internal/Devflare-managed. Rejected (correctly): queue-consumer `type` and the
+  wrangler `dev` sub-fields (both already-covered).
 
 ## Batch CF-9 — CF-8 confirmed gaps (implemented)
 
@@ -417,6 +429,38 @@ open-ended) and added an "esbuild bundling flags" subsection to the matrix's
 passthrough section. This closes the whole class, not just the two named flags.
 
 A **ninth** pass after CF-23 is the next convergence check; the loop ends when a
+pass returns zero real gaps.
+
+## Batch CF-25 — CF-24 confirmed gaps (implemented)
+
+The 3 gaps from the CF-8 ninth pass, shipped.
+
+| Gap | Dimensions | The devflare-way fix | Status |
+| --- | --- | --- | --- |
+| Route `enabled`/`previews_enabled` emitted on non-custom-domain routes (deploy-invalid) | schema, compiler, docs | Reject at config-parse time on `zone_id`/`zone_name` routes (superRefine) + emit only for custom-domain routes. | ✅ |
+| `server.inspectorHost` not modeled/wired | local-dev | Add to `serverConfigSchema`/`ServerConfigInput` + thread to Miniflare `CoreSharedOptions`. | ✅ |
+| `server.verbose` / `server.logRequests` not modeled/wired | local-dev | Same — thread the remaining log knobs. | ✅ |
+
+How covered (CF-25):
+- **Route flags (medium, correctness)** — the third field-on-wrong-subtype leak
+  of the CF-17/19/21 class: wrangler's `ZoneIdRoute`/`ZoneNameRoute` are
+  `additionalProperties:false` and reject `enabled`/`previews_enabled` (only
+  `CustomDomainRoute` accepts them). `routeConfigSchema.superRefine` now rejects
+  those flags when `custom_domain` is not set (validate-locally ≡ deploy-valid),
+  and the compiler emits them only for custom-domain routes. Verified by direct
+  `safeParse` probes (reject on zone routes, accept on custom-domain/plain-zone).
+- **`server.inspectorHost` / `server.verbose` / `server.logRequests`** — the last
+  user-facing Miniflare `CoreSharedOptions` local-dev knobs, added to the `server`
+  config and threaded into the dev `sharedOptions` (siblings of the CF-9/CF-15
+  `https`/`inspectorPort`/`upstream`/`liveReload`/`cf` set). The full
+  `CoreSharedOptions` list was enumerated to **close the class**: the remaining
+  fields (`rootPath`, raw `httpsKey`/`httpsCert`, `log`/`handleRuntimeStdio`/
+  `handleStructuredLogs`/`structuredWorkerdLogs`, the `unsafe*`/dev-registry
+  options, `defaultPersistRoot`, `telemetry`/`deviceId`) are deliberately left
+  unmodeled as internal / Devflare-managed (CLI `--verbose`/`--debug` already
+  drives the Miniflare `log` level; persist roots are managed by Devflare).
+
+A **tenth** pass after CF-25 is the next convergence check; the loop ends when a
 pass returns zero real gaps.
 
 ---

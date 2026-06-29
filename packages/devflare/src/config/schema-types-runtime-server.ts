@@ -92,6 +92,46 @@ export interface ServerConfigInput {
 	inspectorPort?: number
 
 	/**
+	 * Host the V8 inspector (DevTools) binds to. Maps to Miniflare's
+	 * `inspectorHost`.
+	 *
+	 * @default Miniflare's default inspector host.
+	 *
+	 * @example
+	 * ```ts
+	 * server: { inspectorHost: '0.0.0.0', inspectorPort: 9229 }
+	 * ```
+	 */
+	inspectorHost?: string
+
+	/**
+	 * Emit verbose Miniflare runtime logs. Maps to Miniflare's `verbose`.
+	 * Local-dev only — distinct from Devflare's own CLI `--verbose`/`--debug`
+	 * (which set the Miniflare log level).
+	 *
+	 * @default `false`
+	 *
+	 * @example
+	 * ```ts
+	 * server: { verbose: true }
+	 * ```
+	 */
+	verbose?: boolean
+
+	/**
+	 * Log each incoming request handled by the local dev runtime. Maps to
+	 * Miniflare's `logRequests`. Local-dev only.
+	 *
+	 * @default Miniflare's default (`true`).
+	 *
+	 * @example
+	 * ```ts
+	 * server: { logRequests: false }
+	 * ```
+	 */
+	logRequests?: boolean
+
+	/**
 	 * Origin to proxy unmatched requests to and to base the request URL on.
 	 * Maps to Miniflare's `upstream`.
 	 *

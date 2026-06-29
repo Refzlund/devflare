@@ -135,8 +135,14 @@ function compileConfigInternal(
 			...(route.zone_name && { zone_name: route.zone_name }),
 			...(route.zone_id && { zone_id: route.zone_id }),
 			...(route.custom_domain !== undefined && { custom_domain: route.custom_domain }),
-			...(route.enabled !== undefined && { enabled: route.enabled }),
-			...(route.previews_enabled !== undefined && { previews_enabled: route.previews_enabled })
+			// `enabled`/`previews_enabled` are accepted by wrangler only on a
+			// CustomDomainRoute, so emit them only when this is a custom-domain
+			// route (defense-in-depth; the schema already rejects the bad combo).
+			...(route.custom_domain && route.enabled !== undefined && { enabled: route.enabled }),
+			...(route.custom_domain &&
+				route.previews_enabled !== undefined && {
+					previews_enabled: route.previews_enabled
+				})
 		}))
 	}
 

@@ -86,7 +86,7 @@ describe('buildMiniflareDevConfig', () => {
 		expect(mfConfig.port).toBe(3000)
 	})
 
-	test('threads the dev server block (https/inspectorPort/upstream/liveReload/cf) into shared options', () => {
+	test('threads the dev server block (https/inspectorPort/inspectorHost/upstream/liveReload/verbose/logRequests/cf) into shared options', () => {
 		const mfConfig = buildMiniflareDevConfig(
 			buildBaseInput({
 				config: {
@@ -97,8 +97,11 @@ describe('buildMiniflareDevConfig', () => {
 						httpsKeyPath: './certs/key.pem',
 						httpsCertPath: './certs/cert.pem',
 						inspectorPort: 9229,
+						inspectorHost: '0.0.0.0',
 						upstream: 'https://example.com',
 						liveReload: true,
+						verbose: true,
+						logRequests: false,
 						cf: { colo: 'SFO', country: 'US' }
 					}
 				}
@@ -109,8 +112,11 @@ describe('buildMiniflareDevConfig', () => {
 		expect(mfConfig.httpsKeyPath).toBe('./certs/key.pem')
 		expect(mfConfig.httpsCertPath).toBe('./certs/cert.pem')
 		expect(mfConfig.inspectorPort).toBe(9229)
+		expect(mfConfig.inspectorHost).toBe('0.0.0.0')
 		expect(mfConfig.upstream).toBe('https://example.com')
 		expect(mfConfig.liveReload).toBe(true)
+		expect(mfConfig.verbose).toBe(true)
+		expect(mfConfig.logRequests).toBe(false)
 		expect(mfConfig.cf).toEqual({ colo: 'SFO', country: 'US' })
 	})
 
@@ -118,8 +124,11 @@ describe('buildMiniflareDevConfig', () => {
 		const mfConfig = buildMiniflareDevConfig(buildBaseInput())
 		expect(mfConfig.https).toBeUndefined()
 		expect(mfConfig.inspectorPort).toBeUndefined()
+		expect(mfConfig.inspectorHost).toBeUndefined()
 		expect(mfConfig.upstream).toBeUndefined()
 		expect(mfConfig.liveReload).toBeUndefined()
+		expect(mfConfig.verbose).toBeUndefined()
+		expect(mfConfig.logRequests).toBeUndefined()
 		expect(mfConfig.cf).toBeUndefined()
 	})
 

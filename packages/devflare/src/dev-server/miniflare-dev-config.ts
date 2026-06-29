@@ -129,8 +129,13 @@ export function buildMiniflareDevConfig(input: BuildMiniflareDevConfigInput): an
 		...(serverConfig?.inspectorPort !== undefined && {
 			inspectorPort: serverConfig.inspectorPort
 		}),
+		...(serverConfig?.inspectorHost !== undefined && {
+			inspectorHost: serverConfig.inspectorHost
+		}),
 		...(serverConfig?.upstream !== undefined && { upstream: serverConfig.upstream }),
 		...(serverConfig?.liveReload !== undefined && { liveReload: serverConfig.liveReload }),
+		...(serverConfig?.verbose !== undefined && { verbose: serverConfig.verbose }),
+		...(serverConfig?.logRequests !== undefined && { logRequests: serverConfig.logRequests }),
 		...(serverConfig?.cf !== undefined && { cf: serverConfig.cf })
 	}
 
