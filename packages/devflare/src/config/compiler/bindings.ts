@@ -454,9 +454,12 @@ export function compileBindings(
 	if (bindings.services) {
 		result.services = Object.entries(bindings.services).map(([binding, config]) => ({
 			binding,
-			service: config.service,
+			// wrangler binds to a specific environment of the target Worker via the
+			// service NAME (`<worker_name>-<environment_name>`), not a separate
+			// `environment` field (the `services` item is additionalProperties:false),
+			// so fold the ergonomic `environment` input into the emitted name.
+			service: config.environment ? `${config.service}-${config.environment}` : config.service,
 			...(config.entrypoint && { entrypoint: config.entrypoint }),
-			...(config.environment && { environment: config.environment }),
 			...(config.remote !== undefined && { remote: config.remote }),
 			...(config.props !== undefined && { props: config.props })
 		}))

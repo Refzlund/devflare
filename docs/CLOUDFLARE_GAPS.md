@@ -176,6 +176,17 @@ loop is recorded below.
   user-set `environment` was silently dropped before deploy (validate-locally ≢
   deploy-valid, the mirror of CF-17). Fixed in **Batch CF-19** below. No rejected
   candidates this pass.
+- **Seventh pass** (after CF-19 shipped, same dependency grounding): **7 of 8**
+  survey areas returned zero. **1 medium** correctness gap — the **service**
+  binding emitted a separate `environment` field, but wrangler's `services` item
+  is `additionalProperties:false` (it addresses an environment via the service
+  *name*), so a config setting it produced deploy-invalid output. Fixed in **Batch
+  CF-21** below (fold into the name). This also corrected the stale CF-19 claim
+  that services carry `environment`. Rejected (correctly): D1
+  `database_internal_env` (inherent boundary — internal-use wrangler field),
+  queue-consumer `type` const (not-applicable, already dispositioned). The
+  contested service-vs-DO `environment` fact was settled by reading wrangler
+  4.85.0's `config-schema.json` directly (services: no; DO/dispatch/tail: yes).
 
 ## Batch CF-9 — CF-8 confirmed gaps (implemented)
 
@@ -336,13 +347,44 @@ Deploy-only (no local-dev analogue), mirroring the existing service-binding /
 dispatch-namespace `environment` support. This closes the validate-locally ≢
 deploy-valid leak (the field was silently dropped before, the mirror of CF-17's
 fix). Compiler tests assert the cross-worker round-trip and the local-DO drop.
-This is the **last** wrangler-accepted per-binding `environment` field; with
-service bindings (have it), dispatch outbound (have it), streaming tail consumers
-(correctly removed in CF-17), and DOs (added here), per-binding `environment`
-support now exactly matches wrangler.
+This aligns DO `environment` with wrangler. (Note: the parenthetical here
+originally claimed service bindings carry a separate `environment` field — that
+was wrong and is corrected in **CF-21**: wrangler's `services` item is
+`additionalProperties:false` and addresses an environment via the service *name*,
+so devflare folds it into the name rather than emitting a separate field. Verified
+directly against wrangler 4.85.0: `DurableObjectBindings.items` and
+`dispatch_namespaces.outbound` and `tail_consumers` DO carry `environment`;
+`services` and `streaming_tail_consumers` do NOT.)
 
 A **seventh** pass after CF-19 is the next convergence check; the loop ends when a
 pass returns zero real gaps.
+
+## Batch CF-21 — CF-20 correctness fix (implemented)
+
+The 1 medium defect from the CF-8 seventh pass, shipped.
+
+| Gap | Dimensions | The devflare-way fix | Status |
+| --- | --- | --- | --- |
+| Service binding emitted a separate `environment` field that wrangler rejects | schema, compiler, docs | wrangler addresses a service environment via the **name**, so fold `environment` into the emitted `service` (`<service>-<environment>`) and stop emitting a separate field — keeping the ergonomic input AND producing deploy-valid output. | ✅ |
+
+How covered (CF-21): verified directly against wrangler 4.85.0's
+`config-schema.json` that the `services` item is `additionalProperties:false` with
+no `environment` property, and that its `service` description says to address an
+environment via `<worker_name>-<environment_name>`. The compiler now folds
+`config.environment` into the emitted `service` name (rather than emitting the
+unsupported separate field), the `environment` compiler-output type is removed,
+and the input `environment` field is **kept** (backward-compatible, ergonomic)
+with a clarified doc. Local Miniflare wiring already used the base service name
+(environments are a deploy concept), so no local change was needed. This is the
+mirror of CF-17 but resolved by *transforming* rather than *dropping* — the field
+keeps working and the output is deploy-valid. Per-binding `environment` now
+matches wrangler exactly: DO / dispatch-outbound / tail-consumers emit it as a
+field; services fold it into the name; streaming-tail-consumers reject it.
+
+This was the convergence loop's second **correctness** finding and required
+settling a contested cross-pass fact (does wrangler accept service `environment`?)
+by reading the installed schema directly. An **eighth** pass after CF-21 is the
+next convergence check; the loop ends when a pass returns zero real gaps.
 
 ---
 

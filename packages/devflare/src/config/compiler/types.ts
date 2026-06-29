@@ -107,7 +107,6 @@ export interface WranglerConfig {
 		binding: string
 		service: string
 		entrypoint?: string
-		environment?: string
 		remote?: boolean
 		props?: Record<string, unknown>
 	}>

@@ -78,4 +78,59 @@ describe('compileConfig', () => {
 			])
 		})
 	})
+
+	describe('CF-19/CF-21 per-binding environment', () => {
+		test('compiles a cross-worker Durable Object binding with environment', () => {
+			const result = compileConfig({
+				...baseConfig,
+				bindings: {
+					durableObjects: {
+						COUNTER: {
+							className: 'Counter',
+							scriptName: 'other-worker',
+							environment: 'production'
+						}
+					}
+				}
+			})
+
+			expect(result.durable_objects?.bindings).toEqual([
+				{
+					name: 'COUNTER',
+					class_name: 'Counter',
+					script_name: 'other-worker',
+					environment: 'production'
+				}
+			])
+		})
+
+		test('drops environment on a local Durable Object binding (no script_name)', () => {
+			const result = compileConfig({
+				...baseConfig,
+				bindings: {
+					durableObjects: {
+						COUNTER: { className: 'Counter', environment: 'production' }
+					}
+				}
+			})
+
+			// environment is only valid alongside script_name (cross-worker); a
+			// local DO must not emit it.
+			expect(result.durable_objects?.bindings).toEqual([{ name: 'COUNTER', class_name: 'Counter' }])
+		})
+
+		test('folds a service binding environment into the service name', () => {
+			const result = compileConfig({
+				...baseConfig,
+				bindings: {
+					services: {
+						AUTH: { service: 'auth-worker', environment: 'staging' }
+					}
+				}
+			})
+
+			// wrangler addresses an environment via the service name; no separate field.
+			expect(result.services).toEqual([{ binding: 'AUTH', service: 'auth-worker-staging' }])
+		})
+	})
 })

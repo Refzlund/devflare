@@ -292,11 +292,12 @@ function collectBindingAssociationTargets(config: DevflareConfig): BindingAssoci
 	}
 
 	for (const binding of compiled.services ?? []) {
+		// `environment` is folded into `service` (`<service>-<environment>`) at
+		// compile time, so it is already reflected in `resource`.
 		addAssociationTarget(targets, {
 			reference: binding.binding,
 			type: 'Worker',
-			resource: binding.entrypoint ? `${binding.service}#${binding.entrypoint}` : binding.service,
-			note: binding.environment ? `env ${binding.environment}` : undefined
+			resource: binding.entrypoint ? `${binding.service}#${binding.entrypoint}` : binding.service
 		})
 	}
 

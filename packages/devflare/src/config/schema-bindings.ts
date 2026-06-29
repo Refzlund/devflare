@@ -231,7 +231,12 @@ function isServiceBindingValue(val: unknown): boolean {
 export const serviceBindingSchema = z.custom<{
 	/** Target worker/service name */
 	service: string
-	/** Optional environment (staging, production, etc.) */
+	/**
+	 * Optional target environment (staging, production, etc.). wrangler binds to
+	 * an environment via the service NAME, so this is folded into the emitted
+	 * `service` as `<service>-<environment>` at compile time (it is not emitted as
+	 * a separate field — wrangler's `services` item rejects unknown keys).
+	 */
 	environment?: string
 	/** Optional entrypoint class name for named exports */
 	entrypoint?: string

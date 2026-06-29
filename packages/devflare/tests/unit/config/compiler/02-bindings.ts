@@ -182,45 +182,6 @@ describe('compileConfig', () => {
 			])
 		})
 
-		test('compiles a cross-worker Durable Object binding with environment', () => {
-			const result = compileConfig({
-				...baseConfig,
-				bindings: {
-					durableObjects: {
-						COUNTER: {
-							className: 'Counter',
-							scriptName: 'other-worker',
-							environment: 'production'
-						}
-					}
-				}
-			})
-
-			expect(result.durable_objects?.bindings).toEqual([
-				{
-					name: 'COUNTER',
-					class_name: 'Counter',
-					script_name: 'other-worker',
-					environment: 'production'
-				}
-			])
-		})
-
-		test('drops environment on a local Durable Object binding (no script_name)', () => {
-			const result = compileConfig({
-				...baseConfig,
-				bindings: {
-					durableObjects: {
-						COUNTER: { className: 'Counter', environment: 'production' }
-					}
-				}
-			})
-
-			// environment is only valid alongside script_name (cross-worker); a
-			// local DO must not emit it.
-			expect(result.durable_objects?.bindings).toEqual([{ name: 'COUNTER', class_name: 'Counter' }])
-		})
-
 		test('compiles Agents SDK Durable Object bindings and migrations', () => {
 			const result = compileConfig({
 				...baseConfig,
@@ -595,7 +556,7 @@ describe('compileConfig', () => {
 			expect(result.services).toEqual([{ binding: 'AUTH', service: 'auth-worker' }])
 		})
 
-		test('compiles Service bindings with named entrypoints', () => {
+		test('compiles Service bindings with named entrypoints and folds environment into the service name', () => {
 			const result = compileConfig({
 				...baseConfig,
 				bindings: {
@@ -609,12 +570,13 @@ describe('compileConfig', () => {
 				}
 			})
 
+			// wrangler addresses an environment via the service name
+			// (`<worker_name>-<environment_name>`); no separate `environment` field.
 			expect(result.services).toEqual([
 				{
 					binding: 'AUTH',
-					service: 'auth-worker',
-					entrypoint: 'AdminEntrypoint',
-					environment: 'staging'
+					service: 'auth-worker-staging',
+					entrypoint: 'AdminEntrypoint'
 				}
 			])
 		})
