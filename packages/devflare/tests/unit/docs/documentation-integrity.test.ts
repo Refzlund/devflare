@@ -713,7 +713,11 @@ describe('documentation integrity', () => {
 			'bindings/pipelines',
 			'bindings/images',
 			'bindings/media-transformations',
-			'bindings/artifacts'
+			'bindings/artifacts',
+			'bindings/stream',
+			'bindings/vpc-services',
+			'bindings/vpc-networks',
+			'bindings/flagship'
 		]
 
 		const schemaKeyToSlug: Record<string, string> = {
@@ -741,7 +745,11 @@ describe('documentation integrity', () => {
 			pipelines: 'bindings/pipelines',
 			images: 'bindings/images',
 			media: 'bindings/media-transformations',
-			artifacts: 'bindings/artifacts'
+			artifacts: 'bindings/artifacts',
+			stream: 'bindings/stream',
+			vpcServices: 'bindings/vpc-services',
+			vpcNetworks: 'bindings/vpc-networks',
+			flagship: 'bindings/flagship'
 		}
 
 		expect(Object.keys(schemaKeyToSlug).sort()).toEqual(bindingSchemaKeys().sort())
@@ -775,6 +783,10 @@ describe('documentation integrity', () => {
 			'/docs/bindings/images': 'Limited',
 			'/docs/bindings/media-transformations': 'Limited',
 			'/docs/bindings/artifacts': 'Remote',
+			'/docs/bindings/stream': 'Limited',
+			'/docs/bindings/vpc-services': 'Remote',
+			'/docs/bindings/vpc-networks': 'Remote',
+			'/docs/bindings/flagship': 'Limited',
 			'/docs/bindings/containers': 'Full'
 		}
 		const page = docs.find((doc) => doc.slug === 'what-devflare-is')

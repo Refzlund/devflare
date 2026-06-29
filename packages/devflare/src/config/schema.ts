@@ -267,6 +267,7 @@ export type {
 	DurableObjectBindingInput,
 	DurableObjectBindingObjectInput,
 	FilesConfigInput,
+	FlagshipBindingInput,
 	HyperdriveBindingByIdInput,
 	HyperdriveBindingByNameInput,
 	HyperdriveBindingInput,
@@ -305,6 +306,8 @@ export type {
 	ServerConfigInput,
 	ServiceBindingInput,
 	SmartPlacementConfigInput,
+	StreamBindingInput,
+	StreamBindingObjectInput,
 	TailConsumerConfigInput,
 	TailConsumerObjectConfigInput,
 	TargetedHostPlacementConfigInput,
@@ -314,6 +317,10 @@ export type {
 	VectorizeBindingInput,
 	VersionMetadataBindingInput,
 	ViteConfigInput,
+	VpcNetworkBindingInput,
+	VpcNetworkByNetworkInput,
+	VpcNetworkByTunnelInput,
+	VpcServiceBindingInput,
 	WorkflowBindingInput,
 	WorkflowLimitsInput,
 	WorkerLoaderBindingInput,
@@ -347,6 +354,10 @@ export type {
 	ImagesBinding,
 	MediaBinding,
 	ArtifactsBinding,
+	StreamBinding,
+	VpcServiceBinding,
+	VpcNetworkBinding,
+	FlagshipBinding,
 	ServiceBinding,
 	MtlsCertificateBinding
 } from './schema-bindings'
@@ -377,6 +388,10 @@ export type {
 	NormalizedImagesBinding,
 	NormalizedMediaBinding,
 	NormalizedArtifactsBinding,
+	NormalizedStreamBinding,
+	NormalizedVpcServiceBinding,
+	NormalizedVpcNetworkBinding,
+	NormalizedFlagshipBinding,
 	NormalizedSecretsStoreBinding
 } from './schema-normalization'
 export {
@@ -396,6 +411,10 @@ export {
 	normalizePipelineBinding,
 	normalizeImagesBinding,
 	normalizeMediaBinding,
+	normalizeStreamBinding,
+	normalizeVpcServiceBinding,
+	normalizeVpcNetworkBinding,
+	normalizeFlagshipBinding,
 	normalizeSecretsStoreBinding,
 	normalizeArtifactsBinding
 } from './schema-normalization'

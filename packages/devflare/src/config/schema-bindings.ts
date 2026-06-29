@@ -575,6 +575,76 @@ export const artifactsBindingSchema = z.union([
 ])
 
 /**
+ * CF-2 — Cloudflare Stream binding (video upload/playback service).
+ * Mirrors the Images/Media singleton shape: `true` shorthand or `{ remote? }`.
+ */
+export const streamBindingSchema = z
+	.object({
+		/** Ask Wrangler local development to connect this binding to the remote Stream service */
+		remote: z.boolean().optional()
+	})
+	.strict()
+	.or(z.literal(true))
+
+/**
+ * CF-2 — VPC service binding. Connects the Worker to a private service through
+ * a Cloudflare VPC connectivity service. Compiles to wrangler's `vpc_services`.
+ */
+export const vpcServiceBindingSchema = z
+	.object({
+		/** Service ID of the VPC connectivity service; compiles to `service_id` */
+		serviceId: z.string().min(1),
+		/** Ask Wrangler local development to connect this binding to the remote VPC service */
+		remote: z.boolean().optional()
+	})
+	.strict()
+
+/**
+ * CF-2 — VPC network binding routed through a Cloudflare Tunnel (`tunnelId`).
+ */
+export const vpcNetworkByTunnelSchema = z
+	.object({
+		/** Tunnel ID of the Cloudflare Tunnel; compiles to `tunnel_id`. Mutually exclusive with networkId */
+		tunnelId: z.string().min(1),
+		/** Ask Wrangler local development to connect this binding to the remote VPC network */
+		remote: z.boolean().optional()
+	})
+	.strict()
+
+/**
+ * CF-2 — VPC network binding routed through a network ID (`networkId`).
+ */
+export const vpcNetworkByNetworkSchema = z
+	.object({
+		/** Network ID to route traffic through; compiles to `network_id`. Mutually exclusive with tunnelId */
+		networkId: z.string().min(1),
+		/** Ask Wrangler local development to connect this binding to the remote VPC network */
+		remote: z.boolean().optional()
+	})
+	.strict()
+
+/**
+ * CF-2 — VPC network binding. Use exactly one of `tunnelId` or `networkId`.
+ */
+export const vpcNetworkBindingSchema = z.union([
+	vpcNetworkByTunnelSchema,
+	vpcNetworkByNetworkSchema
+])
+
+/**
+ * CF-2 — Flagship feature-flag binding. Compiles to wrangler's `flagship`
+ * array (`app_id`).
+ */
+export const flagshipBindingSchema = z
+	.object({
+		/** Flagship app ID to bind to; compiles to `app_id` */
+		appId: z.string().min(1),
+		/** Ask Wrangler local development to use the remote Flagship service for flag evaluation */
+		remote: z.boolean().optional()
+	})
+	.strict()
+
+/**
  * All worker bindings configuration.
  * Defines connections to Cloudflare services and resources.
  */
@@ -748,7 +818,46 @@ export const bindingsSchema = z
 		 * Maps a binding name to an Artifacts namespace for Git-compatible
 		 * file storage.
 		 */
-		artifacts: z.record(z.string(), artifactsBindingSchema).optional()
+		artifacts: z.record(z.string(), artifactsBindingSchema).optional(),
+
+		/**
+		 * CF-2 — Cloudflare Stream binding.
+		 * Maps a binding name to access the Stream service from the worker
+		 * (video upload/playback via `env.<binding>`).
+		 */
+		stream: z
+			.record(z.string(), streamBindingSchema)
+			.optional()
+			.superRefine((bindings, ctx) => {
+				if (!bindings || Object.keys(bindings).length <= 1) {
+					return
+				}
+
+				ctx.addIssue({
+					code: z.ZodIssueCode.custom,
+					message: 'Wrangler currently supports one Stream binding per Worker'
+				})
+			}),
+
+		/**
+		 * CF-2 — VPC service bindings.
+		 * Maps a binding name to a Cloudflare VPC connectivity service that
+		 * reaches a private service.
+		 */
+		vpcServices: z.record(z.string(), vpcServiceBindingSchema).optional(),
+
+		/**
+		 * CF-2 — VPC network bindings.
+		 * Maps a binding name to a VPC network routed through a Cloudflare
+		 * Tunnel or a network ID.
+		 */
+		vpcNetworks: z.record(z.string(), vpcNetworkBindingSchema).optional(),
+
+		/**
+		 * CF-2 — Flagship feature-flag bindings.
+		 * Maps a binding name to a Flagship app for feature-flag evaluation.
+		 */
+		flagship: z.record(z.string(), flagshipBindingSchema).optional()
 	})
 	.optional()
 
@@ -776,3 +885,7 @@ export type PipelineBinding = z.infer<typeof pipelineBindingSchema>
 export type ImagesBinding = z.infer<typeof imagesBindingSchema>
 export type MediaBinding = z.infer<typeof mediaBindingSchema>
 export type ArtifactsBinding = z.infer<typeof artifactsBindingSchema>
+export type StreamBinding = z.infer<typeof streamBindingSchema>
+export type VpcServiceBinding = z.infer<typeof vpcServiceBindingSchema>
+export type VpcNetworkBinding = z.infer<typeof vpcNetworkBindingSchema>
+export type FlagshipBinding = z.infer<typeof flagshipBindingSchema>

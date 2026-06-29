@@ -64,6 +64,26 @@ const fixtureConfig = {
 				remote: true
 			}
 		},
+		stream: {
+			STREAM: {
+				remote: true
+			}
+		},
+		flagship: {
+			FLAGS: {
+				appId: 'app-id'
+			}
+		},
+		vpcServices: {
+			DB: {
+				serviceId: 'service-uuid'
+			}
+		},
+		vpcNetworks: {
+			NET: {
+				tunnelId: 'tunnel-uuid'
+			}
+		},
 		artifacts: {
 			ARTIFACTS: {
 				namespace: 'default'
@@ -130,6 +150,8 @@ describe('generateBindingTypes — P1-codegen fixture', () => {
 		expect(generated).toContain('Workflow')
 		expect(generated).toContain('ImagesBinding')
 		expect(generated).toContain('MediaBinding')
+		expect(generated).toContain('StreamBinding')
+		expect(generated).toContain('Flagship')
 		expect(generated).toContain('Artifacts')
 		expect(generated).toContain('SecretsStoreSecret')
 		expect(generated).toContain('Ai')
@@ -159,6 +181,10 @@ describe('generateBindingTypes — P1-codegen fixture', () => {
 		expect(generated).toContain('EVENTS: Pipeline')
 		expect(generated).toContain('IMAGES: ImagesBinding')
 		expect(generated).toContain('MEDIA: MediaBinding')
+		expect(generated).toContain('STREAM: StreamBinding')
+		expect(generated).toContain('FLAGS: Flagship')
+		expect(generated).toContain('DB: Fetcher')
+		expect(generated).toContain('NET: Fetcher')
 		expect(generated).toContain('ARTIFACTS: Artifacts')
 		expect(generated).toContain('API_TOKEN: SecretsStoreSecret')
 		expect(generated).toContain('AI_SEARCH: AiSearchNamespace')

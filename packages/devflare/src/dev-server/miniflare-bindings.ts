@@ -11,6 +11,7 @@ import {
 	type DevflareConfig,
 	normalizeArtifactsBinding,
 	normalizeDispatchNamespaceBinding,
+	normalizeFlagshipBinding,
 	normalizeHyperdriveBinding,
 	normalizeImagesBinding,
 	normalizeMediaBinding,
@@ -18,6 +19,7 @@ import {
 	normalizePipelineBinding,
 	normalizeQueueProducer,
 	normalizeSecretsStoreBinding,
+	normalizeStreamBinding,
 	normalizeWorkflowBinding
 } from '../config'
 
@@ -249,6 +251,43 @@ export function buildMediaConfig(bindings: Bindings): { binding: string } | unde
 	return {
 		binding: normalized.binding
 	}
+}
+
+export function buildStreamConfig(bindings: Bindings): { binding: string } | undefined {
+	if (!bindings.stream) {
+		return undefined
+	}
+
+	const [entry] = Object.entries(bindings.stream)
+	if (!entry) {
+		return undefined
+	}
+
+	const [bindingName, binding] = entry
+	const normalized = normalizeStreamBinding(bindingName, binding)
+	return {
+		binding: normalized.binding
+	}
+}
+
+export function buildFlagshipConfig(
+	bindings: Bindings
+): Record<string, { app_id: string }> | undefined {
+	if (!bindings.flagship) {
+		return undefined
+	}
+
+	return Object.fromEntries(
+		Object.entries(bindings.flagship).map(([bindingName, binding]) => {
+			const normalized = normalizeFlagshipBinding(binding)
+			return [
+				bindingName,
+				{
+					app_id: normalized.appId
+				}
+			]
+		})
+	)
 }
 
 export function buildArtifactsConfig(

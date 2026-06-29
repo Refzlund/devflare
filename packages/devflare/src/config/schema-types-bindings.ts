@@ -3,11 +3,15 @@ import type {
 	ArtifactsBindingInput,
 	BrowserBindingInput,
 	DispatchNamespaceBindingInput,
+	FlagshipBindingInput,
 	ImagesBindingInput,
 	MediaBindingInput,
 	MtlsCertificateBindingInput,
 	PipelineBindingInput,
 	SendEmailBindingInput,
+	StreamBindingInput,
+	VpcNetworkBindingInput,
+	VpcServiceBindingInput,
 	WorkflowBindingInput
 } from './schema-types-bindings-platform'
 import type {
@@ -301,6 +305,49 @@ export interface BindingsConfigInput {
 	 * ```
 	 */
 	artifacts?: Record<string, ArtifactsBindingInput>
+
+	/**
+	 * Cloudflare Stream bindings keyed by runtime binding name. Wrangler
+	 * currently supports one Stream binding per Worker.
+	 *
+	 * @example
+	 * ```ts
+	 * stream: { STREAM: true }
+	 * ```
+	 */
+	stream?: Record<string, StreamBindingInput>
+
+	/**
+	 * VPC service bindings keyed by runtime binding name. Each connects the
+	 * Worker to a private service via a Cloudflare VPC connectivity service.
+	 *
+	 * @example
+	 * ```ts
+	 * vpcServices: { DB: { serviceId: 'service-uuid' } }
+	 * ```
+	 */
+	vpcServices?: Record<string, VpcServiceBindingInput>
+
+	/**
+	 * VPC network bindings keyed by runtime binding name. Each routes traffic
+	 * through a Cloudflare Tunnel (`tunnelId`) or a network ID (`networkId`).
+	 *
+	 * @example
+	 * ```ts
+	 * vpcNetworks: { NET: { tunnelId: 'tunnel-uuid' } }
+	 * ```
+	 */
+	vpcNetworks?: Record<string, VpcNetworkBindingInput>
+
+	/**
+	 * Flagship feature-flag bindings keyed by runtime binding name.
+	 *
+	 * @example
+	 * ```ts
+	 * flagship: { FLAGS: { appId: 'app-id' } }
+	 * ```
+	 */
+	flagship?: Record<string, FlagshipBindingInput>
 }
 
 export type * from './schema-types-bindings-resources'

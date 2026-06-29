@@ -180,6 +180,34 @@ export const cloudflarePlatformSupportCards: DocCard[] = [
 		href: docsLink('bindings/artifacts')
 	}),
 	supportCard({
+		label: 'Limited',
+		meta: 'Video streaming',
+		title: 'Stream',
+		body: 'Native singleton config, a Miniflare-backed local Stream simulator, and a deterministic pure mock cover the binding shape (video listing and per-video metadata access). Real video upload, transcode, delivery, signed tokens, and billing remain hosted Cloudflare behavior, so the local contract is narrower than the deployed product.',
+		href: docsLink('bindings/stream')
+	}),
+	supportCard({
+		label: 'Remote',
+		meta: 'Private networking',
+		title: 'VPC Services',
+		body: 'Native config and deploy emission to `vpc_services` are supported. There is no local simulation: Miniflare wires VPC services only as a remote proxy client, so the private connectivity service and its upstream are Cloudflare-owned. Inject a fake binding for pure tests or use remote mode.',
+		href: docsLink('bindings/vpc-services')
+	}),
+	supportCard({
+		label: 'Remote',
+		meta: 'Private networking',
+		title: 'VPC Networks',
+		body: 'Native config (Tunnel ID or network ID) and deploy emission to `vpc_networks` are supported. There is no local simulation: Miniflare wires VPC networks only as a remote proxy client, so the Tunnel and private network path are Cloudflare-owned. Inject a fake binding for pure tests or use remote mode.',
+		href: docsLink('bindings/vpc-networks')
+	}),
+	supportCard({
+		label: 'Limited',
+		meta: 'Feature flags',
+		title: 'Flagship',
+		body: "Native config, deploy emission to `flagship`, and a deterministic pure mock (`createMockFlagshipBinding({ flags })`) cover the local app loop for reading feature flags. Miniflare's Flagship plugin returns each call's default value and ignores the flag key, so it does not evaluate flag rules locally; real targeting-rule evaluation, flag management, and remote flag state remain Cloudflare-owned.",
+		href: docsLink('bindings/flagship')
+	}),
+	supportCard({
 		label: 'Full',
 		meta: 'Containers',
 		title: 'Containers',

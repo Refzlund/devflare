@@ -19,6 +19,7 @@ import type {
 	buildAiSearchNamespacesConfig,
 	buildArtifactsConfig,
 	buildDispatchNamespacesConfig,
+	buildFlagshipConfig,
 	buildHyperdrivesConfig,
 	buildImagesConfig,
 	buildMediaConfig,
@@ -27,6 +28,7 @@ import type {
 	buildRateLimitsConfig,
 	buildSecretsStoreConfig,
 	buildSendEmailConfig,
+	buildStreamConfig,
 	buildVersionMetadataConfig,
 	buildWorkerLoadersConfig,
 	buildWorkflowsConfig
@@ -44,6 +46,8 @@ type PipelinesConfig = ReturnType<typeof buildPipelinesConfig>
 type HyperdrivesConfig = ReturnType<typeof buildHyperdrivesConfig>
 type ImagesConfig = ReturnType<typeof buildImagesConfig>
 type MediaConfig = ReturnType<typeof buildMediaConfig>
+type StreamConfig = ReturnType<typeof buildStreamConfig>
+type FlagshipConfig = ReturnType<typeof buildFlagshipConfig>
 type ArtifactsConfig = ReturnType<typeof buildArtifactsConfig>
 type AiSearchNamespacesConfig = ReturnType<typeof buildAiSearchNamespacesConfig>
 type AiSearchInstancesConfig = ReturnType<typeof buildAiSearchInstancesConfig>
@@ -122,6 +126,8 @@ export interface MakeMiniflareWorkerContext {
 	hyperdrivesConfig: HyperdrivesConfig
 	imagesConfig: ImagesConfig
 	mediaConfig: MediaConfig
+	streamConfig: StreamConfig
+	flagshipConfig: FlagshipConfig
 	artifactsConfig: ArtifactsConfig
 	aiSearchNamespacesConfig: AiSearchNamespacesConfig
 	aiSearchInstancesConfig: AiSearchInstancesConfig
@@ -153,6 +159,8 @@ export function makeMiniflareWorker(
 		hyperdrivesConfig,
 		imagesConfig,
 		mediaConfig,
+		streamConfig,
+		flagshipConfig,
 		artifactsConfig,
 		aiSearchNamespacesConfig,
 		aiSearchInstancesConfig,
@@ -208,6 +216,8 @@ export function makeMiniflareWorker(
 		...(hyperdrivesConfig && { hyperdrives: hyperdrivesConfig }),
 		...(imagesConfig && { images: imagesConfig }),
 		...(mediaConfig && { media: mediaConfig }),
+		...(streamConfig && { stream: streamConfig }),
+		...(flagshipConfig && { flagship: flagshipConfig }),
 		...(artifactsConfig && { artifacts: artifactsConfig }),
 		...(aiSearchNamespacesConfig && { aiSearchNamespaces: aiSearchNamespacesConfig }),
 		...(aiSearchInstancesConfig && { aiSearchInstances: aiSearchInstancesConfig }),

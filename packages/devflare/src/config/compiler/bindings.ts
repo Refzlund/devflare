@@ -9,6 +9,7 @@ import {
 	normalizeD1Binding,
 	normalizeDOBinding,
 	normalizeDispatchNamespaceBinding,
+	normalizeFlagshipBinding,
 	normalizeHyperdriveBinding,
 	normalizeImagesBinding,
 	normalizeKVBinding,
@@ -18,6 +19,9 @@ import {
 	normalizeQueueProducer,
 	normalizeR2Binding,
 	normalizeSecretsStoreBinding,
+	normalizeStreamBinding,
+	normalizeVpcNetworkBinding,
+	normalizeVpcServiceBinding,
 	normalizeWorkflowBinding
 } from '../schema'
 import type {
@@ -354,6 +358,63 @@ export function compileBindings(
 			return {
 				binding,
 				namespace: normalized.namespace,
+				...(normalized.remote !== undefined && { remote: normalized.remote })
+			}
+		})
+	}
+
+	// Stream
+	if (bindings.stream) {
+		const [entry] = Object.entries(bindings.stream)
+		if (entry) {
+			const [binding, config] = entry
+			const normalized = normalizeStreamBinding(binding, config)
+			result.stream = {
+				binding: normalized.binding,
+				...(normalized.remote !== undefined && { remote: normalized.remote })
+			}
+		}
+	}
+
+	// VPC Services
+	if (bindings.vpcServices) {
+		result.vpc_services = Object.entries(bindings.vpcServices).map(([binding, config]) => {
+			const normalized = normalizeVpcServiceBinding(config)
+			return {
+				binding,
+				service_id: normalized.serviceId,
+				...(normalized.remote !== undefined && { remote: normalized.remote })
+			}
+		})
+	}
+
+	// VPC Networks
+	if (bindings.vpcNetworks) {
+		result.vpc_networks = Object.entries(bindings.vpcNetworks).map(([binding, config]) => {
+			const normalized = normalizeVpcNetworkBinding(config)
+			if (normalized.tunnelId !== undefined) {
+				return {
+					binding,
+					tunnel_id: normalized.tunnelId,
+					...(normalized.remote !== undefined && { remote: normalized.remote })
+				}
+			}
+
+			return {
+				binding,
+				network_id: normalized.networkId as string,
+				...(normalized.remote !== undefined && { remote: normalized.remote })
+			}
+		})
+	}
+
+	// Flagship
+	if (bindings.flagship) {
+		result.flagship = Object.entries(bindings.flagship).map(([binding, config]) => {
+			const normalized = normalizeFlagshipBinding(config)
+			return {
+				binding,
+				app_id: normalized.appId,
 				...(normalized.remote !== undefined && { remote: normalized.remote })
 			}
 		})

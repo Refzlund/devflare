@@ -29,6 +29,10 @@ const bindingSupportLevelsBySlugBase: Record<string, BindingSupportLevel> = {
 	images: 'Limited',
 	'media-transformations': 'Limited',
 	artifacts: 'Remote',
+	stream: 'Limited',
+	'vpc-services': 'Remote',
+	'vpc-networks': 'Remote',
+	flagship: 'Limited',
 	containers: 'Full'
 }
 
@@ -42,8 +46,7 @@ export function createBindingHeaderSupport(guide: BindingGuideDefinition): DocHe
 	const supportLevel = getBindingSupportLevel(guide)
 
 	const headerTooltips: Record<BindingSupportLevel, string> = {
-		Full:
-			'Full - Devflare can cover the ordinary local workflow for this surface without needing Cloudflare for the first development loop.',
+		Full: 'Full - Devflare can cover the ordinary local workflow for this surface without needing Cloudflare for the first development loop.',
 		Remote:
 			'Remote - Devflare can wire the surface locally, but full fidelity depends on Cloudflare infrastructure or platform behavior.',
 		Limited:

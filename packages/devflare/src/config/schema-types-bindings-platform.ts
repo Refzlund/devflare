@@ -380,6 +380,147 @@ export interface MediaBindingObjectInput {
 }
 
 /**
+ * Cloudflare Stream binding value.
+ */
+export type StreamBindingInput = true | StreamBindingObjectInput
+
+/**
+ * Cloudflare Stream binding object form.
+ */
+export interface StreamBindingObjectInput {
+	/**
+	 * Whether Wrangler local development should use the remote Stream service.
+	 *
+	 * @default Wrangler default behavior.
+	 *
+	 * @example
+	 * ```ts
+	 * stream: { STREAM: { remote: true } }
+	 * ```
+	 */
+	remote?: boolean
+}
+
+/**
+ * VPC service binding configuration. Connects the Worker to a private service
+ * reachable through a Cloudflare VPC connectivity service.
+ */
+export interface VpcServiceBindingInput {
+	/**
+	 * Service ID of the VPC connectivity service. Compiles to wrangler's
+	 * `service_id`.
+	 *
+	 * @example
+	 * ```ts
+	 * vpcServices: { DB: { serviceId: 'service-uuid' } }
+	 * ```
+	 */
+	serviceId: string
+
+	/**
+	 * Whether Wrangler local development should use the remote VPC service.
+	 *
+	 * @default Wrangler default behavior.
+	 *
+	 * @example
+	 * ```ts
+	 * vpcServices: { DB: { serviceId: 'service-uuid', remote: true } }
+	 * ```
+	 */
+	remote?: boolean
+}
+
+/**
+ * VPC network binding routed through a Cloudflare Tunnel or a network ID.
+ * Use exactly one of `tunnelId` or `networkId` (they are mutually exclusive).
+ */
+export type VpcNetworkBindingInput = VpcNetworkByTunnelInput | VpcNetworkByNetworkInput
+
+/**
+ * VPC network binding routed through a Cloudflare Tunnel.
+ */
+export interface VpcNetworkByTunnelInput {
+	/**
+	 * Tunnel ID of the Cloudflare Tunnel to route traffic through. Compiles to
+	 * wrangler's `tunnel_id`. Mutually exclusive with `networkId`.
+	 *
+	 * @example
+	 * ```ts
+	 * vpcNetworks: { NET: { tunnelId: 'tunnel-uuid' } }
+	 * ```
+	 */
+	tunnelId: string
+
+	/**
+	 * Whether Wrangler local development should use the remote VPC network.
+	 *
+	 * @default Wrangler default behavior.
+	 *
+	 * @example
+	 * ```ts
+	 * vpcNetworks: { NET: { tunnelId: 'tunnel-uuid', remote: true } }
+	 * ```
+	 */
+	remote?: boolean
+}
+
+/**
+ * VPC network binding routed through a network ID.
+ */
+export interface VpcNetworkByNetworkInput {
+	/**
+	 * Network ID to route traffic through. Compiles to wrangler's `network_id`.
+	 * Mutually exclusive with `tunnelId`.
+	 *
+	 * @example
+	 * ```ts
+	 * vpcNetworks: { NET: { networkId: 'network-uuid' } }
+	 * ```
+	 */
+	networkId: string
+
+	/**
+	 * Whether Wrangler local development should use the remote VPC network.
+	 *
+	 * @default Wrangler default behavior.
+	 *
+	 * @example
+	 * ```ts
+	 * vpcNetworks: { NET: { networkId: 'network-uuid', remote: true } }
+	 * ```
+	 */
+	remote?: boolean
+}
+
+/**
+ * Flagship feature-flag binding configuration.
+ */
+export interface FlagshipBindingInput {
+	/**
+	 * Flagship app ID to bind to. Compiles to wrangler's `app_id`.
+	 *
+	 * @example
+	 * ```ts
+	 * flagship: { FLAGS: { appId: 'app-id' } }
+	 * ```
+	 */
+	appId: string
+
+	/**
+	 * Whether Wrangler local development should use the remote Flagship service
+	 * for flag evaluation.
+	 *
+	 * @default Wrangler default behavior.
+	 *
+	 * @example
+	 * ```ts
+	 * flagship: { FLAGS: { appId: 'app-id', remote: true } }
+	 * ```
+	 */
+	remote?: boolean
+}
+
+/**
  * Cloudflare Artifacts binding by namespace name or object form.
  */
 export type ArtifactsBindingInput = string | ArtifactsBindingObjectInput

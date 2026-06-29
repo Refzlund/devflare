@@ -1,5 +1,6 @@
 import { compactBindingGuidesPart1 } from './compact-guides-1'
 import { compactBindingGuidesPart2 } from './compact-guides-2'
+import { compactBindingGuidesPart3 } from './compact-guides-3'
 import { bindingGuidesPart1 } from './core-guides-1'
 import { bindingGuidesPart2 } from './core-guides-2'
 import { bindingGuidesPart3 } from './core-guides-3'
@@ -16,7 +17,8 @@ const activeBindingGuides = [
 	bindingGuidesPart5,
 	bindingGuidesPart6,
 	compactBindingGuidesPart1,
-	compactBindingGuidesPart2
+	compactBindingGuidesPart2,
+	compactBindingGuidesPart3
 ].flat()
 
 export interface BindingTestingGuideLink {

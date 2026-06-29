@@ -102,6 +102,8 @@ export {
 	createMockPipeline,
 	createMockImagesBinding,
 	createMockMediaBinding,
+	createMockStreamBinding,
+	createMockFlagshipBinding,
 	createMockArtifacts,
 	createMockSecretsStoreSecret,
 	createMockEnv,
@@ -119,5 +121,7 @@ export {
 	type MockPipeline,
 	type MockImagesBindingOptions,
 	type MockMediaBindingOptions,
+	type MockStreamBindingOptions,
+	type MockFlagshipBindingOptions,
 	type MockArtifactsOptions
 } from './utilities'

@@ -18,12 +18,15 @@ import {
 	type MockArtifactsOptions,
 	type MockDispatchNamespaceOptions,
 	type MockFetcherHandler,
+	type MockFlagshipBindingOptions,
 	type MockImagesBindingOptions,
 	type MockMediaBindingOptions,
+	type MockStreamBindingOptions,
 	type MockWorkerLoaderOptions,
 	type MockWorkflowOptions,
 	createMockArtifacts,
 	createMockDispatchNamespace,
+	createMockFlagshipBinding,
 	createMockHyperdrive,
 	createMockImagesBinding,
 	createMockMTLSCertificate,
@@ -31,6 +34,7 @@ import {
 	createMockPipeline,
 	createMockRateLimit,
 	createMockSecretsStoreSecret,
+	createMockStreamBinding,
 	createMockVersionMetadata,
 	createMockWorkerLoader,
 	createMockWorkflow
@@ -67,6 +71,8 @@ export interface OfflineBindingFixtures {
 	pipelines?: Record<string, Pipeline>
 	images?: Record<string, MockImagesBindingOptions | ImagesBinding>
 	media?: Record<string, MockMediaBindingOptions | MediaBinding>
+	stream?: Record<string, MockStreamBindingOptions | StreamBinding>
+	flagship?: Record<string, MockFlagshipBindingOptions | Flagship>
 	artifacts?: Record<string, MockArtifactsOptions | Artifacts>
 	aiSearch?: Record<string, MockAISearchInstanceOptions | AiSearchInstance>
 	aiSearchNamespaces?: Record<string, MockAISearchNamespaceOptions | AiSearchNamespace>
@@ -180,6 +186,22 @@ const SUPPORT_MATRIX: Record<string, OfflineSupportEntry> = {
 		recommendation:
 			'Use createTestContext() for local Worker binding tests and createMockMediaBinding() for pure tests; use Cloudflare for codec/output fidelity.'
 	},
+	stream: {
+		service: 'stream',
+		tier: 'offline-native',
+		reason:
+			'Miniflare ships a native Stream plugin (a local StreamObject Durable Object with disk persistence) that simulates the binding locally, and Devflare provides a deterministic low-fidelity pure mock for app-level tests.',
+		recommendation:
+			'Use createTestContext() for local Worker binding tests and createMockStreamBinding() for pure tests; use Cloudflare for real video upload/transcode fidelity.'
+	},
+	flagship: {
+		service: 'flagship',
+		tier: 'offline-native',
+		reason:
+			"Miniflare ships a Flagship plugin, but it returns each call's default value locally and ignores the flag key (it does not evaluate flag rules). Devflare provides a deterministic pure mock that returns configured flag values (falling back to the default), so app-level flag-reading flows are testable offline.",
+		recommendation:
+			'Use createMockFlagshipBinding({ flags }) to return configured values in pure tests; createTestContext() exercises the binding shape but echoes defaults. Use Cloudflare/remote for real targeting-rule evaluation.'
+	},
 	artifacts: {
 		service: 'artifacts',
 		tier: 'offline-fixture',
@@ -249,6 +271,22 @@ const SUPPORT_MATRIX: Record<string, OfflineSupportEntry> = {
 			'Cloudflare Builds/Git-connected Workers are CI/CD orchestration, not a Worker runtime binding.',
 		recommendation:
 			'Run Devflare commands inside your CI; validate Cloudflare build integration with Cloudflare/Wrangler tests.'
+	},
+	vpcServices: {
+		service: 'vpcServices',
+		tier: 'remote-boundary',
+		reason:
+			"VPC services reach private infrastructure through a Cloudflare VPC connectivity service. Miniflare's vpc-services plugin is a remote proxy client only (it has no local worker without a remoteProxyConnectionString), so there is no offline simulation.",
+		recommendation:
+			'Use DEVFLARE_REMOTE=1/devflare remote enable to reach the real VPC service, or inject a fake binding for pure tests.'
+	},
+	vpcNetworks: {
+		service: 'vpcNetworks',
+		tier: 'remote-boundary',
+		reason:
+			"VPC networks route traffic through a Cloudflare Tunnel or network ID. Miniflare's vpc-networks plugin is a remote proxy client only (no local worker without a remoteProxyConnectionString), so there is no offline simulation.",
+		recommendation:
+			'Use DEVFLARE_REMOTE=1/devflare remote enable to reach the real VPC network, or inject a fake binding for pure tests.'
 	}
 }
 
@@ -309,6 +347,18 @@ function isMediaBinding(
 	value: MockMediaBindingOptions | MediaBinding | undefined
 ): value is MediaBinding {
 	return typeof (value as { input?: unknown } | undefined)?.input === 'function'
+}
+
+function isStreamBinding(
+	value: MockStreamBindingOptions | StreamBinding | undefined
+): value is StreamBinding {
+	return typeof (value as { video?: unknown } | undefined)?.video === 'function'
+}
+
+function isFlagshipBinding(
+	value: MockFlagshipBindingOptions | Flagship | undefined
+): value is Flagship {
+	return typeof (value as { getBooleanValue?: unknown } | undefined)?.getBooleanValue === 'function'
 }
 
 function isArtifactsBinding(
@@ -484,6 +534,28 @@ function addMediaBindings(
 	}
 }
 
+function addStreamBindings(
+	env: Record<string, unknown>,
+	bindings: OfflineConfig['bindings'],
+	fixtures: OfflineBindingFixtures
+) {
+	for (const name of Object.keys(bindings?.stream ?? {})) {
+		const fixture = fixtures.stream?.[name]
+		env[name] = isStreamBinding(fixture) ? fixture : createMockStreamBinding(fixture)
+	}
+}
+
+function addFlagshipBindings(
+	env: Record<string, unknown>,
+	bindings: OfflineConfig['bindings'],
+	fixtures: OfflineBindingFixtures
+) {
+	for (const name of Object.keys(bindings?.flagship ?? {})) {
+		const fixture = fixtures.flagship?.[name]
+		env[name] = isFlagshipBinding(fixture) ? fixture : createMockFlagshipBinding(fixture)
+	}
+}
+
 function addArtifactsBindings(
 	env: Record<string, unknown>,
 	bindings: OfflineConfig['bindings'],
@@ -613,6 +685,24 @@ function addRemoteBoundaries(
 			'Vectorize has no offline local simulation in Cloudflare local development.'
 		)
 	}
+
+	for (const name of Object.keys(bindings?.vpcServices ?? {})) {
+		addBoundary(
+			remoteBoundaries,
+			'vpcServices',
+			name,
+			"VPC services are proxy-only locally — Miniflare's vpc-services plugin needs a remote proxy connection, so there is no offline simulation."
+		)
+	}
+
+	for (const name of Object.keys(bindings?.vpcNetworks ?? {})) {
+		addBoundary(
+			remoteBoundaries,
+			'vpcNetworks',
+			name,
+			"VPC networks are proxy-only locally — Miniflare's vpc-networks plugin needs a remote proxy connection, so there is no offline simulation."
+		)
+	}
 }
 
 /**
@@ -620,8 +710,8 @@ function addRemoteBoundaries(
  *
  * Covers the bindings that have a pure-offline simulator or fixture (rate
  * limits, version metadata, hyperdrive, worker loaders, mTLS, dispatch
- * namespaces, workflows, pipelines, images, media, artifacts, secrets store,
- * AI Search). It does **not** create the core storage/wiring bindings
+ * namespaces, workflows, pipelines, images, media, stream, flagship, artifacts,
+ * secrets store, AI Search). It does **not** create the core storage/wiring bindings
  * (`kv`, `d1`, `r2`, `queues`, `durableObjects`, `services`) — those require a
  * real Miniflare runtime, which only `createTestContext()` provides. When such a
  * binding is present in config it is reported in the returned `missingFixtures`
@@ -653,6 +743,8 @@ export function createOfflineBindings(
 	addPipelineBindings(env, bindings, fixtures)
 	addImagesBindings(env, bindings, fixtures)
 	addMediaBindings(env, bindings, fixtures)
+	addStreamBindings(env, bindings, fixtures)
+	addFlagshipBindings(env, bindings, fixtures)
 	addArtifactsBindings(env, bindings, fixtures)
 	addSecretsStoreBindings(env, bindings, fixtures, localSecretValues, missingFixtures)
 	addAISearchBindings(env, bindings, fixtures)

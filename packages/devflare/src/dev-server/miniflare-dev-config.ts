@@ -23,6 +23,7 @@ import {
 	buildAiSearchNamespacesConfig,
 	buildArtifactsConfig,
 	buildDispatchNamespacesConfig,
+	buildFlagshipConfig,
 	buildHyperdrivesConfig,
 	buildImagesConfig,
 	buildMediaConfig,
@@ -33,6 +34,7 @@ import {
 	buildRateLimitsConfig,
 	buildSecretsStoreConfig,
 	buildSendEmailConfig,
+	buildStreamConfig,
 	buildVersionMetadataConfig,
 	buildWorkerLoadersConfig,
 	buildWorkflowsConfig
@@ -112,7 +114,8 @@ export function buildMiniflareDevConfig(input: BuildMiniflareDevConfigInput): an
 		d1Persist: persist ? `${persistPath}/d1` : undefined,
 		durableObjectsPersist: persist ? `${persistPath}/do` : undefined,
 		workflowsPersist: persist ? `${persistPath}/workflows` : undefined,
-		imagesPersist: persist ? `${persistPath}/images` : undefined
+		imagesPersist: persist ? `${persistPath}/images` : undefined,
+		streamPersist: persist ? `${persistPath}/stream` : undefined
 	}
 
 	const localBindingShimServiceConfig = buildLocalBindingShimServiceConfig(loadedConfig)
@@ -134,6 +137,8 @@ export function buildMiniflareDevConfig(input: BuildMiniflareDevConfigInput): an
 	const hyperdrivesConfig = buildHyperdrivesConfig(bindings)
 	const imagesConfig = bindings.images ? undefined : buildImagesConfig(bindings)
 	const mediaConfig = bindings.media ? undefined : buildMediaConfig(bindings)
+	const streamConfig = buildStreamConfig(bindings)
+	const flagshipConfig = buildFlagshipConfig(bindings)
 	const artifactsConfig = buildArtifactsConfig(bindings)
 	const aiSearchNamespacesConfig = buildAiSearchNamespacesConfig(bindings)
 	const aiSearchInstancesConfig = buildAiSearchInstancesConfig(bindings)
@@ -160,6 +165,8 @@ export function buildMiniflareDevConfig(input: BuildMiniflareDevConfigInput): an
 		hyperdrivesConfig,
 		imagesConfig,
 		mediaConfig,
+		streamConfig,
+		flagshipConfig,
 		artifactsConfig,
 		aiSearchNamespacesConfig,
 		aiSearchInstancesConfig,

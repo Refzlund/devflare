@@ -121,6 +121,24 @@ export interface WranglerConfig {
 		namespace: string
 		remote?: boolean
 	}>
+	stream?: {
+		binding: string
+		remote?: boolean
+	}
+	vpc_services?: Array<{
+		binding: string
+		service_id: string
+		remote?: boolean
+	}>
+	vpc_networks?: Array<
+		| { binding: string; tunnel_id: string; remote?: boolean }
+		| { binding: string; network_id: string; remote?: boolean }
+	>
+	flagship?: Array<{
+		binding: string
+		app_id: string
+		remote?: boolean
+	}>
 	containers?: Array<{
 		class_name: string
 		image: string

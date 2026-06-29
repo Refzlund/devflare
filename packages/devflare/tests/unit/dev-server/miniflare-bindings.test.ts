@@ -1,9 +1,14 @@
 import { afterEach, describe, expect, test } from 'bun:test'
+import type { DevflareConfig } from '../../../src/config'
 import {
 	buildAiSearchInstancesConfig,
 	buildAiSearchNamespacesConfig,
-	buildHyperdrivesConfig
+	buildFlagshipConfig,
+	buildHyperdrivesConfig,
+	buildStreamConfig
 } from '../../../src/dev-server/miniflare-bindings'
+
+type Bindings = NonNullable<DevflareConfig['bindings']>
 
 const hyperdriveEnvName = 'CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_POSTGRES'
 const deprecatedHyperdriveEnvName = 'WRANGLER_HYPERDRIVE_LOCAL_CONNECTION_STRING_LEGACY'
@@ -98,5 +103,41 @@ describe('AI Search Miniflare config builders', () => {
 				instance_name: 'docs'
 			}
 		})
+	})
+})
+
+describe('buildStreamConfig', () => {
+	test('maps a Stream binding (true shorthand) to the native Miniflare option', () => {
+		const bindings = { stream: { STREAM: true } } as unknown as Bindings
+		expect(buildStreamConfig(bindings)).toEqual({ binding: 'STREAM' })
+	})
+
+	test('maps a Stream binding (object form) to the native Miniflare option', () => {
+		const bindings = { stream: { STREAM: { remote: true } } } as unknown as Bindings
+		expect(buildStreamConfig(bindings)).toEqual({ binding: 'STREAM' })
+	})
+
+	test('returns undefined when no Stream binding is configured', () => {
+		expect(buildStreamConfig({} as Bindings)).toBeUndefined()
+	})
+})
+
+describe('buildFlagshipConfig', () => {
+	test('maps Flagship bindings to the native Miniflare app_id record', () => {
+		const bindings = {
+			flagship: {
+				FLAGS: { appId: 'app-id', remote: true },
+				EXPERIMENTS: { appId: 'experiments-id' }
+			}
+		} as unknown as Bindings
+
+		expect(buildFlagshipConfig(bindings)).toEqual({
+			FLAGS: { app_id: 'app-id' },
+			EXPERIMENTS: { app_id: 'experiments-id' }
+		})
+	})
+
+	test('returns undefined when no Flagship binding is configured', () => {
+		expect(buildFlagshipConfig({} as Bindings)).toBeUndefined()
 	})
 })

@@ -13,7 +13,7 @@ It is meant to read like a proper markdown handbook rather than a second source 
 - Links use the same `/docs/...` routes as the documentation site.
 
 ## Documentation map
-This export covers 147 pages across 5 top-level groups.
+This export covers 163 pages across 5 top-level groups.
 
 ### Quickstart
 See why Devflare exists, build the smallest safe first worker, and move into routes, bindings, previews, and tests when the app needs them.
@@ -249,6 +249,30 @@ Use the per-binding guides for the exact authoring, runtime, testing, preview, a
   - [Testing Containers](/docs/bindings/containers/testing) — Test Containers by choosing the local harness that matches the product boundary instead of reaching for Cloudflare by default.
   - [Containers example](/docs/bindings/containers/example) — A compact Containers recipe with config and worker usage in one application path.
 
+- **Stream** — Cloudflare Stream binding docs with singleton config, a local Miniflare-backed simulator, and clear video-upload fidelity boundaries.
+  - [Stream](/docs/bindings/stream) — Add the Stream config, call `StreamBinding` from worker code, and start with the local test path Devflare supports.
+  - [Stream internals](/docs/bindings/stream/internals) — Stream compiles from `bindings.stream` to Wrangler `stream`, with local/test behavior called out explicitly.
+  - [Testing Stream](/docs/bindings/stream/testing) — Test Stream by choosing the local harness that matches the product boundary instead of reaching for Cloudflare by default.
+  - [Stream example](/docs/bindings/stream/example) — A compact Stream recipe with config and worker usage in one application path.
+
+- **VPC Services** — VPC service bindings that reach a private service through a Cloudflare VPC connectivity service.
+  - [VPC Services](/docs/bindings/vpc-services) — Add the VPC Services config, call a VPC service `Fetcher` from worker code, and start with the local test path Devflare supports.
+  - [VPC Services internals](/docs/bindings/vpc-services/internals) — VPC Services compiles from `bindings.vpcServices` to Wrangler `vpc_services`, with local/test behavior called out explicitly.
+  - [Testing VPC Services](/docs/bindings/vpc-services/testing) — Test VPC Services by choosing the local harness that matches the product boundary instead of reaching for Cloudflare by default.
+  - [VPC Services example](/docs/bindings/vpc-services/example) — A compact VPC Services recipe with config and worker usage in one application path.
+
+- **VPC Networks** — VPC network bindings that route traffic through a Cloudflare Tunnel or a network ID.
+  - [VPC Networks](/docs/bindings/vpc-networks) — Add the VPC Networks config, call a VPC network `Fetcher` from worker code, and start with the local test path Devflare supports.
+  - [VPC Networks internals](/docs/bindings/vpc-networks/internals) — VPC Networks compiles from `bindings.vpcNetworks` to Wrangler `vpc_networks`, with local/test behavior called out explicitly.
+  - [Testing VPC Networks](/docs/bindings/vpc-networks/testing) — Test VPC Networks by choosing the local harness that matches the product boundary instead of reaching for Cloudflare by default.
+  - [VPC Networks example](/docs/bindings/vpc-networks/example) — A compact VPC Networks recipe with config and worker usage in one application path.
+
+- **Flagship** — Flagship feature-flag bindings for reading feature flags from Workers, with deterministic pure mocks that return configured flag values.
+  - [Flagship](/docs/bindings/flagship) — Add the Flagship config, call `Flagship` from worker code, and start with the local test path Devflare supports.
+  - [Flagship internals](/docs/bindings/flagship/internals) — Flagship compiles from `bindings.flagship` to Wrangler `flagship`, with local/test behavior called out explicitly.
+  - [Testing Flagship](/docs/bindings/flagship/testing) — Test Flagship by choosing the local harness that matches the product boundary instead of reaching for Cloudflare by default.
+  - [Flagship example](/docs/bindings/flagship/example) — A compact Flagship recipe with config and worker usage in one application path.
+
 ## Full documentation
 
 ### Why Devflare feels better than stitching Cloudflare Worker workflows together by hand
@@ -340,6 +364,10 @@ Every native binding or platform lane in the binding docs is listed here with it
 - **Images** — Native singleton config, Miniflare image bindings, and a low-fidelity deterministic pure mock cover Worker `info()`/transform chain shapes. The named gap is the hosted storage API (`hosted.image()` / `.upload()` / `.list()`), which throws locally. Hosted storage, variants, delivery rules, billing, and final transform fidelity remain remote. ([link](/docs/bindings/images))
 - **Media Transformations** — Native config, Miniflare media bindings, and a deterministic passthrough pure mock cover Worker media transform chain shapes locally. Real codecs, output fidelity, duration handling, cache behavior, and billing remain hosted Cloudflare behavior, so the local contract is narrower than the deployed product. ([link](/docs/bindings/media-transformations))
 - **Artifacts** — Native config and in-memory repo or token fixtures are supported for app flow. Durable storage, Git-over-HTTPS remotes, namespace creation, and permissions are Cloudflare-owned. ([link](/docs/bindings/artifacts))
+- **Stream** — Native singleton config, a Miniflare-backed local Stream simulator, and a deterministic pure mock cover the binding shape (video listing and per-video metadata access). Real video upload, transcode, delivery, signed tokens, and billing remain hosted Cloudflare behavior, so the local contract is narrower than the deployed product. ([link](/docs/bindings/stream))
+- **VPC Services** — Native config and deploy emission to `vpc_services` are supported. There is no local simulation: Miniflare wires VPC services only as a remote proxy client, so the private connectivity service and its upstream are Cloudflare-owned. Inject a fake binding for pure tests or use remote mode. ([link](/docs/bindings/vpc-services))
+- **VPC Networks** — Native config (Tunnel ID or network ID) and deploy emission to `vpc_networks` are supported. There is no local simulation: Miniflare wires VPC networks only as a remote proxy client, so the Tunnel and private network path are Cloudflare-owned. Inject a fake binding for pure tests or use remote mode. ([link](/docs/bindings/vpc-networks))
+- **Flagship** — Native config, deploy emission to `flagship`, and a deterministic pure mock (`createMockFlagshipBinding({ flags })`) cover the local app loop for reading feature flags. Miniflare's Flagship plugin returns each call's default value and ignores the flag key, so it does not evaluate flag rules locally; real targeting-rule evaluation, flag management, and remote flag state remain Cloudflare-owned. ([link](/docs/bindings/flagship))
 - **Containers** — Native top-level container config has full local support through Docker or Podman: Devflare can build Dockerfile paths offline-first, run prebuilt image tags, and interact with launched instances. Deployed rollout, registry availability, SSH, scaling, and hosted platform behavior remain Cloudflare-owned. ([link](/docs/bindings/containers))
 
 #### What Devflare adds on top of raw Cloudflare workflows
@@ -4578,6 +4606,10 @@ That is great once you already opened the right binding page. This index is for 
 - **Testing Media Transformations** — Test Media Transformations by choosing the local harness that matches the product boundary instead of reaching for Cloudflare by default. Open the Media Transformations overview first when you need the full binding story, or jump straight here when the only open question is how to test it. ([link](/docs/bindings/media-transformations/testing))
 - **Testing Artifacts** — Test Artifacts by choosing the local harness that matches the product boundary instead of reaching for Cloudflare by default. Open the Artifacts overview first when you need the full binding story, or jump straight here when the only open question is how to test it. ([link](/docs/bindings/artifacts/testing))
 - **Testing Containers** — Test Containers by choosing the local harness that matches the product boundary instead of reaching for Cloudflare by default. Open the Containers overview first when you need the full binding story, or jump straight here when the only open question is how to test it. ([link](/docs/bindings/containers/testing))
+- **Testing Stream** — Test Stream by choosing the local harness that matches the product boundary instead of reaching for Cloudflare by default. Open the Stream overview first when you need the full binding story, or jump straight here when the only open question is how to test it. ([link](/docs/bindings/stream/testing))
+- **Testing VPC Services** — Test VPC Services by choosing the local harness that matches the product boundary instead of reaching for Cloudflare by default. Open the VPC Services overview first when you need the full binding story, or jump straight here when the only open question is how to test it. ([link](/docs/bindings/vpc-services/testing))
+- **Testing VPC Networks** — Test VPC Networks by choosing the local harness that matches the product boundary instead of reaching for Cloudflare by default. Open the VPC Networks overview first when you need the full binding story, or jump straight here when the only open question is how to test it. ([link](/docs/bindings/vpc-networks/testing))
+- **Testing Flagship** — Test Flagship by choosing the local harness that matches the product boundary instead of reaching for Cloudflare by default. Open the Flagship overview first when you need the full binding story, or jump straight here when the only open question is how to test it. ([link](/docs/bindings/flagship/testing))
 
 #### The testing posture is not identical for every binding
 
@@ -4610,6 +4642,10 @@ That is great once you already opened the right binding page. This index is for 
 | Media Transformations | Full local support through Miniflare media bindings and deterministic pure mocks for transform chains | `createTestContext()` or `createOfflineEnv()` with media fixtures |
 | Artifacts | Offline-fixture: repo metadata and token flows can be modeled in memory, not as real Git remotes | `createOfflineEnv()` with artifact fixtures |
 | Containers | Offline-native only when an explicit Docker/Podman engine is available and the image can run without pulling | `devflare/test` containers helpers guarded by `shouldSkip.containers` |
+| Stream | Full local support through the native Miniflare Stream plugin (a local StreamObject backed by disk persistence) plus a deterministic pure mock for app-level tests | `createTestContext()` or `createOfflineEnv()` |
+| VPC Services | Remote boundary: Miniflare wires VPC services only as a remote proxy client, so there is no offline simulation | a deployed or remote-mode test against the real VPC service |
+| VPC Networks | Remote boundary: Miniflare wires VPC networks only as a remote proxy client, so there is no offline simulation | a deployed or remote-mode test against the real VPC network |
+| Flagship | Miniflare's Flagship plugin returns each call's default value locally and ignores the flag key (it does not evaluate flag rules), while Devflare's deterministic pure mock (createMockFlagshipBinding({ flags })) returns configured flag values, falling back to the default | `createTestContext()` or `createOfflineEnv()` |
 
 > **Warning — Different defaults are a good thing**
 >
@@ -4755,6 +4791,8 @@ The `devflare/test` entrypoint intentionally has multiple lanes: runtime-shaped 
 | `createMockPipeline` | Mock a Pipelines binding. |
 | `createMockImagesBinding` | Mock Images chains. |
 | `createMockMediaBinding` | Mock Media Transformation chains. |
+| `createMockStreamBinding` | Mock a Stream binding. |
+| `createMockFlagshipBinding` | Mock a Flagship feature-flag binding. |
 | `createMockArtifacts` | Mock Artifacts repo APIs. |
 | `createMockSecretsStoreSecret` | Mock a Secrets Store secret. |
 | `createMockEnv` | Create a pure env with selected mock bindings. |
@@ -15960,6 +15998,1309 @@ export async function fetch(request: Request): Promise<Response> {
 - Config focus: containers.
 - Runtime shape: Container class config plus a Durable Object container binding.
 - Best use: routing requests to a stateful container instance that runs code outside the Workers runtime.
+
+> **Important — Thread this into the next recipe**
+>
+> Once this smallest path works, add routing, generated types, and feature-specific abstraction in that order.
+
+---
+
+### Use Stream in a Worker
+
+> Add the Stream config, call `StreamBinding` from worker code, and start with the local test path Devflare supports.
+
+| Field | Value |
+| --- | --- |
+| Route | [`/docs/bindings/stream`](/docs/bindings/stream) |
+| Group | Bindings |
+| Navigation title | Stream |
+| Eyebrow | Binding reference |
+
+Start with the config, wire the binding into worker code, then use the support section to decide whether local tests or Cloudflare-backed tests fit.
+
+#### At a glance
+
+| Fact | Value |
+| --- | --- |
+| Config key | `bindings.stream` |
+| Authoring shape | `Record<string, true \| { remote? }>` |
+| Best for | video listing and per-video metadata paths where the Worker calls the Stream binding |
+
+#### Add the binding to config
+
+Add `bindings.stream` to `devflare.config.ts`, then use the generated env binding from Worker code.
+
+Keep the first version close to the route or handler that needs it; move to a helper only after the shape is obvious.
+
+##### Example — Smallest Stream config
+
+```ts
+import { defineConfig } from 'devflare/config'
+
+export default defineConfig({
+	name: 'stream-worker',
+	bindings: {
+		stream: {
+			STREAM: true
+		}
+	}
+})
+```
+
+#### Use the binding from application code
+
+After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first Stream path close to the route, handler, or service method that needs it.
+
+Keep this first path small enough that the config, env binding, and user-visible behavior are easy to review together.
+
+##### Example — List Stream videos
+
+```ts
+import { env } from 'devflare/runtime'
+
+export async function fetch(): Promise<Response> {
+	const videos = await env.STREAM.videos.list()
+
+	return Response.json({ count: videos.length })
+}
+```
+
+#### Local and Remote Support
+
+Devflare has a real lane for Stream, but the local contract is intentionally narrower than Cloudflare's hosted product. The docs call out the supported local path and the remote boundary separately.
+
+Full local support through the native Miniflare Stream plugin (a local StreamObject backed by disk persistence) plus a deterministic pure mock for app-level tests. Use the documented local lane only for the behavior Devflare explicitly models, and keep the narrower boundary visible in code review.
+
+Use Cloudflare when the assertion depends on cloudflare-hosted product behavior rather than the app calling the binding correctly. This is the lane for full Stream product fidelity, remote state, lifecycle behavior, and platform-specific limits.
+
+#### When this binding fits best
+
+##### Key points
+
+- Use Stream when video listing and per-video metadata paths where the worker calls the stream binding.
+- Keep binding names stable and uppercase in examples so generated Env declarations remain predictable.
+- Prefer Devflare native config while it covers the feature; use `wrangler.passthrough` only for unsupported Wrangler-only fields.
+
+#### Testing path
+
+##### Key points
+
+- Start with `createTestContext()` or `createOfflineEnv()` for config-backed local worker tests.
+- Use `createMockStreamBinding()` / `createMockEnv({ stream })` for small unit tests that only need deterministic application behavior.
+- Use Cloudflare-backed tests when the assertion depends on hosted platform behavior, account state, limits, billing, or production routing.
+
+#### Open the next page when you need it
+
+##### Highlights
+
+- **Stream internals** — Check emitted Wrangler `stream`, preview behavior, and Cloudflare-specific details. ([link](/docs/bindings/stream/internals))
+- **Testing Stream** — Pick the `createTestContext()` or `createOfflineEnv()` path first, then move to remote checks only when the test needs them. ([link](/docs/bindings/stream/testing))
+- **Stream example** — Copy a fuller application path when the quick example is too small. ([link](/docs/bindings/stream/example))
+
+---
+
+### How Devflare wires Stream from config to runtime
+
+> Stream compiles from `bindings.stream` to Wrangler `stream`, with local/test behavior called out explicitly.
+
+| Field | Value |
+| --- | --- |
+| Route | [`/docs/bindings/stream/internals`](/docs/bindings/stream/internals) |
+| Group | Bindings |
+| Navigation title | Stream internals |
+| Eyebrow | Under the hood |
+
+Use this page when you need emitted config, preview behavior, or Cloudflare-specific limits. The overview and example pages stay focused on everyday app code.
+
+#### At a glance
+
+| Fact | Value |
+| --- | --- |
+| Normalization | Devflare normalizes `bindings.stream` before emitting Wrangler `stream` |
+| Compile target | Wrangler `stream` |
+| Preview note | Cloudflare owns real video upload, transcode, delivery, signed tokens, and billing; the local mock only models the binding shape. |
+
+#### How authored config becomes Wrangler config
+
+The authored config stays camelCase and project-oriented. The compiler translates that into the Wrangler keys Cloudflare expects.
+
+The emitted output is shown here so the usage pages do not have to explain compiler details.
+
+##### Example — Stream config and emitted Wrangler output
+
+Use this when you need to check how the Devflare config becomes Wrangler-compatible config.
+
+###### File — devflare.config.ts
+
+```ts
+import { defineConfig } from 'devflare/config'
+
+export default defineConfig({
+	name: 'stream-worker',
+	bindings: {
+		stream: {
+			STREAM: true
+		}
+	}
+})
+```
+
+###### File — .devflare/wrangler.jsonc
+
+```json
+{
+	"stream": {
+		"binding": "STREAM"
+	}
+}
+```
+
+#### What local runtime support covers
+
+##### Key points
+
+- Full local support through the native Miniflare Stream plugin (a local StreamObject backed by disk persistence) plus a deterministic pure mock for app-level tests
+- The default docs recipe uses `createTestContext()` or `createOfflineEnv()`.
+- Pure unit tests can use `createMockStreamBinding()` / `createMockEnv({ stream })` when the test only needs deterministic application behavior.
+
+#### Compile, preview, and cleanup behavior
+
+##### Key points
+
+- Devflare emits Wrangler `stream` from the native config surface.
+- Preview and deployment lifecycle stay feature-specific; do not assume all Cloudflare products can be created, cloned, or cleaned up the same way.
+- Cloudflare owns real video upload, transcode, delivery, signed tokens, and billing; the local mock only models the binding shape.
+
+#### Cloudflare docs vs the Devflare layer
+
+Cloudflare Workers bindings docs is the platform reference. Use this internals page when you need to compare Cloudflare's product docs with Devflare config, generated env types, local support, and preview behavior for `bindings.stream`.
+
+##### Highlights
+
+- **Cloudflare Workers bindings docs** — Platform reference for the underlying binding contract on Cloudflare Workers. ([link](https://developers.cloudflare.com/workers/runtime-apis/bindings/))
+
+##### Reference table
+
+| Question | Cloudflare docs | This Devflare page |
+| --- | --- | --- |
+| Primary focus | Platform reference for the underlying binding contract on Cloudflare Workers. | How to author `bindings.stream`, what the runtime surface looks like, and how Stream fits a Devflare project. |
+| Testing and runtime lens | Cloudflare’s docs focus on the raw binding API, product semantics, and platform limits for the binding itself. | Full local support through the native Miniflare Stream plugin (a local StreamObject backed by disk persistence) plus a deterministic pure mock for app-level tests. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
+| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
+
+---
+
+### Test Stream the way Devflare expects it to run
+
+> Test Stream by choosing the local harness that matches the product boundary instead of reaching for Cloudflare by default.
+
+| Field | Value |
+| --- | --- |
+| Route | [`/docs/bindings/stream/testing`](/docs/bindings/stream/testing) |
+| Group | Bindings |
+| Navigation title | Testing Stream |
+| Eyebrow | Testing |
+
+The first test should prove application control flow. Escalate to Wrangler remote binding or deployed tests only when the Cloudflare-hosted behavior is the thing under test.
+
+#### At a glance
+
+| Fact | Value |
+| --- | --- |
+| Best for | video listing and per-video metadata paths where the Worker calls the Stream binding |
+| Default harness | `createTestContext()` or `createOfflineEnv()` |
+| Escalate when | The assertion depends on Cloudflare-hosted product behavior rather than the app calling the binding correctly |
+
+#### Start with the default test loop
+
+Keep the first test small. Name the binding, call the one method your route uses, and assert the behavior your app owns.
+
+When Cloudflare owns the interesting behavior, mark that as a remote/deployed lane instead of building a local fake that claims too much.
+
+##### Example — Pure Stream shape test
+
+```ts
+import { expect, test } from 'bun:test'
+import { createMockStreamBinding } from 'devflare/test'
+
+test('lists no videos by default', async () => {
+	const stream = createMockStreamBinding()
+	const videos = await stream.videos.list()
+
+	expect(videos).toEqual([])
+})
+```
+
+#### The helper surface to remember
+
+##### Key points
+
+- Use `createTestContext()` or `createOfflineEnv()` for config-backed local worker tests.
+- Use `createMockStreamBinding()` / `createMockEnv({ stream })` for pure unit tests.
+- Use `shouldSkip` or an explicit integration lane when the test needs Cloudflare credentials or a local Docker/Podman engine.
+
+#### When to move beyond the default harness
+
+##### Key points
+
+- Cloudflare owns real video upload, transcode, delivery, signed tokens, and billing; the local mock only models the binding shape.
+- Do not let a low-fidelity mock become product documentation. Keep mocks framed as application-flow tools.
+- If a test would mutate paid or remote Cloudflare state, gate it separately from ordinary unit tests.
+
+> **Warning — Local tests should be honest**
+>
+> For Stream, passing locally means the Devflare contract and app flow are correct. It does not automatically prove every hosted Cloudflare behavior.
+
+---
+
+### Use Stream in a real application path
+
+> A compact Stream recipe with config and worker usage in one application path.
+
+| Field | Value |
+| --- | --- |
+| Route | [`/docs/bindings/stream/example`](/docs/bindings/stream/example) |
+| Group | Bindings |
+| Navigation title | Stream example |
+| Eyebrow | Application example |
+
+Use this as the copyable starter before threading the feature into a larger application.
+
+#### At a glance
+
+| Fact | Value |
+| --- | --- |
+| Config focus | bindings.stream |
+| Runtime shape | `StreamBinding` |
+| Best use | video listing and per-video metadata paths where the Worker calls the Stream binding |
+
+#### Start by wiring the binding clearly in config
+
+##### Example — Smallest Stream config
+
+```ts
+import { defineConfig } from 'devflare/config'
+
+export default defineConfig({
+	name: 'stream-worker',
+	bindings: {
+		stream: {
+			STREAM: true
+		}
+	}
+})
+```
+
+#### Build the application flow around the binding
+
+Treat this as the app-level Stream path: the route, event handler, or service module receives a real request and uses the binding to do useful work.
+
+Keep product limits, remote ownership, and fallback behavior visible in the code around the binding instead of hiding everything behind a vague utility too early.
+
+##### Key points
+
+- Keep the first example short enough to paste into a new Worker.
+- Cloudflare owns real video upload, transcode, delivery, signed tokens, and billing; the local mock only models the binding shape.
+
+##### Example — List Stream videos
+
+```ts
+import { env } from 'devflare/runtime'
+
+export async function fetch(): Promise<Response> {
+	const videos = await env.STREAM.videos.list()
+
+	return Response.json({ count: videos.length })
+}
+```
+
+#### Keep production boundaries visible
+
+##### Key points
+
+- Config focus: bindings.stream.
+- Runtime shape: `StreamBinding`.
+- Best use: video listing and per-video metadata paths where the Worker calls the Stream binding.
+
+> **Important — Thread this into the next recipe**
+>
+> Once this smallest path works, add routing, generated types, and feature-specific abstraction in that order.
+
+---
+
+### Use VPC Services in a Worker
+
+> Add the VPC Services config, call a VPC service `Fetcher` from worker code, and start with the local test path Devflare supports.
+
+| Field | Value |
+| --- | --- |
+| Route | [`/docs/bindings/vpc-services`](/docs/bindings/vpc-services) |
+| Group | Bindings |
+| Navigation title | VPC Services |
+| Eyebrow | Binding reference |
+
+Start with the config, wire the binding into worker code, then use the support section to decide whether local tests or Cloudflare-backed tests fit.
+
+#### At a glance
+
+| Fact | Value |
+| --- | --- |
+| Config key | `bindings.vpcServices` |
+| Authoring shape | `Record<string, { serviceId; remote? }>` |
+| Best for | reaching a private upstream service over a Cloudflare VPC connectivity service |
+
+#### Add the binding to config
+
+Add `bindings.vpcServices` to `devflare.config.ts`, then use the generated env binding from Worker code.
+
+Keep the first version close to the route or handler that needs it; move to a helper only after the shape is obvious.
+
+##### Example — Smallest VPC service config
+
+```ts
+import { defineConfig } from 'devflare/config'
+
+export default defineConfig({
+	name: 'vpc-service-worker',
+	bindings: {
+		vpcServices: {
+			DB: {
+				serviceId: 'service-uuid'
+			}
+		}
+	}
+})
+```
+
+#### Use the binding from application code
+
+After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first VPC Services path close to the route, handler, or service method that needs it.
+
+Keep this first path small enough that the config, env binding, and user-visible behavior are easy to review together.
+
+##### Example — Call a private service over VPC
+
+```ts
+import { env } from 'devflare/runtime'
+
+export async function fetch(): Promise<Response> {
+	return env.DB.fetch('https://internal.service/health')
+}
+```
+
+#### Local and Remote Support
+
+Devflare supports the config, generated env shape, docs, and local application-flow work, but full fidelity requires Cloudflare remote infrastructure. Use local shims or fixtures for code your app owns, then connect to Cloudflare when the product behavior is the assertion.
+
+Remote boundary: Miniflare wires VPC services only as a remote proxy client, so there is no offline simulation. Keep local coverage focused on deterministic application flow through fixtures, mocks, shims, or Miniflare-backed wiring instead of pretending to reproduce Cloudflare-hosted product behavior.
+
+Use Cloudflare when the assertion depends on cloudflare-hosted product behavior rather than the app calling the binding correctly. This is the lane for full VPC Services product fidelity, remote state, lifecycle behavior, and platform-specific limits.
+
+#### When this binding fits best
+
+##### Key points
+
+- Use VPC Services when reaching a private upstream service over a cloudflare vpc connectivity service.
+- Keep binding names stable and uppercase in examples so generated Env declarations remain predictable.
+- Prefer Devflare native config while it covers the feature; use `wrangler.passthrough` only for unsupported Wrangler-only fields.
+
+#### Testing path
+
+##### Key points
+
+- Start with a deployed or remote-mode test against the real VPC service for config-backed local worker tests.
+- Use a custom fake binding injected through `createMockEnv()` for small unit tests that only need deterministic application behavior.
+- Use Cloudflare-backed tests when the assertion depends on hosted platform behavior, account state, limits, billing, or production routing.
+
+#### Open the next page when you need it
+
+##### Highlights
+
+- **VPC Services internals** — Check emitted Wrangler `vpc_services`, preview behavior, and Cloudflare-specific details. ([link](/docs/bindings/vpc-services/internals))
+- **Testing VPC Services** — Pick the a deployed or remote-mode test against the real VPC service path first, then move to remote checks only when the test needs them. ([link](/docs/bindings/vpc-services/testing))
+- **VPC Services example** — Copy a fuller application path when the quick example is too small. ([link](/docs/bindings/vpc-services/example))
+
+---
+
+### How Devflare wires VPC Services from config to runtime
+
+> VPC Services compiles from `bindings.vpcServices` to Wrangler `vpc_services`, with local/test behavior called out explicitly.
+
+| Field | Value |
+| --- | --- |
+| Route | [`/docs/bindings/vpc-services/internals`](/docs/bindings/vpc-services/internals) |
+| Group | Bindings |
+| Navigation title | VPC Services internals |
+| Eyebrow | Under the hood |
+
+Use this page when you need emitted config, preview behavior, or Cloudflare-specific limits. The overview and example pages stay focused on everyday app code.
+
+#### At a glance
+
+| Fact | Value |
+| --- | --- |
+| Normalization | Devflare normalizes `bindings.vpcServices` before emitting Wrangler `vpc_services` |
+| Compile target | Wrangler `vpc_services` |
+| Preview note | Cloudflare owns the VPC connectivity service and the private network path; there is no local simulation because Miniflare only proxies to the remote service. |
+
+#### How authored config becomes Wrangler config
+
+The authored config stays camelCase and project-oriented. The compiler translates that into the Wrangler keys Cloudflare expects.
+
+The emitted output is shown here so the usage pages do not have to explain compiler details.
+
+##### Example — VPC Services config and emitted Wrangler output
+
+Use this when you need to check how the Devflare config becomes Wrangler-compatible config.
+
+###### File — devflare.config.ts
+
+```ts
+import { defineConfig } from 'devflare/config'
+
+export default defineConfig({
+	name: 'vpc-service-worker',
+	bindings: {
+		vpcServices: {
+			DB: {
+				serviceId: 'service-uuid'
+			}
+		}
+	}
+})
+```
+
+###### File — .devflare/wrangler.jsonc
+
+```json
+{
+	"vpc_services": [
+		{ "binding": "DB", "service_id": "service-uuid" }
+	]
+}
+```
+
+#### What local runtime support covers
+
+##### Key points
+
+- Remote boundary: Miniflare wires VPC services only as a remote proxy client, so there is no offline simulation
+- The default docs recipe uses a deployed or remote-mode test against the real VPC service.
+- Pure unit tests can use a custom fake binding injected through `createMockEnv()` when the test only needs deterministic application behavior.
+
+#### Compile, preview, and cleanup behavior
+
+##### Key points
+
+- Devflare emits Wrangler `vpc_services` from the native config surface.
+- Preview and deployment lifecycle stay feature-specific; do not assume all Cloudflare products can be created, cloned, or cleaned up the same way.
+- Cloudflare owns the VPC connectivity service and the private network path; there is no local simulation because Miniflare only proxies to the remote service.
+
+#### Cloudflare docs vs the Devflare layer
+
+Cloudflare Workers bindings docs is the platform reference. Use this internals page when you need to compare Cloudflare's product docs with Devflare config, generated env types, local support, and preview behavior for `bindings.vpcServices`.
+
+##### Highlights
+
+- **Cloudflare Workers bindings docs** — Platform reference for the underlying binding contract on Cloudflare Workers. ([link](https://developers.cloudflare.com/workers/runtime-apis/bindings/))
+
+##### Reference table
+
+| Question | Cloudflare docs | This Devflare page |
+| --- | --- | --- |
+| Primary focus | Platform reference for the underlying binding contract on Cloudflare Workers. | How to author `bindings.vpcServices`, what the runtime surface looks like, and how VPC Services fits a Devflare project. |
+| Testing and runtime lens | Cloudflare’s docs focus on the raw binding API, product semantics, and platform limits for the binding itself. | Remote boundary: Miniflare wires VPC services only as a remote proxy client, so there is no offline simulation. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
+| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
+
+---
+
+### Test VPC Services the way Devflare expects it to run
+
+> Test VPC Services by choosing the local harness that matches the product boundary instead of reaching for Cloudflare by default.
+
+| Field | Value |
+| --- | --- |
+| Route | [`/docs/bindings/vpc-services/testing`](/docs/bindings/vpc-services/testing) |
+| Group | Bindings |
+| Navigation title | Testing VPC Services |
+| Eyebrow | Testing |
+
+The first test should prove application control flow. Escalate to Wrangler remote binding or deployed tests only when the Cloudflare-hosted behavior is the thing under test.
+
+#### At a glance
+
+| Fact | Value |
+| --- | --- |
+| Best for | reaching a private upstream service over a Cloudflare VPC connectivity service |
+| Default harness | a deployed or remote-mode test against the real VPC service |
+| Escalate when | The assertion depends on Cloudflare-hosted product behavior rather than the app calling the binding correctly |
+
+#### Start with the default test loop
+
+Keep the first test small. Name the binding, call the one method your route uses, and assert the behavior your app owns.
+
+When Cloudflare owns the interesting behavior, mark that as a remote/deployed lane instead of building a local fake that claims too much.
+
+##### Example — Test the app flow with a custom VPC fake
+
+```ts
+import { expect, test } from 'bun:test'
+import { createMockEnv } from 'devflare/test'
+
+test('reaches the private service over VPC', async () => {
+	const env = createMockEnv({
+		custom: { DB: { fetch: async () => new Response('ok') } }
+	}) as { DB: Fetcher }
+
+	const response = await env.DB.fetch('https://internal.service/health')
+
+	expect(await response.text()).toBe('ok')
+})
+```
+
+#### The helper surface to remember
+
+##### Key points
+
+- Use a deployed or remote-mode test against the real VPC service for config-backed local worker tests.
+- Use a custom fake binding injected through `createMockEnv()` for pure unit tests.
+- Use `shouldSkip` or an explicit integration lane when the test needs Cloudflare credentials or a local Docker/Podman engine.
+
+#### When to move beyond the default harness
+
+##### Key points
+
+- Cloudflare owns the VPC connectivity service and the private network path; there is no local simulation because Miniflare only proxies to the remote service.
+- Do not let a low-fidelity mock become product documentation. Keep mocks framed as application-flow tools.
+- If a test would mutate paid or remote Cloudflare state, gate it separately from ordinary unit tests.
+
+> **Warning — Local tests should be honest**
+>
+> For VPC Services, passing locally means the Devflare contract and app flow are correct. It does not automatically prove every hosted Cloudflare behavior.
+
+---
+
+### Use VPC Services in a real application path
+
+> A compact VPC Services recipe with config and worker usage in one application path.
+
+| Field | Value |
+| --- | --- |
+| Route | [`/docs/bindings/vpc-services/example`](/docs/bindings/vpc-services/example) |
+| Group | Bindings |
+| Navigation title | VPC Services example |
+| Eyebrow | Application example |
+
+Use this as the copyable starter before threading the feature into a larger application.
+
+#### At a glance
+
+| Fact | Value |
+| --- | --- |
+| Config focus | bindings.vpcServices |
+| Runtime shape | a VPC service `Fetcher` |
+| Best use | reaching a private upstream service over a Cloudflare VPC connectivity service |
+
+#### Start by wiring the binding clearly in config
+
+##### Example — Smallest VPC service config
+
+```ts
+import { defineConfig } from 'devflare/config'
+
+export default defineConfig({
+	name: 'vpc-service-worker',
+	bindings: {
+		vpcServices: {
+			DB: {
+				serviceId: 'service-uuid'
+			}
+		}
+	}
+})
+```
+
+#### Build the application flow around the binding
+
+Treat this as the app-level VPC Services path: the route, event handler, or service module receives a real request and uses the binding to do useful work.
+
+Keep product limits, remote ownership, and fallback behavior visible in the code around the binding instead of hiding everything behind a vague utility too early.
+
+##### Key points
+
+- Keep the first example short enough to paste into a new Worker.
+- Cloudflare owns the VPC connectivity service and the private network path; there is no local simulation because Miniflare only proxies to the remote service.
+
+##### Example — Call a private service over VPC
+
+```ts
+import { env } from 'devflare/runtime'
+
+export async function fetch(): Promise<Response> {
+	return env.DB.fetch('https://internal.service/health')
+}
+```
+
+#### Keep production boundaries visible
+
+##### Key points
+
+- Config focus: bindings.vpcServices.
+- Runtime shape: a VPC service `Fetcher`.
+- Best use: reaching a private upstream service over a Cloudflare VPC connectivity service.
+
+> **Important — Thread this into the next recipe**
+>
+> Once this smallest path works, add routing, generated types, and feature-specific abstraction in that order.
+
+---
+
+### Use VPC Networks in a Worker
+
+> Add the VPC Networks config, call a VPC network `Fetcher` from worker code, and start with the local test path Devflare supports.
+
+| Field | Value |
+| --- | --- |
+| Route | [`/docs/bindings/vpc-networks`](/docs/bindings/vpc-networks) |
+| Group | Bindings |
+| Navigation title | VPC Networks |
+| Eyebrow | Binding reference |
+
+Start with the config, wire the binding into worker code, then use the support section to decide whether local tests or Cloudflare-backed tests fit.
+
+#### At a glance
+
+| Fact | Value |
+| --- | --- |
+| Config key | `bindings.vpcNetworks` |
+| Authoring shape | `Record<string, { tunnelId } \| { networkId }>` |
+| Best for | routing Worker traffic through a Cloudflare Tunnel or a private network ID |
+
+#### Add the binding to config
+
+Add `bindings.vpcNetworks` to `devflare.config.ts`, then use the generated env binding from Worker code.
+
+Keep the first version close to the route or handler that needs it; move to a helper only after the shape is obvious.
+
+##### Example — Smallest VPC network config
+
+```ts
+import { defineConfig } from 'devflare/config'
+
+export default defineConfig({
+	name: 'vpc-network-worker',
+	bindings: {
+		vpcNetworks: {
+			NET: {
+				tunnelId: 'tunnel-uuid'
+			}
+		}
+	}
+})
+```
+
+#### Use the binding from application code
+
+After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first VPC Networks path close to the route, handler, or service method that needs it.
+
+Keep this first path small enough that the config, env binding, and user-visible behavior are easy to review together.
+
+##### Example — Route a request through the VPC network
+
+```ts
+import { env } from 'devflare/runtime'
+
+export async function fetch(): Promise<Response> {
+	return env.NET.fetch('https://10.0.0.10/status')
+}
+```
+
+#### Local and Remote Support
+
+Devflare supports the config, generated env shape, docs, and local application-flow work, but full fidelity requires Cloudflare remote infrastructure. Use local shims or fixtures for code your app owns, then connect to Cloudflare when the product behavior is the assertion.
+
+Remote boundary: Miniflare wires VPC networks only as a remote proxy client, so there is no offline simulation. Keep local coverage focused on deterministic application flow through fixtures, mocks, shims, or Miniflare-backed wiring instead of pretending to reproduce Cloudflare-hosted product behavior.
+
+Use Cloudflare when the assertion depends on cloudflare-hosted product behavior rather than the app calling the binding correctly. This is the lane for full VPC Networks product fidelity, remote state, lifecycle behavior, and platform-specific limits.
+
+#### When this binding fits best
+
+##### Key points
+
+- Use VPC Networks when routing worker traffic through a cloudflare tunnel or a private network id.
+- Keep binding names stable and uppercase in examples so generated Env declarations remain predictable.
+- Prefer Devflare native config while it covers the feature; use `wrangler.passthrough` only for unsupported Wrangler-only fields.
+
+#### Testing path
+
+##### Key points
+
+- Start with a deployed or remote-mode test against the real VPC network for config-backed local worker tests.
+- Use a custom fake binding injected through `createMockEnv()` for small unit tests that only need deterministic application behavior.
+- Use Cloudflare-backed tests when the assertion depends on hosted platform behavior, account state, limits, billing, or production routing.
+
+#### Open the next page when you need it
+
+##### Highlights
+
+- **VPC Networks internals** — Check emitted Wrangler `vpc_networks`, preview behavior, and Cloudflare-specific details. ([link](/docs/bindings/vpc-networks/internals))
+- **Testing VPC Networks** — Pick the a deployed or remote-mode test against the real VPC network path first, then move to remote checks only when the test needs them. ([link](/docs/bindings/vpc-networks/testing))
+- **VPC Networks example** — Copy a fuller application path when the quick example is too small. ([link](/docs/bindings/vpc-networks/example))
+
+---
+
+### How Devflare wires VPC Networks from config to runtime
+
+> VPC Networks compiles from `bindings.vpcNetworks` to Wrangler `vpc_networks`, with local/test behavior called out explicitly.
+
+| Field | Value |
+| --- | --- |
+| Route | [`/docs/bindings/vpc-networks/internals`](/docs/bindings/vpc-networks/internals) |
+| Group | Bindings |
+| Navigation title | VPC Networks internals |
+| Eyebrow | Under the hood |
+
+Use this page when you need emitted config, preview behavior, or Cloudflare-specific limits. The overview and example pages stay focused on everyday app code.
+
+#### At a glance
+
+| Fact | Value |
+| --- | --- |
+| Normalization | Devflare normalizes `bindings.vpcNetworks` before emitting Wrangler `vpc_networks` |
+| Compile target | Wrangler `vpc_networks` |
+| Preview note | Cloudflare owns the Tunnel and private network path; there is no local simulation because Miniflare only proxies to the remote network. |
+
+#### How authored config becomes Wrangler config
+
+The authored config stays camelCase and project-oriented. The compiler translates that into the Wrangler keys Cloudflare expects.
+
+The emitted output is shown here so the usage pages do not have to explain compiler details.
+
+##### Example — VPC Networks config and emitted Wrangler output
+
+Use this when you need to check how the Devflare config becomes Wrangler-compatible config.
+
+###### File — devflare.config.ts
+
+```ts
+import { defineConfig } from 'devflare/config'
+
+export default defineConfig({
+	name: 'vpc-network-worker',
+	bindings: {
+		vpcNetworks: {
+			NET: {
+				tunnelId: 'tunnel-uuid'
+			}
+		}
+	}
+})
+```
+
+###### File — .devflare/wrangler.jsonc
+
+```json
+{
+	"vpc_networks": [
+		{ "binding": "NET", "tunnel_id": "tunnel-uuid" }
+	]
+}
+```
+
+#### What local runtime support covers
+
+##### Key points
+
+- Remote boundary: Miniflare wires VPC networks only as a remote proxy client, so there is no offline simulation
+- The default docs recipe uses a deployed or remote-mode test against the real VPC network.
+- Pure unit tests can use a custom fake binding injected through `createMockEnv()` when the test only needs deterministic application behavior.
+
+#### Compile, preview, and cleanup behavior
+
+##### Key points
+
+- Devflare emits Wrangler `vpc_networks` from the native config surface.
+- Preview and deployment lifecycle stay feature-specific; do not assume all Cloudflare products can be created, cloned, or cleaned up the same way.
+- Cloudflare owns the Tunnel and private network path; there is no local simulation because Miniflare only proxies to the remote network.
+
+#### Cloudflare docs vs the Devflare layer
+
+Cloudflare Workers bindings docs is the platform reference. Use this internals page when you need to compare Cloudflare's product docs with Devflare config, generated env types, local support, and preview behavior for `bindings.vpcNetworks`.
+
+##### Highlights
+
+- **Cloudflare Workers bindings docs** — Platform reference for the underlying binding contract on Cloudflare Workers. ([link](https://developers.cloudflare.com/workers/runtime-apis/bindings/))
+
+##### Reference table
+
+| Question | Cloudflare docs | This Devflare page |
+| --- | --- | --- |
+| Primary focus | Platform reference for the underlying binding contract on Cloudflare Workers. | How to author `bindings.vpcNetworks`, what the runtime surface looks like, and how VPC Networks fits a Devflare project. |
+| Testing and runtime lens | Cloudflare’s docs focus on the raw binding API, product semantics, and platform limits for the binding itself. | Remote boundary: Miniflare wires VPC networks only as a remote proxy client, so there is no offline simulation. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
+| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
+
+---
+
+### Test VPC Networks the way Devflare expects it to run
+
+> Test VPC Networks by choosing the local harness that matches the product boundary instead of reaching for Cloudflare by default.
+
+| Field | Value |
+| --- | --- |
+| Route | [`/docs/bindings/vpc-networks/testing`](/docs/bindings/vpc-networks/testing) |
+| Group | Bindings |
+| Navigation title | Testing VPC Networks |
+| Eyebrow | Testing |
+
+The first test should prove application control flow. Escalate to Wrangler remote binding or deployed tests only when the Cloudflare-hosted behavior is the thing under test.
+
+#### At a glance
+
+| Fact | Value |
+| --- | --- |
+| Best for | routing Worker traffic through a Cloudflare Tunnel or a private network ID |
+| Default harness | a deployed or remote-mode test against the real VPC network |
+| Escalate when | The assertion depends on Cloudflare-hosted product behavior rather than the app calling the binding correctly |
+
+#### Start with the default test loop
+
+Keep the first test small. Name the binding, call the one method your route uses, and assert the behavior your app owns.
+
+When Cloudflare owns the interesting behavior, mark that as a remote/deployed lane instead of building a local fake that claims too much.
+
+##### Example — Test the app flow with a custom VPC network fake
+
+```ts
+import { expect, test } from 'bun:test'
+import { createMockEnv } from 'devflare/test'
+
+test('routes a request through the VPC network', async () => {
+	const env = createMockEnv({
+		custom: { NET: { fetch: async () => new Response('ok') } }
+	}) as { NET: Fetcher }
+
+	const response = await env.NET.fetch('https://10.0.0.10/status')
+
+	expect(await response.text()).toBe('ok')
+})
+```
+
+#### The helper surface to remember
+
+##### Key points
+
+- Use a deployed or remote-mode test against the real VPC network for config-backed local worker tests.
+- Use a custom fake binding injected through `createMockEnv()` for pure unit tests.
+- Use `shouldSkip` or an explicit integration lane when the test needs Cloudflare credentials or a local Docker/Podman engine.
+
+#### When to move beyond the default harness
+
+##### Key points
+
+- Cloudflare owns the Tunnel and private network path; there is no local simulation because Miniflare only proxies to the remote network.
+- Do not let a low-fidelity mock become product documentation. Keep mocks framed as application-flow tools.
+- If a test would mutate paid or remote Cloudflare state, gate it separately from ordinary unit tests.
+
+> **Warning — Local tests should be honest**
+>
+> For VPC Networks, passing locally means the Devflare contract and app flow are correct. It does not automatically prove every hosted Cloudflare behavior.
+
+---
+
+### Use VPC Networks in a real application path
+
+> A compact VPC Networks recipe with config and worker usage in one application path.
+
+| Field | Value |
+| --- | --- |
+| Route | [`/docs/bindings/vpc-networks/example`](/docs/bindings/vpc-networks/example) |
+| Group | Bindings |
+| Navigation title | VPC Networks example |
+| Eyebrow | Application example |
+
+Use this as the copyable starter before threading the feature into a larger application.
+
+#### At a glance
+
+| Fact | Value |
+| --- | --- |
+| Config focus | bindings.vpcNetworks |
+| Runtime shape | a VPC network `Fetcher` |
+| Best use | routing Worker traffic through a Cloudflare Tunnel or a private network ID |
+
+#### Start by wiring the binding clearly in config
+
+##### Example — Smallest VPC network config
+
+```ts
+import { defineConfig } from 'devflare/config'
+
+export default defineConfig({
+	name: 'vpc-network-worker',
+	bindings: {
+		vpcNetworks: {
+			NET: {
+				tunnelId: 'tunnel-uuid'
+			}
+		}
+	}
+})
+```
+
+#### Build the application flow around the binding
+
+Treat this as the app-level VPC Networks path: the route, event handler, or service module receives a real request and uses the binding to do useful work.
+
+Keep product limits, remote ownership, and fallback behavior visible in the code around the binding instead of hiding everything behind a vague utility too early.
+
+##### Key points
+
+- Keep the first example short enough to paste into a new Worker.
+- Cloudflare owns the Tunnel and private network path; there is no local simulation because Miniflare only proxies to the remote network.
+
+##### Example — Route a request through the VPC network
+
+```ts
+import { env } from 'devflare/runtime'
+
+export async function fetch(): Promise<Response> {
+	return env.NET.fetch('https://10.0.0.10/status')
+}
+```
+
+#### Keep production boundaries visible
+
+##### Key points
+
+- Config focus: bindings.vpcNetworks.
+- Runtime shape: a VPC network `Fetcher`.
+- Best use: routing Worker traffic through a Cloudflare Tunnel or a private network ID.
+
+> **Important — Thread this into the next recipe**
+>
+> Once this smallest path works, add routing, generated types, and feature-specific abstraction in that order.
+
+---
+
+### Use Flagship in a Worker
+
+> Add the Flagship config, call `Flagship` from worker code, and start with the local test path Devflare supports.
+
+| Field | Value |
+| --- | --- |
+| Route | [`/docs/bindings/flagship`](/docs/bindings/flagship) |
+| Group | Bindings |
+| Navigation title | Flagship |
+| Eyebrow | Binding reference |
+
+Start with the config, wire the binding into worker code, then use the support section to decide whether local tests or Cloudflare-backed tests fit.
+
+#### At a glance
+
+| Fact | Value |
+| --- | --- |
+| Config key | `bindings.flagship` |
+| Authoring shape | `Record<string, { appId; remote? }>` |
+| Best for | application paths where the Worker reads feature flags from the Flagship binding |
+
+#### Add the binding to config
+
+Add `bindings.flagship` to `devflare.config.ts`, then use the generated env binding from Worker code.
+
+Keep the first version close to the route or handler that needs it; move to a helper only after the shape is obvious.
+
+##### Example — Smallest Flagship config
+
+```ts
+import { defineConfig } from 'devflare/config'
+
+export default defineConfig({
+	name: 'flagship-worker',
+	bindings: {
+		flagship: {
+			FLAGS: {
+				appId: 'app-id'
+			}
+		}
+	}
+})
+```
+
+#### Use the binding from application code
+
+After Devflare generates the worker env, import `env` from `devflare/runtime` and keep the first Flagship path close to the route, handler, or service method that needs it.
+
+Keep this first path small enough that the config, env binding, and user-visible behavior are easy to review together.
+
+##### Example — Read a boolean flag
+
+```ts
+import { env } from 'devflare/runtime'
+
+export async function fetch(): Promise<Response> {
+	const enabled = await env.FLAGS.getBooleanValue('new-checkout', false)
+
+	return Response.json({ enabled })
+}
+```
+
+#### Local and Remote Support
+
+Devflare has a real lane for Flagship, but the local contract is intentionally narrower than Cloudflare's hosted product. The docs call out the supported local path and the remote boundary separately.
+
+Miniflare's Flagship plugin returns each call's default value locally and ignores the flag key (it does not evaluate flag rules), while Devflare's deterministic pure mock (createMockFlagshipBinding({ flags })) returns configured flag values, falling back to the default. Use the documented local lane only for the behavior Devflare explicitly models, and keep the narrower boundary visible in code review.
+
+Use Cloudflare when the assertion depends on cloudflare-hosted product behavior rather than the app calling the binding correctly. This is the lane for full Flagship product fidelity, remote state, lifecycle behavior, and platform-specific limits.
+
+#### When this binding fits best
+
+##### Key points
+
+- Use Flagship when application paths where the worker reads feature flags from the flagship binding.
+- Keep binding names stable and uppercase in examples so generated Env declarations remain predictable.
+- Prefer Devflare native config while it covers the feature; use `wrangler.passthrough` only for unsupported Wrangler-only fields.
+
+#### Testing path
+
+##### Key points
+
+- Start with `createTestContext()` or `createOfflineEnv()` for config-backed local worker tests.
+- Use `createMockFlagshipBinding({ flags })` / `createMockEnv({ flagship })` for small unit tests that only need deterministic application behavior.
+- Use Cloudflare-backed tests when the assertion depends on hosted platform behavior, account state, limits, billing, or production routing.
+
+#### Open the next page when you need it
+
+##### Highlights
+
+- **Flagship internals** — Check emitted Wrangler `flagship`, preview behavior, and Cloudflare-specific details. ([link](/docs/bindings/flagship/internals))
+- **Testing Flagship** — Pick the `createTestContext()` or `createOfflineEnv()` path first, then move to remote checks only when the test needs them. ([link](/docs/bindings/flagship/testing))
+- **Flagship example** — Copy a fuller application path when the quick example is too small. ([link](/docs/bindings/flagship/example))
+
+---
+
+### How Devflare wires Flagship from config to runtime
+
+> Flagship compiles from `bindings.flagship` to Wrangler `flagship`, with local/test behavior called out explicitly.
+
+| Field | Value |
+| --- | --- |
+| Route | [`/docs/bindings/flagship/internals`](/docs/bindings/flagship/internals) |
+| Group | Bindings |
+| Navigation title | Flagship internals |
+| Eyebrow | Under the hood |
+
+Use this page when you need emitted config, preview behavior, or Cloudflare-specific limits. The overview and example pages stay focused on everyday app code.
+
+#### At a glance
+
+| Fact | Value |
+| --- | --- |
+| Normalization | Devflare normalizes `bindings.flagship` before emitting Wrangler `flagship` |
+| Compile target | Wrangler `flagship` |
+| Preview note | Cloudflare owns real targeting-rule evaluation, flag management, and remote flag state; the local mock returns configured values and otherwise the default. |
+
+#### How authored config becomes Wrangler config
+
+The authored config stays camelCase and project-oriented. The compiler translates that into the Wrangler keys Cloudflare expects.
+
+The emitted output is shown here so the usage pages do not have to explain compiler details.
+
+##### Example — Flagship config and emitted Wrangler output
+
+Use this when you need to check how the Devflare config becomes Wrangler-compatible config.
+
+###### File — devflare.config.ts
+
+```ts
+import { defineConfig } from 'devflare/config'
+
+export default defineConfig({
+	name: 'flagship-worker',
+	bindings: {
+		flagship: {
+			FLAGS: {
+				appId: 'app-id'
+			}
+		}
+	}
+})
+```
+
+###### File — .devflare/wrangler.jsonc
+
+```json
+{
+	"flagship": [
+		{ "binding": "FLAGS", "app_id": "app-id" }
+	]
+}
+```
+
+#### What local runtime support covers
+
+##### Key points
+
+- Miniflare's Flagship plugin returns each call's default value locally and ignores the flag key (it does not evaluate flag rules), while Devflare's deterministic pure mock (createMockFlagshipBinding({ flags })) returns configured flag values, falling back to the default
+- The default docs recipe uses `createTestContext()` or `createOfflineEnv()`.
+- Pure unit tests can use `createMockFlagshipBinding({ flags })` / `createMockEnv({ flagship })` when the test only needs deterministic application behavior.
+
+#### Compile, preview, and cleanup behavior
+
+##### Key points
+
+- Devflare emits Wrangler `flagship` from the native config surface.
+- Preview and deployment lifecycle stay feature-specific; do not assume all Cloudflare products can be created, cloned, or cleaned up the same way.
+- Cloudflare owns real targeting-rule evaluation, flag management, and remote flag state; the local mock returns configured values and otherwise the default.
+
+#### Cloudflare docs vs the Devflare layer
+
+Cloudflare Workers bindings docs is the platform reference. Use this internals page when you need to compare Cloudflare's product docs with Devflare config, generated env types, local support, and preview behavior for `bindings.flagship`.
+
+##### Highlights
+
+- **Cloudflare Workers bindings docs** — Platform reference for the underlying binding contract on Cloudflare Workers. ([link](https://developers.cloudflare.com/workers/runtime-apis/bindings/))
+
+##### Reference table
+
+| Question | Cloudflare docs | This Devflare page |
+| --- | --- | --- |
+| Primary focus | Platform reference for the underlying binding contract on Cloudflare Workers. | How to author `bindings.flagship`, what the runtime surface looks like, and how Flagship fits a Devflare project. |
+| Testing and runtime lens | Cloudflare’s docs focus on the raw binding API, product semantics, and platform limits for the binding itself. | Miniflare's Flagship plugin returns each call's default value locally and ignores the flag key (it does not evaluate flag rules), while Devflare's deterministic pure mock (createMockFlagshipBinding({ flags })) returns configured flag values, falling back to the default. Use the Devflare guidance when you need the honest local harness or the right remote gate instead of only the product API shape. |
+| When to open it | When you need the platform contract, limits, APIs, or account-level product details. | When you are wiring, testing, previewing, or reviewing the binding inside a Devflare app. |
+
+---
+
+### Test Flagship the way Devflare expects it to run
+
+> Test Flagship by choosing the local harness that matches the product boundary instead of reaching for Cloudflare by default.
+
+| Field | Value |
+| --- | --- |
+| Route | [`/docs/bindings/flagship/testing`](/docs/bindings/flagship/testing) |
+| Group | Bindings |
+| Navigation title | Testing Flagship |
+| Eyebrow | Testing |
+
+The first test should prove application control flow. Escalate to Wrangler remote binding or deployed tests only when the Cloudflare-hosted behavior is the thing under test.
+
+#### At a glance
+
+| Fact | Value |
+| --- | --- |
+| Best for | application paths where the Worker reads feature flags from the Flagship binding |
+| Default harness | `createTestContext()` or `createOfflineEnv()` |
+| Escalate when | The assertion depends on Cloudflare-hosted product behavior rather than the app calling the binding correctly |
+
+#### Start with the default test loop
+
+Keep the first test small. Name the binding, call the one method your route uses, and assert the behavior your app owns.
+
+When Cloudflare owns the interesting behavior, mark that as a remote/deployed lane instead of building a local fake that claims too much.
+
+##### Example — Pure Flagship flag-reading test
+
+```ts
+import { expect, test } from 'bun:test'
+import { createMockFlagshipBinding } from 'devflare/test'
+
+test('returns configured flag value', async () => {
+	const flags = createMockFlagshipBinding({ flags: { 'new-checkout': true } })
+
+	expect(await flags.getBooleanValue('new-checkout', false)).toBe(true)
+})
+```
+
+#### The helper surface to remember
+
+##### Key points
+
+- Use `createTestContext()` or `createOfflineEnv()` for config-backed local worker tests.
+- Use `createMockFlagshipBinding({ flags })` / `createMockEnv({ flagship })` for pure unit tests.
+- Use `shouldSkip` or an explicit integration lane when the test needs Cloudflare credentials or a local Docker/Podman engine.
+
+#### When to move beyond the default harness
+
+##### Key points
+
+- Cloudflare owns real targeting-rule evaluation, flag management, and remote flag state; the local mock returns configured values and otherwise the default.
+- Do not let a low-fidelity mock become product documentation. Keep mocks framed as application-flow tools.
+- If a test would mutate paid or remote Cloudflare state, gate it separately from ordinary unit tests.
+
+> **Warning — Local tests should be honest**
+>
+> For Flagship, passing locally means the Devflare contract and app flow are correct. It does not automatically prove every hosted Cloudflare behavior.
+
+---
+
+### Use Flagship in a real application path
+
+> A compact Flagship recipe with config and worker usage in one application path.
+
+| Field | Value |
+| --- | --- |
+| Route | [`/docs/bindings/flagship/example`](/docs/bindings/flagship/example) |
+| Group | Bindings |
+| Navigation title | Flagship example |
+| Eyebrow | Application example |
+
+Use this as the copyable starter before threading the feature into a larger application.
+
+#### At a glance
+
+| Fact | Value |
+| --- | --- |
+| Config focus | bindings.flagship |
+| Runtime shape | `Flagship` |
+| Best use | application paths where the Worker reads feature flags from the Flagship binding |
+
+#### Start by wiring the binding clearly in config
+
+##### Example — Smallest Flagship config
+
+```ts
+import { defineConfig } from 'devflare/config'
+
+export default defineConfig({
+	name: 'flagship-worker',
+	bindings: {
+		flagship: {
+			FLAGS: {
+				appId: 'app-id'
+			}
+		}
+	}
+})
+```
+
+#### Build the application flow around the binding
+
+Treat this as the app-level Flagship path: the route, event handler, or service module receives a real request and uses the binding to do useful work.
+
+Keep product limits, remote ownership, and fallback behavior visible in the code around the binding instead of hiding everything behind a vague utility too early.
+
+##### Key points
+
+- Keep the first example short enough to paste into a new Worker.
+- Cloudflare owns real targeting-rule evaluation, flag management, and remote flag state; the local mock returns configured values and otherwise the default.
+
+##### Example — Read a boolean flag
+
+```ts
+import { env } from 'devflare/runtime'
+
+export async function fetch(): Promise<Response> {
+	const enabled = await env.FLAGS.getBooleanValue('new-checkout', false)
+
+	return Response.json({ enabled })
+}
+```
+
+#### Keep production boundaries visible
+
+##### Key points
+
+- Config focus: bindings.flagship.
+- Runtime shape: `Flagship`.
+- Best use: application paths where the Worker reads feature flags from the Flagship binding.
 
 > **Important — Thread this into the next recipe**
 >

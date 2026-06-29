@@ -1,5 +1,6 @@
 import './compiler/01-basic-fields'
 import './compiler/02-bindings'
+import './compiler/03-bindings-stream-vpc-flagship'
 import './compiler/03-triggers'
 import './compiler/04-vars'
 import './compiler/05-routes'

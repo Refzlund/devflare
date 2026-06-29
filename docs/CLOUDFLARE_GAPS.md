@@ -37,9 +37,9 @@ How covered (CF-1):
 
 | Gap | Dimensions | The devflare-way fix | Status |
 | --- | --- | --- | --- |
-| Cloudflare **Stream** binding (`stream`) unmodeled | schema, deploy, local-dev, test, docs | Add `streamBindingSchema` (mirror `images`/`media`: `{ binding, remote? }`), compile to `stream`, wire local-dev where Miniflare supports it, offline fixture, matrix row. | ⬜ |
-| **VPC** `vpc_services` / `vpc_networks` unmodeled (Miniflare has VPC plugins) | schema, deploy, local-dev, test, docs | First-class `vpcServices`/`vpcNetworks` schemas; emit arrays; wire Miniflare `vpcServices`/`vpcNetworks` for dev parity; offline fixture; matrix rows. | ⬜ |
-| **Flagship** feature-flag binding (`flagship`) unmodeled | schema, deploy, local-dev, test, docs | `flagshipBindingSchema` (`{ binding, appId, remote? }`), emit (`app_id`), Miniflare wiring, offline fixture, matrix row. | ⬜ |
+| Cloudflare **Stream** binding (`stream`) unmodeled | schema, deploy, local-dev, test, docs | Add `streamBindingSchema` (mirror `images`/`media`: `{ binding, remote? }`), compile to `stream`, wire local-dev where Miniflare supports it, offline fixture, matrix row. | ✅ Stream covered: schema + compile to `stream`, local mock (`createMockStreamBinding`) plus Miniflare-backed dev/offline wiring, docs + matrix row. |
+| **VPC** `vpc_services` / `vpc_networks` unmodeled (Miniflare has VPC plugins) | schema, deploy, local-dev, test, docs | First-class `vpcServices`/`vpcNetworks` schemas; emit arrays; wire Miniflare `vpcServices`/`vpcNetworks` for dev parity; offline fixture; matrix rows. | ✅ VPC covered: `vpcServices`/`vpcNetworks` schemas emit `vpc_services`/`vpc_networks`; remote-boundary surface tested via a custom-fake injected through `createMockEnv({ custom })`; docs + matrix rows. |
+| **Flagship** feature-flag binding (`flagship`) unmodeled | schema, deploy, local-dev, test, docs | `flagshipBindingSchema` (`{ binding, appId, remote? }`), emit (`app_id`), Miniflare wiring, offline fixture, matrix row. | ✅ Flagship covered: schema + compile to `flagship` (`app_id`), pure mock (`createMockFlagshipBinding`) for app-flow tests, docs + matrix row. |
 
 ## Batch CF-3 — local-dev wiring for deploy-modeled-only bindings
 

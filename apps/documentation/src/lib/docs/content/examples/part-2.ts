@@ -247,6 +247,8 @@ export const workerStyle = markWorkerStyle((request, env) => {
 						['`createMockPipeline`', 'Mock a Pipelines binding.'],
 						['`createMockImagesBinding`', 'Mock Images chains.'],
 						['`createMockMediaBinding`', 'Mock Media Transformation chains.'],
+						['`createMockStreamBinding`', 'Mock a Stream binding.'],
+						['`createMockFlagshipBinding`', 'Mock a Flagship feature-flag binding.'],
 						['`createMockArtifacts`', 'Mock Artifacts repo APIs.'],
 						['`createMockSecretsStoreSecret`', 'Mock a Secrets Store secret.'],
 						['`createMockEnv`', 'Create a pure env with selected mock bindings.'],

@@ -86,6 +86,22 @@ interface TypeGenerationConfig {
 					remote?: boolean
 			  }
 		>
+		stream?: Record<
+			string,
+			| true
+			| {
+					remote?: boolean
+			  }
+		>
+		vpcServices?: Record<string, unknown>
+		vpcNetworks?: Record<string, unknown>
+		flagship?: Record<
+			string,
+			{
+				appId?: string
+				remote?: boolean
+			}
+		>
 		artifacts?: Record<
 			string,
 			| string
@@ -229,6 +245,30 @@ function generateBindingMembers(
 		if (config.bindings.media) {
 			for (const binding of Object.keys(config.bindings.media)) {
 				lines.push(`${indent}${binding}: MediaBinding`)
+			}
+		}
+
+		if (config.bindings.stream) {
+			for (const binding of Object.keys(config.bindings.stream)) {
+				lines.push(`${indent}${binding}: StreamBinding`)
+			}
+		}
+
+		if (config.bindings.flagship) {
+			for (const binding of Object.keys(config.bindings.flagship)) {
+				lines.push(`${indent}${binding}: Flagship`)
+			}
+		}
+
+		if (config.bindings.vpcServices) {
+			for (const binding of Object.keys(config.bindings.vpcServices)) {
+				lines.push(`${indent}${binding}: Fetcher`)
+			}
+		}
+
+		if (config.bindings.vpcNetworks) {
+			for (const binding of Object.keys(config.bindings.vpcNetworks)) {
+				lines.push(`${indent}${binding}: Fetcher`)
 			}
 		}
 
@@ -428,6 +468,14 @@ export function generateBindingTypes(
 			usedTypes.add('ImagesBinding')
 		if (config.bindings.media && Object.keys(config.bindings.media).length > 0)
 			usedTypes.add('MediaBinding')
+		if (config.bindings.stream && Object.keys(config.bindings.stream).length > 0)
+			usedTypes.add('StreamBinding')
+		if (config.bindings.flagship && Object.keys(config.bindings.flagship).length > 0)
+			usedTypes.add('Flagship')
+		if (config.bindings.vpcServices && Object.keys(config.bindings.vpcServices).length > 0)
+			usedTypes.add('Fetcher')
+		if (config.bindings.vpcNetworks && Object.keys(config.bindings.vpcNetworks).length > 0)
+			usedTypes.add('Fetcher')
 		if (config.bindings.artifacts && Object.keys(config.bindings.artifacts).length > 0)
 			usedTypes.add('Artifacts')
 		if (config.bindings.secretsStore && Object.keys(config.bindings.secretsStore).length > 0)

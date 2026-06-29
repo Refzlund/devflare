@@ -4,6 +4,7 @@ import {
 	type D1Binding,
 	type DispatchNamespaceBinding,
 	type DurableObjectBinding,
+	type FlagshipBinding,
 	type HyperdriveBinding,
 	type ImagesBinding,
 	type KVBinding,
@@ -13,6 +14,9 @@ import {
 	type QueueProducer,
 	type R2Binding,
 	type SecretsStoreBinding,
+	type StreamBinding,
+	type VpcNetworkBinding,
+	type VpcServiceBinding,
 	type WorkflowBinding,
 	formatBrowserBindingLimitMessage,
 	getBrowserBindingNames
@@ -159,6 +163,36 @@ export interface NormalizedMediaBinding {
 export interface NormalizedArtifactsBinding {
 	/** Artifacts namespace */
 	namespace: string
+	/** Wrangler local-development remote-binding preference */
+	remote?: boolean
+}
+
+export interface NormalizedStreamBinding {
+	/** Stream binding name */
+	binding: string
+	/** Wrangler local-development remote-binding preference */
+	remote?: boolean
+}
+
+export interface NormalizedVpcServiceBinding {
+	/** VPC connectivity service ID */
+	serviceId: string
+	/** Wrangler local-development remote-binding preference */
+	remote?: boolean
+}
+
+export interface NormalizedVpcNetworkBinding {
+	/** Cloudflare Tunnel ID; mutually exclusive with networkId */
+	tunnelId?: string
+	/** VPC network ID; mutually exclusive with tunnelId */
+	networkId?: string
+	/** Wrangler local-development remote-binding preference */
+	remote?: boolean
+}
+
+export interface NormalizedFlagshipBinding {
+	/** Flagship app ID */
+	appId: string
 	/** Wrangler local-development remote-binding preference */
 	remote?: boolean
 }
@@ -441,6 +475,61 @@ export function normalizeArtifactsBinding(config: ArtifactsBinding): NormalizedA
 
 	return {
 		namespace: config.namespace,
+		...(config.remote !== undefined && { remote: config.remote })
+	}
+}
+
+/**
+ * Normalize a Stream binding to Wrangler's singleton binding object.
+ */
+export function normalizeStreamBinding(
+	binding: string,
+	config: StreamBinding
+): NormalizedStreamBinding {
+	if (config === true) {
+		return { binding }
+	}
+
+	return {
+		binding,
+		...(config.remote !== undefined && { remote: config.remote })
+	}
+}
+
+/**
+ * Normalize a VPC service binding to its object form.
+ */
+export function normalizeVpcServiceBinding(config: VpcServiceBinding): NormalizedVpcServiceBinding {
+	return {
+		serviceId: config.serviceId,
+		...(config.remote !== undefined && { remote: config.remote })
+	}
+}
+
+/**
+ * Normalize a VPC network binding to its object form. Exactly one of
+ * `tunnelId`/`networkId` is set, mirroring the wrangler `anyOf` schema.
+ */
+export function normalizeVpcNetworkBinding(config: VpcNetworkBinding): NormalizedVpcNetworkBinding {
+	if ('tunnelId' in config) {
+		return {
+			tunnelId: config.tunnelId,
+			...(config.remote !== undefined && { remote: config.remote })
+		}
+	}
+
+	return {
+		networkId: config.networkId,
+		...(config.remote !== undefined && { remote: config.remote })
+	}
+}
+
+/**
+ * Normalize a Flagship binding to its object form.
+ */
+export function normalizeFlagshipBinding(config: FlagshipBinding): NormalizedFlagshipBinding {
+	return {
+		appId: config.appId,
 		...(config.remote !== undefined && { remote: config.remote })
 	}
 }

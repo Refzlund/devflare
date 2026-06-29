@@ -38,9 +38,13 @@ describe('offline support matrix', () => {
 		expect(matrix.workflows.tier).toBe('offline-native')
 		expect(matrix.aiSearch.tier).toBe('offline-fixture')
 		expect(matrix.media.tier).toBe('offline-native')
+		expect(matrix.stream.tier).toBe('offline-native')
+		expect(matrix.flagship.tier).toBe('offline-native')
 		expect(matrix.mtlsCertificates.tier).toBe('offline-fixture')
 		expect(matrix.ai.tier).toBe('remote-boundary')
 		expect(matrix.vectorize.tier).toBe('remote-boundary')
+		expect(matrix.vpcServices.tier).toBe('remote-boundary')
+		expect(matrix.vpcNetworks.tier).toBe('remote-boundary')
 		expect(matrix.builds.tier).toBe('remote-boundary')
 	})
 
@@ -288,5 +292,41 @@ describe('createOfflineBindings', () => {
 		)
 
 		expect(await (env.API_TOKEN as SecretsStoreSecret).get()).toBe('local-secret')
+	})
+
+	test('creates deterministic Stream and Flagship bindings and flags VPC as remote', async () => {
+		const result = createOfflineBindings(
+			{
+				name: 'cf2-worker',
+				bindings: {
+					stream: { STREAM: true },
+					flagship: { FLAGS: { appId: 'app-id' } },
+					vpcServices: { DB: { serviceId: 'service-uuid' } },
+					vpcNetworks: { NET: { tunnelId: 'tunnel-uuid' } }
+				}
+			},
+			{
+				flagship: {
+					FLAGS: { flags: { 'new-checkout': true } }
+				}
+			}
+		)
+
+		const stream = result.env.STREAM as StreamBinding
+		expect(await stream.videos.list()).toEqual([])
+		expect(typeof stream.video('abc').id).toBe('string')
+
+		const flags = result.env.FLAGS as Flagship
+		expect(await flags.getBooleanValue('new-checkout', false)).toBe(true)
+		expect(await flags.getBooleanValue('missing-flag', false)).toBe(false)
+		const details = await flags.getBooleanDetails('missing-flag', false)
+		expect(details.reason).toBe('DEFAULT')
+
+		const boundaries = result.remoteBoundaries.map((boundary) => boundary.service)
+		expect(boundaries).toContain('vpcServices')
+		expect(boundaries).toContain('vpcNetworks')
+		// VPC bindings are proxy-only, so they are not materialized in env.
+		expect(result.env.DB).toBeUndefined()
+		expect(result.env.NET).toBeUndefined()
 	})
 })
