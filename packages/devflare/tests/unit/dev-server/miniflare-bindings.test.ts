@@ -3,9 +3,12 @@ import type { DevflareConfig } from '../../../src/config'
 import {
 	buildAiSearchInstancesConfig,
 	buildAiSearchNamespacesConfig,
+	buildAnalyticsEngineConfig,
 	buildFlagshipConfig,
 	buildHyperdrivesConfig,
-	buildStreamConfig
+	buildMtlsCertificatesConfig,
+	buildStreamConfig,
+	buildTailConsumersConfig
 } from '../../../src/dev-server/miniflare-bindings'
 
 type Bindings = NonNullable<DevflareConfig['bindings']>
@@ -139,5 +142,67 @@ describe('buildFlagshipConfig', () => {
 
 	test('returns undefined when no Flagship binding is configured', () => {
 		expect(buildFlagshipConfig({} as Bindings)).toBeUndefined()
+	})
+})
+
+describe('buildAnalyticsEngineConfig', () => {
+	test('maps Analytics Engine bindings to the native analyticsEngineDatasets record', () => {
+		const bindings = {
+			analyticsEngine: {
+				ANALYTICS: { dataset: 'events' },
+				METRICS: { dataset: 'metrics-dataset' }
+			}
+		} as unknown as Bindings
+
+		expect(buildAnalyticsEngineConfig(bindings)).toEqual({
+			ANALYTICS: { dataset: 'events' },
+			METRICS: { dataset: 'metrics-dataset' }
+		})
+	})
+
+	test('returns undefined when no Analytics Engine binding is configured', () => {
+		expect(buildAnalyticsEngineConfig({} as Bindings)).toBeUndefined()
+	})
+})
+
+describe('buildTailConsumersConfig', () => {
+	test('maps string tail consumers to the Miniflare tails service-name array', () => {
+		expect(buildTailConsumersConfig({ tailConsumers: ['trace-worker', 'logs'] })).toEqual([
+			'trace-worker',
+			'logs'
+		])
+	})
+
+	test('maps object tail consumers to their service names', () => {
+		expect(
+			buildTailConsumersConfig({
+				tailConsumers: [{ service: 'trace-worker', environment: 'production' }]
+			})
+		).toEqual(['trace-worker'])
+	})
+
+	test('returns undefined when no tail consumers are configured', () => {
+		expect(buildTailConsumersConfig({})).toBeUndefined()
+		expect(buildTailConsumersConfig({ tailConsumers: [] })).toBeUndefined()
+	})
+})
+
+describe('buildMtlsCertificatesConfig', () => {
+	test('preserves the remote flag alongside certificate_id', () => {
+		const bindings = {
+			mtlsCertificates: {
+				CLIENT_CERT: { certificateId: 'cert-uuid', remote: true },
+				LOCAL_CERT: { certificateId: 'local-uuid' }
+			}
+		} as unknown as Bindings
+
+		expect(buildMtlsCertificatesConfig(bindings)).toEqual({
+			CLIENT_CERT: { certificate_id: 'cert-uuid', remote: true },
+			LOCAL_CERT: { certificate_id: 'local-uuid' }
+		})
+	})
+
+	test('returns undefined when no mTLS binding is configured', () => {
+		expect(buildMtlsCertificatesConfig({} as Bindings)).toBeUndefined()
 	})
 })

@@ -202,6 +202,57 @@ describe('buildInlineBridgeMfConfig', () => {
 		})
 	})
 
+	test('preserves the mTLS remote flag for createTestContext', () => {
+		const mfConfig = buildInlineBridgeMfConfig({
+			name: 'my-worker',
+			compatibilityDate: '2026-04-26',
+			compatibilityFlags: [],
+			bindings: {
+				mtlsCertificates: {
+					API_CERT: {
+						certificateId: 'cert-123',
+						remote: true
+					}
+				}
+			}
+		})
+
+		expect(mfConfig.mtlsCertificates).toEqual({
+			API_CERT: {
+				certificate_id: 'cert-123',
+				remote: true
+			}
+		})
+	})
+
+	test('adds Miniflare Analytics Engine datasets for createTestContext', () => {
+		const mfConfig = buildInlineBridgeMfConfig({
+			name: 'my-worker',
+			compatibilityDate: '2026-04-26',
+			compatibilityFlags: [],
+			bindings: {
+				analyticsEngine: {
+					ANALYTICS: { dataset: 'events' }
+				}
+			}
+		})
+
+		expect(mfConfig.analyticsEngineDatasets).toEqual({
+			ANALYTICS: { dataset: 'events' }
+		})
+	})
+
+	test('adds Miniflare tail consumers for createTestContext', () => {
+		const mfConfig = buildInlineBridgeMfConfig({
+			name: 'my-worker',
+			compatibilityDate: '2026-04-26',
+			compatibilityFlags: [],
+			tailConsumers: ['trace-worker', { service: 'logs', environment: 'production' }]
+		})
+
+		expect(mfConfig.tails).toEqual(['trace-worker', 'logs'])
+	})
+
 	test('adds Miniflare Dispatch Namespace bindings for createTestContext', () => {
 		const mfConfig = buildInlineBridgeMfConfig({
 			name: 'my-worker',

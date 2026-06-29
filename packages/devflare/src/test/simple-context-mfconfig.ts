@@ -21,7 +21,11 @@ import {
 	normalizeWorkflowBinding
 } from '../config'
 import type { DevflareConfig } from '../config'
-import { buildHyperdrivesConfig } from '../dev-server/miniflare-bindings'
+import {
+	buildAnalyticsEngineConfig,
+	buildHyperdrivesConfig,
+	buildTailConsumersConfig
+} from '../dev-server/miniflare-bindings'
 import { buildLocalSecretWrappedBindingConfig } from '../secrets/local-secrets'
 import { buildLocalBindingShimServiceConfig } from '../shims/local-media-bindings'
 
@@ -106,7 +110,8 @@ export function buildInlineBridgeMfConfig(
 				return [
 					bindingName,
 					{
-						certificate_id: normalized.certificateId
+						certificate_id: normalized.certificateId,
+						...(normalized.remote !== undefined && { remote: normalized.remote })
 					}
 				]
 			})
@@ -176,6 +181,16 @@ export function buildInlineBridgeMfConfig(
 				binding: normalized.binding
 			}
 		}
+	}
+
+	const analyticsEngineConfig = buildAnalyticsEngineConfig(config.bindings ?? {})
+	if (analyticsEngineConfig) {
+		mfConfig.analyticsEngineDatasets = analyticsEngineConfig
+	}
+
+	const tailConsumersConfig = buildTailConsumersConfig(config)
+	if (tailConsumersConfig) {
+		mfConfig.tails = tailConsumersConfig
 	}
 
 	if (config.bindings?.artifacts) {

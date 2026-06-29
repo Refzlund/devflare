@@ -52,6 +52,10 @@ export function applyMultiWorkerConfig(
 		...(mfConfig.pipelines && { pipelines: mfConfig.pipelines }),
 		...(mfConfig.images && { images: mfConfig.images }),
 		...(mfConfig.media && { media: mfConfig.media }),
+		...(mfConfig.analyticsEngineDatasets && {
+			analyticsEngineDatasets: mfConfig.analyticsEngineDatasets
+		}),
+		...(mfConfig.tails && { tails: mfConfig.tails }),
 		...(mfConfig.artifacts && { artifacts: mfConfig.artifacts }),
 		...(mfConfig.secretsStoreSecrets && { secretsStoreSecrets: mfConfig.secretsStoreSecrets }),
 		...(mfConfig.wrappedBindings && { wrappedBindings: mfConfig.wrappedBindings }),
@@ -105,6 +109,8 @@ export function applyMultiWorkerConfig(
 	delete mfConfig.pipelines
 	delete mfConfig.images
 	delete mfConfig.media
+	delete mfConfig.analyticsEngineDatasets
+	delete mfConfig.tails
 	delete mfConfig.artifacts
 	delete mfConfig.secretsStoreSecrets
 	delete mfConfig.wrappedBindings

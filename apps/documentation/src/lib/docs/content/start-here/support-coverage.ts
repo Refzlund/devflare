@@ -85,7 +85,7 @@ export const cloudflarePlatformSupportCards: DocCard[] = [
 		label: 'Limited',
 		meta: 'Analytics',
 		title: 'Analytics Engine',
-		body: 'Dataset bindings are configured in Devflare and compiled for deploy. Local delivery is not yet wired into the dev/test Miniflare config; Miniflare ships a native Analytics Engine plugin whose `writeDataPoint()` is a write-shape-only no-op (it records nothing), so it is not an inherent remote boundary — production ingestion and query behavior remain hosted.',
+		body: 'Dataset bindings are configured in Devflare, compiled for deploy, and wired into the dev/test Miniflare config: Miniflare ships a native Analytics Engine plugin whose `writeDataPoint()` is a write-shape-only no-op (it records nothing), so the local binding runs the call shape without crashing while production ingestion and query behavior remain hosted.',
 		href: docsLink('bindings/analytics-engine')
 	}),
 	supportCard({

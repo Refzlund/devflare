@@ -17,6 +17,7 @@ import type { LocalSecretWrappedBindingConfig } from '../secrets/local-secrets'
 import type {
 	buildAiSearchInstancesConfig,
 	buildAiSearchNamespacesConfig,
+	buildAnalyticsEngineConfig,
 	buildArtifactsConfig,
 	buildDispatchNamespacesConfig,
 	buildFlagshipConfig,
@@ -29,6 +30,7 @@ import type {
 	buildSecretsStoreConfig,
 	buildSendEmailConfig,
 	buildStreamConfig,
+	buildTailConsumersConfig,
 	buildVersionMetadataConfig,
 	buildWorkerLoadersConfig,
 	buildWorkflowsConfig
@@ -48,6 +50,8 @@ type ImagesConfig = ReturnType<typeof buildImagesConfig>
 type MediaConfig = ReturnType<typeof buildMediaConfig>
 type StreamConfig = ReturnType<typeof buildStreamConfig>
 type FlagshipConfig = ReturnType<typeof buildFlagshipConfig>
+type AnalyticsEngineConfig = ReturnType<typeof buildAnalyticsEngineConfig>
+type TailConsumersConfig = ReturnType<typeof buildTailConsumersConfig>
 type ArtifactsConfig = ReturnType<typeof buildArtifactsConfig>
 type AiSearchNamespacesConfig = ReturnType<typeof buildAiSearchNamespacesConfig>
 type AiSearchInstancesConfig = ReturnType<typeof buildAiSearchInstancesConfig>
@@ -128,6 +132,8 @@ export interface MakeMiniflareWorkerContext {
 	mediaConfig: MediaConfig
 	streamConfig: StreamConfig
 	flagshipConfig: FlagshipConfig
+	analyticsEngineConfig: AnalyticsEngineConfig
+	tailConsumersConfig: TailConsumersConfig
 	artifactsConfig: ArtifactsConfig
 	aiSearchNamespacesConfig: AiSearchNamespacesConfig
 	aiSearchInstancesConfig: AiSearchInstancesConfig
@@ -161,6 +167,8 @@ export function makeMiniflareWorker(
 		mediaConfig,
 		streamConfig,
 		flagshipConfig,
+		analyticsEngineConfig,
+		tailConsumersConfig,
 		artifactsConfig,
 		aiSearchNamespacesConfig,
 		aiSearchInstancesConfig,
@@ -218,6 +226,8 @@ export function makeMiniflareWorker(
 		...(mediaConfig && { media: mediaConfig }),
 		...(streamConfig && { stream: streamConfig }),
 		...(flagshipConfig && { flagship: flagshipConfig }),
+		...(analyticsEngineConfig && { analyticsEngineDatasets: analyticsEngineConfig }),
+		...(tailConsumersConfig && { tails: tailConsumersConfig }),
 		...(artifactsConfig && { artifacts: artifactsConfig }),
 		...(aiSearchNamespacesConfig && { aiSearchNamespaces: aiSearchNamespacesConfig }),
 		...(aiSearchInstancesConfig && { aiSearchInstances: aiSearchInstancesConfig }),

@@ -135,15 +135,16 @@ their local situations differ and neither is an inherent remote boundary:
 - **Send Email** — wired into the dev/test Miniflare worker config (the compiled
   `send_email` list is passed to Miniflare's per-worker `email` option), so the
   binding shape runs locally.
-- **Analytics Engine** — **not** an inherent remote-only boundary. It is simply
-  **not yet wired into the dev/test Miniflare config**: Devflare compiles
-  `analytics_engine_datasets` for deploy but does not pass
+- **Analytics Engine** — **not** an inherent remote-only boundary, and now
+  **wired into the dev/test Miniflare config as a write-only no-op stub**.
+  Devflare compiles `analytics_engine_datasets` for deploy and also passes
   `analyticsEngineDatasets` to the local Miniflare worker. Miniflare 4 ships a
   **native Analytics Engine plugin that is a write-shape-only no-op**
-  (`writeDataPoint()` records nothing), so even once it is wired the local path
-  validates the call shape but does not persist or query data points. Until then
-  use a custom fake for `writeDataPoint()` assertions. Production ingestion and
-  querying remain hosted.
+  (`writeDataPoint()` records nothing), so the local path validates the call
+  shape and no longer crashes (`env.<DATASET>.writeDataPoint()` is bound in
+  dev), but it does not persist or query data points. For `writeDataPoint()`
+  argument assertions, use a custom fake. Production ingestion and querying
+  remain hosted.
 
 ## Platform config (not bindings): deploy-only vs locally wired
 
@@ -155,7 +156,7 @@ dev/test Miniflare worker.
 | Config key | Compiled for deploy | Wired into local dev/test Miniflare? | Notes |
 | --- | --- | --- | --- |
 | Static Assets | `assets` | **No** — deploy-only locally | The `assets` config compiles into the Wrangler config (directory/binding/routing) for deploy, but it is **not** wired into the dev Miniflare worker — there is no Miniflare `assets` plugin wiring and no local `ASSETS` fetcher. Static assets are not served by the local dev runtime; serve them through your own dev tooling (e.g. Vite) until local asset serving is wired. |
-| Tail consumers | `tailConsumers` → `tail_consumers` | **No** — deploy-only locally | The `tailConsumers` config compiles to `tail_consumers` for deploy, but it is **not** passed to Miniflare's per-worker `tails`, so tail events are **not** delivered to consumer Workers locally. This is distinct from `files.tail` — the tail *handler* surface on the Worker itself **is** wired and locally testable (see `cf.tail`); only cross-Worker tail-consumer *delivery* is deploy-only. |
+| Tail consumers | `tailConsumers` → `tail_consumers` | **Yes** (when the consumer Worker is present locally) | The `tailConsumers` config compiles to `tail_consumers` for deploy **and** is now passed to Miniflare's per-worker `tails` (an array of consumer service names). A tail consumer references **another** Worker by service name, so local cross-Worker tail-consumer *delivery* works **when that consumer Worker is also run in the same local Miniflare instance**; when it is absent the designator resolves to nothing and the local runtime degrades cleanly (no crash). This is distinct from `files.tail` — the tail *handler* surface on the Worker itself **is** fully wired and locally testable regardless (see `cf.tail.trigger()`); this change adds the cross-Worker *delivery* path where the consumer Worker is available locally. |
 | Cron triggers | `triggers.crons` | **Yes** (handler invocation) | `triggers.crons` is passed to Miniflare's per-worker `triggers` in dev, and the scheduled handler can be invoked locally through the test layer (`cf.scheduled.trigger(cron?)` / the `scheduled()` helper). Devflare does not run the cron *schedule* on a wall clock locally — you invoke `scheduled()` explicitly — so cron-driven code is locally testable while real timed delivery remains a Cloudflare behavior. |
 
 ## Containers (offline-first)

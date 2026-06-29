@@ -93,7 +93,7 @@ export interface MiniflareOptions {
 	/** Worker Loader bindings */
 	workerLoaders?: Record<string, Record<string, never>>
 	/** mTLS Certificate bindings */
-	mtlsCertificates?: Record<string, { certificate_id: string }>
+	mtlsCertificates?: Record<string, { certificate_id: string; remote?: boolean }>
 	/** Dispatch Namespace bindings */
 	dispatchNamespaces?: Record<string, { namespace: string }>
 	/** Workflow bindings */
@@ -112,6 +112,10 @@ export interface MiniflareOptions {
 	images?: { binding: string }
 	/** Media Transformations binding */
 	media?: { binding: string }
+	/** Analytics Engine dataset bindings */
+	analyticsEngine?: Record<string, { dataset: string }>
+	/** Tail consumer service names (cross-Worker tail delivery) */
+	tailConsumers?: string[]
 	/** Artifacts bindings */
 	artifacts?: Record<string, { namespace: string }>
 	/** Secrets Store bindings */
@@ -179,6 +183,8 @@ type MfOptionsWithEmail = MfOptions & {
 	images?: MiniflareOptions['images']
 	imagesPersist?: string
 	media?: MiniflareOptions['media']
+	analyticsEngineDatasets?: MiniflareOptions['analyticsEngine']
+	tails?: MiniflareOptions['tailConsumers']
 	artifacts?: MiniflareOptions['artifacts']
 	secretsStoreSecrets?: MiniflareOptions['secretsStore']
 	serviceBindings?: MiniflareOptions['serviceBindings']
@@ -496,6 +502,28 @@ function applyMediaConfig(config: MfOptionsWithEmail, media: MiniflareOptions['m
 	config.media = media
 }
 
+function applyAnalyticsEngineConfig(
+	config: MfOptionsWithEmail,
+	analyticsEngine: MiniflareOptions['analyticsEngine']
+): void {
+	if (!analyticsEngine || Object.keys(analyticsEngine).length === 0) {
+		return
+	}
+
+	config.analyticsEngineDatasets = analyticsEngine
+}
+
+function applyTailConsumersConfig(
+	config: MfOptionsWithEmail,
+	tailConsumers: MiniflareOptions['tailConsumers']
+): void {
+	if (!tailConsumers || tailConsumers.length === 0) {
+		return
+	}
+
+	config.tails = tailConsumers
+}
+
 function applyArtifactsConfig(
 	config: MfOptionsWithEmail,
 	artifacts: MiniflareOptions['artifacts']
@@ -607,6 +635,8 @@ function createMiniflareConfig(
 	applyPipelineConfig(config, options.pipelines)
 	applyImagesConfig(config, options.images, persistPath)
 	applyMediaConfig(config, options.media)
+	applyAnalyticsEngineConfig(config, options.analyticsEngine)
+	applyTailConsumersConfig(config, options.tailConsumers)
 	applyArtifactsConfig(config, options.artifacts)
 	applySecretsStoreConfig(config, options.secretsStore)
 	applyServiceBindingsConfig(config, options.serviceBindings)
@@ -793,7 +823,8 @@ export async function startMiniflareFromConfig(
 						return [
 							bindingName,
 							{
-								certificate_id: normalized.certificateId
+								certificate_id: normalized.certificateId,
+								...(normalized.remote !== undefined && { remote: normalized.remote })
 							}
 						]
 					})
@@ -859,6 +890,22 @@ export async function startMiniflareFromConfig(
 					return { binding: normalized.binding }
 				})()
 			: undefined,
+		analyticsEngine: bindings.analyticsEngine
+			? Object.fromEntries(
+					Object.entries(bindings.analyticsEngine).map(([bindingName, binding]) => [
+						bindingName,
+						{
+							dataset: binding.dataset
+						}
+					])
+				)
+			: undefined,
+		tailConsumers:
+			runtimeConfig.tailConsumers && runtimeConfig.tailConsumers.length > 0
+				? runtimeConfig.tailConsumers.map((consumer) =>
+						typeof consumer === 'string' ? consumer : consumer.service
+					)
+				: undefined,
 		artifacts: bindings.artifacts
 			? Object.fromEntries(
 					Object.entries(bindings.artifacts).map(([bindingName, binding]) => {

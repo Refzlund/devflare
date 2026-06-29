@@ -35,6 +35,8 @@ describe('makeMiniflareWorker', () => {
 			mediaConfig: undefined,
 			streamConfig: undefined,
 			flagshipConfig: undefined,
+			analyticsEngineConfig: undefined,
+			tailConsumersConfig: undefined,
 			aiSearchNamespacesConfig: undefined,
 			aiSearchInstancesConfig: undefined,
 			artifactsConfig: undefined,
@@ -83,6 +85,8 @@ describe('makeMiniflareWorker', () => {
 			mediaConfig: undefined,
 			streamConfig: undefined,
 			flagshipConfig: undefined,
+			analyticsEngineConfig: undefined,
+			tailConsumersConfig: undefined,
 			aiSearchNamespacesConfig: undefined,
 			aiSearchInstancesConfig: undefined,
 			artifactsConfig: undefined,
@@ -125,6 +129,55 @@ describe('makeMiniflareWorker', () => {
 					value: 'local-secret'
 				}
 			}
+		})
+	})
+
+	test('sets analyticsEngineDatasets, tails, and mTLS remote on the worker config', () => {
+		const context: MakeMiniflareWorkerContext = {
+			cwd: 'C:/project',
+			loadedConfig: {
+				name: 'app-worker',
+				compatibilityDate: '2026-04-26',
+				compatibilityFlags: []
+			} as any,
+			bindings: {},
+			sendEmailConfig: undefined,
+			rateLimitsConfig: undefined,
+			versionMetadataConfig: undefined,
+			workerLoadersConfig: undefined,
+			mtlsCertificatesConfig: {
+				CLIENT_CERT: { certificate_id: 'cert-uuid', remote: true }
+			},
+			dispatchNamespacesConfig: undefined,
+			workflowsConfig: undefined,
+			pipelinesConfig: undefined,
+			hyperdrivesConfig: undefined,
+			imagesConfig: undefined,
+			mediaConfig: undefined,
+			streamConfig: undefined,
+			flagshipConfig: undefined,
+			analyticsEngineConfig: {
+				ANALYTICS: { dataset: 'events' }
+			},
+			tailConsumersConfig: ['trace-worker'],
+			aiSearchNamespacesConfig: undefined,
+			aiSearchInstancesConfig: undefined,
+			artifactsConfig: undefined,
+			secretsStoreConfig: undefined,
+			queueProducers: undefined
+		}
+
+		const workerConfig = makeMiniflareWorker(context, {
+			name: 'app-worker',
+			script: 'export default {}'
+		})
+
+		expect(workerConfig.analyticsEngineDatasets).toEqual({
+			ANALYTICS: { dataset: 'events' }
+		})
+		expect(workerConfig.tails).toEqual(['trace-worker'])
+		expect(workerConfig.mtlsCertificates).toEqual({
+			CLIENT_CERT: { certificate_id: 'cert-uuid', remote: true }
 		})
 	})
 })

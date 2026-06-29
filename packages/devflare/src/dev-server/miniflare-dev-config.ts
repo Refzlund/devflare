@@ -21,6 +21,7 @@ import { getGatewayScript } from './gateway-script'
 import {
 	buildAiSearchInstancesConfig,
 	buildAiSearchNamespacesConfig,
+	buildAnalyticsEngineConfig,
 	buildArtifactsConfig,
 	buildDispatchNamespacesConfig,
 	buildFlagshipConfig,
@@ -35,6 +36,7 @@ import {
 	buildSecretsStoreConfig,
 	buildSendEmailConfig,
 	buildStreamConfig,
+	buildTailConsumersConfig,
 	buildVersionMetadataConfig,
 	buildWorkerLoadersConfig,
 	buildWorkflowsConfig
@@ -139,6 +141,8 @@ export function buildMiniflareDevConfig(input: BuildMiniflareDevConfigInput): an
 	const mediaConfig = bindings.media ? undefined : buildMediaConfig(bindings)
 	const streamConfig = buildStreamConfig(bindings)
 	const flagshipConfig = buildFlagshipConfig(bindings)
+	const analyticsEngineConfig = buildAnalyticsEngineConfig(bindings)
+	const tailConsumersConfig = buildTailConsumersConfig(loadedConfig)
 	const artifactsConfig = buildArtifactsConfig(bindings)
 	const aiSearchNamespacesConfig = buildAiSearchNamespacesConfig(bindings)
 	const aiSearchInstancesConfig = buildAiSearchInstancesConfig(bindings)
@@ -167,6 +171,8 @@ export function buildMiniflareDevConfig(input: BuildMiniflareDevConfigInput): an
 		mediaConfig,
 		streamConfig,
 		flagshipConfig,
+		analyticsEngineConfig,
+		tailConsumersConfig,
 		artifactsConfig,
 		aiSearchNamespacesConfig,
 		aiSearchInstancesConfig,

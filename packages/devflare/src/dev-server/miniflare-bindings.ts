@@ -100,7 +100,7 @@ export function buildWorkerLoadersConfig(
 
 export function buildMtlsCertificatesConfig(
 	bindings: Bindings
-): Record<string, { certificate_id: string }> | undefined {
+): Record<string, { certificate_id: string; remote?: boolean }> | undefined {
 	if (!bindings.mtlsCertificates) {
 		return undefined
 	}
@@ -111,7 +111,8 @@ export function buildMtlsCertificatesConfig(
 			return [
 				bindingName,
 				{
-					certificate_id: normalized.certificateId
+					certificate_id: normalized.certificateId,
+					...(normalized.remote !== undefined && { remote: normalized.remote })
 				}
 			]
 		})
@@ -290,6 +291,23 @@ export function buildFlagshipConfig(
 	)
 }
 
+export function buildAnalyticsEngineConfig(
+	bindings: Bindings
+): Record<string, { dataset: string }> | undefined {
+	if (!bindings.analyticsEngine) {
+		return undefined
+	}
+
+	return Object.fromEntries(
+		Object.entries(bindings.analyticsEngine).map(([bindingName, binding]) => [
+			bindingName,
+			{
+				dataset: binding.dataset
+			}
+		])
+	)
+}
+
 export function buildArtifactsConfig(
 	bindings: Bindings
 ): Record<string, { namespace: string }> | undefined {
@@ -401,4 +419,29 @@ export function buildSendEmailConfig(bindings: Bindings):
 			})
 		}))
 	}
+}
+
+/**
+ * Translate the top-level `tailConsumers` config into Miniflare's per-worker
+ * `tails` option (an array of service designators). Each tail consumer points
+ * at ANOTHER Worker by service name; Miniflare delivers tail events to that
+ * Worker only when it is present in the same Miniflare `workers` array. In
+ * single-worker local dev the consumer Worker is typically absent, in which
+ * case the designator simply resolves to nothing — local delivery degrades
+ * cleanly (no crash) and live delivery works only when the consumer Worker is
+ * also run locally. The tail *handler* on a Worker is wired separately and is
+ * always testable (`cf.tail.trigger()`).
+ */
+export function buildTailConsumersConfig(
+	config: Pick<DevflareConfig, 'tailConsumers'>
+): string[] | undefined {
+	if (!config.tailConsumers || config.tailConsumers.length === 0) {
+		return undefined
+	}
+
+	const tails = config.tailConsumers.map((consumer) =>
+		typeof consumer === 'string' ? consumer : consumer.service
+	)
+
+	return tails.length > 0 ? tails : undefined
 }
