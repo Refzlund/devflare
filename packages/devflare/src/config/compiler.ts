@@ -10,6 +10,7 @@ import { toWranglerSecretsConfig } from './local-dev-vars'
 import { resolveConfigForEnvironment } from './resolve'
 import type { ResolvedConfig } from './resolve-phased'
 import type { DevflareConfig } from './schema'
+import { normalizeR2Binding } from './schema-normalization'
 
 export { compileDOWorkerConfig } from './compiler/do-workers'
 export {
@@ -120,8 +121,16 @@ function compileConfigInternal(
 		)
 	}
 
-	if (mergedConfig.vars && Object.keys(mergedConfig.vars).length > 0) {
-		result.vars = mergedConfig.vars
+	// Deploy-time symmetry for `presignR2Put`/`presignR2Get`: the runtime
+	// cannot learn a binding's bucket name from the R2Bucket binding object,
+	// so the binding→bucket mapping is injected as a plain var. An explicit
+	// user var of the same name wins.
+	const r2BucketsVar = buildR2BucketsVar(mergedConfig.bindings?.r2)
+	if ((mergedConfig.vars && Object.keys(mergedConfig.vars).length > 0) || r2BucketsVar) {
+		result.vars = {
+			...(r2BucketsVar && { DEVFLARE_R2_BUCKETS: r2BucketsVar }),
+			...mergedConfig.vars
+		}
 	}
 
 	const secrets = toWranglerSecretsConfig(mergedConfig.secrets)
@@ -185,6 +194,35 @@ function compileConfigInternal(
 	}
 
 	return result
+}
+
+/**
+ * Build the JSON value of the injected `DEVFLARE_R2_BUCKETS` var: a mapping
+ * of R2 binding name → `{ bucketName, jurisdiction? }` that `presignR2Put`/
+ * `presignR2Get` read at runtime to presign against the right bucket without
+ * the app hardcoding bucket names. Returns `undefined` when the config has
+ * no R2 bindings.
+ */
+function buildR2BucketsVar(
+	r2Bindings: NonNullable<DevflareConfig['bindings']>['r2'] | undefined
+): string | undefined {
+	if (!r2Bindings || Object.keys(r2Bindings).length === 0) {
+		return undefined
+	}
+
+	const mapping = Object.fromEntries(
+		Object.entries(r2Bindings).map(([bindingName, bindingConfig]) => {
+			const normalized = normalizeR2Binding(bindingConfig)
+			return [
+				bindingName,
+				{
+					bucketName: normalized.bucketName,
+					...(normalized.jurisdiction && { jurisdiction: normalized.jurisdiction })
+				}
+			]
+		})
+	)
+	return JSON.stringify(mapping)
 }
 
 /**

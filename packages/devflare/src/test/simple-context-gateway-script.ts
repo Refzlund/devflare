@@ -1,3 +1,5 @@
+import { R2_PRESIGN_RUNTIME_JS } from '../bridge/r2-presign-runtime'
+
 export function buildGatewayScript(
 	bundledCode: string,
 	wrappers: string,
@@ -6,6 +8,8 @@ export function buildGatewayScript(
 	const nativeRpcBindingsLiteral = JSON.stringify(nativeRpcBindingNames)
 
 	return `
+${R2_PRESIGN_RUNTIME_JS}
+
 // Bundled transport + DO classes
 ${bundledCode}
 
@@ -61,6 +65,10 @@ export default {
 				}
 			})
 			return new Response(null, { status: 101, webSocket: client })
+		}
+		const presignResponse = await __devflareR2PresignHandle(request, env, new URL(request.url))
+		if (presignResponse) {
+			return presignResponse
 		}
 		return new Response('Gateway')
 	}

@@ -27,7 +27,7 @@ import {
 	createDevServerState,
 	disposeDevServerState
 } from './dev-server-state'
-import { buildMiniflareDevConfig } from './miniflare-dev-config'
+import { buildMiniflareDevConfig, resolveR2PresignOrigin } from './miniflare-dev-config'
 import { createMiniflareLog } from './miniflare-log'
 import { createReloadQueue } from './reload-queue'
 import { createRuntimeStdioForwarder } from './runtime-stdio'
@@ -106,6 +106,11 @@ export function createDevServer(options: DevServerOptions): DevServer {
 
 	const state: DevServerState = createDevServerState({ enableVite: enableViteRequested })
 
+	// Per-boot HMAC secret for the local R2 presign endpoint. Stable across
+	// Miniflare reloads within this dev-server instance so already-minted
+	// URLs stay valid; only injected when the config declares R2 bindings.
+	const r2PresignSecret = `${crypto.randomUUID()}${crypto.randomUUID()}`
+
 	const reloadQueue = createReloadQueue({
 		reload: async () => {
 			if (!state.miniflare) return
@@ -163,6 +168,7 @@ export function createDevServer(options: DevServerOptions): DevServer {
 			browserShimPort: state.browserShimPort,
 			doResult,
 			serviceBindingResolution: state.serviceBindingResolution,
+			r2PresignSecret,
 			logger
 		})
 	}
@@ -440,6 +446,12 @@ export function createDevServer(options: DevServerOptions): DevServer {
 				vitePort,
 				miniflarePort,
 				generatedViteConfigPath: state.generatedViteConfigPath,
+				r2Presign: state.config.bindings?.r2
+					? {
+							secret: r2PresignSecret,
+							origin: resolveR2PresignOrigin(state.config.server, miniflareHost, miniflarePort)
+						}
+					: null,
 				logger
 			})
 		} else {

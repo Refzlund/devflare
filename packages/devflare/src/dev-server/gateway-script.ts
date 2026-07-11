@@ -1,4 +1,5 @@
 import { GATEWAY_RUNTIME_JS } from '../bridge/gateway-runtime'
+import { R2_PRESIGN_RUNTIME_JS } from '../bridge/r2-presign-runtime'
 import type { WsRouteConfig } from '../config'
 
 /**
@@ -7,7 +8,8 @@ import type { WsRouteConfig } from '../config'
  * All in-sandbox RPC behavior (method dispatch, error envelope, serialization,
  * WebSocket bridge, HTTP transfer) lives in `GATEWAY_RUNTIME_JS` and is shared
  * with `src/bridge/miniflare.ts`. The canonical TypeScript equivalent lives in
- * `src/bridge/server.ts`.
+ * `src/bridge/server.ts`. The local presigned-R2 endpoint handler is shared
+ * via `R2_PRESIGN_RUNTIME_JS` (`src/bridge/r2-presign-runtime.ts`).
  *
  * This file only owns the pieces that are genuinely dev-server-specific:
  *   - WebSocket route matching & DO WebSocket forwarding (`WS_ROUTES`)
@@ -29,6 +31,8 @@ export function getGatewayScript(
 
 	return `
 ${GATEWAY_RUNTIME_JS}
+
+${R2_PRESIGN_RUNTIME_JS}
 
 // Bridge Gateway Worker — Dev Server
 // Dev-server-specific overlay on top of the shared GATEWAY_RUNTIME_JS:
@@ -55,6 +59,11 @@ export default {
 
 		if (url.pathname.startsWith('/_devflare/transfer/')) {
 			return handleHttpTransfer(request, env, url)
+		}
+
+		const presignResponse = await __devflareR2PresignHandle(request, env, url)
+		if (presignResponse) {
+			return presignResponse
 		}
 
 		if (url.pathname === '/_devflare/migrate' && request.method === 'POST') {

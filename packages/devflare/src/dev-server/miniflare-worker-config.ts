@@ -155,6 +155,13 @@ export interface MakeMiniflareWorkerContext {
 	secretsStoreConfig: SecretsStoreConfig
 	localSecretWrappedBindingConfig?: LocalSecretWrappedBindingConfig
 	queueProducers: Record<string, { queueName: string; deliveryDelay?: number }> | undefined
+	/**
+	 * Devflare-internal plain-string vars merged into every worker's
+	 * `bindings` on top of `config.vars` (e.g. the local R2 presign
+	 * secret/origin). Collisions win over user vars — these names are
+	 * `DEVFLARE_`-prefixed and reserved.
+	 */
+	injectedVars?: Record<string, string>
 }
 
 /**
@@ -197,7 +204,10 @@ export function makeMiniflareWorker(
 	const compatFlags = baseFlags.includes('nodejs_compat')
 		? baseFlags
 		: [...baseFlags, 'nodejs_compat']
-	const workerBindings: Record<string, unknown> = loadedConfig.vars ?? {}
+	const workerBindings: Record<string, unknown> = {
+		...(loadedConfig.vars ?? {}),
+		...(context.injectedVars ?? {})
+	}
 	const localWrappedBindings = {
 		...(localSecretWrappedBindingConfig?.wrappedBindings ?? {})
 	}

@@ -8,6 +8,7 @@
 
 import { BridgeClient } from '../bridge/client'
 import { wrapEnvSendEmailBindings } from '../utils/send-email'
+import { addR2PresignOriginVar } from './simple-context-mfconfig'
 import { getAvailablePort } from './simple-context-paths'
 
 const TEST_CONTEXT_STARTUP_RETRY_ATTEMPTS = 3
@@ -132,12 +133,13 @@ export async function startBridgeBackedTestContext(
 		let client: BridgeClient | null = null
 
 		try {
-			miniflare = new Miniflare(
-				expandLocalBindingWorkers({
-					...mfConfig,
-					port
-				})
-			)
+			const attemptConfig: any = { ...mfConfig, port }
+			const bindingsWithOrigin = addR2PresignOriginVar(attemptConfig.bindings, port)
+			if (bindingsWithOrigin) {
+				attemptConfig.bindings = bindingsWithOrigin
+			}
+
+			miniflare = new Miniflare(expandLocalBindingWorkers(attemptConfig))
 			await miniflare.ready
 
 			const miniflareBindings = wrapEnvSendEmailBindings(await miniflare.getBindings())

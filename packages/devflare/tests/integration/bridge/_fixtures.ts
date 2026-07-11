@@ -18,7 +18,8 @@ export const PORTS = {
 	multiInstance2: 9789,
 	r2Transfer: 9793,
 	r2Large: 9794,
-	case18Do: 9795
+	case18Do: 9795,
+	r2Presign: 9796
 } as const
 
 // =============================================================================

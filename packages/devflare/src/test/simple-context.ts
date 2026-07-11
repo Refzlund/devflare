@@ -107,6 +107,19 @@ export async function createTestContext(configPath?: string): Promise<void> {
 
 	const mfConfig: any = buildInlineBridgeMfConfig(config, { cwd: configDir })
 
+	// Local R2 presign: hand the gateway a per-boot HMAC secret so app code
+	// under test can mint presigned URLs against this instance. The origin is
+	// only known after boot and is overlaid onto the test env further down.
+	const r2PresignSecret = config.bindings?.r2
+		? `${crypto.randomUUID()}${crypto.randomUUID()}`
+		: null
+	if (r2PresignSecret) {
+		mfConfig.bindings = {
+			...mfConfig.bindings,
+			DEVFLARE_R2_PRESIGN_SECRET: r2PresignSecret
+		}
+	}
+
 	const transportFile = resolveTransportFile(configDir, config.files?.transport)
 
 	if (transportFile) {
@@ -133,6 +146,11 @@ export async function createTestContext(configPath?: string): Promise<void> {
 	state.miniflare = runtime.miniflare
 	state.miniflareBindings = runtime.miniflareBindings
 	state.client = runtime.client
+
+	if (r2PresignSecret && state.miniflareBindings) {
+		state.miniflareBindings.DEVFLARE_R2_PRESIGN_SECRET = r2PresignSecret
+		state.miniflareBindings.DEVFLARE_R2_PRESIGN_ORIGIN = `http://127.0.0.1:${activePort}`
+	}
 
 	const disposeContext = createDisposeContext(state)
 

@@ -69,7 +69,32 @@ export interface BuildMiniflareDevConfigInput {
 	browserShimPort: number
 	doResult: DOBundleResult | null
 	serviceBindingResolution?: ServiceBindingResolution | null
+	/**
+	 * Per-boot HMAC secret for the local R2 presign endpoint. Injected (with
+	 * the gateway origin) as `DEVFLARE_R2_PRESIGN_*` vars into every worker
+	 * when the config declares R2 bindings; ignored otherwise.
+	 */
+	r2PresignSecret?: string | null
 	logger?: ConsolaInstance
+}
+
+/**
+ * Resolve the browser-facing origin of the local dev runtime, used inside
+ * locally-presigned R2 URLs. Honors `server.publicUrl` (reverse proxy /
+ * tunnel setups); otherwise derives `http(s)://<host>:<port>` from the
+ * Miniflare listen address, normalizing wildcard hosts to `localhost`.
+ */
+export function resolveR2PresignOrigin(
+	serverConfig: DevflareConfig['server'],
+	miniflareHost: string,
+	miniflarePort: number
+): string {
+	if (serverConfig?.publicUrl) {
+		return serverConfig.publicUrl.replace(/\/$/, '')
+	}
+	const protocol = serverConfig?.https ? 'https' : 'http'
+	const host = miniflareHost === '0.0.0.0' || miniflareHost === '::' ? 'localhost' : miniflareHost
+	return `${protocol}://${host}:${miniflarePort}`
 }
 
 /**
@@ -97,6 +122,7 @@ export function buildMiniflareDevConfig(input: BuildMiniflareDevConfigInput): an
 		browserShimPort,
 		doResult,
 		serviceBindingResolution,
+		r2PresignSecret,
 		logger
 	} = input
 
@@ -175,6 +201,20 @@ export function buildMiniflareDevConfig(input: BuildMiniflareDevConfigInput): an
 		localSecretBindingNames
 	)
 
+	// Local R2 presign vars ride on every worker so both the gateway (validator)
+	// and worker-mode app code (URL minting) share the per-boot secret.
+	const injectedVars =
+		bindings.r2 && r2PresignSecret
+			? {
+					DEVFLARE_R2_PRESIGN_SECRET: r2PresignSecret,
+					DEVFLARE_R2_PRESIGN_ORIGIN: resolveR2PresignOrigin(
+						serverConfig,
+						miniflareHost,
+						miniflarePort
+					)
+				}
+			: undefined
+
 	const workerContext: MakeMiniflareWorkerContext = {
 		cwd,
 		loadedConfig,
@@ -200,7 +240,8 @@ export function buildMiniflareDevConfig(input: BuildMiniflareDevConfigInput): an
 		aiSearchInstancesConfig,
 		secretsStoreConfig,
 		localSecretWrappedBindingConfig,
-		queueProducers
+		queueProducers,
+		injectedVars
 	}
 
 	const createWorkerConfig = (options: Parameters<typeof makeMiniflareWorker>[1]) =>

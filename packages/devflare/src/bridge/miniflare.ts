@@ -33,7 +33,14 @@ import {
 	buildLocalSecretWrappedBindingConfig
 } from '../secrets/local-secrets'
 import { buildLocalBindingShimServiceConfig } from '../shims/local-media-bindings'
-import { GATEWAY_RUNTIME_JS } from './gateway-runtime'
+import {
+	type R2PresignContext,
+	generateGatewayScript,
+	hasNamedBindings,
+	resolveR2PresignSetup
+} from './miniflare-gateway'
+
+export type { R2PresignContext } from './miniflare-gateway'
 
 // -----------------------------------------------------------------------------
 // Types
@@ -42,6 +49,11 @@ import { GATEWAY_RUNTIME_JS } from './gateway-runtime'
 export interface MiniflareInstance {
 	/** Ready promise - resolves when Miniflare is ready */
 	ready: Promise<void>
+	/**
+	 * Local R2 presign context. Present when the instance was started with R2
+	 * buckets; `null` otherwise.
+	 */
+	r2Presign: R2PresignContext | null
 	/** Dispose the Miniflare instance */
 	dispose(): Promise<void>
 	/** Get bindings directly from Miniflare */
@@ -196,70 +208,6 @@ type MfOptionsWithEmail = MfOptions & {
 	workers?: Array<Record<string, unknown>>
 	r2Buckets?: MiniflareOptions['r2Buckets']
 	r2Persist?: string
-}
-
-// -----------------------------------------------------------------------------
-// Gateway Worker Script
-// -----------------------------------------------------------------------------
-
-/**
- * Generates a lightweight HTTP-only gateway worker script for
- * `startMiniflare()` usage (tests, scripts, programmatic access).
- *
- * The RPC dispatch logic is shared with `dev-server/gateway-script.ts` via
- * `GATEWAY_RUNTIME_JS`. This gateway exposes the dispatcher over a plain
- * HTTP endpoint (`POST /_devflare/rpc`). The full WebSocket bridge with
- * streaming and WebSocket proxying lives in `./server.ts` / the dev-server
- * gateway.
- */
-function generateGatewayScript(): string {
-	return `
-${GATEWAY_RUNTIME_JS}
-
-export default {
-	async fetch(request, env, ctx) {
-		const url = new URL(request.url)
-
-		if (url.pathname === '/_devflare/health') {
-			return new Response(JSON.stringify({ ok: true, status: 'ok', bindings: Object.keys(env) }), {
-				headers: { 'Content-Type': 'application/json' }
-			})
-		}
-
-		if (url.pathname === '/_devflare/rpc' && request.method === 'POST') {
-			try {
-				const { method, params } = await request.json()
-				const result = await executeRpcMethod(method, params, env, ctx)
-				return new Response(JSON.stringify({ ok: true, result }), {
-					headers: { 'Content-Type': 'application/json' }
-				})
-			} catch (error) {
-				return new Response(JSON.stringify({
-					ok: false,
-					error: { code: error?.code || 'RPC_ERROR', message: error?.message || String(error) }
-				}), {
-					status: 500,
-					headers: { 'Content-Type': 'application/json' }
-				})
-			}
-		}
-
-		return new Response('Devflare Gateway', { status: 200 })
-	}
-}
-`
-}
-
-function hasNamedBindings(bindings: string[] | Record<string, string> | undefined): boolean {
-	if (!bindings) {
-		return false
-	}
-
-	if (Array.isArray(bindings)) {
-		return bindings.length > 0
-	}
-
-	return Object.keys(bindings).length > 0
 }
 
 function resolvePersistPath(options: MiniflareOptions): string | undefined {
@@ -667,10 +615,13 @@ function getPrimaryWorkerName(config: MfOptionsWithEmail): string | undefined {
 export function createMiniflareInstanceHandle(
 	mf: MiniflareType,
 	primaryWorkerName?: string,
-	nodeBindingOverrides: Record<string, unknown> = {}
+	nodeBindingOverrides: Record<string, unknown> = {},
+	r2Presign: R2PresignContext | null = null
 ): MiniflareInstance {
 	return {
 		ready: Promise.resolve(),
+
+		r2Presign,
 
 		async dispose() {
 			const dispose = (mf as { dispose?: unknown }).dispose
@@ -716,14 +667,16 @@ export function createMiniflareInstanceHandle(
  */
 export async function startMiniflare(options: MiniflareOptions = {}): Promise<MiniflareInstance> {
 	const runtime = await loadMiniflareRuntime()
-	const mfConfig = createMiniflareConfig(options, runtime)
+	const presignSetup = resolveR2PresignSetup(options)
+	const mfConfig = createMiniflareConfig(presignSetup.options, runtime)
 	const mf = new runtime.Miniflare(mfConfig as MfOptions)
 	await mf.ready
 
 	return createMiniflareInstanceHandle(
 		mf,
 		getPrimaryWorkerName(mfConfig),
-		options.nodeBindingOverrides
+		options.nodeBindingOverrides,
+		presignSetup.r2Presign
 	)
 }
 

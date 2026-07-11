@@ -120,3 +120,14 @@ export {
 	clearLocalSendEmailBindings,
 	type LocalSendEmailBindingConfig
 } from '../utils/send-email'
+
+// R2 presigned URLs (worker-safe: WebCrypto + aws4fetch only)
+export {
+	presignR2Put,
+	presignR2Get,
+	type R2PresignCredentials,
+	type R2PresignBaseOptions,
+	type R2PresignPutOptions,
+	type R2PresignGetOptions,
+	type PresignedR2Request
+} from './r2-presign'

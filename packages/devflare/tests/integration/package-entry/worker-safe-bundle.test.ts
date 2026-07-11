@@ -39,7 +39,10 @@ async function createBundleResult(
 	const tempDir = await mkdtemp(join(tmpdir(), 'devflare-worker-bundle-'))
 	tempDirs.push(tempDir)
 
-	await installBuiltDevflare(tempDir)
+	// aws4fetch is a real runtime dependency of `devflare/runtime` (R2
+	// presigning); a consumer install always has it, so the temp install must
+	// mirror that for the bundle to resolve.
+	await installBuiltDevflare(tempDir, { runtimeDependencies: ['aws4fetch'] })
 
 	await writeFile(
 		join(tempDir, 'entry.ts'),
@@ -83,6 +86,12 @@ describe('worker-safe package entrypoints', () => {
 			'devflare/runtime',
 			'sequence, resolveFetchHandler, invokeFetchHandler, createResolveFetch, invokeFetchModule'
 		)
+		expect(result.success).toBe(true)
+		expect(formatBuildLogs(result.logs)).toBe('')
+	})
+
+	test('runtime entry exports R2 presign helpers', async () => {
+		const result = await createBundleResult('devflare/runtime', 'presignR2Put, presignR2Get')
 		expect(result.success).toBe(true)
 		expect(formatBuildLogs(result.logs)).toBe('')
 	})

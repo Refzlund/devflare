@@ -59,6 +59,10 @@ export function applyMultiWorkerConfig(
 		...(mfConfig.artifacts && { artifacts: mfConfig.artifacts }),
 		...(mfConfig.secretsStoreSecrets && { secretsStoreSecrets: mfConfig.secretsStoreSecrets }),
 		...(mfConfig.wrappedBindings && { wrappedBindings: mfConfig.wrappedBindings }),
+		// Vars/plain bindings (incl. the injected R2 presign secret) must ride on
+		// the primary worker — Miniflare ignores per-worker options left top-level
+		// once a `workers` array is present.
+		...(mfConfig.bindings && { bindings: mfConfig.bindings }),
 		...(mfConfig.email && { email: mfConfig.email }),
 		...(Object.keys(primaryDurableObjects).length > 0 && { durableObjects: primaryDurableObjects }),
 		...(mfConfig.serviceBindings || serviceBindingResolution?.primaryServiceBindings
@@ -114,6 +118,7 @@ export function applyMultiWorkerConfig(
 	delete mfConfig.artifacts
 	delete mfConfig.secretsStoreSecrets
 	delete mfConfig.wrappedBindings
+	delete mfConfig.bindings
 	delete mfConfig.serviceBindings
 	delete mfConfig.__devflareLocalSecretWorkers
 	delete mfConfig.__devflareLocalBindingWorkers

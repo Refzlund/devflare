@@ -9,6 +9,7 @@
 
 import type { BridgeClient } from '../bridge/client'
 import { wrapEnvSendEmailBindings } from '../utils/send-email'
+import { addR2PresignOriginVar } from './simple-context-mfconfig'
 import { getAvailablePort } from './simple-context-paths'
 import { startBridgeBackedTestContext } from './simple-context-startup'
 
@@ -36,6 +37,15 @@ export async function bootTestRuntime(
 	if (usesMultiWorker) {
 		const { Miniflare } = await import('miniflare')
 		const activePort = await getAvailablePort()
+
+		// The multi-worker rewrite already moved plain bindings onto the primary
+		// worker; the gateway origin can only be added now that the port exists.
+		const primaryWorker = Array.isArray(mfConfig.workers) ? mfConfig.workers[0] : undefined
+		const primaryBindings = addR2PresignOriginVar(primaryWorker?.bindings, activePort)
+		if (primaryWorker && primaryBindings) {
+			primaryWorker.bindings = primaryBindings
+		}
+
 		const miniflare = new Miniflare({
 			...mfConfig,
 			port: activePort

@@ -35,6 +35,23 @@ export interface BuildInlineBridgeMfConfigOptions {
 }
 
 /**
+ * Return `bindings` with the local R2 presign gateway origin added, when (and
+ * only when) the presign secret was wired in. The origin can only be built at
+ * boot time — the test context picks a fresh port per startup attempt — so
+ * this runs next to each `new Miniflare(...)` call rather than in the config
+ * builder.
+ */
+export function addR2PresignOriginVar(
+	bindings: Record<string, unknown> | undefined,
+	port: number
+): Record<string, unknown> | undefined {
+	if (!bindings || typeof bindings.DEVFLARE_R2_PRESIGN_SECRET !== 'string') {
+		return bindings
+	}
+	return { ...bindings, DEVFLARE_R2_PRESIGN_ORIGIN: `http://127.0.0.1:${port}` }
+}
+
+/**
  * Build the seed Miniflare config for an inline (single-worker) bridge.
  * Pure: no I/O, no closures.
  */

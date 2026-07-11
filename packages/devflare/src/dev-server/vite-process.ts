@@ -8,6 +8,12 @@ export interface StartViteProcessOptions {
 	vitePort: number
 	miniflarePort: number
 	generatedViteConfigPath: string | null
+	/**
+	 * Local R2 presign context, exposed to the app process as
+	 * `DEVFLARE_R2_PRESIGN_SECRET`/`DEVFLARE_R2_PRESIGN_ORIGIN` so
+	 * `presignR2Put`/`presignR2Get` mint gateway-local URLs in dev.
+	 */
+	r2Presign?: { secret: string; origin: string } | null
 	logger?: ConsolaInstance
 }
 
@@ -15,7 +21,8 @@ export interface StartViteProcessOptions {
  * Start the Vite dev server process.
  */
 export async function startViteProcess(options: StartViteProcessOptions): Promise<ChildProcess> {
-	const { cwd, configPath, vitePort, miniflarePort, generatedViteConfigPath, logger } = options
+	const { cwd, configPath, vitePort, miniflarePort, generatedViteConfigPath, r2Presign, logger } =
+		options
 
 	const args = ['vite', 'dev', '--port', String(vitePort)]
 	if (generatedViteConfigPath) {
@@ -31,6 +38,12 @@ export async function startViteProcess(options: StartViteProcessOptions): Promis
 			DEVFLARE_DEV: 'true',
 			DEVFLARE_BRIDGE_PORT: String(miniflarePort),
 			...(configPath ? { DEVFLARE_CONFIG_PATH: configPath } : {}),
+			...(r2Presign
+				? {
+						DEVFLARE_R2_PRESIGN_SECRET: r2Presign.secret,
+						DEVFLARE_R2_PRESIGN_ORIGIN: r2Presign.origin
+					}
+				: {}),
 			FORCE_COLOR: '1'
 		}
 	})
