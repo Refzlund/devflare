@@ -56,6 +56,7 @@
     "packaging-license-hygiene",
     "phase-b-code-paths",
     "phase-f-docs-debt",
+    "r2-presigned-put-uploads",
     "remove-context-unavailable-error",
     "robust-package-json-resolution",
     "rolldown-build-fix",
