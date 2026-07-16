@@ -29,6 +29,7 @@
     "devflare": "1.0.0-next.27"
   },
   "changesets": [
+    "bridge-app-route-websocket-forward",
     "bridge-do-rpc-native-dispatch",
     "bridge-do-websocket-fix",
     "bridge-do-websocket-hibernation-broadcast",
