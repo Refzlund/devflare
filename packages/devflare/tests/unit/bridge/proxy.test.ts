@@ -124,7 +124,7 @@ describe('createDOStubProxy.connect startTls (B5)', () => {
 			async call() {
 				return { __type: 'DOId', hex: 'abc123' }
 			},
-			async createWsProxy() {
+			async openDoWebSocket() {
 				return {
 					wid: 1,
 					send: () => {},

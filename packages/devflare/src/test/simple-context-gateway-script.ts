@@ -51,6 +51,39 @@ function __encodeTransport(value) {
 export default {
 	async fetch(request, env) {
 		if (request.headers.get('Upgrade') === 'websocket') {
+			const wsUrl = new URL(request.url)
+			// Bridge DO connect(): a real pass-through upgrade to a Durable Object.
+			// The client's openDoWebSocket() opens a real loopback WS here rather
+			// than tunneling frames over the RPC socket; we forward the upgrade to
+			// the DO and pass its 101 response straight back so miniflare wires the
+			// inbound connection to the DO's client socket. That genuine inbound
+			// connection is what makes the runtime dispatch the DO's hibernation
+			// handlers (webSocketMessage/webSocketClose) and deliver
+			// ctx.getWebSockets() broadcasts — an in-process pump never does.
+			//
+			// This is a byte-equivalent copy of handleBridgeDoWebSocket in
+			// src/bridge/gateway-runtime.ts (this gateway is a separately-bundled
+			// Worker template that cannot import that runtime) — keep the two in sync.
+			if (wsUrl.pathname === '/_devflare/do-ws') {
+				try {
+					const bindingName = wsUrl.searchParams.get('binding')
+					const idHex = wsUrl.searchParams.get('id')
+					const targetUrl = wsUrl.searchParams.get('u') || request.url
+					const doBinding = env[bindingName]
+					if (!doBinding || typeof doBinding.idFromString !== 'function') {
+						return new Response('Durable Object binding not found: ' + bindingName, { status: 500 })
+					}
+					if (!idHex) {
+						return new Response('Missing Durable Object id', { status: 400 })
+					}
+					const stub = doBinding.get(doBinding.idFromString(idHex))
+					return stub.fetch(new Request(targetUrl, { method: 'GET', headers: request.headers }))
+				} catch (error) {
+					return new Response('Error opening DO WebSocket: ' + (error?.message || String(error)), {
+						status: 500
+					})
+				}
+			}
 			const { 0: client, 1: server } = new WebSocketPair()
 			server.accept()
 			server.addEventListener('message', async (e) => {

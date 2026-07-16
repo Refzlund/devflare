@@ -570,6 +570,47 @@ async function handleBridgeJsonMessage(data, ws, env, ctx, wsProxies) {
 	}
 }
 
+// Pass-through DO WebSocket upgrade (bridge client -> gateway -> DO).
+//
+// The bridge client's openDoWebSocket() opens a REAL loopback WebSocket to this
+// endpoint (/_devflare/do-ws?binding&id&u) instead of tunneling frames over the
+// bridge socket. We resolve the DO by id and RETURN the DO's 101 response
+// verbatim (webSocket included), so miniflare wires the inbound connection to
+// the DO's client socket. That genuine inbound connection is what makes workerd
+// dispatch the DO's hibernation handlers (webSocketMessage/webSocketClose) and
+// deliver ctx.getWebSockets() broadcasts. Pumping the DO socket in-process (the
+// legacy handleBridgeWsOpen path) never triggers hibernation, so two sockets to
+// one getByName(id) could not see each other's messages. This mirrors the
+// browser WS_ROUTES pass-through (handleDoWebSocket) and real Cloudflare.
+//
+// NOTE: the devflare/test gateway (src/test/simple-context-gateway-script.ts)
+// keeps a byte-equivalent copy of this handler because it is a separately-bundled
+// Worker template that cannot import this runtime — keep the two in sync.
+async function handleBridgeDoWebSocket(request, env, url) {
+	try {
+		const bindingName = url.searchParams.get('binding')
+		const idHex = url.searchParams.get('id')
+		const targetUrl = url.searchParams.get('u') || url.toString()
+
+		const binding = env[bindingName]
+		if (!binding || typeof binding.idFromString !== 'function') {
+			return new Response('Durable Object binding not found: ' + bindingName, { status: 500 })
+		}
+		if (!idHex) {
+			return new Response('Missing Durable Object id', { status: 400 })
+		}
+
+		const stub = binding.get(binding.idFromString(idHex))
+		// Forward the real upgrade request (its headers carry any auth/cookies the
+		// caller passed to connect()) and pass the DO's 101 response straight back.
+		return stub.fetch(new Request(targetUrl, { method: 'GET', headers: request.headers }))
+	} catch (error) {
+		return new Response('Error opening DO WebSocket: ' + (error?.message || String(error)), {
+			status: 500
+		})
+	}
+}
+
 function handleBridgeWebSocket(request, env, ctx) {
 	const { 0: client, 1: server } = new WebSocketPair()
 	server.accept()

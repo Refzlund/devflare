@@ -10,6 +10,7 @@
 // and ws-relay messages are dispatched through the codec.
 // =============================================================================
 
+import { openDurableObjectWebSocket } from './do-websocket-connect'
 import { bridgeLog } from './log'
 import { TransportV2Codec } from './v2/codec'
 import type { TransportV2DecodedBinaryFrame } from './v2/frames'
@@ -35,6 +36,14 @@ import {
 	parseJsonMsg,
 	stringifyJsonMsg
 } from './v2/wire'
+import {
+	type WebSocketConstructor,
+	getRuntimeWebSocketConstructor,
+	importWsPackageConstructor
+} from './websocket-constructor'
+
+// Re-exported for callers that historically imported it from the client module.
+export { resolveBridgeWebSocketConstructor } from './websocket-constructor'
 
 // -----------------------------------------------------------------------------
 // Internal — adapter that exposes a real browser/Node WebSocket as a
@@ -63,57 +72,6 @@ class BridgeWsAdapter implements WebSocketLike {
 }
 
 const BRIDGE_CLIENT_CAPABILITIES = ['streams', 'ws-relay', 'http-transfer'] as const
-type WebSocketConstructor = new (url: string) => WebSocket
-let wsPackageConstructorPromise: Promise<WebSocketConstructor> | null = null
-
-async function importWsPackageConstructor(): Promise<WebSocketConstructor> {
-	if (!wsPackageConstructorPromise) {
-		wsPackageConstructorPromise = (async () => {
-			const dynamicImport = new Function(
-				'specifier',
-				['return ', 'import', '(specifier)'].join('')
-			) as (specifier: string) => Promise<{
-				WebSocket?: unknown
-				default?: unknown
-			}>
-			const wsModule = await dynamicImport('ws')
-			const defaultExport = wsModule.default as { WebSocket?: unknown } | unknown
-			const wsConstructor =
-				wsModule.WebSocket ??
-				(typeof defaultExport === 'object' && defaultExport !== null
-					? (defaultExport as { WebSocket?: unknown }).WebSocket
-					: undefined) ??
-				defaultExport
-
-			if (typeof wsConstructor !== 'function') {
-				throw new Error('Could not load a WebSocket client implementation from the ws package')
-			}
-
-			return wsConstructor as WebSocketConstructor
-		})()
-	}
-
-	return wsPackageConstructorPromise
-}
-
-function getRuntimeWebSocketConstructor(
-	runtimeWebSocket: unknown = globalThis.WebSocket
-): WebSocketConstructor | null {
-	if (typeof runtimeWebSocket === 'function') {
-		return runtimeWebSocket as WebSocketConstructor
-	}
-
-	return null
-}
-
-export async function resolveBridgeWebSocketConstructor(
-	runtimeWebSocket: unknown = globalThis.WebSocket
-): Promise<WebSocketConstructor> {
-	const runtimeConstructor = getRuntimeWebSocketConstructor(runtimeWebSocket)
-	if (runtimeConstructor) return runtimeConstructor
-
-	return importWsPackageConstructor()
-}
 
 // -----------------------------------------------------------------------------
 // Types
@@ -460,7 +418,18 @@ export class BridgeClient {
 	// WebSocket Proxy
 	// ---------------------------------------------------------------------------
 
-	/** Create a proxied WebSocket to a Durable Object */
+	/**
+	 * Create a proxied WebSocket to a Durable Object via the in-process bridge
+	 * relay (`ws.open` control frame → gateway `stub.fetch()` pump → `WsData`
+	 * frames).
+	 *
+	 * DEPRECATED for DO connect(): this relay pumps the DO's WebSocket in-process,
+	 * which does NOT trigger workerd's hibernation dispatch — so a DO that uses
+	 * `ctx.acceptWebSocket()` never sees `webSocketMessage`/`webSocketClose` and
+	 * cross-socket `ctx.getWebSockets()` broadcasts never cross. `connect()` now
+	 * uses `openDoWebSocket()` (a real pass-through) instead. This method is
+	 * retained for the `ws-relay` wire capability and backward compatibility.
+	 */
 	async createWsProxy(
 		binding: string,
 		id: string,
@@ -525,6 +494,48 @@ export class BridgeClient {
 				proxy.onClose = handler
 			}
 		}
+	}
+
+	/**
+	 * Open a REAL WebSocket to the gateway's DO pass-through endpoint
+	 * (`/_devflare/do-ws`), which forwards the upgrade to the target Durable
+	 * Object and passes through its `101` response.
+	 *
+	 * This is the ONLY way a bridged DO WebSocket triggers the runtime's
+	 * hibernation dispatch under miniflare: the gateway returns the DO's client
+	 * socket for a genuine inbound connection, so workerd pumps it and invokes
+	 * `webSocketMessage`/`webSocketClose` and delivers `ctx.getWebSockets()`
+	 * broadcasts. The legacy in-process relay (`createWsProxy` + gateway
+	 * `stub.fetch()` pump) never fires hibernation, so two sockets to the same
+	 * `getByName(id)` could not see each other's messages. Here they share ONE DO
+	 * instance and broadcast across each other, exactly as on real Cloudflare.
+	 *
+	 * Unlike `createWsProxy`, this does not multiplex over the bridge socket: it
+	 * is a standalone connection (see `openDurableObjectWebSocket`) with its own
+	 * lifecycle, so it is unaffected by the bridge client's disconnect/reconnect
+	 * bookkeeping. It also does not require the bridge socket to be connected.
+	 *
+	 * @param binding - DO namespace binding name (e.g. `DOC_ROOM`).
+	 * @param idHex - Already-resolved Durable Object id, hex form.
+	 * @param targetUrl - The DO fetch URL the caller passed to `stub.connect(url)`.
+	 * @param headers - Optional upgrade headers (auth/cookies) forwarded to the DO.
+	 * @returns A minimal proxy surface (send/close/onMessage/onClose) over the socket.
+	 * @throws When the pass-through socket fails to open (bad binding/id, or the
+	 *   DO rejected the upgrade).
+	 */
+	async openDoWebSocket(
+		binding: string,
+		idHex: string,
+		targetUrl: string,
+		headers?: [string, string][]
+	): Promise<{
+		wid: number
+		send: (data: Uint8Array | string) => void
+		close: (code?: number, reason?: string) => void
+		onMessage: (handler: (data: Uint8Array | string) => void) => void
+		onClose: (handler: (code?: number, reason?: string) => void) => void
+	}> {
+		return openDurableObjectWebSocket(this.url, binding, idHex, targetUrl, headers)
 	}
 
 	// ---------------------------------------------------------------------------

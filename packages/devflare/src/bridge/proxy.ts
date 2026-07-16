@@ -344,8 +344,12 @@ function createDOStubProxy(
 				})
 			}
 
-			// Create WebSocket proxy via bridge
-			const wsProxy = await client.createWsProxy(bindingName, id.hex, url, headersList)
+			// Open a real pass-through WebSocket to the DO. This routes through the
+			// gateway's /_devflare/do-ws endpoint (which forwards the upgrade and
+			// passes through the DO's 101), so the runtime fires the DO's
+			// hibernation handlers and cross-socket getWebSockets() broadcasts
+			// reach every connected client — unlike the legacy in-process relay.
+			const wsProxy = await client.openDoWebSocket(bindingName, id.hex, url, headersList)
 
 			// Create readable stream from WS messages
 			let readController: ReadableStreamDefaultController<Uint8Array> | null = null

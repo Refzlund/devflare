@@ -50,6 +50,11 @@ export default {
 		const isWebSocket = request.headers.get('Upgrade') === 'websocket'
 
 		if (isWebSocket) {
+			// Bridge DO connect(): a real pass-through upgrade to a Durable Object
+			// (hibernation-correct), distinct from the bridge RPC/relay socket.
+			if (url.pathname === '/_devflare/do-ws') {
+				return handleBridgeDoWebSocket(request, env, url)
+			}
 			const matchedRoute = matchWsRoute(url.pathname)
 			if (matchedRoute) {
 				return handleDoWebSocket(request, env, url, matchedRoute)
