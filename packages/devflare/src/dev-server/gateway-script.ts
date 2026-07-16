@@ -59,6 +59,20 @@ export default {
 			if (matchedRoute) {
 				return handleDoWebSocket(request, env, url, matchedRoute)
 			}
+			// Worker mode: the app worker (SvelteKit etc.) owns app WebSocket routes.
+			// A handler like GET /api/doc/:id/subscribe that does
+			// \`return stub.fetch(clientUpgradeRequest)\` must reach the app worker so
+			// its returned 101 (with the DO's client socket) flows back to the
+			// browser and the DO's hibernation handlers fire. The gateway previously
+			// hijacked EVERY unmatched WS upgrade into the in-worker bridge socket
+			// (handleBridgeWebSocket), so the app route never ran and two tabs never
+			// shared the DO. Forward to the app first; only fall back to the bridge
+			// socket when the app did not answer with a WebSocket upgrade (e.g. a
+			// Node-side bridge RPC client, which only exists when there is no app).
+			const appWsResponse = await forwardWebSocketToApp(request, env)
+			if (appWsResponse) {
+				return appWsResponse
+			}
 			return handleBridgeWebSocket(request, env, ctx)
 		}
 
@@ -262,6 +276,25 @@ function matchWsRoute(pathname) {
 		if (pathname === route.pattern || pathname.startsWith(route.pattern + '?')) {
 			return route
 		}
+	}
+	return null
+}
+
+// Forward a WebSocket upgrade to the app worker (worker mode) and pass through
+// its response ONLY when the app answered with a genuine WebSocket upgrade
+// (status 101 + a webSocket). Returns null otherwise so the caller falls back to
+// the in-worker bridge socket. This is what lets an app route that does
+// \`return stub.fetch(clientUpgradeRequest)\` reach the DO and stream the DO's
+// client socket back to the browser (hibernation handlers then fire, and two
+// tabs share one DO instance). A GET upgrade has no body, so forwarding the same
+// request and — on a non-101 answer — discarding it is safe (no stream consumed).
+async function forwardWebSocketToApp(request, env) {
+	if (!APP_SERVICE_BINDING) return null
+	const appWorker = env[APP_SERVICE_BINDING]
+	if (!appWorker || typeof appWorker.fetch !== 'function') return null
+	const response = await appWorker.fetch(request)
+	if (response.status === 101 && response.webSocket) {
+		return response
 	}
 	return null
 }
