@@ -226,6 +226,146 @@ describe('executeRpcMethod — B5-frame: binding errors round-trip with typed ca
 	})
 })
 
+describe('executeRpcMethod — do.rpc dispatches native Durable Object RPC', () => {
+	// Mirrors the reported bug: a DO that `extends DurableObject` exposes RPC
+	// methods natively AND defines its own fetch() that only accepts websocket
+	// upgrades (426 for anything else). The bridge must invoke the method
+	// DIRECTLY on the stub; routing it through fetch() hands the internal `_rpc`
+	// probe to the user handler, whose 426 text body then fails `response.json()`
+	// with "Unexpected token 'e', \"expected a\"... is not valid JSON".
+	function makeNativeRpcDoEnv(): GatewayEnv {
+		const stub = {
+			fetch(request: Request): Response {
+				if (request.headers.get('Upgrade') !== 'websocket') {
+					return new Response('expected a websocket upgrade', { status: 426 })
+				}
+				return new Response(null, { status: 101 })
+			},
+			async push(value: string): Promise<{ seq: number; echo: string }> {
+				return { seq: 1, echo: value }
+			},
+			async pull(since: number): Promise<{ seq: number; framesB64: string[]; since: number }> {
+				return { seq: 2, framesB64: ['AAAA'], since }
+			}
+		}
+		const doNs = {
+			idFromName: () => ({ toString: () => 'hex-id' }),
+			idFromString: () => ({ __id: 'hex-id' }),
+			newUniqueId: () => ({ __id: 'hex-id' }),
+			get: () => stub
+		}
+		return { MY_DO: doNs } as unknown as GatewayEnv
+	}
+
+	const serializedId = { __type: 'DOId', hex: 'hex-id' }
+
+	test('push() returns the structured value (not the fetch 426 / JSON-parse error)', async () => {
+		const env = makeNativeRpcDoEnv()
+		const result = await executeRpcMethod(
+			'MY_DO.do.rpc',
+			['MY_DO', serializedId, 'push', ['AAAA']],
+			env,
+			noopCtx
+		)
+		expect(result).toEqual({ seq: 1, echo: 'AAAA' })
+	})
+
+	test('pull(since) returns its structured value', async () => {
+		const env = makeNativeRpcDoEnv()
+		const result = await executeRpcMethod(
+			'MY_DO.do.rpc',
+			['MY_DO', serializedId, 'pull', [5]],
+			env,
+			noopCtx
+		)
+		expect(result).toEqual({ seq: 2, framesB64: ['AAAA'], since: 5 })
+	})
+
+	test('a genuine error thrown by the RPC method propagates (not swallowed as a fallback)', async () => {
+		const stub = {
+			fetch: () => new Response('should not be reached', { status: 500 }),
+			async push(): Promise<never> {
+				throw new Error('boom from method')
+			}
+		}
+		const doNs = {
+			idFromName: () => ({ toString: () => 'hex' }),
+			idFromString: () => ({ __id: 'hex' }),
+			newUniqueId: () => ({ __id: 'hex' }),
+			get: () => stub
+		}
+		const env = { MY_DO: doNs } as unknown as GatewayEnv
+		await expect(
+			executeRpcMethod('MY_DO.do.rpc', ['MY_DO', serializedId, 'push', []], env, noopCtx)
+		).rejects.toThrow(/boom from method/)
+	})
+
+	test('falls back to the fetch /_rpc convention for a DO with no native method', async () => {
+		// A stub whose only surface is fetch() dispatching POST /_rpc — the legacy
+		// non-RPC DO shape. The gateway must keep serving it.
+		const stub = {
+			async fetch(request: Request): Promise<Response> {
+				const { method, params } = (await request.json()) as {
+					method: string
+					params: unknown[]
+				}
+				if (method === 'ping') {
+					return Response.json({ ok: true, result: { pong: params[0] } })
+				}
+				return Response.json({ ok: false, error: { message: `no method ${method}` } })
+			}
+		}
+		const doNs = {
+			idFromName: () => ({ toString: () => 'hex' }),
+			idFromString: () => ({ __id: 'hex' }),
+			newUniqueId: () => ({ __id: 'hex' }),
+			get: () => stub
+		}
+		const env = { LEGACY_DO: doNs } as unknown as GatewayEnv
+		const result = await executeRpcMethod(
+			'LEGACY_DO.do.rpc',
+			['LEGACY_DO', serializedId, 'ping', ['hi']],
+			env,
+			noopCtx
+		)
+		expect(result).toEqual({ pong: 'hi' })
+	})
+
+	test('falls back to /_rpc when native dispatch reports the DO is not RPC-enabled', async () => {
+		// workerd exposes stub[method] as callable even for non-RPC DOs, but
+		// invoking it throws "does not support RPC". The gateway must catch that
+		// specific signal and retry through the fetch /_rpc convention.
+		const stub = {
+			async fetch(request: Request): Promise<Response> {
+				const { method, params } = (await request.json()) as {
+					method: string
+					params: unknown[]
+				}
+				return Response.json({ ok: true, result: { via: 'fetch', method, params } })
+			},
+			ping(): never {
+				throw new Error(
+					'The receiving Durable Object does not support RPC, because its class was not declared with `extends DurableObject`.'
+				)
+			}
+		}
+		const doNs = {
+			idFromName: () => ({ toString: () => 'hex' }),
+			idFromString: () => ({ __id: 'hex' }),
+			newUniqueId: () => ({ __id: 'hex' }),
+			get: () => stub
+		}
+		const env = { PROXY_DO: doNs } as unknown as GatewayEnv
+		const result = await executeRpcMethod(
+			'PROXY_DO.do.rpc',
+			['PROXY_DO', serializedId, 'ping', ['x']],
+			env,
+			noopCtx
+		)
+		expect(result).toEqual({ via: 'fetch', method: 'ping', params: ['x'] })
+	})
+})
+
 describe('executeRpcMethod — DO jurisdiction (B2)', () => {
 	test('forwards jurisdiction to binding.jurisdiction(j) when supported', async () => {
 		const seen: string[] = []

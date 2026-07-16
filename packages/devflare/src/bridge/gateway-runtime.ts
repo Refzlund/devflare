@@ -181,6 +181,42 @@ function resolveDoNamespace(binding, jurisdiction) {
 	return binding
 }
 
+// Dispatch a single Durable Object RPC method call to its stub.
+//
+// A DO that extends DurableObject (from cloudflare:workers) exposes its methods
+// as native RPC on the stub, so the method is invoked DIRECTLY as
+// stub[method](...args) — exactly as on real Cloudflare. This is the ONLY
+// correct path for a DO that ALSO defines its own fetch(): routing the call
+// through fetch() would hand devflare's internal _rpc probe to the user handler,
+// which may reject it (e.g. a websocket-only fetch() returning 426) and yield a
+// non-JSON body that then fails to parse (the reported crash).
+//
+// The fetch _rpc convention is kept only as a fallback for DOs that are not
+// RPC-enabled: the stub proxies every property as callable, so such a DO only
+// reveals itself when the native call throws "does not support RPC".
+async function callDurableObjectRpc(stub, methodName, args) {
+	if (typeof stub[methodName] === 'function') {
+		try {
+			return await stub[methodName](...args)
+		} catch (error) {
+			if (!isDurableObjectRpcUnsupported(error)) throw error
+		}
+	}
+	const response = await stub.fetch(new Request('http://do/_rpc', {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ method: methodName, params: args })
+	}))
+	const result = await response.json()
+	if (!result.ok) throw new Error(result.error?.message || 'RPC failed')
+	return result.result
+}
+
+function isDurableObjectRpcUnsupported(error) {
+	const message = error && error.message ? String(error.message) : String(error)
+	return message.indexOf('does not support RPC') !== -1
+}
+
 /**
  * Execute an RPC method against the gateway's bindings.
  *
@@ -307,14 +343,7 @@ async function executeRpcMethod(method, params, env, _ctx) {
 		const [, serializedId, methodName, args] = params
 		const id = binding.idFromString(serializedId.hex)
 		const stub = binding.get(id)
-		const response = await stub.fetch(new Request('http://do/_rpc', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ method: methodName, params: args })
-		}))
-		const result = await response.json()
-		if (!result.ok) throw new Error(result.error?.message || 'RPC failed')
-		return result.result
+		return callDurableObjectRpc(stub, methodName, Array.isArray(args) ? args : [])
 	}
 
 	// Service Bindings

@@ -5,6 +5,7 @@
 // =============================================================================
 
 import { normalizeSendEmailMessage } from '../utils/send-email'
+import { callDurableObjectRpc } from './do-rpc-dispatch'
 import {
 	type SerializedRequest,
 	type StreamRef,
@@ -642,10 +643,11 @@ async function executeDoFetch(
 }
 
 /**
- * Execute an RPC method on a Durable Object stub
+ * Execute an RPC method on a Durable Object stub.
  *
- * This uses the DO's internal `_rpc` endpoint convention to call methods.
- * The DO class must expose an RPC handler via fetch() that routes to methods.
+ * Resolves the stub, then dispatches through `callDurableObjectRpc`, which
+ * prefers native workerd RPC and only falls back to the fetch `_rpc` convention
+ * for DOs that are not RPC-enabled.
  */
 async function executeDoRpc(
 	env: GatewayEnv,
@@ -657,26 +659,7 @@ async function executeDoRpc(
 	const binding = env[bindingName] as DurableObjectNamespace
 	const id = deserializeDOId(idSerialized, binding)
 	const stub = binding.get(id)
-
-	// Call the DO's RPC endpoint
-	// Convention: POST to /_rpc with { method, params }
-	const response = await stub.fetch(
-		new Request('http://do/_rpc', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ method: methodName, params: args })
-		})
-	)
-
-	const result = (await response.json()) as {
-		ok: boolean
-		result?: unknown
-		error?: { message: string }
-	}
-	if (!result.ok) {
-		throw new Error(result.error?.message ?? 'DO RPC failed')
-	}
-	return result.result
+	return callDurableObjectRpc(stub, methodName, Array.isArray(args) ? args : [])
 }
 
 // -----------------------------------------------------------------------------
