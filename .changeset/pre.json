@@ -31,6 +31,7 @@
   "changesets": [
     "bridge-do-rpc-native-dispatch",
     "bridge-do-websocket-fix",
+    "bridge-do-websocket-hibernation-broadcast",
     "cf-binding-remote-preview-fields",
     "cf-cron-fetch-lint-secrets",
     "cf-deploy-lifecycle",
