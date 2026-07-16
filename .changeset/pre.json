@@ -29,6 +29,7 @@
     "devflare": "1.0.0-next.27"
   },
   "changesets": [
+    "bridge-do-rpc-native-dispatch",
     "bridge-do-websocket-fix",
     "cf-binding-remote-preview-fields",
     "cf-cron-fetch-lint-secrets",
