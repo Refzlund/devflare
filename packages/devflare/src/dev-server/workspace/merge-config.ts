@@ -18,6 +18,26 @@ import { resolve } from 'pathe'
 /** A Miniflare worker config object (shape owned by `makeMiniflareWorker`). */
 type MiniflareWorker = Record<string, any>
 
+/*
+	→ GOTCHA: this MUST NOT be `/`. workerd tolerates `/` in plain service/worker
+	  names (a bare gateway/service boots fine), but a Durable Object whose
+	  host-worker (script) name contains `/` crashes the runtime at STARTUP with
+	  `*** std::terminate() called with no exception` — an uncatchable native
+	  abort, not a JS error — so ANY app with a DO would fail to boot in a
+	  workspace. `-` is the canonical Cloudflare worker-name character and is safe
+	  in every workerd context (service names, DO script names, DO uniqueKeys, and
+	  the on-disk persist paths derived from them). Because worker/app names are
+	  charset-unrestricted, `-` (unlike `/`, which can never appear in a name) can
+	  in principle let two apps collide; `buildMergedWorkspaceConfig` guards that
+	  with a loud duplicate-name error.
+*/
+const NAMESPACE_SEPARATOR = '-'
+
+/** Join an app namespace to one of its worker names for the merged instance. */
+function namespacedWorkerName(appName: string, workerName: string): string {
+	return `${appName}${NAMESPACE_SEPARATOR}${workerName}`
+}
+
 /** One app's contribution to the merged instance. */
 export interface WorkspaceAppWorkers {
 	/** Unique per-app namespace (prefixes every worker name). */
@@ -45,7 +65,7 @@ export interface WorkspacePersistPaths {
  * worker names. External/cross-app targets are left untouched.
  */
 function namespaceIfLocal(name: string, appName: string, localNames: Set<string>): string {
-	return localNames.has(name) ? `${appName}/${name}` : name
+	return localNames.has(name) ? namespacedWorkerName(appName, name) : name
 }
 
 /** Rewrite an intra-app worker reference on a service-binding value (object or string form). */
@@ -122,13 +142,13 @@ export function namespaceAppWorkers(
 			)
 		}
 
-		worker.name = `${appName}/${worker.name}`
+		worker.name = namespacedWorkerName(appName, String(worker.name))
 	}
 
 	// The gateway is the app's entry worker (buildMiniflareDevConfig puts it
 	// first and names it `gateway`). Its direct socket IS the app's browser
 	// origin for a pure worker, and the bridge port for a Vite app.
-	const gatewayWorkerName = `${appName}/gateway`
+	const gatewayWorkerName = namespacedWorkerName(appName, 'gateway')
 	const gatewayWorker = workers.find((worker) => worker.name === gatewayWorkerName) ?? workers[0]
 	gatewayWorker.unsafeDirectSockets = [
 		{ host: options.host, port: options.directSocketPort, entrypoint: 'default' }
@@ -218,6 +238,23 @@ export function buildMergedWorkspaceConfig(input: BuildMergedWorkspaceConfigInpu
 		})
 		mergedWorkers.push(...workers)
 		directSockets.push({ appName: app.appName, gatewayWorkerName, port: app.directSocketPort })
+	}
+
+	// Worker/app names are charset-unrestricted, so the `-` namespace separator
+	// (unlike the old `/`, which could never appear in a name) could in principle
+	// let two apps produce the same merged worker name (e.g. app `a` worker `b-c`
+	// vs app `a-b` worker `c`). Miniflare would silently keep only the last such
+	// worker; surface the clash loudly instead of shipping a half-wired instance.
+	const seenWorkerNames = new Set<string>()
+	for (const worker of mergedWorkers) {
+		const workerName = String(worker.name)
+		if (seenWorkerNames.has(workerName)) {
+			throw new Error(
+				`Workspace produced two workers named "${workerName}" after namespacing. ` +
+					`Rename one of the conflicting apps so their namespaced worker names stay distinct.`
+			)
+		}
+		seenWorkerNames.add(workerName)
 	}
 
 	const persistPaths = resolveWorkspacePersistPaths(input.persist, input.persistDir)

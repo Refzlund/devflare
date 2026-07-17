@@ -36,30 +36,36 @@ describe('namespaceAppWorkers', () => {
 		})
 
 		expect(workers.map((worker) => worker.name)).toEqual([
-			'api/gateway',
-			'api/my-app',
-			'api/do-doc_room'
+			'api-gateway',
+			'api-my-app',
+			'api-do-doc_room'
 		])
+
+		// REGRESSION: the separator must NOT be `/`. workerd aborts at startup
+		// (`std::terminate`) when a Durable Object's host-worker name contains `/`,
+		// so a DO app could never boot in a workspace. Every namespaced name must
+		// be free of `/` (esp. the DO worker + the DO reference's scriptName).
+		expect(workers.every((worker) => !String(worker.name).includes('/'))).toBe(true)
 
 		const gateway = workers[0]
 		// Entry routes dropped so the shared entry socket has no contention.
 		expect('routes' in gateway).toBe(false)
 		// Intra-app service binding namespaced; external one untouched.
-		expect(gateway.serviceBindings.__DEVFLARE_APP).toEqual({ name: 'api/my-app' })
+		expect(gateway.serviceBindings.__DEVFLARE_APP).toEqual({ name: 'api-my-app' })
 		expect(gateway.serviceBindings.EXTERNAL).toEqual({ name: 'some-other-worker' })
 		// DO reference scriptName namespaced.
 		expect(gateway.durableObjects.DOC_ROOM).toEqual({
 			className: 'DocRoom',
-			scriptName: 'api/do-doc_room'
+			scriptName: 'api-do-doc_room'
 		})
 		// Direct socket on the gateway (the entry/browser origin).
 		expect(gateway.unsafeDirectSockets).toEqual([
 			{ host: '127.0.0.1', port: 8789, entrypoint: 'default' }
 		])
-		expect(gatewayWorkerName).toBe('api/gateway')
+		expect(gatewayWorkerName).toBe('api-gateway')
 
 		// String-form service binding target that is a local worker is namespaced.
-		expect(workers[1].serviceBindings.OUT).toBe('api/do-doc_room')
+		expect(workers[1].serviceBindings.OUT).toBe('api-do-doc_room')
 		// The DO worker's own `durableObjects` value is a class name, NOT a ref.
 		expect(workers[2].durableObjects.DOC_ROOM).toBe('DocRoom')
 	})
@@ -81,8 +87,8 @@ describe('buildMergedWorkspaceConfig', () => {
 		expect(config.workers).toHaveLength(6)
 		const names = config.workers.map((worker: any) => worker.name)
 		expect(new Set(names).size).toBe(6)
-		expect(names).toContain('api/gateway')
-		expect(names).toContain('web/gateway')
+		expect(names).toContain('api-gateway')
+		expect(names).toContain('web-gateway')
 
 		// Entry socket is ephemeral by default; browsers use the direct sockets.
 		expect(config.port).toBe(0)
@@ -91,8 +97,8 @@ describe('buildMergedWorkspaceConfig', () => {
 		expect(config.r2Persist).toContain('ws-data')
 
 		expect(directSockets).toEqual([
-			{ appName: 'api', gatewayWorkerName: 'api/gateway', port: 8789 },
-			{ appName: 'web', gatewayWorkerName: 'web/gateway', port: 8788 }
+			{ appName: 'api', gatewayWorkerName: 'api-gateway', port: 8789 },
+			{ appName: 'web', gatewayWorkerName: 'web-gateway', port: 8788 }
 		])
 	})
 
@@ -144,5 +150,22 @@ describe('buildMergedWorkspaceConfig', () => {
 				persistDir: '/tmp/ws-data'
 			})
 		).toThrow(/both use port 8789/)
+	})
+
+	test('rejects apps whose namespaced worker names collide', () => {
+		// With the `-` separator, app `a-b` + worker `gateway` and app `a` +
+		// worker `b-gateway` both collapse to `a-b-gateway`. The guard must catch
+		// it rather than let Miniflare silently keep only one.
+		expect(() =>
+			buildMergedWorkspaceConfig({
+				apps: [
+					{ appName: 'a-b', workers: [{ name: 'gateway' }], directSocketPort: 8789 },
+					{ appName: 'a', workers: [{ name: 'b-gateway' }], directSocketPort: 8790 }
+				],
+				host: '127.0.0.1',
+				persist: false,
+				persistDir: '/tmp/ws-data'
+			})
+		).toThrow(/two workers named "a-b-gateway"/)
 	})
 })
