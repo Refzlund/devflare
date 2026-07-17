@@ -66,6 +66,7 @@
     "robust-package-json-resolution",
     "rolldown-build-fix",
     "test-ci-quality",
-    "typescript-runtime-dep"
+    "typescript-runtime-dep",
+    "workspace-shared-bindings-dev"
   ]
 }
