@@ -1,5 +1,11 @@
 # devflare
 
+## 1.0.0-next.65
+
+### Patch Changes
+
+- 844e4e1: feat: DEVFLARE_PERSIST_DIR env override for the dev-server persist directory (share one persist dir across multiple workers in local multi-worker dev)
+
 ## 1.0.0-next.64
 
 ### Patch Changes
