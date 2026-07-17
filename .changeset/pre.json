@@ -33,6 +33,7 @@
     "bridge-do-rpc-native-dispatch",
     "bridge-do-websocket-fix",
     "bridge-do-websocket-hibernation-broadcast",
+    "bridge-set-cookie-fidelity",
     "cf-binding-remote-preview-fields",
     "cf-cron-fetch-lint-secrets",
     "cf-deploy-lifecycle",
