@@ -127,7 +127,14 @@ export function buildMiniflareDevConfig(input: BuildMiniflareDevConfigInput): an
 	} = input
 
 	const bindings = loadedConfig.bindings ?? {}
-	const persistPath = resolve(cwd, '.devflare/data')
+	// A worker's local miniflare state (D1/KV/R2/DO/cache) normally persists to `<cwd>/.devflare/data`. Set
+	// DEVFLARE_PERSIST_DIR to point several `devflare dev` processes at ONE shared directory — the standard
+	// local multi-worker pattern for sharing bindings (e.g. two workers that bind the SAME D1 in production
+	// must also share it in dev). A relative value resolves against cwd (so `../../.devflare-shared/data` from
+	// sibling apps lands on one path); an absolute value is used as-is. Unset ⇒ the original per-worker default.
+	const persistPath = process.env.DEVFLARE_PERSIST_DIR
+		? resolve(cwd, process.env.DEVFLARE_PERSIST_DIR)
+		: resolve(cwd, '.devflare/data')
 	const appWorkerName = loadedConfig.name
 	const shouldRunMainWorker =
 		!enableVite &&
