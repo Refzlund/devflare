@@ -67,6 +67,7 @@
     "rolldown-build-fix",
     "test-ci-quality",
     "typescript-runtime-dep",
+    "workspace-durable-object-name-fix",
     "workspace-shared-bindings-dev"
   ]
 }
