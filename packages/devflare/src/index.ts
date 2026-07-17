@@ -7,6 +7,10 @@
 // Config utilities
 export {
 	defineConfig,
+	defineWorkspace,
+	type WorkspaceManifest,
+	type WorkspaceManifestInput,
+	type WorkspaceApp,
 	preview,
 	loadConfig,
 	loadResolvedConfig,

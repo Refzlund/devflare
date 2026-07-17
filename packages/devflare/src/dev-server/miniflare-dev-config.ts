@@ -75,6 +75,14 @@ export interface BuildMiniflareDevConfigInput {
 	 * when the config declares R2 bindings; ignored otherwise.
 	 */
 	r2PresignSecret?: string | null
+	/**
+	 * Extra plain-string vars merged into every worker's `bindings` on top of
+	 * the R2-presign vars. Used by the workspace coordinator to inject an app's
+	 * manifest `env` (e.g. `DOC_API_DEV_SEED`) as worker-visible vars. The
+	 * single-app `devflare dev` path never passes this, so its output is
+	 * unchanged.
+	 */
+	additionalInjectedVars?: Record<string, string>
 	logger?: ConsolaInstance
 }
 
@@ -123,6 +131,7 @@ export function buildMiniflareDevConfig(input: BuildMiniflareDevConfigInput): an
 		doResult,
 		serviceBindingResolution,
 		r2PresignSecret,
+		additionalInjectedVars,
 		logger
 	} = input
 
@@ -209,8 +218,11 @@ export function buildMiniflareDevConfig(input: BuildMiniflareDevConfigInput): an
 	)
 
 	// Local R2 presign vars ride on every worker so both the gateway (validator)
-	// and worker-mode app code (URL minting) share the per-boot secret.
-	const injectedVars =
+	// and worker-mode app code (URL minting) share the per-boot secret. The
+	// workspace coordinator's per-app `env` (seed flags etc.) is layered on top;
+	// when neither is present the result stays `undefined` so the single-app
+	// path is unchanged.
+	const presignVars =
 		bindings.r2 && r2PresignSecret
 			? {
 					DEVFLARE_R2_PRESIGN_SECRET: r2PresignSecret,
@@ -220,6 +232,12 @@ export function buildMiniflareDevConfig(input: BuildMiniflareDevConfigInput): an
 						miniflarePort
 					)
 				}
+			: undefined
+	const hasAdditional =
+		additionalInjectedVars !== undefined && Object.keys(additionalInjectedVars).length > 0
+	const injectedVars =
+		presignVars || hasAdditional
+			? { ...(presignVars ?? {}), ...(hasAdditional ? additionalInjectedVars : {}) }
 			: undefined
 
 	const workerContext: MakeMiniflareWorkerContext = {

@@ -108,7 +108,7 @@ bun test tests/worker.test.ts
 
 | Import | Use |
 | --- | --- |
-| `devflare` | Node-side utilities: `defineConfig`, `preview`, `loadConfig`, `loadResolvedConfig`, `compileConfig`, `stringifyConfig`, `configSchema`, `ConfigNotFoundError`, `ConfigValidationError`, `ConfigResourceResolutionError`, `ref()`, `workerName`, `env`, `vars`, `durableObject`, `getDurableObjectOptions`, `runCli`, `parseArgs` |
+| `devflare` | Node-side utilities: `defineConfig`, `defineWorkspace`, `preview`, `loadConfig`, `loadResolvedConfig`, `compileConfig`, `stringifyConfig`, `configSchema`, `ConfigNotFoundError`, `ConfigValidationError`, `ConfigResourceResolutionError`, `ref()`, `workerName`, `env`, `vars`, `durableObject`, `getDurableObjectOptions`, `runCli`, `parseArgs` |
 | `devflare/config` | Lightweight config-authoring entry (no CLI/bridge/test barrel): `defineConfig`, `env`, `preview`, `ref`, plus the config types. The full Node-side compiler and normalizer helpers live on the bare devflare import instead. |
 | `devflare/runtime` | Worker-safe runtime helpers: `env`, `ctx`, `event`, `locals`, `sequence`, `defineFetchHandler`, `defineQueueHandler`, `defineScheduledHandler`, `markResolveStyle`, `markWorkerStyle`, `createResolveFetch`, `invokeFetchHandler`, `invokeFetchModule`, `matchFetchRoute`, `invokeRouteModules`, `createRouteResolve`, event creators and getters |
 | `devflare/test` | Testing helpers: `createTestContext`, `env`, `cf`, `worker`, `queue`, `scheduled`, `email`, `tail`, `shouldSkip`, `createOfflineEnv`, `createOfflineBindings`, `describeOfflineSupport`, `getOfflineSupportMatrix`, `containers`, `detectContainerEngine`, `getContainerSkipReason`, `stopActiveContainers`, `createMockEnv`, `createMockKV`, `createMockD1`, `createMockR2`, `createMockQueue`, `createMockRateLimit`, `createMockVersionMetadata`, `createMockHyperdrive`, `createMockWorkerLoader`, `createMockMTLSCertificate`, `createMockDispatchNamespace`, `createMockWorkflow`, `createMockPipeline`, `createMockImagesBinding`, `createMockMediaBinding`, `createMockArtifacts`, `createMockAISearchInstance`, `createMockAISearchNamespace`, `createMockTestContext`, `withTestContext`, `resolveServiceBindings`, `resolveDOBindings`, `clearBundleCache` |
@@ -196,6 +196,7 @@ for examples with file paths.
 | `devflare types` | generate `env.d.ts` |
 | `devflare version` | print the installed version |
 | `devflare worker` | run Worker control-plane helpers |
+| `devflare workspace` | run several apps in one Miniflare with shared live bindings |
 
 Useful local-first switches:
 

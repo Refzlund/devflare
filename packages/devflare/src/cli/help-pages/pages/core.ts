@@ -13,6 +13,7 @@ export const CORE_HELP_PAGES: HelpPage[] = [
 		subcommands: [
 			entry('init [name]', 'Create a new devflare project'),
 			entry('dev', 'Start the development server'),
+			entry('workspace dev', 'Run several apps in one Miniflare with shared live bindings'),
 			entry('build', 'Build for production'),
 			entry('deploy', 'Deploy explicitly to production or preview'),
 			entry('types', 'Generate TypeScript types'),
@@ -126,6 +127,50 @@ export const CORE_HELP_PAGES: HelpPage[] = [
 			'Runtime host/port resolve as CLI flag, then DEVFLARE_RUNTIME_HOST/DEVFLARE_RUNTIME_PORT (and DEVFLARE_BRIDGE_PORT), then `server` config, then 127.0.0.1:8787.',
 			'`--log` and `--log-temp` still print to the terminal; they add a file mirror instead of redirecting output away.'
 		]
+	},
+	{
+		path: ['workspace'],
+		summary: 'Run several devflare apps in one shared local runtime',
+		usage: ['devflare workspace dev [--config <path>] [--no-persist] [--verbose] [--debug]'],
+		description: [
+			'Co-hosts every app listed in a `devflare.workspace.ts` manifest inside ONE Miniflare instance, so workers that bind the same D1/KV/R2/Durable Object id share LIVE state in dev — a write by one app is immediately visible to the others, exactly as they share one managed resource in production.',
+			'Each app is still exposed on its own browser-reachable origin via a per-app direct socket, so the cross-origin split (e.g. `ui.localhost` ↔ `api.ui.localhost`) is preserved. Vite apps are spawned as child processes pointed at the shared instance.',
+			'Strictly opt-in: it changes nothing about the per-app `devflare dev` path.'
+		],
+		subcommands: [entry('dev', 'Start the shared workspace dev server')],
+		options: [
+			entry('--config <path>', 'Use a specific workspace manifest file'),
+			entry(
+				'--no-persist',
+				'Keep workspace storage in-memory instead of `.devflare/workspace-data`'
+			),
+			entry('--verbose', 'Increase logging verbosity'),
+			entry('--debug', 'Enable extra debug logging in the gateway workers')
+		],
+		examples: [
+			entry('devflare workspace dev', 'Start all manifest apps sharing one instance'),
+			entry('devflare workspace dev --no-persist', 'Run with ephemeral storage')
+		],
+		notes: [
+			'Requires a `devflare.workspace.ts` at the current directory exporting `defineWorkspace({ apps: [...] })`.',
+			'Each app declares a `port` (pure worker) or `bridgePort` + `vitePort` (Vite app); those ports must be unique across the workspace.',
+			'Migrations run once per app against the shared store (the migration ledger dedupes shared files). Worker/DO hot reload inside the shared instance is not wired yet — restart to pick up worker source changes.'
+		]
+	},
+	{
+		path: ['workspace', 'dev'],
+		summary: 'Start the shared workspace dev server',
+		usage: ['devflare workspace dev [--config <path>] [--no-persist] [--verbose] [--debug]'],
+		description: [
+			'Loads the workspace manifest, prepares each app with the same pipeline `devflare dev` uses, merges their workers into one Miniflare instance with shared bindings, and exposes each app on its own direct socket.'
+		],
+		options: [
+			entry('--config <path>', 'Use a specific workspace manifest file'),
+			entry('--no-persist', 'Keep workspace storage in-memory'),
+			entry('--verbose', 'Increase logging verbosity'),
+			entry('--debug', 'Enable extra debug logging in the gateway workers')
+		],
+		examples: [entry('devflare workspace dev', 'Start all manifest apps sharing one instance')]
 	},
 	{
 		path: ['build'],

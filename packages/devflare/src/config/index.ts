@@ -4,6 +4,19 @@
 
 export { defineConfig, type DefineConfigInput, type TypedConfig } from './define'
 export {
+	defineWorkspace,
+	loadWorkspaceManifest,
+	resolveAppDirectSocketPort,
+	assertSharedBindingIds,
+	WorkspaceManifestNotFoundError,
+	WorkspaceManifestValidationError,
+	type WorkspaceManifest,
+	type WorkspaceManifestInput,
+	type WorkspaceApp,
+	type LoadedWorkspaceManifest,
+	type LoadWorkspaceManifestOptions
+} from './workspace'
+export {
 	env,
 	isEnvVarDescriptor,
 	loadDevflareDotenv,

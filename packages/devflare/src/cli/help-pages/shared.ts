@@ -3,6 +3,7 @@ import type { HelpEntry, HelpPage } from './types'
 export const COMMANDS = [
 	'init',
 	'dev',
+	'workspace',
 	'build',
 	'deploy',
 	'types',

@@ -173,6 +173,9 @@ export async function runCli(argv: string[], options: CliOptions = {}): Promise<
 		case 'dev':
 			return runDev(parsed, logger, options)
 
+		case 'workspace':
+			return runWorkspace(parsed, logger, options)
+
 		case 'build':
 			return runBuild(parsed, logger, options)
 
@@ -244,6 +247,15 @@ async function runDev(
 ): Promise<CliResult> {
 	const { runDevCommand } = await import('./commands/dev')
 	return runDevCommand(parsed, logger, options)
+}
+
+async function runWorkspace(
+	parsed: ParsedArgs,
+	logger: ConsolaInstance,
+	options: CliOptions
+): Promise<CliResult> {
+	const { runWorkspaceCommand } = await import('./commands/workspace')
+	return runWorkspaceCommand(parsed, logger, options)
 }
 
 async function runBuild(
