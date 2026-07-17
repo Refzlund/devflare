@@ -9,11 +9,46 @@ import {
 	deserializeRequest,
 	deserializeResponse,
 	deserializeValue,
+	readSetCookieValues,
 	serializeDOId,
+	serializeHeaders,
 	serializeRequest,
 	serializeResponse,
 	serializeValue
 } from '../../../src/bridge/v2/value-serialization'
+
+/**
+ * Build a `Headers`-like object whose enumeration COMBINES `Set-Cookie` into a
+ * single comma-joined value — the behavior of the Fetch spec's sort-and-combine
+ * as seen in older workerd/undici — while optionally exposing the split
+ * accessors. Lets the host-side tests exercise the collapse deterministically,
+ * independent of the test runtime's own (currently non-combining) `Headers`.
+ *
+ * @param cookies - The individual `Set-Cookie` values.
+ * @param others - Non-cookie headers as `[name, value]` pairs.
+ * @param accessor - Which split accessor the fake exposes:
+ *   `getSetCookie` (modern), `getAll` (legacy workerd), or `none` (neither).
+ */
+function makeCombiningHeaders(
+	cookies: string[],
+	others: [string, string][],
+	accessor: 'getSetCookie' | 'getAll' | 'none'
+): Headers {
+	const fake = {
+		forEach(callback: (value: string, key: string, parent: unknown) => void): void {
+			for (const [key, value] of others) callback(value, key, fake)
+			if (cookies.length > 0) callback(cookies.join(', '), 'set-cookie', fake)
+		}
+	} as Record<string, unknown>
+
+	if (accessor === 'getSetCookie') {
+		fake.getSetCookie = () => [...cookies]
+	} else if (accessor === 'getAll') {
+		fake.getAll = (name: string) => (name.toLowerCase() === 'set-cookie' ? [...cookies] : [])
+	}
+
+	return fake as unknown as Headers
+}
 
 async function roundTrip<T>(value: T): Promise<unknown> {
 	const { value: encoded } = await serializeValue(value)
@@ -278,5 +313,103 @@ describe('serializeValue / deserializeValue \u2014 large Response streaming (B1)
 			offset += chunk.byteLength
 		}
 		expect(joined).toEqual(original)
+	})
+})
+
+describe('serializeHeaders / readSetCookieValues — multi Set-Cookie fidelity', () => {
+	const COOKIE_A = 'a=1; Path=/; SameSite=Lax'
+	const COOKIE_B = 'b=2; Path=/; HttpOnly'
+
+	test('readSetCookieValues reads each cookie separately via getSetCookie', () => {
+		const headers = makeCombiningHeaders([COOKIE_A, COOKIE_B], [], 'getSetCookie')
+		expect(readSetCookieValues(headers)).toEqual([COOKIE_A, COOKIE_B])
+	})
+
+	test('readSetCookieValues falls back to getAll("set-cookie") (legacy workerd)', () => {
+		const headers = makeCombiningHeaders([COOKIE_A, COOKIE_B], [], 'getAll')
+		expect(readSetCookieValues(headers)).toEqual([COOKIE_A, COOKIE_B])
+	})
+
+	test('readSetCookieValues returns null when neither accessor exists', () => {
+		const headers = makeCombiningHeaders([COOKIE_A, COOKIE_B], [], 'none')
+		expect(readSetCookieValues(headers)).toBeNull()
+	})
+
+	test('serializeHeaders emits each Set-Cookie as its own pair even when forEach combines', () => {
+		const headers = makeCombiningHeaders(
+			[COOKIE_A, COOKIE_B],
+			[['content-type', 'text/plain']],
+			'getSetCookie'
+		)
+		const pairs = serializeHeaders(headers)
+		const setCookiePairs = pairs.filter(([k]) => k.toLowerCase() === 'set-cookie')
+		expect(setCookiePairs).toEqual([
+			['set-cookie', COOKIE_A],
+			['set-cookie', COOKIE_B]
+		])
+		// The combined value must NOT survive.
+		expect(setCookiePairs.some(([, v]) => v.includes(', '))).toBe(false)
+		// Non-cookie headers pass through untouched.
+		expect(pairs).toContainEqual(['content-type', 'text/plain'])
+	})
+
+	test('serializeHeaders splits via the getAll fallback (legacy workerd)', () => {
+		const headers = makeCombiningHeaders([COOKIE_A, COOKIE_B], [], 'getAll')
+		expect(serializeHeaders(headers)).toEqual([
+			['set-cookie', COOKIE_A],
+			['set-cookie', COOKIE_B]
+		])
+	})
+
+	test('serializeHeaders keeps the combined value verbatim when it cannot split (graceful)', () => {
+		const headers = makeCombiningHeaders([COOKIE_A, COOKIE_B], [], 'none')
+		// No split accessor → the header is preserved as-is, never dropped.
+		expect(serializeHeaders(headers)).toEqual([['set-cookie', `${COOKIE_A}, ${COOKIE_B}`]])
+	})
+
+	test('serializeHeaders is a no-op shape for responses with zero cookies', () => {
+		const headers = new Headers({ 'content-type': 'application/json', 'x-test': '1' })
+		const pairs = serializeHeaders(headers)
+		expect(pairs).toContainEqual(['content-type', 'application/json'])
+		expect(pairs).toContainEqual(['x-test', '1'])
+		expect(pairs.some(([k]) => k.toLowerCase() === 'set-cookie')).toBe(false)
+	})
+
+	test('serializeResponse → JSON → deserializeResponse preserves both Set-Cookie headers', async () => {
+		const headers = new Headers()
+		headers.append('Set-Cookie', COOKIE_A)
+		headers.append('Set-Cookie', COOKIE_B)
+		headers.set('Content-Type', 'text/plain')
+		const original = new Response('payload', { headers })
+
+		const { serialized } = await serializeResponse(original)
+		const setCookieEntries = serialized.headers.filter(([k]) => k.toLowerCase() === 'set-cookie')
+		expect(setCookieEntries).toEqual([
+			['set-cookie', COOKIE_A],
+			['set-cookie', COOKIE_B]
+		])
+
+		const transported = JSON.parse(JSON.stringify(serialized))
+		const restored = deserializeResponse(transported)
+		expect(restored.headers.getSetCookie()).toEqual([COOKIE_A, COOKIE_B])
+		expect(restored.headers.get('content-type')).toBe('text/plain')
+	})
+
+	test('serializeRequest → JSON → deserializeRequest preserves multiple Set-Cookie headers', async () => {
+		const headers = new Headers()
+		headers.append('Set-Cookie', COOKIE_A)
+		headers.append('Set-Cookie', COOKIE_B)
+		const original = new Request('https://example.com/api', { headers })
+
+		const { serialized } = await serializeRequest(original)
+		const setCookieEntries = serialized.headers.filter(([k]) => k.toLowerCase() === 'set-cookie')
+		expect(setCookieEntries).toEqual([
+			['set-cookie', COOKIE_A],
+			['set-cookie', COOKIE_B]
+		])
+
+		const transported = JSON.parse(JSON.stringify(serialized))
+		const restored = deserializeRequest(transported)
+		expect(restored.headers.getSetCookie()).toEqual([COOKIE_A, COOKIE_B])
 	})
 })

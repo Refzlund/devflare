@@ -54,6 +54,80 @@ export interface SerializedDOId {
 }
 
 // -----------------------------------------------------------------------------
+// Header Serialization
+// -----------------------------------------------------------------------------
+
+/**
+ * Read every `Set-Cookie` header value as a SEPARATE string.
+ *
+ * `Headers.forEach`/`entries()`/`get()` fold multiple `Set-Cookie` headers into
+ * one comma-joined value (the Fetch spec's sort-and-combine), which corrupts
+ * cookies: the second cookie's attributes bleed into the first. Only the
+ * dedicated accessors keep them apart — the standard `getSetCookie()` (Bun,
+ * Node, and workerd on a compatibility date ≥ 2023-08-01) or workerd's legacy
+ * `getAll('set-cookie')` (present on older compat dates that predate
+ * `getSetCookie`).
+ *
+ * @param headers - The header set to read.
+ * @returns Each `Set-Cookie` value in insertion order, or `null` when the
+ *   runtime exposes neither accessor — the caller then keeps the combined value
+ *   rather than dropping the header.
+ */
+export function readSetCookieValues(headers: Headers): string[] | null {
+	const accessors = headers as Headers & {
+		getSetCookie?: () => string[]
+		getAll?: (name: string) => string[]
+	}
+	if (typeof accessors.getSetCookie === 'function') {
+		const values = accessors.getSetCookie()
+		return Array.isArray(values) ? values : null
+	}
+	if (typeof accessors.getAll === 'function') {
+		try {
+			const values = accessors.getAll('set-cookie')
+			return Array.isArray(values) ? values : null
+		} catch {
+			return null
+		}
+	}
+	return null
+}
+
+/**
+ * Flatten a `Headers` set to `[name, value]` pairs WITHOUT collapsing multiple
+ * `Set-Cookie` headers into one, so a response setting several cookies survives
+ * the bridge round-trip byte-faithfully.
+ *
+ * Non-cookie headers are emitted via `forEach` as before. `Set-Cookie` is
+ * enumerated separately (see `readSetCookieValues`) and appended as its own pair
+ * per cookie, so the reconstructing `new Headers(pairs)` re-`append`s each one.
+ * When the runtime can split neither (no `getSetCookie`/`getAll`), the combined
+ * `forEach` value is kept verbatim — graceful degradation, never a dropped
+ * header.
+ *
+ * @param headers - The header set to flatten.
+ * @returns `[name, value]` pairs safe to round-trip; each `Set-Cookie` is a
+ *   distinct pair.
+ */
+export function serializeHeaders(headers: Headers): [string, string][] {
+	const setCookies = readSetCookieValues(headers)
+	const pairs: [string, string][] = []
+	headers.forEach((value, key) => {
+		// Drop the (possibly combined) Set-Cookie value here; the individual
+		// cookies are appended below. Only drop it when we actually recovered
+		// them, otherwise keep the verbatim value so nothing is lost.
+		if (setCookies !== null && key.toLowerCase() === 'set-cookie') return
+		pairs.push([key, value])
+	})
+	if (setCookies) {
+		for (const cookie of setCookies) {
+			pairs.push(['set-cookie', cookie])
+		}
+	}
+	return pairs
+}
+
+// -----------------------------------------------------------------------------
 // Request Serialization
 // -----------------------------------------------------------------------------
 
@@ -65,10 +139,7 @@ export async function serializeRequest(
 	const streams: StreamRef[] = []
 	const threshold = options?.httpThreshold ?? HTTP_TRANSFER_THRESHOLD
 
-	const headers: [string, string][] = []
-	request.headers.forEach((value, key) => {
-		headers.push([key, value])
-	})
+	const headers = serializeHeaders(request.headers)
 
 	let body: BodyRef | null = null
 
@@ -149,10 +220,7 @@ export async function serializeResponse(
 	const streams: StreamRef[] = []
 	const threshold = options?.httpThreshold ?? HTTP_TRANSFER_THRESHOLD
 
-	const headers: [string, string][] = []
-	response.headers.forEach((value, key) => {
-		headers.push([key, value])
-	})
+	const headers = serializeHeaders(response.headers)
 
 	let body: BodyRef | null = null
 

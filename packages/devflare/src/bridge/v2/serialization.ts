@@ -89,6 +89,11 @@ export function serializeResponseV2(
 	codec: TransportV2Codec,
 	rpcId: string
 ): { serialized: TransportV2SerializedResponse; bodyStreamPromise: Promise<void> } {
+	// → NOTE: this plain forEach collapses multiple Set-Cookie headers into one
+	// combined value on runtimes/compat dates that don't split them (workerd
+	// < 2023-08-01). It's not a live bug today — the v2 codec is unused — but
+	// before wiring v2 into a workerd gateway, route this through
+	// `serializeHeaders` in ./value-serialization.ts (as v1 does).
 	const headers: [string, string][] = []
 	response.headers.forEach((value, key) => {
 		headers.push([key, value])

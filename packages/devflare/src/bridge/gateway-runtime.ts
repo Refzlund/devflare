@@ -115,6 +115,44 @@ function serializeR2Objects(result) {
 	}
 }
 
+// Read each Set-Cookie value separately. entries()/forEach() combine multiple
+// Set-Cookie headers into one comma-joined value (Fetch sort-and-combine), which
+// corrupts cookies. getSetCookie() keeps them apart on a compat date
+// >= 2023-08-01; older workerd predates it but still exposes getAll('set-cookie').
+// MUST match readSetCookieValues in v2/value-serialization.ts.
+function readSetCookieValues(headers) {
+	if (typeof headers.getSetCookie === 'function') {
+		const values = headers.getSetCookie()
+		return Array.isArray(values) ? values : null
+	}
+	if (typeof headers.getAll === 'function') {
+		try {
+			const values = headers.getAll('set-cookie')
+			return Array.isArray(values) ? values : null
+		} catch (error) {
+			return null
+		}
+	}
+	return null
+}
+
+// Flatten headers to [name, value] pairs without collapsing multiple Set-Cookie
+// into one. Each cookie becomes its own pair so the client's new Headers(pairs)
+// re-appends them individually. Falls back to the combined value when the
+// runtime can split neither. MUST match serializeHeaders in v2/value-serialization.ts.
+function serializeHeaders(headers) {
+	const setCookies = readSetCookieValues(headers)
+	const pairs = []
+	headers.forEach((value, key) => {
+		if (setCookies !== null && key.toLowerCase() === 'set-cookie') return
+		pairs.push([key, value])
+	})
+	if (setCookies) {
+		for (const cookie of setCookies) pairs.push(['set-cookie', cookie])
+	}
+	return pairs
+}
+
 async function serializeResponse(response) {
 	let body = null
 	if (response.body) {
@@ -135,7 +173,7 @@ async function serializeResponse(response) {
 	return {
 		status: response.status,
 		statusText: response.statusText,
-		headers: [...response.headers.entries()],
+		headers: serializeHeaders(response.headers),
 		body
 	}
 }
