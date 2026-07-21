@@ -65,6 +65,7 @@
     "remove-context-unavailable-error",
     "robust-package-json-resolution",
     "rolldown-build-fix",
+    "sveltekit-bridge-connect-retry",
     "test-ci-quality",
     "typescript-runtime-dep",
     "workspace-durable-object-name-fix",
