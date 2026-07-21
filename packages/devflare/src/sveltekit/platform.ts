@@ -114,6 +114,59 @@ export function drainWaitUntilErrors(platform: Platform): unknown[] {
 }
 
 /**
+ * Total budget for riding out a transient bridge outage while (re)connecting for a request. An HMR worker
+ * reload or a brief coordinator restart drops the bridge socket for well under a second; retrying within this
+ * window keeps the request's bindings available instead of failing it. Kept modest so a bridge that is
+ * genuinely down (devflare not running) still surfaces the error promptly rather than hanging every request.
+ */
+const BRIDGE_CONNECT_MAX_WAIT_MS = 3000
+/** Delay between bridge (re)connect attempts within {@link BRIDGE_CONNECT_MAX_WAIT_MS}. */
+const BRIDGE_CONNECT_RETRY_DELAY_MS = 150
+
+/**
+ * Connect to the bridge, riding out a TRANSIENT outage with a bounded retry.
+ *
+ * The bridge socket drops for a fraction of a second whenever the dev runtime reloads a worker (HMR /
+ * config change) or the coordinator briefly restarts (e.g. after a worker threw). A single per-request
+ * `connect()` attempt rejects the instant the socket is refused, which the SvelteKit handle turns into
+ * "dropped every binding for this request" — so an unrelated route 500s with a missing D1/KV/R2 binding
+ * mid-reload. Retrying for a short window instead lets the reconnect land and the request proceed. The LAST
+ * error is rethrown only once the budget is spent (the bridge really is down), so a genuine
+ * misconfiguration still fails fast rather than hanging.
+ *
+ * Exported for unit testing; `sleep`/`now` are injectable so the retry schedule is asserted without real time.
+ *
+ * @param connect - the bridge client's `connect()`; a fresh attempt each call (the client dedups in-flight ones).
+ * @param options - `maxWaitMs` total budget, `retryDelayMs` between attempts, and injectable `sleep`/`now` for tests.
+ */
+export async function connectBridgeWithRetry(
+	connect: () => Promise<void>,
+	options: {
+		maxWaitMs?: number
+		retryDelayMs?: number
+		sleep?: (ms: number) => Promise<void>
+		now?: () => number
+	} = {}
+): Promise<void> {
+	const maxWaitMs = options.maxWaitMs ?? BRIDGE_CONNECT_MAX_WAIT_MS
+	const retryDelayMs = options.retryDelayMs ?? BRIDGE_CONNECT_RETRY_DELAY_MS
+	const sleep = options.sleep ?? ((ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)))
+	const now = options.now ?? Date.now
+	const deadline = now() + maxWaitMs
+
+	for (;;) {
+		try {
+			await connect()
+			return
+		} catch (error) {
+			// Stop once another delay would run past the budget — rethrow the outage as-is.
+			if (now() + retryDelayMs >= deadline) throw error
+			await sleep(retryDelayMs)
+		}
+	}
+}
+
+/**
  * Create a platform object that routes bindings through the bridge
  *
  * Use this in dev mode to get access to Miniflare bindings via WebSocket RPC.
@@ -159,8 +212,9 @@ export async function createDevflarePlatform(
 	// Get/create bridge client
 	const client = getClient({ url: bridgeUrl })
 
-	// Connect to bridge
-	await client.connect()
+	// Connect to bridge — riding out a transient outage (an HMR worker reload / brief coordinator restart)
+	// so a mid-reload request keeps its bindings instead of 500ing with a "binding is missing" error.
+	await connectBridgeWithRetry(() => client.connect())
 
 	// Create env proxy with hints
 	const env = overlayLocalBindings(createEnvProxy({ client, hints, strict: true }), localBindings)
