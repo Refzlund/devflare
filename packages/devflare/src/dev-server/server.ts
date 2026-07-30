@@ -7,6 +7,7 @@
 import type { ConsolaInstance } from 'consola'
 import type { Miniflare as MiniflareType } from 'miniflare'
 import { dirname, resolve } from 'pathe'
+import { isIgnorableMiniflareDisposeError } from '../bridge/miniflare'
 import { type DOBundleResult, bundleWorkerEntry } from '../bundler'
 import { checkRemoteBindingRequirements } from '../cli/wrangler-auth'
 import {
@@ -30,6 +31,12 @@ import {
 import { buildMiniflareDevConfig, resolveR2PresignOrigin } from './miniflare-dev-config'
 import { createMiniflareLog } from './miniflare-log'
 import { createReloadQueue } from './reload-queue'
+import {
+	type RuntimeWatchdog,
+	createRuntimeWatchdog,
+	dialableHost,
+	probeTcpReachable
+} from './runtime-health'
 import { createRuntimeStdioForwarder } from './runtime-stdio'
 import {
 	logMiniflareBindingDiagnostics,
@@ -111,8 +118,65 @@ export function createDevServer(options: DevServerOptions): DevServer {
 	// URLs stay valid; only injected when the config declares R2 bindings.
 	const r2PresignSecret = `${crypto.randomUUID()}${crypto.randomUUID()}`
 
+	/** Whether the local runtime is still accepting connections. */
+	async function isRuntimeReachable(): Promise<boolean> {
+		return probeTcpReachable({ host: dialableHost(miniflareHost), port: miniflarePort })
+	}
+
+	/**
+	 * Drop a runtime that has already gone away.
+	 *
+	 * Disposing a dead Miniflare routinely throws (its runtime is not there to talk to), which is not a
+	 * reason to abandon the rebuild — so anything unrecognised is logged rather than propagated.
+	 */
+	async function discardDeadMiniflare(): Promise<void> {
+		if (!state.miniflare) return
+		try {
+			await state.miniflare.dispose()
+		} catch (error) {
+			if (!isIgnorableMiniflareDisposeError(error)) {
+				logger?.debug('Disposing the dead Miniflare threw (continuing with the rebuild):', error)
+			}
+		}
+		state.miniflare = null
+	}
+
+	/**
+	 * Set once {@link stop} begins. A rebuild started just before shutdown would otherwise construct a
+	 * fresh Miniflare AFTER the teardown disposed the old one, leaking a runtime that outlives the
+	 * server — which shows up as the next thing to use the port hanging.
+	 */
+	let isStopping = false
+
+	/**
+	 * Set once the runtime has come up at least once. Gates the rebuild path so a reload that arrives
+	 * before the first start cannot mistake "not started yet" for "died".
+	 */
+	let hasStartedRuntime = false
+
 	const reloadQueue = createReloadQueue({
 		reload: async () => {
+			if (isStopping) return
+
+			// A runtime that has gone away cannot be reconfigured — `setOptions` would talk to a socket
+			// that is no longer there. Rebuild it instead. This is the path the watchdog drives when
+			// workerd dies on its own, which nothing used to notice.
+			//
+			// Checked BEFORE `state.miniflare`, deliberately: a rebuild that failed leaves that field
+			// null, and gating on it would make every later reload — including the watchdog's own
+			// retries — a silent no-op, wedging the server in the state we are here to escape.
+			if (hasStartedRuntime && !(await isRuntimeReachable())) {
+				if (isStopping) return
+				logger?.warn('Local runtime stopped responding — rebuilding it')
+				await discardDeadMiniflare()
+				await startMiniflare(state.currentDoResult)
+				// A rebuilt runtime starts empty unless storage is persisted, so the schema has to be
+				// re-applied — otherwise the failure just changes shape, from a loud "binding is missing"
+				// to a quiet "no such table" under a cheerful "Miniflare ready".
+				await runD1Migrations({ cwd, config: state.config, miniflarePort, logger })
+				return
+			}
+
 			if (!state.miniflare) return
 
 			const { Log, LogLevel } = await import('miniflare')
@@ -130,6 +194,32 @@ export function createDevServer(options: DevServerOptions): DevServer {
 		},
 		logger
 	})
+
+	/**
+	 * Watches the runtime for the rest of the process's life, once it is first up.
+	 *
+	 * Held here rather than on {@link DevServerState} because it is pure server orchestration — it owns
+	 * no resource the teardown sequence has to order around, only a timer.
+	 */
+	let runtimeWatchdog: RuntimeWatchdog | null = null
+
+	/**
+	 * Begin watching the runtime, if it is not already being watched.
+	 *
+	 * Deliberately idempotent, because `startMiniflare` also runs on the REBUILD path — replacing the
+	 * watchdog there would hand each rebuild a fresh recovery budget, so a probe that is wrong about a
+	 * healthy runtime could rebuild it forever without the attempt limit ever biting. One watchdog for
+	 * the server's lifetime keeps that budget meaningful; only a successful probe clears it.
+	 */
+	function watchRuntimeHealth(): void {
+		if (isStopping || runtimeWatchdog) return
+		runtimeWatchdog = createRuntimeWatchdog({
+			probe: isRuntimeReachable,
+			// Rebuilding goes through the queue so it cannot race a config- or worker-driven reload.
+			onRuntimeLost: () => reloadQueue.schedule(),
+			logger
+		})
+	}
 
 	async function bundleMainWorker(): Promise<void> {
 		if (!state.mainWorkerScriptPath || !state.config) {
@@ -202,12 +292,20 @@ export function createDevServer(options: DevServerOptions): DevServer {
 			logMiniflareConfigDiagnostics(logger, mfConfig)
 		}
 
-		state.miniflare = new Miniflare(mfConfig)
-		await state.miniflare.ready
+		// Constructed into a local first: Miniflare validates synchronously and can throw, and assigning
+		// only what was built keeps a failed rebuild from leaving a half-set field behind.
+		const miniflare = new Miniflare(mfConfig)
+		state.miniflare = miniflare
+		await miniflare.ready
 
 		const displayHost =
 			miniflareHost === '0.0.0.0' || miniflareHost === '::' ? 'localhost' : miniflareHost
 		logger?.success(`Miniflare ready on http://${displayHost}:${miniflarePort}`)
+
+		// From here the runtime is a live child process that can die on its own; watch it so the dev
+		// server rebuilds instead of silently serving every request against a runtime that is gone.
+		hasStartedRuntime = true
+		watchRuntimeHealth()
 
 		if (shouldLogMiniflareDiagnostics) {
 			await logMiniflareBindingDiagnostics(logger, state.miniflare, mfConfig)
@@ -467,6 +565,13 @@ export function createDevServer(options: DevServerOptions): DevServer {
 	 * Stop the dev server
 	 */
 	async function stop(): Promise<void> {
+		// Order matters: refuse new rebuilds, stop probing so none is scheduled, then let any rebuild
+		// already running finish. Disposing while one is in flight would leave the runtime it builds
+		// behind, outliving the server that owns it.
+		isStopping = true
+		runtimeWatchdog?.stop()
+		runtimeWatchdog = null
+		await reloadQueue.drain()
 		await disposeDevServerState(state)
 	}
 
