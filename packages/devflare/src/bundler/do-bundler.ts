@@ -257,7 +257,6 @@ export default {
 		},
 		sourcemap: bundleOptions?.sourcemap ?? defaults.sourcemap,
 		minify: bundleOptions?.minify ?? defaults.minify,
-		inlineDynamicImports: true,
 		defaultTsconfigMode: 'always'
 	})
 

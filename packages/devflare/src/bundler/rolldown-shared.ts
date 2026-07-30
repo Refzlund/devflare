@@ -272,7 +272,6 @@ export function resolveWorkerCompatibleRolldownConfig(options: {
 	rolldownOptions?: DevflareRolldownOptions
 	sourcemap?: boolean
 	minify?: boolean
-	inlineDynamicImports?: boolean
 	defaultTsconfigMode: 'always' | 'if-present'
 }): {
 	inputOptions: InputOptions
@@ -329,10 +328,12 @@ export function resolveWorkerCompatibleRolldownConfig(options: {
 			format: 'esm',
 			sourcemap: safeUserOutputOptions.sourcemap ?? options.sourcemap ?? false,
 			minify: safeUserOutputOptions.minify ?? options.minify,
-			codeSplitting: false,
-			...(options.inlineDynamicImports !== undefined
-				? { inlineDynamicImports: options.inlineDynamicImports }
-				: {})
+			// A worker bundle is always one file, so every dynamic import is folded into the single
+			// chunk. Do NOT also pass `inlineDynamicImports` — rolldown treats it as redundant here
+			// and greets every bundle with `WARN inlineDynamicImports option is ignored because
+			// codeSplitting: false is set.` That is why the user's own `output.inlineDynamicImports`
+			// is stripped above rather than forwarded.
+			codeSplitting: false
 		}
 	}
 }
