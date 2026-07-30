@@ -56,6 +56,7 @@
     "cloudflare-matrix-accuracy",
     "deploy-secrets-guide",
     "dev-server-host-port",
+    "dev-server-runtime-watchdog",
     "devflare-persist-dir-env",
     "docs-contract-honesty",
     "fix-typed-env-vars-proxy-assignability",
