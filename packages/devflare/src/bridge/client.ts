@@ -174,6 +174,9 @@ export class BridgeClient {
 			? this.openConnection(WebSocketCtor)
 			: this.openConnectionWithPackageFallback()
 		this.connectPromise = promise
+		// Backstop for the settle paths that never reach a socket handler (a constructor
+		// throw, an expired connect timeout). Guarded so a retry's newer attempt, already
+		// parked here, is not cleared by the older one finally rejecting.
 		promise.catch(() => {
 			if (this.connectPromise === promise) {
 				this.connectPromise = null
@@ -190,20 +193,48 @@ export class BridgeClient {
 
 	private openConnection(WebSocketCtor: WebSocketConstructor): Promise<void> {
 		return new Promise<void>((resolve, reject) => {
+			let socket: WebSocket | null = null
+
+			// A refused socket rejects on `error` but stays alive until its `close`
+			// arrives, so a caller retrying in between can replace it. Everything below
+			// therefore acts on ITS OWN socket and stands down once superseded — a late
+			// event from an abandoned attempt must never disturb the connection that
+			// replaced it (it used to tear the live one down and reject its in-flight work).
+			const isCurrent = () => socket !== null && this.ws === socket
+
+			// Release the in-flight marker for the next caller. `connect()` parks the promise
+			// and this assigns `this.ws` with no await between, so owning the socket means
+			// owning the marker — except on the `ws`-package path, which awaits the import
+			// first; there `connect()`'s own identity-guarded catch is the backstop.
+			const releaseConnectSlot = () => {
+				if (isCurrent()) this.connectPromise = null
+			}
+
 			const timeout = setTimeout(() => {
+				// Close the socket THIS attempt opened; `this.ws` may be a healthy replacement.
+				socket?.close()
 				reject(new Error(`Connection timeout: ${this.url}`))
-				this.ws?.close()
 			}, this.connectTimeout)
 
 			try {
-				this.ws = new WebSocketCtor(this.url)
-				this.ws.binaryType = 'arraybuffer'
+				socket = new WebSocketCtor(this.url)
+				this.ws = socket
+				socket.binaryType = 'arraybuffer'
 
-				const adapter = new BridgeWsAdapter(this.ws)
+				const adapter = new BridgeWsAdapter(socket)
 				this.adapter = adapter
 
-				this.ws.onopen = () => {
+				socket.onopen = () => {
 					clearTimeout(timeout)
+					// Superseded mid-upgrade: drop this socket rather than installing a
+					// second codec over the one already serving requests. Settle as a
+					// failure — returning without settling would strand this attempt's
+					// promise in `connectPromise` and hang every later connect() on it.
+					if (!isCurrent()) {
+						socket?.close()
+						reject(new Error(`Bridge connection superseded: ${this.url}`))
+						return
+					}
 					// Attach the v2 codec only once the socket is open so its
 					// `sendHello()` call writes to a live transport.
 					this.codec = new TransportV2Codec(adapter, {
@@ -220,31 +251,33 @@ export class BridgeClient {
 						/* surfaced through cleanupPending */
 					})
 					this.isConnected = true
-					this.connectPromise = null
+					releaseConnectSlot()
 					resolve()
 				}
 
-				this.ws.onerror = (event) => {
+				socket.onerror = (event) => {
 					clearTimeout(timeout)
-					this.connectPromise = null
+					releaseConnectSlot()
 					adapter.onerror?.({ error: (event as unknown as { error?: unknown }).error })
 					reject(new Error('WebSocket connection failed'))
 				}
 
-				this.ws.onclose = (event) => {
+				socket.onclose = (event) => {
 					adapter.onclose?.({
 						code: event?.code ?? 1006,
 						reason: event?.reason ?? ''
 					})
+					// Only the socket the client is actually using may declare the client
+					// disconnected — and so schedule the one auto-reconnect that follows.
+					if (!isCurrent()) return
 					this.handleDisconnect()
 				}
 
-				this.ws.onmessage = (event) => {
+				socket.onmessage = (event) => {
 					adapter.onmessage?.({ data: event.data })
 				}
 			} catch (error) {
 				clearTimeout(timeout)
-				this.connectPromise = null
 				reject(error)
 			}
 		})

@@ -370,11 +370,41 @@ function resolveWithPlatformContext<
 	return runWithEventContext(fetchEvent, () => resolve(event))
 }
 
-async function createPlatformWithRequestContext<
+/**
+ * Build this request's dev platform, reporting a failure instead of throwing.
+ *
+ * A dev request should still be served when the bridge is unreachable — just without bindings — so the
+ * failure is deliberately swallowed here. Equally deliberately, this covers ONLY the setup: resolving
+ * options and connecting. An error raised by the request itself belongs to the request. Catching that
+ * here (as one try around setup AND `resolve()` used to) blamed it on the platform, hid the real cause,
+ * and re-ran the whole request — repeating every side effect and running the second pass outside the
+ * context {@link resolveWithPlatformContext} established for the first.
+ *
+ * @param resolveOptions - produces the platform options; may itself fail (config load, hint extraction).
+ * @returns the platform, or null when it could not be built.
+ */
+async function createPlatformOrReport(
+	resolveOptions: () => Promise<DevflarePlatformOptions>
+): Promise<Platform | null> {
+	try {
+		return await createDevflarePlatform(await resolveOptions())
+	} catch (error) {
+		console.error('[devflare] Failed to create platform:', error)
+		return null
+	}
+}
+
+/**
+ * Attach a built platform to the event and resolve the request under its context.
+ *
+ * @param event - the SvelteKit request event.
+ * @param resolve - SvelteKit's resolve for this handle.
+ * @param platform - the platform from {@link createPlatformOrReport}.
+ */
+function serveWithPlatform<
 	TEvent extends { platform?: unknown; request?: Request },
 	TResolve extends (event: unknown) => Response | Promise<Response>
->(event: TEvent, resolve: TResolve, options: DevflarePlatformOptions): Promise<Response> {
-	const platform = await createDevflarePlatform(options)
+>(event: TEvent, resolve: TResolve, platform: Platform): Response | Promise<Response> {
 	event.platform = platform as typeof event.platform
 	return resolveWithPlatformContext(event, resolve, platform)
 }
@@ -455,16 +485,9 @@ export function createHandle<
 			: process.env.NODE_ENV !== 'production' && process.env.DEVFLARE_DEV === 'true'
 
 		if (enabled) {
-			try {
-				return await createPlatformWithRequestContext(
-					event,
-					resolve,
-					await getCustomPlatformOptions(platformOptions)
-				)
-			} catch (error) {
-				console.error('[devflare] Failed to create platform:', error)
-				// Fall through to default platform
-			}
+			const platform = await createPlatformOrReport(() => getCustomPlatformOptions(platformOptions))
+			// Only a failure to BUILD the platform falls through to an unbridged resolve.
+			if (platform) return serveWithPlatform(event, resolve, platform)
 		}
 
 		return resolve(event)
@@ -511,12 +534,9 @@ export const handle = async <
 	const enabled = process.env.NODE_ENV !== 'production' && process.env.DEVFLARE_DEV === 'true'
 
 	if (enabled) {
-		try {
-			return await createPlatformWithRequestContext(event, resolve, await getAutoPlatformOptions())
-		} catch (error) {
-			console.error('[devflare] Failed to create platform:', error)
-			// Fall through to default platform
-		}
+		const platform = await createPlatformOrReport(getAutoPlatformOptions)
+		// Only a failure to BUILD the platform falls through to an unbridged resolve.
+		if (platform) return serveWithPlatform(event, resolve, platform)
 	}
 
 	return resolve(event)
