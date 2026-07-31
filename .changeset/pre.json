@@ -35,6 +35,7 @@
     "bridge-do-websocket-hibernation-broadcast",
     "bridge-set-cookie-fidelity",
     "bridge-superseded-socket-isolation",
+    "browser-shim-port-flag",
     "cf-binding-remote-preview-fields",
     "cf-cron-fetch-lint-secrets",
     "cf-deploy-lifecycle",
