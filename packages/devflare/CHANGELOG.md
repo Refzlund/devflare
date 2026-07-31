@@ -1,5 +1,48 @@
 # devflare
 
+## 1.0.0-next.71
+
+### Minor Changes
+
+- 8384f9e: Allow two devflare instances to run against the same app directory, via `DEVFLARE_DIR`.
+
+  The generated-state root (`.devflare`) was a constant repeated across six modules and resolved
+  from the process cwd, so every instance started in the same app wrote the same files — the dev
+  Wrangler config, the composed worker entrypoint, the synthesized `vite.config.mjs`, the local
+  data. Vite watches the config it loaded, so starting a second instance hot-restarted the first
+  onto the SECOND's configuration; when that instance shut down and took its runtime port with it,
+  the first was left dialling a port that no longer existed, socket still bound and every request
+  hanging forever. Giving each instance its own ports did not help, because the collision was on a
+  file path rather than a socket.
+
+  The root now resolves through one function that honours `DEVFLARE_DIR`, so a Playwright suite can
+  run beside a dev server in a single working tree:
+
+  ```bash
+  DEVFLARE_DIR=.devflare-e2e bunx --bun devflare dev --port 5990 --runtime-port 8788
+  ```
+
+  Unset, everything resolves exactly as before. The override applies uniformly — including build and
+  deploy artifacts — so keep it set for the whole life of an instance.
+
+### Patch Changes
+
+- 0d3055f: Stop the `WARN inlineDynamicImports option is ignored because codeSplitting: false is set.`
+  that rolldown printed on every `devflare dev` start-up.
+
+  `resolveWorkerCompatibleRolldownConfig` always pins `codeSplitting: false` — a worker bundle
+  is one file by definition — and the Durable Object bundler additionally asked for
+  `inlineDynamicImports: true`. Rolldown treats the pair as contradictory, ignores the second
+  option and warns once per bundled DO. The option was never load-bearing: with
+  `codeSplitting: false` the dynamic imports are already folded into the single chunk, and the
+  bundle rolldown writes is byte-identical either way (verified against rolldown 1.1.3, the
+  version consumers resolve — this repo's own lockfile pins 1.0.0-rc.15, which predates the
+  warning, so the noise only ever showed up downstream).
+
+  The internal `inlineDynamicImports` parameter is gone. A user-supplied
+  `rolldownOptions.output.inlineDynamicImports` is still stripped, as before, so it cannot
+  reintroduce the warning.
+
 ## 1.0.0-next.70
 
 ### Patch Changes
