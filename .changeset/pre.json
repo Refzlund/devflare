@@ -62,6 +62,7 @@
     "docs-contract-honesty",
     "fix-typed-env-vars-proxy-assignability",
     "generated-dir-override",
+    "generated-dir-remaining-sites",
     "packaging-license-hygiene",
     "phase-b-code-paths",
     "phase-f-docs-debt",
