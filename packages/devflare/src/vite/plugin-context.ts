@@ -24,6 +24,7 @@ import { resolveConfigPath } from '../config/loader'
 import type { ResolvedConfig as ResolvedDevflareConfig } from '../config/resolve-phased'
 import type { DevflareConfig } from '../config/schema'
 import { resolveServiceBindings } from '../test/resolve-service-bindings'
+import { generatedDir } from '../utils/generated-dir'
 import { DEFAULT_DO_PATTERN } from '../utils/glob'
 import { prepareComposedWorkerEntrypoint } from '../worker-entry/composed-worker'
 import {
@@ -33,8 +34,6 @@ import {
 	discoverDurableObjects
 } from './plugin-durable-objects'
 import { createAuxiliaryServiceWorkerConfigs } from './plugin-service-bindings'
-
-const CONFIG_DIR = '.devflare'
 
 export interface ResolvedPluginContextState {
 	wranglerConfig: WranglerConfig
@@ -170,7 +169,7 @@ export async function buildPluginContextState(
 }
 
 export async function ensureGeneratedConfigDir(projectRoot: string): Promise<string> {
-	const configDir = resolve(projectRoot, CONFIG_DIR)
+	const configDir = generatedDir(projectRoot)
 	const fs = await import('node:fs/promises')
 	await fs.mkdir(configDir, { recursive: true })
 

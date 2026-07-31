@@ -18,6 +18,7 @@ import type { Plugin, ResolvedConfig, ViteDevServer } from 'vite'
 import type { WranglerConfig } from '../config/compiler'
 import { loadConfig } from '../config/loader'
 import type { DevflareConfig } from '../config/schema'
+import { generatedDirName } from '../utils/generated-dir'
 import { buildPluginConfigHookResult } from './plugin-config-hook'
 import {
 	buildPluginContextState,
@@ -41,7 +42,6 @@ import { runDevflareTransform } from './plugin-transform'
 export type { AuxiliaryWorkerConfig, DODiscoveryResult }
 
 // Config directory name (same as dev.ts)
-const CONFIG_DIR = '.devflare'
 
 export interface DevflarePluginOptions {
 	/**
@@ -292,14 +292,14 @@ export function devflarePlugin(options: DevflarePluginOptions = {}): Plugin {
 				)
 
 				if (config.command === 'serve') {
-					console.log('[devflare] Config generated to .devflare/wrangler.jsonc')
+					console.log(`[devflare] Config generated to ${generatedDirName()}/wrangler.jsonc`)
 					if (state.context.auxiliaryWorkerConfig) {
 						console.log('[devflare] ✓ Auxiliary DO worker configured')
 					}
 				}
 
 				if (config.command === 'build') {
-					console.log(`[devflare] Generated ${CONFIG_DIR}/wrangler.jsonc`)
+					console.log(`[devflare] Generated ${generatedDirName()}/wrangler.jsonc`)
 				}
 			} catch (error) {
 				if (error instanceof Error) {

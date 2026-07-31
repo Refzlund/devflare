@@ -22,6 +22,7 @@ import {
 	assertSharedBindingIds,
 	resolveAppDirectSocketPort
 } from '../../config/workspace'
+import { generatedDir } from '../../utils/generated-dir'
 import { setLocalSendEmailBindings } from '../../utils/send-email'
 import { runD1Migrations } from '../d1-migrations'
 import { resolveR2PresignOrigin } from '../miniflare-dev-config'
@@ -89,7 +90,9 @@ export function createWorkspaceDevServer(options: WorkspaceDevServerOptions): Wo
 	const debug = options.debug ?? process.env.DEVFLARE_DEBUG === 'true'
 
 	const host = manifest.host ?? '127.0.0.1'
-	const persistDir = resolve(manifestDir, manifest.persist ?? '.devflare/workspace-data')
+	const persistDir = manifest.persist
+		? resolve(manifestDir, manifest.persist)
+		: generatedDir(manifestDir, 'workspace-data')
 	// One per-boot HMAC secret for the whole instance; each app mints presigned
 	// R2 URLs against its OWN origin (injected per-app via its direct-socket port).
 	const r2PresignSecret = `${crypto.randomUUID()}${crypto.randomUUID()}`

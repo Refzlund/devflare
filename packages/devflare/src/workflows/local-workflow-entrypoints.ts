@@ -3,6 +3,7 @@ import type { ConsolaInstance } from 'consola'
 import { dirname, join, relative, resolve } from 'pathe'
 import { bundleWorkerEntry } from '../bundler'
 import { type DevflareConfig, normalizeWorkflowBinding } from '../config'
+import { generatedDir } from '../utils/generated-dir'
 import { DEFAULT_WORKFLOW_PATTERN, findFiles } from '../utils/glob'
 
 interface LocalWorkflowEntrypoint {
@@ -128,7 +129,7 @@ export async function bundleWorkflowEntrypointScript(
 		return ''
 	}
 
-	const entryDir = resolve(configDir, '.devflare', 'workflow-entrypoints')
+	const entryDir = generatedDir(configDir, 'workflow-entrypoints')
 	const entryPath = join(entryDir, '__entry.ts')
 	const outFile = join(entryDir, 'index.js')
 	await mkdir(entryDir, { recursive: true })

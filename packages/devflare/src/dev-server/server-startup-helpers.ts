@@ -14,6 +14,7 @@ import type { checkRemoteBindingRequirements } from '../cli/wrangler-auth'
 import { resolveConfigPath } from '../config/loader'
 import type { DevflareConfig } from '../config/schema'
 import { getSingleBrowserBindingName } from '../config/schema'
+import { generatedDir } from '../utils/generated-dir'
 import { writeGeneratedViteConfig } from '../vite'
 import type { RouteDiscoveryResult } from '../worker-entry/routes'
 import { resolveViteMode } from './vite-utils'
@@ -231,7 +232,7 @@ export async function maybeStartDOBundler(
 		return { bundler: null, result: null }
 	}
 
-	const outDir = resolve(options.cwd, '.devflare/do-bundles')
+	const outDir = generatedDir(options.cwd, 'do-bundles')
 	const bundler = createDOBundler({
 		cwd: options.cwd,
 		pattern: doPattern,

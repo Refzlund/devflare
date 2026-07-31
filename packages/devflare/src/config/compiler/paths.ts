@@ -1,4 +1,5 @@
 import { basename, isAbsolute, relative, resolve } from 'pathe'
+import { generatedDir } from '../../utils/generated-dir'
 import type { WranglerConfig } from './types'
 
 /**
@@ -49,9 +50,8 @@ export function isolateViteBuildOutputPaths(
 		return config
 	}
 
-	const isolatedAssetsDirectoryPath = resolve(
+	const isolatedAssetsDirectoryPath = generatedDir(
 		projectRoot,
-		'.devflare',
 		'vite-build-output',
 		basename(assetsDirectory)
 	)

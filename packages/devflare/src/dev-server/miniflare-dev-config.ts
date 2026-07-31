@@ -16,6 +16,7 @@ import { getSingleBrowserBindingName } from '../config/schema'
 import { buildLocalSecretWrappedBindingConfig } from '../secrets/local-secrets'
 import { buildLocalBindingShimServiceConfig } from '../shims/local-media-bindings'
 import type { resolveServiceBindings } from '../test/resolve-service-bindings'
+import { generatedDir } from '../utils/generated-dir'
 import type { RouteDiscoveryResult } from '../worker-entry/routes'
 import { getGatewayScript } from './gateway-script'
 import {
@@ -143,7 +144,7 @@ export function buildMiniflareDevConfig(input: BuildMiniflareDevConfigInput): an
 	// sibling apps lands on one path); an absolute value is used as-is. Unset ⇒ the original per-worker default.
 	const persistPath = process.env.DEVFLARE_PERSIST_DIR
 		? resolve(cwd, process.env.DEVFLARE_PERSIST_DIR)
-		: resolve(cwd, '.devflare/data')
+		: generatedDir(cwd, 'data')
 	const appWorkerName = loadedConfig.name
 	const shouldRunMainWorker =
 		!enableVite &&

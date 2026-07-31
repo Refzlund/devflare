@@ -179,7 +179,7 @@ export async function prepareWorkspaceApp(
 		doBundler = createDOBundler({
 			cwd: appCwd,
 			pattern: doPattern,
-			outDir: resolve(appCwd, '.devflare', 'do-bundles'),
+			outDir: generatedDir(appCwd, 'do-bundles'),
 			rolldownOptions: config.rolldown?.options,
 			sourcemap: config.rolldown?.sourcemap,
 			minify: config.rolldown?.minify,
