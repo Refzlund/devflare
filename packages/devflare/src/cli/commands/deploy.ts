@@ -15,6 +15,7 @@ import {
 	resolveConfigForEnvironment
 } from '../../config'
 import { stringifyConfig } from '../../config/compiler'
+import { generatedDir } from '../../utils/generated-dir'
 import { getDependencies } from '../dependencies'
 import { applyDeploymentStrategy, describeDeploymentStrategy } from '../deploy-strategy'
 import {
@@ -284,7 +285,7 @@ export async function runDeployCommand(
 			)
 			const deployStartedAt = new Date()
 
-			const wranglerOutputDirectory = join(cwd, '.devflare')
+			const wranglerOutputDirectory = generatedDir(cwd)
 			const wranglerOutputFilePath = join(
 				wranglerOutputDirectory,
 				`wrangler-output-${Date.now()}-${process.pid}.ndjson`

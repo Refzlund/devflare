@@ -18,6 +18,7 @@ import {
 import { loadConfig } from '../config/loader'
 import { applyLocalDevVarsToConfig } from '../config/local-dev-vars'
 import { resolveServiceBindings } from '../test/resolve-service-bindings'
+import { generatedDir } from '../utils/generated-dir'
 import { setLocalSendEmailBindings } from '../utils/send-email'
 import { prepareComposedWorkerEntrypoint } from '../worker-entry/composed-worker'
 import { discoverRoutes } from '../worker-entry/routes'
@@ -230,7 +231,7 @@ export function createDevServer(options: DevServerOptions): DevServer {
 		state.bundledMainWorkerScriptPath = await bundleWorkerEntry({
 			cwd,
 			inputFile: state.mainWorkerScriptPath,
-			outFile: resolve(cwd, '.devflare', 'worker-entrypoints', 'main.js'),
+			outFile: generatedDir(cwd, 'worker-entrypoints', 'main.js'),
 			rolldownOptions: state.config.rolldown?.options,
 			sourcemap: state.config.rolldown?.sourcemap,
 			minify: state.config.rolldown?.minify,

@@ -33,6 +33,7 @@ import {
 	buildLocalSecretWrappedBindingConfig
 } from '../secrets/local-secrets'
 import { buildLocalBindingShimServiceConfig } from '../shims/local-media-bindings'
+import { generatedDirName } from '../utils/generated-dir'
 import {
 	type R2PresignContext,
 	generateGatewayScript,
@@ -219,7 +220,7 @@ function resolvePersistPath(options: MiniflareOptions): string | undefined {
 		return options.persist
 	}
 
-	return options.persistPath ?? '.devflare/data'
+	return options.persistPath ?? `${generatedDirName()}/data`
 }
 
 async function loadMiniflareRuntime() {

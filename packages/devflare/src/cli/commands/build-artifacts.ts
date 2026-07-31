@@ -16,6 +16,7 @@ import {
 	writeWranglerConfig
 } from '../../config/compiler'
 import { detectViteProject } from '../../dev-server/vite-utils'
+import { generatedDir } from '../../utils/generated-dir'
 import { resolvePackageSpecifier } from '../../utils/resolve-package'
 import {
 	type EffectiveViteProjectDetection,
@@ -441,7 +442,7 @@ export async function prepareBuildArtifacts(
 		const bundledMainEntryPath = await bundleWorkerEntry({
 			cwd,
 			inputFile: composedMainEntry,
-			outFile: resolve(cwd, '.devflare', 'worker-entrypoints', 'main.js'),
+			outFile: generatedDir(cwd, 'worker-entrypoints', 'main.js'),
 			rolldownOptions: config.rolldown?.options,
 			sourcemap: config.rolldown?.sourcemap,
 			minify: config.rolldown?.minify,

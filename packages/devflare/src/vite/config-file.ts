@@ -2,9 +2,9 @@ import type { ConfigEnv, Plugin, PluginOption, UserConfig } from 'vite'
 import { type DevflareConfig, loadConfig } from '../config'
 import { resolveConfigForEnvironment } from '../config/resolve'
 import type { ViteProjectDetection } from '../dev-server/vite-utils'
+import { generatedDir } from '../utils/generated-dir'
 import { type DevflarePluginOptions, devflarePlugin } from './plugin'
 
-const CONFIG_DIR = '.devflare'
 const GENERATED_VITE_CONFIG_FILENAME = 'vite.config.mjs'
 
 export interface EffectiveViteProjectDetection extends ViteProjectDetection {
@@ -128,7 +128,7 @@ export async function resolveViteUserConfig(
 async function ensureGeneratedConfigDir(cwd: string): Promise<string> {
 	const fs = await import('node:fs/promises')
 	const { resolve } = await import('pathe')
-	const configDir = resolve(cwd, CONFIG_DIR)
+	const configDir = generatedDir(cwd)
 	await fs.mkdir(configDir, { recursive: true })
 
 	const gitignorePath = resolve(configDir, '.gitignore')

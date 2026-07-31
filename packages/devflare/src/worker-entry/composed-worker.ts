@@ -2,6 +2,7 @@ import { dirname, relative, resolve } from 'pathe'
 import type { DevflareConfig } from '../config'
 import { resolveConfigForEnvironment } from '../config/resolve'
 import { normalizeDOBinding } from '../config/schema'
+import { generatedDir } from '../utils/generated-dir'
 import { DEFAULT_DO_PATTERN } from '../utils/glob'
 import { discoverDurableObjectFiles } from './durable-object-discovery'
 import { type RouteDiscoveryResult, discoverRoutes } from './routes'
@@ -564,7 +565,7 @@ export async function prepareComposedWorkerEntrypoint(
 	await validateFetchHandlerStyle(surfacePaths.fetch)
 
 	const fs = await import('node:fs/promises')
-	const entryDir = resolve(cwd, '.devflare', 'worker-entrypoints')
+	const entryDir = generatedDir(cwd, 'worker-entrypoints')
 	const entryPath = resolve(entryDir, 'main.ts')
 
 	await fs.mkdir(entryDir, { recursive: true })

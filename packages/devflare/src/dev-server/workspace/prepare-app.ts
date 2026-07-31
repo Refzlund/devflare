@@ -29,6 +29,7 @@ import {
 	normalizeR2Binding
 } from '../../config/schema'
 import { resolveServiceBindings } from '../../test/resolve-service-bindings'
+import { generatedDir } from '../../utils/generated-dir'
 import { prepareComposedWorkerEntrypoint } from '../../worker-entry/composed-worker'
 import { discoverRoutes } from '../../worker-entry/routes'
 import { bundleWorkflowEntrypointScript } from '../../workflows/local-workflow-entrypoints'
@@ -162,7 +163,7 @@ export async function prepareWorkspaceApp(
 		bundledMainWorkerScriptPath = await bundleWorkerEntry({
 			cwd: appCwd,
 			inputFile: mainWorkerScriptPath,
-			outFile: resolve(appCwd, '.devflare', 'worker-entrypoints', 'main.js'),
+			outFile: generatedDir(appCwd, 'worker-entrypoints', 'main.js'),
 			rolldownOptions: config.rolldown?.options,
 			sourcemap: config.rolldown?.sourcemap,
 			minify: config.rolldown?.minify,

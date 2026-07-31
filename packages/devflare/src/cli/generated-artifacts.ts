@@ -1,7 +1,6 @@
 import { resolve } from 'pathe'
+import { generatedDir } from '../utils/generated-dir'
 
-const DEVFLARE_DIR = ['.devflare'] as const
-const DEVFLARE_BUILD_DIR = ['.devflare', 'build'] as const
 const WRANGLER_DEPLOY_DIR = ['.wrangler', 'deploy'] as const
 
 export interface GeneratedArtifactPaths {
@@ -15,8 +14,8 @@ export interface GeneratedArtifactPaths {
 }
 
 export function getGeneratedArtifactPaths(cwd: string): GeneratedArtifactPaths {
-	const devflareDir = resolve(cwd, ...DEVFLARE_DIR)
-	const buildDir = resolve(cwd, ...DEVFLARE_BUILD_DIR)
+	const devflareDir = generatedDir(cwd)
+	const buildDir = generatedDir(cwd, 'build')
 	const deployDir = resolve(cwd, ...WRANGLER_DEPLOY_DIR)
 
 	return {
