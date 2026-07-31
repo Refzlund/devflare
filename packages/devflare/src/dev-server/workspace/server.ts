@@ -32,11 +32,26 @@ import { startViteProcess } from '../vite-process'
 import { buildMergedWorkspaceConfig } from './merge-config'
 import { type PreparedWorkspaceApp, prepareWorkspaceApp } from './prepare-app'
 
-/** The first browser-shim port; each app that binds browser rendering gets `+index`. */
-const BROWSER_SHIM_BASE_PORT = 9700
+/** Default first browser-shim port; each app that binds browser rendering gets `+index`. */
+export const DEFAULT_BROWSER_SHIM_BASE_PORT = 9700
 
 /** Delay before running migrations, matching the single-app path's stabilization wait. */
 const MIGRATION_STABILIZE_DELAY_MS = 1000
+
+/**
+ * Place one app's Browser Rendering shim inside the workspace's shim block.
+ *
+ * The block is contiguous from the base port so a user who moves it only has to
+ * keep `apps.length` ports free, and an app's shim stays at the same offset for
+ * the life of the manifest.
+ *
+ * @param basePort - First port of the block (the resolved `browserShimBasePort`).
+ * @param appIndex - The app's position in the manifest.
+ * @returns The port that app's shim listens on.
+ */
+export function resolveAppBrowserShimPort(basePort: number, appIndex: number): number {
+	return basePort + appIndex
+}
 
 /** Options for {@link createWorkspaceDevServer}. */
 export interface WorkspaceDevServerOptions {
@@ -46,6 +61,12 @@ export interface WorkspaceDevServerOptions {
 	manifestDir: string
 	/** Persist storage to the shared workspace dir (default: true). */
 	persist?: boolean
+	/**
+	 * First browser-shim port (default: 9700); each app that binds browser
+	 * rendering listens on `base + its index`. Move the block when another local
+	 * instance already owns it.
+	 */
+	browserShimBasePort?: number
 	/** Logger. */
 	logger?: ConsolaInstance
 	/** Verbose logging. */
@@ -86,6 +107,7 @@ export interface WorkspaceDevServer {
 export function createWorkspaceDevServer(options: WorkspaceDevServerOptions): WorkspaceDevServer {
 	const { manifest, manifestDir, logger } = options
 	const persist = options.persist ?? true
+	const browserShimBasePort = options.browserShimBasePort ?? DEFAULT_BROWSER_SHIM_BASE_PORT
 	const verbose = options.verbose ?? false
 	const debug = options.debug ?? process.env.DEVFLARE_DEBUG === 'true'
 
@@ -128,7 +150,7 @@ export function createWorkspaceDevServer(options: WorkspaceDevServerOptions): Wo
 					persist,
 					debug,
 					verbose,
-					browserShimPort: BROWSER_SHIM_BASE_PORT + index,
+					browserShimPort: resolveAppBrowserShimPort(browserShimBasePort, index),
 					r2PresignSecret,
 					host,
 					logger

@@ -79,7 +79,7 @@ export const CORE_HELP_PAGES: HelpPage[] = [
 		path: ['dev'],
 		summary: 'Start the development server',
 		usage: [
-			'devflare dev [--config <path>] [--port <port>] [--runtime-port <port>] [--runtime-host <host>] [--bridge-port <port>] [--persist] [--verbose] [--debug] [--log | --log-temp]'
+			'devflare dev [--config <path>] [--port <port>] [--runtime-port <port>] [--runtime-host <host>] [--bridge-port <port>] [--browser-shim-port <port>] [--persist] [--verbose] [--debug] [--log | --log-temp]'
 		],
 		description: [
 			'Starts a worker-only Miniflare server by default, and automatically enables Vite when the current package has an effective local Vite setup.',
@@ -104,6 +104,10 @@ export const CORE_HELP_PAGES: HelpPage[] = [
 				'--bridge-port <port>',
 				'Alias for --runtime-port; also honored via DEVFLARE_BRIDGE_PORT'
 			),
+			entry(
+				'--browser-shim-port <port>',
+				'Port the local Browser Rendering shim listens on (defaults to 8788); also honored via DEVFLARE_BROWSER_SHIM_PORT'
+			),
 			entry('--persist', 'Persist Miniflare storage between restarts'),
 			entry('--verbose', 'Increase logging verbosity'),
 			entry('--debug', 'Enable extra debug logging and stack traces'),
@@ -118,6 +122,10 @@ export const CORE_HELP_PAGES: HelpPage[] = [
 				'Use a custom local runtime port when another project owns 8787'
 			),
 			entry(
+				'devflare dev --runtime-port 8790 --browser-shim-port 8791',
+				'Run a second dev server beside one that already owns 8787 and the browser shim'
+			),
+			entry(
 				'devflare dev --persist --log-temp',
 				'Keep Miniflare state and overwrite `.log` on each run'
 			)
@@ -125,13 +133,16 @@ export const CORE_HELP_PAGES: HelpPage[] = [
 		notes: [
 			'Worker-only mode is the default when no effective local `vite.config.*` is present.',
 			'Runtime host/port resolve as CLI flag, then DEVFLARE_RUNTIME_HOST/DEVFLARE_RUNTIME_PORT (and DEVFLARE_BRIDGE_PORT), then `server` config, then 127.0.0.1:8787.',
+			'The Browser Rendering shim is a listener of its own, so two dev servers that both bind `browser` also need distinct `--browser-shim-port` (or DEVFLARE_BROWSER_SHIM_PORT) values, not just distinct runtime ports.',
 			'`--log` and `--log-temp` still print to the terminal; they add a file mirror instead of redirecting output away.'
 		]
 	},
 	{
 		path: ['workspace'],
 		summary: 'Run several devflare apps in one shared local runtime',
-		usage: ['devflare workspace dev [--config <path>] [--no-persist] [--verbose] [--debug]'],
+		usage: [
+			'devflare workspace dev [--config <path>] [--no-persist] [--browser-shim-port <port>] [--verbose] [--debug]'
+		],
 		description: [
 			'Co-hosts every app listed in a `devflare.workspace.ts` manifest inside ONE Miniflare instance, so workers that bind the same D1/KV/R2/Durable Object id share LIVE state in dev — a write by one app is immediately visible to the others, exactly as they share one managed resource in production.',
 			'Each app is still exposed on its own browser-reachable origin via a per-app direct socket, so the cross-origin split (e.g. `ui.localhost` ↔ `api.ui.localhost`) is preserved. Vite apps are spawned as child processes pointed at the shared instance.',
@@ -144,12 +155,20 @@ export const CORE_HELP_PAGES: HelpPage[] = [
 				'--no-persist',
 				'Keep workspace storage in-memory instead of `.devflare/workspace-data`'
 			),
+			entry(
+				'--browser-shim-port <port>',
+				'First Browser Rendering shim port; each app that binds browser rendering uses this plus its index (defaults to 9700). Also honored via DEVFLARE_BROWSER_SHIM_PORT'
+			),
 			entry('--verbose', 'Increase logging verbosity'),
 			entry('--debug', 'Enable extra debug logging in the gateway workers')
 		],
 		examples: [
 			entry('devflare workspace dev', 'Start all manifest apps sharing one instance'),
-			entry('devflare workspace dev --no-persist', 'Run with ephemeral storage')
+			entry('devflare workspace dev --no-persist', 'Run with ephemeral storage'),
+			entry(
+				'devflare workspace dev --browser-shim-port 9800',
+				'Move the per-app browser-shim block when another instance owns 9700'
+			)
 		],
 		notes: [
 			'Requires a `devflare.workspace.ts` at the current directory exporting `defineWorkspace({ apps: [...] })`.',
@@ -160,13 +179,19 @@ export const CORE_HELP_PAGES: HelpPage[] = [
 	{
 		path: ['workspace', 'dev'],
 		summary: 'Start the shared workspace dev server',
-		usage: ['devflare workspace dev [--config <path>] [--no-persist] [--verbose] [--debug]'],
+		usage: [
+			'devflare workspace dev [--config <path>] [--no-persist] [--browser-shim-port <port>] [--verbose] [--debug]'
+		],
 		description: [
 			'Loads the workspace manifest, prepares each app with the same pipeline `devflare dev` uses, merges their workers into one Miniflare instance with shared bindings, and exposes each app on its own direct socket.'
 		],
 		options: [
 			entry('--config <path>', 'Use a specific workspace manifest file'),
 			entry('--no-persist', 'Keep workspace storage in-memory'),
+			entry(
+				'--browser-shim-port <port>',
+				'First Browser Rendering shim port; each app that binds browser rendering uses this plus its index (defaults to 9700). Also honored via DEVFLARE_BROWSER_SHIM_PORT'
+			),
 			entry('--verbose', 'Increase logging verbosity'),
 			entry('--debug', 'Enable extra debug logging in the gateway workers')
 		],

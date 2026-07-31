@@ -342,6 +342,7 @@ bunx --bun devflare productions versions`
 				bullets: [
 					'Run `types` after binding or entrypoint changes so `env.d.ts` stays honest.',
 					'Use `dev --runtime-port <port>` or `DEVFLARE_RUNTIME_PORT` when another local project already owns the default 8787 runtime port.',
+					'Use `dev --browser-shim-port <port>` or `DEVFLARE_BROWSER_SHIM_PORT` when a second instance also binds Browser Rendering. The shim is a listener of its own on 8788, so moving the runtime port alone still collides. `workspace dev` reads the same flag as the first port of its per-app block, which otherwise starts at 9700.',
 					'Set `DEVFLARE_DIR` to give an instance its own generated-state root when TWO instances run against the same app directory — a Playwright suite beside a dev server, say. They otherwise share `.devflare/vite.config.mjs`, and Vite restarts whichever server is watching it onto the other one\'s config; separate ports do not help, because the collision is a file path. Defaults to `.devflare`, and applies to build and deploy artifacts too, so keep it set for an instance\'s whole life.',
 					'Use `config --phase local --format wrangler` when you want local config inspection without Cloudflare account lookups.',
 					'Use `ref()` service bindings for local full-stack packages; Devflare starts those referenced workers in CLI dev and exposes them as Vite auxiliary workers for framework dev.',

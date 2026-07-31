@@ -11,6 +11,7 @@
 import { type ConsolaInstance, createConsola } from 'consola'
 import { loadWorkspaceManifest } from '../../config/workspace'
 import { createWorkspaceDevServer } from '../../dev-server/workspace/server'
+import { resolveDevBrowserShimPort } from '../dev-ports'
 import type { CliOptions, CliResult, ParsedArgs } from '../index'
 import { createCliTheme, cyanBold, dim, logLine, yellow } from '../ui'
 
@@ -41,6 +42,15 @@ export async function runWorkspaceCommand(
 
 	const devLogger = createConsola({ level: verbose ? 4 : 3 })
 
+	// Resolved before the manifest loads so a mistyped port fails immediately.
+	let browserShimBasePort: number | undefined
+	try {
+		browserShimBasePort = resolveDevBrowserShimPort(parsed.options, process.env)
+	} catch (error) {
+		logger.error(error instanceof Error ? error.message : String(error))
+		return { exitCode: 1 }
+	}
+
 	let loaded: Awaited<ReturnType<typeof loadWorkspaceManifest>>
 	try {
 		loaded = await loadWorkspaceManifest({ cwd, configFile })
@@ -60,6 +70,7 @@ export async function runWorkspaceCommand(
 		manifest: loaded.manifest,
 		manifestDir: loaded.manifestDir,
 		persist,
+		browserShimBasePort,
 		logger: devLogger,
 		verbose,
 		debug: debugEnabled

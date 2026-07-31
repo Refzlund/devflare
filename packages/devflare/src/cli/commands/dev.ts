@@ -25,6 +25,11 @@ import { loadConfig } from '../../config/loader'
 import { createDevServer } from '../../dev-server'
 import { detectViteProject } from '../../dev-server/vite-utils'
 import { resolveEffectiveViteProject } from '../../vite'
+import {
+	resolveDevBrowserShimPort,
+	resolveDevRuntimeHost,
+	resolveDevRuntimePort
+} from '../dev-ports'
 import type { CliOptions, CliResult, ParsedArgs } from '../index'
 import { createCliTheme, cyanBold, dim, logLine, yellow } from '../ui'
 
@@ -36,70 +41,6 @@ interface LogWriter {
 	path: string
 	write: (data: string | Buffer, source?: 'vite' | 'miniflare' | 'rolldown') => void
 	close: () => void
-}
-
-function readStringOption(value: string | boolean | undefined): string | undefined {
-	return typeof value === 'string' ? value : undefined
-}
-
-function parsePort(value: string, source: string): number {
-	const port = Number(value)
-	if (!Number.isInteger(port) || port <= 0 || port > 65535) {
-		throw new Error(`${source} must be an integer between 1 and 65535`)
-	}
-	return port
-}
-
-function resolveSinglePort(
-	runtimePort: string | undefined,
-	bridgePort: string | undefined,
-	source: string
-): number | undefined {
-	if (runtimePort && bridgePort && runtimePort !== bridgePort) {
-		throw new Error(
-			`Conflicting Devflare runtime ports: ${source} runtime port is ${runtimePort}, but bridge port is ${bridgePort}. Use one value for both.`
-		)
-	}
-
-	const value = runtimePort ?? bridgePort
-	return value ? parsePort(value, source) : undefined
-}
-
-export function resolveDevRuntimePort(
-	options: Record<string, string | boolean>,
-	env: NodeJS.ProcessEnv = process.env,
-	configPort?: number
-): number {
-	return (
-		resolveSinglePort(
-			readStringOption(options['runtime-port']),
-			readStringOption(options['bridge-port']),
-			'CLI'
-		) ??
-		resolveSinglePort(env.DEVFLARE_RUNTIME_PORT, env.DEVFLARE_BRIDGE_PORT, 'environment') ??
-		configPort ??
-		8787
-	)
-}
-
-/**
- * Resolve the host the local Miniflare runtime instance binds to.
- *
- * Precedence: `--runtime-host` CLI flag > `DEVFLARE_RUNTIME_HOST` env var >
- * `server.host` config value > `127.0.0.1`.
- */
-export function resolveDevRuntimeHost(
-	options: Record<string, string | boolean>,
-	env: NodeJS.ProcessEnv = process.env,
-	configHost?: string
-): string {
-	const envHost = env.DEVFLARE_RUNTIME_HOST?.trim()
-	return (
-		readStringOption(options['runtime-host']) ??
-		(envHost ? envHost : undefined) ??
-		configHost ??
-		'127.0.0.1'
-	)
 }
 
 /**
@@ -170,9 +111,11 @@ export async function runDevCommand(
 
 	let miniflarePort: number
 	let miniflareHost: string
+	let browserShimPort: number | undefined
 	try {
 		miniflarePort = resolveDevRuntimePort(parsed.options, process.env, config.server?.port)
 		miniflareHost = resolveDevRuntimeHost(parsed.options, process.env, config.server?.host)
+		browserShimPort = resolveDevBrowserShimPort(parsed.options, process.env)
 	} catch (error) {
 		logger.error(error instanceof Error ? error.message : String(error))
 		return { exitCode: 1 }
@@ -247,6 +190,7 @@ export async function runDevCommand(
 			vitePort: port ? Number.parseInt(port, 10) : 5173,
 			miniflarePort,
 			miniflareHost,
+			browserShimPort,
 			enableVite: viteProject.shouldStartVite,
 			persist: persistEnabled,
 			logger: devLogger,

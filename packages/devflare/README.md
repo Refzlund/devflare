@@ -201,6 +201,7 @@ for examples with file paths.
 Useful local-first switches:
 
 - `devflare dev --runtime-port 8788` or `DEVFLARE_RUNTIME_PORT=8788` moves the local Miniflare runtime/bridge off the default `127.0.0.1:8787`. `--bridge-port` and `DEVFLARE_BRIDGE_PORT` are aliases for the same runtime port.
+- `devflare dev --browser-shim-port 8791` or `DEVFLARE_BROWSER_SHIM_PORT=8791` moves the local Browser Rendering shim off the default `8788`. It is a listener of its own, so two instances that both bind `browser` need this as well as separate runtime ports. `devflare workspace dev` reads the same flag as the first port of its per-app block, which otherwise starts at `9700`.
 - `devflare doctor --scope local` skips deploy-readiness artifact warnings during a local-only loop.
 - `devflare config --phase local --format wrangler` prints the local-runtime Wrangler shape without Cloudflare account resource lookups.
 - `devflare dev` and `devflare/vite` start `ref()` service-binding workers inside the same local runtime, including their local KV, D1, R2, Queue producer/consumer, vars, Durable Objects, and other Miniflare-backed bindings.

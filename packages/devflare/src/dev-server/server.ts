@@ -73,6 +73,12 @@ export interface DevServerOptions {
 	miniflarePort?: number
 	/** Host the Miniflare runtime instance binds to (default: 127.0.0.1) */
 	miniflareHost?: string
+	/**
+	 * Port the local Browser Rendering shim listens on (default: 8788). Only
+	 * used when the config declares a `browser` binding; move it when another
+	 * local instance already owns the default.
+	 */
+	browserShimPort?: number
 	/** Whether to start Vite for this package */
 	enableVite?: boolean
 	/** Persist storage data */
@@ -105,6 +111,7 @@ export function createDevServer(options: DevServerOptions): DevServer {
 		vitePort = 5173,
 		miniflarePort = 8787,
 		miniflareHost = '127.0.0.1',
+		browserShimPort,
 		enableVite: enableViteRequested = true,
 		persist = true, // Default to true for dev - migrations need persistence
 		logger,
@@ -112,7 +119,10 @@ export function createDevServer(options: DevServerOptions): DevServer {
 		debug = process.env.DEVFLARE_DEBUG === 'true'
 	} = options
 
-	const state: DevServerState = createDevServerState({ enableVite: enableViteRequested })
+	const state: DevServerState = createDevServerState({
+		enableVite: enableViteRequested,
+		browserShimPort
+	})
 
 	// Per-boot HMAC secret for the local R2 presign endpoint. Stable across
 	// Miniflare reloads within this dev-server instance so already-minted

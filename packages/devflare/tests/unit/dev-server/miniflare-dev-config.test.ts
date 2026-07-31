@@ -145,4 +145,34 @@ describe('buildMiniflareDevConfig', () => {
 		const mfConfig = buildMiniflareDevConfig(buildBaseInput({ persist: false }))
 		expect(mfConfig.cachePersist).toBeUndefined()
 	})
+
+	test('points the browser binding worker at the requested browser shim port', () => {
+		const mfConfig = buildMiniflareDevConfig(
+			buildBaseInput({
+				config: {
+					name: 'site-worker',
+					compatibilityDate: '2026-04-28',
+					bindings: { browser: { BROWSER: 'browser' } }
+				},
+				// A browser binding worker is only emitted when something can call
+				// it — here, the worker-only main worker.
+				enableVite: false,
+				mainWorkerSurfacePaths: {
+					fetch: 'C:/repo/site/src/fetch.ts',
+					queue: null,
+					scheduled: null,
+					email: null,
+					tail: null
+				},
+				browserShimPort: 9911
+			})
+		)
+
+		const browserWorker = mfConfig.workers.find(
+			(worker: { name: string }) => worker.name === 'browser-binding'
+		)
+		expect(browserWorker).toBeDefined()
+		expect(browserWorker.script).toContain('http://127.0.0.1:9911')
+		expect(browserWorker.script).not.toContain('8788')
+	})
 })
