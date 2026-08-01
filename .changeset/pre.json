@@ -36,6 +36,8 @@
     "bridge-set-cookie-fidelity",
     "bridge-superseded-socket-isolation",
     "browser-shim-port-flag",
+    "browser-shim-puppeteer-1-1-endpoints",
+    "browser-shim-sessions-envelope",
     "cf-binding-remote-preview-fields",
     "cf-cron-fetch-lint-secrets",
     "cf-deploy-lifecycle",
