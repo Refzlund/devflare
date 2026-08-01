@@ -494,7 +494,9 @@ export function createBrowserShim(options: BrowserShimOptions = {}): BrowserShim
 				return
 			}
 
-			// List active sessions
+			// List active sessions. Named field, not a bare array: every
+			// @cloudflare/puppeteer version reads `JSON.parse(text).sessions`,
+			// so an array reaches the caller of sessions() as undefined.
 			case 'sessions': {
 				const activeSessions = Array.from(sessions.values()).map((s) => ({
 					sessionId: s.sessionId,
@@ -502,13 +504,13 @@ export function createBrowserShim(options: BrowserShimOptions = {}): BrowserShim
 					connectionId: s.connectionId,
 					connectionStartTime: s.connectionStartTime
 				}))
-				sendJson(res, 200, activeSessions)
+				sendJson(res, 200, { sessions: activeSessions })
 				return
 			}
 
-			// List recent sessions
+			// List recent sessions, likewise read off `.history`
 			case 'history':
-				sendJson(res, 200, history.slice(0, 50))
+				sendJson(res, 200, { history: history.slice(0, 50) })
 				return
 
 			case 'limits':
