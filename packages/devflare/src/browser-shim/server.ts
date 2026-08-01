@@ -15,12 +15,19 @@
  * applies to this shim only and does not apply to the user's normal worker
  * routes.
  */
-// Provides endpoints that @cloudflare/puppeteer expects:
-// - POST /v1/acquire → Launch browser, return sessionId
-// - GET /v1/connectDevtools?browser_session=X → WebSocket to Chrome DevTools
+// Provides endpoints that @cloudflare/puppeteer expects, in both the spellings
+// it has used — 1.1.0 moved acquire and DevTools without a major bump, so a
+// shim that serves only one generation locks apps to one client version:
+// - GET|POST /v1/acquire → Launch browser, return sessionId (client ≤ 1.0.7)
+// - GET|POST /v1/devtools/browser → Launch browser, return sessionId (≥ 1.1.0)
+// - GET /v1/connectDevtools?browser_session=X → WebSocket to Chrome DevTools (≤ 1.0.7)
+// - GET /v1/devtools/browser/X → WebSocket to Chrome DevTools (≥ 1.1.0)
 // - GET /v1/sessions → List active sessions
 // - GET /v1/limits → Return limits info
 // - GET /v1/history → Return session history
+// - GET /v1/session/X → Session info incl. wsEndpoint (devflare's own)
+//
+// The path table itself lives in ./routes.
 //
 // Auto-installs Chrome Headless Shell using @puppeteer/browsers
 // Works with both Node.js and Bun runtimes
@@ -43,6 +50,14 @@ import {
 } from '@puppeteer/browsers'
 import type { ConsolaInstance } from 'consola'
 import puppeteerCore, { type Browser } from 'puppeteer-core'
+import {
+	type AcquireOptions,
+	isDevtoolsPath,
+	matchShimRoute,
+	normalizeKeepAlive,
+	readAcquireOptions,
+	readDevtoolsSessionId
+} from './routes'
 
 // -----------------------------------------------------------------------------
 // Types
@@ -354,9 +369,7 @@ export function createBrowserShim(options: BrowserShimOptions = {}): BrowserShim
 	/**
 	 * Launch a new browser and create a session
 	 */
-	async function acquireSession(acquireOptions?: {
-		keep_alive?: number
-	}): Promise<{ sessionId: string }> {
+	async function acquireSession(acquireOptions?: AcquireOptions): Promise<{ sessionId: string }> {
 		if (!executablePath) {
 			throw new Error('Chrome not initialized')
 		}
@@ -465,105 +478,112 @@ export function createBrowserShim(options: BrowserShimOptions = {}): BrowserShim
 			return
 		}
 
-		// POST /v1/acquire - Launch a new browser
-		// Note: @cloudflare/puppeteer actually uses GET (with query params) for acquire
-		if (url.pathname === '/v1/acquire' && (method === 'POST' || method === 'GET')) {
-			try {
-				let acquireOptions: { keep_alive?: number } = {}
-				// Parse query params for GET requests (used by @cloudflare/puppeteer)
-				if (method === 'GET') {
-					const keepAlive = url.searchParams.get('keep_alive')
-					if (keepAlive) {
-						acquireOptions.keep_alive = Number.parseInt(keepAlive, 10)
-					}
-				} else {
-					// Parse body for POST requests
-					try {
-						const body = await readBody(req)
-						acquireOptions = JSON.parse(body) as { keep_alive?: number }
-					} catch {
-						// Ignore JSON parse errors
-					}
+		const route = matchShimRoute(url.pathname, method)
+
+		switch (route.kind) {
+			// Launch a new browser
+			case 'acquire': {
+				try {
+					const result = await acquireSession(await readAcquire(req, url, method))
+					sendJson(res, 200, result)
+				} catch (error) {
+					const msg = error instanceof Error ? error.message : 'Failed to acquire browser'
+					logger?.error(`[BrowserShim] Acquire failed: ${msg}`)
+					sendJson(res, 500, { error: msg })
 				}
-				const result = await acquireSession(acquireOptions)
-				sendJson(res, 200, result)
-			} catch (error) {
-				const msg = error instanceof Error ? error.message : 'Failed to acquire browser'
-				logger?.error(`[BrowserShim] Acquire failed: ${msg}`)
-				sendJson(res, 500, { error: msg })
-			}
-			return
-		}
-
-		// GET /v1/sessions - List active sessions
-		if (url.pathname === '/v1/sessions' && method === 'GET') {
-			const activeSessions = Array.from(sessions.values()).map((s) => ({
-				sessionId: s.sessionId,
-				startTime: s.startTime,
-				connectionId: s.connectionId,
-				connectionStartTime: s.connectionStartTime
-			}))
-			sendJson(res, 200, activeSessions)
-			return
-		}
-
-		// GET /v1/history - List recent sessions
-		if (url.pathname === '/v1/history' && method === 'GET') {
-			sendJson(res, 200, history.slice(0, 50))
-			return
-		}
-
-		// GET /v1/limits - Return limits info
-		if (url.pathname === '/v1/limits' && method === 'GET') {
-			sendJson(res, 200, {
-				activeSessions: Array.from(sessions.keys()).map((id) => ({ id })),
-				allowedBrowserAcquisitions: 10,
-				maxConcurrentSessions: 10,
-				timeUntilNextAllowedBrowserAcquisition: 0
-			})
-			return
-		}
-
-		// GET /v1/session/:sessionId - Get session info including wsEndpoint
-		// This is used by the browser rendering worker to connect to Chrome directly
-		if (url.pathname.startsWith('/v1/session/') && method === 'GET') {
-			const sessionId = url.pathname.slice('/v1/session/'.length)
-			const session = sessions.get(sessionId)
-			if (!session) {
-				sendJson(res, 404, { error: 'Session not found' })
 				return
 			}
-			sendJson(res, 200, {
-				sessionId: session.sessionId,
-				wsEndpoint: session.wsEndpoint,
-				startTime: session.startTime,
-				connectionId: session.connectionId,
-				connectionStartTime: session.connectionStartTime
-			})
-			return
+
+			// List active sessions
+			case 'sessions': {
+				const activeSessions = Array.from(sessions.values()).map((s) => ({
+					sessionId: s.sessionId,
+					startTime: s.startTime,
+					connectionId: s.connectionId,
+					connectionStartTime: s.connectionStartTime
+				}))
+				sendJson(res, 200, activeSessions)
+				return
+			}
+
+			// List recent sessions
+			case 'history':
+				sendJson(res, 200, history.slice(0, 50))
+				return
+
+			case 'limits':
+				sendJson(res, 200, {
+					activeSessions: Array.from(sessions.keys()).map((id) => ({ id })),
+					allowedBrowserAcquisitions: 10,
+					maxConcurrentSessions: 10,
+					timeUntilNextAllowedBrowserAcquisition: 0
+				})
+				return
+
+			// Session info including wsEndpoint, used by the browser rendering
+			// worker to connect to Chrome directly
+			case 'session': {
+				const session = sessions.get(route.sessionId)
+				if (!session) {
+					sendJson(res, 404, { error: 'Session not found' })
+					return
+				}
+				sendJson(res, 200, {
+					sessionId: session.sessionId,
+					wsEndpoint: session.wsEndpoint,
+					startTime: session.startTime,
+					connectionId: session.connectionId,
+					connectionStartTime: session.connectionStartTime
+				})
+				return
+			}
+
+			case 'health':
+				sendJson(res, 200, {
+					ok: true,
+					activeSessions: sessions.size,
+					historySize: history.length,
+					executablePath
+				})
+				return
+
+			// Reached over plain HTTP; the upgrade handler takes it otherwise
+			case 'devtools':
+				res.writeHead(426, { 'Content-Type': 'text/plain' })
+				res.end('WebSocket upgrade required')
+				return
+
+			case 'not-found':
+				res.writeHead(404, { 'Content-Type': 'text/plain' })
+				res.end('Not found')
+				return
+		}
+	}
+
+	/**
+	 * Read the options an acquire request asked for.
+	 *
+	 * Both client generations pass them in the query string. A JSON body is
+	 * optional and wins where it overlaps — 1.1.0 onwards sends none, but a
+	 * `POST /v1/acquire` from an older integration could, and used to be the
+	 * only place this looked.
+	 */
+	async function readAcquire(
+		req: IncomingMessage,
+		url: URL,
+		method: string
+	): Promise<AcquireOptions> {
+		const options = readAcquireOptions(url.searchParams)
+
+		const body = method === 'POST' ? (await readBody(req)).trim() : ''
+		if (body) {
+			const keepAlive = normalizeKeepAlive((JSON.parse(body) as AcquireOptions).keep_alive)
+			if (keepAlive !== undefined) {
+				options.keep_alive = keepAlive
+			}
 		}
 
-		// Health check
-		if (url.pathname === '/_devflare/browser/health') {
-			sendJson(res, 200, {
-				ok: true,
-				activeSessions: sessions.size,
-				historySize: history.length,
-				executablePath
-			})
-			return
-		}
-
-		// For WebSocket upgrade requests, the upgrade handler handles it
-		if (url.pathname === '/v1/connectDevtools') {
-			// Will be handled by WebSocket server upgrade
-			res.writeHead(426, { 'Content-Type': 'text/plain' })
-			res.end('WebSocket upgrade required')
-			return
-		}
-
-		res.writeHead(404, { 'Content-Type': 'text/plain' })
-		res.end('Not found')
+		return options
 	}
 
 	/**
@@ -651,12 +671,12 @@ export function createBrowserShim(options: BrowserShimOptions = {}): BrowserShim
 
 				const url = new URL(request.url || '/', `http://${host}:${port}`)
 
-				if (url.pathname !== '/v1/connectDevtools') {
+				if (!isDevtoolsPath(url.pathname)) {
 					socket.destroy()
 					return
 				}
 
-				const sessionId = url.searchParams.get('browser_session')
+				const sessionId = readDevtoolsSessionId(url.pathname, url.searchParams)
 				if (!sessionId) {
 					socket.write('HTTP/1.1 400 Bad Request\r\n\r\n')
 					socket.destroy()

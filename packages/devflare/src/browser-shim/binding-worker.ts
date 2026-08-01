@@ -6,25 +6,31 @@
 // connections using WebSocketPair to properly support @cloudflare/puppeteer.
 //
 // Flow:
-// 1. puppeteer.launch() → GET /v1/acquire → proxy to browser shim → get sessionId
-// 2. puppeteer.connect() → GET /v1/connectDevtools?browser_session=X
+// 1. puppeteer.launch() → acquire → proxy to browser shim → get sessionId
+// 2. puppeteer.connect() → DevTools upgrade
 //    → Create WebSocketPair, connect to Chrome's DevTools endpoint via shim
 //    → Return Response with webSocket property (Cloudflare style)
 //
 // The browser shim server provides:
-// - POST/GET /v1/acquire → Launch browser, return sessionId
+// - GET|POST /v1/acquire and /v1/devtools/browser → Launch browser, return sessionId
+// - GET /v1/connectDevtools?browser_session=X and /v1/devtools/browser/X → DevTools
 // - GET /v1/session/:sessionId → Get session info including wsEndpoint
 // - GET /v1/sessions → List active sessions
 // - GET /v1/limits → Return limits info
 // - GET /v1/history → Return session history
 //
-// CRITICAL: @cloudflare/puppeteer uses a multi-chunk framing protocol:
+// CRITICAL: @cloudflare/puppeteer ≤ 1.0.7 wraps CDP traffic in a multi-chunk
+// framing protocol, and 1.1.0 dropped it for plain unframed messages. The two
+// generations also connect on different paths (see ./routes), and they changed
+// together — so the DevTools path decides the framing. Chunked means:
 // - First chunk: 4-byte little-endian length header + payload slice
 // - Subsequent chunks: raw payload slices (no header)
 // - Max chunk size: 1048575 bytes (just under 1MB Workers limit)
 // - Must reassemble chunks before forwarding to Chrome
 // - Must split Chrome responses into chunks for puppeteer
 // =============================================================================
+
+import { DEVTOOLS_PATH_PREFIX, LEGACY_DEVTOOLS_PATH, LEGACY_SESSION_PARAM } from './routes'
 
 // Max chunk size for WebSocket messages (Workers limit is ~1MB, leave room)
 const MAX_CHUNK_SIZE = 1048575
@@ -47,6 +53,30 @@ const MAX_CHUNK_SIZE = ${MAX_CHUNK_SIZE}
 const DEBUG = ${debug}
 const log = (...args) => DEBUG && console.log('[BrowserBinding]', ...args)
 
+// Interpolated from src/browser-shim/routes.ts, which a workerd script string
+// cannot import. Keep the matching below in step with that module.
+const LEGACY_DEVTOOLS_PATH = ${JSON.stringify(LEGACY_DEVTOOLS_PATH)}
+const LEGACY_SESSION_PARAM = ${JSON.stringify(LEGACY_SESSION_PARAM)}
+const DEVTOOLS_PATH_PREFIX = ${JSON.stringify(DEVTOOLS_PATH_PREFIX)}
+
+// A DevTools endpoint, in either @cloudflare/puppeteer generation's spelling
+function isDevtoolsPath(pathname) {
+	return pathname === LEGACY_DEVTOOLS_PATH || pathname.startsWith(DEVTOOLS_PATH_PREFIX)
+}
+
+// The session a DevTools request wants: <= 1.0.7 puts it in a query parameter,
+// >= 1.1.0 in the last path segment. Null when the request names none.
+function readDevtoolsSessionId(url) {
+	if (url.pathname === LEGACY_DEVTOOLS_PATH) {
+		return url.searchParams.get(LEGACY_SESSION_PARAM) || null
+	}
+	if (!url.pathname.startsWith(DEVTOOLS_PATH_PREFIX)) {
+		return null
+	}
+	const sessionId = url.pathname.slice(DEVTOOLS_PATH_PREFIX.length)
+	return sessionId.length > 0 && !sessionId.includes('/') ? sessionId : null
+}
+
 export default {
 	async fetch(request, env, ctx) {
 		const url = new URL(request.url)
@@ -56,7 +86,7 @@ export default {
 		log('Request:', url.pathname, isWebSocket ? '(WebSocket)' : '(HTTP)')
 
 		// Handle WebSocket upgrade for DevTools connection
-		if (url.pathname === '/v1/connectDevtools' && isWebSocket) {
+		if (isDevtoolsPath(url.pathname) && isWebSocket) {
 			return handleDevToolsWebSocket(request, url)
 		}
 
@@ -175,13 +205,17 @@ function chunksToMessage(chunks) {
 // Handle WebSocket upgrade for DevTools connection
 // Creates a WebSocketPair and proxies to Chrome's DevTools WebSocket
 async function handleDevToolsWebSocket(request, url) {
-	const sessionId = url.searchParams.get('browser_session')
+	const sessionId = readDevtoolsSessionId(url)
 	if (!sessionId) {
-		return new Response('browser_session parameter required', { status: 400 })
+		return new Response('browser session id required', { status: 400 })
 	}
-	
-	log('DevTools WebSocket request for session:', sessionId)
-	
+
+	// The legacy DevTools path is the one whose client generation chunks CDP
+	// traffic; from 1.1.0 the path changed and the framing went away with it.
+	const chunked = url.pathname === LEGACY_DEVTOOLS_PATH
+
+	log('DevTools WebSocket request for session:', sessionId, chunked ? '(chunked)' : '(plain)')
+
 	// Get session info from browser shim (includes Chrome's wsEndpoint)
 	const sessionUrl = new URL('/v1/session/' + sessionId, BROWSER_SHIM_URL)
 	
@@ -244,11 +278,19 @@ async function handleDevToolsWebSocket(request, url) {
 	// Proxy messages from client (puppeteer) to Chrome
 	// Handle multi-chunk framing protocol
 	server.addEventListener('message', (event) => {
-		// Keep-alive ping from puppeteer
+		// Keep-alive ping from puppeteer (<= 1.0.7 only)
 		if (event.data === 'ping') {
 			return
 		}
-		
+
+		// A plain client sends CDP messages whole, so pass them straight on
+		if (!chunked) {
+			if (chromeWs.readyState === 1) { // OPEN
+				chromeWs.send(event.data)
+			}
+			return
+		}
+
 		// Handle binary data (chunked protocol)
 		if (event.data instanceof ArrayBuffer) {
 			const chunk = new Uint8Array(event.data)
@@ -287,7 +329,14 @@ async function handleDevToolsWebSocket(request, url) {
 	// Split into chunks following the multi-chunk protocol
 	chromeWs.addEventListener('message', (event) => {
 		if (server.readyState !== 1) return // Not OPEN
-		
+
+		// A plain client reads what arrives as the CDP message itself, so a
+		// length header would be parsed as part of the payload
+		if (!chunked) {
+			server.send(event.data)
+			return
+		}
+
 		// Split message into chunks
 		const outChunks = messageToChunks(event.data)
 		for (const chunk of outChunks) {

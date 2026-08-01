@@ -20,6 +20,7 @@
 
 import type { ConsolaInstance } from 'consola'
 import type { Miniflare } from 'miniflare'
+import { readDevtoolsSessionId } from './routes'
 
 // -----------------------------------------------------------------------------
 // Types
@@ -182,10 +183,11 @@ async function handleWebSocketUpgrade(
 	logger?: ConsolaInstance,
 	verbose?: boolean
 ): Promise<Response> {
-	// Get session ID from query params
-	const sessionId = url.searchParams.get('browser_session')
+	// Get session ID from wherever the client's generation put it: a query
+	// parameter up to @cloudflare/puppeteer 1.0.7, the last path segment after
+	const sessionId = readDevtoolsSessionId(url.pathname, url.searchParams)
 	if (!sessionId) {
-		return new Response('Missing browser_session parameter', { status: 400 })
+		return new Response('Missing browser session id', { status: 400 })
 	}
 
 	if (verbose) {
