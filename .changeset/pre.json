@@ -38,6 +38,7 @@
     "browser-shim-port-flag",
     "browser-shim-puppeteer-1-1-endpoints",
     "browser-shim-sessions-envelope",
+    "builtin-subpath-externals",
     "cf-binding-remote-preview-fields",
     "cf-cron-fetch-lint-secrets",
     "cf-deploy-lifecycle",
