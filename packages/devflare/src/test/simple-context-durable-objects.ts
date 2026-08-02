@@ -1,9 +1,14 @@
-import { mkdirSync, writeFileSync } from 'fs'
-import { dirname, join } from 'path'
+import { mkdirSync, rmSync, writeFileSync } from 'fs'
+import { dirname, join, resolve } from 'path'
 import { readFile } from 'fs/promises'
+import { getPackageVersion } from '../cli/package-metadata'
 import { type DevflareConfig, loadConfig, normalizeDOBinding } from '../config'
 import { DEFAULT_DO_PATTERN, findFiles } from '../utils/glob'
 import { bundleWorkflowEntrypointScript } from '../workflows/local-workflow-entrypoints'
+import {
+	readCachedDurableObjectBundle,
+	writeCachedDurableObjectBundle
+} from './durable-object-bundle-cache'
 import { buildGatewayScript } from './simple-context-gateway-script'
 import { getBunRuntime } from './simple-context-paths'
 
@@ -192,11 +197,21 @@ export class ${info.runtimeClassName} {
 		.join('\n\n')
 }
 
-async function bundleDurableObjectModules(
+/**
+ * Build the module that pulls the transport and every local Durable Object
+ * class into one graph.
+ *
+ * @param configDir - The directory holding the devflare config under test.
+ * @param doInfos - The Durable Objects that live in this worker.
+ * @param transportFile - The transport module, relative to `configDir`, or null.
+ * @returns The entry source, or an empty string when there is nothing to bundle.
+ *   It names every input path, so it doubles as the bundle's cache identity.
+ */
+function buildVirtualEntrySource(
 	configDir: string,
 	doInfos: LocalDurableObjectInfo[],
 	transportFile: string | null
-): Promise<string> {
+): string {
 	const virtualImports: string[] = []
 	const virtualExports: string[] = []
 
@@ -217,8 +232,54 @@ async function bundleDurableObjectModules(
 		return ''
 	}
 
-	const virtualEntry = [...virtualImports, '', ...virtualExports].join('\n')
-	const virtualPath = join(configDir, '.devflare', '__test_entry.ts')
+	return [...virtualImports, '', ...virtualExports].join('\n')
+}
+
+/** The `Bun.build` options the Durable Object graph is bundled with. */
+const DO_BUNDLE_OPTIONS = {
+	target: 'browser',
+	format: 'esm',
+	minify: false,
+	external: ['cloudflare:workers', 'cloudflare:*']
+} as const
+
+/**
+ * Describe everything that shapes the bundle beyond the files it reads.
+ *
+ * @returns The bundler and devflare versions plus the build options, so a
+ *   `bun upgrade` or a devflare release that changes them cannot leave a
+ *   cached bundle looking fresh.
+ */
+async function describeBundleBuilder(): Promise<string> {
+	const bunVersion = (globalThis as { Bun?: { version?: string } }).Bun?.version ?? 'unknown'
+	return JSON.stringify({
+		bun: bunVersion,
+		devflare: await getPackageVersion(),
+		options: DO_BUNDLE_OPTIONS
+	})
+}
+
+async function bundleDurableObjectModules(
+	configDir: string,
+	doInfos: LocalDurableObjectInfo[],
+	transportFile: string | null
+): Promise<string> {
+	const virtualEntry = buildVirtualEntrySource(configDir, doInfos, transportFile)
+	if (!virtualEntry) {
+		return ''
+	}
+
+	const identity = { entry: virtualEntry, builder: await describeBundleBuilder() }
+	const cached = readCachedDurableObjectBundle(configDir, identity)
+	if (cached !== null) {
+		return cached
+	}
+
+	// The entry name carries this process's identity because it lives for the
+	// whole build: two test slots sharing a configDir would otherwise overwrite
+	// each other's entry mid-build, and each cache the OTHER's script under its
+	// own key — a wrong bundle that then looks fresh forever.
+	const virtualPath = join(configDir, '.devflare', `__test_entry.${process.pid}.ts`)
 	mkdirSync(dirname(virtualPath), { recursive: true })
 	writeFileSync(virtualPath, virtualEntry)
 
@@ -227,19 +288,39 @@ async function bundleDurableObjectModules(
 		throw new Error('Bun runtime is required for createTestContext with Durable Objects')
 	}
 
-	const result = await bun.build({
-		entrypoints: [virtualPath],
-		target: 'browser',
-		format: 'esm',
-		minify: false,
-		external: ['cloudflare:workers', 'cloudflare:*']
-	})
+	// Every module Bun reads is recorded, so the cache can be invalidated by the
+	// whole transitive graph rather than by the entry files alone.
+	const graphPaths = new Set<string>()
+	try {
+		const result = await bun.build({
+			entrypoints: [virtualPath],
+			...DO_BUNDLE_OPTIONS,
+			external: [...DO_BUNDLE_OPTIONS.external],
+			plugins: [
+				{
+					name: 'devflare-record-do-graph',
+					setup(build) {
+						build.onLoad({ filter: /.*/ }, (args) => {
+							graphPaths.add(resolve(args.path))
+							return undefined
+						})
+					}
+				}
+			]
+		})
 
-	if (!result.success) {
-		throw new Error(`Failed to bundle test entry: ${result.logs.join('\n')}`)
+		if (!result.success) {
+			throw new Error(`Failed to bundle test entry: ${result.logs.join('\n')}`)
+		}
+
+		const script = await result.outputs[0].text()
+		graphPaths.delete(resolve(virtualPath))
+		writeCachedDurableObjectBundle(configDir, identity, [...graphPaths], script)
+
+		return script
+	} finally {
+		rmSync(virtualPath, { force: true })
 	}
-
-	return await result.outputs[0].text()
 }
 
 export async function buildDurableObjectGateway(

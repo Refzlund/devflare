@@ -39,6 +39,10 @@ export {
 	type DOBindingResolution
 } from './resolve-service-bindings'
 
+// Cache resets — for a suite that rewrites the tree it is testing, mid-process
+export { __resetDurableObjectBundleCache } from './durable-object-bundle-cache'
+export { __resetTestContextConfigCache } from './simple-context-lifecycle'
+
 // Skip helper for conditional test execution
 export { shouldSkip } from './should-skip'
 

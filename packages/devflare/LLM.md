@@ -4517,6 +4517,28 @@ describe('worker runtime', () => {
 })
 ```
 
+#### Run as many test files per process as you like, even with Durable Objects
+
+A config with Durable Objects has its class graph bundled before the runtime boots. That bundle is cached on disk under `.devflare/test-bundles/`, so the second test file in a process reuses it rather than rebuilding it.
+
+That is a correctness fix as much as a speed one. Rebuilding it mid-process is what suites used to spend a whole process per test file to avoid: once the test runner has loaded a module on that graph, the bundler will not re-read it and fails against an ordinary source file with a misleading file error.
+
+##### Key points
+
+- An entry is reused only when nothing it depended on moved: the content of every file on the transitive graph — editing a module a Durable Object imports rebuilds it, same as editing the Durable Object — plus the `package.json` / `tsconfig.json` files above them, a listing of each directory they came from, and the bundler and devflare versions.
+- It lives beside the config rather than under `DEVFLARE_DIR`, so parallel test slots pointed at their own generated directories still share one build.
+- `.devflare/` is already in the generated-state directory you ignore in version control; nothing new needs ignoring.
+- Each context still boots its own runtime, so two files in one process never see each other’s KV, R2, D1, or Durable Object state.
+- The config is loaded once per process too. The config module was only ever evaluated once anyway, but the env and `.dev.vars` overlay is now held with it — call `__resetTestContextConfigCache` from `devflare/test` if a test rewrites those between contexts.
+
+> **Note — Storage isolation is per context, not per process**
+>
+> `env.dispose()` takes the runtime and its storage with it, so the next `createTestContext()` starts empty however many contexts a process has already created.
+
+> **Warning — Delete the cache when resolution changed out from under it**
+>
+> What the cache tracks is what the last build read and resolved through. A resolver input that did not exist then and sits outside those directories — a `tsconfig.json` added further up the tree, a newly installed package that shadows one — can leave an entry looking fresh. Removing `.devflare/test-bundles/` forces a rebuild, and `__resetDurableObjectBundleCache` from `devflare/test` does the same within one process.
+
 #### Add `transport.ts` only when local RPC-style bridge calls in tests must preserve custom classes
 
 Most `createTestContext()` tests do not need a transport file because strings, numbers, arrays, and plain JSON objects already cross the bridge naturally.

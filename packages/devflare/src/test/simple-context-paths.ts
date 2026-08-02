@@ -14,6 +14,21 @@ export const DEFAULT_TRANSPORT_ENTRY_FILES = [
 const CURRENT_PACKAGE_ROOT = findPackageRoot(dirname(fileURLToPath(import.meta.url)))
 
 /**
+ * A build plugin that only observes. `onLoad` returning nothing hands the
+ * module back to Bun's own loader, so recording the graph this way leaves the
+ * emitted bundle byte-for-byte what it would have been.
+ */
+export interface BunBuildObserverPlugin {
+	name: string
+	setup: (build: {
+		onLoad: (
+			constraints: { filter: RegExp },
+			callback: (args: { path: string }) => undefined
+		) => void
+	}) => void
+}
+
+/**
  * Access Bun global via globalThis to avoid shadowing richer @types/bun
  * when available. Returns undefined if not running in Bun.
  */
@@ -26,6 +41,7 @@ export function getBunRuntime():
 				format: string
 				minify: boolean
 				external?: string[]
+				plugins?: BunBuildObserverPlugin[]
 			}) => Promise<{
 				success: boolean
 				logs: string[]
