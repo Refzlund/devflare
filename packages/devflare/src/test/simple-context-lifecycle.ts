@@ -38,21 +38,38 @@ export interface ResolvedTestContextConfig {
 }
 
 /**
+ * Configs already loaded in this process, keyed by their absolute path.
+ *
+ * Loading one costs ~100ms — evaluating the config module, then resolving env
+ * placeholders and `.dev.vars` — and a suite creating a context per test file
+ * paid it every time. The config module itself was never actually re-read: the
+ * loader evaluates it once per process and hands back that same instance
+ * afterwards, rewritten file or not. What the memo additionally holds still is
+ * the env / `.dev.vars` overlay, which no longer follows a change made between
+ * two contexts. Use {@link __resetTestContextConfigCache} where that matters.
+ */
+const loadedConfigs = new Map<string, ResolvedTestContextConfig>()
+
+/**
  * Resolve and load the devflare config for the test context.
  *
  * If `configPath` is given, it is interpreted relative to the caller's
  * directory (the file that invoked `createTestContext()`). Otherwise the
  * resolver walks upward from the caller's directory looking for a supported
  * `devflare.config.*` file.
+ *
+ * The load is memoised per resolved path, so several test files sharing one
+ * config in a single process load it once. Different callers reaching the same
+ * file share the result; a different file is loaded on its own.
  */
 export async function resolveTestContextConfig(
 	configPath: string | undefined,
 	callerDir: string = getCallerDirectory()
 ): Promise<ResolvedTestContextConfig> {
-	let absolutePath: string
+	let foundPath: string
 
 	if (configPath) {
-		absolutePath = resolve(callerDir, configPath)
+		foundPath = resolve(callerDir, configPath)
 	} else {
 		const found = await findNearestConfig(callerDir)
 		if (!found) {
@@ -62,7 +79,17 @@ export async function resolveTestContextConfig(
 					`Either create a config file or provide an explicit path: createTestContext('./path/to/config.ts')`
 			)
 		}
-		absolutePath = found
+		foundPath = found
+	}
+
+	// Autodiscovery answers in posix separators and an explicit path in the
+	// platform's, so one config file reached both ways spelled itself two ways.
+	// Left alone that is two memo entries and two config objects for one file.
+	const absolutePath = resolve(foundPath)
+
+	const remembered = loadedConfigs.get(absolutePath)
+	if (remembered) {
+		return remembered
 	}
 
 	const configDir = dirname(absolutePath)
@@ -80,7 +107,17 @@ export async function resolveTestContextConfig(
 		configPath: absolutePath
 	})
 
-	return { absolutePath, configDir, config }
+	const resolved: ResolvedTestContextConfig = { absolutePath, configDir, config }
+	loadedConfigs.set(absolutePath, resolved)
+	return resolved
+}
+
+/**
+ * Forget every config loaded in this process, so the next resolve re-reads the
+ * env and `.dev.vars` overlay.
+ */
+export function __resetTestContextConfigCache(): void {
+	loadedConfigs.clear()
 }
 
 /**
