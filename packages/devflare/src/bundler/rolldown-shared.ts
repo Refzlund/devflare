@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs'
+import { builtinModules } from 'node:module'
 import { resolve } from 'pathe'
 import type { ExternalOption, InputOptions, OutputOptions, RolldownPluginOption } from 'rolldown'
 import type { DevflareRolldownOptions } from '../config/schema'
@@ -17,29 +18,38 @@ type SanitizedRolldownOptions = DevflareRolldownOptions &
 type SanitizedRolldownOutputOptions = NonNullable<DevflareRolldownOptions['output']> &
 	Partial<Pick<OutputOptions, 'codeSplitting' | 'dir' | 'file' | 'format' | 'inlineDynamicImports'>>
 
+/**
+ * Specifiers a non-Node host reports from `builtinModules` that Node itself does
+ * not have. Bun reports `ws` and `undici` (and `bun`) there; all three are real,
+ * publishable npm packages, so treating them as builtins would leave a worker's
+ * own copy unbundled and hand workerd an import it cannot resolve. Node's list
+ * has no such entries, so this set is inert when devflare runs under Node.
+ */
+const NON_NODE_HOST_BUILTINS = new Set(['bun', 'undici', 'ws'])
+
+/**
+ * Node builtins are external because workerd's `nodejs_compat` provides them —
+ * the bundle must not try to resolve one.
+ *
+ * Derived from the runtime's own builtin set rather than hand-listed: the literal
+ * list this replaced named ~20 BARE builtins, so every builtin SUBPATH
+ * (`fs/promises`, `stream/web`, `timers/promises`, …) fell through and rolldown
+ * reported it as `UNRESOLVED_IMPORT` on each build before externalizing it anyway.
+ * A dependency only has to `await import('fs/promises')` — `@cloudflare/puppeteer`
+ * does — for the worker-compat transform to hoist it into a static import and make
+ * that a warning on every dev start-up.
+ *
+ * → prefixed ids are dropped: `node:` has its own pattern below, and no other
+ *   prefix (Bun's `bun:sqlite`) belongs in a worker bundle.
+ */
+const NODE_BUILTIN_MODULES: string[] = builtinModules.filter((specifier) => {
+	return !specifier.includes(':') && !NON_NODE_HOST_BUILTINS.has(specifier)
+})
+
 const DEFAULT_EXTERNAL_MODULES: ExternalPattern[] = [
 	/^cloudflare:/,
 	/^node:/,
-	'buffer',
-	'crypto',
-	'events',
-	'http',
-	'https',
-	'net',
-	'os',
-	'path',
-	'stream',
-	'tls',
-	'url',
-	'util',
-	'zlib',
-	'fs',
-	'child_process',
-	'async_hooks',
-	'querystring',
-	'string_decoder',
-	'assert',
-	'dns'
+	...NODE_BUILTIN_MODULES
 ]
 
 function toArray<T>(value: T | T[]): T[] {

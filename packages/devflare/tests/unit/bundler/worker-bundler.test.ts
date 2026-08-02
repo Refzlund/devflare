@@ -1,11 +1,30 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { isAbsolute, join } from 'pathe'
+import type { LogLevel, RolldownLog } from 'rolldown'
 import { bundleWorkerEntry } from '../../../src/bundler'
 import { configSchema } from '../../../src/config/schema'
 import { prepareComposedWorkerEntrypoint } from '../../../src/worker-entry/composed-worker'
 
 const TEST_DIR = join(import.meta.dirname, '../.fixtures/worker-bundler')
+
+/**
+ * Write a minimal ESM package into the fixture's `node_modules` so a test can
+ * exercise how the bundler resolves a bare specifier.
+ *
+ * @param name - Package name, which is also the bare specifier the fixture imports.
+ * @param source - Body of the package's `index.js` entry.
+ */
+async function writeFixturePackage(name: string, source: string): Promise<void> {
+	const packageDir = join(TEST_DIR, 'node_modules', name)
+
+	await mkdir(packageDir, { recursive: true })
+	await writeFile(
+		join(packageDir, 'package.json'),
+		JSON.stringify({ name, type: 'module', main: 'index.js' }, null, '\t')
+	)
+	await writeFile(join(packageDir, 'index.js'), source)
+}
 
 describe('bundleWorkerEntry', () => {
 	beforeEach(async () => {
@@ -273,5 +292,107 @@ export async function fetch(request: Request): Promise<Response> {
 		).rejects.toThrow(
 			'Devflare worker bundles cannot contain unresolved dynamic import() expressions'
 		)
+	})
+
+	test('treats a Node builtin subpath as external instead of failing to resolve it', async () => {
+		// Shaped after @cloudflare/puppeteer's util.js, whose Node-only branch does
+		// exactly this: the worker-compat transform hoists the literal dynamic import
+		// into a static one, which is what forces rolldown to resolve the specifier.
+		await writeFixturePackage(
+			'example-node-subpath',
+			`
+let fs = null
+
+export async function openHandle(path) {
+	fs = await import('fs/promises')
+	return fs.open(path, 'w+')
+}
+		`.trim()
+		)
+		await writeFile(
+			join(TEST_DIR, 'src', 'fetch.ts'),
+			`
+import { openHandle } from 'example-node-subpath'
+
+export async function fetch(): Promise<Response> {
+	return new Response(String(await openHandle('')))
+}
+		`.trim()
+		)
+
+		const config = configSchema.parse({
+			name: 'worker-bundler-builtin-subpath-test',
+			compatibilityDate: '2026-03-17',
+			files: {
+				fetch: 'src/fetch.ts'
+			}
+		})
+
+		const composedEntry = await prepareComposedWorkerEntrypoint(TEST_DIR, config)
+
+		if (!composedEntry) {
+			throw new Error('Expected composed worker entry to be generated')
+		}
+
+		const logs: RolldownLog[] = []
+		const bundlePath = await bundleWorkerEntry({
+			cwd: TEST_DIR,
+			inputFile: composedEntry,
+			outFile: join(TEST_DIR, '.devflare', 'worker-entrypoints', 'main.js'),
+			rolldownOptions: {
+				onLog(_level: LogLevel, log: RolldownLog) {
+					logs.push(log)
+				}
+			}
+		})
+
+		expect(logs.map((log) => log.code)).not.toContain('UNRESOLVED_IMPORT')
+		// The specifier still leaves the bundle as an import — workerd's nodejs_compat
+		// owns it. Only the diagnostic changes, which is why the assertion is on the log.
+		expect(await readFile(bundlePath, 'utf-8')).toContain(`from "fs/promises"`)
+	})
+
+	test('bundles npm packages that only the host runtime reports as builtins', async () => {
+		// Bun's `builtinModules` lists `ws` and `undici`; Node's does not. They are
+		// installable packages, so externalizing them would hand workerd an import
+		// it cannot resolve.
+		await writeFixturePackage('ws', `export const WS_MARKER = 'bundled-ws-package'`)
+		await writeFixturePackage('undici', `export const UNDICI_MARKER = 'bundled-undici-package'`)
+		await writeFile(
+			join(TEST_DIR, 'src', 'fetch.ts'),
+			`
+import { WS_MARKER } from 'ws'
+import { UNDICI_MARKER } from 'undici'
+
+export async function fetch(): Promise<Response> {
+	return new Response([WS_MARKER, UNDICI_MARKER].join(','))
+}
+		`.trim()
+		)
+
+		const config = configSchema.parse({
+			name: 'worker-bundler-host-only-builtin-test',
+			compatibilityDate: '2026-03-17',
+			files: {
+				fetch: 'src/fetch.ts'
+			}
+		})
+
+		const composedEntry = await prepareComposedWorkerEntrypoint(TEST_DIR, config)
+
+		if (!composedEntry) {
+			throw new Error('Expected composed worker entry to be generated')
+		}
+
+		const bundlePath = await bundleWorkerEntry({
+			cwd: TEST_DIR,
+			inputFile: composedEntry,
+			outFile: join(TEST_DIR, '.devflare', 'worker-entrypoints', 'main.js')
+		})
+
+		const output = await readFile(bundlePath, 'utf-8')
+		expect(output).toContain('bundled-ws-package')
+		expect(output).toContain('bundled-undici-package')
+		expect(output).not.toMatch(/from ["'](?:ws|undici)["']/)
 	})
 })
