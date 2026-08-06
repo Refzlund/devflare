@@ -1,6 +1,6 @@
 {
 	"name": "devflare",
-	"version": "1.0.0-next.76",
+	"version": "1.0.0-next.77",
 	"description": "Devflare is a developer-first toolkit for Cloudflare Workers that sits on top of Miniflare and Wrangler-compatible config",
 	"repository": {
 		"type": "git",
