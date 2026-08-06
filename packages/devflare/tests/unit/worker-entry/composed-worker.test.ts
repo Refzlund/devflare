@@ -175,4 +175,63 @@ export default {
 		expect(source).toContain('async tail(events, env, ctx)')
 		expect(source).toContain('createTailEvent(events, env, ctx)')
 	})
+
+	describe('outbound email wiring', () => {
+		const emailConfig = () =>
+			configSchema.parse({
+				name: 'email-composition-test',
+				compatibilityDate: '2026-04-26',
+				files: { fetch: 'src/fetch.ts' },
+				bindings: { sendEmail: { MAILER: {} } }
+			})
+
+		beforeEach(async () => {
+			await mkdir(join(TEST_DIR, 'src'), { recursive: true })
+			await writeFile(
+				join(TEST_DIR, 'src', 'fetch.ts'),
+				"export async function fetch(): Promise<Response> { return new Response('ok') }"
+			)
+		})
+
+		test('a build bakes in NO delivery endpoint', async () => {
+			// A machine-local loopback URL in a deployable worker would be both
+			// useless in production and a leak of the developer's setup.
+			const composedEntry = await prepareComposedWorkerEntrypoint(TEST_DIR, emailConfig())
+			const source = await readFile(composedEntry!, 'utf-8')
+
+			expect(source).toContain('setLocalSendEmailBindings({"MAILER":{}})')
+			expect(source).not.toContain('setEmailDeliverySink')
+		})
+
+		test('dev bakes in the loopback endpoint the host listens on', async () => {
+			const composedEntry = await prepareComposedWorkerEntrypoint(
+				TEST_DIR,
+				emailConfig(),
+				undefined,
+				{
+					devInternalEmail: true,
+					outboundEmailEndpoint: 'http://127.0.0.1:54321/_devflare/email/outbound'
+				}
+			)
+			const source = await readFile(composedEntry!, 'utf-8')
+
+			expect(source).toContain(
+				'setEmailDeliverySink(createHttpEmailDeliverySink("http://127.0.0.1:54321/_devflare/email/outbound"))'
+			)
+			expect(source).toContain('setLocalSendEmailBindings({"MAILER":{}})')
+		})
+
+		test('live mode registers no local binding, leaving the runtime binding in place', async () => {
+			const composedEntry = await prepareComposedWorkerEntrypoint(
+				TEST_DIR,
+				emailConfig(),
+				undefined,
+				{ devInternalEmail: true, skipLocalSendEmailBindings: true }
+			)
+			const source = await readFile(composedEntry!, 'utf-8')
+
+			expect(source).toContain('setLocalSendEmailBindings({})')
+			expect(source).not.toContain('"MAILER"')
+		})
+	})
 })

@@ -806,6 +806,18 @@ describe('compileConfig', () => {
 				}
 			])
 		})
+
+		test('compiles a restriction-free sendEmail binding to just its name', () => {
+			// Cloudflare permits any recipient once a sending domain is onboarded,
+			// which is expressed by a send_email entry carrying no destination
+			// fields at all — so an empty authoring object has to survive intact.
+			const result = compileConfig({
+				...baseConfig,
+				bindings: { sendEmail: { MAILER: {} } }
+			})
+
+			expect(result.send_email).toEqual([{ name: 'MAILER' }])
+		})
 	})
 })
 

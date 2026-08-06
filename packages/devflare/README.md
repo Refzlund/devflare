@@ -142,6 +142,7 @@ The most important top-level keys are:
 - `compatibilityFlags`
 - `complianceRegion`
 - `containers`
+- `email`
 - `env`
 - `files`
 - `findAdditionalModules`

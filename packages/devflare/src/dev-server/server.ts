@@ -19,7 +19,6 @@ import { loadConfig } from '../config/loader'
 import { applyLocalDevVarsToConfig } from '../config/local-dev-vars'
 import { resolveServiceBindings } from '../test/resolve-service-bindings'
 import { generatedDir } from '../utils/generated-dir'
-import { setLocalSendEmailBindings } from '../utils/send-email'
 import { prepareComposedWorkerEntrypoint } from '../worker-entry/composed-worker'
 import { discoverRoutes } from '../worker-entry/routes'
 import { bundleWorkflowEntrypointScript } from '../workflows/local-workflow-entrypoints'
@@ -29,6 +28,12 @@ import {
 	createDevServerState,
 	disposeDevServerState
 } from './dev-server-state'
+import {
+	applyEmailRuntime,
+	ensureOutboundEmailService,
+	installEmailDeliverySink,
+	startInboundEmailIfEnabled
+} from './email-runtime'
 import { buildMiniflareDevConfig, resolveR2PresignOrigin } from './miniflare-dev-config'
 import { createMiniflareLog } from './miniflare-log'
 import { createReloadQueue } from './reload-queue'
@@ -338,8 +343,11 @@ export function createDevServer(options: DevServerOptions): DevServer {
 
 		state.mainWorkerSurfacePaths = await resolveMainWorkerSurfacePaths(cwd, state.config)
 		state.mainWorkerRoutes = await discoverRoutes(cwd, state.config)
+		const outboundEmailEndpoint = await ensureOutboundEmailService(state)
 		const composedMainEntry = await prepareComposedWorkerEntrypoint(cwd, state.config, undefined, {
-			devInternalEmail: true
+			devInternalEmail: true,
+			outboundEmailEndpoint,
+			skipLocalSendEmailBindings: state.emailRuntime?.mode === 'live'
 		})
 		state.mainWorkerScriptPath = composedMainEntry ? composedMainEntry : null
 
@@ -381,7 +389,7 @@ export function createDevServer(options: DevServerOptions): DevServer {
 		if (!state.config) {
 			return
 		}
-		setLocalSendEmailBindings(state.config.bindings?.sendEmail ?? {})
+		applyEmailRuntime(state, state.config, logger)
 		await bundleWorkflowEntrypoints()
 		await refreshWorkerOnlySurfaceState()
 		await reloadMiniflare(state.currentDoResult)
@@ -484,7 +492,8 @@ export function createDevServer(options: DevServerOptions): DevServer {
 		if (!state.config) {
 			throw new Error('Config not loaded')
 		}
-		setLocalSendEmailBindings(state.config.bindings?.sendEmail ?? {})
+		applyEmailRuntime(state, state.config, logger)
+		installEmailDeliverySink(state)
 		logger?.debug('Loaded config:', state.config.name)
 		await bundleWorkflowEntrypoints()
 		const viteIntegration = await resolveViteIntegration({
@@ -570,6 +579,14 @@ export function createDevServer(options: DevServerOptions): DevServer {
 		// Run D1 migrations after the dev runtime is started (give Miniflare more time to stabilize)
 		await new Promise((r) => setTimeout(r, 1000))
 		await runD1Migrations({ cwd, config: state.config, miniflarePort, logger })
+
+		// Last: the poller feeds messages INTO the runtime, so it must not start
+		// before the runtime can answer.
+		startInboundEmailIfEnabled(
+			state,
+			`http://${dialableHost(miniflareHost)}:${miniflarePort}`,
+			logger
+		)
 	}
 
 	/**

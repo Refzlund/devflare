@@ -13,7 +13,10 @@
 
 import type { BridgeClient } from '../bridge/client'
 import { type BindingHints, createEnvProxy, setBindingHints } from '../bridge/proxy'
+import { createHostEmailDeliverySink } from '../email/host-sink'
+import { resolveEmailRuntime } from '../email/runtime-config'
 import { __setTestContext } from '../env'
+import { setEmailDeliverySink } from '../utils/email-delivery'
 import { extractBindingHints } from './binding-hints'
 import {
 	hasCrossWorkerDOs,
@@ -84,7 +87,13 @@ export async function createTestContext(configPath?: string): Promise<void> {
 	const state = createTestContextState()
 	const { configDir, config } = await resolveTestContextConfig(configPath)
 
-	state.remoteBindings = buildRemoteAndStaticBindings(config)
+	// Settle email behaviour before any binding exists. `capture` is the default
+	// and is never inferred from credentials, so a suite that happens to run on a
+	// machine holding SMTP settings still cannot transmit anything.
+	const emailRuntime = resolveEmailRuntime(config.email, process.env)
+	setEmailDeliverySink(createHostEmailDeliverySink(() => emailRuntime))
+
+	state.remoteBindings = buildRemoteAndStaticBindings(config, { emailMode: emailRuntime.mode })
 
 	const hints = extractBindingHints(config)
 

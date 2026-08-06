@@ -121,6 +121,27 @@ export {
 	type LocalSendEmailBindingConfig
 } from '../utils/send-email'
 
+// Outbound-email delivery seam (worker-safe). The generated composed worker
+// installs the HTTP sink so a send inside workerd reaches the dev server's host
+// process, which is the only place an SMTP socket can be opened.
+export {
+	setEmailDeliverySink,
+	clearEmailDeliverySink,
+	createHttpEmailDeliverySink,
+	type EmailDelivery,
+	type EmailDeliverySink
+} from '../utils/email-delivery'
+
+export {
+	EMAIL_MAX_MESSAGE_BYTES,
+	buildEmailMessage,
+	type BuiltEmailMessage,
+	type ComposedEmailMessage,
+	type EmailAddressInput,
+	type EmailAttachmentSummary,
+	type NormalizedEmailMessage
+} from '../utils/email-message'
+
 // R2 presigned URLs (worker-safe: WebCrypto + aws4fetch only)
 export {
 	presignR2Put,

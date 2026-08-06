@@ -303,6 +303,20 @@ export const configurationDocsPart2: DocPage[] = [
 				}
 			},
 			{
+				id: 'inbound-email-locally',
+				title: 'Give the email handler something real to handle',
+				paragraphs: [
+					'`cf.email.send()` posts a message at the local runtime and `src/email.ts` receives it exactly as Email Routing would. That covers a written test, but it means every inbound message is one you wrote yourself.',
+					'To exercise the handler against real mail, point `email.inbound` at a mailbox: `devflare dev` polls it over IMAP and posts each new message at the same local endpoint. It is off unless you enable it, because it reads (and by default marks) real mail.',
+					'The poller skips anything carrying the relay marker header. That matters when outbound relay mode pins its mail at the mailbox being polled, which is the usual arrangement: without the skip, a handler that auto-replies would answer its own message forever.'
+				],
+				bullets: [
+					'`email.inbound.to` sets what the handler sees as `message.to`, which is rarely the polled mailbox address.',
+					'`email.inbound.markSeen` defaults to `true`; turn it off and Devflare tracks handled messages in memory for the life of the dev server instead.',
+					'Local email behavior never reaches deployed output — see the Send Email binding pages for the full `email` block.'
+				]
+			},
+			{
 				id: 'scheduled-intent',
 				title: 'Put scheduled intent in config instead of scripts or comments',
 				paragraphs: [

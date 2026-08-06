@@ -39,6 +39,10 @@ export type MockSendEmailBinding = SendEmail & {
  * {@link createLocalSendEmailBinding} (so disallowed senders/recipients throw
  * exactly as they would locally), and records each accepted message.
  *
+ * @param config - Allow-list restrictions to enforce.
+ * @param options.binding - Binding name recorded on the outbox entry, so a test
+ *   running under `createTestContext()` can tell `MAILER` from `NOTIFIER`.
+ *
  * @example
  * ```ts
  * const email = createMockSendEmail()
@@ -47,14 +51,16 @@ export type MockSendEmailBinding = SendEmail & {
  * ```
  */
 export function createMockSendEmail(
-	config: LocalSendEmailBindingConfig = {}
+	config: LocalSendEmailBindingConfig = {},
+	options: { binding?: string } = {}
 ): MockSendEmailBinding {
 	const sentEmails: SentEmail[] = []
 
 	const binding = createLocalSendEmailBinding(config, {
 		onSend(message) {
 			sentEmails.push(message)
-		}
+		},
+		...(options.binding ? { binding: options.binding } : {})
 	})
 
 	return {

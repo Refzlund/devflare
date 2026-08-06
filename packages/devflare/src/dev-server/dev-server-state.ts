@@ -13,7 +13,11 @@ import { isIgnorableMiniflareDisposeError } from '../bridge/miniflare'
 import type { BrowserShim } from '../browser-shim'
 import type { DOBundleResult, DOBundler } from '../bundler'
 import type { DevflareConfig } from '../config'
+import type { OutboundEmailService } from '../email/host-service'
+import type { InboundEmailPoller } from '../email/inbound-poller'
+import type { ResolvedEmailRuntime } from '../email/runtime-config'
 import type { resolveServiceBindings } from '../test/resolve-service-bindings'
+import { clearEmailDeliverySink } from '../utils/email-delivery'
 import { clearLocalSendEmailBindings } from '../utils/send-email'
 import type { RouteDiscoveryResult } from '../worker-entry/routes'
 import { stopSpawnedProcessTree } from './vite-utils'
@@ -46,6 +50,12 @@ export interface DevServerState {
 	currentDoResult: DOBundleResult | null
 	mainWorkerRoutes: RouteDiscoveryResult | null
 	generatedViteConfigPath: string | null
+	/** Settled email behaviour for this run; re-resolved on each config reload. */
+	emailRuntime: ResolvedEmailRuntime | null
+	/** Loopback listener the composed worker posts outbound mail to. */
+	outboundEmailService: OutboundEmailService | null
+	/** IMAP poller feeding a real mailbox into `src/email.ts`, when enabled. */
+	inboundEmailPoller: InboundEmailPoller | null
 }
 
 /**
@@ -81,7 +91,10 @@ export function createDevServerState(initial: {
 		workflowEntrypointScript: '',
 		currentDoResult: null,
 		mainWorkerRoutes: null,
-		generatedViteConfigPath: null
+		generatedViteConfigPath: null,
+		emailRuntime: null,
+		outboundEmailService: null,
+		inboundEmailPoller: null
 	}
 }
 
@@ -96,7 +109,9 @@ export function createDevServerState(initial: {
  * 3. Miniflare itself
  * 4. Vite child process (after Miniflare so requests cannot race shutdown)
  * 5. Browser shim
- * 6. Local sendEmail registry reset
+ * 6. Inbound email poller (stop reading a mailbox before the runtime it feeds)
+ * 7. Outbound email service
+ * 8. Local sendEmail registry + delivery sink reset
  */
 export async function disposeDevServerState(state: DevServerState): Promise<void> {
 	if (state.doBundler) {
@@ -130,5 +145,17 @@ export async function disposeDevServerState(state: DevServerState): Promise<void
 		state.browserShim = null
 	}
 
+	if (state.inboundEmailPoller) {
+		await state.inboundEmailPoller.stop()
+		state.inboundEmailPoller = null
+	}
+
+	if (state.outboundEmailService) {
+		await state.outboundEmailService.close()
+		state.outboundEmailService = null
+	}
+
 	clearLocalSendEmailBindings()
+	clearEmailDeliverySink()
+	state.emailRuntime = null
 }

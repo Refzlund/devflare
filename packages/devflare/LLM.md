@@ -2575,6 +2575,20 @@ That separation is especially useful once the package has both request/response 
 | Scheduled handler | `src/scheduled.ts` plus `triggers.crons` | Time-based jobs should run from config-owned schedules. | `cf.scheduled.trigger()` |
 | Email handler | `src/email.ts` | The Worker handles inbound email or local email-handler flows. | `cf.email.send()` |
 
+#### Give the email handler something real to handle
+
+`cf.email.send()` posts a message at the local runtime and `src/email.ts` receives it exactly as Email Routing would. That covers a written test, but it means every inbound message is one you wrote yourself.
+
+To exercise the handler against real mail, point `email.inbound` at a mailbox: `devflare dev` polls it over IMAP and posts each new message at the same local endpoint. It is off unless you enable it, because it reads (and by default marks) real mail.
+
+The poller skips anything carrying the relay marker header. That matters when outbound relay mode pins its mail at the mailbox being polled, which is the usual arrangement: without the skip, a handler that auto-replies would answer its own message forever.
+
+##### Key points
+
+- `email.inbound.to` sets what the handler sees as `message.to`, which is rarely the polled mailbox address.
+- `email.inbound.markSeen` defaults to `true`; turn it off and Devflare tracks handled messages in memory for the life of the dev server instead.
+- Local email behavior never reaches deployed output — see the Send Email binding pages for the full `email` block.
+
 #### Put scheduled intent in config instead of scripts or comments
 
 A scheduled handler is only half the story. The code lives in `src/scheduled.ts`, but the timing contract belongs in `triggers.crons` so the package declares when the job should run instead of relying on external shell memory.
@@ -11143,6 +11157,8 @@ Send Email bindings are easiest to trust when the allowed addresses are visible 
 
 Devflare validates the main mutual-exclusion rule here too: use either one `destinationAddress` or a list of `allowedDestinationAddresses`, not both.
 
+A binding that names neither is also valid, and is what you want once a sending domain is onboarded: `MAILER: {}` compiles to `{ "name": "MAILER" }` and may address any recipient.
+
 ##### Example — Send Email binding authoring
 
 ```ts
@@ -11158,7 +11174,8 @@ export default defineConfig({
 			},
 			SUPPORT_EMAIL: {
 				destinationAddress: 'support@example.com'
-			}
+			},
+			MAILER: {}
 		}
 	}
 })
@@ -11195,11 +11212,92 @@ Outbound local support; distinct from inbound email event testing. Start locally
 
 Use Cloudflare when the assertion depends on deployed limits, account state, lifecycle behavior, billing, or other production-only Send Email details.
 
+#### Decide what a local send actually does
+
+The top-level `email` block answers one question for `devflare dev` and `createTestContext()`: what happens to a message a worker hands to a Send Email binding. It never reaches deployed output.
+
+The mode is never inferred from credentials. A populated `relay.url`, or the matching environment variable, leaves the run in `capture` until something explicitly selects `relay` — otherwise a suite that happened to run on a machine with real mail settings would start sending real mail.
+
+`relay` requires `relay.to`, and every address in `to`, `cc`, and `bcc` is rewritten to it at the binding boundary, before transport, on the assembled MIME. Worker code cannot route around it, which is the point: a developer laptop holding a production token still cannot reach a real user.
+
+Every relayed message is stamped with a marker header (`X-Devflare-Dev-Relay: 1` by default, renameable via `relay.header`). The inbound poller skips anything carrying it, so pinning outbound mail at the same mailbox you poll does not feed each message straight back into the worker.
+
+##### Reference table
+
+| Mode | What happens | Reach for it when |
+| --- | --- | --- |
+| `capture` (default) | The message is recorded in the outbox. Nothing leaves the machine. | Always, unless you have decided otherwise. |
+| `relay` | Recorded, then every recipient is rewritten to `relay.to` and the message is delivered over SMTP from the host process. | You want to look at the real rendered mail in a real inbox. |
+| `live` | Devflare stands aside; the runtime binding performs the send, which is real Cloudflare delivery when the binding is `remote: true`. | You are deliberately exercising the hosted path. |
+
+> **Warning — Capture is the default on purpose**
+>
+> Every knob below `email` is inert until `mode` says otherwise. Set it in the config you keep out of CI, or through `DEVFLARE_EMAIL_MODE`, and leave the default alone everywhere else.
+
+##### Example — Relay local mail to one inbox, and poll that inbox back in
+
+###### File — devflare.config.ts
+
+```ts
+import { defineConfig } from 'devflare/config'
+
+export default defineConfig({
+	name: 'email-worker',
+	bindings: {
+		sendEmail: { MAILER: {} }
+	},
+	email: {
+		// Never inferred: without this line the SMTP settings below are inert.
+		mode: 'relay',
+		relay: {
+			url: 'smtps://apikey:secret@smtp.example.com:465',
+			to: 'dev-inbox@example.com',
+			header: 'X-Devflare-Dev-Relay'
+		},
+		inbound: {
+			enabled: true,
+			url: 'imaps://dev%40example.com:app-password@imap.example.com:993',
+			mailbox: 'INBOX',
+			intervalMs: 15000,
+			to: 'support@example.com'
+		}
+	}
+})
+```
+
+#### Environment overrides for local email
+
+Every `email` field has an environment variable, so a machine can carry mail settings without the repo carrying them. `DEVFLARE_EMAIL_MODE` is the only one that changes what happens.
+
+##### Key points
+
+- `relay` with no endpoint or no pinned recipient fails at start-up rather than quietly falling back to `capture`.
+- The inbound poller stays off until `email.inbound.enabled` or `DEVFLARE_EMAIL_INBOUND` says otherwise; it reads, and by default marks, real mail.
+- Both SMTP and IMAP use implicit TLS only — `smtps://` on 465 and `imaps://` on 993.
+
+##### Reference table
+
+| Variable | Overrides |
+| --- | --- |
+| `DEVFLARE_EMAIL_MODE` | `email.mode` — `capture`, `relay`, or `live` |
+| `DEVFLARE_EMAIL_RELAY_URL` | `email.relay.url` |
+| `DEVFLARE_EMAIL_RELAY_TO` | `email.relay.to` (the pinned recipient) |
+| `DEVFLARE_EMAIL_RELAY_FROM` | `email.relay.from` |
+| `DEVFLARE_EMAIL_RELAY_HEADER` | `email.relay.header` |
+| `DEVFLARE_EMAIL_RELAY_REJECT_UNAUTHORIZED` | `email.relay.rejectUnauthorized` |
+| `DEVFLARE_EMAIL_INBOUND` | `email.inbound.enabled` |
+| `DEVFLARE_EMAIL_INBOUND_URL` | `email.inbound.url` |
+| `DEVFLARE_EMAIL_INBOUND_MAILBOX` | `email.inbound.mailbox` |
+| `DEVFLARE_EMAIL_INBOUND_INTERVAL_MS` | `email.inbound.intervalMs` |
+| `DEVFLARE_EMAIL_INBOUND_TO` | `email.inbound.to` |
+| `DEVFLARE_EMAIL_INBOUND_MARK_SEEN` | `email.inbound.markSeen` |
+
 #### When this binding fits best
 
 ##### Key points
 
 - Use Send Email when the worker needs to send notifications or transactional messages outward.
+- Leave a binding unrestricted (`MAILER: {}`) when the account sends to arbitrary recipients from a verified domain.
 - Keep address restrictions explicit so the worker cannot quietly send anywhere it pleases.
 - Do not confuse outbound send-email bindings with inbound email processing handlers.
 
@@ -11250,7 +11348,9 @@ That runtime normalization is worth calling out because it lets worker code send
 
 The schema work here is less about ids and more about safety rules: which addresses are permitted and which combinations are invalid.
 
-At runtime, Devflare can normalize higher-level email message shapes into raw MIME-backed delivery when the outbound path needs it.
+At runtime, Devflare normalizes the higher-level message builder — `to`, `from`, `subject`, `html`, `text`, `cc`, `bcc`, `replyTo`, `headers`, `attachments` — into a raw MIME document, and hands the binding that. An address may be a bare string, a `{ email, name }` object, or a list mixing both; the document is built exactly once, so the bytes recorded are the bytes that travel. `send()` answers with the `messageId` stamped on it. A caller who supplies `raw` themselves keeps that document untouched.
+
+Where that document goes is decided by `email.mode`, and only ever there: `capture` records it, `relay` pins and transmits it, `live` hands it to the runtime binding. Credentials alone never select a mode.
 
 ##### Example — Send Email config and emitted Wrangler output
 
@@ -11271,7 +11371,8 @@ export default defineConfig({
 			},
 			SUPPORT_EMAIL: {
 				destinationAddress: 'support@example.com'
-			}
+			},
+			MAILER: {}
 		}
 	}
 })
@@ -11282,7 +11383,9 @@ export default defineConfig({
 ```json
 {
 	"send_email": [
-		{ "name": "SUPPORT_EMAIL", "destination_address": "support@example.com" }
+		{ "name": "TRANSACTIONAL_EMAIL", "allowed_destination_addresses": ["ops@example.com"], "allowed_sender_addresses": ["noreply@example.com"] },
+		{ "name": "SUPPORT_EMAIL", "destination_address": "support@example.com" },
+		{ "name": "MAILER" }
 	]
 }
 ```
@@ -11293,6 +11396,10 @@ export default defineConfig({
 
 - Local send-email bindings can be created and enforced in the default runtime/test context.
 - Address restrictions are part of the local contract, which keeps the binding honest during development.
+- Under `devflare dev` the binding lives inside workerd, which has no raw sockets, so the composed worker posts each assembled message to a loopback listener the dev server owns on 127.0.0.1. The SMTP client runs in the host process; the endpoint is baked in at dev start and never into a build.
+- `relay` rewrites `to`, `cc`, and `bcc` on the assembled document, so a worker that hand-rolls its own MIME is pinned exactly like one that used the builder. The originals are kept as `X-Devflare-Original-To`, `-Cc`, and `-Bcc` so the pinned inbox still shows who the message was for.
+- Caller text that reaches a header — a subject, a display name, a custom header value, an attachment filename — is stripped of CR and LF, and an envelope address carrying one is refused before a socket is opened. Devflare composes headers and SMTP commands by concatenation, so without that a newline in a subject forges a recipient and a newline in `from` smuggles a second `RCPT TO` past the pin.
+- The inbound poller reads a mailbox over IMAP and posts each new message at the same local endpoint `cf.email.send()` falls back to, so `src/email.ts` sees the Cloudflare-shaped event either way. Messages carrying the relay marker are skipped.
 - Inbound email helper APIs exist too, but they serve the inbound event story rather than replacing outbound bindings.
 
 #### Compile, preview, and cleanup behavior
@@ -11301,6 +11408,7 @@ export default defineConfig({
 
 - Compile turns the authored send-email rules into Wrangler-facing `send_email` entries.
 - The binding rules are emitted as-is; there is no preview resource provisioning story for destination addresses or sender allow-lists.
+- The top-level `email` block is local-only and never appears in compiled output — a machine-local SMTP URL in a deployable artifact would be a credential leak.
 - The runtime normalization step is the subtle part worth documenting because it shapes how friendly outbound code can look.
 
 > **Note — Safety rules are part of the binding**
@@ -11356,18 +11464,35 @@ If you are testing inbound processing, switch mental models entirely and use the
 
 ```ts
 import { afterAll, beforeAll, expect, test } from 'bun:test'
-import { createTestContext, env } from 'devflare/test'
+import { cf, createTestContext, env } from 'devflare/test'
 
 beforeAll(() => createTestContext())
 afterAll(() => env.dispose())
 
 test('sends an outbound transactional email', async () => {
-	await expect(env.TRANSACTIONAL_EMAIL.send({
-		from: 'noreply@example.com',
+	const result = await env.TRANSACTIONAL_EMAIL.send({
+		from: { email: 'noreply@example.com', name: 'My App' },
 		to: 'ops@example.com',
+		cc: ['audit@example.com'],
+		replyTo: 'support@example.com',
 		subject: 'Smoke check',
+		html: '<p>Hello from Devflare</p>',
 		text: 'Hello from Devflare'
-	})).resolves.toBeUndefined()
+	})
+
+	// send() answers with the id stamped on the message, like the real binding.
+	expect(result.messageId).toMatch(/@/)
+
+	// The structured view is where shape assertions read best.
+	const [sent] = cf.email.outbox
+	expect(sent.binding).toBe('TRANSACTIONAL_EMAIL')
+	expect(sent.message.to).toEqual(['ops@example.com'])
+	expect(sent.message.cc).toEqual(['audit@example.com'])
+	expect(sent.message.replyTo).toBe('support@example.com')
+
+	// Generated headers and total size can only be checked on the raw MIME.
+	expect(sent.raw).toContain('From: "My App" <noreply@example.com>')
+	expect(sent.size).toBeLessThan(5 * 1024 * 1024)
 })
 ```
 
@@ -11376,6 +11501,8 @@ test('sends an outbound transactional email', async () => {
 ##### Key points
 
 - Use the outbound binding directly when the worker is sending mail.
+- `cf.email.outbox` holds every message dispatched through a Send Email binding, newest last; `cf.email.sent()` returns a mutable copy, `cf.email.clearOutbox()` empties it, and `cf.email.onOutbound(cb)` observes each one as it happens.
+- Each entry carries both representations: `message` for addresses, subject, bodies, headers and attachment metadata, and `raw` for the full MIME. Total message size (`size`, against Cloudflare 5 MiB cap) and generated headers can only be asserted on `raw`.
 - Use the inbound `email` helper surface (`cf.email.send(...)` from `devflare/test`) when the worker is handling inbound email in `src/email.ts`.
 - For pure offline tests, `createMockSendEmail()` (or `createMockEnv({ sendEmail })` / `createOfflineEnv()`) records every dispatched message into `.sentEmails` while still enforcing the configured sender/destination allow-lists; `createLocalSendEmailBinding()` is the underlying non-recording simulator.
 - Keep address restrictions visible in tests when those restrictions are part of the safety story.
@@ -11384,6 +11511,8 @@ test('sends an outbound transactional email', async () => {
 
 ##### Key points
 
+- A suite runs in `capture` unless something explicitly asks for another mode, so nothing a test dispatches can leave the machine.
+- The outbox is process-wide and is emptied when the context is disposed; call `cf.email.clearOutbox()` between cases that both send.
 - Do not document inbound email helper tests as if they were proof of the outbound binding path, or vice versa.
 - If external delivery or provider-side verification matters, add a separate integration lane rather than overfitting the local harness.
 - The local harness is great for binding behavior, but email product workflows often still need a higher-level end-to-end check.

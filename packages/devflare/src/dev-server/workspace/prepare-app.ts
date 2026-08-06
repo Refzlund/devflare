@@ -68,6 +68,13 @@ export interface PrepareWorkspaceAppInput {
 	r2PresignSecret: string
 	/** Host the instance binds. */
 	host: string
+	/**
+	 * Loopback URL the coordinator listens on for outbound email. Baked into
+	 * this app's composed worker so a send inside workerd reaches the host.
+	 */
+	outboundEmailEndpoint?: string
+	/** Leave local `sendEmail` bindings unregistered (`email.mode: 'live'`). */
+	skipLocalSendEmailBindings?: boolean
 	/** Logger. */
 	logger?: ConsolaInstance
 }
@@ -152,7 +159,9 @@ export async function prepareWorkspaceApp(
 	const mainWorkerSurfacePaths = await resolveMainWorkerSurfacePaths(appCwd, config)
 	const mainWorkerRoutes = await discoverRoutes(appCwd, config)
 	const composedMainEntry = await prepareComposedWorkerEntrypoint(appCwd, config, undefined, {
-		devInternalEmail: true
+		devInternalEmail: true,
+		...(input.outboundEmailEndpoint ? { outboundEmailEndpoint: input.outboundEmailEndpoint } : {}),
+		...(input.skipLocalSendEmailBindings ? { skipLocalSendEmailBindings: true } : {})
 	})
 	const mainWorkerScriptPath = composedMainEntry ?? null
 

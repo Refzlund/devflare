@@ -30,6 +30,22 @@ interface GeneratedDurableObjectExport {
 export interface PrepareComposedWorkerEntrypointOptions {
 	devInternalEmail?: boolean
 	includeDevOnlyHooks?: boolean
+	/**
+	 * Loopback URL the dev server listens on for outbound email.
+	 *
+	 * Dev-only. workerd cannot open an SMTP socket, so the local `sendEmail`
+	 * binding posts each composed message here and the host process decides what
+	 * happens to it. Absent for `devflare build`, which must never bake a
+	 * machine-local URL into a deployable worker.
+	 */
+	outboundEmailEndpoint?: string
+	/**
+	 * Skip registering local `sendEmail` bindings entirely.
+	 *
+	 * Set for `email.mode: 'live'`, where the runtime's own binding performs the
+	 * send and Devflare must not shadow it.
+	 */
+	skipLocalSendEmailBindings?: boolean
 }
 
 /**
@@ -301,7 +317,12 @@ function getComposedWorkerEntrypointSource(
 			'invokeFetchModule',
 			'matchFetchRoute',
 			'runWithEventContext',
-			'setLocalSendEmailBindings'
+			'setLocalSendEmailBindings',
+			// Only pulled in for `devflare dev`: a built worker has no host process
+			// to post outbound mail to, and should not carry the import.
+			...(options.outboundEmailEndpoint
+				? ['setEmailDeliverySink', 'createHttpEmailDeliverySink']
+				: [])
 		],
 		'devflare/runtime'
 	)
@@ -343,7 +364,16 @@ function getComposedWorkerEntrypointSource(
 	builder.raw(fallbacksBuilder.toString())
 	builder.raw(reExportsBuilder.toString())
 	builder.blank()
-	builder.raw(`setLocalSendEmailBindings(${JSON.stringify(configuredLocalSendEmailBindings)})`)
+	builder.raw(
+		`setLocalSendEmailBindings(${JSON.stringify(
+			options.skipLocalSendEmailBindings ? {} : configuredLocalSendEmailBindings
+		)})`
+	)
+	if (options.outboundEmailEndpoint) {
+		builder.raw(
+			`setEmailDeliverySink(createHttpEmailDeliverySink(${JSON.stringify(options.outboundEmailEndpoint)}))`
+		)
+	}
 	builder.blank()
 	builder.constDeclaration('__devflareHasFetchModule', surfaceImportPaths.fetch ? 'true' : 'false')
 	builder.raw(`const __devflareRoutes = [\n${routeManifestEntries.join(',\n')}\n]`)

@@ -17,6 +17,7 @@ import { normalizeCompatibilityFlags } from './compatibility'
 import { isEnvVarDescriptor } from './env-vars'
 import { bindingsSchema } from './schema-bindings'
 import { rolldownConfigSchema, viteConfigSchema } from './schema-build'
+import { emailConfigSchema } from './schema-email'
 import { envConfigSchemaInner } from './schema-env'
 import {
 	assetsConfigSchema,
@@ -138,6 +139,9 @@ export const rootConfigShape = {
 
 	/** Dev server (Miniflare runtime instance) host/port for `devflare dev`. */
 	server: serverConfigSchema,
+
+	/** Local email behaviour: capture / relay / live, plus the inbound poller. */
+	email: emailConfigSchema,
 
 	/** File handlers configuration. */
 	files: filesSchema,

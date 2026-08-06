@@ -4,7 +4,7 @@
 // Usage:
 //   import { email } from 'devflare/test'
 //
-//   // Send a raw email through the helper
+//   // Send a raw email through the helper (INBOUND — invokes src/email.ts)
 //   await email.send({
 //     from: 'sender@example.com',
 //     to: 'recipient@example.com',
@@ -12,14 +12,29 @@
 //     body: 'Hello, world!'
 //   })
 //
-//   // Observe outgoing emails when runtime wiring records them
+//   // Assert on OUTBOUND mail the worker sent through a sendEmail binding
+//   expect(email.outbox).toHaveLength(1)
+//   expect(email.outbox[0].message.cc).toEqual(['ops@example.com'])
+//   expect(email.outbox[0].raw).toContain('Reply-To: support@example.com')
+//
+//   // Observe forward()/reply() calls made by an inbound handler
 //   const unsub = email.onReceive((msg) => {
 //     console.log('Received:', msg)
 //   })
 // =============================================================================
 
 import { join } from 'path'
+import { postInboundEmail } from '../email/inbound'
+import {
+	clearOutbox,
+	getOutbox,
+	getSentMessages,
+	onOutboxEntry,
+	resetOutbox
+} from '../email/outbox'
+import type { OutboxListener, SentEmailRecord } from '../email/outbox'
 import { createEmailEvent, runWithEventContext } from '../runtime'
+import { clearEmailDeliverySink } from '../utils/email-delivery'
 
 // -----------------------------------------------------------------------------
 // Types
@@ -271,19 +286,11 @@ async function send(options: EmailSendOptions): Promise<Response> {
 		})
 	}
 
-	const url = new URL(`http://localhost:${miniflarePort}/cdn-cgi/handler/email`)
-	url.searchParams.set('from', options.from)
-	url.searchParams.set('to', options.to)
-
-	const response = await fetch(url.toString(), {
-		method: 'POST',
-		headers: {
-			'Content-Type': 'text/plain'
-		},
-		body: raw
+	return postInboundEmail(`http://localhost:${miniflarePort}`, {
+		from: options.from,
+		to: options.to,
+		raw
 	})
-
-	return response
 }
 
 /**
@@ -340,15 +347,62 @@ export function resetEmailState(): void {
 	testEnvGetter = null
 	emailListeners = []
 	sentEmails = []
+	resetOutbox()
+	clearEmailDeliverySink()
+}
+
+// -----------------------------------------------------------------------------
+// Outbound mail — the outbox
+// -----------------------------------------------------------------------------
+
+/**
+ * Every message the worker sent through a `sendEmail` binding, in order.
+ *
+ * Each entry carries the structured message AND the raw MIME: a claim about
+ * `cc`, `bcc`, or `replyTo` reads best off `message`, while anything about
+ * generated headers or total size (Cloudflare caps a send at 5 MiB) can only be
+ * made against `raw`.
+ */
+function outbox(): readonly SentEmailRecord[] {
+	return getOutbox()
+}
+
+/**
+ * A mutable copy of the outbox.
+ *
+ * @returns The recorded messages, safe to sort or filter in place.
+ */
+function sent(): SentEmailRecord[] {
+	return getSentMessages()
+}
+
+/**
+ * Observe each message as it is dispatched.
+ *
+ * @param listener - Called synchronously with every new outbox entry.
+ * @returns Unsubscribe function.
+ */
+function onOutbound(listener: OutboxListener): () => void {
+	return onOutboxEntry(listener)
 }
 
 // -----------------------------------------------------------------------------
 // Export
 // -----------------------------------------------------------------------------
 
+export type { SentEmailRecord, OutboxListener }
+
 export const email = {
 	send,
 	onReceive,
 	getSentEmails,
-	clearSentEmails
+	clearSentEmails,
+	/** @see {@link outbox} */
+	get outbox(): readonly SentEmailRecord[] {
+		return outbox()
+	},
+	sent,
+	/** Drop every recorded outbound message. */
+	clearOutbox,
+	onOutbound
 }

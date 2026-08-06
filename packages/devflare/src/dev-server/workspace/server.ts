@@ -22,6 +22,11 @@ import {
 	assertSharedBindingIds,
 	resolveAppDirectSocketPort
 } from '../../config/workspace'
+import { startOutboundEmailService } from '../../email/host-service'
+import { createHostEmailDeliverySink } from '../../email/host-sink'
+import { startInboundEmailPoller } from '../../email/inbound-poller'
+import { type ResolvedEmailRuntime, resolveEmailRuntime } from '../../email/runtime-config'
+import { clearEmailDeliverySink, setEmailDeliverySink } from '../../utils/email-delivery'
 import { generatedDir } from '../../utils/generated-dir'
 import { setLocalSendEmailBindings } from '../../utils/send-email'
 import { runD1Migrations } from '../d1-migrations'
@@ -121,6 +126,13 @@ export function createWorkspaceDevServer(options: WorkspaceDevServerOptions): Wo
 
 	let miniflare: MiniflareType | null = null
 	let preparedApps: PreparedWorkspaceApp[] = []
+	// Resolved from the environment first, because every app's composed worker is
+	// built before any app config has been read. A per-app `email` block then
+	// refines the relay/inbound settings; selecting `live` for a workspace has to
+	// come from DEVFLARE_EMAIL_MODE, since that decision changes what is bundled.
+	let emailRuntime: ResolvedEmailRuntime = resolveEmailRuntime(undefined, process.env)
+	let outboundEmailService: Awaited<ReturnType<typeof startOutboundEmailService>> | null = null
+	let inboundEmailPoller: ReturnType<typeof startInboundEmailPoller> | null = null
 	const viteChildren: ChildProcess[] = []
 	const appOrigins: WorkspaceAppOrigin[] = []
 
@@ -153,6 +165,8 @@ export function createWorkspaceDevServer(options: WorkspaceDevServerOptions): Wo
 					browserShimPort: resolveAppBrowserShimPort(browserShimBasePort, index),
 					r2PresignSecret,
 					host,
+					...(outboundEmailService ? { outboundEmailEndpoint: outboundEmailService.url } : {}),
+					...(emailRuntime.mode === 'live' ? { skipLocalSendEmailBindings: true } : {}),
 					logger
 				})
 			)
@@ -162,11 +176,51 @@ export function createWorkspaceDevServer(options: WorkspaceDevServerOptions): Wo
 
 	/** Merge sendEmail bindings from all apps and register them once (global registry). */
 	function registerSharedSendEmailBindings(apps: PreparedWorkspaceApp[]): void {
+		if (emailRuntime.mode === 'live') {
+			setLocalSendEmailBindings({})
+			return
+		}
+
 		const merged: Record<string, any> = {}
 		for (const app of apps) {
 			Object.assign(merged, app.sendEmailBindings)
 		}
 		setLocalSendEmailBindings(merged)
+	}
+
+	/**
+	 * Refine the email runtime from the first app that declares an `email` block.
+	 *
+	 * Runs AFTER the apps are prepared, because an app's config is only read
+	 * inside `prepareWorkspaceApp`. That is fine for `capture` and `relay`, which
+	 * the host decides per message, but `live` changes what is BUNDLED — so a
+	 * per-app `live` cannot take effect and says so rather than pretending.
+	 *
+	 * @param apps - The prepared apps, in manifest order.
+	 */
+	function refineEmailRuntime(apps: PreparedWorkspaceApp[]): void {
+		const declaring = apps.find((app) => app.config.email !== undefined)
+		if (!declaring) {
+			return
+		}
+
+		const bundledMode = emailRuntime.mode
+		emailRuntime = resolveEmailRuntime(declaring.config.email, process.env)
+
+		if (emailRuntime.mode === 'live' && bundledMode !== 'live') {
+			logger?.warn(
+				`App "${declaring.appName}" asks for email mode 'live', but each app's worker was already ` +
+					'built before its config was read. Set DEVFLARE_EMAIL_MODE=live to apply it in a ' +
+					`workspace; continuing in '${bundledMode}'.`
+			)
+			emailRuntime = { ...emailRuntime, mode: bundledMode }
+			return
+		}
+
+		logger?.info(
+			`Email mode: ${emailRuntime.mode} (from app "${declaring.appName}")` +
+				(emailRuntime.relay ? ` → pinned to ${emailRuntime.relay.to}` : '')
+		)
 	}
 
 	async function startMiniflare(apps: PreparedWorkspaceApp[]): Promise<void> {
@@ -251,7 +305,11 @@ export function createWorkspaceDevServer(options: WorkspaceDevServerOptions): Wo
 	async function start(): Promise<void> {
 		logger?.info('Starting workspace dev server…')
 
+		setEmailDeliverySink(createHostEmailDeliverySink(() => emailRuntime))
+		outboundEmailService = await startOutboundEmailService(() => emailRuntime)
+
 		preparedApps = await prepareAllApps()
+		refineEmailRuntime(preparedApps)
 
 		if (manifest.shared) {
 			assertSharedBindingIds(
@@ -270,10 +328,26 @@ export function createWorkspaceDevServer(options: WorkspaceDevServerOptions): Wo
 		await startViteChildren(preparedApps)
 		await runMigrations(preparedApps)
 
+		if (emailRuntime.inbound) {
+			logger?.info(
+				`Email inbound: polling ${emailRuntime.inbound.mailbox} every ${emailRuntime.inbound.intervalMs}ms → src/email.ts`
+			)
+			inboundEmailPoller = startInboundEmailPoller({
+				inbound: emailRuntime.inbound,
+				runtimeOrigin: `http://${host}:${manifest.entryPort}`,
+				...(logger ? { logger } : {})
+			})
+		}
+
 		logger?.success(`Workspace ready — ${preparedApps.length} app(s) sharing one instance`)
 	}
 
 	async function stop(): Promise<void> {
+		if (inboundEmailPoller) {
+			await inboundEmailPoller.stop()
+			inboundEmailPoller = null
+		}
+
 		for (const child of viteChildren) {
 			child.kill()
 		}
@@ -296,6 +370,13 @@ export function createWorkspaceDevServer(options: WorkspaceDevServerOptions): Wo
 			await miniflare.dispose()
 			miniflare = null
 		}
+
+		if (outboundEmailService) {
+			await outboundEmailService.close()
+			outboundEmailService = null
+		}
+
+		clearEmailDeliverySink()
 	}
 
 	return {

@@ -564,7 +564,9 @@ function addSendEmailBindings(
 ) {
 	for (const [name, binding] of Object.entries(bindings?.sendEmail ?? {})) {
 		const fixture = fixtures.sendEmail?.[name]
-		env[name] = isSendEmailBinding(fixture) ? fixture : createMockSendEmail(fixture ?? binding)
+		env[name] = isSendEmailBinding(fixture)
+			? fixture
+			: createMockSendEmail(fixture ?? binding, { binding: name })
 	}
 }
 

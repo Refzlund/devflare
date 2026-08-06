@@ -5,6 +5,7 @@ import type {
 	ViteConfigInput,
 	WranglerConfigInput
 } from './schema-types-build'
+import type { EmailConfigInput } from './schema-types-email'
 import type {
 	AssetsConfigInput,
 	ContainerConfigInput,
@@ -136,6 +137,20 @@ export interface DevflareConfigInput {
 	 * ```
 	 */
 	server?: ServerConfigInput
+
+	/**
+	 * Local email behaviour for `devflare dev` and `createTestContext()`: what
+	 * happens to a message a worker sends, and whether a real mailbox is polled
+	 * into `src/email.ts`. Development-only; never affects deployed Workers.
+	 *
+	 * @default `{ mode: 'capture' }`
+	 *
+	 * @example
+	 * ```ts
+	 * email: { mode: 'relay', relay: { url: 'smtps://user:pass@smtp.example.com:465', to: 'dev@example.com' } }
+	 * ```
+	 */
+	email?: EmailConfigInput
 
 	/**
 	 * Source file discovery for Worker handlers, Durable Objects, entrypoints,
@@ -511,5 +526,6 @@ export interface DevflareEnvConfigInput
 	extends Partial<Omit<DevflareConfigInput, 'accountId' | 'wsRoutes' | 'env'>> {}
 
 export type * from './schema-types-bindings'
+export type * from './schema-types-email'
 export type * from './schema-types-build'
 export type * from './schema-types-runtime'
