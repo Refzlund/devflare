@@ -79,6 +79,7 @@
     "phase-f-docs-debt",
     "queue-event-subscriptions",
     "r2-presigned-put-uploads",
+    "rate-limit-namespace-id",
     "remove-context-unavailable-error",
     "robust-package-json-resolution",
     "rolldown-build-fix",
