@@ -21,11 +21,14 @@ import { getEffectiveAccountId } from '../cloudflare/preferences'
 import {
 	createDnsRecord,
 	createEmailRoutingRule,
+	createSendingDomain,
 	enableEmailRouting,
 	getEmailRoutingCatchAll,
 	getEmailRoutingSettings,
+	getSendingDomainDnsStatus,
 	listDnsRecords,
 	listEmailRoutingRules,
+	listSendingDomains,
 	resolveZone,
 	setEmailRoutingCatchAll,
 	updateDnsRecord
@@ -79,6 +82,9 @@ interface DeployResourcePreparationApi {
 	listDnsRecords: ZoneProvisionApi['listDnsRecords']
 	createDnsRecord: ZoneProvisionApi['createDnsRecord']
 	updateDnsRecord: ZoneProvisionApi['updateDnsRecord']
+	listSendingDomains: ZoneProvisionApi['listSendingDomains']
+	createSendingDomain: ZoneProvisionApi['createSendingDomain']
+	getSendingDomainDnsStatus: ZoneProvisionApi['getSendingDomainDnsStatus']
 }
 
 const defaultDeployResourcePreparationApi: DeployResourcePreparationApi = {
@@ -103,7 +109,10 @@ const defaultDeployResourcePreparationApi: DeployResourcePreparationApi = {
 	setEmailRoutingCatchAll,
 	listDnsRecords,
 	createDnsRecord,
-	updateDnsRecord
+	updateDnsRecord,
+	listSendingDomains,
+	createSendingDomain,
+	getSendingDomainDnsStatus
 }
 
 export interface DeployResourceNames {
@@ -472,7 +481,8 @@ export async function prepareMaterializedConfigResourcesForDeploy(
 	const hasZoneWork =
 		!isPreviewEnvironment &&
 		Object.values(resolvedConfig.zones ?? {}).some(
-			(zone) => zone.emailRouting !== undefined || zone.dns !== undefined
+			(zone) =>
+				zone.emailRouting !== undefined || zone.emailSending !== undefined || zone.dns !== undefined
 		)
 
 	if (
@@ -564,6 +574,13 @@ export async function prepareMaterializedConfigResourcesForDeploy(
 		cloudflareApi.setEmailRoutingCatchAll = async (_zoneId: string, rule) => rule
 		cloudflareApi.createDnsRecord = async (_zoneId: string, record) => record
 		cloudflareApi.updateDnsRecord = async (_zoneId: string, _recordId: string, record) => record
+		// Onboarding a sending domain writes AND LOCKS DNS records in the zone, so it is a mutation
+		// like any other here. The `tag` is a placeholder the readiness read is skipped for.
+		cloudflareApi.createSendingDomain = async (_zoneId: string, name: string) => ({
+			tag: '',
+			name,
+			enabled: true
+		})
 	}
 
 	// C13 — sequential provisioning leaves silent orphans. We do not
@@ -673,7 +690,8 @@ export async function prepareMaterializedConfigResourcesForDeploy(
 		if (hasZoneWork) {
 			await provisionZoneResources(resolvedConfig.zones, accountId, cloudflareApi, {
 				created: created.zones,
-				existing: existing.zones
+				existing: existing.zones,
+				warnings
 			})
 		}
 

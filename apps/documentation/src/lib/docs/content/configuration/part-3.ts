@@ -217,11 +217,17 @@ export const configurationDocsPart3: DocPage[] = [
 				paragraphs: [
 					'Everything else Devflare provisions is account-scoped. Email Routing rules and DNS records are not: they belong to a zone, which is a different identifier reached by a different lookup and gated by a different token scope. The `zones` key is where they are declared, and a deploy reconciles them.',
 					'The key is a domain rather than a zone id, because a domain is what an author knows. Devflare walks the domain labels up to the apex to find the zone, so `mail.example.com` is configured under its own name and its records land in the `example.com` zone. A relative record name resolves against the domain it was declared under, not the zone apex — for a subdomain those differ, and the apex would be the wrong place.',
-					'Rules reconcile on the address they claim and records on their type and name, so deploying twice is a no-op rather than a pile of duplicates. Nothing is ever deleted: a zone almost always carries rules and records this config never mentioned.'
+					'Rules reconcile on the address they claim and records on their type and name, so deploying twice is a no-op rather than a pile of duplicates. Nothing is ever deleted: a zone almost always carries rules and records this config never mentioned.',
+					'`emailSending` and `emailRouting` are different Cloudflare products that happen to share a zone. Routing is inbound — what happens to mail arriving for the domain. Sending is outbound — whether a `send_email` binding may send from an address here. A domain that does both is onboarded to both, separately, and a subdomain gets its own DKIM key rather than inheriting the apex one. Sending readiness is reported rather than waited on: Cloudflare writes the records at onboarding and they take minutes to propagate, so a deploy that failed on them would fail one that did everything right.'
 				],
 				table: {
 					headers: ['Declared', 'What a deploy does', 'What it will not do'],
 					rows: [
+						[
+							'`emailSending`',
+							'Checks the domain is onboarded and able to send, and reports its DNS readiness.',
+							'Onboard it without `enable: true` — it fails and names the fix instead.'
+						],
 						[
 							'`emailRouting.rules`',
 							'Creates any rule whose address is not already claimed.',

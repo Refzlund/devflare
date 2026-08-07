@@ -2,8 +2,12 @@
 	──────────────────────────────────────────────────────────────────────────────
 	              Provisioning zone-scoped resources at deploy
 	──────────────────────────────────────────────────────────────────────────────
-	Reconciles the `zones` namespace against a Cloudflare account: Email Routing
-	rules and DNS records, per domain. Lives beside `deploy-resources.ts` rather
+	Reconciles the `zones` namespace against a Cloudflare account, per domain:
+	Email Sending onboarding, Email Routing rules, and DNS records — in that
+	order, because sending is the precondition for the rest of a domain's mail
+	and Cloudflare writes records of its own while onboarding it. Sending is
+	OUTBOUND and routing is INBOUND; they are separate products sharing a zone.
+	Lives beside `deploy-resources.ts` rather
 	than inside it because everything there is account-scoped and shares one
 	list/create shape, while these need a zone lookup first and reconcile on
 	different identities (an address, a type+name pair).
@@ -27,7 +31,9 @@ import type {
 	EmailRoutingAction,
 	EmailRoutingRule,
 	EmailRoutingSettings,
-	ResolvedZone
+	ResolvedZone,
+	SendingDomain,
+	SendingDomainDnsStatus
 } from '../cloudflare/zone-resources'
 import type { DevflareConfig } from './schema'
 
@@ -47,6 +53,12 @@ export interface ZoneProvisionApi {
 	getEmailRoutingCatchAll: (zoneId: string) => Promise<EmailRoutingRule>
 	/** Replace the catch-all. */
 	setEmailRoutingCatchAll: (zoneId: string, rule: EmailRoutingRule) => Promise<EmailRoutingRule>
+	/** List the domains this zone may send mail from. */
+	listSendingDomains: (zoneId: string) => Promise<SendingDomain[]>
+	/** Onboard a domain for sending. Writes and locks DNS records. */
+	createSendingDomain: (zoneId: string, name: string) => Promise<SendingDomain>
+	/** Read how ready a sending domain's DNS is. */
+	getSendingDomainDnsStatus: (zoneId: string, domainTag: string) => Promise<SendingDomainDnsStatus>
 	/** List records of one type and fully-qualified name. */
 	listDnsRecords: (zoneId: string, query: { type: string; name: string }) => Promise<DnsRecord[]>
 	/** Create one record. */
@@ -61,6 +73,14 @@ export interface ZoneProvisionResult {
 	created: string[]
 	/** Things already correct, so the pass left them alone. */
 	existing: string[]
+	/**
+	 * Things worth saying that are not failures.
+	 *
+	 * A sending domain whose DNS has not propagated yet is the standing case: it is the expected
+	 * state minutes after onboarding, so failing the deploy would fail one that did everything right,
+	 * and saying nothing would leave a broken sender looking provisioned.
+	 */
+	warnings: string[]
 }
 
 /** Raised when a zone cannot be provisioned as declared, with the fix in the message. */
@@ -262,6 +282,68 @@ async function provisionCatchAll(
 	result.created.push(`Email catch-all (zone ${zone.name}) — set to ${actions[0]?.type}`)
 }
 
+/**
+ * @description Make sure this domain may send mail, and report how ready its DNS is.
+ *
+ * @param zone - the resolved zone, and the domain it was reached through.
+ * @param declared - the domain's `emailSending` block.
+ * @param api - the injected Cloudflare calls.
+ * @param result - the caller's accumulator, appended to in place.
+ * @throws {ZoneProvisionError} when the domain is not onboarded and `enable` was not given.
+ *
+ * → NOTE: readiness is REPORTED, never waited on. Cloudflare writes the records at onboarding but
+ *   they take minutes to propagate, so a fresh domain is legitimately `unconfigured` for a while —
+ *   failing there would fail a deploy that did everything right. Saying nothing would be worse: a
+ *   sender whose DKIM never landed looks provisioned and silently fails authentication.
+ */
+async function provisionEmailSending(
+	zone: ResolvedZone,
+	declared: NonNullable<NonNullable<DevflareConfig['zones']>[string]['emailSending']>,
+	api: ZoneProvisionApi,
+	result: ZoneProvisionResult
+): Promise<void> {
+	const onboarded = await api.listSendingDomains(zone.id)
+	const match = onboarded.find((domain) => domain.name.toLowerCase() === zone.domain.toLowerCase())
+
+	let sending = match
+
+	if (!match || !match.enabled) {
+		if (!declared.enable) {
+			const state = match ? 'onboarded but switched OFF' : 'not onboarded'
+			throw new ZoneProvisionError(
+				`"${zone.domain}" is ${state} for Email Sending, so a \`send_email\` binding cannot send from it. ` +
+					'Onboarding makes Cloudflare write and LOCK DNS records in the zone, so Devflare will not do it ' +
+					`unless asked: set \`zones['${zone.domain}'].emailSending.enable = true\`, or run ` +
+					`\`wrangler email sending enable ${zone.domain}\` once and re-run this deploy.`
+			)
+		}
+
+		sending = await api.createSendingDomain(zone.id, zone.domain)
+		result.created.push(`Email Sending onboarded: ${zone.domain}`)
+	} else {
+		result.existing.push(`Email Sending: ${zone.domain}`)
+	}
+
+	if (!sending?.tag) return
+
+	const dns = await api.getSendingDomainDnsStatus(zone.id, sending.tag)
+
+	// `unlocked` still means every record exists with the right content — only that one has had its
+	// managed lock cleared — so it passes. Treating it as a failure would cry wolf on a working setup.
+	if (dns.status === 'ready' || dns.status === 'unlocked') return
+
+	const reasons = (dns.errors ?? [])
+		.map((error) => error.code ?? error.message)
+		.filter((reason): reason is string => Boolean(reason))
+
+	result.warnings.push(
+		`Email Sending DNS for ${zone.domain} is "${dns.status ?? 'unknown'}"` +
+			`${reasons.length > 0 ? ` (${reasons.join(', ')})` : ''}. ` +
+			'Records take a few minutes to propagate after onboarding; if it stays this way, mail from this ' +
+			'domain will fail authentication even though the deploy succeeded.'
+	)
+}
+
 /** Whether a live record already matches every field the config declared. */
 function sameRecord(live: DnsRecord, declared: DnsRecord): boolean {
 	return (
@@ -380,9 +462,16 @@ export async function provisionZoneResources(
 	if (!zones) return
 
 	for (const [domain, declared] of Object.entries(zones)) {
-		if (!declared.emailRouting && !declared.dns) continue
+		if (!declared.emailRouting && !declared.emailSending && !declared.dns) continue
 
 		const zone = await api.resolveZone(domain, accountId)
+
+		// FIRST, because it is the precondition for everything else about this domain's mail — a
+		// `send_email` binding cannot send from a domain that was never onboarded, and Cloudflare writes
+		// its own records during onboarding, so any `dns` declared here should be reconciled after them.
+		if (declared.emailSending) {
+			await provisionEmailSending(zone, declared.emailSending, api, result)
+		}
 
 		if (declared.emailRouting) {
 			await provisionEmailRouting(zone, declared.emailRouting, api, result)

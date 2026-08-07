@@ -168,11 +168,34 @@ export const dnsRecordConfigSchema = z
 	})
 	.strict()
 
+/**
+ * Whether this domain may SEND mail, which is a different product from routing.
+ *
+ * Routing is inbound; sending is whether a Worker's `send_email` binding may use an address here.
+ */
+export const emailSendingConfigSchema = z
+	.object({
+		/**
+		 * Authorize Devflare to onboard this domain for sending.
+		 *
+		 * Never inferred, for the same reason as `emailRouting.enable`: onboarding makes Cloudflare
+		 * write AND LOCK a set of DNS records in the zone. Without it, a domain that is not onboarded
+		 * fails the deploy and names the one command that fixes it.
+		 *
+		 * @default false
+		 */
+		enable: z.boolean().optional()
+	})
+	.strict()
+
 /** Everything Devflare provisions for one domain. */
 export const zoneConfigSchema = z
 	.object({
-		/** Email Routing for this domain. */
+		/** Email Routing for this domain — inbound. */
 		emailRouting: emailRoutingConfigSchema.optional(),
+
+		/** Email Sending for this domain — outbound. */
+		emailSending: emailSendingConfigSchema.optional(),
 		/** DNS records Devflare keeps at their declared values. */
 		dns: z.array(dnsRecordConfigSchema).optional()
 	})

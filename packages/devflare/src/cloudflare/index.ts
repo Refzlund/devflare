@@ -421,7 +421,10 @@ export {
 	setEmailRoutingCatchAll,
 	listDnsRecords,
 	createDnsRecord,
-	updateDnsRecord
+	updateDnsRecord,
+	listSendingDomains,
+	createSendingDomain,
+	getSendingDomainDnsStatus
 } from './zone-resources'
 export type {
 	ZoneInfo,
@@ -430,7 +433,9 @@ export type {
 	EmailRoutingAction,
 	EmailRoutingRule,
 	EmailRoutingSettings,
-	DnsRecord
+	DnsRecord,
+	SendingDomain,
+	SendingDomainDnsStatus
 } from './zone-resources'
 
 // -----------------------------------------------------------------------------

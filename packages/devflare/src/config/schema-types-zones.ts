@@ -226,10 +226,36 @@ export interface DnsRecordInput {
 	comment?: string
 }
 
+/**
+ * Whether this domain may SEND mail — a different Cloudflare product from routing.
+ *
+ * Routing is inbound: what happens to mail arriving for the domain. Sending is outbound: whether a
+ * Worker's `send_email` binding may send from an address here. A domain commonly needs both, and
+ * they are onboarded separately.
+ */
+export interface EmailSendingConfigInput {
+	/**
+	 * Authorize Devflare to onboard this domain for sending.
+	 *
+	 * Never inferred, for the same reason as `emailRouting.enable`: onboarding makes Cloudflare write
+	 * AND LOCK a set of DNS records in the zone — `MX` and SPF on `cf-bounce.<domain>`, a DKIM key,
+	 * and a DMARC policy. Without this, a domain that is not onboarded fails the deploy and names the
+	 * one command that fixes it, rather than being silently changed.
+	 *
+	 * @default `false`
+	 *
+	 * @example
+	 * ```ts
+	 * enable: true
+	 * ```
+	 */
+	enable?: boolean
+}
+
 /** Everything Devflare provisions for one domain. */
 export interface ZoneConfigInput {
 	/**
-	 * Email Routing for this domain.
+	 * Email Routing for this domain — INBOUND, what happens to mail arriving for it.
 	 *
 	 * @example
 	 * ```ts
@@ -237,6 +263,20 @@ export interface ZoneConfigInput {
 	 * ```
 	 */
 	emailRouting?: EmailRoutingConfigInput
+
+	/**
+	 * Email Sending for this domain — OUTBOUND, whether a `send_email` binding may send from it.
+	 *
+	 * A deploy always CHECKS this when declared, and reports the DNS readiness Cloudflare publishes
+	 * rather than waiting on it: propagation takes minutes, and a fresh onboarding is legitimately
+	 * unready for a while.
+	 *
+	 * @example
+	 * ```ts
+	 * emailSending: { enable: true }
+	 * ```
+	 */
+	emailSending?: EmailSendingConfigInput
 
 	/**
 	 * DNS records Devflare keeps at their declared values.

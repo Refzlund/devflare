@@ -444,6 +444,10 @@ export default defineConfig({
 	name: 'docs-site',
 	zones: {
 		'example.com': {
+			// Outbound: may a send_email binding send from this domain?
+			// Onboarding makes Cloudflare write and LOCK the DKIM/SPF/bounce records.
+			emailSending: { enable: true },
+			// Inbound: what happens to mail arriving for it.
 			emailRouting: {
 				// Explicit authorization: enabling rewrites the zone MX records.
 				enable: true,

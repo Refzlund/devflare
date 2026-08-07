@@ -3458,10 +3458,13 @@ The key is a domain rather than a zone id, because a domain is what an author kn
 
 Rules reconcile on the address they claim and records on their type and name, so deploying twice is a no-op rather than a pile of duplicates. Nothing is ever deleted: a zone almost always carries rules and records this config never mentioned.
 
+`emailSending` and `emailRouting` are different Cloudflare products that happen to share a zone. Routing is inbound — what happens to mail arriving for the domain. Sending is outbound — whether a `send_email` binding may send from an address here. A domain that does both is onboarded to both, separately, and a subdomain gets its own DKIM key rather than inheriting the apex one. Sending readiness is reported rather than waited on: Cloudflare writes the records at onboarding and they take minutes to propagate, so a deploy that failed on them would fail one that did everything right.
+
 ##### Reference table
 
 | Declared | What a deploy does | What it will not do |
 | --- | --- | --- |
+| `emailSending` | Checks the domain is onboarded and able to send, and reports its DNS readiness. | Onboard it without `enable: true` — it fails and names the fix instead. |
 | `emailRouting.rules` | Creates any rule whose address is not already claimed. | Rewrite one that exists and points elsewhere — it reports the difference instead. |
 | `emailRouting.catchAll` | Sets it, but only when it differs from what is live. | Touch it at all when the key is omitted. |
 | `emailRouting.enable` | Turns Email Routing on for the zone. | Turn it on without this — a zone with routing off fails the deploy instead. |
@@ -3496,6 +3499,10 @@ export default defineConfig({
 	name: 'docs-site',
 	zones: {
 		'example.com': {
+			// Outbound: may a send_email binding send from this domain?
+			// Onboarding makes Cloudflare write and LOCK the DKIM/SPF/bounce records.
+			emailSending: { enable: true },
+			// Inbound: what happens to mail arriving for it.
 			emailRouting: {
 				// Explicit authorization: enabling rewrites the zone MX records.
 				enable: true,

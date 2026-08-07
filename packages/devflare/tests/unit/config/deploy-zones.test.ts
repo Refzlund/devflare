@@ -41,6 +41,13 @@ function makeZoneApi(overrides: Partial<ZoneProvisionApi> = {}) {
 			actions: [{ type: 'drop' as const }]
 		})),
 		setEmailRoutingCatchAll: mock(async (_zoneId: string, rule) => rule),
+		listSendingDomains: mock(async () => [{ tag: 'sd_1', name: 'example.com', enabled: true }]),
+		createSendingDomain: mock(async (_zoneId: string, name: string) => ({
+			tag: 'sd_new',
+			name,
+			enabled: true
+		})),
+		getSendingDomainDnsStatus: mock(async () => ({ status: 'ready' as const })),
 		listDnsRecords: mock(async () => []),
 		createDnsRecord: mock(async (_zoneId: string, record) => record),
 		updateDnsRecord: mock(async (_zoneId: string, _recordId: string, record) => record),
@@ -53,7 +60,7 @@ async function provision(
 	zones: DevflareConfig['zones'],
 	api: ZoneProvisionApi
 ): Promise<ZoneProvisionResult> {
-	const result: ZoneProvisionResult = { created: [], existing: [] }
+	const result: ZoneProvisionResult = { created: [], existing: [], warnings: [] }
 	await provisionZoneResources(zones, 'acct_1', api, result)
 	return result
 }
@@ -252,6 +259,96 @@ describe('provisionZoneResources — Email Routing', () => {
 	})
 })
 
+describe('provisionZoneResources — Email Sending', () => {
+	test('a domain already onboarded and enabled is reported, and nothing is written', async () => {
+		const api = makeZoneApi()
+
+		const result = await provision({ 'example.com': { emailSending: {} } }, api)
+
+		expect(api.createSendingDomain).not.toHaveBeenCalled()
+		expect(result.existing).toContain('Email Sending: example.com')
+	})
+
+	test('a domain that is NOT onboarded fails, naming both ways to fix it', async () => {
+		// Onboarding makes Cloudflare write AND LOCK records in the zone, so it is a real mutation and
+		// not a registration formality — same stance as enabling Email Routing.
+		const api = makeZoneApi({ listSendingDomains: mock(async () => []) })
+
+		const failure = provision({ 'example.com': { emailSending: {} } }, api)
+
+		await expect(failure).rejects.toThrow(ZoneProvisionError)
+		await failure.catch((error: unknown) => {
+			expect((error as Error).message).toContain('emailSending.enable = true')
+			expect((error as Error).message).toContain('wrangler email sending enable example.com')
+		})
+		expect(api.createSendingDomain).not.toHaveBeenCalled()
+	})
+
+	test('an onboarded but DISABLED domain also fails, and says which of the two it is', async () => {
+		// Present in the list is not the same as able to send. Reporting it as fine because a row exists
+		// would leave every message failing with a config that looks provisioned.
+		const api = makeZoneApi({
+			listSendingDomains: mock(async () => [{ tag: 'sd_1', name: 'example.com', enabled: false }])
+		})
+
+		const failure = provision({ 'example.com': { emailSending: {} } }, api)
+
+		await failure.catch((error: unknown) => {
+			expect((error as Error).message).toContain('onboarded but switched OFF')
+		})
+	})
+
+	test('`enable: true` onboards it', async () => {
+		const api = makeZoneApi({ listSendingDomains: mock(async () => []) })
+
+		const result = await provision({ 'example.com': { emailSending: { enable: true } } }, api)
+
+		expect(api.createSendingDomain).toHaveBeenCalledTimes(1)
+		expect(api.createSendingDomain.mock.calls[0]?.[1]).toBe('example.com')
+		expect(result.created).toContain('Email Sending onboarded: example.com')
+	})
+
+	test('DNS that has not propagated is a WARNING, not a failure', async () => {
+		// Cloudflare writes the records at onboarding but they take minutes. Failing here would fail a
+		// deploy that did everything right; saying nothing would leave a sender whose DKIM never landed
+		// looking provisioned while every message fails authentication.
+		const api = makeZoneApi({
+			getSendingDomainDnsStatus: mock(async () => ({
+				status: 'misconfigured' as const,
+				errors: [{ code: 'dkim.missing' }, { code: 'spf.multiple' }]
+			}))
+		})
+
+		const result = await provision({ 'example.com': { emailSending: {} } }, api)
+
+		expect(result.warnings).toHaveLength(1)
+		expect(result.warnings[0]).toContain('dkim.missing, spf.multiple')
+		expect(result.warnings[0]).toContain('misconfigured')
+	})
+
+	test('`unlocked` passes — the records exist and are correct', async () => {
+		// Only that one has had its managed lock cleared. Warning here would cry wolf on a working setup.
+		const api = makeZoneApi({
+			getSendingDomainDnsStatus: mock(async () => ({ status: 'unlocked' as const }))
+		})
+
+		const result = await provision({ 'example.com': { emailSending: {} } }, api)
+
+		expect(result.warnings).toEqual([])
+	})
+
+	test('the domain is matched case-insensitively', async () => {
+		const api = makeZoneApi({
+			listSendingDomains: mock(async () => [{ tag: 'sd_1', name: 'EXAMPLE.COM', enabled: true }])
+		})
+
+		const result = await provision({ 'example.com': { emailSending: {} } }, api)
+
+		expect(api.createSendingDomain).not.toHaveBeenCalled()
+		expect(result.existing).toContain('Email Sending: example.com')
+	})
+})
+
 describe('provisionZoneResources — DNS', () => {
 	const dmarc = {
 		'example.com': {
@@ -424,7 +521,7 @@ describe('provisionZoneResources — shape of the pass itself', () => {
 		const result = await provision(undefined, api)
 
 		expect(api.resolveZone).not.toHaveBeenCalled()
-		expect(result).toEqual({ created: [], existing: [] })
+		expect(result).toEqual({ created: [], existing: [], warnings: [] })
 	})
 
 	test('a domain declaring neither routing nor DNS is skipped before the zone lookup', async () => {
@@ -471,6 +568,7 @@ describe('the deploy path guards zone provisioning', () => {
 		compatibilityFlags: [],
 		zones: {
 			'example.com': {
+				emailSending: { enable: true },
 				emailRouting: {
 					enable: true,
 					rules: [{ to: 'support@example.com', worker: 'api' }],
@@ -484,6 +582,7 @@ describe('the deploy path guards zone provisioning', () => {
 	/** Everything in the WORST state, so any missing guard shows up as a recorded mutation. */
 	function worstCaseApi() {
 		return makeZoneApi({
+			listSendingDomains: mock(async () => []),
 			getEmailRoutingSettings: mock(async () => ({ enabled: false, status: 'unconfigured' })),
 			getEmailRoutingCatchAll: mock(async () => ({
 				enabled: false,
@@ -503,13 +602,14 @@ describe('the deploy path guards zone provisioning', () => {
 		})
 	}
 
-	/** Assert not one of the five mutations happened. */
+	/** Assert not one of the six mutations happened. */
 	function expectNoMutation(api: ReturnType<typeof makeZoneApi>) {
 		expect(api.enableEmailRouting).not.toHaveBeenCalled()
 		expect(api.createEmailRoutingRule).not.toHaveBeenCalled()
 		expect(api.setEmailRoutingCatchAll).not.toHaveBeenCalled()
 		expect(api.createDnsRecord).not.toHaveBeenCalled()
 		expect(api.updateDnsRecord).not.toHaveBeenCalled()
+		expect(api.createSendingDomain).not.toHaveBeenCalled()
 	}
 
 	test('describeOnly performs no zone mutation, while still reading the real state', async () => {
@@ -567,6 +667,7 @@ describe('the deploy path guards zone provisioning', () => {
 		expect(api.createEmailRoutingRule).toHaveBeenCalledTimes(1)
 		expect(api.setEmailRoutingCatchAll).toHaveBeenCalledTimes(1)
 		expect(api.updateDnsRecord).toHaveBeenCalledTimes(1)
+		expect(api.createSendingDomain).toHaveBeenCalledTimes(1)
 	})
 
 	test('a non-preview NAMED environment still provisions', async () => {

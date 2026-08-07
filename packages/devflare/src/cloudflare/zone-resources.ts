@@ -234,6 +234,128 @@ export async function enableEmailRouting(
 	return apiPost<EmailRoutingSettings>(`/zones/${zoneId}/email/routing/enable`, {}, options)
 }
 
+/*
+	──────────────────────────────────────────────────────────────────────────────
+	                    Email SENDING — a different product
+	──────────────────────────────────────────────────────────────────────────────
+	Email Routing above is INBOUND: what happens to mail arriving for the domain.
+	Email Sending is OUTBOUND: whether a Worker's `send_email` binding may send
+	FROM an address at this domain. They share the zone and nothing else.
+
+	→ KEY: onboarding a sending domain makes Cloudflare write AND LOCK a set of
+	  DNS records of its own — `MX` and SPF `TXT` on `cf-bounce.<domain>`, the DKIM
+	  key at `cf-bounce._domainkey.<domain>`, and a DMARC policy at
+	  `_dmarc.<domain>`. Anything declared under `dns` that collides with one of
+	  those is fighting Cloudflare for the record.
+	→ NOTE: shapes verified against Cloudflare's own OpenAPI schema and the
+	  generated `cloudflare` SDK. The SDK LAGS the API — it has no `/dns/status`
+	  — so these are hand-written against the paths rather than taken from it.
+	→ GOTCHA: the schema declares `api_email`/`api_key` security for these
+	  operations and omits `api_token`, unlike the sibling send endpoints. That may
+	  be a codegen artefact, but it means a token-authenticated create could 403;
+	  {@link createSendingDomain} says what to do if it does.
+*/
+
+/** One onboarded sending domain. */
+export interface SendingDomain {
+	/** Cloudflare's id for the subdomain, used in the `/dns/status` path. */
+	tag: string
+	/** The domain itself, e.g. `mail.example.com`. */
+	name: string
+	/** Whether sending is currently on for it. */
+	enabled: boolean
+	/** The DKIM selector Cloudflare published for it. */
+	dkim_selector?: string
+	/** The bounce domain Cloudflare routes return-path mail through. */
+	return_path_domain?: string
+}
+
+/** How ready a sending domain's DNS actually is. */
+export interface SendingDomainDnsStatus {
+	/**
+	 * `ready` and `unlocked` both mean the records exist with correct content —
+	 * `unlocked` only that one has had its managed lock cleared. `unconfigured`
+	 * and `misconfigured` are the real failures.
+	 */
+	status?: 'ready' | 'unconfigured' | 'unlocked' | 'misconfigured'
+	/** Precisely what is wrong, e.g. `dkim.missing`, `spf.multiple`. */
+	errors?: { code?: string; message?: string }[]
+}
+
+/**
+ * @description List the domains this zone may send mail from.
+ *
+ * @param zoneId - the zone.
+ * @param options - API client options.
+ * @returns every onboarded sending domain, including disabled ones.
+ */
+export async function listSendingDomains(
+	zoneId: string,
+	options?: APIClientOptions
+): Promise<SendingDomain[]> {
+	return apiGetAll<SendingDomain>(`/zones/${zoneId}/email/sending/subdomains`, options)
+}
+
+/**
+ * @description Onboard a domain for sending, or re-enable one that was switched off.
+ *
+ * @param zoneId - the zone the domain sits in.
+ * @param name - the domain to onboard. Must be within the zone.
+ * @param options - API client options.
+ * @returns the onboarded domain, carrying its `tag` and DKIM selector.
+ * @throws when Cloudflare refuses — enriched with the CLI fallback, since token auth may not be accepted.
+ *
+ * → GOTCHA: this WRITES DNS RECORDS into the zone and locks them, so it is a real mutation and not a
+ *   registration formality. It is also idempotent by design: Cloudflare re-enables an existing
+ *   disabled domain rather than erroring.
+ */
+export async function createSendingDomain(
+	zoneId: string,
+	name: string,
+	options?: APIClientOptions
+): Promise<SendingDomain> {
+	try {
+		return await apiPost<SendingDomain>(
+			`/zones/${zoneId}/email/sending/subdomains`,
+			{ name },
+			options
+		)
+	} catch (error) {
+		// PROPAGATE, enriched — not swallowed. Cloudflare's own message for a rejected credential says
+		// nothing about there being a working alternative, and this endpoint's declared security omits
+		// API tokens, which is exactly the credential a deploy uses.
+		throw new Error(
+			`Could not onboard "${name}" for Email Sending. If this was an authentication failure, note that ` +
+				'Cloudflare does not document API-token auth for this endpoint — onboard it once with ' +
+				`\`wrangler email sending enable ${name}\`, then re-run the deploy, which will find it already done.`,
+			{ cause: error }
+		)
+	}
+}
+
+/**
+ * @description Read whether a sending domain's DNS has actually taken effect.
+ *
+ * @param zoneId - the zone.
+ * @param domainTag - the sending domain's `tag`.
+ * @param options - API client options.
+ * @returns the aggregated status and, when it is bad, the specific record problems.
+ *
+ * → NOTE: propagation takes minutes, so a deploy REPORTS this rather than waiting on it. A fresh
+ *   onboarding is legitimately `unconfigured` for a while, and blocking there would fail a deploy
+ *   that did everything right.
+ */
+export async function getSendingDomainDnsStatus(
+	zoneId: string,
+	domainTag: string,
+	options?: APIClientOptions
+): Promise<SendingDomainDnsStatus> {
+	return apiGet<SendingDomainDnsStatus>(
+		`/zones/${zoneId}/email/sending/subdomains/${domainTag}/dns/status`,
+		options
+	)
+}
+
 /** One DNS record, as much of it as Devflare reads or writes. */
 export interface DnsRecord {
 	/** Cloudflare's id. Absent when creating. */
