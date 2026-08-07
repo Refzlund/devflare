@@ -103,7 +103,26 @@ export function startOutboundEmailService(
 				port: address.port,
 				close: () =>
 					new Promise<void>((closed, failed) => {
-						server.close((error) => (error ? failed(error) : closed()))
+						// `close()` alone only refuses NEW connections; it then waits out every socket
+						// still open, and the composed worker posts its deliveries over a keep-alive
+						// one. Waiting is exactly wrong here — the caller is `disposeDevServerState`,
+						// and a dev server that will not exit is worse than a send that gets cut off.
+						//
+						// → GOTCHA: this must come BEFORE `close()`. Both orders work under Node, but
+						//   bun's `node:http` only honours it first — called after, the callback still
+						//   waits the full socket lifetime (measured: 1ms vs 2973ms). The two calls sit
+						//   in one tick, so nothing can connect between them.
+						server.closeAllConnections()
+						server.close((error) => {
+							// And bun's version takes the listener down with the connections, so the
+							// `close()` that follows finds nothing left to close. That is the outcome
+							// this asked for, not a failure to report.
+							if (error && (error as NodeJS.ErrnoException).code !== 'ERR_SERVER_NOT_RUNNING') {
+								failed(error)
+								return
+							}
+							closed()
+						})
 					})
 			})
 		})

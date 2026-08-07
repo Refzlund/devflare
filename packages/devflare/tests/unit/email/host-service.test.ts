@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test'
+import { connect } from 'node:net'
 import {
 	type OutboundEmailService,
 	startOutboundEmailService
@@ -86,5 +87,42 @@ describe('outbound email loopback service', () => {
 		await started.close()
 
 		await expect(fetch(url, { method: 'POST', body: '{}' })).rejects.toThrow()
+	})
+
+	test('a stalled request does not keep the listener from closing', async () => {
+		// Untracked: this test closes the service itself, and a second close would reject.
+		const started = await startOutboundEmailService(() => capture)
+
+		// A POST that announces more body than it sends. The handler is already awaiting
+		// `readBody`, so this is a connection mid-request rather than an idle keep-alive one —
+		// the shape `close()` on its own sits and waits out.
+		const stalled = connect(started.port, '127.0.0.1')
+		await new Promise<void>((opened) => stalled.once('connect', opened))
+		stalled.write(
+			[
+				`POST ${new URL(started.url).pathname} HTTP/1.1`,
+				'host: 127.0.0.1',
+				'content-type: application/json',
+				'content-length: 64',
+				'',
+				'{'
+			].join('\r\n')
+		)
+		await new Promise((settle) => setTimeout(settle, 20))
+
+		// The socket is cut loose on a clock because the defect does not FAIL the close, it
+		// delays it: measured rather than merely awaited, and bounded so a listener that
+		// waits the socket out turns the test red instead of hanging the run.
+		const releaseStalled = setTimeout(() => stalled.destroy(), 3000)
+
+		const startedAt = Date.now()
+		await started.close()
+		const closedInMs = Date.now() - startedAt
+
+		clearTimeout(releaseStalled)
+		stalled.destroy()
+
+		expect(closedInMs).toBeLessThan(1000)
+		await expect(fetch(started.url, { method: 'POST', body: '{}' })).rejects.toThrow()
 	})
 })
