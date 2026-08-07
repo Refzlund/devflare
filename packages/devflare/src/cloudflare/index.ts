@@ -438,6 +438,13 @@ export type {
 	SendingDomainDnsStatus
 } from './zone-resources'
 
+export { listEventSubscriptions, createEventSubscription } from './event-subscriptions'
+export type {
+	EventSubscription,
+	EventSubscriptionSource,
+	EventSubscriptionDestination
+} from './event-subscriptions'
+
 // -----------------------------------------------------------------------------
 // Error Exports
 // -----------------------------------------------------------------------------

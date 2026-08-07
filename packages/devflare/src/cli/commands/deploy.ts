@@ -175,7 +175,8 @@ export async function runDeployCommand(
 						// Already zone-qualified, so no prefix. Vectorize and Hyperdrive were simply MISSING from
 						// this list — both are resolve-only, so they can never appear in `created` and the omission
 						// was invisible; included now so the next resolve-only family does not inherit the gap.
-						...describeResult.created.zones
+						...describeResult.created.zones,
+						...describeResult.created.subscriptions
 					]
 					if (wouldCreate.length > 0) {
 						logLine(logger, dim(`Would create:\n  - ${wouldCreate.join('\n  - ')}`, theme))

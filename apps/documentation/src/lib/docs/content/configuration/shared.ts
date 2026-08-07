@@ -466,3 +466,25 @@ export default defineConfig({
 		}
 	}
 })`
+
+export const eventSubscriptionsCode = String.raw`import { defineConfig } from 'devflare/config'
+
+export default defineConfig({
+	name: 'docs-site',
+	bindings: {
+		// The subscription's destination. Declared here so the same deploy
+		// creates it first — a subscription cannot create its own queue.
+		queues: { EMAIL_EVENTS: { consumer: 'email-events' } }
+	},
+	eventSubscriptions: [
+		{
+			queue: 'email-events',
+			// Forwarded to Cloudflare verbatim. For a source whose request shape
+			// Cloudflare has not published, create one subscription by hand and
+			// copy the field names a deploy reads back for you.
+			source: { type: 'email.sending', zone_id: 'ZONE_ID', domain: 'example.com' },
+			// SHORT form. Not the cf.email.sending.* string that arrives on the queue.
+			events: ['message.delivered', 'message.bounced', 'message.complained']
+		}
+	]
+})`

@@ -24,6 +24,7 @@ import type {
 	TriggersConfigInput,
 	WsRouteConfigInput
 } from './schema-types-runtime'
+import type { EventSubscriptionsConfigInput } from './schema-types-subscriptions'
 import type { ZonesConfigInput } from './schema-types-zones'
 
 /**
@@ -174,6 +175,26 @@ export interface DevflareConfigInput {
 	 * ```
 	 */
 	zones?: ZonesConfigInput
+
+	/**
+	 * Queue event subscriptions — which platform's events Cloudflare should
+	 * publish onto which of your Queues, reconciled at deploy.
+	 *
+	 * Matched on the pair of (source, queue) rather than on name, so a
+	 * subscription created by hand in the dashboard is recognised rather than
+	 * duplicated. The queue must exist; declare it in `bindings.queues` and the
+	 * same deploy provisions it first.
+	 *
+	 * @default `undefined`
+	 *
+	 * @example
+	 * ```ts
+	 * eventSubscriptions: [
+	 *   { queue: 'email-events', source: { type: 'r2' }, events: ['bucket.created'] }
+	 * ]
+	 * ```
+	 */
+	eventSubscriptions?: EventSubscriptionsConfigInput
 
 	/**
 	 * Source file discovery for Worker handlers, Durable Objects, entrypoints,
@@ -550,6 +571,7 @@ export interface DevflareEnvConfigInput
 
 export type * from './schema-types-bindings'
 export type * from './schema-types-email'
+export type * from './schema-types-subscriptions'
 export type * from './schema-types-zones'
 export type * from './schema-types-build'
 export type * from './schema-types-runtime'

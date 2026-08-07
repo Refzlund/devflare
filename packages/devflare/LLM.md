@@ -3523,6 +3523,48 @@ export default defineConfig({
 })
 ```
 
+#### Subscribe a Queue to platform events in config
+
+`eventSubscriptions` declares which platform events Cloudflare should publish onto which of your Queues — R2 object writes, Workers Builds results, Email Sending delivery outcomes. The queue is named rather than identified, and Devflare resolves the id; declare the queue in `bindings.queues` and the same deploy provisions it first, because a subscription cannot create its own.
+
+They are matched on the pair of source and queue, never on name. A name is cosmetic, and a subscription created by hand in the dashboard will not carry the one Devflare would have written — matching on it would add a second subscription beside the working one, and both would deliver, doubling every event onto the queue. Nothing is deleted or updated: a subscription is a live delivery path, and changing which events it carries is a decision rather than a reconciliation.
+
+> **Warning — The `events` array takes the SHORT form**
+>
+> `message.delivered`, not the `cf.email.sending.message.delivered` that arrives ON the queue. The prefixed string is what a consumer reads off the message; a subscription that asks for it subscribes to nothing, and does so silently — no error, no events, and a queue that simply stays empty.
+
+> **Note — `source` is a passthrough, and that is deliberate**
+>
+> Cloudflare publishes eight source types in its API schema and ships ten in wrangler, and Email Sending — generally available and documented since July 2026 — appears in neither. A modelled union would therefore reject sources that work, so the object is forwarded verbatim instead.
+>
+> Which leaves the question of what to put in it for a source Cloudflare has not documented. Do not guess: the sample event payloads use camelCase while every verified request shape uses snake_case, so `zoneId` and `zone_id` are a coin flip that fails at deploy time. Create one subscription in the dashboard and deploy — when a declared subscription matches nothing, Devflare prints the source of every subscription the account already has, exactly as Cloudflare stores it. Copy those field names.
+
+##### Example — One queue, one source, the events between them
+
+```ts
+import { defineConfig } from 'devflare/config'
+
+export default defineConfig({
+	name: 'docs-site',
+	bindings: {
+		// The subscription's destination. Declared here so the same deploy
+		// creates it first \u2014 a subscription cannot create its own queue.
+		queues: { EMAIL_EVENTS: { consumer: 'email-events' } }
+	},
+	eventSubscriptions: [
+		{
+			queue: 'email-events',
+			// Forwarded to Cloudflare verbatim. For a source whose request shape
+			// Cloudflare has not published, create one subscription by hand and
+			// copy the field names a deploy reads back for you.
+			source: { type: 'email.sending', zone_id: 'ZONE_ID', domain: 'example.com' },
+			// SHORT form. Not the cf.email.sending.* string that arrives on the queue.
+			events: ['message.delivered', 'message.bounced', 'message.complained']
+		}
+	]
+})
+```
+
 #### Put release and operational controls in source control too
 
 Once a package has Durable Object history, production traffic expectations, or explicit preview behavior, the runtime contract is no longer just “what files exist?” It also includes how that package should be migrated, sampled, and limited at runtime.

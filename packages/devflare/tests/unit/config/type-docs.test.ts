@@ -19,7 +19,8 @@ const schemaTypesPaths = [
 	//   exists to give an author hover documentation; one nothing checks is the case where they get
 	//   none and nobody notices. Add every new `schema-types-*.ts` to this list in the same change.
 	'src/config/schema-types-email.ts',
-	'src/config/schema-types-zones.ts'
+	'src/config/schema-types-zones.ts',
+	'src/config/schema-types-subscriptions.ts'
 ].map((path) => resolve(devflareRoot, path))
 
 const fixtureSource = `

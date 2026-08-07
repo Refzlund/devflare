@@ -144,6 +144,7 @@ The most important top-level keys are:
 - `containers`
 - `email`
 - `env`
+- `eventSubscriptions`
 - `files`
 - `findAdditionalModules`
 - `keepVars`

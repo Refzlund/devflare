@@ -17,6 +17,7 @@ import {
 	listR2Buckets,
 	listVectorizeIndexes
 } from '../cloudflare/account'
+import { createEventSubscription, listEventSubscriptions } from '../cloudflare/event-subscriptions'
 import { getEffectiveAccountId } from '../cloudflare/preferences'
 import {
 	createDnsRecord,
@@ -45,6 +46,7 @@ import {
 	normalizeKVNameBinding,
 	withResolvedIdBindings
 } from './binding-resolution-helpers'
+import { type SubscriptionProvisionApi, provisionEventSubscriptions } from './deploy-subscriptions'
 import { type ZoneProvisionApi, provisionZoneResources } from './deploy-zones'
 import type { PreviewResolutionOptions } from './preview'
 import { type DeployConfig, brandAsDeployConfig, resolveResources } from './resolve-phased'
@@ -85,6 +87,8 @@ interface DeployResourcePreparationApi {
 	listSendingDomains: ZoneProvisionApi['listSendingDomains']
 	createSendingDomain: ZoneProvisionApi['createSendingDomain']
 	getSendingDomainDnsStatus: ZoneProvisionApi['getSendingDomainDnsStatus']
+	listEventSubscriptions: SubscriptionProvisionApi['listEventSubscriptions']
+	createEventSubscription: SubscriptionProvisionApi['createEventSubscription']
 }
 
 const defaultDeployResourcePreparationApi: DeployResourcePreparationApi = {
@@ -112,7 +116,9 @@ const defaultDeployResourcePreparationApi: DeployResourcePreparationApi = {
 	updateDnsRecord,
 	listSendingDomains,
 	createSendingDomain,
-	getSendingDomainDnsStatus
+	getSendingDomainDnsStatus,
+	listEventSubscriptions,
+	createEventSubscription
 }
 
 export interface DeployResourceNames {
@@ -129,6 +135,8 @@ export interface DeployResourceNames {
 	 * zone it lives in, so each entry already carries it (`Email rule support@x (zone x)`).
 	 */
 	zones: string[]
+	/** Event-subscription labels, already naming their source and queue. */
+	subscriptions: string[]
 }
 
 export interface PrepareConfigResourcesForDeployOptions {
@@ -146,8 +154,9 @@ export interface PrepareMaterializedConfigResourcesForDeployOptions {
 	/**
 	 * Which environment is deploying, when one was named.
 	 *
-	 * Only `'preview'` changes anything here, and only for zone resources: they belong to a whole
-	 * domain and have no branch-scoped form, so a preview must not provision them. Everything else is
+	 * Only `'preview'` changes anything here, and only for the two families that have no branch-scoped
+	 * form: zone resources belong to a whole domain, and an event subscription is account-wide. Both
+	 * would outlive the branch that made them, so a preview provisions neither. Everything else is
 	 * already preview-scoped before it reaches this function.
 	 */
 	environment?: string
@@ -183,7 +192,8 @@ function createEmptyDeployResourceNames(): DeployResourceNames {
 		queues: [],
 		vectorize: [],
 		hyperdrive: [],
-		zones: []
+		zones: [],
+		subscriptions: []
 	}
 }
 
@@ -209,6 +219,7 @@ function decorateOrphanError(err: unknown, created: DeployResourceNames): Error 
 	// Pushed WITHOUT a family prefix, because each label already names its own zone — a line reading
 	// `Zones: Email rule support@example.com (zone example.com)` would say it twice.
 	for (const zoneChange of created.zones) summaryParts.push(zoneChange)
+	for (const subscription of created.subscriptions) summaryParts.push(subscription)
 
 	const base = err instanceof Error ? err : new Error(String(err))
 	if (summaryParts.length === 0) return base
@@ -478,6 +489,11 @@ export async function prepareMaterializedConfigResourcesForDeploy(
 	//   behind when the branch was deleted. The guard is here rather than in the reconciler because
 	//   this is the only layer that knows which environment is deploying.
 	const isPreviewEnvironment = options.environment === 'preview'
+	// Same trap, same reason: a config whose only provisioning is an event subscription must not fall
+	// through the shortcuts below. This is the second time it has bitten — the guards enumerate what
+	// they know about, so anything ADDED to the provisioning sequence has to be added here too.
+	const hasSubscriptionWork =
+		!isPreviewEnvironment && (resolvedConfig.eventSubscriptions?.length ?? 0) > 0
 	const hasZoneWork =
 		!isPreviewEnvironment &&
 		Object.values(resolvedConfig.zones ?? {}).some(
@@ -492,7 +508,8 @@ export async function prepareMaterializedConfigResourcesForDeploy(
 		r2Names.length === 0 &&
 		queueNames.length === 0 &&
 		vectorizeNames.length === 0 &&
-		!hasZoneWork
+		!hasZoneWork &&
+		!hasSubscriptionWork
 	) {
 		return {
 			config: brandAsDeployConfig(resolvedConfig),
@@ -516,7 +533,8 @@ export async function prepareMaterializedConfigResourcesForDeploy(
 		r2Names.length === 0 &&
 		queueNames.length === 0 &&
 		vectorizeNames.length === 0 &&
-		!hasZoneWork
+		!hasZoneWork &&
+		!hasSubscriptionWork
 	) {
 		return {
 			config: brandAsDeployConfig(
@@ -581,6 +599,7 @@ export async function prepareMaterializedConfigResourcesForDeploy(
 			name,
 			enabled: true
 		})
+		cloudflareApi.createEventSubscription = async (_accountId: string, subscription) => subscription
 	}
 
 	// C13 — sequential provisioning leaves silent orphans. We do not
@@ -693,6 +712,18 @@ export async function prepareMaterializedConfigResourcesForDeploy(
 				existing: existing.zones,
 				warnings
 			})
+		}
+
+		// After the queues above, because a subscription's destination must already exist — Cloudflare
+		// requires a `queue_id` and offers no create-if-missing. Preview-exempt for the same reason
+		// zones are: a subscription is account-scoped and would outlive the branch that made it.
+		if (hasSubscriptionWork) {
+			await provisionEventSubscriptions(
+				resolvedConfig.eventSubscriptions,
+				accountId,
+				cloudflareApi,
+				{ created: created.subscriptions, existing: existing.subscriptions, warnings }
+			)
 		}
 
 		const config = withResolvedIdBindings(resolvedConfig, {

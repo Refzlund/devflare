@@ -39,6 +39,7 @@ import {
 	wranglerConfigSchema,
 	wsRouteConfigSchema
 } from './schema-runtime'
+import { eventSubscriptionsConfigSchema } from './schema-subscriptions'
 import { zonesConfigSchema } from './schema-zones'
 
 /** Helper to get current date in YYYY-MM-DD format */
@@ -146,6 +147,9 @@ export const rootConfigShape = {
 
 	/** Zone-scoped resources — Email Routing rules and DNS records, keyed by domain. */
 	zones: zonesConfigSchema,
+
+	/** Queue event subscriptions — which platform events Cloudflare publishes onto which Queue. */
+	eventSubscriptions: eventSubscriptionsConfigSchema,
 
 	/** File handlers configuration. */
 	files: filesSchema,

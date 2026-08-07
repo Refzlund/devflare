@@ -3,6 +3,7 @@ import {
 	customDomainRouteCode,
 	docsLink,
 	environmentOverlayCode,
+	eventSubscriptionsCode,
 	fullConfigExampleCode,
 	generatedTypesOutputCode,
 	previewBindingsConfigCode,
@@ -286,6 +287,38 @@ export const configurationDocsPart3: DocPage[] = [
 						title: '`--dry-run` reads the live zone but changes nothing in it',
 						body: [
 							'Every zone mutation is substituted in describe-only mode, enabling included, while the reads still happen for real — so the plan reflects the actual mix of what exists and what does not, without a single write. Preview-scoped deploys have no zone resources at all: a rule or a record is shared by the whole domain and would outlive the branch that created it.'
+						]
+					}
+				]
+			},
+			{
+				id: 'event-subscriptions',
+				title: 'Subscribe a Queue to platform events in config',
+				paragraphs: [
+					'`eventSubscriptions` declares which platform events Cloudflare should publish onto which of your Queues — R2 object writes, Workers Builds results, Email Sending delivery outcomes. The queue is named rather than identified, and Devflare resolves the id; declare the queue in `bindings.queues` and the same deploy provisions it first, because a subscription cannot create its own.',
+					'They are matched on the pair of source and queue, never on name. A name is cosmetic, and a subscription created by hand in the dashboard will not carry the one Devflare would have written — matching on it would add a second subscription beside the working one, and both would deliver, doubling every event onto the queue. Nothing is deleted or updated: a subscription is a live delivery path, and changing which events it carries is a decision rather than a reconciliation.'
+				],
+				snippets: [
+					{
+						title: 'One queue, one source, the events between them',
+						language: 'ts',
+						code: eventSubscriptionsCode
+					}
+				],
+				callouts: [
+					{
+						tone: 'warning',
+						title: 'The `events` array takes the SHORT form',
+						body: [
+							'`message.delivered`, not the `cf.email.sending.message.delivered` that arrives ON the queue. The prefixed string is what a consumer reads off the message; a subscription that asks for it subscribes to nothing, and does so silently — no error, no events, and a queue that simply stays empty.'
+						]
+					},
+					{
+						tone: 'info',
+						title: '`source` is a passthrough, and that is deliberate',
+						body: [
+							'Cloudflare publishes eight source types in its API schema and ships ten in wrangler, and Email Sending — generally available and documented since July 2026 — appears in neither. A modelled union would therefore reject sources that work, so the object is forwarded verbatim instead.',
+							'Which leaves the question of what to put in it for a source Cloudflare has not documented. Do not guess: the sample event payloads use camelCase while every verified request shape uses snake_case, so `zoneId` and `zone_id` are a coin flip that fails at deploy time. Create one subscription in the dashboard and deploy — when a declared subscription matches nothing, Devflare prints the source of every subscription the account already has, exactly as Cloudflare stores it. Copy those field names.'
 						]
 					}
 				]

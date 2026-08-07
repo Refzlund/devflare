@@ -38,12 +38,16 @@ export interface PreparedDeployConfigResult {
 /**
  * What this summary can count.
  *
- * `zones` is OPTIONAL because preview-scoped resources deliberately have none: a preview branch
- * must not mint Email Routing rules or DNS records on a real zone, since those are shared by the
- * whole domain and would outlive the branch that created them. So the same summary serves both,
- * and the preview shape stays honest about not having them rather than carrying an empty array.
+ * `zones` and `subscriptions` are OPTIONAL because preview-scoped resources deliberately have
+ * neither: a preview branch must not mint Email Routing rules, DNS records or event subscriptions,
+ * since all of those are shared beyond the branch and would outlive it. So the same summary serves
+ * both shapes, and the preview one stays honest about not having them rather than carrying two
+ * empty arrays that imply it could.
  */
-type SummarizableResourceNames = Omit<DeployResourceNames, 'zones'> & { zones?: string[] }
+type SummarizableResourceNames = Omit<DeployResourceNames, 'zones' | 'subscriptions'> & {
+	zones?: string[]
+	subscriptions?: string[]
+}
 
 export function summarizeDeployResourceNames(resources: SummarizableResourceNames): string | null {
 	const segments = [
@@ -53,7 +57,10 @@ export function summarizeDeployResourceNames(resources: SummarizableResourceName
 		resources.queues.length > 0 ? `Queues ${resources.queues.length}` : null,
 		resources.vectorize.length > 0 ? `Vectorize ${resources.vectorize.length}` : null,
 		resources.hyperdrive.length > 0 ? `Hyperdrive ${resources.hyperdrive.length}` : null,
-		resources.zones && resources.zones.length > 0 ? `Zones ${resources.zones.length}` : null
+		resources.zones && resources.zones.length > 0 ? `Zones ${resources.zones.length}` : null,
+		resources.subscriptions && resources.subscriptions.length > 0
+			? `Subscriptions ${resources.subscriptions.length}`
+			: null
 	].filter((segment): segment is string => segment !== null)
 
 	return segments.length > 0 ? segments.join(' · ') : null
