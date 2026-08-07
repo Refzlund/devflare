@@ -66,6 +66,7 @@
     "devflare-persist-dir-env",
     "do-bundle-inline-dynamic-imports-warning",
     "docs-contract-honesty",
+    "email-host-service-close-drops-sockets",
     "email-outbox-relay-inbound",
     "email-routing-destination-addresses",
     "env-absent-in-dev-and-public-tier",
