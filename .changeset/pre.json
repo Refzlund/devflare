@@ -29,6 +29,7 @@
     "devflare": "1.0.0-next.27"
   },
   "changesets": [
+    "absent-in-dev-honours-a-real-value",
     "bridge-app-route-websocket-forward",
     "bridge-do-rpc-native-dispatch",
     "bridge-do-websocket-fix",
@@ -82,6 +83,7 @@
     "test-context-do-bundle-cache",
     "typescript-runtime-dep",
     "workspace-durable-object-name-fix",
-    "workspace-shared-bindings-dev"
+    "workspace-shared-bindings-dev",
+    "zone-scoped-email-routing-and-dns"
   ]
 }
