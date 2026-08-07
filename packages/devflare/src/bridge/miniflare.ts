@@ -23,6 +23,7 @@ import {
 } from '../config'
 import { applyLocalDevVarsToConfig } from '../config/local-dev-vars'
 import {
+	buildRateLimitsConfig,
 	buildStreamingTailConsumersConfig,
 	buildTailConsumersConfig
 } from '../dev-server/miniflare-bindings'
@@ -103,8 +104,12 @@ export interface MiniflareOptions {
 	d1Databases?: string[] | Record<string, string>
 	/** Queue bindings */
 	queues?: string[]
-	/** Rate Limiting bindings */
-	rateLimits?: Record<string, { simple: { limit: number; period: 10 | 60 } }>
+	/**
+	 * Rate Limiting bindings, already in Miniflare's snake_case shape.
+	 * `namespace_id` is required — Miniflare keys its counters by the
+	 * namespace, not by the binding name, and rejects the option without it.
+	 */
+	rateLimits?: Record<string, { namespace_id: string; simple: { limit: number; period: 10 | 60 } }>
 	/** Version Metadata binding name */
 	versionMetadata?: string
 	/** Worker Loader bindings */
@@ -750,19 +755,7 @@ export async function startMiniflareFromConfig(
 				)
 			: undefined,
 		queues: bindings.queues?.consumers?.map((c) => c.queue),
-		rateLimits: bindings.rateLimits
-			? Object.fromEntries(
-					Object.entries(bindings.rateLimits).map(([bindingName, binding]) => [
-						bindingName,
-						{
-							simple: {
-								limit: binding.simple.limit,
-								period: binding.simple.period
-							}
-						}
-					])
-				)
-			: undefined,
+		rateLimits: buildRateLimitsConfig(bindings),
 		versionMetadata: bindings.versionMetadata?.binding,
 		workerLoaders: bindings.workerLoaders
 			? Object.fromEntries(

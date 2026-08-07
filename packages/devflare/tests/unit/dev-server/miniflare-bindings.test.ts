@@ -8,6 +8,7 @@ import {
 	buildHyperdrivesConfig,
 	buildMtlsCertificatesConfig,
 	buildQueueProducers,
+	buildRateLimitsConfig,
 	buildSendEmailConfig,
 	buildStreamConfig,
 	buildStreamingTailConsumersConfig,
@@ -225,6 +226,45 @@ describe('buildQueueProducers', () => {
 			JOBS: { queueName: 'jobs-queue', deliveryDelay: 60 },
 			MAIL: { queueName: 'mail-queue' }
 		})
+	})
+})
+
+describe('buildRateLimitsConfig', () => {
+	// Dropping namespace_id does not degrade — Miniflare has required it since
+	// 4.20260730.0 and aborts the whole boot ("Unexpected options passed to new
+	// Miniflare() constructor") when it is missing, so every other binding in
+	// the session goes down with it.
+	test('carries the authored namespaceId onto the Miniflare ratelimits designator', () => {
+		const bindings = {
+			rateLimits: {
+				AUTH_IP_LIMIT: { namespaceId: '1001', simple: { limit: 100, period: 60 } },
+				AUTH_ADDRESS_LIMIT: { namespaceId: '1002', simple: { limit: 5, period: 10 } }
+			}
+		} as unknown as Bindings
+
+		expect(buildRateLimitsConfig(bindings)).toEqual({
+			AUTH_IP_LIMIT: { namespace_id: '1001', simple: { limit: 100, period: 60 } },
+			AUTH_ADDRESS_LIMIT: { namespace_id: '1002', simple: { limit: 5, period: 10 } }
+		})
+	})
+
+	// Counters are keyed by namespace, not by binding name, so two bindings on
+	// one namespace must arrive at Miniflare sharing an identifier.
+	test('keeps two bindings on a shared namespace pointing at the same namespace_id', () => {
+		const bindings = {
+			rateLimits: {
+				READ_LIMIT: { namespaceId: '2001', simple: { limit: 50, period: 60 } },
+				WRITE_LIMIT: { namespaceId: '2001', simple: { limit: 50, period: 60 } }
+			}
+		} as unknown as Bindings
+
+		const result = buildRateLimitsConfig(bindings)
+		expect(result?.READ_LIMIT.namespace_id).toBe('2001')
+		expect(result?.WRITE_LIMIT.namespace_id).toBe('2001')
+	})
+
+	test('returns undefined when no Rate Limiting binding is configured', () => {
+		expect(buildRateLimitsConfig({} as unknown as Bindings)).toBeUndefined()
 	})
 })
 

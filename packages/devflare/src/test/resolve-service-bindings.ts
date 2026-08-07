@@ -153,7 +153,7 @@ export interface ResolvedWorker {
 	serviceBindings?: Record<string, { name: string; entrypoint?: string }>
 	/** Durable Object bindings for classes hosted by this worker or another script */
 	durableObjects?: Record<string, string | { className: string; scriptName: string }>
-	ratelimits?: Record<string, { simple: { limit: number; period: 10 | 60 } }>
+	ratelimits?: Record<string, { namespace_id: string; simple: { limit: number; period: 10 | 60 } }>
 	versionMetadata?: string
 	workerLoaders?: Record<string, Record<string, never>>
 	mtlsCertificates?: Record<string, { certificate_id: string }>

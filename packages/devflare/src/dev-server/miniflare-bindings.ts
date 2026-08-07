@@ -66,9 +66,31 @@ export function buildQueueConsumers(
 	return consumers
 }
 
+/**
+ * Translate `bindings.rateLimits` into Miniflare's per-worker `ratelimits`
+ * option.
+ *
+ * `namespace_id` carries the authored `namespaceId` through and is NOT
+ * optional: Miniflare keys its rate-limit counters by the namespace rather
+ * than by the binding name, so two bindings pointing at the same namespace
+ * share one limit while the same binding name pointing at different
+ * namespaces stays isolated. Miniflare has required the field since
+ * 4.20260730.0 and drops it silently on older releases, so emitting it is
+ * both correct and safe across the whole supported range.
+ *
+ * → GOTCHA: omitting it does not degrade — it aborts the whole Miniflare
+ *   boot with "Unexpected options passed to new Miniflare() constructor",
+ *   taking down every other binding in the session with it.
+ *
+ * @param bindings - The authored `bindings` block; `rateLimits` is optional.
+ * @returns Miniflare's `ratelimits` record, or `undefined` when none are
+ *   declared (so the caller can omit the key entirely).
+ */
 export function buildRateLimitsConfig(
 	bindings: Bindings
-): Record<string, { simple: { limit: number; period: 10 | 60 } }> | undefined {
+):
+	| Record<string, { namespace_id: string; simple: { limit: number; period: 10 | 60 } }>
+	| undefined {
 	if (!bindings.rateLimits) {
 		return undefined
 	}
@@ -77,6 +99,7 @@ export function buildRateLimitsConfig(
 		Object.entries(bindings.rateLimits).map(([name, binding]) => [
 			name,
 			{
+				namespace_id: binding.namespaceId,
 				simple: {
 					limit: binding.simple.limit,
 					period: binding.simple.period

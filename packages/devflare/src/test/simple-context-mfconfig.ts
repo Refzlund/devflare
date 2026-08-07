@@ -24,6 +24,7 @@ import type { DevflareConfig } from '../config'
 import {
 	buildAnalyticsEngineConfig,
 	buildHyperdrivesConfig,
+	buildRateLimitsConfig,
 	buildStreamingTailConsumersConfig,
 	buildTailConsumersConfig
 } from '../dev-server/miniflare-bindings'
@@ -101,18 +102,9 @@ export function buildInlineBridgeMfConfig(
 		mfConfig.queueProducers = queueProducers
 	}
 
-	if (config.bindings?.rateLimits) {
-		mfConfig.ratelimits = Object.fromEntries(
-			Object.entries(config.bindings.rateLimits).map(([bindingName, binding]) => [
-				bindingName,
-				{
-					simple: {
-						limit: binding.simple.limit,
-						period: binding.simple.period
-					}
-				}
-			])
-		)
+	const rateLimits = buildRateLimitsConfig(config.bindings ?? {})
+	if (rateLimits) {
+		mfConfig.ratelimits = rateLimits
 	}
 
 	if (config.bindings?.versionMetadata) {

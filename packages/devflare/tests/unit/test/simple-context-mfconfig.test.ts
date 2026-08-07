@@ -40,6 +40,7 @@ describe('buildInlineBridgeMfConfig', () => {
 
 		expect(mfConfig.ratelimits).toEqual({
 			MY_RATE_LIMITER: {
+				namespace_id: '1001',
 				simple: {
 					limit: 100,
 					period: 60
