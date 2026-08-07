@@ -2993,7 +2993,7 @@ Devflare vars can now be a typed bridge from local `.env` files into Worker runt
 | --- | --- |
 | Config import | `import { defineConfig, env } from 'devflare/config'` |
 | Runtime import | `import { vars } from 'devflare'` |
-| File order | Parents first, then closer directories; `.env.dev` first, `.env` last |
+| File order | Parents first, then closer directories; `.env.public`, `.env.dev`, `.env` |
 | Missing build vars | Build fails with a nested missing-variable report |
 
 #### Declare the runtime shape in config
@@ -3048,13 +3048,19 @@ export default {
 
 #### Let Devflare parse `.env` files itself
 
-Devflare reads `.env.dev` and `.env` from the config directory and every parent directory. Parent files load first, then closer files override them. Within one directory, `.env.dev` loads first and `.env` wins last.
+Devflare reads `.env.public`, `.env.dev` and `.env` from the config directory and every parent directory. Parent files load first, then closer files override them. Within one directory the order is `.env.public`, then `.env.dev`, then `.env`, so a developer file always wins over one the repository ships.
+
+`.env.public` is the tier meant to be committed. Every other env file is conventionally git-ignored, which leaves values that are genuinely not secrets — a sender address, a support forwarding target, a public API origin — with nowhere to live but a deploy dashboard. It is deliberately the weakest tier so a committed default can never override the machine it runs on.
 
 The parser does not expand `$OTHER_VARIABLE` references. Values such as passwords, MongoDB connection strings, and shell-looking fragments are read as written instead of being interpreted by Bun.
 
 > **Note — Process env still wins over files**
 >
 > CI-provided environment variables and explicit shell exports override `.env` file values. Dotenv files fill in missing process variables; they do not stomp values the process already had.
+
+> **Warning — `.env.public` is a promise you keep, not one Devflare checks**
+>
+> Anything committed to `.env.public` is in version-control history permanently. Devflare cannot tell a sender address from an SMTP URL with a password in it, so nothing validates the name — treat it as documentation of intent, and keep secrets in `.env` or `.env.dev`.
 
 ##### Example — The later `.env` value overrides the earlier `.env.dev` value
 
@@ -3100,10 +3106,15 @@ These environment variables are missing:
 | `.parse(fn)` / `.parser(fn)` | Transform the string from env files into a typed runtime value. | `env.RETRIES.parse(Number)` |
 | `.default(value)` | Use a fallback in every mode when the env value is missing. | `env.APP_MODE.default('local')` |
 | `.dev(value)` | Use a fallback only in dev when the env value is missing. | `env.MOCK_TENANT_ID.dev(123)` |
+| `.absentInDev()` | Required for a build, omitted entirely in dev. | `env.EMAIL_FROM.absentInDev()` |
 
 > **Warning — Dev-only defaults are still required in build**
 >
 > `.dev(value)` is intentionally local-only. If the same variable may be missing in build too, use `.default(value)` or `.optional()` instead.
+
+> **Note — `.absentInDev()` is the third answer, not a synonym for the other two**
+>
+> Some variables a deployment must have are ones a developer must not. A sender address is the clearest case: with none set, code that shape-checks its environment takes its cannot-send path, which is how local development returns a sign-in code instead of mailing one. `.optional()` would let a production build ship without it, and `.dev(value)` would hand every laptop a placeholder it then believes. `.absentInDev()` fails the build and omits the key locally, and the inferred type is optional because in dev it genuinely is.
 
 ---
 

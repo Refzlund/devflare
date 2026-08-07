@@ -182,3 +182,135 @@ describe('resolveConfigEnvVars', () => {
 		}
 	})
 })
+
+describe('.env.public — the committed tier', () => {
+	test('is read like any other env file', async () => {
+		const cwd = makeTempProject()
+		writeProjectFile(cwd, '.env.public', 'EMAIL_FROM=no-reply@example.test')
+
+		const loaded = await loadDevflareDotenv(cwd)
+
+		expect(loaded.values.EMAIL_FROM).toBe('no-reply@example.test')
+	})
+
+	test('LOSES to both of a developer own files in the same directory', async () => {
+		// The whole reason it is a separate tier. A value the repository ships is a default, and a default
+		// that overrode the machine it is running on would be worse than no default at all.
+		const cwd = makeTempProject()
+		writeProjectFile(cwd, '.env.public', ['A=public', 'B=public', 'C=public'].join('\n'))
+		writeProjectFile(cwd, '.env.dev', ['B=dev', 'C=dev'].join('\n'))
+		writeProjectFile(cwd, '.env', 'C=env')
+
+		const loaded = await loadDevflareDotenv(cwd)
+
+		expect(loaded.values).toMatchObject({ A: 'public', B: 'dev', C: 'env' })
+	})
+
+	test('a CLOSER .env.public still beats a parent .env', async () => {
+		// Directory proximity outranks file tier — the same rule the other two files already follow. Worth
+		// pinning because the two orderings compose, and "the weakest tier" could be read as weakest overall.
+		const root = makeTempProject()
+		const app = join(root, 'apps', 'site')
+		mkdirSync(app, { recursive: true })
+		writeProjectFile(root, '.env', 'WHICH=root-env')
+		writeProjectFile(app, '.env.public', 'WHICH=app-public')
+
+		const loaded = await loadDevflareDotenv(app)
+
+		expect(loaded.values.WHICH).toBe('app-public')
+	})
+})
+
+describe('.absentInDev() — required to build, absent to develop', () => {
+	/** A config with one `.absentInDev()` var, so each mode can be asked about the same shape. */
+	function senderConfig() {
+		return defineConfig({
+			name: 'env-worker',
+			compatibilityDate: '2026-05-01',
+			vars: { EMAIL_FROM: env.EMAIL_FROM.absentInDev() }
+		})
+	}
+
+	test('a BUILD with the variable missing fails, naming it', async () => {
+		// The point of the whole descriptor. `.optional()` would have shipped this deploy silently.
+		const cwd = makeTempProject()
+
+		const failure = resolveConfigEnvVars(senderConfig(), {
+			cwd,
+			configPath: join(cwd, 'devflare.config.ts'),
+			mode: 'build'
+		})
+
+		await expect(failure).rejects.toThrow(EnvVarResolutionError)
+		await failure.catch((error: unknown) => {
+			expect((error as EnvVarResolutionError).missing).toEqual([
+				{ path: ['EMAIL_FROM'], name: 'EMAIL_FROM' }
+			])
+		})
+	})
+
+	test('a BUILD with the variable set emits it', async () => {
+		const cwd = makeTempProject()
+		writeProjectFile(cwd, '.env', 'EMAIL_FROM=no-reply@example.test')
+
+		const resolved = await resolveConfigEnvVars(senderConfig(), {
+			cwd,
+			configPath: join(cwd, 'devflare.config.ts'),
+			mode: 'build'
+		})
+
+		expect(resolved.vars).toEqual({ EMAIL_FROM: 'no-reply@example.test' })
+	})
+
+	test('a DEV run with it missing omits the KEY, rather than emitting undefined', async () => {
+		// `Object.hasOwn`, not a truthiness or undefined check: a key present-and-undefined is a different
+		// thing from an absent one to any consumer that shape-checks its environment, which is exactly the
+		// kind of consumer this descriptor exists for.
+		const cwd = makeTempProject()
+
+		const resolved = await resolveConfigEnvVars(senderConfig(), {
+			cwd,
+			configPath: join(cwd, 'devflare.config.ts'),
+			mode: 'dev'
+		})
+
+		expect(Object.hasOwn(resolved.vars ?? {}, 'EMAIL_FROM')).toBe(false)
+	})
+
+	test('a DEV run with it SET still uses it', async () => {
+		// Absent by default is not the same as forbidden. A developer who deliberately points their machine
+		// at a real sender must be able to.
+		const cwd = makeTempProject()
+		writeProjectFile(cwd, '.env', 'EMAIL_FROM=me@example.test')
+
+		const resolved = await resolveConfigEnvVars(senderConfig(), {
+			cwd,
+			configPath: join(cwd, 'devflare.config.ts'),
+			mode: 'dev'
+		})
+
+		expect(resolved.vars).toEqual({ EMAIL_FROM: 'me@example.test' })
+	})
+
+	test('an explicit .dev() value wins over it, and .default() does not', async () => {
+		// Both combinations are contradictory, so the resolution order decides rather than the author. The
+		// one that NAMES dev mode wins in dev mode; a whole-mode default loses to it.
+		const cwd = makeTempProject()
+		const config = defineConfig({
+			name: 'env-worker',
+			compatibilityDate: '2026-05-01',
+			vars: {
+				withDevValue: env.WITH_DEV.absentInDev().dev('dev-value'),
+				withDefault: env.WITH_DEFAULT.default('fallback').absentInDev()
+			}
+		})
+
+		const resolved = await resolveConfigEnvVars(config, {
+			cwd,
+			configPath: join(cwd, 'devflare.config.ts'),
+			mode: 'dev'
+		})
+
+		expect(resolved.vars).toEqual({ withDevValue: 'dev-value' })
+	})
+})

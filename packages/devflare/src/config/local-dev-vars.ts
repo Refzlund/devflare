@@ -91,6 +91,11 @@ async function loadWranglerCompatibleLocalVars(
 		return devVars
 	}
 
+	// → NOTE: deliberately NOT the same list as `env-vars.ts`'s, and it must not be kept in step with it.
+	//   This one exists to be WRANGLER-COMPATIBLE — these are the files wrangler itself reads for local
+	//   secrets, in wrangler's order. `env-vars.ts` reads `.env.public`/`.env.dev`/`.env` for config-time
+	//   `env.NAME` descriptors, which is Devflare's own mechanism. Adding `.env.public` here would break the
+	//   compatibility this function is named for, since wrangler has no such file.
 	const envFiles = [
 		'.env',
 		'.env.local',

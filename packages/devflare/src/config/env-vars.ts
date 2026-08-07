@@ -26,6 +26,7 @@ export interface EnvVarDescriptorState<TValue = string, TOptional extends boolea
 	hasDefault: boolean
 	devValue?: TValue
 	hasDevDefault: boolean
+	absentInDev: boolean
 }
 
 /**
@@ -105,13 +106,42 @@ export interface EnvVarDescriptor<TValue = string, TOptional extends boolean = f
 	 * ```
 	 */
 	dev<TDev>(value: TDev): EnvVarDescriptor<TValue | TDev, TOptional>
+
+	/**
+	 * Omit this variable entirely in dev mode, while keeping it REQUIRED in build
+	 * mode. A missing value fails a build; in dev the key is simply not emitted.
+	 *
+	 * This is the third answer to "what if it is missing", and it exists because
+	 * the other two are both wrong for a class of variable that a deployment must
+	 * have and a developer must NOT: `.optional()` allows it to be missing in a
+	 * production build too, and `.dev(value)` hands the local runtime a value.
+	 *
+	 * The motivating case is a sender address. A worker with no sender is the
+	 * intended local state — code that shape-checks the environment finds nothing
+	 * and takes its "cannot send" path, which is how local development gets a
+	 * sign-in code in the response instead of an email nobody will read. Give it a
+	 * placeholder and every laptop starts believing it can send. Let it be
+	 * `.optional()` and a production deploy that forgot it ships silently broken.
+	 *
+	 * The inferred type is OPTIONAL, because a dev runtime genuinely may not have
+	 * the key — code reading it must handle that, which is the point.
+	 *
+	 * @example
+	 * ```ts
+	 * vars: {
+	 *   EMAIL_FROM: env.EMAIL_FROM.absentInDev()
+	 * }
+	 * ```
+	 */
+	absentInDev(): EnvVarDescriptor<TValue, true>
 }
 
 /**
  * One value allowed under `defineConfig({ vars })`.
  *
  * Use literals for values that are already known, or `env.NAME` descriptors
- * for values loaded from `.env`, `.env.dev`, or `process.env`.
+ * for values loaded from Devflare-discovered env files (`.env.public`, `.env.dev`, `.env`) or from
+ * `process.env`.
  *
  * @example
  * ```ts
@@ -218,6 +248,16 @@ function createDescriptor<TValue, TOptional extends boolean>(
 				devValue: value,
 				hasDevDefault: true
 			} as unknown as EnvVarDescriptorState<TValue | TDev, TOptional>)
+		},
+		absentInDev() {
+			// `optional` stays FALSE on the state while the TYPE parameter flips to true, and the split is the
+			// whole feature. The state drives resolution, where this must still be required in a build; the
+			// type parameter drives the generated `env.d.ts`, where the key must read as possibly-absent
+			// because in dev it genuinely is.
+			return createDescriptor({
+				...state,
+				absentInDev: true
+			} as unknown as EnvVarDescriptorState<TValue, true>)
 		}
 	}
 
@@ -229,7 +269,8 @@ function createEnvVarDescriptor(name: string): EnvVarDescriptor<string, false> {
 		name,
 		optional: false,
 		hasDefault: false,
-		hasDevDefault: false
+		hasDevDefault: false,
+		absentInDev: false
 	})
 }
 
@@ -368,11 +409,33 @@ function collectAncestorDirectories(startDir: string): string[] {
 }
 
 /**
- * Return `.env.dev` and `.env` candidate paths from the filesystem root to a
- * project directory.
+ * The env files Devflare reads in one directory, LOWEST precedence first.
+ *
+ * `.env.public` is the tier meant to be COMMITTED. Every other env file here is
+ * conventionally git-ignored, which leaves a value that is genuinely not a
+ * secret — a sender address, a support forwarding target, a public API origin —
+ * with nowhere to live but a deploy dashboard or a hand-rolled spread in the
+ * config. Both of those hide it from the reader who needs it most: the next
+ * person setting the project up.
+ *
+ * It is deliberately the WEAKEST tier, so a developer's own `.env.dev` or `.env`
+ * always wins over a committed default rather than the other way round.
+ *
+ * → GOTCHA: the name is a warning, not a category. Anything in `.env.public` is
+ *   in git history permanently. Devflare cannot tell a sender address from an
+ *   SMTP url with a password in it, so nothing here validates that promise —
+ *   the filename is the only thing standing between a convenience and a leak.
+ */
+const DOTENV_FILES_LOWEST_FIRST = ['.env.public', '.env.dev', '.env'] as const
+
+/**
+ * Return `.env.public`, `.env.dev` and `.env` candidate paths from the
+ * filesystem root to a project directory.
  *
  * Paths are ordered in the same precedence order as loading: parent files
- * first, then closer files, with `.env` after `.env.dev` for each directory.
+ * first, then closer files, and within each directory the order of
+ * {@link DOTENV_FILES_LOWEST_FIRST} — committed defaults, then a developer's
+ * dev file, then their `.env`.
  *
  * @example
  * ```ts
@@ -380,15 +443,14 @@ function collectAncestorDirectories(startDir: string): string[] {
  * ```
  */
 export function getDevflareDotenvPaths(startDir: string): string[] {
-	return collectAncestorDirectories(startDir).flatMap((directory) => [
-		resolve(directory, '.env.dev'),
-		resolve(directory, '.env')
-	])
+	return collectAncestorDirectories(startDir).flatMap((directory) =>
+		DOTENV_FILES_LOWEST_FIRST.map((file) => resolve(directory, file))
+	)
 }
 
 export interface LoadDevflareDotenvResult {
 	/**
-	 * Merged values from all discovered `.env.dev` and `.env` files.
+	 * Merged values from every discovered `.env.public`, `.env.dev` and `.env` file.
 	 *
 	 * @default {}
 	 */
@@ -403,10 +465,12 @@ export interface LoadDevflareDotenvResult {
 }
 
 /**
- * Load Devflare `.env.dev` and `.env` files without mutating `process.env`.
+ * Load Devflare `.env.public`, `.env.dev` and `.env` files without mutating `process.env`.
  *
  * Parent directories are loaded first, closer directories override them, and
- * `.env` overrides `.env.dev` within the same directory.
+ * within one directory the order is `.env.public` (committed defaults), then
+ * `.env.dev`, then `.env` — so a developer's own file always beats a value the
+ * repository ships.
  *
  * @example
  * ```ts
@@ -564,6 +628,14 @@ function resolveDescriptorValue(
 
 	if (mode === 'dev' && state.hasDevDefault) {
 		return state.devValue
+	}
+
+	// AFTER `.dev(value)` and BEFORE `.default(value)`. Chaining either with this one is contradictory, so
+	// the order decides rather than the author: an explicit dev value is a deliberate statement about dev
+	// and wins here, while `.default()` is a statement about every mode and loses to the one that names
+	// this mode. Neither combination is worth rejecting — they just have to resolve the same way twice.
+	if (mode === 'dev' && state.absentInDev) {
+		return OMIT_VALUE
 	}
 
 	if (state.hasDefault) {
