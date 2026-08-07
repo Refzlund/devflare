@@ -15,6 +15,7 @@ import {
 	resolveConfigForEnvironment
 } from '../../config'
 import { stringifyConfig } from '../../config/compiler'
+import { ZoneProvisionError } from '../../config/deploy-zones'
 import { generatedDir } from '../../utils/generated-dir'
 import { getDependencies } from '../dependencies'
 import { applyDeploymentStrategy, describeDeploymentStrategy } from '../deploy-strategy'
@@ -168,12 +169,26 @@ export async function runDeployCommand(
 						...describeResult.created.kv.map((n) => `KV: ${n}`),
 						...describeResult.created.d1.map((n) => `D1: ${n}`),
 						...describeResult.created.r2.map((n) => `R2: ${n}`),
-						...describeResult.created.queues.map((n) => `Queue: ${n}`)
+						...describeResult.created.queues.map((n) => `Queue: ${n}`),
+						...describeResult.created.vectorize.map((n) => `Vectorize: ${n}`),
+						...describeResult.created.hyperdrive.map((n) => `Hyperdrive: ${n}`),
+						// Already zone-qualified, so no prefix. Vectorize and Hyperdrive were simply MISSING from
+						// this list — both are resolve-only, so they can never appear in `created` and the omission
+						// was invisible; included now so the next resolve-only family does not inherit the gap.
+						...describeResult.created.zones
 					]
 					if (wouldCreate.length > 0) {
 						logLine(logger, dim(`Would create:\n  - ${wouldCreate.join('\n  - ')}`, theme))
 					}
 				} catch (describeErr) {
+					// → KEY: a CONFIG error is not a missing credential. This catch exists so a dry-run on a
+					//   machine with no Cloudflare auth still prints the build view, and downgrading to a dim
+					//   note is right for that. It is wrong for a `ZoneProvisionError`, which is the deploy
+					//   telling you it WILL fail — reporting success there defeats the one job a dry run has.
+					if (describeErr instanceof ZoneProvisionError) {
+						throw describeErr
+					}
+
 					logLine(
 						logger,
 						dim(`(resolved view unavailable: ${(describeErr as Error).message})`, theme)

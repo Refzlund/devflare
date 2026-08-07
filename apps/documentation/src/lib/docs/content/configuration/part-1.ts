@@ -513,7 +513,7 @@ export const configurationDocsPart1: DocPage[] = [
 			'Dev mode reports missing values and waits for `.env` / `.env.dev` changes instead of exiting immediately.',
 			'Nested objects are preserved, so `vars.mongo.database` is a normal typed runtime access.',
 			'Parsers, optional values, normal defaults, and dev-only defaults are all chainable.',
-			'`.absentInDev()` keeps a variable required for a build while omitting it entirely in dev.'
+			'`.absentInDev()` keeps a variable required for a build while letting dev run without it.'
 		],
 		facts: [
 			{ label: 'Config import', value: "`import { defineConfig, env } from 'devflare/config'`" },
@@ -645,7 +645,7 @@ export const configurationDocsPart1: DocPage[] = [
 						],
 						[
 							'`.absentInDev()`',
-							'Required for a build, omitted entirely in dev.',
+							'Required for a build; dev runs without it unless something supplies one.',
 							'`env.EMAIL_FROM.absentInDev()`'
 						]
 					]
@@ -663,6 +663,13 @@ export const configurationDocsPart1: DocPage[] = [
 						title: '`.absentInDev()` is the third answer, not a synonym for the other two',
 						body: [
 							'Some variables a deployment must have are ones a developer must not. A sender address is the clearest case: with none set, code that shape-checks its environment takes its cannot-send path, which is how local development returns a sign-in code instead of mailing one. `.optional()` would let a production build ship without it, and `.dev(value)` would hand every laptop a placeholder it then believes. `.absentInDev()` fails the build and omits the key locally, and the inferred type is optional because in dev it genuinely is.'
+						]
+					},
+					{
+						tone: 'warning',
+						title: 'Never put an `.absentInDev()` variable in `.env.public`',
+						body: [
+							"Absent by default is not the same as forbidden — a value that is genuinely present still wins, in dev as everywhere else, so a developer who deliberately exports one to point their machine at a real sender gets it. That is the intended escape hatch, and it is also the trap: `.env.public` is committed, so a value written there reaches every checkout and hands the exact placeholder to every laptop the descriptor exists to withhold. Supply it from the deployment — a CI variable or the dashboard — or from a developer's own git-ignored `.env`."
 						]
 					}
 				]

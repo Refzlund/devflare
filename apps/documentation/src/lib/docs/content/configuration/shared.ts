@@ -437,3 +437,28 @@ declare global {
  * Use with defineConfig<Entrypoints>() for type-safe cross-worker references.
  */
 export type Entrypoints = 'AdminEntrypoint'`
+
+export const zoneResourcesCode = String.raw`import { defineConfig } from 'devflare/config'
+
+export default defineConfig({
+	name: 'docs-site',
+	zones: {
+		'example.com': {
+			emailRouting: {
+				// Explicit authorization: enabling rewrites the zone MX records.
+				enable: true,
+				rules: [
+					{ to: 'support@example.com', worker: 'docs-api' },
+					{ to: 'press@example.com', forward: ['someone@example.net'] }
+				],
+				catchAll: { drop: true }
+			},
+			dns: [{ type: 'TXT', name: '_dmarc', content: 'v=DMARC1; p=none; rua=mailto:dmarc@example.com' }]
+		},
+		// A subdomain is configured under its own name. Its records land in the
+		// example.com zone, and a relative name resolves against the subdomain.
+		'mail.example.com': {
+			dns: [{ type: 'TXT', name: '_dmarc', content: 'v=DMARC1; p=none' }]
+		}
+	}
+})`

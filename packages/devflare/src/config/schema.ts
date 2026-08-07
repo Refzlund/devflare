@@ -39,6 +39,7 @@ import {
 	wranglerConfigSchema,
 	wsRouteConfigSchema
 } from './schema-runtime'
+import { zonesConfigSchema } from './schema-zones'
 
 /** Helper to get current date in YYYY-MM-DD format */
 function getCurrentDate(): string {
@@ -142,6 +143,9 @@ export const rootConfigShape = {
 
 	/** Local email behaviour: capture / relay / live, plus the inbound poller. */
 	email: emailConfigSchema,
+
+	/** Zone-scoped resources — Email Routing rules and DNS records, keyed by domain. */
+	zones: zonesConfigSchema,
 
 	/** File handlers configuration. */
 	files: filesSchema,

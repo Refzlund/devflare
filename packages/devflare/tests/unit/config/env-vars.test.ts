@@ -292,6 +292,23 @@ describe('.absentInDev() — required to build, absent to develop', () => {
 		expect(resolved.vars).toEqual({ EMAIL_FROM: 'me@example.test' })
 	})
 
+	test('a value committed to .env.public DEFEATS it — the documented trap, demonstrated', async () => {
+		// The reason the docs forbid pairing the two. `.env.public` is committed, so a sender written there
+		// reaches every checkout and hands the placeholder to every laptop this descriptor exists to
+		// withhold. Pinning it here keeps that warning HONEST: if resolution ever started ignoring a
+		// committed value in dev, this test fails and the prose that says otherwise gets corrected with it.
+		const cwd = makeTempProject()
+		writeProjectFile(cwd, '.env.public', 'EMAIL_FROM=no-reply@committed.test')
+
+		const resolved = await resolveConfigEnvVars(senderConfig(), {
+			cwd,
+			configPath: join(cwd, 'devflare.config.ts'),
+			mode: 'dev'
+		})
+
+		expect(resolved.vars).toEqual({ EMAIL_FROM: 'no-reply@committed.test' })
+	})
+
 	test('an explicit .dev() value wins over it, and .default() does not', async () => {
 		// Both combinations are contradictory, so the resolution order decides rather than the author. The
 		// one that NAMES dev mode wins in dev mode; a whole-mode default loses to it.

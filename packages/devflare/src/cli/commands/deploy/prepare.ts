@@ -35,14 +35,25 @@ export interface PreparedDeployConfigResult {
 	wranglerConfig: WranglerConfig
 }
 
-export function summarizeDeployResourceNames(resources: DeployResourceNames): string | null {
+/**
+ * What this summary can count.
+ *
+ * `zones` is OPTIONAL because preview-scoped resources deliberately have none: a preview branch
+ * must not mint Email Routing rules or DNS records on a real zone, since those are shared by the
+ * whole domain and would outlive the branch that created them. So the same summary serves both,
+ * and the preview shape stays honest about not having them rather than carrying an empty array.
+ */
+type SummarizableResourceNames = Omit<DeployResourceNames, 'zones'> & { zones?: string[] }
+
+export function summarizeDeployResourceNames(resources: SummarizableResourceNames): string | null {
 	const segments = [
 		resources.kv.length > 0 ? `KV ${resources.kv.length}` : null,
 		resources.d1.length > 0 ? `D1 ${resources.d1.length}` : null,
 		resources.r2.length > 0 ? `R2 ${resources.r2.length}` : null,
 		resources.queues.length > 0 ? `Queues ${resources.queues.length}` : null,
 		resources.vectorize.length > 0 ? `Vectorize ${resources.vectorize.length}` : null,
-		resources.hyperdrive.length > 0 ? `Hyperdrive ${resources.hyperdrive.length}` : null
+		resources.hyperdrive.length > 0 ? `Hyperdrive ${resources.hyperdrive.length}` : null,
+		resources.zones && resources.zones.length > 0 ? `Zones ${resources.zones.length}` : null
 	].filter((segment): segment is string => segment !== null)
 
 	return segments.length > 0 ? segments.join(' · ') : null

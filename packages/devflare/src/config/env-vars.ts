@@ -108,8 +108,8 @@ export interface EnvVarDescriptor<TValue = string, TOptional extends boolean = f
 	dev<TDev>(value: TDev): EnvVarDescriptor<TValue | TDev, TOptional>
 
 	/**
-	 * Omit this variable entirely in dev mode, while keeping it REQUIRED in build
-	 * mode. A missing value fails a build; in dev the key is simply not emitted.
+	 * Keep this variable REQUIRED in build mode, and let dev run WITHOUT it. A
+	 * missing value fails a build; in dev the key is simply not emitted.
 	 *
 	 * This is the third answer to "what if it is missing", and it exists because
 	 * the other two are both wrong for a class of variable that a deployment must
@@ -125,6 +125,16 @@ export interface EnvVarDescriptor<TValue = string, TOptional extends boolean = f
 	 *
 	 * The inferred type is OPTIONAL, because a dev runtime genuinely may not have
 	 * the key — code reading it must handle that, which is the point.
+	 *
+	 * → KEY: absent by default is not the same as FORBIDDEN. A value that is
+	 *   actually present still wins, in dev as everywhere else, so a developer who
+	 *   deliberately exports one to point their machine at a real sender gets it.
+	 * → GOTCHA: which is why a variable declared this way must NOT be written into
+	 *   `.env.public`. That file is committed, so a value there reaches every
+	 *   checkout — handing the exact placeholder to every laptop that this
+	 *   descriptor exists to withhold, and doing it without anyone choosing to.
+	 *   Supply it from the deployment (a CI variable, the dashboard) or from a
+	 *   developer's own git-ignored `.env`.
 	 *
 	 * @example
 	 * ```ts

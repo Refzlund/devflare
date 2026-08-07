@@ -170,6 +170,7 @@ The most important top-level keys are:
 - `workersDev`
 - `wrangler.passthrough`
 - `wsRoutes`
+- `zones`
 
 Open `/docs/full-config`, `/docs/config-basics`, and `/docs/generated-types`
 for examples with file paths.

@@ -24,6 +24,7 @@ import type {
 	TriggersConfigInput,
 	WsRouteConfigInput
 } from './schema-types-runtime'
+import type { ZonesConfigInput } from './schema-types-zones'
 
 /**
  * Authoring input accepted by `defineConfig()`.
@@ -151,6 +152,28 @@ export interface DevflareConfigInput {
 	 * ```
 	 */
 	email?: EmailConfigInput
+
+	/**
+	 * Zone-scoped Cloudflare resources — Email Routing rules and DNS records —
+	 * keyed by domain, and provisioned at deploy.
+	 *
+	 * Unlike `email`, which is local behaviour, this reaches the real account.
+	 * The key is a domain rather than a zone id because a domain is what an
+	 * author knows; Devflare walks its labels up to the apex to find the zone.
+	 *
+	 * @default `undefined`
+	 *
+	 * @example
+	 * ```ts
+	 * zones: {
+	 *   'example.com': {
+	 *     emailRouting: { rules: [{ to: 'support@example.com', worker: 'example-api' }] },
+	 *     dns: [{ type: 'TXT', name: '_dmarc', content: 'v=DMARC1; p=none' }]
+	 *   }
+	 * }
+	 * ```
+	 */
+	zones?: ZonesConfigInput
 
 	/**
 	 * Source file discovery for Worker handlers, Durable Objects, entrypoints,
@@ -527,5 +550,6 @@ export interface DevflareEnvConfigInput
 
 export type * from './schema-types-bindings'
 export type * from './schema-types-email'
+export type * from './schema-types-zones'
 export type * from './schema-types-build'
 export type * from './schema-types-runtime'

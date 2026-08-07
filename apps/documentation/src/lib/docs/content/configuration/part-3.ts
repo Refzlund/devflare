@@ -11,7 +11,8 @@ import {
 	runtimeDeploySettingsCode,
 	workerSurfacesConfigCode,
 	workersDevRouteCode,
-	workersRouteCode
+	workersRouteCode,
+	zoneResourcesCode
 } from './shared'
 
 export const configurationDocsPart3: DocPage[] = [
@@ -206,6 +207,79 @@ export const configurationDocsPart3: DocPage[] = [
 						title: 'Custom Domains are not wildcard routes',
 						body: [
 							'Cloudflare Custom Domains match the hostname exactly and ignore paths. Do not add `/*` when `custom_domain: true`; a request to any path on that hostname will already invoke the Worker.'
+						]
+					}
+				]
+			},
+			{
+				id: 'zone-resources',
+				title: 'Declare zone-scoped resources instead of clicking them into the dashboard',
+				paragraphs: [
+					'Everything else Devflare provisions is account-scoped. Email Routing rules and DNS records are not: they belong to a zone, which is a different identifier reached by a different lookup and gated by a different token scope. The `zones` key is where they are declared, and a deploy reconciles them.',
+					'The key is a domain rather than a zone id, because a domain is what an author knows. Devflare walks the domain labels up to the apex to find the zone, so `mail.example.com` is configured under its own name and its records land in the `example.com` zone. A relative record name resolves against the domain it was declared under, not the zone apex — for a subdomain those differ, and the apex would be the wrong place.',
+					'Rules reconcile on the address they claim and records on their type and name, so deploying twice is a no-op rather than a pile of duplicates. Nothing is ever deleted: a zone almost always carries rules and records this config never mentioned.'
+				],
+				table: {
+					headers: ['Declared', 'What a deploy does', 'What it will not do'],
+					rows: [
+						[
+							'`emailRouting.rules`',
+							'Creates any rule whose address is not already claimed.',
+							'Rewrite one that exists and points elsewhere — it reports the difference instead.'
+						],
+						[
+							'`emailRouting.catchAll`',
+							'Sets it, but only when it differs from what is live.',
+							'Touch it at all when the key is omitted.'
+						],
+						[
+							'`emailRouting.enable`',
+							'Turns Email Routing on for the zone.',
+							'Turn it on without this — a zone with routing off fails the deploy instead.'
+						],
+						[
+							'`dns`',
+							'Creates a missing record, and rewrites one that drifted in content, TTL or MX priority.',
+							'Guess which record it owns when several already share that type and name.'
+						]
+					]
+				},
+				snippets: [
+					{
+						title: 'Email routing and DNS as authored config',
+						language: 'ts',
+						code: zoneResourcesCode
+					}
+				],
+				callouts: [
+					{
+						tone: 'warning',
+						title: 'Declaring a DNS record means owning it',
+						body: [
+							'A declared record that drifted in content, TTL or MX priority is rewritten to match, because that is what declarative means — and it is what turns a staged DMARC rollout into a config edit rather than a dashboard visit. The consequence is that you must not declare a record another system writes.',
+							'Cloudflare writes and LOCKS its own records when a domain is onboarded to Email Routing or Email Sending: the `MX` and SPF `TXT` on `cf-bounce.<domain>`, the DKIM key at `cf-bounce._domainkey.<domain>`, and a DMARC policy at `_dmarc.<domain>`. Check what is already there before declaring anything in that set — a DMARC record in particular may already exist and belong to Cloudflare.'
+						]
+					},
+					{
+						tone: 'warning',
+						title: 'A type and name pair is a record SET, not one record',
+						body: [
+							'An apex `TXT` routinely holds an SPF record AND a vendor verification string; `MX` and `A` hold several by design. So when more than one record already exists for a declared type and name, Devflare refuses rather than picking one: rewriting the wrong one destroys an unrelated record, and for SPF it also leaves the domain with two SPF records, which is a permanent error for the whole domain under RFC 7208.',
+							'It resolves the ambiguity only when it can do so safely — exactly one record carrying its own `Managed by Devflare` comment, or exactly one whose content already matches. Otherwise it names the count and stops, and you either remove the extras or mark the one it should own with that comment.'
+						]
+					},
+					{
+						tone: 'warning',
+						title: 'Enabling Email Routing rewrites the zone MX records',
+						body: [
+							'That changes where all mail for the domain is delivered, which is too large a side effect to follow from someone adding a forwarding rule. So it is never inferred: `enable: true` is the authorization, and without it a zone with routing off fails the deploy and says what to do. Existing mail flow for a domain is not something a deploy should be able to redirect by accident.'
+						]
+					},
+					{
+						tone: 'info',
+						title: '`--dry-run` reads the live zone but changes nothing in it',
+						body: [
+							'Every zone mutation is substituted in describe-only mode, enabling included, while the reads still happen for real — so the plan reflects the actual mix of what exists and what does not, without a single write. Preview-scoped deploys have no zone resources at all: a rule or a record is shared by the whole domain and would outlive the branch that created it.'
 						]
 					}
 				]

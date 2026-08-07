@@ -406,6 +406,34 @@ export {
 } from './preview-registry'
 
 // -----------------------------------------------------------------------------
+// Zone-scoped Exports
+// -----------------------------------------------------------------------------
+// Everything above is account-scoped. These reach a ZONE, which is a different
+// identifier, a different lookup, and a different token scope.
+
+export {
+	resolveZone,
+	getEmailRoutingSettings,
+	enableEmailRouting,
+	listEmailRoutingRules,
+	createEmailRoutingRule,
+	getEmailRoutingCatchAll,
+	setEmailRoutingCatchAll,
+	listDnsRecords,
+	createDnsRecord,
+	updateDnsRecord
+} from './zone-resources'
+export type {
+	ZoneInfo,
+	ResolvedZone,
+	EmailRoutingMatcher,
+	EmailRoutingAction,
+	EmailRoutingRule,
+	EmailRoutingSettings,
+	DnsRecord
+} from './zone-resources'
+
+// -----------------------------------------------------------------------------
 // Error Exports
 // -----------------------------------------------------------------------------
 

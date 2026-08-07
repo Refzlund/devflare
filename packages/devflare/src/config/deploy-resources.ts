@@ -19,6 +19,18 @@ import {
 } from '../cloudflare/account'
 import { getEffectiveAccountId } from '../cloudflare/preferences'
 import {
+	createDnsRecord,
+	createEmailRoutingRule,
+	enableEmailRouting,
+	getEmailRoutingCatchAll,
+	getEmailRoutingSettings,
+	listDnsRecords,
+	listEmailRoutingRules,
+	resolveZone,
+	setEmailRoutingCatchAll,
+	updateDnsRecord
+} from '../cloudflare/zone-resources'
+import {
 	type PendingNameBinding,
 	collectPendingNameBindings,
 	formatMissingBindings,
@@ -30,6 +42,7 @@ import {
 	normalizeKVNameBinding,
 	withResolvedIdBindings
 } from './binding-resolution-helpers'
+import { type ZoneProvisionApi, provisionZoneResources } from './deploy-zones'
 import type { PreviewResolutionOptions } from './preview'
 import { type DeployConfig, brandAsDeployConfig, resolveResources } from './resolve-phased'
 import { ConfigResourceResolutionError } from './resource-resolution'
@@ -54,6 +67,18 @@ interface DeployResourcePreparationApi {
 	createQueue: typeof createQueue
 	listHyperdrives: typeof listHyperdrives
 	listVectorizeIndexes: typeof listVectorizeIndexes
+	// Zone-scoped. Typed through `ZoneProvisionApi` rather than `typeof` so the reconciler's contract
+	// is the single definition — a signature that drifts from it becomes a type error here.
+	resolveZone: ZoneProvisionApi['resolveZone']
+	getEmailRoutingSettings: ZoneProvisionApi['getEmailRoutingSettings']
+	enableEmailRouting: ZoneProvisionApi['enableEmailRouting']
+	listEmailRoutingRules: ZoneProvisionApi['listEmailRoutingRules']
+	createEmailRoutingRule: ZoneProvisionApi['createEmailRoutingRule']
+	getEmailRoutingCatchAll: ZoneProvisionApi['getEmailRoutingCatchAll']
+	setEmailRoutingCatchAll: ZoneProvisionApi['setEmailRoutingCatchAll']
+	listDnsRecords: ZoneProvisionApi['listDnsRecords']
+	createDnsRecord: ZoneProvisionApi['createDnsRecord']
+	updateDnsRecord: ZoneProvisionApi['updateDnsRecord']
 }
 
 const defaultDeployResourcePreparationApi: DeployResourcePreparationApi = {
@@ -68,7 +93,17 @@ const defaultDeployResourcePreparationApi: DeployResourcePreparationApi = {
 	listQueues,
 	createQueue,
 	listHyperdrives,
-	listVectorizeIndexes
+	listVectorizeIndexes,
+	resolveZone,
+	getEmailRoutingSettings,
+	enableEmailRouting,
+	listEmailRoutingRules,
+	createEmailRoutingRule,
+	getEmailRoutingCatchAll,
+	setEmailRoutingCatchAll,
+	listDnsRecords,
+	createDnsRecord,
+	updateDnsRecord
 }
 
 export interface DeployResourceNames {
@@ -78,6 +113,13 @@ export interface DeployResourceNames {
 	queues: string[]
 	vectorize: string[]
 	hyperdrive: string[]
+	/**
+	 * Zone-scoped changes, as whole human-readable labels.
+	 *
+	 * Unlike every other family these are not bare names: a rule or record means nothing without the
+	 * zone it lives in, so each entry already carries it (`Email rule support@x (zone x)`).
+	 */
+	zones: string[]
 }
 
 export interface PrepareConfigResourcesForDeployOptions {
@@ -92,6 +134,14 @@ export interface PrepareConfigResourcesForDeployOptions {
 
 export interface PrepareMaterializedConfigResourcesForDeployOptions {
 	accountId?: string
+	/**
+	 * Which environment is deploying, when one was named.
+	 *
+	 * Only `'preview'` changes anything here, and only for zone resources: they belong to a whole
+	 * domain and have no branch-scoped form, so a preview must not provision them. Everything else is
+	 * already preview-scoped before it reaches this function.
+	 */
+	environment?: string
 	cloudflare?: Partial<DeployResourcePreparationApi>
 	/**
 	 * C6 — describe-only mode. When true, no `create*` Cloudflare APIs are
@@ -123,7 +173,8 @@ function createEmptyDeployResourceNames(): DeployResourceNames {
 		r2: [],
 		queues: [],
 		vectorize: [],
-		hyperdrive: []
+		hyperdrive: [],
+		zones: []
 	}
 }
 
@@ -146,6 +197,9 @@ function decorateOrphanError(err: unknown, created: DeployResourceNames): Error 
 	if (created.r2.length > 0) summaryParts.push(`R2: ${created.r2.join(', ')}`)
 	if (created.queues.length > 0) summaryParts.push(`Queues: ${created.queues.join(', ')}`)
 	if (created.vectorize.length > 0) summaryParts.push(`Vectorize: ${created.vectorize.join(', ')}`)
+	// Pushed WITHOUT a family prefix, because each label already names its own zone — a line reading
+	// `Zones: Email rule support@example.com (zone example.com)` would say it twice.
+	for (const zoneChange of created.zones) summaryParts.push(zoneChange)
 
 	const base = err instanceof Error ? err : new Error(String(err))
 	if (summaryParts.length === 0) return base
@@ -403,6 +457,23 @@ export async function prepareMaterializedConfigResourcesForDeploy(
 	)
 	const queueNames = collectQueueNames(resolvedConfig)
 	const vectorizeNames = collectVectorizeIndexNames(resolvedConfig)
+	// Zone work is independent of every binding: a config can declare NOTHING but a DMARC record and
+	// still have real provisioning to do. Both "nothing to prepare" shortcuts below therefore have to
+	// ask about it, or a zones-only config returns success having done nothing — which looks exactly
+	// like a successful deploy.
+	//
+	// → KEY: and a PREVIEW deploy has no zone work by construction. Every other resource can be
+	//   preview-scoped — a branch gets its own KV namespace, its own D1 — but a routing rule and a DNS
+	//   record belong to the whole domain. There is no branch-scoped version of them, so a preview that
+	//   provisioned them would redirect production mail from a feature branch and leave the change
+	//   behind when the branch was deleted. The guard is here rather than in the reconciler because
+	//   this is the only layer that knows which environment is deploying.
+	const isPreviewEnvironment = options.environment === 'preview'
+	const hasZoneWork =
+		!isPreviewEnvironment &&
+		Object.values(resolvedConfig.zones ?? {}).some(
+			(zone) => zone.emailRouting !== undefined || zone.dns !== undefined
+		)
 
 	if (
 		!kvBindings &&
@@ -410,7 +481,8 @@ export async function prepareMaterializedConfigResourcesForDeploy(
 		!hyperdriveBindings &&
 		r2Names.length === 0 &&
 		queueNames.length === 0 &&
-		vectorizeNames.length === 0
+		vectorizeNames.length === 0 &&
+		!hasZoneWork
 	) {
 		return {
 			config: brandAsDeployConfig(resolvedConfig),
@@ -433,7 +505,8 @@ export async function prepareMaterializedConfigResourcesForDeploy(
 		pendingHyperdriveNameBindings.length === 0 &&
 		r2Names.length === 0 &&
 		queueNames.length === 0 &&
-		vectorizeNames.length === 0
+		vectorizeNames.length === 0 &&
+		!hasZoneWork
 	) {
 		return {
 			config: brandAsDeployConfig(
@@ -480,6 +553,17 @@ export async function prepareMaterializedConfigResourcesForDeploy(
 			id: `<would-create:${name}>`,
 			name
 		})) as DeployResourcePreparationApi['createQueue']
+
+		// → KEY: EVERY zone mutation, not just the `create*` ones. Account resources are only ever
+		//   created, so stubbing creation was enough; a zone is also ENABLED, and its catch-all and its
+		//   records are REPLACED. A dry-run that stubbed only `create*` would leave three live writes
+		//   running — rewriting a zone's MX records among them — while printing a plan and claiming to
+		//   have done nothing. Add a zone mutation to `ZoneProvisionApi` and it must appear here too.
+		cloudflareApi.enableEmailRouting = async (_zoneId: string) => ({ enabled: true })
+		cloudflareApi.createEmailRoutingRule = async (_zoneId: string, rule) => rule
+		cloudflareApi.setEmailRoutingCatchAll = async (_zoneId: string, rule) => rule
+		cloudflareApi.createDnsRecord = async (_zoneId: string, record) => record
+		cloudflareApi.updateDnsRecord = async (_zoneId: string, _recordId: string, record) => record
 	}
 
 	// C13 — sequential provisioning leaves silent orphans. We do not
@@ -576,6 +660,23 @@ export async function prepareMaterializedConfigResourcesForDeploy(
 		created.queues.push(...queueState.created)
 		existing.queues.push(...queueState.existing)
 
+		// LAST, and deliberately so. Everything above provisions resources this deploy's own bindings
+		// need; a zone rule or a DNS record changes how the outside world reaches the domain. Running
+		// it after the account resources means a config error in the ordinary path fails before any
+		// zone is touched — and a zone left half-provisioned is the one kind of orphan a user cannot
+		// simply ignore, because it is already routing real mail.
+		//
+		// → KEY: the accumulator arrays are passed IN rather than a result being returned. A returned
+		//   value is lost on a throw, which is exactly when the orphan report matters — the failure
+		//   this guards against is enabling Email Routing (rewriting the domain's MX records), then
+		//   dying on the next call, and telling the operator only "Cloudflare 400".
+		if (hasZoneWork) {
+			await provisionZoneResources(resolvedConfig.zones, accountId, cloudflareApi, {
+				created: created.zones,
+				existing: existing.zones
+			})
+		}
+
 		const config = withResolvedIdBindings(resolvedConfig, {
 			kv: kvBindings
 				? pendingKVNameBindings.length > 0
@@ -635,6 +736,10 @@ export async function prepareConfigResourcesForDeploy(
 	return prepareMaterializedConfigResourcesForDeploy(resolvedConfig, {
 		accountId: options.accountId,
 		cloudflare: options.cloudflare,
-		describeOnly: options.describeOnly
+		describeOnly: options.describeOnly,
+		// Forwarded so the zone guard can see it. It was NOT forwarded before, which made the
+		// "previews have no zone resources" promise in the docs unenforced — a preview deploy wrote
+		// rules and records to the real zone, and the only thing saying otherwise was prose.
+		environment: options.environment
 	})
 }

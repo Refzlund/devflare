@@ -13,7 +13,13 @@ const schemaTypesPaths = [
 	'src/config/schema-types-bindings-resources.ts',
 	'src/config/schema-types-build.ts',
 	'src/config/schema-types-runtime.ts',
-	'src/config/schema-types-runtime-server.ts'
+	'src/config/schema-types-runtime-server.ts',
+	// → GOTCHA: this list is hand-maintained, so a new mirror file is UNENFORCED until it is added
+	//   here — and `schema-types-email.ts` shipped that way, undocumented members and all. A mirror
+	//   exists to give an author hover documentation; one nothing checks is the case where they get
+	//   none and nobody notices. Add every new `schema-types-*.ts` to this list in the same change.
+	'src/config/schema-types-email.ts',
+	'src/config/schema-types-zones.ts'
 ].map((path) => resolve(devflareRoot, path))
 
 const fixtureSource = `

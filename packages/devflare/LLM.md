@@ -3106,7 +3106,7 @@ These environment variables are missing:
 | `.parse(fn)` / `.parser(fn)` | Transform the string from env files into a typed runtime value. | `env.RETRIES.parse(Number)` |
 | `.default(value)` | Use a fallback in every mode when the env value is missing. | `env.APP_MODE.default('local')` |
 | `.dev(value)` | Use a fallback only in dev when the env value is missing. | `env.MOCK_TENANT_ID.dev(123)` |
-| `.absentInDev()` | Required for a build, omitted entirely in dev. | `env.EMAIL_FROM.absentInDev()` |
+| `.absentInDev()` | Required for a build; dev runs without it unless something supplies one. | `env.EMAIL_FROM.absentInDev()` |
 
 > **Warning — Dev-only defaults are still required in build**
 >
@@ -3115,6 +3115,10 @@ These environment variables are missing:
 > **Note — `.absentInDev()` is the third answer, not a synonym for the other two**
 >
 > Some variables a deployment must have are ones a developer must not. A sender address is the clearest case: with none set, code that shape-checks its environment takes its cannot-send path, which is how local development returns a sign-in code instead of mailing one. `.optional()` would let a production build ship without it, and `.dev(value)` would hand every laptop a placeholder it then believes. `.absentInDev()` fails the build and omits the key locally, and the inferred type is optional because in dev it genuinely is.
+
+> **Warning — Never put an `.absentInDev()` variable in `.env.public`**
+>
+> Absent by default is not the same as forbidden — a value that is genuinely present still wins, in dev as everywhere else, so a developer who deliberately exports one to point their machine at a real sender gets it. That is the intended escape hatch, and it is also the trap: `.env.public` is committed, so a value written there reaches every checkout and hands the exact placeholder to every laptop the descriptor exists to withhold. Supply it from the deployment — a CI variable or the dashboard — or from a developer's own git-ignored `.env`.
 
 ---
 
@@ -3443,6 +3447,72 @@ export default defineConfig({
 			new_sqlite_classes: ['ChatRoom']
 		}
 	]
+})
+```
+
+#### Declare zone-scoped resources instead of clicking them into the dashboard
+
+Everything else Devflare provisions is account-scoped. Email Routing rules and DNS records are not: they belong to a zone, which is a different identifier reached by a different lookup and gated by a different token scope. The `zones` key is where they are declared, and a deploy reconciles them.
+
+The key is a domain rather than a zone id, because a domain is what an author knows. Devflare walks the domain labels up to the apex to find the zone, so `mail.example.com` is configured under its own name and its records land in the `example.com` zone. A relative record name resolves against the domain it was declared under, not the zone apex — for a subdomain those differ, and the apex would be the wrong place.
+
+Rules reconcile on the address they claim and records on their type and name, so deploying twice is a no-op rather than a pile of duplicates. Nothing is ever deleted: a zone almost always carries rules and records this config never mentioned.
+
+##### Reference table
+
+| Declared | What a deploy does | What it will not do |
+| --- | --- | --- |
+| `emailRouting.rules` | Creates any rule whose address is not already claimed. | Rewrite one that exists and points elsewhere — it reports the difference instead. |
+| `emailRouting.catchAll` | Sets it, but only when it differs from what is live. | Touch it at all when the key is omitted. |
+| `emailRouting.enable` | Turns Email Routing on for the zone. | Turn it on without this — a zone with routing off fails the deploy instead. |
+| `dns` | Creates a missing record, and rewrites one that drifted in content, TTL or MX priority. | Guess which record it owns when several already share that type and name. |
+
+> **Warning — Declaring a DNS record means owning it**
+>
+> A declared record that drifted in content, TTL or MX priority is rewritten to match, because that is what declarative means — and it is what turns a staged DMARC rollout into a config edit rather than a dashboard visit. The consequence is that you must not declare a record another system writes.
+>
+> Cloudflare writes and LOCKS its own records when a domain is onboarded to Email Routing or Email Sending: the `MX` and SPF `TXT` on `cf-bounce.<domain>`, the DKIM key at `cf-bounce._domainkey.<domain>`, and a DMARC policy at `_dmarc.<domain>`. Check what is already there before declaring anything in that set — a DMARC record in particular may already exist and belong to Cloudflare.
+
+> **Warning — A type and name pair is a record SET, not one record**
+>
+> An apex `TXT` routinely holds an SPF record AND a vendor verification string; `MX` and `A` hold several by design. So when more than one record already exists for a declared type and name, Devflare refuses rather than picking one: rewriting the wrong one destroys an unrelated record, and for SPF it also leaves the domain with two SPF records, which is a permanent error for the whole domain under RFC 7208.
+>
+> It resolves the ambiguity only when it can do so safely — exactly one record carrying its own `Managed by Devflare` comment, or exactly one whose content already matches. Otherwise it names the count and stops, and you either remove the extras or mark the one it should own with that comment.
+
+> **Warning — Enabling Email Routing rewrites the zone MX records**
+>
+> That changes where all mail for the domain is delivered, which is too large a side effect to follow from someone adding a forwarding rule. So it is never inferred: `enable: true` is the authorization, and without it a zone with routing off fails the deploy and says what to do. Existing mail flow for a domain is not something a deploy should be able to redirect by accident.
+
+> **Note — `--dry-run` reads the live zone but changes nothing in it**
+>
+> Every zone mutation is substituted in describe-only mode, enabling included, while the reads still happen for real — so the plan reflects the actual mix of what exists and what does not, without a single write. Preview-scoped deploys have no zone resources at all: a rule or a record is shared by the whole domain and would outlive the branch that created it.
+
+##### Example — Email routing and DNS as authored config
+
+```ts
+import { defineConfig } from 'devflare/config'
+
+export default defineConfig({
+	name: 'docs-site',
+	zones: {
+		'example.com': {
+			emailRouting: {
+				// Explicit authorization: enabling rewrites the zone MX records.
+				enable: true,
+				rules: [
+					{ to: 'support@example.com', worker: 'docs-api' },
+					{ to: 'press@example.com', forward: ['someone@example.net'] }
+				],
+				catchAll: { drop: true }
+			},
+			dns: [{ type: 'TXT', name: '_dmarc', content: 'v=DMARC1; p=none; rua=mailto:dmarc@example.com' }]
+		},
+		// A subdomain is configured under its own name. Its records land in the
+		// example.com zone, and a relative name resolves against the subdomain.
+		'mail.example.com': {
+			dns: [{ type: 'TXT', name: '_dmarc', content: 'v=DMARC1; p=none' }]
+		}
+	}
 })
 ```
 
