@@ -203,6 +203,41 @@ describe('createRuntimeWatchdog', () => {
 		expect(clock.pending).toBe(0)
 	})
 
+	test('gaveUp separates standing down from being shut down', async () => {
+		const clock = manualClock()
+
+		const healthy = createRuntimeWatchdog({
+			probe: async () => true,
+			onRuntimeLost: async () => {},
+			failureThreshold: 1,
+			recoveryAttemptLimit: 2,
+			setTimer: clock.setTimer,
+			clearTimer: clock.clearTimer
+		})
+
+		await clock.advance(3)
+		expect(healthy.gaveUp).toBe(false)
+
+		// The server's own teardown is not a give-up: it says nothing about the runtime.
+		healthy.stop()
+		expect(healthy.gaveUp).toBe(false)
+
+		const doomed = createRuntimeWatchdog({
+			probe: async () => false,
+			onRuntimeLost: async () => {},
+			failureThreshold: 1,
+			recoveryAttemptLimit: 2,
+			setTimer: clock.setTimer,
+			clearTimer: clock.clearTimer
+		})
+
+		await clock.advance(20)
+
+		// This is what the runtime-status channel turns into `failed`, so a waiting request
+		// stops waiting for a rebuild that is never coming.
+		expect(doomed.gaveUp).toBe(true)
+	})
+
 	test('a rebuild that throws does not kill the watch', async () => {
 		const clock = manualClock()
 		let attempts = 0

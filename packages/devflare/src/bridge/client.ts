@@ -339,13 +339,11 @@ export class BridgeClient {
 		this.cleanupPending(new Error('Bridge disconnected'))
 
 		// Auto-reconnect. Replacing any timer already pending keeps a run of drops to ONE attempt in
-		// flight, and re-reading `autoReconnect` inside the callback closes the window in which an
-		// explicit disconnect lands between scheduling and firing.
+		// flight; `disconnect()` cancels whichever is left, so the callback needs no guard of its own.
 		this.cancelScheduledReconnect()
 		if (this.autoReconnect) {
 			this.reconnectTimer = setTimeout(() => {
 				this.reconnectTimer = null
-				if (!this.autoReconnect) return
 				this.connect().catch((error) => {
 					bridgeLog.warn('auto-reconnect attempt failed', error)
 				})

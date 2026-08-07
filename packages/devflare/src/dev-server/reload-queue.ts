@@ -19,12 +19,12 @@ export interface ReloadQueue {
 	/** Wait until there is no running or pending reload. */
 	drain(): Promise<void>
 	/**
-	 * Whether a reload is running, or already queued behind one.
+	 * Whether a reload is running.
 	 *
 	 * Read by the runtime-status channel to tell an app "the runtime is coming back,
-	 * keep waiting" from "nothing is going to fix this". A trailing request counts:
-	 * from the app's side the outage lasts until the queue is empty, not until the
-	 * reload that happens to be in flight right now finishes.
+	 * keep waiting" from "nothing is going to fix this". A trailing request needs no
+	 * term of its own: one only exists while a reload is running, and the handover
+	 * between them is a single microtask — no observer can be inside it.
 	 */
 	readonly busy: boolean
 }
@@ -77,7 +77,7 @@ export function createReloadQueue({ reload, logger }: ReloadQueueOptions): Reloa
 		schedule,
 		drain,
 		get busy() {
-			return running !== null || pending !== null
+			return running !== null
 		}
 	}
 }

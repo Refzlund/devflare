@@ -1,8 +1,8 @@
 // =============================================================================
 // SvelteKit handle — what the platform try/catch is allowed to catch
 // =============================================================================
-// The handle wraps platform creation so a dev request can fall back when the
-// bridge is unavailable. That fallback must cover creating the platform and
+// The handle wraps platform creation so a dev request is still served when the
+// bridge is unavailable. That catch must cover creating the platform and
 // NOTHING else: the same try also spanned `resolve(event)`, so a failure anywhere
 // downstream was blamed on the platform — logged as "[devflare] Failed to create
 // platform" — and the whole request was then re-run, repeating every side effect
@@ -104,7 +104,7 @@ describe('createHandle error scoping', () => {
 		expect(seenPlatforms[0]).toBeDefined()
 	})
 
-	test('a genuine platform failure still falls back to an unbridged resolve', async () => {
+	test('a genuine platform failure still serves the request, now with a platform that says why', async () => {
 		// No WebSocket at all, and no `ws` package resolution — connecting cannot succeed.
 		;(globalThis as unknown as { WebSocket: unknown }).WebSocket = class {
 			constructor(_url: string) {
@@ -123,7 +123,13 @@ describe('createHandle error scoping', () => {
 			}
 		})
 
+		// Serving continues, as it always did — but the platform is attached rather than absent, so a
+		// binding read reports the bridge instead of reaching the app's "binding is missing". The
+		// contract of that platform is pinned in `unavailable-platform.test.ts`.
 		expect(await response.text()).toBe('fallback')
-		expect(platformOnResolve).toBeUndefined()
+		expect(platformOnResolve).toBeDefined()
+		expect(() => (platformOnResolve as { env: Record<string, unknown> }).env.MY_KV).toThrow(
+			'Cloudflare bindings are unavailable'
+		)
 	})
 })

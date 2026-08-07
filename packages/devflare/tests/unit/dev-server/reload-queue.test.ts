@@ -139,4 +139,46 @@ describe('createReloadQueue', () => {
 		await expect(queue.drain()).resolves.toBeUndefined()
 		expect(reload).not.toHaveBeenCalled()
 	})
+
+	test('busy is true for exactly as long as a reload is running', async () => {
+		const gate = createDeferred()
+		let calls = 0
+		const reload = mock(async () => {
+			calls++
+			if (calls === 1) {
+				await gate.promise
+			}
+		})
+		const queue = createReloadQueue({ reload })
+
+		expect(queue.busy).toBe(false)
+
+		// The runtime-status channel reads this to tell a waiting app the outage is owned by
+		// something that will end it, rather than one nothing is going to fix.
+		const first = queue.schedule()
+		expect(queue.busy).toBe(true)
+
+		const trailing = queue.schedule()
+		expect(queue.busy).toBe(true)
+
+		gate.resolve()
+		await Promise.all([first, trailing])
+
+		expect(queue.busy).toBe(false)
+		expect(reload).toHaveBeenCalledTimes(2)
+	})
+
+	test('busy clears after a reload that threw', async () => {
+		const logger = createLoggerStub()
+		const reload = mock(async () => {
+			throw new Error('boom')
+		})
+		const queue = createReloadQueue({ reload, logger })
+
+		await queue.schedule()
+
+		// A failed reload that left `busy` stuck would tell every later request to keep waiting
+		// on a reload that already ended.
+		expect(queue.busy).toBe(false)
+	})
 })

@@ -208,6 +208,67 @@ const HOPELESS_READINGS: Partial<Record<DevRuntimeReading, BridgeUnavailableReas
 	stopping: 'coordinator-stopping'
 }
 
+/** Everything {@link connectBridgeWithRetry} accepts. Every field has a default. */
+export interface BridgeConnectRetryOptions {
+	/** Budget while nothing vouches for the outage. @default 3000 */
+	maxWaitMs?: number
+	/** Budget while the coordinator says its runtime is coming back. @default 30000 */
+	reloadMaxWaitMs?: number
+	/** Delay between attempts. @default 150 */
+	retryDelayMs?: number
+	/**
+	 * Asks the dev coordinator what its runtime is doing. Omit it — as a hand-started `vite dev`
+	 * does — and the retry holds {@link maxWaitMs} throughout, with no assumption that help is coming.
+	 */
+	readRuntimeState?: () => Promise<DevRuntimeReading>
+	/** Named in the error, so a custom runtime port is visible in the failure. */
+	bridgeUrl?: string
+	/** Injectable for tests, so the retry schedule is asserted without real time. */
+	sleep?: (ms: number) => Promise<void>
+	/** Injectable for tests. @default Date.now */
+	now?: () => number
+}
+
+/** Apply the defaults once, leaving the retry loop to be only the schedule it runs. */
+function resolveRetrySchedule(options: BridgeConnectRetryOptions) {
+	return {
+		maxWaitMs: options.maxWaitMs ?? BRIDGE_CONNECT_MAX_WAIT_MS,
+		reloadMaxWaitMs: options.reloadMaxWaitMs ?? BRIDGE_CONNECT_RELOAD_MAX_WAIT_MS,
+		retryDelayMs: options.retryDelayMs ?? BRIDGE_CONNECT_RETRY_DELAY_MS,
+		sleep:
+			options.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))),
+		now: options.now ?? Date.now
+	}
+}
+
+/** What one coordinator reading does to the wait: end it now, or say how long it may run. */
+type WaitPlan =
+	| { readonly giveUpWith: BridgeUnavailableReason }
+	| { readonly deadline: number; readonly timedOutReason: BridgeUnavailableReason }
+
+/**
+ * Turn a reading into the whole of this round's policy — the one decision the retry loop makes.
+ *
+ * Pure, and kept out of the loop so the loop reads as mechanism (attempt, ask, wait) with the
+ * judgement stated once, in one place.
+ *
+ * @param state - what the coordinator just said, or `'unreachable'` if it said nothing.
+ * @param budgets - the two deadlines this call is working between.
+ */
+function planWait(
+	state: DevRuntimeReading,
+	budgets: { plainDeadline: number; reloadDeadline: number }
+): WaitPlan {
+	const hopeless = HOPELESS_READINGS[state]
+	if (hopeless) return { giveUpWith: hopeless }
+
+	// Anything left that is not `ready` — `reloading`, `starting` — is the coordinator promising
+	// to end the outage, which is what buys the generous budget.
+	return state === 'ready'
+		? { deadline: budgets.plainDeadline, timedOutReason: 'connect-timeout' }
+		: { deadline: budgets.reloadDeadline, timedOutReason: 'reload-timeout' }
+}
+
 /**
  * Connect to the bridge, riding out an outage for exactly as long as it is worth riding out.
  *
@@ -230,68 +291,46 @@ const HOPELESS_READINGS: Partial<Record<DevRuntimeReading, BridgeUnavailableReas
  * With no reader supplied the behaviour is unchanged from before this existed: the modest budget, then
  * the failure. That is the path a hand-started `vite dev` takes.
  *
- * Exported for unit testing; `sleep`/`now` are injectable so the retry schedule is asserted without real time.
+ * Exported for unit testing.
  *
  * @param connect - the bridge client's `connect()`; a fresh attempt each call (the client dedups in-flight ones).
- * @param options - the two budgets, the delay between attempts, the optional coordinator reader, the
- *   `bridgeUrl` to name in the error, and injectable `sleep`/`now` for tests.
+ * @param options - see {@link BridgeConnectRetryOptions}.
  * @throws {BridgeUnavailableError} naming which of the causes ended the attempt.
  */
 export async function connectBridgeWithRetry(
 	connect: () => Promise<void>,
-	options: {
-		maxWaitMs?: number
-		reloadMaxWaitMs?: number
-		retryDelayMs?: number
-		readRuntimeState?: () => Promise<DevRuntimeReading>
-		bridgeUrl?: string
-		sleep?: (ms: number) => Promise<void>
-		now?: () => number
-	} = {}
+	options: BridgeConnectRetryOptions = {}
 ): Promise<void> {
-	const maxWaitMs = options.maxWaitMs ?? BRIDGE_CONNECT_MAX_WAIT_MS
-	const reloadMaxWaitMs = options.reloadMaxWaitMs ?? BRIDGE_CONNECT_RELOAD_MAX_WAIT_MS
-	const retryDelayMs = options.retryDelayMs ?? BRIDGE_CONNECT_RETRY_DELAY_MS
-	const sleep = options.sleep ?? ((ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)))
-	const now = options.now ?? Date.now
+	const { maxWaitMs, reloadMaxWaitMs, retryDelayMs, sleep, now } = resolveRetrySchedule(options)
 	const readRuntimeState = options.readRuntimeState
 
 	const startedAt = now()
-	// The generous budget is a ceiling, never a shortening: a caller that asks for a longer plain
-	// `maxWaitMs` than the reload budget keeps it.
-	const reloadDeadline = startedAt + Math.max(maxWaitMs, reloadMaxWaitMs)
-	let deadline = startedAt + maxWaitMs
-	let timedOutReason: BridgeUnavailableReason = 'connect-timeout'
+	const budgets = {
+		plainDeadline: startedAt + maxWaitMs,
+		// The generous budget is a ceiling, never a shortening: a caller that asks for a longer plain
+		// `maxWaitMs` than the reload budget keeps it.
+		reloadDeadline: startedAt + Math.max(maxWaitMs, reloadMaxWaitMs)
+	}
+
+	let plan: WaitPlan = { deadline: budgets.plainDeadline, timedOutReason: 'connect-timeout' }
+	const fail = (reason: BridgeUnavailableReason, cause: unknown) =>
+		bridgeUnavailable(reason, {
+			waitedMs: now() - startedAt,
+			bridgeUrl: options.bridgeUrl,
+			cause
+		})
 
 	for (;;) {
 		try {
 			await connect()
 			return
 		} catch (error) {
-			if (readRuntimeState) {
-				const state = await readRuntimeState()
-				const hopeless = HOPELESS_READINGS[state]
-				if (hopeless) {
-					throw bridgeUnavailable(hopeless, {
-						waitedMs: now() - startedAt,
-						bridgeUrl: options.bridgeUrl,
-						cause: error
-					})
-				}
-
-				const comingBack = state !== 'ready'
-				deadline = comingBack ? reloadDeadline : startedAt + maxWaitMs
-				timedOutReason = comingBack ? 'reload-timeout' : 'connect-timeout'
-			}
+			// Re-asked every round, so the plan tracks the outage rather than the moment it began.
+			if (readRuntimeState) plan = planWait(await readRuntimeState(), budgets)
+			if ('giveUpWith' in plan) throw fail(plan.giveUpWith, error)
 
 			// Stop once another delay would run past the budget.
-			if (now() + retryDelayMs >= deadline) {
-				throw bridgeUnavailable(timedOutReason, {
-					waitedMs: now() - startedAt,
-					bridgeUrl: options.bridgeUrl,
-					cause: error
-				})
-			}
+			if (now() + retryDelayMs >= plan.deadline) throw fail(plan.timedOutReason, error)
 			await sleep(retryDelayMs)
 		}
 	}
@@ -530,11 +569,12 @@ function createUnavailablePlatform(cause: unknown): Platform {
 	const pendingErrors: unknown[] = []
 	const env = new Proxy({} as Record<string, unknown>, {
 		get(_target, prop: string | symbol) {
-			// Symbols are never a binding; they are how a runtime inspects an object it was handed
-			// (`Symbol.toStringTag`, node's inspect hooks), and throwing at THOSE would move the failure
-			// to a console.log far from any binding. `then` for the same reason: were this object ever
-			// awaited or resolved through, V8 reads `.then` first, and a throw there is unreadable.
-			if (typeof prop !== 'string' || prop === 'then') return undefined
+			// Symbols are never a binding — they are how a runtime inspects an object it was handed
+			// (`Symbol.toStringTag`, node's inspect hooks) — and neither are these two names: `then` is
+			// read by any `await`/`Promise.resolve` this object passes through, `toJSON` by every
+			// `JSON.stringify`, including the one inside a logger. Throwing at a PROTOCOL hook moves
+			// the failure somewhere it cannot be read, far from the binding that is actually missing.
+			if (typeof prop !== 'string' || prop === 'then' || prop === 'toJSON') return undefined
 			throw cause
 		},
 		has: () => false,

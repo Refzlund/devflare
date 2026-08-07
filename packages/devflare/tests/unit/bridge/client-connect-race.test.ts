@@ -153,6 +153,31 @@ describe('BridgeClient superseded socket isolation', () => {
 		client.disconnect()
 	})
 
+	test('an explicit disconnect cancels the reconnect that was already scheduled', async () => {
+		const client = new BridgeClient({
+			url: 'ws://localhost:1',
+			autoReconnect: true,
+			reconnectDelay: 20
+		})
+
+		const live = beginAttempt(client)
+		live.open()
+		expect(client.connected).toBe(true)
+
+		// The socket drops, scheduling the one auto-reconnect…
+		live.close()
+		const socketsBefore = FakeWebSocket.instances.length
+
+		// …and the client is torn down before it fires. `autoReconnect = false` alone does not
+		// help: it is read when the reconnect is SCHEDULED, so a timer already pending went on
+		// to open a socket for a client nobody holds — one second into whatever came next.
+		client.disconnect()
+		await sleep(60)
+
+		expect(FakeWebSocket.instances.length).toBe(socketsBefore)
+		expect(client.connected).toBe(false)
+	})
+
 	test('a burst of refused attempts whose closes land late converges on a single reconnect chain', async () => {
 		const client = new BridgeClient({
 			url: 'ws://localhost:1',
