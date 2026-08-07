@@ -417,6 +417,19 @@ async function provisionEmailSending(
 	)
 }
 
+/**
+ * Whether Cloudflare owns this record and will refuse a write to it.
+ *
+ * → KEY: enabling Email Routing or onboarding a sending domain makes Cloudflare write AND LOCK
+ *   records of its own, and one of them lands on a name a config may legitimately want: the DMARC
+ *   policy at `_dmarc.<domain>` sits at the apex, not under the `cf-bounce` subdomain the rest of
+ *   the managed set uses. A locked record answers a write with HTTP 400 code 1046, which reaches
+ *   the operator as a bare Cloudflare error naming neither the record nor what to do about it.
+ */
+function isCloudflareManaged(record: DnsRecord): boolean {
+	return record.meta?.read_only === true || record.meta?.email_routing === true
+}
+
 /** Whether a live record already matches every field the config declared. */
 function sameRecord(live: DnsRecord, declared: DnsRecord): boolean {
 	return (
@@ -496,6 +509,23 @@ async function provisionDnsRecords(
 
 		if (sameRecord(target, record)) {
 			result.existing.push(`DNS ${label} (zone ${zone.name})`)
+			continue
+		}
+
+		// Cloudflare owns it, so the declared value is NOT what is live — and it never will be by
+		// re-running. Reported rather than thrown, and the asymmetry with the ambiguous-set error above
+		// is deliberate: that one throws because guessing could DESTROY an unrelated record, while this
+		// one destroys nothing. It only means a value the config claims to control is not in effect,
+		// which must not block shipping the worker that this deploy is actually about.
+		if (isCloudflareManaged(target)) {
+			result.warnings.push(
+				`${label} in zone ${zone.name} is managed by Cloudflare Email and cannot be written, so it still ` +
+					`reads "${target.content}" rather than the declared "${record.content}". ` +
+					'Enabling Email Routing or onboarding a sending domain writes and locks records of its own. ' +
+					'For a DMARC policy this matters more than it looks: without your own `rua=`, aggregate ' +
+					'reports go nowhere and there is no evidence on which to tighten the policy. ' +
+					'Unlock it under Email → DNS records, or drop the declaration and let Cloudflare keep it.'
+			)
 			continue
 		}
 

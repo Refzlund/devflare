@@ -72,7 +72,12 @@ export async function resolveZone(
 		)
 		const zone = zones[0]
 		if (zone) {
-			return { id: zone.id, name: zone.name, domain, isSubdomain: domain !== zone.name }
+			return {
+				id: zone.id,
+				name: zone.name,
+				domain,
+				isSubdomain: domain !== zone.name
+			}
 		}
 	}
 
@@ -372,6 +377,21 @@ export interface DnsRecord {
 	priority?: number
 	/** A note Cloudflare stores with the record. */
 	comment?: string
+
+	/**
+	 * Cloudflare's own flags for the record. Read, never sent.
+	 *
+	 * → GOTCHA: `meta` is typed as an OPAQUE object in Cloudflare's published schema, and these two
+	 *   keys are observed on real responses rather than documented. So they are optional and read
+	 *   defensively: a record whose `meta` says nothing is treated as ordinary, which is the safe
+	 *   default — the worst case is attempting a write that Cloudflare then refuses out loud.
+	 */
+	meta?: {
+		/** Cloudflare manages this record and refuses writes to it — HTTP 400, code 1046. */
+		read_only?: boolean
+		/** Email Routing or Email Sending owns it. Set together with `read_only` in practice. */
+		email_routing?: boolean
+	}
 }
 
 /**

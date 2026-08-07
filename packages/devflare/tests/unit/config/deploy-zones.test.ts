@@ -24,7 +24,12 @@ import type { DevflareConfig } from '../../../src/config/schema'
 
 /** A zone lookup that answers for `example.com` and treats anything under it as a subdomain. */
 function zoneFor(domain: string) {
-	return { id: 'zone_1', name: 'example.com', domain, isSubdomain: domain !== 'example.com' }
+	return {
+		id: 'zone_1',
+		name: 'example.com',
+		domain,
+		isSubdomain: domain !== 'example.com'
+	}
 }
 
 /** Every zone call as a mock, with read-only defaults a test can override per case. */
@@ -32,10 +37,17 @@ function makeZoneApi(overrides: Partial<ZoneProvisionApi> = {}) {
 	return {
 		resolveZone: mock(async (domain: string) => zoneFor(domain)),
 		listDestinationAddresses: mock(async () => [
-			{ tag: 'da_1', email: 'someone@example.net', verified: '2026-01-01T00:00:00Z' }
+			{
+				tag: 'da_1',
+				email: 'someone@example.net',
+				verified: '2026-01-01T00:00:00Z'
+			}
 		]),
 		createDestinationAddress: mock(async (_accountId: string, email: string) => ({ email })),
-		getEmailRoutingSettings: mock(async () => ({ enabled: true, status: 'ready' })),
+		getEmailRoutingSettings: mock(async () => ({
+			enabled: true,
+			status: 'ready'
+		})),
 		enableEmailRouting: mock(async () => ({ enabled: true })),
 		listEmailRoutingRules: mock(async () => []),
 		createEmailRoutingRule: mock(async (_zoneId: string, rule) => rule),
@@ -64,7 +76,11 @@ async function provision(
 	zones: DevflareConfig['zones'],
 	api: ZoneProvisionApi
 ): Promise<ZoneProvisionResult> {
-	const result: ZoneProvisionResult = { created: [], existing: [], warnings: [] }
+	const result: ZoneProvisionResult = {
+		created: [],
+		existing: [],
+		warnings: []
+	}
 	await provisionZoneResources(zones, 'acct_1', api, result)
 	return result
 }
@@ -102,7 +118,11 @@ describe('provisionZoneResources — Email Routing', () => {
 
 		const result = await provision(
 			{
-				'example.com': { emailRouting: { rules: [{ to: 'support@example.com', worker: 'api' }] } }
+				'example.com': {
+					emailRouting: {
+						rules: [{ to: 'support@example.com', worker: 'api' }]
+					}
+				}
 			},
 			api
 		)
@@ -124,7 +144,11 @@ describe('provisionZoneResources — Email Routing', () => {
 				{
 					tag: 'r1',
 					matchers: [
-						{ type: 'literal' as const, field: 'to' as const, value: 'support@example.com' }
+						{
+							type: 'literal' as const,
+							field: 'to' as const,
+							value: 'support@example.com'
+						}
 					],
 					actions: [{ type: 'worker' as const, value: ['api'] }]
 				}
@@ -133,7 +157,11 @@ describe('provisionZoneResources — Email Routing', () => {
 
 		const result = await provision(
 			{
-				'example.com': { emailRouting: { rules: [{ to: 'support@example.com', worker: 'api' }] } }
+				'example.com': {
+					emailRouting: {
+						rules: [{ to: 'support@example.com', worker: 'api' }]
+					}
+				}
 			},
 			api
 		)
@@ -152,7 +180,11 @@ describe('provisionZoneResources — Email Routing', () => {
 				{
 					tag: 'r1',
 					matchers: [
-						{ type: 'literal' as const, field: 'to' as const, value: 'support@example.com' }
+						{
+							type: 'literal' as const,
+							field: 'to' as const,
+							value: 'support@example.com'
+						}
 					],
 					actions: [{ type: 'forward' as const, value: ['someone@example.net'] }]
 				}
@@ -161,7 +193,11 @@ describe('provisionZoneResources — Email Routing', () => {
 
 		const result = await provision(
 			{
-				'example.com': { emailRouting: { rules: [{ to: 'support@example.com', worker: 'api' }] } }
+				'example.com': {
+					emailRouting: {
+						rules: [{ to: 'support@example.com', worker: 'api' }]
+					}
+				}
 			},
 			api
 		)
@@ -196,11 +232,18 @@ describe('provisionZoneResources — Email Routing', () => {
 
 	test('routing OFF without `enable` fails, and the message says how to fix it', async () => {
 		const api = makeZoneApi({
-			getEmailRoutingSettings: mock(async () => ({ enabled: false, status: 'unconfigured' }))
+			getEmailRoutingSettings: mock(async () => ({
+				enabled: false,
+				status: 'unconfigured'
+			}))
 		})
 
 		const failure = provision(
-			{ 'example.com': { emailRouting: { rules: [{ to: 'support@example.com', drop: true }] } } },
+			{
+				'example.com': {
+					emailRouting: { rules: [{ to: 'support@example.com', drop: true }] }
+				}
+			},
 			api
 		)
 
@@ -215,7 +258,10 @@ describe('provisionZoneResources — Email Routing', () => {
 
 	test('routing OFF with `enable: true` is authorization, and it turns it on', async () => {
 		const api = makeZoneApi({
-			getEmailRoutingSettings: mock(async () => ({ enabled: false, status: 'unconfigured' }))
+			getEmailRoutingSettings: mock(async () => ({
+				enabled: false,
+				status: 'unconfigured'
+			}))
 		})
 
 		const result = await provision(
@@ -237,7 +283,11 @@ describe('provisionZoneResources — Email Routing', () => {
 
 		const forwarding = makeZoneApi()
 		const result = await provision(
-			{ 'example.com': { emailRouting: { catchAll: { forward: ['someone@example.net'] } } } },
+			{
+				'example.com': {
+					emailRouting: { catchAll: { forward: ['someone@example.net'] } }
+				}
+			},
 			forwarding
 		)
 		expect(forwarding.setEmailRoutingCatchAll).toHaveBeenCalledTimes(1)
@@ -259,14 +309,18 @@ describe('provisionZoneResources — Email Routing', () => {
 		await provision({ 'example.com': { emailRouting: { catchAll: { drop: true } } } }, api)
 
 		expect(api.setEmailRoutingCatchAll).toHaveBeenCalledTimes(1)
-		expect(api.setEmailRoutingCatchAll.mock.calls[0]?.[1]).toMatchObject({ enabled: true })
+		expect(api.setEmailRoutingCatchAll.mock.calls[0]?.[1]).toMatchObject({
+			enabled: true
+		})
 	})
 })
 
 describe('provisionZoneResources — forwarding destinations', () => {
 	const forwards = {
 		'example.com': {
-			emailRouting: { rules: [{ to: 'press@example.com', forward: ['new@example.net'] }] }
+			emailRouting: {
+				rules: [{ to: 'press@example.com', forward: ['new@example.net'] }]
+			}
 		}
 	}
 
@@ -318,7 +372,11 @@ describe('provisionZoneResources — forwarding destinations', () => {
 	test('a verified address is left alone and says nothing alarming', async () => {
 		const api = makeZoneApi({
 			listDestinationAddresses: mock(async () => [
-				{ tag: 'da_1', email: 'NEW@Example.NET', verified: '2026-01-01T00:00:00Z' }
+				{
+					tag: 'da_1',
+					email: 'NEW@Example.NET',
+					verified: '2026-01-01T00:00:00Z'
+				}
 			])
 		})
 
@@ -332,7 +390,11 @@ describe('provisionZoneResources — forwarding destinations', () => {
 	test('the catch-all forward counts too, and a domain with no forward asks nothing', async () => {
 		const withCatchAll = makeZoneApi()
 		await provision(
-			{ 'example.com': { emailRouting: { catchAll: { forward: ['new@example.net'] } } } },
+			{
+				'example.com': {
+					emailRouting: { catchAll: { forward: ['new@example.net'] } }
+				}
+			},
 			withCatchAll
 		)
 		expect(withCatchAll.createDestinationAddress).toHaveBeenCalledTimes(1)
@@ -340,7 +402,11 @@ describe('provisionZoneResources — forwarding destinations', () => {
 		// A worker/drop-only domain must not pay for the lookup at all.
 		const noForward = makeZoneApi()
 		await provision(
-			{ 'example.com': { emailRouting: { rules: [{ to: 'a@example.com', drop: true }] } } },
+			{
+				'example.com': {
+					emailRouting: { rules: [{ to: 'a@example.com', drop: true }] }
+				}
+			},
 			noForward
 		)
 		expect(noForward.listDestinationAddresses).not.toHaveBeenCalled()
@@ -417,7 +483,9 @@ describe('provisionZoneResources — Email Sending', () => {
 	test('`unlocked` passes — the records exist and are correct', async () => {
 		// Only that one has had its managed lock cleared. Warning here would cry wolf on a working setup.
 		const api = makeZoneApi({
-			getSendingDomainDnsStatus: mock(async () => ({ status: 'unlocked' as const }))
+			getSendingDomainDnsStatus: mock(async () => ({
+				status: 'unlocked' as const
+			}))
 		})
 
 		const result = await provision({ 'example.com': { emailSending: {} } }, api)
@@ -503,6 +571,86 @@ describe('provisionZoneResources — DNS', () => {
 		expect(result.created.join('\n')).toContain('updated from "v=DMARC1; p=quarantine"')
 	})
 
+	test('a record CLOUDFLARE owns is reported, not written — and the write is never attempted', async () => {
+		// The collision that actually happens: onboarding a sending domain writes and locks a DMARC policy
+		// at `_dmarc.<domain>` — the apex, not the `cf-bounce` subdomain the rest of the managed set uses,
+		// so it lands on exactly the name a config wants for its own `rua=`. A write to it answers HTTP 400
+		// code 1046, which reaches the operator as a bare Cloudflare error naming neither the record nor the
+		// remedy. Warned rather than thrown: nothing is destroyed, and a reporting record must not block
+		// shipping the worker the deploy is about.
+		const api = makeZoneApi({
+			listDnsRecords: mock(async () => [
+				{
+					id: 'rec_locked',
+					type: 'TXT',
+					name: '_dmarc.example.com',
+					content: 'v=DMARC1; p=reject;',
+					ttl: 1,
+					meta: { read_only: true, email_routing: true }
+				}
+			])
+		})
+
+		const result = await provision(dmarc, api)
+
+		expect(api.updateDnsRecord).not.toHaveBeenCalled()
+		expect(api.createDnsRecord).not.toHaveBeenCalled()
+
+		const warning = result.warnings.join('\n')
+		expect(warning).toContain('_dmarc.example.com')
+		expect(warning).toContain('v=DMARC1; p=reject;')
+		expect(warning).toContain('v=DMARC1; p=none')
+		expect(warning).toContain('rua=')
+	})
+
+	test('a managed record whose content ALREADY matches is ordinary, not a warning', async () => {
+		// The guard must fire on divergence, not on the lock. A locked record that already says what the
+		// config says is a converged deploy — warning there would cry wolf on every run of a working setup,
+		// which is how a warning stops being read at all.
+		const api = makeZoneApi({
+			listDnsRecords: mock(async () => [
+				{
+					id: 'rec_locked',
+					type: 'TXT',
+					name: '_dmarc.example.com',
+					content: 'v=DMARC1; p=none',
+					ttl: 1,
+					comment: DEVFLARE_RECORD_COMMENT,
+					meta: { read_only: true }
+				}
+			])
+		})
+
+		const result = await provision(dmarc, api)
+
+		expect(result.warnings).toEqual([])
+		expect(result.existing).toContain('DNS TXT _dmarc.example.com (zone example.com)')
+	})
+
+	test('a record with NO meta is treated as ordinary and still rewritten', async () => {
+		// `meta` is opaque in Cloudflare's published schema and these keys are observed rather than
+		// documented, so the guard reads them defensively. Absent meta must mean "ordinary record" — the
+		// alternative, treating unknown as managed, would silently stop reconciling every normal record.
+		const api = makeZoneApi({
+			listDnsRecords: mock(async () => [
+				{
+					id: 'rec_1',
+					type: 'TXT',
+					name: '_dmarc.example.com',
+					content: 'v=DMARC1; p=quarantine',
+					ttl: 1,
+					comment: DEVFLARE_RECORD_COMMENT,
+					meta: {}
+				}
+			])
+		})
+
+		const result = await provision(dmarc, api)
+
+		expect(api.updateDnsRecord).toHaveBeenCalledTimes(1)
+		expect(result.warnings).toEqual([])
+	})
+
 	test('a drifted TTL or MX PRIORITY is reconciled too, not silently reported as correct', async () => {
 		// MX priority is a live mail-delivery decision, and the documented contract is that a declared
 		// record does not stay at a value the config disagrees with. Comparing only `content` would
@@ -539,7 +687,10 @@ describe('provisionZoneResources — DNS', () => {
 		)
 
 		expect(api.updateDnsRecord).toHaveBeenCalledTimes(1)
-		expect(api.updateDnsRecord.mock.calls[0]?.[2]).toMatchObject({ ttl: 3600, priority: 10 })
+		expect(api.updateDnsRecord.mock.calls[0]?.[2]).toMatchObject({
+			ttl: 3600,
+			priority: 10
+		})
 	})
 
 	test('an AMBIGUOUS record set is refused rather than guessed at', async () => {
@@ -555,12 +706,21 @@ describe('provisionZoneResources — DNS', () => {
 					name: 'example.com',
 					content: 'google-site-verification=AbCdEf'
 				},
-				{ id: 'rec_other', type: 'TXT', name: 'example.com', content: 'something-else' }
+				{
+					id: 'rec_other',
+					type: 'TXT',
+					name: 'example.com',
+					content: 'something-else'
+				}
 			])
 		})
 
 		const failure = provision(
-			{ 'example.com': { dns: [{ type: 'TXT', name: '@', content: 'v=spf1 -all' }] } },
+			{
+				'example.com': {
+					dns: [{ type: 'TXT', name: '@', content: 'v=spf1 -all' }]
+				}
+			},
 			api
 		)
 
@@ -593,7 +753,11 @@ describe('provisionZoneResources — DNS', () => {
 		})
 
 		await provision(
-			{ 'example.com': { dns: [{ type: 'TXT', name: '@', content: 'v=spf1 -all' }] } },
+			{
+				'example.com': {
+					dns: [{ type: 'TXT', name: '@', content: 'v=spf1 -all' }]
+				}
+			},
 			api
 		)
 
@@ -626,7 +790,10 @@ describe('provisionZoneResources — shape of the pass itself', () => {
 		// records; if the next call then fails and the progress is lost with the return value, the
 		// operator is told only what Cloudflare said and never learns their mail was just redirected.
 		const api = makeZoneApi({
-			getEmailRoutingSettings: mock(async () => ({ enabled: false, status: 'unconfigured' })),
+			getEmailRoutingSettings: mock(async () => ({
+				enabled: false,
+				status: 'unconfigured'
+			})),
 			createEmailRoutingRule: mock(async () => {
 				throw new Error('Cloudflare 400: destination not verified')
 			})
@@ -636,7 +803,10 @@ describe('provisionZoneResources — shape of the pass itself', () => {
 		const failure = provisionZoneResources(
 			{
 				'example.com': {
-					emailRouting: { enable: true, rules: [{ to: 'support@example.com', drop: true }] }
+					emailRouting: {
+						enable: true,
+						rules: [{ to: 'support@example.com', drop: true }]
+					}
 				}
 			},
 			'acct_1',
@@ -672,7 +842,10 @@ describe('the deploy path guards zone provisioning', () => {
 		return makeZoneApi({
 			listSendingDomains: mock(async () => []),
 			listDestinationAddresses: mock(async () => []),
-			getEmailRoutingSettings: mock(async () => ({ enabled: false, status: 'unconfigured' })),
+			getEmailRoutingSettings: mock(async () => ({
+				enabled: false,
+				status: 'unconfigured'
+			})),
 			getEmailRoutingCatchAll: mock(async () => ({
 				enabled: false,
 				matchers: [{ type: 'all' as const }],
