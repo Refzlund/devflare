@@ -1,5 +1,6 @@
 import { type ChildProcess, spawn } from 'node:child_process'
 import type { ConsolaInstance } from 'consola'
+import { RUNTIME_STATUS_URL_ENV } from './runtime-status'
 import { waitForViteReady } from './vite-utils'
 
 export interface StartViteProcessOptions {
@@ -7,6 +8,13 @@ export interface StartViteProcessOptions {
 	configPath?: string
 	vitePort: number
 	miniflarePort: number
+	/**
+	 * Absolute URL of the coordinator's runtime-status listener, exposed to the app
+	 * process as `DEVFLARE_RUNTIME_STATUS_URL`. Its ABSENCE is meaningful — the bridge
+	 * connect path reads that as "no coordinator to ask" and keeps its old, modest
+	 * retry budget rather than assuming a reload is under way.
+	 */
+	runtimeStatusUrl?: string
 	generatedViteConfigPath: string | null
 	/**
 	 * Local R2 presign context, exposed to the app process as
@@ -21,8 +29,16 @@ export interface StartViteProcessOptions {
  * Start the Vite dev server process.
  */
 export async function startViteProcess(options: StartViteProcessOptions): Promise<ChildProcess> {
-	const { cwd, configPath, vitePort, miniflarePort, generatedViteConfigPath, r2Presign, logger } =
-		options
+	const {
+		cwd,
+		configPath,
+		vitePort,
+		miniflarePort,
+		runtimeStatusUrl,
+		generatedViteConfigPath,
+		r2Presign,
+		logger
+	} = options
 
 	const args = ['vite', 'dev', '--port', String(vitePort)]
 	if (generatedViteConfigPath) {
@@ -37,6 +53,7 @@ export async function startViteProcess(options: StartViteProcessOptions): Promis
 			...process.env,
 			DEVFLARE_DEV: 'true',
 			DEVFLARE_BRIDGE_PORT: String(miniflarePort),
+			...(runtimeStatusUrl ? { [RUNTIME_STATUS_URL_ENV]: runtimeStatusUrl } : {}),
 			...(configPath ? { DEVFLARE_CONFIG_PATH: configPath } : {}),
 			...(r2Presign
 				? {

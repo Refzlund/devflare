@@ -25,6 +25,13 @@ export const RUNTIME_PROBE_FAILURE_THRESHOLD = 3
 /** How long a single probe waits for the connection before counting as a failure. */
 export const RUNTIME_PROBE_TIMEOUT_MS = 1000
 /**
+ * Budget for the probe that answers a runtime-status request, kept well under
+ * {@link RUNTIME_PROBE_TIMEOUT_MS}. An app is blocked on this answer, and a loopback
+ * connect that has not been accepted in a quarter second is not going to serve the
+ * request either — "not answering" is the useful reading, promptly.
+ */
+export const RUNTIME_STATUS_PROBE_TIMEOUT_MS = 250
+/**
  * How many times an outage may be recovered before the watchdog stands down. A runtime that dies
  * immediately on every rebuild is broken in a way retrying cannot fix; looping on it would bury the
  * real error under restart noise.
@@ -108,6 +115,15 @@ export interface RuntimeWatchdogOptions {
 export interface RuntimeWatchdog {
 	/** Stop probing. Idempotent. */
 	stop(): void
+	/**
+	 * Whether the watch ended because the recovery budget was spent, as opposed to
+	 * the server shutting it down.
+	 *
+	 * The distinction is only visible from here, and it is the difference between
+	 * "the runtime is coming back" and "nothing further is coming" — which the
+	 * runtime-status channel hands to a waiting app so it stops waiting.
+	 */
+	readonly gaveUp: boolean
 }
 
 /**
@@ -137,6 +153,8 @@ export function createRuntimeWatchdog(options: RuntimeWatchdogOptions): RuntimeW
 	let consecutiveFailures = 0
 	// Counts rebuilds since the runtime was last seen alive; a successful probe clears it.
 	let recoveryAttempts = 0
+	// Set only on the give-up path, never by the server's own teardown.
+	let gaveUp = false
 
 	function scheduleNext(): void {
 		if (stopped) return
@@ -171,6 +189,7 @@ export function createRuntimeWatchdog(options: RuntimeWatchdogOptions): RuntimeW
 				`The local runtime keeps going away after ${recoveryAttemptLimit} rebuild attempts. ` +
 					'Giving up so the real error stays visible — restart `devflare dev` once it is resolved.'
 			)
+			gaveUp = true
 			stop()
 			return
 		}
@@ -198,5 +217,10 @@ export function createRuntimeWatchdog(options: RuntimeWatchdogOptions): RuntimeW
 
 	scheduleNext()
 
-	return { stop }
+	return {
+		stop,
+		get gaveUp() {
+			return gaveUp
+		}
+	}
 }

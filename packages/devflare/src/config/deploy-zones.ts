@@ -26,6 +26,7 @@
 	  DELETED — a zone always carries rules and records this config never mentioned.
 */
 
+import type { DestinationAddress } from '../cloudflare/email-addresses'
 import type {
 	DnsRecord,
 	EmailRoutingAction,
@@ -41,6 +42,10 @@ import type { DevflareConfig } from './schema'
 export interface ZoneProvisionApi {
 	/** Find the zone governing a domain, walking up to its apex. */
 	resolveZone: (domain: string, accountId: string) => Promise<ResolvedZone>
+	/** Every destination address on the ACCOUNT — where forwarded mail is allowed to go. */
+	listDestinationAddresses: (accountId: string) => Promise<DestinationAddress[]>
+	/** Add one, which is what sends its owner the verification email. */
+	createDestinationAddress: (accountId: string, email: string) => Promise<DestinationAddress>
 	/** Read whether Email Routing is on. */
 	getEmailRoutingSettings: (zoneId: string) => Promise<EmailRoutingSettings>
 	/** Turn Email Routing on. Rewrites the zone's MX records. */
@@ -155,6 +160,68 @@ function ruleAddress(rule: EmailRoutingRule): string | null {
 }
 
 /**
+ * @description Make sure every address a rule forwards to exists as a destination on the account.
+ *
+ * @param accountId - the account destination addresses belong to.
+ * @param declared - the domain's `emailRouting` block, whose rules and catch-all name the addresses.
+ * @param api - the injected Cloudflare calls.
+ * @param result - the caller's accumulator, appended to in place.
+ *
+ * → KEY: this is the step that SENDS THE VERIFICATION EMAIL, and it has to run before the rules that
+ *   need it. Creating a forwarding rule does NOT create the destination — Cloudflare accepts the rule
+ *   against an address it has never heard of and then silently drops every message, with no error, no
+ *   bounce and no log. Nobody can click a verification link that was never sent, so a deploy that
+ *   created only the rule left the operator waiting for mail that could not arrive.
+ * → NOTE: an address that exists but is UNVERIFIED is a warning rather than a failure. The click
+ *   belongs to whoever owns that mailbox and may reasonably happen minutes or days later; failing the
+ *   deploy would make a correct configuration unshippable until somebody read their email.
+ */
+async function provisionForwardDestinations(
+	accountId: string,
+	declared: NonNullable<NonNullable<DevflareConfig['zones']>[string]['emailRouting']>,
+	api: ZoneProvisionApi,
+	result: ZoneProvisionResult
+): Promise<void> {
+	const wanted = new Set(
+		[
+			...(declared.rules ?? []).flatMap((rule) => rule.forward ?? []),
+			...(declared.catchAll?.forward ?? [])
+		].map((address) => address.toLowerCase())
+	)
+	if (wanted.size === 0) return
+
+	const live = await api.listDestinationAddresses(accountId)
+	const byAddress = new Map(live.map((address) => [address.email.toLowerCase(), address]))
+
+	for (const address of wanted) {
+		const existing = byAddress.get(address)
+
+		if (!existing) {
+			await api.createDestinationAddress(accountId, address)
+			result.created.push(`Destination address ${address} — verification email sent`)
+			result.warnings.push(
+				`${address} was added as a forwarding destination and Cloudflare has emailed it a verification link. ` +
+					'Until somebody opens that mailbox and clicks it, every rule forwarding there is accepted and then ' +
+					'silently drops the message.'
+			)
+			continue
+		}
+
+		// Absence of a timestamp IS the unverified state — Cloudflare publishes no boolean for it.
+		if (!existing.verified) {
+			result.warnings.push(
+				`${address} is a known forwarding destination but is NOT verified yet, so mail forwarded there is ` +
+					'silently dropped. Check that mailbox for Cloudflare verification link, or re-send it from ' +
+					'Email → Email Routing → Destination addresses.'
+			)
+			continue
+		}
+
+		result.existing.push(`Destination address ${address}`)
+	}
+}
+
+/**
  * @description Bring one zone's Email Routing to the declared state.
  *
  * @param zone - the resolved zone, and the domain it was reached through.
@@ -164,6 +231,7 @@ function ruleAddress(rule: EmailRoutingRule): string | null {
  * @throws {ZoneProvisionError} when routing is off and `enable` was not given.
  */
 async function provisionEmailRouting(
+	accountId: string,
 	zone: ResolvedZone,
 	declared: NonNullable<NonNullable<DevflareConfig['zones']>[string]['emailRouting']>,
 	api: ZoneProvisionApi,
@@ -189,6 +257,11 @@ async function provisionEmailRouting(
 	} else {
 		result.existing.push(`Email Routing: ${zone.name}`)
 	}
+
+	// BEFORE the rules, because a rule forwarding to an address the account does not know is accepted
+	// and then silently drops every message — and creating the address is what sends the verification
+	// email somebody has to click.
+	await provisionForwardDestinations(accountId, declared, api, result)
 
 	await provisionRoutingRules(zone, declared.rules ?? [], api, result)
 
@@ -474,7 +547,7 @@ export async function provisionZoneResources(
 		}
 
 		if (declared.emailRouting) {
-			await provisionEmailRouting(zone, declared.emailRouting, api, result)
+			await provisionEmailRouting(accountId, zone, declared.emailRouting, api, result)
 		}
 
 		if (declared.dns) {

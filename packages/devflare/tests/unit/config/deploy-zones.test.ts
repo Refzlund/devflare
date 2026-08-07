@@ -31,6 +31,10 @@ function zoneFor(domain: string) {
 function makeZoneApi(overrides: Partial<ZoneProvisionApi> = {}) {
 	return {
 		resolveZone: mock(async (domain: string) => zoneFor(domain)),
+		listDestinationAddresses: mock(async () => [
+			{ tag: 'da_1', email: 'someone@example.net', verified: '2026-01-01T00:00:00Z' }
+		]),
+		createDestinationAddress: mock(async (_accountId: string, email: string) => ({ email })),
 		getEmailRoutingSettings: mock(async () => ({ enabled: true, status: 'ready' })),
 		enableEmailRouting: mock(async () => ({ enabled: true })),
 		listEmailRoutingRules: mock(async () => []),
@@ -256,6 +260,90 @@ describe('provisionZoneResources — Email Routing', () => {
 
 		expect(api.setEmailRoutingCatchAll).toHaveBeenCalledTimes(1)
 		expect(api.setEmailRoutingCatchAll.mock.calls[0]?.[1]).toMatchObject({ enabled: true })
+	})
+})
+
+describe('provisionZoneResources — forwarding destinations', () => {
+	const forwards = {
+		'example.com': {
+			emailRouting: { rules: [{ to: 'press@example.com', forward: ['new@example.net'] }] }
+		}
+	}
+
+	test('an unknown forward address is ADDED, which is what sends the verification email', async () => {
+		// The whole reason this step exists. Creating the RULE does not create the ADDRESS — Cloudflare
+		// accepts a rule pointing at an address it has never heard of, then silently drops every message.
+		// Nobody can click a link that was never sent.
+		const api = makeZoneApi()
+
+		const result = await provision(forwards, api)
+
+		expect(api.createDestinationAddress).toHaveBeenCalledTimes(1)
+		expect(api.createDestinationAddress.mock.calls[0]?.[1]).toBe('new@example.net')
+		expect(result.created.join('\n')).toContain('verification email sent')
+		expect(result.warnings.join('\n')).toContain('silently drops')
+	})
+
+	test('it runs BEFORE the rule that needs it', async () => {
+		const order: string[] = []
+		const api = makeZoneApi({
+			createDestinationAddress: mock(async (_accountId: string, email: string) => {
+				order.push('address')
+				return { email }
+			}),
+			createEmailRoutingRule: mock(async (_zoneId: string, rule) => {
+				order.push('rule')
+				return rule
+			})
+		})
+
+		await provision(forwards, api)
+
+		expect(order).toEqual(['address', 'rule'])
+	})
+
+	test('an address that exists but is UNVERIFIED warns rather than failing', async () => {
+		// The click belongs to whoever owns that mailbox and may happen days later. Failing here would
+		// make a correct configuration unshippable until somebody read their email.
+		const api = makeZoneApi({
+			listDestinationAddresses: mock(async () => [{ tag: 'da_1', email: 'new@example.net' }])
+		})
+
+		const result = await provision(forwards, api)
+
+		expect(api.createDestinationAddress).not.toHaveBeenCalled()
+		expect(result.warnings.join('\n')).toContain('NOT verified yet')
+	})
+
+	test('a verified address is left alone and says nothing alarming', async () => {
+		const api = makeZoneApi({
+			listDestinationAddresses: mock(async () => [
+				{ tag: 'da_1', email: 'NEW@Example.NET', verified: '2026-01-01T00:00:00Z' }
+			])
+		})
+
+		const result = await provision(forwards, api)
+
+		expect(api.createDestinationAddress).not.toHaveBeenCalled()
+		expect(result.warnings).toEqual([])
+		expect(result.existing).toContain('Destination address new@example.net')
+	})
+
+	test('the catch-all forward counts too, and a domain with no forward asks nothing', async () => {
+		const withCatchAll = makeZoneApi()
+		await provision(
+			{ 'example.com': { emailRouting: { catchAll: { forward: ['new@example.net'] } } } },
+			withCatchAll
+		)
+		expect(withCatchAll.createDestinationAddress).toHaveBeenCalledTimes(1)
+
+		// A worker/drop-only domain must not pay for the lookup at all.
+		const noForward = makeZoneApi()
+		await provision(
+			{ 'example.com': { emailRouting: { rules: [{ to: 'a@example.com', drop: true }] } } },
+			noForward
+		)
+		expect(noForward.listDestinationAddresses).not.toHaveBeenCalled()
 	})
 })
 
@@ -583,6 +671,7 @@ describe('the deploy path guards zone provisioning', () => {
 	function worstCaseApi() {
 		return makeZoneApi({
 			listSendingDomains: mock(async () => []),
+			listDestinationAddresses: mock(async () => []),
 			getEmailRoutingSettings: mock(async () => ({ enabled: false, status: 'unconfigured' })),
 			getEmailRoutingCatchAll: mock(async () => ({
 				enabled: false,
@@ -610,6 +699,7 @@ describe('the deploy path guards zone provisioning', () => {
 		expect(api.createDnsRecord).not.toHaveBeenCalled()
 		expect(api.updateDnsRecord).not.toHaveBeenCalled()
 		expect(api.createSendingDomain).not.toHaveBeenCalled()
+		expect(api.createDestinationAddress).not.toHaveBeenCalled()
 	}
 
 	test('describeOnly performs no zone mutation, while still reading the real state', async () => {
@@ -668,6 +758,7 @@ describe('the deploy path guards zone provisioning', () => {
 		expect(api.setEmailRoutingCatchAll).toHaveBeenCalledTimes(1)
 		expect(api.updateDnsRecord).toHaveBeenCalledTimes(1)
 		expect(api.createSendingDomain).toHaveBeenCalledTimes(1)
+		expect(api.createDestinationAddress).toHaveBeenCalledTimes(1)
 	})
 
 	test('a non-preview NAMED environment still provisions', async () => {

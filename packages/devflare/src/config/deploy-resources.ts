@@ -17,6 +17,7 @@ import {
 	listR2Buckets,
 	listVectorizeIndexes
 } from '../cloudflare/account'
+import { createDestinationAddress, listDestinationAddresses } from '../cloudflare/email-addresses'
 import { createEventSubscription, listEventSubscriptions } from '../cloudflare/event-subscriptions'
 import { getEffectiveAccountId } from '../cloudflare/preferences'
 import {
@@ -87,6 +88,8 @@ interface DeployResourcePreparationApi {
 	listSendingDomains: ZoneProvisionApi['listSendingDomains']
 	createSendingDomain: ZoneProvisionApi['createSendingDomain']
 	getSendingDomainDnsStatus: ZoneProvisionApi['getSendingDomainDnsStatus']
+	listDestinationAddresses: ZoneProvisionApi['listDestinationAddresses']
+	createDestinationAddress: ZoneProvisionApi['createDestinationAddress']
 	listEventSubscriptions: SubscriptionProvisionApi['listEventSubscriptions']
 	createEventSubscription: SubscriptionProvisionApi['createEventSubscription']
 }
@@ -117,6 +120,8 @@ const defaultDeployResourcePreparationApi: DeployResourcePreparationApi = {
 	listSendingDomains,
 	createSendingDomain,
 	getSendingDomainDnsStatus,
+	listDestinationAddresses,
+	createDestinationAddress,
 	listEventSubscriptions,
 	createEventSubscription
 }
@@ -600,6 +605,9 @@ export async function prepareMaterializedConfigResourcesForDeploy(
 			enabled: true
 		})
 		cloudflareApi.createEventSubscription = async (_accountId: string, subscription) => subscription
+		cloudflareApi.createDestinationAddress = async (_accountId: string, email: string) => ({
+			email
+		})
 	}
 
 	// C13 — sequential provisioning leaves silent orphans. We do not

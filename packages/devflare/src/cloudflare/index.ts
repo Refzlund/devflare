@@ -438,6 +438,8 @@ export type {
 	SendingDomainDnsStatus
 } from './zone-resources'
 
+export { listDestinationAddresses, createDestinationAddress } from './email-addresses'
+export type { DestinationAddress } from './email-addresses'
 export { listEventSubscriptions, createEventSubscription } from './event-subscriptions'
 export type {
 	EventSubscription,

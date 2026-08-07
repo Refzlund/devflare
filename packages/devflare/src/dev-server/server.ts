@@ -38,11 +38,14 @@ import { buildMiniflareDevConfig, resolveR2PresignOrigin } from './miniflare-dev
 import { createMiniflareLog } from './miniflare-log'
 import { createReloadQueue } from './reload-queue'
 import {
+	RUNTIME_STATUS_PROBE_TIMEOUT_MS,
 	type RuntimeWatchdog,
 	createRuntimeWatchdog,
 	dialableHost,
 	probeTcpReachable
 } from './runtime-health'
+import type { DevRuntimeState } from './runtime-status'
+import { startRuntimeStatusService } from './runtime-status-service'
 import { createRuntimeStdioForwarder } from './runtime-stdio'
 import {
 	logMiniflareBindingDiagnostics,
@@ -134,9 +137,14 @@ export function createDevServer(options: DevServerOptions): DevServer {
 	// URLs stay valid; only injected when the config declares R2 bindings.
 	const r2PresignSecret = `${crypto.randomUUID()}${crypto.randomUUID()}`
 
-	/** Whether the local runtime is still accepting connections. */
-	async function isRuntimeReachable(): Promise<boolean> {
-		return probeTcpReachable({ host: dialableHost(miniflareHost), port: miniflarePort })
+	/**
+	 * Whether the local runtime is still accepting connections.
+	 *
+	 * @param timeoutMs - How long to wait for the connect; the default suits the watchdog,
+	 *   while a request blocked on {@link readRuntimeState} wants a much shorter one.
+	 */
+	async function isRuntimeReachable(timeoutMs?: number): Promise<boolean> {
+		return probeTcpReachable({ host: dialableHost(miniflareHost), port: miniflarePort, timeoutMs })
 	}
 
 	/**
@@ -235,6 +243,26 @@ export function createDevServer(options: DevServerOptions): DevServer {
 			onRuntimeLost: () => reloadQueue.schedule(),
 			logger
 		})
+	}
+
+	/**
+	 * Settle what this dev server would tell a waiting app about its runtime.
+	 *
+	 * Answers the runtime-status channel, whose whole value is letting an app tell an
+	 * outage it should ride out from one it should fail on. The last line is why this
+	 * probes live rather than reporting cached belief: a workerd that dies on its own
+	 * leaves the queue idle and the watchdog needing three probes (~6s) to notice, so
+	 * every cached answer in that window would say `ready` — which is exactly the
+	 * window that produced the misleading "binding is missing" this channel exists to
+	 * end. A runtime that is not answering while this process is still here is
+	 * `reloading` in the sense the caller cares about: something is coming.
+	 */
+	async function readRuntimeState(): Promise<DevRuntimeState> {
+		if (isStopping) return 'stopping'
+		if (!hasStartedRuntime) return 'starting'
+		if (runtimeWatchdog?.gaveUp) return 'failed'
+		if (reloadQueue.busy) return 'reloading'
+		return (await isRuntimeReachable(RUNTIME_STATUS_PROBE_TIMEOUT_MS)) ? 'ready' : 'reloading'
 	}
 
 	async function bundleMainWorker(): Promise<void> {
@@ -558,11 +586,18 @@ export function createDevServer(options: DevServerOptions): DevServer {
 		await startWorkerSourceWatcher()
 
 		if (state.enableVite) {
+			// Started here, immediately before the process that reads it: only the app Vite
+			// hosts asks, and standing the listener up any earlier would leave a bound port
+			// behind if a startup step between here and there threw.
+			state.runtimeStatusService = await startRuntimeStatusService(readRuntimeState)
+			logger?.debug(`Runtime status channel → ${state.runtimeStatusService.url}`)
+
 			state.viteProcess = await startViteProcess({
 				cwd,
 				configPath,
 				vitePort,
 				miniflarePort,
+				runtimeStatusUrl: state.runtimeStatusService.url,
 				generatedViteConfigPath: state.generatedViteConfigPath,
 				r2Presign: state.config.bindings?.r2
 					? {

@@ -141,6 +141,15 @@ export class BridgeClient {
 
 	private connectPromise: Promise<void> | null = null
 	private isConnected = false
+	/**
+	 * The one pending auto-reconnect, held so it can be cancelled.
+	 *
+	 * Untracked, it outlived the client that scheduled it: a drop schedules a reconnect a second out,
+	 * an explicit `disconnect()` (or `resetClient()`) arrives before it fires, and the timer then opens
+	 * a fresh socket to the bridge on behalf of a client nobody holds any more. `autoReconnect = false`
+	 * did not help — it is read when the reconnect is SCHEDULED, not when it fires.
+	 */
+	private reconnectTimer: ReturnType<typeof setTimeout> | null = null
 
 	constructor(options: BridgeClientOptions = {}) {
 		this.url = options.url ?? `ws://localhost:${DEFAULT_BRIDGE_PORT}`
@@ -283,9 +292,17 @@ export class BridgeClient {
 		})
 	}
 
+	/** Cancel the pending auto-reconnect, if one is scheduled. Idempotent. */
+	private cancelScheduledReconnect(): void {
+		if (this.reconnectTimer === null) return
+		clearTimeout(this.reconnectTimer)
+		this.reconnectTimer = null
+	}
+
 	/** Disconnect from the bridge and tear down all pending state */
 	disconnect(): void {
 		this.autoReconnect = false
+		this.cancelScheduledReconnect()
 		// Closing the codec rejects any pending RPC calls registered there
 		// with the codec's own "v2 transport closed" error; cleanupPending()
 		// then layers the BridgeClient-level streams/ws teardown.
@@ -321,9 +338,14 @@ export class BridgeClient {
 
 		this.cleanupPending(new Error('Bridge disconnected'))
 
-		// Auto-reconnect
+		// Auto-reconnect. Replacing any timer already pending keeps a run of drops to ONE attempt in
+		// flight, and re-reading `autoReconnect` inside the callback closes the window in which an
+		// explicit disconnect lands between scheduling and firing.
+		this.cancelScheduledReconnect()
 		if (this.autoReconnect) {
-			setTimeout(() => {
+			this.reconnectTimer = setTimeout(() => {
+				this.reconnectTimer = null
+				if (!this.autoReconnect) return
 				this.connect().catch((error) => {
 					bridgeLog.warn('auto-reconnect attempt failed', error)
 				})

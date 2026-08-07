@@ -18,6 +18,15 @@ export interface ReloadQueue {
 	schedule(): Promise<void>
 	/** Wait until there is no running or pending reload. */
 	drain(): Promise<void>
+	/**
+	 * Whether a reload is running, or already queued behind one.
+	 *
+	 * Read by the runtime-status channel to tell an app "the runtime is coming back,
+	 * keep waiting" from "nothing is going to fix this". A trailing request counts:
+	 * from the app's side the outage lasts until the queue is empty, not until the
+	 * reload that happens to be in flight right now finishes.
+	 */
+	readonly busy: boolean
 }
 
 export function createReloadQueue({ reload, logger }: ReloadQueueOptions): ReloadQueue {
@@ -64,5 +73,11 @@ export function createReloadQueue({ reload, logger }: ReloadQueueOptions): Reloa
 		}
 	}
 
-	return { schedule, drain }
+	return {
+		schedule,
+		drain,
+		get busy() {
+			return running !== null || pending !== null
+		}
+	}
 }

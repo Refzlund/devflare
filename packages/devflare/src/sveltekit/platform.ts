@@ -7,6 +7,11 @@
 
 import { type BindingHints, createEnvProxy, getClient, setBindingHints } from '../bridge'
 import { type DevflareConfig, loadConfig } from '../config'
+import {
+	type DevRuntimeReading,
+	getRuntimeStatusUrl,
+	readDevRuntimeState
+} from '../dev-server/runtime-status'
 import { createFetchEvent, runWithEventContext } from '../runtime/context'
 import { extractBindingHints } from '../test/binding-hints'
 import { buildSvelteKitLocalBindings, overlayLocalBindings } from './local-bindings'
@@ -114,53 +119,179 @@ export function drainWaitUntilErrors(platform: Platform): unknown[] {
 }
 
 /**
- * Total budget for riding out a transient bridge outage while (re)connecting for a request. An HMR worker
- * reload or a brief coordinator restart drops the bridge socket for well under a second; retrying within this
- * window keeps the request's bindings available instead of failing it. Kept modest so a bridge that is
- * genuinely down (devflare not running) still surfaces the error promptly rather than hanging every request.
+ * Budget for riding out a bridge outage NOBODY has vouched for — either because no dev coordinator
+ * published a status channel (a hand-started `vite dev`, an older dev server) or because the one that
+ * did says its runtime is up. Long enough for the sub-second gap of a socket that is merely mid-accept,
+ * short enough that a bridge which is genuinely down surfaces promptly instead of hanging every request.
  */
 const BRIDGE_CONNECT_MAX_WAIT_MS = 3000
-/** Delay between bridge (re)connect attempts within {@link BRIDGE_CONNECT_MAX_WAIT_MS}. */
+/**
+ * Budget while the dev coordinator affirmatively says its runtime is starting or coming back.
+ *
+ * Far longer than {@link BRIDGE_CONNECT_MAX_WAIT_MS}, and safely so: it applies only while something
+ * that survives the outage keeps promising to end it, and collapses back the moment that promise stops.
+ * It has to be this generous because the coordinator's own recovery is — three failed probes at 2s each
+ * before a death is even declared, then a rebuild and a re-migration. The old flat 3s could not outlast
+ * the DETECTION half alone, which is why every such outage reached the app as a lost binding.
+ */
+const BRIDGE_CONNECT_RELOAD_MAX_WAIT_MS = 30_000
+/** Delay between bridge (re)connect attempts. */
 const BRIDGE_CONNECT_RETRY_DELAY_MS = 150
 
+/** Which of the mutually exclusive causes left this request without bindings. */
+export type BridgeUnavailableReason =
+	/** The dev coordinator did not answer — `devflare dev` is not running. */
+	| 'coordinator-unreachable'
+	/** The coordinator gave up rebuilding its runtime; nothing further is coming. */
+	| 'runtime-failed'
+	/** The coordinator is shutting down. */
+	| 'coordinator-stopping'
+	/** The coordinator kept saying "coming back", but not within the budget. */
+	| 'reload-timeout'
+	/** The bridge simply refused for the whole budget, with nobody to explain why. */
+	| 'connect-timeout'
+
 /**
- * Connect to the bridge, riding out a TRANSIENT outage with a bounded retry.
+ * The bridge could not be reached for this request, and WHY — in devflare's own words.
  *
- * The bridge socket drops for a fraction of a second whenever the dev runtime reloads a worker (HMR /
- * config change) or the coordinator briefly restarts (e.g. after a worker threw). A single per-request
- * `connect()` attempt rejects the instant the socket is refused, which the SvelteKit handle turns into
- * "dropped every binding for this request" — so an unrelated route 500s with a missing D1/KV/R2 binding
- * mid-reload. Retrying for a short window instead lets the reconnect land and the request proceed. The LAST
- * error is rethrown only once the budget is spent (the bridge really is down), so a genuine
- * misconfiguration still fails fast rather than hanging.
+ * The message matters as much as the type. Before this existed the failure reached the developer as
+ * their own app's "`<BINDING>` binding is missing — run via `devflare dev`", which names a cause that
+ * is not the cause and prescribes a fix they have already applied.
+ */
+export class BridgeUnavailableError extends Error {
+	readonly reason: BridgeUnavailableReason
+
+	constructor(reason: BridgeUnavailableReason, message: string, cause?: unknown) {
+		super(message, { cause })
+		this.name = 'BridgeUnavailableError'
+		this.reason = reason
+	}
+}
+
+/** One sentence per cause, written for whoever is reading their dev console. */
+function explainBridgeFailure(reason: BridgeUnavailableReason, waitedMs: number): string {
+	switch (reason) {
+		case 'coordinator-unreachable':
+			return 'the devflare dev coordinator is not answering, so nothing is going to bring the local runtime back — is `devflare dev` still running?'
+		case 'runtime-failed':
+			return 'devflare dev gave up rebuilding the local runtime — the underlying failure is in its output.'
+		case 'coordinator-stopping':
+			return 'devflare dev is shutting down.'
+		case 'reload-timeout':
+			return `the local runtime was still reloading after ${waitedMs}ms.`
+		case 'connect-timeout':
+			return `the bridge refused a connection for ${waitedMs}ms — the local runtime may not be running.`
+	}
+}
+
+/**
+ * Build the error a failed connect surfaces.
+ *
+ * The last transport error is kept BOTH as `cause` and inline in the message: the message is what
+ * reaches a console or an error overlay, and dropping "WebSocket connection failed" from it would
+ * trade one incomplete story for another.
+ */
+function bridgeUnavailable(
+	reason: BridgeUnavailableReason,
+	options: { waitedMs: number; bridgeUrl?: string; cause?: unknown }
+): BridgeUnavailableError {
+	const where = options.bridgeUrl ? ` (bridge ${options.bridgeUrl})` : ''
+	const cause = options.cause instanceof Error ? `: ${options.cause.message}` : ''
+	const message = `[devflare] Cloudflare bindings are unavailable — ${explainBridgeFailure(reason, options.waitedMs)}${where}${cause}`
+	return new BridgeUnavailableError(reason, message, options.cause)
+}
+
+/** Readings that mean waiting is pointless, mapped to the reason they are reported as. */
+const HOPELESS_READINGS: Partial<Record<DevRuntimeReading, BridgeUnavailableReason>> = {
+	unreachable: 'coordinator-unreachable',
+	failed: 'runtime-failed',
+	stopping: 'coordinator-stopping'
+}
+
+/**
+ * Connect to the bridge, riding out an outage for exactly as long as it is worth riding out.
+ *
+ * The bridge endpoint is served from inside the workerd runtime, so it goes away on every reload of
+ * that runtime — an HMR worker change, a config change, a watchdog rebuild. A single per-request
+ * `connect()` rejects the instant the socket is refused, which the handle turns into "no bindings for
+ * this request", and an unrelated route 500s mid-reload.
+ *
+ * Retrying fixes that, but a flat budget cannot: the app cannot see the difference between a runtime
+ * that is coming back and a dev server that was never started, and those two want opposite answers —
+ * wait as long as it takes, versus fail immediately. `readRuntimeState` is what tells them apart. Ask
+ * the coordinator, which is a plain Node process that outlives every runtime reload:
+ *
+ * - it says `reloading`/`starting` → keep waiting on the generous budget, re-asking each round so the
+ *   budget collapses the moment it stops promising;
+ * - it says `ready` → the modest budget; the runtime is up, so a refusal that persists is a real fault;
+ * - it says `failed`/`stopping`, or does not answer at all → fail NOW. This is the case a long budget
+ *   used to punish, and the reason the budget could never be long enough to cover a rebuild.
+ *
+ * With no reader supplied the behaviour is unchanged from before this existed: the modest budget, then
+ * the failure. That is the path a hand-started `vite dev` takes.
  *
  * Exported for unit testing; `sleep`/`now` are injectable so the retry schedule is asserted without real time.
  *
  * @param connect - the bridge client's `connect()`; a fresh attempt each call (the client dedups in-flight ones).
- * @param options - `maxWaitMs` total budget, `retryDelayMs` between attempts, and injectable `sleep`/`now` for tests.
+ * @param options - the two budgets, the delay between attempts, the optional coordinator reader, the
+ *   `bridgeUrl` to name in the error, and injectable `sleep`/`now` for tests.
+ * @throws {BridgeUnavailableError} naming which of the causes ended the attempt.
  */
 export async function connectBridgeWithRetry(
 	connect: () => Promise<void>,
 	options: {
 		maxWaitMs?: number
+		reloadMaxWaitMs?: number
 		retryDelayMs?: number
+		readRuntimeState?: () => Promise<DevRuntimeReading>
+		bridgeUrl?: string
 		sleep?: (ms: number) => Promise<void>
 		now?: () => number
 	} = {}
 ): Promise<void> {
 	const maxWaitMs = options.maxWaitMs ?? BRIDGE_CONNECT_MAX_WAIT_MS
+	const reloadMaxWaitMs = options.reloadMaxWaitMs ?? BRIDGE_CONNECT_RELOAD_MAX_WAIT_MS
 	const retryDelayMs = options.retryDelayMs ?? BRIDGE_CONNECT_RETRY_DELAY_MS
 	const sleep = options.sleep ?? ((ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)))
 	const now = options.now ?? Date.now
-	const deadline = now() + maxWaitMs
+	const readRuntimeState = options.readRuntimeState
+
+	const startedAt = now()
+	// The generous budget is a ceiling, never a shortening: a caller that asks for a longer plain
+	// `maxWaitMs` than the reload budget keeps it.
+	const reloadDeadline = startedAt + Math.max(maxWaitMs, reloadMaxWaitMs)
+	let deadline = startedAt + maxWaitMs
+	let timedOutReason: BridgeUnavailableReason = 'connect-timeout'
 
 	for (;;) {
 		try {
 			await connect()
 			return
 		} catch (error) {
-			// Stop once another delay would run past the budget — rethrow the outage as-is.
-			if (now() + retryDelayMs >= deadline) throw error
+			if (readRuntimeState) {
+				const state = await readRuntimeState()
+				const hopeless = HOPELESS_READINGS[state]
+				if (hopeless) {
+					throw bridgeUnavailable(hopeless, {
+						waitedMs: now() - startedAt,
+						bridgeUrl: options.bridgeUrl,
+						cause: error
+					})
+				}
+
+				const comingBack = state !== 'ready'
+				deadline = comingBack ? reloadDeadline : startedAt + maxWaitMs
+				timedOutReason = comingBack ? 'reload-timeout' : 'connect-timeout'
+			}
+
+			// Stop once another delay would run past the budget.
+			if (now() + retryDelayMs >= deadline) {
+				throw bridgeUnavailable(timedOutReason, {
+					waitedMs: now() - startedAt,
+					bridgeUrl: options.bridgeUrl,
+					cause: error
+				})
+			}
 			await sleep(retryDelayMs)
 		}
 	}
@@ -212,9 +343,15 @@ export async function createDevflarePlatform(
 	// Get/create bridge client
 	const client = getClient({ url: bridgeUrl })
 
-	// Connect to bridge — riding out a transient outage (an HMR worker reload / brief coordinator restart)
-	// so a mid-reload request keeps its bindings instead of 500ing with a "binding is missing" error.
-	await connectBridgeWithRetry(() => client.connect())
+	// Connect to bridge — riding out an outage the dev coordinator says it is ending, so a mid-reload
+	// request keeps its bindings instead of 500ing with a "binding is missing" error. The status URL is
+	// published by `devflare dev` into the process it spawns; without one the retry keeps its old,
+	// modest budget rather than assuming anybody is coming.
+	const runtimeStatusUrl = getRuntimeStatusUrl()
+	await connectBridgeWithRetry(() => client.connect(), {
+		bridgeUrl,
+		readRuntimeState: runtimeStatusUrl ? () => readDevRuntimeState(runtimeStatusUrl) : undefined
+	})
 
 	// Create env proxy with hints
 	const env = overlayLocalBindings(createEnvProxy({ client, hints, strict: true }), localBindings)
@@ -371,26 +508,75 @@ function resolveWithPlatformContext<
 }
 
 /**
- * Build this request's dev platform, reporting a failure instead of throwing.
+ * A platform that serves the request but refuses its bindings, with the real reason.
  *
- * A dev request should still be served when the bridge is unreachable — just without bindings — so the
- * failure is deliberately swallowed here. Equally deliberately, this covers ONLY the setup: resolving
- * options and connecting. An error raised by the request itself belongs to the request. Catching that
- * here (as one try around setup AND `resolve()` used to) blamed it on the platform, hid the real cause,
- * and re-ran the whole request — repeating every side effect and running the second pass outside the
- * context {@link resolveWithPlatformContext} established for the first.
+ * The third option, and the right one. Failing the whole request would turn a 200ms bridge blip into a
+ * broken dev server for everything that never touches a binding — an asset, a static page, the Vite
+ * client. Serving unbridged (what this used to do, by leaving `event.platform` unset) kept those
+ * working but handed every request that DID touch a binding to the app's own "`<BINDING>` is missing —
+ * run via `devflare dev`", which blames the developer for the one thing they are already doing.
+ *
+ * So: serve, and let the absence describe itself at the moment it is actually reached.
+ *
+ * The tradeoff, deliberately taken: an app that treats a missing binding as a soft signal
+ * (`if (!platform.env.DB) …`) now throws where it used to branch. In dev, under a coordinator that has
+ * just told us the runtime is gone, a loud cause beats a silent fallback down a path the developer did
+ * not know they were on.
+ *
+ * @param cause - the failure to report; thrown as-is on the first binding read.
+ * @returns a platform whose `context`/`caches`/`cf` work normally and whose `env` throws.
+ */
+function createUnavailablePlatform(cause: unknown): Platform {
+	const pendingErrors: unknown[] = []
+	const env = new Proxy({} as Record<string, unknown>, {
+		get(_target, prop: string | symbol) {
+			// Symbols are never a binding; they are how a runtime inspects an object it was handed
+			// (`Symbol.toStringTag`, node's inspect hooks), and throwing at THOSE would move the failure
+			// to a console.log far from any binding. `then` for the same reason: were this object ever
+			// awaited or resolved through, V8 reads `.then` first, and a throw there is unreadable.
+			if (typeof prop !== 'string' || prop === 'then') return undefined
+			throw cause
+		},
+		has: () => false,
+		ownKeys: () => [],
+		getOwnPropertyDescriptor: () => undefined
+	})
+
+	return {
+		env,
+		context: createDevExecutionContext(pendingErrors),
+		caches: {
+			default: createMockCache(),
+			open: async () => createMockCache()
+		} as unknown as CacheStorage,
+		cf: {},
+		pendingErrors
+	}
+}
+
+/**
+ * Build this request's dev platform, degrading to {@link createUnavailablePlatform} instead of throwing.
+ *
+ * Deliberately covers ONLY the setup: resolving options and connecting. An error raised by the request
+ * itself belongs to the request. Catching that here (as one try around setup AND `resolve()` used to)
+ * blamed it on the platform, hid the real cause, and re-ran the whole request — repeating every side
+ * effect and running the second pass outside the context {@link resolveWithPlatformContext} established
+ * for the first.
  *
  * @param resolveOptions - produces the platform options; may itself fail (config load, hint extraction).
- * @returns the platform, or null when it could not be built.
+ * @returns a usable platform, or one that reports `error` when a binding is read.
  */
 async function createPlatformOrReport(
 	resolveOptions: () => Promise<DevflarePlatformOptions>
-): Promise<Platform | null> {
+): Promise<Platform> {
 	try {
 		return await createDevflarePlatform(await resolveOptions())
 	} catch (error) {
-		console.error('[devflare] Failed to create platform:', error)
-		return null
+		// The error's own message now carries the diagnosis; the object is logged whole so its stack
+		// and `cause` survive. The old prefix said "Failed to create platform", which was true and
+		// useless — it named the symptom devflare saw, not the thing the developer has to fix.
+		console.error('[devflare] Cloudflare bindings are unavailable for this request:', error)
+		return createUnavailablePlatform(error)
 	}
 }
 
@@ -485,9 +671,12 @@ export function createHandle<
 			: process.env.NODE_ENV !== 'production' && process.env.DEVFLARE_DEV === 'true'
 
 		if (enabled) {
-			const platform = await createPlatformOrReport(() => getCustomPlatformOptions(platformOptions))
-			// Only a failure to BUILD the platform falls through to an unbridged resolve.
-			if (platform) return serveWithPlatform(event, resolve, platform)
+			// Always a platform, even when the bridge is gone — see createUnavailablePlatform.
+			return serveWithPlatform(
+				event,
+				resolve,
+				await createPlatformOrReport(() => getCustomPlatformOptions(platformOptions))
+			)
 		}
 
 		return resolve(event)
@@ -534,9 +723,8 @@ export const handle = async <
 	const enabled = process.env.NODE_ENV !== 'production' && process.env.DEVFLARE_DEV === 'true'
 
 	if (enabled) {
-		const platform = await createPlatformOrReport(getAutoPlatformOptions)
-		// Only a failure to BUILD the platform falls through to an unbridged resolve.
-		if (platform) return serveWithPlatform(event, resolve, platform)
+		// Always a platform, even when the bridge is gone — see createUnavailablePlatform.
+		return serveWithPlatform(event, resolve, await createPlatformOrReport(getAutoPlatformOptions))
 	}
 
 	return resolve(event)

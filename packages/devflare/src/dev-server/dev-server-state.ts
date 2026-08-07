@@ -20,6 +20,7 @@ import type { resolveServiceBindings } from '../test/resolve-service-bindings'
 import { clearEmailDeliverySink } from '../utils/email-delivery'
 import { clearLocalSendEmailBindings } from '../utils/send-email'
 import type { RouteDiscoveryResult } from '../worker-entry/routes'
+import type { RuntimeStatusService } from './runtime-status-service'
 import { stopSpawnedProcessTree } from './vite-utils'
 import type { WorkerSurfacePaths } from './worker-surface-paths'
 
@@ -56,6 +57,8 @@ export interface DevServerState {
 	outboundEmailService: OutboundEmailService | null
 	/** IMAP poller feeding a real mailbox into `src/email.ts`, when enabled. */
 	inboundEmailPoller: InboundEmailPoller | null
+	/** Loopback listener telling the app process what the local runtime is doing. */
+	runtimeStatusService: RuntimeStatusService | null
 }
 
 /**
@@ -94,7 +97,8 @@ export function createDevServerState(initial: {
 		generatedViteConfigPath: null,
 		emailRuntime: null,
 		outboundEmailService: null,
-		inboundEmailPoller: null
+		inboundEmailPoller: null,
+		runtimeStatusService: null
 	}
 }
 
@@ -108,10 +112,12 @@ export function createDevServerState(initial: {
  * 2. Worker source watcher (stop FS callbacks before Miniflare disposal)
  * 3. Miniflare itself
  * 4. Vite child process (after Miniflare so requests cannot race shutdown)
- * 5. Browser shim
- * 6. Inbound email poller (stop reading a mailbox before the runtime it feeds)
- * 7. Outbound email service
- * 8. Local sendEmail registry + delivery sink reset
+ * 5. Runtime status listener (after Vite: it exists to answer that process, and
+ *    a request still in flight should read `stopping` rather than nothing at all)
+ * 6. Browser shim
+ * 7. Inbound email poller (stop reading a mailbox before the runtime it feeds)
+ * 8. Outbound email service
+ * 9. Local sendEmail registry + delivery sink reset
  */
 export async function disposeDevServerState(state: DevServerState): Promise<void> {
 	if (state.doBundler) {
@@ -138,6 +144,11 @@ export async function disposeDevServerState(state: DevServerState): Promise<void
 	if (state.viteProcess) {
 		await stopSpawnedProcessTree(state.viteProcess)
 		state.viteProcess = null
+	}
+
+	if (state.runtimeStatusService) {
+		await state.runtimeStatusService.close()
+		state.runtimeStatusService = null
 	}
 
 	if (state.browserShim) {
