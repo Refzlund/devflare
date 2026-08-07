@@ -64,6 +64,7 @@
     "dev-server-host-port",
     "dev-server-runtime-watchdog",
     "devflare-persist-dir-env",
+    "dns-record-managed-by-cloudflare",
     "do-bundle-inline-dynamic-imports-warning",
     "docs-contract-honesty",
     "email-host-service-close-drops-sockets",
