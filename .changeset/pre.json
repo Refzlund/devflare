@@ -65,6 +65,7 @@
     "do-bundle-inline-dynamic-imports-warning",
     "docs-contract-honesty",
     "email-outbox-relay-inbound",
+    "env-absent-in-dev-and-public-tier",
     "fix-typed-env-vars-proxy-assignability",
     "generated-dir-override",
     "generated-dir-remaining-sites",
