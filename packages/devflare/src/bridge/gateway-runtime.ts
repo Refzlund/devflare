@@ -579,7 +579,25 @@ function handleBridgeBinaryMessage(buffer, wsProxies) {
 }
 
 async function handleBridgeJsonMessage(data, ws, env, ctx, wsProxies) {
-	const msg = JSON.parse(data)
+	let msg
+	try {
+		msg = JSON.parse(data)
+	} catch (error) {
+		// A text frame that is not JSON is not a bridge frame at all: whatever is
+		// on the other end of this socket is not a devflare bridge client and is
+		// speaking its own protocol (a browser sending its first liveness probe,
+		// say). Reported rather than parsed, because a bare JSON.parse SyntaxError
+		// names neither the peer nor the situation — it reads as a devflare
+		// serialization bug, and it repeats on every frame the peer sends.
+		const text = String(data)
+		const preview = text.length > 120 ? text.slice(0, 120) + '...' : text
+		throw new Error(
+			'A client that does not speak the devflare bridge protocol is connected to the bridge socket. ' +
+				'Expected a JSON bridge frame, received: ' + JSON.stringify(preview) + '. ' +
+				'An application WebSocket route must be served by the app worker, not by this socket.',
+			{ cause: error }
+		)
+	}
 	switch (msg.t) {
 		case 'hello':
 			// v2 handshake — acknowledge with welcome echoing the negotiated

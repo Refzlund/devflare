@@ -16,6 +16,14 @@
 // app worker and passes its 101 through, so both connections reach one DO
 // instance and hibernation broadcasts work. This mirrors the multi-worker
 // topology built by buildMiniflareDevConfig (gateway + app + do-<binding>).
+//
+// The last two tests cover the OTHER half of that pass-through, which the first
+// fix left swallowed: an app route that REFUSES the upgrade. The gateway kept
+// only a 101 and discarded everything else, falling through to the bridge socket
+// — so a 401 from an expired token was answered 101, the client believed it had
+// reached its own route, sent its first frame, and the gateway logged
+// `"ping" is not valid JSON` every liveness probe while the refusal never
+// arrived. The app worker owns every unmatched WS upgrade, refusals included.
 // =============================================================================
 
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
@@ -59,12 +67,21 @@ export class DocRoom extends DurableObject {
 }
 `
 
-// The consumer's SvelteKit-route shape: forward the CLIENT upgrade request to the
-// DO and return its 101 verbatim (and forward the /count probe too).
+// The consumer's SvelteKit-route shape: authenticate, then forward the CLIENT
+// upgrade request to the DO and return its 101 verbatim (and forward the /count
+// probe too). An expired token is refused BEFORE the DO is reached — a plain
+// (non-101) Response on a request carrying `Upgrade: websocket`, which is the
+// answer the browser must receive.
 const appWorkerSource = `
 export default {
 	async fetch(request, env) {
 		const url = new URL(request.url)
+		if (url.searchParams.get('token') === 'expired') {
+			return new Response(JSON.stringify({ error: 'unauthorized' }), {
+				status: 401,
+				headers: { 'Content-Type': 'application/json' }
+			})
+		}
 		const id = url.searchParams.get('id') || 'default'
 		const stub = env.DOC_ROOM.get(env.DOC_ROOM.idFromName(id))
 		return stub.fetch(request)
@@ -205,4 +222,49 @@ describe('DO WebSocket via an app-worker route (gateway -> app -> stub.fetch)', 
 
 		b.close()
 	})
+
+	test("a refused upgrade reaches the caller as the app's own response, not a bridge 101", async () => {
+		// A plain request carrying the upgrade header, so the refusal is readable as
+		// an ordinary response. `miniflare.dispatchFetch` cannot express this: it
+		// opens a real `ws` client for an upgrade request, and a non-101 answer there
+		// escapes as an unhandled 'error' rather than a Response.
+		const response = await fetch(
+			`http://127.0.0.1:${PORT}/api/doc/subscribe?id=room&token=expired`,
+			{
+				headers: { Upgrade: 'websocket', Connection: 'Upgrade' }
+			}
+		)
+
+		// The gateway used to discard this and answer 101 with its own bridge RPC
+		// socket, standing in for a route that said no.
+		expect(response.status).toBe(401)
+		expect(await response.json()).toEqual({ error: 'unauthorized' })
+	})
+
+	test('a browser WS to a refused route fails the handshake instead of joining the bridge socket', async () => {
+		const WS = await importWs()
+		const ws = new WS(
+			`ws://127.0.0.1:${PORT}/api/doc/subscribe?id=room&token=expired`
+		) as WebSocket & { on?: (event: string, listener: (arg: unknown) => void) => void }
+
+		const outcome = await new Promise<string>((resolve) => {
+			const timer = setTimeout(() => resolve('HUNG'), 8000)
+			ws.addEventListener('open', () => {
+				clearTimeout(timer)
+				resolve('OPENED — the client was upgraded into the bridge socket')
+			})
+			// The refusal has to be taken on the EventEmitter channel: bun substitutes
+			// its own implementation for `ws`, and there an addEventListener('error')
+			// listener does not count as one, so a failed handshake surfaces as an
+			// unhandled 'error' that aborts the whole file. The status itself is not
+			// readable here either (bun does not implement ws's 'unexpected-response'),
+			// which is why the test above is the one that pins it to 401.
+			ws.on?.('error', (error) => {
+				clearTimeout(timer)
+				resolve(`REFUSED: ${(error as Error)?.message ?? String(error)}`)
+			})
+		})
+
+		expect(outcome).toStartWith('REFUSED')
+	}, 20000)
 })

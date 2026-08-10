@@ -59,19 +59,30 @@ export default {
 			if (matchedRoute) {
 				return handleDoWebSocket(request, env, url, matchedRoute)
 			}
-			// Worker mode: the app worker (SvelteKit etc.) owns app WebSocket routes.
-			// A handler like GET /api/doc/:id/subscribe that does
+			// Worker mode: the app worker (SvelteKit etc.) owns EVERY unmatched app
+			// WebSocket route, and whatever it answers is what the browser gets. A
+			// handler like GET /api/doc/:id/subscribe that does
 			// \`return stub.fetch(clientUpgradeRequest)\` must reach the app worker so
 			// its returned 101 (with the DO's client socket) flows back to the
-			// browser and the DO's hibernation handlers fire. The gateway previously
-			// hijacked EVERY unmatched WS upgrade into the in-worker bridge socket
-			// (handleBridgeWebSocket), so the app route never ran and two tabs never
-			// shared the DO. Forward to the app first; only fall back to the bridge
-			// socket when the app did not answer with a WebSocket upgrade (e.g. a
-			// Node-side bridge RPC client, which only exists when there is no app).
-			const appWsResponse = await forwardWebSocketToApp(request, env)
-			if (appWsResponse) {
-				return appWsResponse
+			// browser and the DO's hibernation handlers fire.
+			//
+			// → GOTCHA: there is no bridge fallback here, and adding one back is the
+			// bug. The gateway used to discard any answer that was not 101 and
+			// upgrade the browser into the in-worker bridge RPC socket instead — so
+			// a route that REFUSED the upgrade (401/403/404/500) still answered 101,
+			// the browser believed it had reached its own route, sent its own
+			// protocol's first frame, and the bridge dispatcher logged
+			// "… is not valid JSON" on every liveness probe while the real refusal
+			// never arrived. The bridge socket belongs to the Node-side bridge
+			// client, which cannot coexist with an app worker: APP_SERVICE_BINDING
+			// is non-null only when shouldRunMainWorker is true, which requires
+			// !enableVite (dev-server/miniflare-dev-config.ts), while that client IS
+			// the Vite/SvelteKit dev handle dialing ws://localhost:<bridgePort>
+			// (sveltekit/platform.ts, config/workspace.ts). Worker mode therefore
+			// has no bridge client to serve, and an app that serves its own WS at
+			// any path — '/' included — keeps it.
+			if (APP_SERVICE_BINDING) {
+				return forwardWebSocketToApp(request, env)
 			}
 			return handleBridgeWebSocket(request, env, ctx)
 		}
@@ -280,23 +291,25 @@ function matchWsRoute(pathname) {
 	return null
 }
 
-// Forward a WebSocket upgrade to the app worker (worker mode) and pass through
-// its response ONLY when the app answered with a genuine WebSocket upgrade
-// (status 101 + a webSocket). Returns null otherwise so the caller falls back to
-// the in-worker bridge socket. This is what lets an app route that does
-// \`return stub.fetch(clientUpgradeRequest)\` reach the DO and stream the DO's
-// client socket back to the browser (hibernation handlers then fire, and two
-// tabs share one DO instance). A GET upgrade has no body, so forwarding the same
-// request and — on a non-101 answer — discarding it is safe (no stream consumed).
+// Hand a WebSocket upgrade to the app worker (worker mode) and answer with its
+// response VERBATIM, whatever the status. An app route that upgrades answers 101
+// with the DO's client socket, which is what lets \`return stub.fetch(clientUpgradeRequest)\`
+// reach the DO and stream that socket back to the browser (hibernation handlers
+// then fire, and two tabs share one DO instance). An app route that REFUSES —
+// an auth check answering 401, a route that does not exist answering 404 — owns
+// that answer just as much, and the browser has to receive it: a refusal the
+// gateway rewrites into a successful handshake is a client connected to nothing
+// it asked for. A GET upgrade has no body, so forwarding the same request is safe.
 async function forwardWebSocketToApp(request, env) {
-	if (!APP_SERVICE_BINDING) return null
 	const appWorker = env[APP_SERVICE_BINDING]
-	if (!appWorker || typeof appWorker.fetch !== 'function') return null
-	const response = await appWorker.fetch(request)
-	if (response.status === 101 && response.webSocket) {
-		return response
+	if (!appWorker || typeof appWorker.fetch !== 'function') {
+		// Only reachable if the gateway was built with an app service binding name
+		// that miniflare did not bind — a devflare bug, not an app one. Say so;
+		// upgrading the browser into the bridge socket instead would hide it.
+		console.error('[Gateway] App service binding is not bound:', APP_SERVICE_BINDING)
+		return new Response('App service binding is not bound: ' + APP_SERVICE_BINDING, { status: 500 })
 	}
-	return null
+	return appWorker.fetch(request)
 }
 
 async function handleDoWebSocket(request, env, url, route) {
