@@ -8,6 +8,7 @@ import {
 	type ExecInvocation,
 	TEST_ACCOUNT_ID,
 	captureDeployEnvironmentSnapshot,
+	classifyWranglerUploadExecution,
 	cloudflareApiResponse,
 	createCliDependencies,
 	createLogger,
@@ -16,6 +17,7 @@ import {
 	disableCloudflareAccountResolution,
 	enableStrictDeployVerification,
 	isViteBuildExecution,
+	recordWranglerUpload,
 	restoreDeployEnvironmentSnapshot,
 	successResult,
 	writeAccountProjectFiles,
@@ -49,9 +51,16 @@ describe('build/deploy worker-only behavior', () => {
 		const logger = createLogger()
 		setDependencies(
 			createCliDependencies(
-				createProcessRunner((command, args) => {
+				createProcessRunner(async (command, args, executionOptions) => {
 					if (isViteBuildExecution(command, args)) {
 						throw new Error('vite build should not run for worker-only deploy')
+					}
+
+					// Record the upload the way a real Wrangler does — devflare now
+					// refuses to call a deploy successful without that evidence.
+					const uploadKind = classifyWranglerUploadExecution(command, args)
+					if (uploadKind) {
+						await recordWranglerUpload(executionOptions, { kind: uploadKind })
 					}
 
 					return successResult()
@@ -108,9 +117,16 @@ console.log('stub wrangler binary')
 		const logger = createLogger()
 		setDependencies(
 			createCliDependencies(
-				createProcessRunner((command, args) => {
+				createProcessRunner(async (command, args, executionOptions) => {
 					if (isViteBuildExecution(command, args)) {
 						throw new Error('vite build should not run for worker-only deploy')
+					}
+
+					// Record the upload the way a real Wrangler does — devflare now
+					// refuses to call a deploy successful without that evidence.
+					const uploadKind = classifyWranglerUploadExecution(command, args)
+					if (uploadKind) {
+						await recordWranglerUpload(executionOptions, { kind: uploadKind })
 					}
 
 					return successResult()
@@ -167,9 +183,16 @@ console.log('stub wrangler binary')
 		const logger = createLogger()
 		setDependencies(
 			createCliDependencies(
-				createProcessRunner((command, args) => {
+				createProcessRunner(async (command, args, executionOptions) => {
 					if (isViteBuildExecution(command, args)) {
 						throw new Error('vite build should not run for worker-only deploy')
+					}
+
+					// Record the upload the way a real Wrangler does — devflare now
+					// refuses to call a deploy successful without that evidence.
+					const uploadKind = classifyWranglerUploadExecution(command, args)
+					if (uploadKind) {
+						await recordWranglerUpload(executionOptions, { kind: uploadKind })
 					}
 
 					return successResult()
@@ -198,7 +221,18 @@ console.log('stub wrangler binary')
 
 		const executions: ExecInvocation[] = []
 		const logger = createLogger()
-		setDependencies(createCliDependencies(createProcessRunner(() => successResult(), executions)))
+		setDependencies(
+			createCliDependencies(
+				createProcessRunner(async (command, args, executionOptions) => {
+					const uploadKind = classifyWranglerUploadExecution(command, args)
+					if (uploadKind) {
+						await recordWranglerUpload(executionOptions, { kind: uploadKind })
+					}
+
+					return successResult()
+				}, executions)
+			)
+		)
 
 		const result = await runDeployCommand(
 			{
@@ -671,7 +705,16 @@ console.log('stub wrangler binary')
 			logger.messages.some((message) =>
 				message.args
 					.join(' ')
-					.includes('Deployment verification failed: Wrangler did not return a Worker version id')
+					.includes(
+						'Devflare could not prove which version of "worker-build-test-next" Cloudflare accepted'
+					)
+			)
+		).toBe(true)
+		// The fallbacks are the whole subject of this case, so the failure must
+		// say what each of them reported rather than dropping it.
+		expect(
+			logger.messages.some((message) =>
+				message.args.join(' ').includes('Cloudflare fallback checks also failed:')
 			)
 		).toBe(true)
 		expect(

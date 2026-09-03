@@ -6,11 +6,13 @@ import { runDeployCommand } from '../../../src/cli/commands/deploy'
 import { clearDependencies, setDependencies } from '../../../src/cli/dependencies'
 import {
 	type ExecInvocation,
+	classifyWranglerUploadExecution,
 	createCliDependencies,
 	createLogger,
 	createProcessRunner,
 	disableCloudflareAccountResolution,
 	readGeneratedDeployConfig,
+	recordWranglerUpload,
 	successResult
 } from './build-deploy-worker-only.test-utils'
 
@@ -112,7 +114,21 @@ describe('deploy env var descriptors', () => {
 		await writeEnvDescriptorProject(projectDir)
 		const executions: ExecInvocation[] = []
 		const logger = createLogger()
-		setDependencies(createCliDependencies(createProcessRunner(() => successResult(), executions)))
+		setDependencies(
+			createCliDependencies(
+				createProcessRunner(async (command, args, executionOptions) => {
+					const uploadKind = classifyWranglerUploadExecution(command, args)
+					if (uploadKind) {
+						await recordWranglerUpload(executionOptions, {
+							kind: uploadKind,
+							workerName: 'deploy-env-vars'
+						})
+					}
+
+					return successResult()
+				}, executions)
+			)
+		)
 
 		const result = await runDeployCommand(
 			{ command: 'deploy', args: [], options: { prod: true } },

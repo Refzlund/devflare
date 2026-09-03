@@ -20,11 +20,92 @@ export { createLogger, type TestLogger }
 
 export const TEST_ACCOUNT_ID = '0123456789abcdef0123456789abcdef'
 
+/** The version id the shared Wrangler-upload fixture records. */
+export const TEST_UPLOAD_VERSION_ID = '11111111-2222-4333-8444-555555555555'
+
+/**
+ * Classify a captured execution as the Wrangler upload devflare asked for.
+ *
+ * @param command - The spawned command; `bunx` for the bundled Wrangler, `node` for a project-local one.
+ * @param args - Its arguments.
+ * @returns The upload kind Wrangler was asked to perform, or `undefined` for anything else. `wrangler versions deploy` — the traffic-split half of a gradual rollout — deliberately returns `undefined`: it uploads nothing, so a fixture must not record an upload for it.
+ */
+export function classifyWranglerUploadExecution(
+	command: string,
+	args: string[]
+): 'deploy' | 'version-upload' | undefined {
+	const isWrangler =
+		(command === 'bunx' && args[0] === 'wrangler') ||
+		(command === 'node' && (args[0] ?? '').replace(/\\/g, '/').endsWith('/wrangler.js'))
+	if (!isWrangler) {
+		return undefined
+	}
+
+	const versionsIndex = args.indexOf('versions')
+	if (versionsIndex >= 0) {
+		return args[versionsIndex + 1] === 'upload' ? 'version-upload' : undefined
+	}
+
+	return args.includes('deploy') ? 'deploy' : undefined
+}
+
+/**
+ * Write the structured output a real Wrangler run appends when it uploads.
+ *
+ * @description Production spawns Wrangler with `stdio: 'inherit'`, so its
+ * console output never reaches devflare — the ND-JSON file named by
+ * `WRANGLER_OUTPUT_FILE_PATH` is the only in-band evidence a deploy has. A
+ * fixture that returns a stdout string models a run devflare cannot actually
+ * observe; this one models the run it can.
+ * @param executionOptions - The options the process runner was called with; the output path is read from its `env`.
+ * @param options.kind - Which upload entry to record; defaults to a full `deploy`.
+ * @param options.versionId - The version id to record. Pass `null` for the entry Wrangler writes on a dry run or an aborted deploy — an upload that never happened.
+ * @param options.workerName - The Worker name to record.
+ * @returns Nothing. A no-op when no output path was supplied, so a fixture can share one handler across invocations that do not set it.
+ */
+export async function recordWranglerUpload(
+	executionOptions: Record<string, unknown> | undefined,
+	options: {
+		kind?: 'deploy' | 'version-upload'
+		versionId?: string | null
+		workerName?: string
+	} = {}
+): Promise<void> {
+	const outputFilePath = String(
+		(executionOptions?.env as Record<string, unknown> | undefined)?.WRANGLER_OUTPUT_FILE_PATH ?? ''
+	)
+	if (!outputFilePath) {
+		return
+	}
+
+	const kind = options.kind ?? 'deploy'
+	const versionId = options.versionId === undefined ? TEST_UPLOAD_VERSION_ID : options.versionId
+	const lines = [
+		{
+			type: 'wrangler-session',
+			version: 1,
+			wrangler_version: '4.128.0',
+			command_line_args: [kind === 'deploy' ? 'deploy' : 'versions'],
+			log_file_path: '/tmp/wrangler-debug.log'
+		},
+		{
+			type: kind,
+			version: 1,
+			worker_name: options.workerName ?? 'worker-build-test',
+			worker_tag: 'test-worker-tag',
+			version_id: versionId
+		}
+	]
+
+	await writeFile(outputFilePath, `${lines.map((line) => JSON.stringify(line)).join('\n')}\n`)
+}
+
 export interface DeployEnvironmentSnapshot {
 	fetch: typeof fetch
 	token?: string
 	accountId?: string
 	verifyDeployment?: string
+	verifyDeploymentAttempts?: string
 	verifyDeploymentDelayMs?: string
 	requireFreshProductionDeployment?: string
 	deployMetadataPath?: string
@@ -40,6 +121,7 @@ export function captureDeployEnvironmentSnapshot(): DeployEnvironmentSnapshot {
 		token: process.env.CLOUDFLARE_API_TOKEN,
 		accountId: process.env.CLOUDFLARE_ACCOUNT_ID,
 		verifyDeployment: process.env.DEVFLARE_VERIFY_DEPLOYMENT,
+		verifyDeploymentAttempts: process.env.DEVFLARE_VERIFY_DEPLOYMENT_ATTEMPTS,
 		verifyDeploymentDelayMs: process.env.DEVFLARE_VERIFY_DEPLOYMENT_DELAY_MS,
 		requireFreshProductionDeployment: process.env.DEVFLARE_REQUIRE_FRESH_PRODUCTION_DEPLOYMENT,
 		deployMetadataPath: process.env.DEVFLARE_DEPLOY_METADATA_PATH
@@ -60,6 +142,10 @@ export function restoreDeployEnvironmentSnapshot(snapshot: DeployEnvironmentSnap
 	restoreOptionalEnvironmentVariable('CLOUDFLARE_API_TOKEN', snapshot.token)
 	restoreOptionalEnvironmentVariable('CLOUDFLARE_ACCOUNT_ID', snapshot.accountId)
 	restoreOptionalEnvironmentVariable('DEVFLARE_VERIFY_DEPLOYMENT', snapshot.verifyDeployment)
+	restoreOptionalEnvironmentVariable(
+		'DEVFLARE_VERIFY_DEPLOYMENT_ATTEMPTS',
+		snapshot.verifyDeploymentAttempts
+	)
 	restoreOptionalEnvironmentVariable(
 		'DEVFLARE_VERIFY_DEPLOYMENT_DELAY_MS',
 		snapshot.verifyDeploymentDelayMs

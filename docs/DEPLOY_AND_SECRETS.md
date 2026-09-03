@@ -118,6 +118,44 @@ and counts it as *existing* (reused) rather than creating it again. So:
 (The footer lists categories in a fixed cosmetic order that differs from the
 run order; that ordering carries no meaning.)
 
+## What makes a deploy "successful"
+
+**A zero exit code from Wrangler is not evidence that anything was uploaded**, so
+Devflare does not treat it as such. `devflare deploy` reports success only when it
+holds a **Worker version id** — the one thing that names what Cloudflare accepted.
+It looks for one in this order:
+
+1. **Wrangler's own structured output.** Devflare passes
+   `WRANGLER_OUTPUT_FILE_PATH` and reads the ND-JSON Wrangler appends there: a
+   `deploy` entry for `wrangler deploy`, a `version-upload` entry for
+   `wrangler versions upload`. This is the only in-band source, and it needs no
+   Cloudflare credentials — Wrangler is spawned with `stdio: 'inherit'`, so its
+   console output never reaches Devflare at all.
+2. **The Cloudflare API**, when an account id resolves: the latest version, then
+   the latest deployment, then the current live deployment.
+
+If none of them produces a version id, the deploy **fails** with exit `1` and a
+message naming which of four things happened — Wrangler wrote nothing at all;
+Wrangler ran but recorded no upload entry; Wrangler recorded an upload entry with
+no version id (what it writes for a dry run or an aborted deploy); or Wrangler
+recorded its own `command-failed`. The message also lists what each Cloudflare
+fallback reported and, where Wrangler wrote one, the path to its debug log for
+that run.
+
+This check is **always on**. `DEVFLARE_VERIFY_DEPLOYMENT` opts in to the extra
+control-plane round-trips *on top* of it (confirming the version record exists
+and that a deployment references it); it has never been what decides whether an
+upload happened, and a deploy with no such opt-in used to report
+`Deployed successfully!` over a Worker that did not exist on the account.
+
+**The unchanged-bundle case still succeeds.** When the built Worker and its
+configuration are identical to what is already live, Cloudflare keeps the
+existing version rather than creating a new one. Devflare resolves the id from
+the current active deployment, prints a verification note saying so, and exits
+`0` — the deploy *is* proven, it simply proves the version that was already
+there. Set `DEVFLARE_REQUIRE_FRESH_PRODUCTION_DEPLOYMENT` when a reused live
+version should be a failure instead.
+
 ## Dry-run / describe-only
 
 `devflare deploy --dry-run` describes a deploy **without performing it** and

@@ -42,6 +42,11 @@ import {
 } from './deploy/prepare'
 import { resolveLocalWranglerExecutable } from './deploy/runtime'
 import {
+	type WranglerUploadKind,
+	describeMissingUploadEvidence,
+	readWranglerUploadReport
+} from './deploy/upload-evidence'
+import {
 	normalizeCloudflareAccountId,
 	resolveDeployAccountId,
 	resolveVersionIdFromCurrentProductionDeployment,
@@ -327,6 +332,14 @@ export async function runDeployCommand(
 				wranglerArgs.push('--tag', deployTag.trim())
 			}
 
+			// → KEY: `inherit` keeps Wrangler's live upload/asset progress in front
+			//   of the user, and Devflare does not need the stream to diagnose the
+			//   run: `WRANGLER_OUTPUT_FILE_PATH` below is a machine-readable record
+			//   of the same run, written by Wrangler for exactly this purpose. The
+			//   consequence is that `deployProc.stdout`/`stderr` are undefined on
+			//   this path, so the console parse further down carries nothing in
+			//   production — it only ever sees output from a caller that injected a
+			//   capturing process runner.
 			const deployProc = await deps.exec.exec(wranglerCommand, wranglerArgs, {
 				cwd,
 				stdio: 'inherit',
@@ -362,6 +375,8 @@ export async function runDeployCommand(
 				parsedConsoleOutput,
 				parsedStructuredOutput
 			)
+			const uploadKind: WranglerUploadKind = uploadVersionOnly ? 'version-upload' : 'deploy'
+			const uploadReport = readWranglerUploadReport(structuredOutput, uploadKind)
 			const workersDevUrl = parsedOutput.urls.find((url) => url.includes('workers.dev'))
 			const configuredAccountId =
 				normalizeCloudflareAccountId(prepared.config.accountId) ??
@@ -563,23 +578,53 @@ export async function runDeployCommand(
 				logLine(logger, `Preview URL: ${resolvedPreviewUrl}`)
 			}
 
-			if (shouldVerifyDeployControlPlane()) {
-				if (!resolvedVersionId) {
-					const recoveryDetails =
-						versionRecoveryDiagnostics.length > 0
-							? ` Cloudflare fallback checks also failed: ${versionRecoveryDiagnostics.join(' | ')}`
-							: ''
-					await persistDeployMetadata({
-						status: 'failure',
-						exitCode: 1,
-						error: `Wrangler did not return a Worker version id, so Devflare could not prove which version Cloudflare accepted.${recoveryDetails}`
-					})
-					logger.error(
-						`Deployment verification failed: Wrangler did not return a Worker version id, so Devflare could not prove which version Cloudflare accepted.${recoveryDetails}`
-					)
-					return { exitCode: 1, output: structuredOutput }
-				}
+			// → KEY: a deploy may only report success when something OBSERVED the
+			//   upload, and the version id is that observation — it comes from
+			//   Wrangler's own structured output, or from one of the Cloudflare
+			//   lookups above (the reused-live-version branch included, which is a
+			//   legitimate unchanged-bundle deploy and does resolve an id).
+			//   Reaching here without one means nothing saw an upload, and saying
+			//   "Deployed successfully!" there is how a Worker that does not exist
+			//   on the account gets a green deploy and a green CI job.
+			//   Ungated on purpose: DEVFLARE_VERIFY_DEPLOYMENT opts in to the extra
+			//   control-plane round-trips below, never to being told the truth
+			//   about whether anything shipped.
+			if (!resolvedVersionId) {
+				const evidence = describeMissingUploadEvidence({
+					workerName: prepared.config.name,
+					kind: uploadKind,
+					report: uploadReport,
+					accountResolved: Boolean(resolvedAccountId),
+					recoveryDiagnostics: versionRecoveryDiagnostics
+				})
+				// A percentage rollout leaves traffic un-split as well as unproven,
+				// so it owes the operator the extra half of the story.
+				const failure = usePercentageRollout
+					? `${evidence} The ${rolloutPercentage}% gradual rollout was not started; re-run \`devflare deploy --prod --percentage ${rolloutPercentage}\`, or split traffic manually with \`wrangler versions deploy\`.`
+					: evidence
+				await persistDeployMetadata({
+					status: 'failure',
+					exitCode: 1,
+					error: failure
+				})
+				logger.error(`Deployment verification failed: ${failure}`)
+				return { exitCode: 1, output: structuredOutput }
+			}
 
+			if (versionRecoveryDiagnostics.length > 0) {
+				// Collected while falling back and, before this line existed, never
+				// shown — so a deploy that only just recovered looked identical to
+				// one that never needed to.
+				logLine(
+					logger,
+					dim(
+						`Version lookups that failed before this deploy was proven: ${versionRecoveryDiagnostics.join(' | ')}`,
+						theme
+					)
+				)
+			}
+
+			if (shouldVerifyDeployControlPlane()) {
 				resolvedAccountId = await ensureResolvedAccountId()
 
 				if (!resolvedAccountId) {
@@ -622,21 +667,6 @@ export async function runDeployCommand(
 			}
 
 			if (usePercentageRollout) {
-				if (!resolvedVersionId) {
-					const recoveryDetails =
-						versionRecoveryDiagnostics.length > 0
-							? ` Cloudflare fallback checks also failed: ${versionRecoveryDiagnostics.join(' | ')}`
-							: ''
-					const rolloutError = `A new Worker version was uploaded, but Devflare could not resolve its version id, so it could not start the ${rolloutPercentage}% gradual rollout. Re-run \`devflare deploy --prod --percentage ${rolloutPercentage}\`, or split traffic manually with \`wrangler versions deploy\`.${recoveryDetails}`
-					await persistDeployMetadata({
-						status: 'failure',
-						exitCode: 1,
-						error: rolloutError
-					})
-					logger.error(rolloutError)
-					return { exitCode: 1, output: structuredOutput }
-				}
-
 				const rolloutInvocation = buildGradualDeployInvocation(
 					{
 						versionId: resolvedVersionId,
