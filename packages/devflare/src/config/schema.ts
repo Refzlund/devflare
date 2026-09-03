@@ -1,0 +1,452 @@
+// =============================================================================
+// Config Schema — Zod schema for devflare.config.ts validation
+// =============================================================================
+//
+// This module assembles the complete schema for devflare configuration files.
+// Leaf schema modules live beside it so the public API stays stable without
+// keeping every schema, transform, and utility in one giant file.
+//
+// DEFAULTS (you don't need to specify these):
+// - compatibilityDate: Defaults to current date (YYYY-MM-DD)
+// - compatibilityFlags: Always includes ['nodejs_compat', 'nodejs_als']
+//
+// =============================================================================
+
+import { z } from 'zod'
+import { normalizeCompatibilityFlags } from './compatibility'
+import { isEnvVarDescriptor } from './env-vars'
+import { bindingsSchema } from './schema-bindings'
+import { rolldownConfigSchema, viteConfigSchema } from './schema-build'
+import { emailConfigSchema } from './schema-email'
+import { envConfigSchemaInner } from './schema-env'
+import {
+	assetsConfigSchema,
+	compatibilityDateSchema,
+	containersConfigSchema,
+	filesSchema,
+	limitsSchema,
+	migrationSchema,
+	moduleRulesSchema,
+	observabilitySchema,
+	placementSchema,
+	previewsConfigSchema,
+	routeConfigSchema,
+	secretConfigSchema,
+	serverConfigSchema,
+	streamingTailConsumerSchema,
+	tailConsumerSchema,
+	triggersSchema,
+	wranglerConfigSchema,
+	wsRouteConfigSchema
+} from './schema-runtime'
+import { eventSubscriptionsConfigSchema } from './schema-subscriptions'
+import { zonesConfigSchema } from './schema-zones'
+
+/** Helper to get current date in YYYY-MM-DD format */
+function getCurrentDate(): string {
+	const now = new Date()
+	return now.toISOString().split('T')[0]
+}
+
+function getSecretsStoreShorthandBindings(config: {
+	bindings?: {
+		secretsStore?: Record<string, unknown>
+	}
+}): string[] {
+	return Object.entries(config.bindings?.secretsStore ?? {})
+		.filter(([, binding]) => typeof binding === 'string')
+		.map(([bindingName]) => bindingName)
+}
+
+function addSecretsStoreShorthandIssues(
+	ctx: z.RefinementCtx,
+	config: {
+		secretsStoreId?: string
+		bindings?: {
+			secretsStore?: Record<string, unknown>
+		}
+	},
+	pathPrefix: Array<string | number> = []
+): void {
+	if (config.secretsStoreId) {
+		return
+	}
+
+	for (const bindingName of getSecretsStoreShorthandBindings(config)) {
+		ctx.addIssue({
+			code: z.ZodIssueCode.custom,
+			path: [...pathPrefix, 'bindings', 'secretsStore', bindingName],
+			message: `Secrets Store binding "${bindingName}" uses shorthand and requires top-level secretsStoreId.`
+		})
+	}
+}
+
+const varValueSchema: z.ZodType<unknown> = z.lazy(() =>
+	z.union([
+		z.string(),
+		z.number(),
+		z.boolean(),
+		z.null(),
+		z.custom(isEnvVarDescriptor),
+		z.array(varValueSchema),
+		z.record(z.string(), varValueSchema)
+	])
+)
+
+/**
+ * Raw Zod shape of the root devflare configuration (excluding the `env` field,
+ * which references back into this shape via the environment override schema).
+ *
+ * Exported so `schema-env.ts` can derive the environment override schema from
+ * the single source of truth without hand-listing every field.
+ */
+export const rootConfigShape = {
+	/**
+	 * Worker name (required).
+	 * Used as the deployment target and in URLs.
+	 */
+	name: z.string({
+		required_error: 'Worker name is required'
+	}),
+
+	/**
+	 * Cloudflare account ID.
+	 * Required for remote bindings (AI, Vectorize, etc.).
+	 */
+	accountId: z.string().optional(),
+
+	/**
+	 * Default Cloudflare Secrets Store ID used by shorthand Secrets Store
+	 * bindings in `bindings.secretsStore`.
+	 */
+	secretsStoreId: z.string().min(1).optional(),
+
+	/**
+	 * Cloudflare Workers compatibility date.
+	 * @default Current date (YYYY-MM-DD)
+	 */
+	compatibilityDate: compatibilityDateSchema.optional().default(getCurrentDate),
+
+	/**
+	 * Compatibility flags to enable additional features.
+	 * @default ['nodejs_compat', 'nodejs_als'] (always included)
+	 */
+	compatibilityFlags: z
+		.array(z.string())
+		.optional()
+		.transform((flags = []) => normalizeCompatibilityFlags(flags)),
+
+	/** Preview-specific Devflare behavior. */
+	previews: previewsConfigSchema,
+
+	/** Dev server (Miniflare runtime instance) host/port for `devflare dev`. */
+	server: serverConfigSchema,
+
+	/** Local email behaviour: capture / relay / live, plus the inbound poller. */
+	email: emailConfigSchema,
+
+	/** Zone-scoped resources — Email Routing rules and DNS records, keyed by domain. */
+	zones: zonesConfigSchema,
+
+	/** Queue event subscriptions — which platform events Cloudflare publishes onto which Queue. */
+	eventSubscriptions: eventSubscriptionsConfigSchema,
+
+	/** File handlers configuration. */
+	files: filesSchema,
+
+	/** Bindings to Cloudflare services. */
+	bindings: bindingsSchema,
+
+	/** Trigger configuration (cron schedules). */
+	triggers: triggersSchema,
+
+	/** Wrangler module rules for non-JavaScript imports and additional modules. */
+	rules: moduleRulesSchema,
+
+	/** Whether Wrangler should include additional files matching module rules. */
+	findAdditionalModules: z.boolean().optional(),
+
+	/** Base directory for Wrangler module rule discovery. */
+	baseDir: z.string().optional(),
+
+	/** Whether Wrangler should preserve bundled file names. */
+	preserveFileNames: z.boolean().optional(),
+
+	/** Send Trace Events from this Worker to Workers Logpush. Does not create a Logpush job. */
+	logpush: z.boolean().optional(),
+
+	/**
+	 * Cloudflare compliance region this Worker is deployed under.
+	 * Compiles to `compliance_region`.
+	 */
+	complianceRegion: z.enum(['public', 'fedramp_high']).optional(),
+
+	/**
+	 * Whether the Worker is reachable on its `*.workers.dev` subdomain.
+	 * Compiles to `workers_dev` (defaults to `true` when omitted).
+	 */
+	workersDev: z.boolean().optional(),
+
+	/** Include source maps when uploading this Worker. */
+	uploadSourceMaps: z.boolean().optional(),
+
+	/** Keep dashboard-managed vars when Wrangler deploys this Worker. */
+	keepVars: z.boolean().optional(),
+
+	/** Tail Workers that consume traces from this Worker. */
+	tailConsumers: z.array(tailConsumerSchema).optional(),
+
+	/** Tail Workers that consume a live event stream from this Worker. */
+	streamingTailConsumers: z.array(streamingTailConsumerSchema).optional(),
+
+	/** Environment variables. */
+	vars: z.record(z.string(), varValueSchema).optional(),
+
+	/** Secret declarations. */
+	secrets: z.record(z.string(), secretConfigSchema).optional(),
+
+	/** Deployment routes. */
+	routes: z.array(routeConfigSchema).optional(),
+
+	/** WebSocket routes for dev mode DO proxying. */
+	wsRoutes: z.array(wsRouteConfigSchema).optional(),
+
+	/** Static assets configuration. */
+	assets: assetsConfigSchema,
+
+	/** Cloudflare Containers launched alongside the Worker. */
+	containers: containersConfigSchema,
+
+	/** Worker placement behavior. */
+	placement: placementSchema,
+
+	/** Resource limits. */
+	limits: limitsSchema,
+
+	/** Observability settings (logging, tracing). */
+	observability: observabilitySchema,
+
+	/** Durable Object migrations. */
+	migrations: z.array(migrationSchema).optional(),
+
+	/** Rolldown configuration for Durable Object bundling. */
+	rolldown: rolldownConfigSchema,
+
+	/** Vite-related configuration namespace. */
+	vite: viteConfigSchema,
+
+	/** Wrangler passthrough for unsupported options. */
+	wrangler: wranglerConfigSchema
+} as const
+
+/**
+ * Main devflare configuration schema.
+ *
+ * This is the complete schema for `devflare.config.ts` files.
+ * Use `defineConfig()` for type-safe configuration with autocompletion.
+ */
+const canonicalConfigSchema = z
+	.object({
+		...rootConfigShape,
+		/** Environment-specific configuration overrides. */
+		env: z.record(z.string(), envConfigSchemaInner).optional()
+	})
+	.strict()
+	.superRefine((config, ctx) => {
+		addSecretsStoreShorthandIssues(ctx, config)
+
+		for (const [envName, envConfig] of Object.entries(config.env ?? {})) {
+			addSecretsStoreShorthandIssues(
+				ctx,
+				{
+					...envConfig,
+					secretsStoreId: envConfig.secretsStoreId ?? config.secretsStoreId
+				},
+				['env', envName]
+			)
+		}
+	})
+
+export const configSchema = canonicalConfigSchema
+
+/** Output type after Zod validation and transforms */
+export type DevflareConfig = z.output<typeof configSchema>
+
+export type {
+	AiBindingInput,
+	AiSearchInstanceBindingInput,
+	AiSearchNamespaceBindingInput,
+	AnalyticsBindingInput,
+	ArtifactsBindingInput,
+	ArtifactsBindingObjectInput,
+	AssetsConfigInput,
+	BindingsConfigInput,
+	BrowserBindingInput,
+	BrowserBindingObjectInput,
+	ContainerConfigInput,
+	D1BindingByIdInput,
+	D1BindingByNameInput,
+	D1BindingInput,
+	DevflareConfigInput,
+	DevflareEnvConfigInput,
+	DispatchNamespaceBindingInput,
+	DispatchNamespaceBindingObjectInput,
+	DispatchNamespaceOutboundInput,
+	DurableObjectBindingInput,
+	DurableObjectBindingObjectInput,
+	FilesConfigInput,
+	FlagshipBindingInput,
+	HyperdriveBindingByIdInput,
+	HyperdriveBindingByNameInput,
+	HyperdriveBindingInput,
+	ImagesBindingInput,
+	ImagesBindingObjectInput,
+	KVBindingByIdInput,
+	KVBindingByNameInput,
+	KVBindingInput,
+	LimitsConfigInput,
+	MediaBindingInput,
+	MediaBindingObjectInput,
+	MigrationConfigInput,
+	ModuleRuleConfigInput,
+	MtlsCertificateBindingByIdInput,
+	MtlsCertificateBindingByWranglerIdInput,
+	MtlsCertificateBindingInput,
+	ObservabilityConfigInput,
+	ObservabilityLogsConfigInput,
+	ObservabilityTracesConfigInput,
+	PipelineBindingInput,
+	PipelineBindingObjectInput,
+	PlacementConfigInput,
+	PreviewConfigInput,
+	QueueConsumerInput,
+	QueuesConfigInput,
+	RateLimitBindingInput,
+	RateLimitSimpleInput,
+	RenamedClassMigrationInput,
+	RolldownConfigInput,
+	RouteConfigInput,
+	RouteTreeConfigInput,
+	SecretConfigInput,
+	SecretsStoreBindingInput,
+	SecretsStoreBindingObjectInput,
+	SendEmailBindingInput,
+	ServerConfigInput,
+	ServiceBindingInput,
+	SmartPlacementConfigInput,
+	StreamBindingInput,
+	StreamBindingObjectInput,
+	StreamingTailConsumerConfigInput,
+	StreamingTailConsumerObjectConfigInput,
+	TailConsumerConfigInput,
+	TailConsumerObjectConfigInput,
+	TargetedHostPlacementConfigInput,
+	TargetedHostnamePlacementConfigInput,
+	TargetedRegionPlacementConfigInput,
+	TriggersConfigInput,
+	VectorizeBindingInput,
+	VersionMetadataBindingInput,
+	ViteConfigInput,
+	VpcNetworkBindingInput,
+	VpcNetworkByNetworkInput,
+	VpcNetworkByTunnelInput,
+	VpcServiceBindingInput,
+	WorkflowBindingInput,
+	WorkflowLimitsInput,
+	WorkerLoaderBindingInput,
+	WranglerConfigInput,
+	WsRouteConfigInput
+} from './schema-types'
+
+export type {
+	DevflareRolldownOptions,
+	DevflareRolldownOutputOptions,
+	RolldownConfig,
+	ViteConfig
+} from './schema-build'
+export type {
+	BrowserBindings,
+	D1Binding,
+	DurableObjectBinding,
+	HyperdriveBinding,
+	KVBinding,
+	R2Binding,
+	QueueProducer,
+	QueueConsumer,
+	QueuesConfig,
+	RateLimitBinding,
+	VersionMetadataBinding,
+	WorkerLoaderBinding,
+	SecretsStoreBinding,
+	DispatchNamespaceBinding,
+	WorkflowBinding,
+	PipelineBinding,
+	ImagesBinding,
+	MediaBinding,
+	ArtifactsBinding,
+	StreamBinding,
+	VpcServiceBinding,
+	VpcNetworkBinding,
+	FlagshipBinding,
+	ServiceBinding,
+	MtlsCertificateBinding
+} from './schema-bindings'
+export type { DevflareEnvConfig } from './schema-env'
+export type {
+	AssetsConfig,
+	ContainerConfig,
+	MigrationConfig,
+	ModuleRuleConfig,
+	PlacementConfig,
+	PreviewConfig,
+	RouteConfig,
+	ServerConfig,
+	StreamingTailConsumerConfig,
+	TailConsumerConfig,
+	WsRouteConfig
+} from './schema-runtime'
+export type {
+	NormalizedD1Binding,
+	NormalizedDispatchNamespaceBinding,
+	NormalizedDOBinding,
+	NormalizedHyperdriveBinding,
+	NormalizedKVBinding,
+	NormalizedR2Binding,
+	NormalizedQueueProducer,
+	NormalizedMtlsCertificateBinding,
+	NormalizedWorkflowBinding,
+	NormalizedPipelineBinding,
+	NormalizedImagesBinding,
+	NormalizedMediaBinding,
+	NormalizedArtifactsBinding,
+	NormalizedStreamBinding,
+	NormalizedVpcServiceBinding,
+	NormalizedVpcNetworkBinding,
+	NormalizedFlagshipBinding,
+	NormalizedSecretsStoreBinding
+} from './schema-normalization'
+export {
+	getLocalD1DatabaseIdentifier,
+	getLocalHyperdriveConfigIdentifier,
+	getLocalKVNamespaceIdentifier,
+	getSingleBrowserBindingName,
+	normalizeD1Binding,
+	normalizeDispatchNamespaceBinding,
+	normalizeDOBinding,
+	normalizeHyperdriveBinding,
+	normalizeKVBinding,
+	normalizeR2Binding,
+	normalizeQueueProducer,
+	normalizeMtlsCertificateBinding,
+	normalizeWorkflowBinding,
+	normalizePipelineBinding,
+	normalizeImagesBinding,
+	normalizeMediaBinding,
+	normalizeStreamBinding,
+	normalizeVpcServiceBinding,
+	normalizeVpcNetworkBinding,
+	normalizeFlagshipBinding,
+	normalizeSecretsStoreBinding,
+	normalizeArtifactsBinding
+} from './schema-normalization'
+export { browserBindingSchema, formatBrowserBindingLimitMessage } from './schema-bindings'

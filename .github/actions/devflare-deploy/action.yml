@@ -1,0 +1,447 @@
+name: "Devflare Deploy"
+description: "Install dependencies and deploy a Devflare project to Cloudflare with an explicit production or named preview-scope target"
+inputs:
+  working-directory:
+    description: "Directory containing the Devflare project"
+    required: false
+    default: "."
+  environment:
+    description: "Optional Devflare environment name. When set, it must match the explicit deploy target"
+    required: false
+    default: ""
+  production:
+    description: "When true, deploy explicitly to production via --prod"
+    required: false
+    default: "false"
+  preview-scope:
+    description: "Explicit named preview scope to deploy via --preview <name>"
+    required: false
+    default: ""
+  bun-version:
+    description: "Bun version to install"
+    required: false
+    default: "1.3.12"
+  install-command:
+    description: "Dependency installation command to run before deploy"
+    required: false
+    default: "bun install --frozen-lockfile"
+  install-working-directory:
+    description: "Directory to run the dependency installation command from, allowing monorepo subdirectory deploys to reuse a shared root install"
+    required: false
+    default: ""
+  skip-setup:
+    description: "When true, assume Bun is already installed by an earlier workflow step and skip the local setup/cache steps"
+    required: false
+    default: "false"
+  skip-install:
+    description: "When true, assume dependencies are already installed by an earlier workflow step and skip the local install step"
+    required: false
+    default: "false"
+  deploy-command:
+    description: "Optional command prefix used to invoke deploy from the target package, for example 'bun run deploy --'. When omitted, the action falls back to 'bunx devflare deploy'."
+    required: false
+    default: ""
+  deploy-message:
+    description: "Optional Wrangler --message value applied to the Worker version/deployment"
+    required: false
+    default: ""
+  deploy-tag:
+    description: "Optional Wrangler --tag value applied to the Worker version"
+    required: false
+    default: ""
+  verify-deployment:
+    description: "When true, fail if Devflare cannot verify the uploaded version or deployment in Cloudflare's control plane"
+    required: false
+    default: "true"
+  require-fresh-production-deployment:
+    description: "When true, production deploys fail if Cloudflare keeps serving the existing live deployment instead of exposing a fresh version/deployment"
+    required: false
+    default: "false"
+  cloudflare-api-token:
+    description: "Cloudflare API token passed explicitly from the caller workflow"
+    required: true
+  cloudflare-account-id:
+    description: "Optional Cloudflare account ID passed explicitly from the caller workflow"
+    required: false
+    default: ""
+outputs:
+  preview-url:
+    description: "Preview URL or deployed workers.dev URL returned by Devflare or Wrangler when available"
+    value: ${{ steps.finalize.outputs.preview_url }}
+  version-id:
+    description: "Cloudflare Worker version ID returned by Devflare or Wrangler"
+    value: ${{ steps.finalize.outputs.version_id }}
+  verification-note:
+    description: "Additional deployment verification context, such as when Cloudflare kept the existing active production version"
+    value: ${{ steps.finalize.outputs.verification_note }}
+  status:
+    description: "Deployment status reported by the action: success or failure"
+    value: ${{ steps.finalize.outputs.status }}
+  failure-stage:
+    description: "Stage where the action failed: setup, install, or deploy"
+    value: ${{ steps.finalize.outputs.failure_stage }}
+  exit-code:
+    description: "Exit code returned by devflare deploy"
+    value: ${{ steps.finalize.outputs.exit_code }}
+  log-excerpt:
+    description: "Tail excerpt from the deploy log for PR comments or summaries"
+    value: ${{ steps.finalize.outputs.log_excerpt }}
+runs:
+  using: "composite"
+  steps:
+    - name: Setup Bun
+      id: setup
+      if: ${{ inputs.skip-setup != 'true' }}
+      continue-on-error: true
+      uses: oven-sh/setup-bun@v2
+      with:
+        bun-version: ${{ inputs.bun-version }}
+
+    - name: Restore Bun install cache
+      id: bun-cache
+      if: ${{ inputs.skip-setup != 'true' && steps.setup.outcome == 'success' }}
+      uses: actions/cache@v4
+      with:
+        path: ~/.bun/install/cache
+        key: ${{ runner.os }}-bun-${{ inputs.bun-version }}-${{ hashFiles('bun.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-bun-${{ inputs.bun-version }}-
+
+    - name: Install dependencies
+      id: install
+      if: ${{ inputs.skip-install != 'true' && (inputs.skip-setup == 'true' || steps.setup.outcome == 'success') }}
+      continue-on-error: true
+      shell: bash
+      working-directory: ${{ inputs.install-working-directory != '' && inputs.install-working-directory || inputs.working-directory }}
+      run: |
+        set -euo pipefail
+
+        install_log="$(mktemp)"
+
+        set +e
+        ${{ inputs.install-command }} 2>&1 | tee "$install_log"
+        install_exit_code="${PIPESTATUS[0]}"
+        set -e
+
+        log_excerpt="$(tail -n 40 "$install_log" | sed $'s/\r$//')"
+        log_delimiter="DEVFLARE_LOG_$(date +%s)_$$"
+
+        echo "exit_code=$install_exit_code" >> "$GITHUB_OUTPUT"
+        {
+          echo "log_excerpt<<$log_delimiter"
+          printf '%s\n' "$log_excerpt"
+          echo "$log_delimiter"
+        } >> "$GITHUB_OUTPUT"
+
+        rm -f "$install_log"
+
+        exit "$install_exit_code"
+
+    - name: Deploy with Devflare
+      id: deploy
+      if: ${{ (inputs.skip-setup == 'true' || steps.setup.outcome == 'success') && (inputs.skip-install == 'true' || steps.install.outcome == 'success') }}
+      continue-on-error: true
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        CLOUDFLARE_API_TOKEN: ${{ inputs.cloudflare-api-token }}
+        CLOUDFLARE_ACCOUNT_ID: ${{ inputs.cloudflare-account-id }}
+        INPUT_ENVIRONMENT: ${{ inputs.environment }}
+        INPUT_PRODUCTION: ${{ inputs.production }}
+        INPUT_PREVIEW_SCOPE: ${{ inputs.preview-scope }}
+        INPUT_DEPLOY_COMMAND: ${{ inputs.deploy-command }}
+        INPUT_DEPLOY_MESSAGE: ${{ inputs.deploy-message }}
+        INPUT_DEPLOY_TAG: ${{ inputs.deploy-tag }}
+        DEVFLARE_VERIFY_DEPLOYMENT: ${{ inputs.verify-deployment }}
+        DEVFLARE_REQUIRE_FRESH_PRODUCTION_DEPLOYMENT: ${{ inputs.require-fresh-production-deployment }}
+        GITHUB_HEAD_REF: ${{ github.head_ref }}
+        GITHUB_REF_NAME: ${{ github.ref_name }}
+        WORKERS_CI_BRANCH: ${{ env.WORKERS_CI_BRANCH }}
+      run: |
+        set -euo pipefail
+
+        deploy_args=()
+        resolved_target=''
+
+        target_count=0
+        if [ "$INPUT_PRODUCTION" = 'true' ]; then
+          target_count=$((target_count + 1))
+        fi
+        if [ -n "$INPUT_PREVIEW_SCOPE" ]; then
+          target_count=$((target_count + 1))
+        fi
+
+        if [ "$target_count" -eq 0 ]; then
+          echo 'Devflare deploy action requires one explicit target input. Set exactly one of production: "true" or preview-scope: <name>.' >&2
+          exit 1
+        fi
+
+        if [ "$target_count" -gt 1 ]; then
+          echo 'Choose only one explicit deploy target input: production or preview-scope.' >&2
+          exit 1
+        fi
+
+        if [ -n "$INPUT_ENVIRONMENT" ]; then
+          if [ "$INPUT_PRODUCTION" = 'true' ] && [ "$INPUT_ENVIRONMENT" != 'production' ]; then
+            echo 'Production deploys can only be paired with environment: production.' >&2
+            exit 1
+          fi
+
+          if [ -n "$INPUT_PREVIEW_SCOPE" ] && [ "$INPUT_ENVIRONMENT" != 'preview' ]; then
+            echo 'Preview deploys can only be paired with environment: preview.' >&2
+            exit 1
+          fi
+        fi
+
+        if [ "$INPUT_PRODUCTION" = 'true' ]; then
+          deploy_args+=(--prod)
+          resolved_target='production'
+        elif [ -n "$INPUT_PREVIEW_SCOPE" ]; then
+          deploy_args+=(--preview "$INPUT_PREVIEW_SCOPE")
+          resolved_target="preview scope ($INPUT_PREVIEW_SCOPE)"
+        fi
+
+        if [ -n "$INPUT_ENVIRONMENT" ]; then
+          deploy_args+=(--env "$INPUT_ENVIRONMENT")
+        fi
+
+        if [ -n "$INPUT_DEPLOY_MESSAGE" ]; then
+          deploy_args+=(--message "$INPUT_DEPLOY_MESSAGE")
+        fi
+
+        if [ -n "$INPUT_DEPLOY_TAG" ]; then
+          deploy_args+=(--tag "$INPUT_DEPLOY_TAG")
+        fi
+
+        deploy_command="$INPUT_DEPLOY_COMMAND"
+        if [ -z "$deploy_command" ]; then
+          deploy_command='bunx devflare deploy'
+        fi
+
+        deploy_log="$(mktemp)"
+        deploy_metadata_file="$(mktemp)"
+        export DEVFLARE_DEPLOY_METADATA_PATH="$deploy_metadata_file"
+        printf 'Using deploy command: %s\n' "$deploy_command" | tee "$deploy_log"
+        printf 'Deploy target: %s\n' "$resolved_target" | tee -a "$deploy_log"
+        printf 'Bun version: %s\n' "$(bun --version)" | tee -a "$deploy_log"
+        printf 'Node version: %s\n' "$(node --version)" | tee -a "$deploy_log"
+        if [ -f node_modules/vite/package.json ]; then
+          printf 'Installed vite version: %s\n' "$(node -p 'require("./node_modules/vite/package.json").version')" | tee -a "$deploy_log"
+        fi
+        set +e
+        bash -lc "$deploy_command \"\$@\"" bash "${deploy_args[@]}" 2>&1 | tee -a "$deploy_log"
+        deploy_exit_code="${PIPESTATUS[0]}"
+        set -e
+
+        metadata_field_reader='const fs = require("node:fs"); const [filePath, fieldName] = process.argv.slice(1); try { const payload = JSON.parse(fs.readFileSync(filePath, "utf8")); const value = payload?.[fieldName]; if (typeof value === "string") { process.stdout.write(value); } else if (typeof value === "number") { process.stdout.write(String(value)); } } catch {}'
+
+        version_id="$(node -e "$metadata_field_reader" "$deploy_metadata_file" versionId)"
+        preview_url="$(node -e "$metadata_field_reader" "$deploy_metadata_file" previewUrl)"
+        verification_note="$(node -e "$metadata_field_reader" "$deploy_metadata_file" verificationNote)"
+        workers_dev_url="$(grep -oE 'https?:\/\/[^[:space:]]+' "$deploy_log" | grep 'workers.dev' | tail -n 1 || true)"
+        deploy_status='success'
+        if [ "$deploy_exit_code" -ne 0 ]; then
+          deploy_status='failure'
+        fi
+
+        if [ -z "$version_id" ]; then
+          version_id="$(sed -nE 's/^.*(Worker )?[Vv]ersion ID:?[[:space:]]+([A-Za-z0-9_-]+).*$/\2/p' "$deploy_log" | tail -n 1)"
+        fi
+
+        if [ -z "$preview_url" ]; then
+          preview_url="$(sed -nE 's/^.*(Preview URL|Version Preview URL|URL):[[:space:]]+(https?:\/\/[^[:space:]]+).*$/\2/p' "$deploy_log" | tail -n 1)"
+        fi
+
+        if [ -z "$verification_note" ]; then
+          verification_note="$(sed -nE 's/^.*Deployment verification note:[[:space:]]+(.*)$/\1/p' "$deploy_log" | tail -n 1)"
+        fi
+
+        preferred_preview_url="$preview_url"
+        if [ -z "$preferred_preview_url" ]; then
+          preferred_preview_url="$workers_dev_url"
+        fi
+
+        log_excerpt="$(tail -n 40 "$deploy_log" | sed $'s/\r$//')"
+        log_delimiter="DEVFLARE_LOG_$(date +%s)_$$"
+        note_delimiter="DEVFLARE_NOTE_$(date +%s)_$$"
+
+        echo "version_id=$version_id" >> "$GITHUB_OUTPUT"
+        echo "preview_url=$preferred_preview_url" >> "$GITHUB_OUTPUT"
+        echo "status=$deploy_status" >> "$GITHUB_OUTPUT"
+        echo "exit_code=$deploy_exit_code" >> "$GITHUB_OUTPUT"
+        {
+          echo "verification_note<<$note_delimiter"
+          printf '%s\n' "$verification_note"
+          echo "$note_delimiter"
+        } >> "$GITHUB_OUTPUT"
+        {
+          echo "log_excerpt<<$log_delimiter"
+          printf '%s\n' "$log_excerpt"
+          echo "$log_delimiter"
+        } >> "$GITHUB_OUTPUT"
+
+        rm -f "$deploy_log"
+        rm -f "$deploy_metadata_file"
+
+        exit "$deploy_exit_code"
+
+    - name: Finalize deploy result
+      id: finalize
+      if: ${{ always() }}
+      shell: bash
+      env:
+        SETUP_OUTCOME: ${{ inputs.skip-setup == 'true' && 'success' || steps.setup.outcome }}
+        INSTALL_OUTCOME: ${{ inputs.skip-install == 'true' && 'success' || steps.install.outcome }}
+        INSTALL_EXIT_CODE: ${{ steps.install.outputs.exit_code }}
+        INSTALL_LOG_EXCERPT: ${{ steps.install.outputs.log_excerpt }}
+        DEPLOY_OUTCOME: ${{ steps.deploy.outcome }}
+        DEPLOY_STATUS: ${{ steps.deploy.outputs.status }}
+        DEPLOY_EXIT_CODE: ${{ steps.deploy.outputs.exit_code }}
+        DEPLOY_VERSION_ID: ${{ steps.deploy.outputs.version_id }}
+        DEPLOY_PREVIEW_URL: ${{ steps.deploy.outputs.preview_url }}
+        DEPLOY_VERIFICATION_NOTE: ${{ steps.deploy.outputs.verification_note }}
+        DEPLOY_LOG_EXCERPT: ${{ steps.deploy.outputs.log_excerpt }}
+        INPUT_ENVIRONMENT: ${{ inputs.environment }}
+        INPUT_PRODUCTION: ${{ inputs.production }}
+        INPUT_PREVIEW_SCOPE: ${{ inputs.preview-scope }}
+        INPUT_WORKING_DIRECTORY: ${{ inputs.working-directory }}
+      run: |
+        set -euo pipefail
+
+        deploy_target=''
+        failure_stage=''
+        deploy_status='success'
+        exit_code=''
+        version_id=''
+        preview_url=''
+        verification_note=''
+        log_excerpt=''
+
+        if [ "$SETUP_OUTCOME" != 'success' ]; then
+          failure_stage='setup'
+          deploy_status='failure'
+          log_excerpt='Bun setup failed before dependency installation or deploy could start. Inspect the "Setup Bun" logs inside the Devflare deploy action.'
+        elif [ "$INSTALL_OUTCOME" != 'success' ]; then
+          failure_stage='install'
+          deploy_status='failure'
+          exit_code="$INSTALL_EXIT_CODE"
+          log_excerpt="$INSTALL_LOG_EXCERPT"
+
+          if [ -z "$log_excerpt" ]; then
+            log_excerpt='Dependency installation failed before the deploy command could start. Inspect the "Install dependencies" logs inside the Devflare deploy action.'
+          fi
+        else
+          deploy_status="$DEPLOY_STATUS"
+          if [ -z "$deploy_status" ]; then
+            deploy_status='failure'
+          fi
+
+          if [ "$deploy_status" != 'success' ]; then
+            failure_stage='deploy'
+          fi
+
+          exit_code="$DEPLOY_EXIT_CODE"
+          version_id="$DEPLOY_VERSION_ID"
+          preview_url="$DEPLOY_PREVIEW_URL"
+          verification_note="$DEPLOY_VERIFICATION_NOTE"
+          log_excerpt="$DEPLOY_LOG_EXCERPT"
+
+          if [ "$DEPLOY_OUTCOME" = 'failure' ] && [ -z "$log_excerpt" ]; then
+            log_excerpt='The deploy command failed, but no log excerpt was captured. Inspect the "Deploy with Devflare" logs inside the Devflare deploy action.'
+          fi
+        fi
+
+        if [ "$deploy_status" = 'success' ]; then
+          failure_stage=''
+        fi
+
+        if [ "$INPUT_PRODUCTION" = 'true' ]; then
+          deploy_target='production'
+        elif [ -n "$INPUT_PREVIEW_SCOPE" ]; then
+          deploy_target="preview scope ($INPUT_PREVIEW_SCOPE)"
+        else
+          deploy_target='unknown'
+        fi
+
+        log_delimiter="DEVFLARE_LOG_$(date +%s)_$$"
+        note_delimiter="DEVFLARE_NOTE_$(date +%s)_$$"
+
+        echo "version_id=$version_id" >> "$GITHUB_OUTPUT"
+        echo "preview_url=$preview_url" >> "$GITHUB_OUTPUT"
+        echo "status=$deploy_status" >> "$GITHUB_OUTPUT"
+        echo "failure_stage=$failure_stage" >> "$GITHUB_OUTPUT"
+        echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
+        {
+          echo "verification_note<<$note_delimiter"
+          printf '%s\n' "$verification_note"
+          echo "$note_delimiter"
+        } >> "$GITHUB_OUTPUT"
+        {
+          echo "log_excerpt<<$log_delimiter"
+          printf '%s\n' "$log_excerpt"
+          echo "$log_delimiter"
+        } >> "$GITHUB_OUTPUT"
+
+        {
+          if [ "$deploy_status" = 'success' ]; then
+            echo '### ✅ Devflare deployment succeeded'
+          else
+            echo '### ❌ Devflare deployment failed'
+          fi
+          echo ''
+          echo "- Working directory: \`$INPUT_WORKING_DIRECTORY\`"
+          echo "- Deploy target: \`$deploy_target\`"
+          echo "- Status: \`$deploy_status\`"
+          if [ -n "$failure_stage" ]; then
+            echo "- Failure stage: \`$failure_stage\`"
+          fi
+          if [ -n "$exit_code" ]; then
+            echo "- Exit code: \`$exit_code\`"
+          fi
+          if [ -n "$INPUT_ENVIRONMENT" ]; then
+            echo "- Environment: \`$INPUT_ENVIRONMENT\`"
+          fi
+          if [ -n "$version_id" ]; then
+            echo "- Version ID: \`$version_id\`"
+          fi
+          if [ -n "$verification_note" ]; then
+            echo "- Verification note: $verification_note"
+          fi
+          if [ -n "$preview_url" ]; then
+            echo "- Preview URL: $preview_url"
+          fi
+          if [ -n "$log_excerpt" ] && [ "$deploy_status" != 'success' ]; then
+            echo ''
+            echo '#### Log excerpt'
+            echo ''
+            echo '```text'
+            printf '%s\n' "$log_excerpt"
+            echo '```'
+          fi
+        } >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Fail action when deploy did not succeed
+      if: ${{ steps.finalize.outputs.status != 'success' }}
+      shell: bash
+      env:
+        DEVFLARE_FAILURE_STAGE: ${{ steps.finalize.outputs.failure_stage }}
+        DEVFLARE_EXIT_CODE: ${{ steps.finalize.outputs.exit_code }}
+        DEVFLARE_LOG_EXCERPT: ${{ steps.finalize.outputs.log_excerpt }}
+      run: |
+        echo 'Devflare deploy action failed.' >&2
+
+        if [ -n "$DEVFLARE_FAILURE_STAGE" ]; then
+          echo "Failure stage: $DEVFLARE_FAILURE_STAGE" >&2
+        fi
+
+        if [ -n "$DEVFLARE_EXIT_CODE" ]; then
+          echo "Exit code: $DEVFLARE_EXIT_CODE" >&2
+        fi
+
+        if [ -n "$DEVFLARE_LOG_EXCERPT" ]; then
+          echo '' >&2
+          echo 'Log excerpt:' >&2
+          printf '%s\n' "$DEVFLARE_LOG_EXCERPT" >&2
+        fi
+
+        exit 1

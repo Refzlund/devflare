@@ -1,0 +1,75 @@
+name: Workspace CI
+
+on:
+  pull_request:
+    paths:
+      - "apps/documentation/**"
+      - "cases/**"
+      - "packages/**"
+      - "package.json"
+      - "bun.lock"
+      - "turbo.json"
+      - "biome.json"
+      - "tsconfig.json"
+      - ".github/workflows/workspace-ci.yml"
+  push:
+    branches:
+      - main
+      - next
+    paths:
+      - "apps/documentation/**"
+      - "cases/**"
+      - "packages/**"
+      - "package.json"
+      - "bun.lock"
+      - "turbo.json"
+      - "biome.json"
+      - "tsconfig.json"
+      - ".github/workflows/workspace-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    env:
+      TURBO_TELEMETRY_DISABLED: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.12
+
+      - name: Restore Bun install cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-1.3.12-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-1.3.12-
+
+      - name: Restore Turborepo cache
+        uses: actions/cache@v4
+        with:
+          path: .turbo/cache
+          key: ${{ runner.os }}-turbo-${{ hashFiles('bun.lock', 'package.json', 'turbo.json', 'biome.json', 'tsconfig.json', 'cases/tsconfig.base.json', 'apps/*/package.json', 'apps/testing/workers/*/package.json', 'packages/*/package.json', 'cases/**/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-
+
+      - name: Install workspace dependencies
+        shell: bash
+        run: bun install --frozen-lockfile
+
+      - name: Run cached devflare validation lane
+        shell: bash
+        run: bun run devflare:ci

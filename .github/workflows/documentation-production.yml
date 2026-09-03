@@ -1,0 +1,196 @@
+name: Documentation Production
+
+env:
+  DOCUMENTATION_PRODUCTION_URL: https://devflare-docs.refz.workers.dev
+
+on:
+  push:
+    paths:
+      - "apps/documentation/**"
+      - "packages/devflare/**"
+      - "package.json"
+      - "bun.lock"
+      - "turbo.json"
+      - ".github/actions/devflare-deploy/**"
+      - ".github/actions/devflare-deploy-impact/**"
+      - ".github/actions/devflare-github-feedback/**"
+      - ".github/actions/devflare-setup-workspace/**"
+      - ".github/scripts/resolve-deploy-impact.mjs"
+      - ".github/workflows/documentation-production.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  deployments: write
+
+concurrency:
+  group: documentation-production
+  cancel-in-progress: true
+
+jobs:
+  deploy-production:
+    if: ${{ github.event_name == 'workflow_dispatch' || (startsWith(github.ref, 'refs/heads/') && github.ref_name == github.event.repository.default_branch) }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Resolve documentation deploy impact
+        id: impact
+        uses: ./.github/actions/devflare-deploy-impact
+        with:
+          target-package: documentation
+          default-branch: ${{ github.event.repository.default_branch }}
+          event-name: ${{ github.event_name }}
+          event-action: ""
+          push-before: ${{ github.event.before || '' }}
+          pull-request-base-sha: ""
+          pull-request-head-sha: ""
+
+      - name: Deploy documentation production
+        id: deploy
+        if: ${{ steps.impact.outputs.should-deploy == 'true' }}
+        continue-on-error: true
+        uses: ./.github/actions/devflare-deploy
+        with:
+          working-directory: apps/documentation
+          install-working-directory: .
+          deploy-command: bun run deploy --
+          production: "true"
+          deploy-message: Documentation production ${{ github.sha }} (run ${{ github.run_id }})
+          deploy-tag: documentation-production-${{ github.run_id }}
+          cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          cloudflare-account-id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Verify live documentation production content
+        id: verify-live
+        if: ${{ steps.deploy.outputs.status == 'success' && steps.deploy.outcome == 'success' }}
+        continue-on-error: true
+        shell: bash
+        env:
+          EXPECTED_BUILD_SHA: ${{ github.sha }}
+          DOCUMENTATION_LIVE_URL: ${{ steps.deploy.outputs.preview-url || env.DOCUMENTATION_PRODUCTION_URL }}
+        run: |
+          set -euo pipefail
+
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            if payload="$(curl --fail --silent --show-error --location "${DOCUMENTATION_LIVE_URL}/build.json?attempt=${attempt}")"; then
+              if printf '%s' "$payload" | grep -Fq "$EXPECTED_BUILD_SHA"; then
+                echo 'verified=true' >> "$GITHUB_OUTPUT"
+                echo "Verified live production build metadata exposes build SHA ${EXPECTED_BUILD_SHA}."
+                exit 0
+              fi
+            fi
+
+            if [ "$attempt" -lt 10 ]; then
+              echo "Live production build metadata does not show build SHA ${EXPECTED_BUILD_SHA} yet (attempt ${attempt}/10). Retrying..."
+              sleep 6
+            fi
+          done
+
+          echo 'verified=false' >> "$GITHUB_OUTPUT"
+          echo "Live production build metadata did not contain build SHA ${EXPECTED_BUILD_SHA} after 10 attempts." >&2
+          exit 1
+
+      - name: Publish production deployment feedback
+        if: ${{ steps.impact.outputs.should-deploy == 'true' && always() }}
+        uses: ./.github/actions/devflare-github-feedback
+        with:
+          github-token: ${{ github.token }}
+          mode: deployment
+          operation: report
+          status: ${{ steps.deploy.outputs.status == 'success' && steps.verify-live.outcome != 'failure' && 'success' || 'failure' }}
+          title: Documentation production
+          deployment-kind: production
+          ref-name: ${{ github.ref_name }}
+          sha: ${{ github.sha }}
+          environment: documentation production
+          environment-url: ${{ steps.deploy.outputs.preview-url || env.DOCUMENTATION_PRODUCTION_URL }}
+          production-url: ${{ steps.deploy.outputs.preview-url || env.DOCUMENTATION_PRODUCTION_URL }}
+          version-id: ${{ steps.deploy.outputs.version-id }}
+          log-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          log-excerpt: ${{ steps.deploy.outputs.log-excerpt }}
+          summary: GitHub now records the production URL and deployment status directly on the branch ref through the Deployments API.
+
+      - name: Summarize production deployment
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          cat <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          ### Documentation production workflow
+
+          - Deploy target: explicit production via `--prod`
+          - Impact decision: `${{ steps.impact.outputs.should-deploy == 'true' && 'deploy' || 'skip' }}`
+          - Impact reason: ${{ steps.impact.outputs.reason }}
+          EOF
+
+          if [ "${{ steps.impact.outputs.should-deploy }}" != 'true' ]; then
+            cat <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          - Deployment verification: skipped because the documentation workspace and its dependencies were unaffected
+          - GitHub feedback: skipped because no new deployment was needed
+          - Final status: `skipped`
+          - Production URL: ${{ env.DOCUMENTATION_PRODUCTION_URL }}
+          EOF
+          else
+            cat <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          - Deployment verification: handled by the deploy action via Cloudflare control-plane checks
+          - Live URL verification: ${{ steps.verify-live.outcome == 'success' && 'current build SHA observed on production' || (steps.verify-live.outcome == 'failure' && 'expected build SHA not visible on production' || 'skipped') }}
+          - GitHub feedback: production deployment status published
+          - Final status: `${{ steps.deploy.outputs.status == 'success' && steps.verify-live.outcome != 'failure' && 'success' || 'failure' }}`
+          - Production URL: ${{ steps.deploy.outputs.preview-url || env.DOCUMENTATION_PRODUCTION_URL }}
+          EOF
+
+            if [ -n "${{ steps.deploy.outputs.failure-stage }}" ]; then
+              cat <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          - Failure stage: `${{ steps.deploy.outputs.failure-stage }}`
+          EOF
+            fi
+
+            if [ -n "${{ steps.deploy.outputs.exit-code }}" ]; then
+              cat <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          - Exit code: `${{ steps.deploy.outputs.exit-code }}`
+          EOF
+            fi
+
+            if [ -n "${{ steps.deploy.outputs.version-id }}" ]; then
+              cat <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          - Version ID: `${{ steps.deploy.outputs.version-id }}`
+          EOF
+            fi
+          fi
+
+      - name: Fail when documentation production deploy did not succeed
+        if: ${{ steps.impact.outputs.should-deploy == 'true' && (steps.deploy.outputs.status != 'success' || steps.deploy.outcome == 'failure' || steps.verify-live.outcome == 'failure') }}
+        shell: bash
+        env:
+          DEVFLARE_FAILURE_STAGE: ${{ steps.deploy.outputs.failure-stage }}
+          DEVFLARE_DEPLOY_EXIT_CODE: ${{ steps.deploy.outputs.exit-code }}
+          DEVFLARE_DEPLOY_VERSION_ID: ${{ steps.deploy.outputs.version-id }}
+          DEVFLARE_DEPLOY_LOG_EXCERPT: ${{ steps.deploy.outputs.log-excerpt }}
+          DOCUMENTATION_LIVE_VERIFY_OUTCOME: ${{ steps.verify-live.outcome }}
+          DOCUMENTATION_EXPECTED_BUILD_SHA: ${{ github.sha }}
+          DOCUMENTATION_LIVE_URL: ${{ steps.deploy.outputs.preview-url || env.DOCUMENTATION_PRODUCTION_URL }}
+        run: |
+          echo 'Documentation production deployment failed.' >&2
+          if [ -n "$DEVFLARE_FAILURE_STAGE" ]; then
+            echo "Failure stage: $DEVFLARE_FAILURE_STAGE" >&2
+          fi
+          if [ -n "$DEVFLARE_DEPLOY_EXIT_CODE" ]; then
+            echo "Devflare exit code: $DEVFLARE_DEPLOY_EXIT_CODE" >&2
+          fi
+          if [ -n "$DEVFLARE_DEPLOY_VERSION_ID" ]; then
+            echo "Last version ID: $DEVFLARE_DEPLOY_VERSION_ID" >&2
+          fi
+          if [ "$DOCUMENTATION_LIVE_VERIFY_OUTCOME" = 'failure' ]; then
+            echo "Live production build metadata at $DOCUMENTATION_LIVE_URL/build.json did not expose build SHA $DOCUMENTATION_EXPECTED_BUILD_SHA after deploy verification retries." >&2
+          fi
+          if [ -n "$DEVFLARE_DEPLOY_LOG_EXCERPT" ]; then
+            echo '' >&2
+            echo 'Last deploy log excerpt:' >&2
+            printf '%s\n' "$DEVFLARE_DEPLOY_LOG_EXCERPT" >&2
+          else
+            echo 'No deploy log excerpt was captured by the deploy action.' >&2
+          fi
+          exit 1

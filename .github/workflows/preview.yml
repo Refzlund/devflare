@@ -1,0 +1,957 @@
+name: Preview
+
+env:
+  DOCUMENTATION_PRODUCTION_URL: https://devflare-docs.refz.workers.dev
+  TESTING_EXPECTED_APP_NAME: testing-binding-matrix-preview
+  TESTING_EXPECTED_DEPLOYMENT_CHANNEL: preview
+
+on:
+  push:
+    paths:
+      - 'apps/documentation/**'
+      - 'apps/testing/**'
+      - 'packages/devflare/**'
+      - 'package.json'
+      - 'bun.lock'
+      - 'turbo.json'
+      - '.github/actions/devflare-deploy/**'
+      - '.github/actions/devflare-deploy-impact/**'
+      - '.github/actions/devflare-github-feedback/**'
+      - '.github/actions/devflare-setup-workspace/**'
+      - '.github/scripts/resolve-deploy-impact.mjs'
+      - '.github/scripts/verify-testing-preview-deployment.ts'
+      - '.github/workflows/preview.yml'
+  pull_request:
+    types: [opened, reopened, ready_for_review, closed]
+    paths:
+      - 'apps/documentation/**'
+      - 'apps/testing/**'
+      - 'packages/devflare/**'
+      - 'package.json'
+      - 'bun.lock'
+      - 'turbo.json'
+      - '.github/actions/devflare-deploy/**'
+      - '.github/actions/devflare-deploy-impact/**'
+      - '.github/actions/devflare-github-feedback/**'
+      - '.github/actions/devflare-setup-workspace/**'
+      - '.github/scripts/resolve-deploy-impact.mjs'
+      - '.github/scripts/verify-testing-preview-deployment.ts'
+      - '.github/workflows/preview.yml'
+  delete:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: Branch name to clean up manually
+        required: true
+        type: string
+      project:
+        description: Which preview family to clean up
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - documentation
+          - testing
+
+permissions:
+  contents: read
+  deployments: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  resolve-context:
+    name: Resolve preview context
+    runs-on: ubuntu-latest
+    outputs:
+      default-branch: ${{ steps.resolve.outputs.default-branch }}
+      source-branch: ${{ steps.resolve.outputs.source-branch }}
+      checkout-ref: ${{ steps.resolve.outputs.checkout-ref }}
+      pr-number: ${{ steps.resolve.outputs.pr-number }}
+      branch-preview-enabled: ${{ steps.resolve.outputs.branch-preview-enabled }}
+      pr-preview-enabled: ${{ steps.resolve.outputs.pr-preview-enabled }}
+      branch-cleanup-enabled: ${{ steps.resolve.outputs.branch-cleanup-enabled }}
+      pr-cleanup-enabled: ${{ steps.resolve.outputs.pr-cleanup-enabled }}
+      branch-preview-scope: ${{ steps.resolve.outputs.branch-preview-scope }}
+      pr-preview-scope: ${{ steps.resolve.outputs.pr-preview-scope }}
+      cleanup-project: ${{ steps.resolve.outputs.cleanup-project }}
+    steps:
+      - name: Resolve preview targets
+        id: resolve
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const defaultBranch = context.payload.repository?.default_branch ?? ''
+            const eventName = context.eventName
+            const action = context.payload.action ?? ''
+            const manualBranch = (context.payload.inputs?.branch ?? '').trim()
+            const manualProject = (context.payload.inputs?.project ?? 'all').trim() || 'all'
+            let sourceBranch = ''
+            let checkoutRef = context.sha
+            let prNumber = ''
+            let branchPreviewEnabled = false
+            let prPreviewEnabled = false
+            let branchCleanupEnabled = false
+            let prCleanupEnabled = false
+
+            if (eventName === 'push' && context.ref.startsWith('refs/heads/')) {
+              sourceBranch = context.ref.replace(/^refs\/heads\//, '')
+              checkoutRef = context.sha
+
+              if (sourceBranch && sourceBranch !== defaultBranch) {
+                branchPreviewEnabled = true
+                const { data: pulls } = await github.rest.pulls.list({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  state: 'open',
+                  head: `${context.repo.owner}:${sourceBranch}`,
+                  per_page: 10
+                })
+                const matchingPr = pulls.find((pull) => pull.base?.ref === defaultBranch && pull.head?.repo?.fork === false)
+                if (matchingPr?.number) {
+                  prNumber = String(matchingPr.number)
+                  prPreviewEnabled = true
+                }
+              }
+            } else if (eventName === 'pull_request') {
+              const pullRequest = context.payload.pull_request
+              sourceBranch = pullRequest?.head?.ref ?? ''
+              checkoutRef = pullRequest?.head?.sha ?? context.sha
+              const targetsDefaultBranch = pullRequest?.base?.ref === defaultBranch
+              const sameRepositoryBranch = pullRequest?.head?.repo?.fork === false
+
+              if (targetsDefaultBranch && sameRepositoryBranch) {
+                prNumber = String(pullRequest?.number ?? '')
+                if (action === 'closed') {
+                  prCleanupEnabled = true
+                } else if (['opened', 'reopened', 'ready_for_review'].includes(action)) {
+                  prPreviewEnabled = true
+                }
+              }
+            } else if (eventName === 'delete' && context.payload.ref_type === 'branch') {
+              sourceBranch = context.payload.ref ?? ''
+              branchCleanupEnabled = Boolean(sourceBranch) && sourceBranch !== defaultBranch
+            } else if (eventName === 'workflow_dispatch') {
+              sourceBranch = manualBranch
+              branchCleanupEnabled = Boolean(sourceBranch) && sourceBranch !== defaultBranch
+            }
+
+            const branchPreviewScope = sourceBranch
+            const prPreviewScope = prNumber ? `pr-${prNumber}` : ''
+
+            core.setOutput('default-branch', defaultBranch)
+            core.setOutput('source-branch', sourceBranch)
+            core.setOutput('checkout-ref', checkoutRef)
+            core.setOutput('pr-number', prNumber)
+            core.setOutput('branch-preview-enabled', String(branchPreviewEnabled))
+            core.setOutput('pr-preview-enabled', String(prPreviewEnabled))
+            core.setOutput('branch-cleanup-enabled', String(branchCleanupEnabled))
+            core.setOutput('pr-cleanup-enabled', String(prCleanupEnabled))
+            core.setOutput('branch-preview-scope', branchPreviewScope)
+            core.setOutput('pr-preview-scope', prPreviewScope)
+            core.setOutput('cleanup-project', manualProject)
+
+  documentation-preview:
+    name: Documentation preview
+    needs: resolve-context
+    if: ${{ needs.resolve-context.outputs.branch-preview-enabled == 'true' || needs.resolve-context.outputs.pr-preview-enabled == 'true' }}
+    runs-on: ubuntu-latest
+    concurrency:
+      group: preview-documentation-${{ needs.resolve-context.outputs.source-branch || needs.resolve-context.outputs.pr-number || github.run_id }}
+      cancel-in-progress: true
+    steps:
+      - name: Checkout preview source
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.resolve-context.outputs.checkout-ref }}
+
+      - name: Setup shared workspace
+        uses: ./.github/actions/devflare-setup-workspace
+
+      - name: Resolve documentation preview impact
+        id: impact
+        uses: ./.github/actions/devflare-deploy-impact
+        with:
+          target-package: documentation
+          default-branch: ${{ needs.resolve-context.outputs.default-branch }}
+          event-name: ${{ github.event_name }}
+          event-action: ${{ github.event.action || '' }}
+          push-before: ${{ github.event.before || '' }}
+          pull-request-base-sha: ${{ github.event.pull_request.base.sha || '' }}
+          pull-request-head-sha: ${{ github.event.pull_request.head.sha || '' }}
+
+      - name: Deploy documentation branch preview
+        id: branch-deploy
+        if: ${{ needs.resolve-context.outputs.branch-preview-enabled == 'true' && steps.impact.outputs.should-deploy == 'true' }}
+        continue-on-error: true
+        uses: ./.github/actions/devflare-deploy
+        with:
+          working-directory: apps/documentation
+          install-working-directory: .
+          skip-setup: 'true'
+          skip-install: 'true'
+          deploy-command: bun run deploy --
+          preview-scope: ${{ needs.resolve-context.outputs.branch-preview-scope }}
+          verify-deployment: 'false'
+          deploy-message: Documentation branch preview ${{ github.sha }} (run ${{ github.run_id }})
+          deploy-tag: documentation-branch-preview-${{ github.run_id }}
+          cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          cloudflare-account-id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Validate documentation branch preview target
+        id: branch-validate
+        if: ${{ needs.resolve-context.outputs.branch-preview-enabled == 'true' && steps.impact.outputs.should-deploy == 'true' && steps.branch-deploy.outputs.status == 'success' && always() }}
+        continue-on-error: true
+        shell: bash
+        env:
+          DEVFLARE_PREVIEW_URL: ${{ steps.branch-deploy.outputs.preview-url }}
+          DEVFLARE_PRODUCTION_URL: ${{ env.DOCUMENTATION_PRODUCTION_URL }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "$DEVFLARE_PREVIEW_URL" ]; then
+            echo 'Expected documentation branch preview deployment to produce a preview URL.' >&2
+            exit 1
+          fi
+
+          if [ "$DEVFLARE_PREVIEW_URL" = "$DEVFLARE_PRODUCTION_URL" ]; then
+            echo "Documentation branch preview resolved to the production URL: $DEVFLARE_PREVIEW_URL" >&2
+            exit 1
+          fi
+
+      - name: Verify documentation branch preview content
+        id: branch-content
+        if: ${{ needs.resolve-context.outputs.branch-preview-enabled == 'true' && steps.impact.outputs.should-deploy == 'true' && steps.branch-deploy.outputs.status == 'success' && always() }}
+        continue-on-error: true
+        shell: bash
+        env:
+          DOCUMENTATION_PREVIEW_URL: ${{ steps.branch-deploy.outputs.preview-url }}
+          EXPECTED_BUILD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            if payload="$(curl --fail --silent --show-error --location "${DOCUMENTATION_PREVIEW_URL}/build.json?attempt=${attempt}")"; then
+              if printf '%s' "$payload" | grep -Fq "$EXPECTED_BUILD_SHA"; then
+                echo 'verified=true' >> "$GITHUB_OUTPUT"
+                echo "Verified documentation branch preview exposes build SHA ${EXPECTED_BUILD_SHA}."
+                exit 0
+              fi
+            fi
+
+            if [ "$attempt" -lt 10 ]; then
+              echo "Documentation branch preview does not expose build SHA ${EXPECTED_BUILD_SHA} yet (attempt ${attempt}/10). Retrying..."
+              sleep 6
+            fi
+          done
+
+          echo 'verified=false' >> "$GITHUB_OUTPUT"
+          echo "Documentation branch preview did not expose build SHA ${EXPECTED_BUILD_SHA} after 10 attempts." >&2
+          exit 1
+
+      - name: Publish documentation branch preview feedback
+        if: ${{ needs.resolve-context.outputs.branch-preview-enabled == 'true' && steps.impact.outputs.should-deploy == 'true' && always() }}
+        uses: ./.github/actions/devflare-github-feedback
+        with:
+          github-token: ${{ github.token }}
+          mode: deployment
+          operation: report
+          status: ${{ steps.branch-deploy.outputs.status == 'success' && steps.branch-validate.outcome != 'failure' && steps.branch-content.outcome != 'failure' && 'success' || 'failure' }}
+          title: Documentation branch preview
+          deployment-kind: preview
+          ref-name: ${{ needs.resolve-context.outputs.branch-preview-scope }}
+          sha: ${{ github.sha }}
+          environment: documentation branch preview / ${{ needs.resolve-context.outputs.branch-preview-scope }}
+          environment-url: ${{ steps.branch-deploy.outputs.preview-url }}
+          preview-url: ${{ steps.branch-deploy.outputs.preview-url }}
+          version-id: ${{ steps.branch-deploy.outputs.version-id }}
+          log-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          log-excerpt: ${{ steps.branch-deploy.outputs.log-excerpt }}
+          summary: This shared preview workflow keeps the named documentation preview scope updated on qualifying pushes.
+
+      - name: Deploy documentation PR preview
+        id: pr-deploy
+        if: ${{ needs.resolve-context.outputs.pr-preview-enabled == 'true' && steps.impact.outputs.should-deploy == 'true' }}
+        continue-on-error: true
+        uses: ./.github/actions/devflare-deploy
+        with:
+          working-directory: apps/documentation
+          install-working-directory: .
+          skip-setup: 'true'
+          skip-install: 'true'
+          deploy-command: bun run deploy --
+          preview-scope: ${{ needs.resolve-context.outputs.pr-preview-scope }}
+          verify-deployment: 'false'
+          deploy-message: Documentation PR preview ${{ needs.resolve-context.outputs.checkout-ref }} (run ${{ github.run_id }})
+          deploy-tag: documentation-pr-preview-${{ github.run_id }}
+          cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          cloudflare-account-id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Validate documentation PR preview target
+        id: pr-validate
+        if: ${{ needs.resolve-context.outputs.pr-preview-enabled == 'true' && steps.impact.outputs.should-deploy == 'true' && steps.pr-deploy.outputs.status == 'success' && always() }}
+        continue-on-error: true
+        shell: bash
+        env:
+          DEVFLARE_PREVIEW_URL: ${{ steps.pr-deploy.outputs.preview-url }}
+          DEVFLARE_EXPECTED_PREVIEW_WORKER: devflare-docs-${{ needs.resolve-context.outputs.pr-preview-scope }}
+          DEVFLARE_PRODUCTION_URL: ${{ env.DOCUMENTATION_PRODUCTION_URL }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "$DEVFLARE_PREVIEW_URL" ]; then
+            echo 'Expected documentation PR preview deployment to produce a preview URL.' >&2
+            exit 1
+          fi
+
+          if [ "$DEVFLARE_PREVIEW_URL" = "$DEVFLARE_PRODUCTION_URL" ]; then
+            echo "Documentation PR preview resolved to the production URL: $DEVFLARE_PREVIEW_URL" >&2
+            exit 1
+          fi
+
+          if [[ "$DEVFLARE_PREVIEW_URL" != *"$DEVFLARE_EXPECTED_PREVIEW_WORKER"* ]]; then
+            echo "Documentation PR preview resolved to $DEVFLARE_PREVIEW_URL, which does not contain the expected preview worker name $DEVFLARE_EXPECTED_PREVIEW_WORKER." >&2
+            exit 1
+          fi
+
+      - name: Verify documentation PR preview content
+        id: pr-content
+        if: ${{ needs.resolve-context.outputs.pr-preview-enabled == 'true' && steps.impact.outputs.should-deploy == 'true' && steps.pr-deploy.outputs.status == 'success' && always() }}
+        continue-on-error: true
+        shell: bash
+        env:
+          DOCUMENTATION_PREVIEW_URL: ${{ steps.pr-deploy.outputs.preview-url }}
+          EXPECTED_BUILD_SHA: ${{ needs.resolve-context.outputs.checkout-ref }}
+        run: |
+          set -euo pipefail
+
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            if payload="$(curl --fail --silent --show-error --location "${DOCUMENTATION_PREVIEW_URL}/build.json?attempt=${attempt}")"; then
+              if printf '%s' "$payload" | grep -Fq "$EXPECTED_BUILD_SHA"; then
+                echo 'verified=true' >> "$GITHUB_OUTPUT"
+                echo "Verified documentation PR preview exposes build SHA ${EXPECTED_BUILD_SHA}."
+                exit 0
+              fi
+            fi
+
+            if [ "$attempt" -lt 10 ]; then
+              echo "Documentation PR preview does not expose build SHA ${EXPECTED_BUILD_SHA} yet (attempt ${attempt}/10). Retrying..."
+              sleep 6
+            fi
+          done
+
+          echo 'verified=false' >> "$GITHUB_OUTPUT"
+          echo "Documentation PR preview did not expose build SHA ${EXPECTED_BUILD_SHA} after 10 attempts." >&2
+          exit 1
+
+      - name: Publish documentation PR preview feedback
+        if: ${{ needs.resolve-context.outputs.pr-preview-enabled == 'true' && always() }}
+        uses: ./.github/actions/devflare-github-feedback
+        with:
+          github-token: ${{ github.token }}
+          mode: comment
+          operation: report
+          status: ${{ steps.impact.outputs.should-deploy != 'true' && 'skipped' || (steps.pr-deploy.outputs.status == 'success' && steps.pr-validate.outcome != 'failure' && steps.pr-content.outcome != 'failure' && 'success' || 'failure') }}
+          title: Documentation PR preview
+          comment-key: pr-deployment-status
+          comment-section-key: documentation-preview
+          comment-group-title: Pull request deployment status
+          comment-group-summary: This single comment tracks the latest documentation and testing preview results for this pull request and is updated in place by the shared preview workflow.
+          pr-number: ${{ needs.resolve-context.outputs.pr-number }}
+          deployment-kind: preview
+          ref-name: ${{ needs.resolve-context.outputs.source-branch }}
+          sha: ${{ needs.resolve-context.outputs.checkout-ref }}
+          preview-url: ${{ steps.pr-deploy.outputs.preview-url }}
+          version-id: ${{ steps.pr-deploy.outputs.version-id }}
+          log-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          log-excerpt: ${{ steps.pr-deploy.outputs.log-excerpt }}
+          summary: ${{ steps.impact.outputs.should-deploy != 'true' && 'No documentation preview redeploy was needed for this run, so the existing PR-scoped preview remains in place.' || 'This pull request gets a stable PR-scoped documentation preview that the shared preview workflow updates in place on every relevant branch push or PR lifecycle event.' }}
+          details-markdown: |
+            - Impact decision: `${{ steps.impact.outputs.should-deploy == 'true' && 'deploy' || 'skip' }}`
+            - Impact reason: `${{ steps.impact.outputs.reason }}`
+            - Preview target verification: `${{ steps.impact.outputs.should-deploy != 'true' && 'skipped' || (steps.pr-validate.outcome == 'success' && 'passed' || 'failed') }}`
+            - Preview content verification: `${{ steps.impact.outputs.should-deploy != 'true' && 'skipped' || (steps.pr-content.outcome == 'success' && 'passed' || 'failed') }}`
+            - Final status: `${{ steps.impact.outputs.should-deploy != 'true' && 'skipped' || (steps.pr-deploy.outputs.status == 'success' && steps.pr-validate.outcome != 'failure' && steps.pr-content.outcome != 'failure' && 'success' || 'failure') }}`
+            - Preview strategy: branch pushes build the workspace once per job, then update both branch and PR targets when the branch already belongs to an open pull request.
+
+      - name: Summarize documentation preview
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          cat <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          ### Documentation preview
+
+          - Impact decision: `${{ steps.impact.outputs.should-deploy == 'true' && 'deploy' || 'skip' }}`
+          - Impact reason: ${{ steps.impact.outputs.reason }}
+          - Branch target: `${{ needs.resolve-context.outputs.branch-preview-enabled == 'true' && needs.resolve-context.outputs.branch-preview-scope || 'disabled' }}`
+          - PR target: `${{ needs.resolve-context.outputs.pr-preview-enabled == 'true' && needs.resolve-context.outputs.pr-preview-scope || 'disabled' }}`
+          EOF
+
+          if [ "${{ needs.resolve-context.outputs.branch-preview-enabled }}" = 'true' ]; then
+            cat <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          - Branch preview status: `${{ steps.impact.outputs.should-deploy != 'true' && 'skipped' || (steps.branch-deploy.outputs.status == 'success' && steps.branch-validate.outcome != 'failure' && steps.branch-content.outcome != 'failure' && 'success' || 'failure') }}`
+          EOF
+          fi
+
+          if [ "${{ needs.resolve-context.outputs.pr-preview-enabled }}" = 'true' ]; then
+            cat <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          - PR preview status: `${{ steps.impact.outputs.should-deploy != 'true' && 'skipped' || (steps.pr-deploy.outputs.status == 'success' && steps.pr-validate.outcome != 'failure' && steps.pr-content.outcome != 'failure' && 'success' || 'failure') }}`
+          EOF
+          fi
+
+      - name: Fail when documentation preview deploy did not succeed
+        if: ${{ always() && steps.impact.outputs.should-deploy == 'true' && ((needs.resolve-context.outputs.branch-preview-enabled == 'true' && (steps.branch-deploy.outputs.status != 'success' || steps.branch-deploy.outcome == 'failure' || steps.branch-validate.outcome == 'failure' || steps.branch-content.outcome == 'failure')) || (needs.resolve-context.outputs.pr-preview-enabled == 'true' && (steps.pr-deploy.outputs.status != 'success' || steps.pr-deploy.outcome == 'failure' || steps.pr-validate.outcome == 'failure' || steps.pr-content.outcome == 'failure'))) }}
+        shell: bash
+        run: |
+          echo 'Documentation preview deployment failed.' >&2
+          exit 1
+
+  documentation-cleanup:
+    name: Documentation cleanup
+    needs: resolve-context
+    if: ${{ (needs.resolve-context.outputs.branch-cleanup-enabled == 'true' && (needs.resolve-context.outputs.cleanup-project == 'all' || needs.resolve-context.outputs.cleanup-project == 'documentation')) || needs.resolve-context.outputs.pr-cleanup-enabled == 'true' }}
+    runs-on: ubuntu-latest
+    concurrency:
+      group: preview-documentation-${{ needs.resolve-context.outputs.source-branch || needs.resolve-context.outputs.pr-number || github.run_id }}
+      cancel-in-progress: true
+    steps:
+      - name: Checkout default branch
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.resolve-context.outputs.default-branch }}
+
+      - name: Setup shared workspace
+        uses: ./.github/actions/devflare-setup-workspace
+
+      - name: Clean up documentation branch preview scope
+        if: ${{ needs.resolve-context.outputs.branch-cleanup-enabled == 'true' }}
+        shell: bash
+        env:
+          PREVIEW_SCOPE: ${{ needs.resolve-context.outputs.branch-preview-scope }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+
+          cd apps/documentation
+
+          bunx --bun devflare previews cleanup \
+            --account "$CLOUDFLARE_ACCOUNT_ID" \
+            --scope "$PREVIEW_SCOPE" \
+            --apply
+
+      - name: Mark documentation branch preview deployment inactive
+        if: ${{ needs.resolve-context.outputs.branch-cleanup-enabled == 'true' }}
+        uses: ./.github/actions/devflare-github-feedback
+        with:
+          github-token: ${{ github.token }}
+          mode: deployment
+          operation: cleanup
+          status: inactive
+          title: Documentation branch preview
+          deployment-kind: preview
+          ref-name: ${{ needs.resolve-context.outputs.branch-preview-scope }}
+          environment: documentation branch preview / ${{ needs.resolve-context.outputs.branch-preview-scope }}
+          log-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          summary: This branch was deleted, so the shared preview workflow cleaned up the named documentation preview scope and marked the matching GitHub deployment inactive.
+
+      - name: Clean up documentation PR preview scope
+        if: ${{ needs.resolve-context.outputs.pr-cleanup-enabled == 'true' }}
+        shell: bash
+        env:
+          PREVIEW_SCOPE: ${{ needs.resolve-context.outputs.pr-preview-scope }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+
+          cd apps/documentation
+
+          bunx --bun devflare previews cleanup \
+            --account "$CLOUDFLARE_ACCOUNT_ID" \
+            --scope "$PREVIEW_SCOPE" \
+            --apply
+
+      - name: Publish documentation PR preview cleanup feedback
+        if: ${{ needs.resolve-context.outputs.pr-cleanup-enabled == 'true' }}
+        uses: ./.github/actions/devflare-github-feedback
+        with:
+          github-token: ${{ github.token }}
+          mode: comment
+          operation: cleanup
+          status: inactive
+          title: Documentation PR preview
+          comment-key: pr-deployment-status
+          comment-section-key: documentation-preview
+          comment-group-title: Pull request deployment status
+          comment-group-summary: This single comment tracks the latest documentation and testing preview results for this pull request and is updated in place by the shared preview workflow.
+          pr-number: ${{ needs.resolve-context.outputs.pr-number }}
+          deployment-kind: preview
+          ref-name: ${{ needs.resolve-context.outputs.source-branch }}
+          summary: This pull request was closed, so the shared preview workflow deleted the PR-scoped documentation preview Worker, cleaned up preview-owned resources, and marked the shared PR deployment comment section inactive.
+
+      - name: Summarize documentation cleanup
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          cat <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          ### Documentation cleanup
+
+          - Branch cleanup: `${{ needs.resolve-context.outputs.branch-cleanup-enabled == 'true' && needs.resolve-context.outputs.branch-preview-scope || 'not requested' }}`
+          - PR cleanup: `${{ needs.resolve-context.outputs.pr-cleanup-enabled == 'true' && needs.resolve-context.outputs.pr-preview-scope || 'not requested' }}`
+          EOF
+
+  testing-preview:
+    name: Testing preview
+    needs: resolve-context
+    if: ${{ needs.resolve-context.outputs.branch-preview-enabled == 'true' || needs.resolve-context.outputs.pr-preview-enabled == 'true' }}
+    runs-on: ubuntu-latest
+    concurrency:
+      group: preview-testing-${{ needs.resolve-context.outputs.source-branch || needs.resolve-context.outputs.pr-number || github.run_id }}
+      cancel-in-progress: true
+    steps:
+      - name: Checkout preview source
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.resolve-context.outputs.checkout-ref }}
+
+      - name: Setup shared workspace
+        uses: ./.github/actions/devflare-setup-workspace
+
+      - name: Resolve testing auth service deploy impact
+        id: auth-impact
+        uses: ./.github/actions/devflare-deploy-impact
+        with:
+          target-package: testing-auth-service
+          default-branch: ${{ needs.resolve-context.outputs.default-branch }}
+          event-name: ${{ github.event_name }}
+          event-action: ${{ github.event.action || '' }}
+          push-before: ${{ github.event.before || '' }}
+          pull-request-base-sha: ${{ github.event.pull_request.base.sha || '' }}
+          pull-request-head-sha: ${{ github.event.pull_request.head.sha || '' }}
+          extra-paths: |
+            apps/testing/worker-names.ts
+
+      - name: Resolve testing search service deploy impact
+        id: search-impact
+        uses: ./.github/actions/devflare-deploy-impact
+        with:
+          target-package: testing-search-service
+          default-branch: ${{ needs.resolve-context.outputs.default-branch }}
+          event-name: ${{ github.event_name }}
+          event-action: ${{ github.event.action || '' }}
+          push-before: ${{ github.event.before || '' }}
+          pull-request-base-sha: ${{ github.event.pull_request.base.sha || '' }}
+          pull-request-head-sha: ${{ github.event.pull_request.head.sha || '' }}
+          extra-paths: |
+            apps/testing/worker-names.ts
+
+      - name: Resolve testing main preview deploy impact
+        id: main-impact
+        uses: ./.github/actions/devflare-deploy-impact
+        with:
+          target-package: testing
+          default-branch: ${{ needs.resolve-context.outputs.default-branch }}
+          event-name: ${{ github.event_name }}
+          event-action: ${{ github.event.action || '' }}
+          push-before: ${{ github.event.before || '' }}
+          pull-request-base-sha: ${{ github.event.pull_request.base.sha || '' }}
+          pull-request-head-sha: ${{ github.event.pull_request.head.sha || '' }}
+
+      - name: Deploy testing auth service for branch preview
+        id: branch-auth
+        if: ${{ needs.resolve-context.outputs.branch-preview-enabled == 'true' && steps.auth-impact.outputs.should-deploy == 'true' }}
+        continue-on-error: true
+        uses: ./.github/actions/devflare-deploy
+        with:
+          working-directory: apps/testing/workers/auth-service
+          install-working-directory: .
+          skip-setup: 'true'
+          skip-install: 'true'
+          preview-scope: ${{ needs.resolve-context.outputs.branch-preview-scope }}
+          verify-deployment: 'false'
+          cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          cloudflare-account-id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Deploy testing search service for branch preview
+        id: branch-search
+        if: ${{ needs.resolve-context.outputs.branch-preview-enabled == 'true' && steps.search-impact.outputs.should-deploy == 'true' }}
+        continue-on-error: true
+        uses: ./.github/actions/devflare-deploy
+        with:
+          working-directory: apps/testing/workers/search-service
+          install-working-directory: .
+          skip-setup: 'true'
+          skip-install: 'true'
+          preview-scope: ${{ needs.resolve-context.outputs.branch-preview-scope }}
+          verify-deployment: 'false'
+          cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          cloudflare-account-id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Deploy testing branch preview
+        id: branch-deploy
+        if: ${{ needs.resolve-context.outputs.branch-preview-enabled == 'true' && steps.main-impact.outputs.should-deploy == 'true' }}
+        continue-on-error: true
+        uses: ./.github/actions/devflare-deploy
+        with:
+          working-directory: apps/testing
+          install-working-directory: .
+          skip-setup: 'true'
+          skip-install: 'true'
+          preview-scope: ${{ needs.resolve-context.outputs.branch-preview-scope }}
+          verify-deployment: 'false'
+          cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          cloudflare-account-id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Verify testing branch preview deployed bindings
+        id: branch-verify
+        if: ${{ needs.resolve-context.outputs.branch-preview-enabled == 'true' && steps.main-impact.outputs.should-deploy == 'true' && always() }}
+        continue-on-error: true
+        shell: bash
+        env:
+          DEVFLARE_PREVIEW_BRANCH: ${{ needs.resolve-context.outputs.branch-preview-scope }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_ACCESS_CLIENT_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
+          CLOUDFLARE_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
+          TESTING_DEPLOY_VERSION_ID: ${{ steps.branch-deploy.outputs.version-id }}
+          # The branch-preview workers are commonly gated by a Cloudflare Access
+          # policy. Live /health and /status probes only work when the Access
+          # service-token secrets are configured. Without them the verifier
+          # would (correctly) fail on every Access-redirect; expose the URL only
+          # when we can authenticate, otherwise emit a loud warning so the gap
+          # is visible. PR-preview workers are not gated, so this only affects
+          # the branch lane.
+          TESTING_DEPLOY_PREVIEW_URL: ${{ (secrets.CLOUDFLARE_ACCESS_CLIENT_ID != '' && secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET != '') && steps.branch-deploy.outputs.preview-url || '' }}
+          TESTING_VERIFICATION_ATTEMPTS: '5'
+          TESTING_VERIFICATION_DELAY_MS: '3000'
+        run: |
+          set -euo pipefail
+
+          if [ -z "${{ steps.branch-deploy.outputs.preview-url }}" ]; then
+            echo 'Expected the deploy action to return a preview-url output for GitHub feedback.' >&2
+            exit 1
+          fi
+
+          if [ -z "$TESTING_DEPLOY_PREVIEW_URL" ]; then
+            warning='Branch-preview live /health + /status probe SKIPPED: CLOUDFLARE_ACCESS_CLIENT_ID / CLOUDFLARE_ACCESS_CLIENT_SECRET secrets are not configured, and the branch-preview workers are gated by Cloudflare Access. Add the service-token secrets to enable end-to-end deploy verification on push events. Falling back to Wrangler metadata only.'
+            echo "::warning::$warning"
+            {
+              echo '### :warning: Branch-preview live verification skipped'
+              echo ''
+              echo "$warning"
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          bun .github/scripts/verify-testing-preview-deployment.ts "$DEVFLARE_PREVIEW_BRANCH"
+
+      - name: Publish testing branch preview feedback
+        if: ${{ needs.resolve-context.outputs.branch-preview-enabled == 'true' && (steps.auth-impact.outputs.should-deploy == 'true' || steps.search-impact.outputs.should-deploy == 'true' || steps.main-impact.outputs.should-deploy == 'true') && always() }}
+        uses: ./.github/actions/devflare-github-feedback
+        with:
+          github-token: ${{ github.token }}
+          mode: deployment
+          operation: report
+          status: ${{ (steps.auth-impact.outputs.should-deploy != 'true' || steps.branch-auth.outputs.status == 'success') && (steps.search-impact.outputs.should-deploy != 'true' || steps.branch-search.outputs.status == 'success') && (steps.main-impact.outputs.should-deploy != 'true' || (steps.branch-deploy.outputs.status == 'success' && steps.branch-verify.outcome == 'success')) && 'success' || 'failure' }}
+          title: Testing branch preview
+          deployment-kind: preview
+          ref-name: ${{ needs.resolve-context.outputs.branch-preview-scope }}
+          sha: ${{ github.sha }}
+          environment: testing branch preview / ${{ needs.resolve-context.outputs.branch-preview-scope }}
+          environment-url: ${{ steps.branch-deploy.outputs.preview-url }}
+          preview-url: ${{ steps.branch-deploy.outputs.preview-url }}
+          version-id: ${{ steps.branch-deploy.outputs.version-id }}
+          log-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          log-excerpt: ${{ steps.branch-deploy.outputs.log-excerpt }}
+          summary: This shared preview workflow keeps the named testing preview scope updated on qualifying pushes.
+          details-markdown: |
+            - Auth impact: `${{ steps.auth-impact.outputs.should-deploy == 'true' && 'deploy' || 'skip' }}` (`${{ steps.auth-impact.outputs.reason }}`)
+            - Search impact: `${{ steps.search-impact.outputs.should-deploy == 'true' && 'deploy' || 'skip' }}` (`${{ steps.search-impact.outputs.reason }}`)
+            - Main preview impact: `${{ steps.main-impact.outputs.should-deploy == 'true' && 'deploy' || 'skip' }}` (`${{ steps.main-impact.outputs.reason }}`)
+            - Deployed binding verification: `${{ steps.main-impact.outputs.should-deploy != 'true' && 'skipped' || (steps.branch-verify.outcome == 'success' && 'passed' || 'failed') }}`
+            - Preview strategy: branch pushes build the workspace once per job, then update both branch and PR targets when the branch already belongs to an open pull request.
+
+      - name: Deploy testing auth service for PR preview
+        id: pr-auth
+        if: ${{ needs.resolve-context.outputs.pr-preview-enabled == 'true' && steps.auth-impact.outputs.should-deploy == 'true' }}
+        continue-on-error: true
+        uses: ./.github/actions/devflare-deploy
+        with:
+          working-directory: apps/testing/workers/auth-service
+          install-working-directory: .
+          skip-setup: 'true'
+          skip-install: 'true'
+          preview-scope: ${{ needs.resolve-context.outputs.pr-preview-scope }}
+          verify-deployment: 'false'
+          cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          cloudflare-account-id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Deploy testing search service for PR preview
+        id: pr-search
+        if: ${{ needs.resolve-context.outputs.pr-preview-enabled == 'true' && steps.search-impact.outputs.should-deploy == 'true' }}
+        continue-on-error: true
+        uses: ./.github/actions/devflare-deploy
+        with:
+          working-directory: apps/testing/workers/search-service
+          install-working-directory: .
+          skip-setup: 'true'
+          skip-install: 'true'
+          preview-scope: ${{ needs.resolve-context.outputs.pr-preview-scope }}
+          verify-deployment: 'false'
+          cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          cloudflare-account-id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Deploy testing PR preview
+        id: pr-deploy
+        if: ${{ needs.resolve-context.outputs.pr-preview-enabled == 'true' && steps.main-impact.outputs.should-deploy == 'true' }}
+        continue-on-error: true
+        uses: ./.github/actions/devflare-deploy
+        with:
+          working-directory: apps/testing
+          install-working-directory: .
+          skip-setup: 'true'
+          skip-install: 'true'
+          preview-scope: ${{ needs.resolve-context.outputs.pr-preview-scope }}
+          verify-deployment: 'false'
+          cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          cloudflare-account-id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Verify testing PR preview deployed bindings
+        id: pr-verify
+        if: ${{ needs.resolve-context.outputs.pr-preview-enabled == 'true' && steps.main-impact.outputs.should-deploy == 'true' && always() }}
+        continue-on-error: true
+        shell: bash
+        env:
+          DEVFLARE_PREVIEW_BRANCH: ${{ needs.resolve-context.outputs.pr-preview-scope }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_ACCESS_CLIENT_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
+          CLOUDFLARE_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
+          TESTING_DEPLOY_VERSION_ID: ${{ steps.pr-deploy.outputs.version-id }}
+          TESTING_DEPLOY_PREVIEW_URL: ${{ steps.pr-deploy.outputs.preview-url }}
+          TESTING_VERIFICATION_ATTEMPTS: '5'
+          TESTING_VERIFICATION_DELAY_MS: '3000'
+        run: |
+          set -euo pipefail
+
+          if [ -z "${{ steps.pr-deploy.outputs.preview-url }}" ]; then
+            echo 'Expected the deploy action to return a preview-url output for GitHub feedback.' >&2
+            exit 1
+          fi
+
+          bun .github/scripts/verify-testing-preview-deployment.ts "$DEVFLARE_PREVIEW_BRANCH"
+
+      - name: Publish testing PR preview feedback
+        if: ${{ needs.resolve-context.outputs.pr-preview-enabled == 'true' && always() }}
+        uses: ./.github/actions/devflare-github-feedback
+        with:
+          github-token: ${{ github.token }}
+          mode: comment
+          operation: report
+          status: ${{ (steps.auth-impact.outputs.should-deploy != 'true' && steps.search-impact.outputs.should-deploy != 'true' && steps.main-impact.outputs.should-deploy != 'true') && 'skipped' || (((steps.auth-impact.outputs.should-deploy != 'true' || steps.pr-auth.outputs.status == 'success') && (steps.search-impact.outputs.should-deploy != 'true' || steps.pr-search.outputs.status == 'success') && (steps.main-impact.outputs.should-deploy != 'true' || (steps.pr-deploy.outputs.status == 'success' && steps.pr-verify.outcome == 'success'))) && 'success' || 'failure') }}
+          title: Testing PR preview
+          comment-key: pr-deployment-status
+          comment-section-key: testing-preview
+          comment-group-title: Pull request deployment status
+          comment-group-summary: This single comment tracks the latest documentation and testing preview results for this pull request and is updated in place by the shared preview workflow.
+          pr-number: ${{ needs.resolve-context.outputs.pr-number }}
+          deployment-kind: preview
+          ref-name: ${{ needs.resolve-context.outputs.source-branch }}
+          sha: ${{ needs.resolve-context.outputs.checkout-ref }}
+          preview-url: ${{ steps.pr-deploy.outputs.preview-url }}
+          version-id: ${{ steps.pr-deploy.outputs.version-id }}
+          log-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          log-excerpt: ${{ steps.pr-deploy.outputs.log-excerpt }}
+          summary: ${{ (steps.auth-impact.outputs.should-deploy != 'true' && steps.search-impact.outputs.should-deploy != 'true' && steps.main-impact.outputs.should-deploy != 'true') && 'No testing preview redeploy was needed for this run, so the existing PR-scoped testing preview remains in place.' || 'This pull request gets a stable PR-scoped testing preview family that the shared preview workflow updates in place on every relevant branch push or PR lifecycle event.' }}
+          details-markdown: |
+            - Auth impact: `${{ steps.auth-impact.outputs.should-deploy == 'true' && 'deploy' || 'skip' }}` (`${{ steps.auth-impact.outputs.reason }}`)
+            - Search impact: `${{ steps.search-impact.outputs.should-deploy == 'true' && 'deploy' || 'skip' }}` (`${{ steps.search-impact.outputs.reason }}`)
+            - Main preview impact: `${{ steps.main-impact.outputs.should-deploy == 'true' && 'deploy' || 'skip' }}` (`${{ steps.main-impact.outputs.reason }}`)
+            - Deployed binding verification: `${{ steps.main-impact.outputs.should-deploy != 'true' && 'skipped' || (steps.pr-verify.outcome == 'success' && 'passed' || 'failed') }}`
+            - Preview strategy: branch pushes build the workspace once per job, then update both branch and PR targets when the branch already belongs to an open pull request.
+            - PR scope: `#${{ needs.resolve-context.outputs.pr-number }}`
+
+      - name: Summarize testing preview
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          cat <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          ### Testing preview
+
+          - Auth impact: `${{ steps.auth-impact.outputs.should-deploy == 'true' && 'deploy' || 'skip' }}` (`${{ steps.auth-impact.outputs.reason }}`)
+          - Search impact: `${{ steps.search-impact.outputs.should-deploy == 'true' && 'deploy' || 'skip' }}` (`${{ steps.search-impact.outputs.reason }}`)
+          - Main preview impact: `${{ steps.main-impact.outputs.should-deploy == 'true' && 'deploy' || 'skip' }}` (`${{ steps.main-impact.outputs.reason }}`)
+          - Branch target: `${{ needs.resolve-context.outputs.branch-preview-enabled == 'true' && needs.resolve-context.outputs.branch-preview-scope || 'disabled' }}`
+          - PR target: `${{ needs.resolve-context.outputs.pr-preview-enabled == 'true' && needs.resolve-context.outputs.pr-preview-scope || 'disabled' }}`
+          EOF
+
+          if [ "${{ needs.resolve-context.outputs.branch-preview-enabled }}" = 'true' ]; then
+            cat <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          - Branch preview status: `${{ (steps.auth-impact.outputs.should-deploy != 'true' || steps.branch-auth.outputs.status == 'success') && (steps.search-impact.outputs.should-deploy != 'true' || steps.branch-search.outputs.status == 'success') && (steps.main-impact.outputs.should-deploy != 'true' || (steps.branch-deploy.outputs.status == 'success' && steps.branch-verify.outcome == 'success')) && 'success' || 'failure' }}`
+          EOF
+          fi
+
+          if [ "${{ needs.resolve-context.outputs.pr-preview-enabled }}" = 'true' ]; then
+            cat <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          - PR preview status: `${{ (steps.auth-impact.outputs.should-deploy != 'true' && steps.search-impact.outputs.should-deploy != 'true' && steps.main-impact.outputs.should-deploy != 'true') && 'skipped' || (((steps.auth-impact.outputs.should-deploy != 'true' || steps.pr-auth.outputs.status == 'success') && (steps.search-impact.outputs.should-deploy != 'true' || steps.pr-search.outputs.status == 'success') && (steps.main-impact.outputs.should-deploy != 'true' || (steps.pr-deploy.outputs.status == 'success' && steps.pr-verify.outcome == 'success'))) && 'success' || 'failure') }}`
+          EOF
+          fi
+
+      - name: Fail when any testing preview deploy or verification step did not succeed
+        if: ${{ always() }}
+        shell: bash
+        env:
+          BRANCH_ENABLED: ${{ needs.resolve-context.outputs.branch-preview-enabled }}
+          BRANCH_AUTH_IMPACT: ${{ steps.auth-impact.outputs.should-deploy }}
+          BRANCH_AUTH_STATUS: ${{ steps.branch-auth.outputs.status }}
+          BRANCH_SEARCH_IMPACT: ${{ steps.search-impact.outputs.should-deploy }}
+          BRANCH_SEARCH_STATUS: ${{ steps.branch-search.outputs.status }}
+          BRANCH_MAIN_IMPACT: ${{ steps.main-impact.outputs.should-deploy }}
+          BRANCH_MAIN_STATUS: ${{ steps.branch-deploy.outputs.status }}
+          BRANCH_VERIFY_OUTCOME: ${{ steps.branch-verify.outcome }}
+          PR_ENABLED: ${{ needs.resolve-context.outputs.pr-preview-enabled }}
+          PR_AUTH_IMPACT: ${{ steps.auth-impact.outputs.should-deploy }}
+          PR_AUTH_STATUS: ${{ steps.pr-auth.outputs.status }}
+          PR_SEARCH_IMPACT: ${{ steps.search-impact.outputs.should-deploy }}
+          PR_SEARCH_STATUS: ${{ steps.pr-search.outputs.status }}
+          PR_MAIN_IMPACT: ${{ steps.main-impact.outputs.should-deploy }}
+          PR_MAIN_STATUS: ${{ steps.pr-deploy.outputs.status }}
+          PR_VERIFY_OUTCOME: ${{ steps.pr-verify.outcome }}
+        run: |
+          set -euo pipefail
+
+          should_fail='false'
+
+          if [ "$BRANCH_ENABLED" = 'true' ]; then
+            if [ "$BRANCH_AUTH_IMPACT" = 'true' ] && [ "$BRANCH_AUTH_STATUS" != 'success' ]; then
+              should_fail='true'
+            fi
+
+            if [ "$BRANCH_SEARCH_IMPACT" = 'true' ] && [ "$BRANCH_SEARCH_STATUS" != 'success' ]; then
+              should_fail='true'
+            fi
+
+            if [ "$BRANCH_MAIN_IMPACT" = 'true' ] && { [ "$BRANCH_MAIN_STATUS" != 'success' ] || [ "$BRANCH_VERIFY_OUTCOME" = 'failure' ]; }; then
+              should_fail='true'
+            fi
+          fi
+
+          if [ "$PR_ENABLED" = 'true' ]; then
+            if [ "$PR_AUTH_IMPACT" = 'true' ] && [ "$PR_AUTH_STATUS" != 'success' ]; then
+              should_fail='true'
+            fi
+
+            if [ "$PR_SEARCH_IMPACT" = 'true' ] && [ "$PR_SEARCH_STATUS" != 'success' ]; then
+              should_fail='true'
+            fi
+
+            if [ "$PR_MAIN_IMPACT" = 'true' ] && { [ "$PR_MAIN_STATUS" != 'success' ] || [ "$PR_VERIFY_OUTCOME" = 'failure' ]; }; then
+              should_fail='true'
+            fi
+          fi
+
+          if [ "$should_fail" != 'true' ]; then
+            exit 0
+          fi
+
+          echo 'Testing preview deployment or deployed-binding verification failed.' >&2
+          exit 1
+
+  testing-cleanup:
+    name: Testing cleanup
+    needs: resolve-context
+    if: ${{ (needs.resolve-context.outputs.branch-cleanup-enabled == 'true' && (needs.resolve-context.outputs.cleanup-project == 'all' || needs.resolve-context.outputs.cleanup-project == 'testing')) || needs.resolve-context.outputs.pr-cleanup-enabled == 'true' }}
+    runs-on: ubuntu-latest
+    concurrency:
+      group: preview-testing-${{ needs.resolve-context.outputs.source-branch || needs.resolve-context.outputs.pr-number || github.run_id }}
+      cancel-in-progress: true
+    steps:
+      - name: Checkout default branch
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.resolve-context.outputs.default-branch }}
+
+      - name: Setup shared workspace
+        uses: ./.github/actions/devflare-setup-workspace
+
+      - name: Clean up testing branch preview scope
+        if: ${{ needs.resolve-context.outputs.branch-cleanup-enabled == 'true' }}
+        shell: bash
+        env:
+          PREVIEW_SCOPE: ${{ needs.resolve-context.outputs.branch-preview-scope }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+
+          cd apps/testing
+
+          bunx --bun devflare previews cleanup \
+            --account "$CLOUDFLARE_ACCOUNT_ID" \
+            --scope "$PREVIEW_SCOPE" \
+            --apply
+
+      - name: Mark testing branch preview deployment inactive
+        if: ${{ needs.resolve-context.outputs.branch-cleanup-enabled == 'true' }}
+        uses: ./.github/actions/devflare-github-feedback
+        with:
+          github-token: ${{ github.token }}
+          mode: deployment
+          operation: cleanup
+          status: inactive
+          title: Testing branch preview
+          deployment-kind: preview
+          ref-name: ${{ needs.resolve-context.outputs.branch-preview-scope }}
+          environment: testing branch preview / ${{ needs.resolve-context.outputs.branch-preview-scope }}
+          log-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          summary: This branch was deleted, so the shared preview workflow cleaned up the named testing preview scope and marked the matching GitHub deployment inactive.
+
+      - name: Clean up testing PR preview scope
+        if: ${{ needs.resolve-context.outputs.pr-cleanup-enabled == 'true' }}
+        shell: bash
+        env:
+          PREVIEW_SCOPE: ${{ needs.resolve-context.outputs.pr-preview-scope }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+
+          cd apps/testing
+
+          bunx --bun devflare previews cleanup \
+            --account "$CLOUDFLARE_ACCOUNT_ID" \
+            --scope "$PREVIEW_SCOPE" \
+            --apply
+
+      - name: Publish testing PR preview cleanup feedback
+        if: ${{ needs.resolve-context.outputs.pr-cleanup-enabled == 'true' }}
+        uses: ./.github/actions/devflare-github-feedback
+        with:
+          github-token: ${{ github.token }}
+          mode: comment
+          operation: cleanup
+          status: inactive
+          title: Testing PR preview
+          comment-key: pr-deployment-status
+          comment-section-key: testing-preview
+          comment-group-title: Pull request deployment status
+          comment-group-summary: This single comment tracks the latest documentation and testing preview results for this pull request and is updated in place by the shared preview workflow.
+          pr-number: ${{ needs.resolve-context.outputs.pr-number }}
+          deployment-kind: preview
+          ref-name: ${{ needs.resolve-context.outputs.source-branch }}
+          summary: This pull request was closed, so the shared preview workflow cleaned up the PR-scoped testing preview Workers plus preview-owned Cloudflare resources and marked the shared PR deployment comment section inactive.
+
+      - name: Summarize testing cleanup
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          cat <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          ### Testing cleanup
+
+          - Branch cleanup: `${{ needs.resolve-context.outputs.branch-cleanup-enabled == 'true' && needs.resolve-context.outputs.branch-preview-scope || 'not requested' }}`
+          - PR cleanup: `${{ needs.resolve-context.outputs.pr-cleanup-enabled == 'true' && needs.resolve-context.outputs.pr-preview-scope || 'not requested' }}`
+          EOF

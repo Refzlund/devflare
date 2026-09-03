@@ -1,0 +1,190 @@
+// =============================================================================
+// Config Module — Public exports
+// =============================================================================
+
+export { defineConfig, type DefineConfigInput, type TypedConfig } from './define'
+export {
+	defineWorkspace,
+	loadWorkspaceManifest,
+	resolveAppDirectSocketPort,
+	assertSharedBindingIds,
+	WorkspaceManifestNotFoundError,
+	WorkspaceManifestValidationError,
+	type WorkspaceManifest,
+	type WorkspaceManifestInput,
+	type WorkspaceApp,
+	type LoadedWorkspaceManifest,
+	type LoadWorkspaceManifestOptions
+} from './workspace'
+export {
+	env,
+	isEnvVarDescriptor,
+	loadDevflareDotenv,
+	loadDevflareDotenvIntoProcess,
+	parseDevflareEnvFile,
+	resolveConfigEnvVars,
+	EnvVarResolutionError,
+	EnvVarParseError,
+	type DevflareVarInput,
+	type DevflareVarsInput,
+	type EnvResolutionMode,
+	type EnvVarDescriptor,
+	type InferConfigVars,
+	type MissingEnvVar,
+	type ResolveConfigEnvVarsOptions
+} from './env-vars'
+export {
+	preview,
+	isPreviewScopedName,
+	resolvePreviewIdentifier,
+	materializePreviewScopedConfig,
+	materializePreviewScopedString,
+	type ResolvedPreviewIdentifier,
+	type PreviewIdentifierSource,
+	type PreviewScopeFn,
+	type PreviewScopeOptions,
+	type PreviewScopedName,
+	type PreviewScopedNameOptions,
+	type PreviewResolutionOptions
+} from './preview'
+export {
+	configSchema,
+	getLocalHyperdriveConfigIdentifier,
+	getLocalKVNamespaceIdentifier,
+	getSingleBrowserBindingName,
+	getLocalD1DatabaseIdentifier,
+	normalizeHyperdriveBinding,
+	normalizeKVBinding,
+	normalizeD1Binding,
+	normalizeR2Binding,
+	normalizeQueueProducer,
+	normalizeDOBinding,
+	normalizeMtlsCertificateBinding,
+	normalizeDispatchNamespaceBinding,
+	normalizeWorkflowBinding,
+	normalizePipelineBinding,
+	normalizeImagesBinding,
+	normalizeMediaBinding,
+	normalizeStreamBinding,
+	normalizeVpcServiceBinding,
+	normalizeVpcNetworkBinding,
+	normalizeFlagshipBinding,
+	normalizeSecretsStoreBinding,
+	normalizeArtifactsBinding,
+	type BrowserBindings,
+	type D1Binding,
+	type HyperdriveBinding,
+	type DevflareConfig,
+	type DevflareConfigInput,
+	type DevflareEnvConfig,
+	type PreviewConfig,
+	type DurableObjectBinding,
+	type KVBinding,
+	type R2Binding,
+	type QueueProducer,
+	type NormalizedHyperdriveBinding,
+	type NormalizedKVBinding,
+	type NormalizedD1Binding,
+	type NormalizedR2Binding,
+	type NormalizedQueueProducer,
+	type NormalizedDOBinding,
+	type NormalizedMtlsCertificateBinding,
+	type NormalizedDispatchNamespaceBinding,
+	type NormalizedWorkflowBinding,
+	type NormalizedPipelineBinding,
+	type NormalizedImagesBinding,
+	type NormalizedMediaBinding,
+	type NormalizedStreamBinding,
+	type NormalizedVpcServiceBinding,
+	type NormalizedVpcNetworkBinding,
+	type NormalizedFlagshipBinding,
+	type NormalizedSecretsStoreBinding,
+	type NormalizedArtifactsBinding,
+	type QueueConsumer,
+	type QueuesConfig,
+	type RateLimitBinding,
+	type VersionMetadataBinding,
+	type WorkerLoaderBinding,
+	type SecretsStoreBinding,
+	type MtlsCertificateBinding,
+	type DispatchNamespaceBinding,
+	type WorkflowBinding,
+	type PipelineBinding,
+	type ImagesBinding,
+	type MediaBinding,
+	type ArtifactsBinding,
+	type StreamBinding,
+	type VpcServiceBinding,
+	type VpcNetworkBinding,
+	type FlagshipBinding,
+	type ServiceBinding,
+	type RouteConfig,
+	type TailConsumerConfig,
+	type WsRouteConfig,
+	type AssetsConfig,
+	type ContainerConfig,
+	type ViteConfig,
+	type RolldownConfig,
+	type MigrationConfig
+} from './schema'
+export {
+	compileBuildConfig,
+	compileConfig,
+	readWranglerConfig,
+	stringifyConfig,
+	writeWranglerConfig,
+	type WranglerConfig,
+	type WranglerD1DatabaseBinding,
+	type WranglerHyperdriveBinding,
+	type WranglerKVNamespaceBinding
+} from './compiler'
+export {
+	loadConfig,
+	loadResolvedConfig,
+	resolveConfigPath,
+	ConfigNotFoundError,
+	ConfigValidationError,
+	ConfigResourceResolutionError,
+	type LoadConfigOptions
+} from './loader'
+export { resolveConfigForEnvironment } from './resolve'
+export {
+	resolveMaterializedConfigResources,
+	type LoadResolvedConfigOptions,
+	type ResolveMaterializedConfigResourcesOptions
+} from './resource-resolution'
+export {
+	prepareConfigResourcesForDeploy,
+	prepareMaterializedConfigResourcesForDeploy,
+	type DeployResourceNames,
+	type PrepareConfigResourcesForDeployOptions,
+	type PrepareConfigResourcesForDeployResult,
+	type PrepareMaterializedConfigResourcesForDeployOptions
+} from './deploy-resources'
+export {
+	resolveResources,
+	type BuildConfig,
+	type LocalConfig,
+	type DeployConfig,
+	type Phase,
+	type PhaseConfig,
+	type ResolveResourcesOptions,
+	type ResolveResourcesBuildOptions,
+	type ResolveResourcesLocalOptions,
+	type ResolveResourcesDeployOptions
+} from './resolve-phased'
+export {
+	collectReferencedServiceNames,
+	validateServiceBindings,
+	ServiceBindingValidationError,
+	type ValidateServiceBindingsOptions
+} from './service-bindings-validation'
+
+// Cross-config referencing
+export {
+	ref,
+	type RefResult,
+	type WorkerBinding,
+	type WorkerBindingAccessor,
+	type DOBindingRef
+} from './ref'

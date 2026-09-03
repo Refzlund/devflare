@@ -1,0 +1,47 @@
+{
+	"name": "documentation",
+	"private": true,
+	"version": "0.0.1",
+	"type": "module",
+	"scripts": {
+		"llm:generate": "bun ./scripts/generate-llm-documents.ts",
+		"social:generate": "bun ./scripts/generate-social-cards.ts",
+		"dev": "bun run social:generate && bun run llm:generate && bunx --bun devflare dev",
+		"build": "bun run social:generate && bun run llm:generate && bunx --bun devflare build",
+		"deploy": "bun run social:generate && bun run llm:generate && bunx devflare deploy",
+		"deploy:preview": "bun run social:generate && bun run llm:generate && bunx devflare deploy --preview",
+		"paraglide:compile": "bun ./scripts/compile-paraglide.ts",
+		"prepare": "bun run paraglide:compile && bun run llm:generate && svelte-kit sync || echo ''",
+		"check": "bun run paraglide:compile && bun run social:generate && bun run llm:generate && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"check:watch": "bun run paraglide:compile && bun run social:generate && bun run llm:generate && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+		"types": "bunx --bun devflare types"
+	},
+	"devDependencies": {
+		"@cloudflare/vite-plugin": "^1.0.0",
+		"@iconify-json/fluent": "^1.2.44",
+		"@iconify-json/logos": "^1.2.11",
+		"@iconify-json/material-icon-theme": "^1.2.58",
+		"@iconify-json/twemoji": "^1.2.5",
+		"@iconify/tailwind4": "^1.2.3",
+		"@inlang/paraglide-js": "^2.15.2",
+		"@sveltejs/adapter-cloudflare": "^7.2.8",
+		"@sveltejs/kit": "^2.57.0",
+		"@sveltejs/vite-plugin-svelte": "^7.0.0",
+		"@tailwindcss/typography": "^0.5.19",
+		"@tailwindcss/vite": "^4.2.2",
+		"@types/prismjs": "^1.26.6",
+		"devflare": "workspace:*",
+		"puppeteer-core": "^24.40.0",
+		"svelte": "^5.55.2",
+		"svelte-check": "^4.4.6",
+		"tailwindcss": "^4.2.2",
+		"typescript": "^6.0.2",
+		"vite": "^8.0.7",
+		"wrangler": "^4.81.0"
+	},
+	"dependencies": {
+		"@chenglou/pretext": "^0.0.5",
+		"floating-runes": "^1.4.0",
+		"prismjs": "^1.30.0"
+	}
+}

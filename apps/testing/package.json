@@ -1,0 +1,13 @@
+{
+	"name": "testing",
+	"private": true,
+	"version": "0.0.1",
+	"type": "module",
+	"devDependencies": {
+		"devflare": "workspace:*",
+		"testing-auth-service": "workspace:*",
+		"testing-lock-service": "workspace:*",
+		"testing-search-service": "workspace:*",
+		"wrangler": "4.81.1"
+	}
+}

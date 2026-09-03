@@ -1,0 +1,496 @@
+// =============================================================================
+// Dev server — pure binding-config translators
+// =============================================================================
+// Translates `DevflareConfig.bindings.queues` and `bindings.sendEmail` into
+// the shapes Miniflare expects. Extracted from the long buildMiniflareConfig
+// closure in server.ts so the translations are independently testable and the
+// main dev-server file is easier to read.
+// =============================================================================
+
+import {
+	type DevflareConfig,
+	normalizeArtifactsBinding,
+	normalizeDispatchNamespaceBinding,
+	normalizeFlagshipBinding,
+	normalizeHyperdriveBinding,
+	normalizeImagesBinding,
+	normalizeMediaBinding,
+	normalizeMtlsCertificateBinding,
+	normalizePipelineBinding,
+	normalizeQueueProducer,
+	normalizeSecretsStoreBinding,
+	normalizeStreamBinding,
+	normalizeWorkflowBinding
+} from '../config'
+
+type Bindings = NonNullable<DevflareConfig['bindings']>
+
+export function buildQueueProducers(
+	bindings: Bindings
+): Record<string, { queueName: string; deliveryDelay?: number }> | undefined {
+	if (!bindings.queues?.producers) {
+		return undefined
+	}
+
+	const producers: Record<string, { queueName: string; deliveryDelay?: number }> = {}
+	for (const [bindingName, producer] of Object.entries(bindings.queues.producers)) {
+		const normalized = normalizeQueueProducer(producer)
+		producers[bindingName] = {
+			queueName: normalized.queue,
+			...(normalized.deliveryDelay !== undefined && { deliveryDelay: normalized.deliveryDelay })
+		}
+	}
+
+	return producers
+}
+
+export function buildQueueConsumers(
+	bindings: Bindings
+): Record<string, Record<string, unknown>> | undefined {
+	if (!bindings.queues?.consumers || bindings.queues.consumers.length === 0) {
+		return undefined
+	}
+
+	const consumers: Record<string, Record<string, unknown>> = {}
+	for (const consumer of bindings.queues.consumers) {
+		consumers[consumer.queue] = {
+			...(consumer.maxBatchSize !== undefined && { maxBatchSize: consumer.maxBatchSize }),
+			...(consumer.maxBatchTimeout !== undefined && { maxBatchTimeout: consumer.maxBatchTimeout }),
+			...(consumer.maxRetries !== undefined && { maxRetries: consumer.maxRetries }),
+			...(consumer.deadLetterQueue && { deadLetterQueue: consumer.deadLetterQueue }),
+			...(consumer.maxConcurrency !== undefined && { maxConcurrency: consumer.maxConcurrency }),
+			...(consumer.retryDelay !== undefined && { retryDelay: consumer.retryDelay })
+		}
+	}
+
+	return consumers
+}
+
+/**
+ * Translate `bindings.rateLimits` into Miniflare's per-worker `ratelimits`
+ * option.
+ *
+ * `namespace_id` carries the authored `namespaceId` through and is NOT
+ * optional: Miniflare keys its rate-limit counters by the namespace rather
+ * than by the binding name, so two bindings pointing at the same namespace
+ * share one limit while the same binding name pointing at different
+ * namespaces stays isolated. Miniflare has required the field since
+ * 4.20260730.0 and drops it silently on older releases, so emitting it is
+ * both correct and safe across the whole supported range.
+ *
+ * → GOTCHA: omitting it does not degrade — it aborts the whole Miniflare
+ *   boot with "Unexpected options passed to new Miniflare() constructor",
+ *   taking down every other binding in the session with it.
+ *
+ * @param bindings - The authored `bindings` block; `rateLimits` is optional.
+ * @returns Miniflare's `ratelimits` record, or `undefined` when none are
+ *   declared (so the caller can omit the key entirely).
+ */
+export function buildRateLimitsConfig(
+	bindings: Bindings
+):
+	| Record<string, { namespace_id: string; simple: { limit: number; period: 10 | 60 } }>
+	| undefined {
+	if (!bindings.rateLimits) {
+		return undefined
+	}
+
+	return Object.fromEntries(
+		Object.entries(bindings.rateLimits).map(([name, binding]) => [
+			name,
+			{
+				namespace_id: binding.namespaceId,
+				simple: {
+					limit: binding.simple.limit,
+					period: binding.simple.period
+				}
+			}
+		])
+	)
+}
+
+export function buildVersionMetadataConfig(bindings: Bindings): string | undefined {
+	return bindings.versionMetadata?.binding
+}
+
+export function buildWorkerLoadersConfig(
+	bindings: Bindings
+): Record<string, Record<string, never>> | undefined {
+	if (!bindings.workerLoaders) {
+		return undefined
+	}
+
+	return Object.fromEntries(
+		Object.keys(bindings.workerLoaders).map((bindingName) => [bindingName, {}])
+	)
+}
+
+export function buildMtlsCertificatesConfig(
+	bindings: Bindings
+): Record<string, { certificate_id: string; remote?: boolean }> | undefined {
+	if (!bindings.mtlsCertificates) {
+		return undefined
+	}
+
+	return Object.fromEntries(
+		Object.entries(bindings.mtlsCertificates).map(([bindingName, binding]) => {
+			const normalized = normalizeMtlsCertificateBinding(binding)
+			return [
+				bindingName,
+				{
+					certificate_id: normalized.certificateId,
+					...(normalized.remote !== undefined && { remote: normalized.remote })
+				}
+			]
+		})
+	)
+}
+
+export function buildDispatchNamespacesConfig(
+	bindings: Bindings
+): Record<string, { namespace: string }> | undefined {
+	if (!bindings.dispatchNamespaces) {
+		return undefined
+	}
+
+	return Object.fromEntries(
+		Object.entries(bindings.dispatchNamespaces).map(([bindingName, binding]) => {
+			const normalized = normalizeDispatchNamespaceBinding(binding)
+			return [
+				bindingName,
+				{
+					namespace: normalized.namespace
+				}
+			]
+		})
+	)
+}
+
+export function buildWorkflowsConfig(bindings: Bindings):
+	| Record<
+			string,
+			{
+				name: string
+				className: string
+				scriptName?: string
+				stepLimit?: number
+			}
+	  >
+	| undefined {
+	if (!bindings.workflows) {
+		return undefined
+	}
+
+	return Object.fromEntries(
+		Object.entries(bindings.workflows).map(([bindingName, binding]) => {
+			const normalized = normalizeWorkflowBinding(binding)
+			return [
+				bindingName,
+				{
+					name: normalized.name,
+					className: normalized.className,
+					...(normalized.scriptName && { scriptName: normalized.scriptName }),
+					...(normalized.limits && { stepLimit: normalized.limits.steps })
+				}
+			]
+		})
+	)
+}
+
+export function buildPipelinesConfig(
+	bindings: Bindings
+): Record<string, string | { pipeline: string }> | undefined {
+	if (!bindings.pipelines) {
+		return undefined
+	}
+
+	return Object.fromEntries(
+		Object.entries(bindings.pipelines).map(([bindingName, binding]) => {
+			const normalized = normalizePipelineBinding(binding)
+			return [
+				bindingName,
+				typeof binding === 'string' ? normalized.pipeline : { pipeline: normalized.pipeline }
+			]
+		})
+	)
+}
+
+function getHyperdriveLocalConnectionString(
+	bindingName: string,
+	binding: NonNullable<Bindings['hyperdrive']>[string]
+): string | undefined {
+	const cloudflareEnvName = `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_${bindingName}`
+	const wranglerEnvName = `WRANGLER_HYPERDRIVE_LOCAL_CONNECTION_STRING_${bindingName}`
+	const envValue = process.env[cloudflareEnvName] ?? process.env[wranglerEnvName]
+	if (envValue?.trim()) {
+		return envValue
+	}
+
+	const normalized = normalizeHyperdriveBinding(binding)
+	return normalized.localConnectionString
+}
+
+export function buildHyperdrivesConfig(bindings: Bindings): Record<string, string> | undefined {
+	if (!bindings.hyperdrive) {
+		return undefined
+	}
+
+	const hyperdrives = Object.fromEntries(
+		Object.entries(bindings.hyperdrive)
+			.map(([bindingName, binding]) => {
+				const localConnectionString = getHyperdriveLocalConnectionString(bindingName, binding)
+				return localConnectionString ? [bindingName, localConnectionString] : null
+			})
+			.filter((entry): entry is [string, string] => entry !== null)
+	)
+
+	return Object.keys(hyperdrives).length > 0 ? hyperdrives : undefined
+}
+
+export function buildImagesConfig(bindings: Bindings): { binding: string } | undefined {
+	if (!bindings.images) {
+		return undefined
+	}
+
+	const [entry] = Object.entries(bindings.images)
+	if (!entry) {
+		return undefined
+	}
+
+	const [bindingName, binding] = entry
+	const normalized = normalizeImagesBinding(bindingName, binding)
+	return {
+		binding: normalized.binding
+	}
+}
+
+export function buildMediaConfig(bindings: Bindings): { binding: string } | undefined {
+	if (!bindings.media) {
+		return undefined
+	}
+
+	const [entry] = Object.entries(bindings.media)
+	if (!entry) {
+		return undefined
+	}
+
+	const [bindingName, binding] = entry
+	const normalized = normalizeMediaBinding(bindingName, binding)
+	return {
+		binding: normalized.binding
+	}
+}
+
+export function buildStreamConfig(bindings: Bindings): { binding: string } | undefined {
+	if (!bindings.stream) {
+		return undefined
+	}
+
+	const [entry] = Object.entries(bindings.stream)
+	if (!entry) {
+		return undefined
+	}
+
+	const [bindingName, binding] = entry
+	const normalized = normalizeStreamBinding(bindingName, binding)
+	return {
+		binding: normalized.binding
+	}
+}
+
+export function buildFlagshipConfig(
+	bindings: Bindings
+): Record<string, { app_id: string }> | undefined {
+	if (!bindings.flagship) {
+		return undefined
+	}
+
+	return Object.fromEntries(
+		Object.entries(bindings.flagship).map(([bindingName, binding]) => {
+			const normalized = normalizeFlagshipBinding(binding)
+			return [
+				bindingName,
+				{
+					app_id: normalized.appId
+				}
+			]
+		})
+	)
+}
+
+export function buildAnalyticsEngineConfig(
+	bindings: Bindings
+): Record<string, { dataset: string }> | undefined {
+	if (!bindings.analyticsEngine) {
+		return undefined
+	}
+
+	return Object.fromEntries(
+		Object.entries(bindings.analyticsEngine).map(([bindingName, binding]) => [
+			bindingName,
+			{
+				dataset: binding.dataset
+			}
+		])
+	)
+}
+
+export function buildArtifactsConfig(
+	bindings: Bindings
+): Record<string, { namespace: string }> | undefined {
+	if (!bindings.artifacts) {
+		return undefined
+	}
+
+	return Object.fromEntries(
+		Object.entries(bindings.artifacts).map(([bindingName, binding]) => {
+			const normalized = normalizeArtifactsBinding(binding)
+			return [
+				bindingName,
+				{
+					namespace: normalized.namespace
+				}
+			]
+		})
+	)
+}
+
+export function buildAiSearchNamespacesConfig(
+	bindings: Bindings
+): Record<string, { namespace: string }> | undefined {
+	if (!bindings.aiSearchNamespaces) {
+		return undefined
+	}
+
+	return Object.fromEntries(
+		Object.entries(bindings.aiSearchNamespaces).map(([bindingName, binding]) => [
+			bindingName,
+			{
+				namespace: binding.namespace
+			}
+		])
+	)
+}
+
+export function buildAiSearchInstancesConfig(
+	bindings: Bindings
+): Record<string, { instance_name: string }> | undefined {
+	if (!bindings.aiSearch) {
+		return undefined
+	}
+
+	return Object.fromEntries(
+		Object.entries(bindings.aiSearch).map(([bindingName, binding]) => [
+			bindingName,
+			{
+				instance_name: binding.instanceName
+			}
+		])
+	)
+}
+
+export function buildSecretsStoreConfig(
+	bindings: Bindings,
+	defaultSecretsStoreId?: string,
+	excludedBindingNames: Set<string> = new Set()
+): Record<string, { store_id: string; secret_name: string }> | undefined {
+	if (!bindings.secretsStore) {
+		return undefined
+	}
+
+	const entries = Object.entries(bindings.secretsStore).flatMap(([bindingName, binding]) => {
+		if (excludedBindingNames.has(bindingName)) {
+			return []
+		}
+
+		const normalized = normalizeSecretsStoreBinding(binding, defaultSecretsStoreId, bindingName)
+		return [
+			[
+				bindingName,
+				{
+					store_id: normalized.storeId,
+					secret_name: normalized.secretName
+				}
+			]
+		]
+	})
+
+	return entries.length > 0 ? Object.fromEntries(entries) : undefined
+}
+
+export function buildSendEmailConfig(bindings: Bindings):
+	| {
+			send_email: Array<{
+				name: string
+				destination_address?: string
+				allowed_destination_addresses?: string[]
+				allowed_sender_addresses?: string[]
+				remote?: boolean
+			}>
+	  }
+	| undefined {
+	if (!bindings.sendEmail) {
+		return undefined
+	}
+
+	return {
+		send_email: Object.entries(bindings.sendEmail).map(([name, binding]) => ({
+			name,
+			...(binding.destinationAddress && {
+				destination_address: binding.destinationAddress
+			}),
+			...(binding.allowedDestinationAddresses && {
+				allowed_destination_addresses: binding.allowedDestinationAddresses
+			}),
+			...(binding.allowedSenderAddresses && {
+				allowed_sender_addresses: binding.allowedSenderAddresses
+			}),
+			...(binding.remote !== undefined && { remote: binding.remote })
+		}))
+	}
+}
+
+/**
+ * Translate the top-level `tailConsumers` config into Miniflare's per-worker
+ * `tails` option (an array of service designators). Each tail consumer points
+ * at ANOTHER Worker by service name; Miniflare delivers tail events to that
+ * Worker only when it is present in the same Miniflare `workers` array. In
+ * single-worker local dev the consumer Worker is typically absent, in which
+ * case the designator simply resolves to nothing — local delivery degrades
+ * cleanly (no crash) and live delivery works only when the consumer Worker is
+ * also run locally. The tail *handler* on a Worker is wired separately and is
+ * always testable (`cf.tail.trigger()`).
+ */
+export function buildTailConsumersConfig(
+	config: Pick<DevflareConfig, 'tailConsumers'>
+): string[] | undefined {
+	if (!config.tailConsumers || config.tailConsumers.length === 0) {
+		return undefined
+	}
+
+	const tails = config.tailConsumers.map((consumer) =>
+		typeof consumer === 'string' ? consumer : consumer.service
+	)
+
+	return tails.length > 0 ? tails : undefined
+}
+
+/**
+ * Translate the top-level `streamingTailConsumers` config into Miniflare's
+ * per-worker `streamingTails` option (an array of service designators). This is
+ * the streaming twin of {@link buildTailConsumersConfig}; the same
+ * present-only-when-the-consumer-Worker-is-run-locally delivery semantics apply.
+ */
+export function buildStreamingTailConsumersConfig(
+	config: Pick<DevflareConfig, 'streamingTailConsumers'>
+): string[] | undefined {
+	if (!config.streamingTailConsumers || config.streamingTailConsumers.length === 0) {
+		return undefined
+	}
+
+	const streamingTails = config.streamingTailConsumers.map((consumer) =>
+		typeof consumer === 'string' ? consumer : consumer.service
+	)
+
+	return streamingTails.length > 0 ? streamingTails : undefined
+}

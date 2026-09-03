@@ -1,0 +1,16 @@
+{
+	"extends": "./.svelte-kit/tsconfig.json",
+	"compilerOptions": {
+		"rootDir": "./",
+		"types": ["@cloudflare/workers-types", "@sveltejs/kit"],
+		"skipLibCheck": true
+	},
+	"include": [
+		"env.d.ts",
+		"src/**/*.ts",
+		"src/**/*.svelte",
+		"devflare.config.ts",
+		"vite.config.ts",
+		".svelte-kit/types/**/*.d.ts"
+	]
+}
