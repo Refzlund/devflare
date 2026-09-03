@@ -59,6 +59,7 @@
     "ci-quality-gates",
     "cloudflare-deploy-policy-flags",
     "cloudflare-matrix-accuracy",
+    "deploy-requires-upload-evidence",
     "deploy-secrets-guide",
     "dev-runtime-status-channel",
     "dev-server-host-port",
