@@ -50,6 +50,30 @@ export const LEGACY_SESSION_PARAM = 'browser_session'
  */
 export const SESSION_PATH_PREFIX = '/v1/session/'
 
+/**
+ * Suffix that turns the session path into the release endpoint —
+ * `POST /v1/session/<id>/release`. Devflare's own, for the same reason
+ * {@link SESSION_PATH_PREFIX} is.
+ *
+ * → the binding worker connects the websocket straight to Chrome, so the shim
+ *   never sees that socket open or close. This is the "my client has gone"
+ *   edge, without which `keep_alive` has nothing to count from and a session
+ *   stays attached until Chrome itself exits.
+ */
+export const SESSION_RELEASE_SUFFIX = '/release'
+
+/**
+ * Query flag on a session lookup asking to be recorded as the connecting
+ * client: `GET /v1/session/<id>?attach=1`.
+ *
+ * → a bare lookup stays a pure read — `/v1/sessions` and a human with curl must
+ *   not cancel a session's idle reaper by looking at it.
+ */
+export const SESSION_ATTACH_PARAM = 'attach'
+
+/** Query parameter carrying the connection id a release is for. */
+export const SESSION_CONNECTION_PARAM = 'connection'
+
 /** Liveness probe, devflare's own. */
 export const HEALTH_PATH = '/_devflare/browser/health'
 
@@ -65,6 +89,8 @@ export type ShimRoute =
 	| { kind: 'limits' }
 	/** @param sessionId - the id as written in the path; may not exist */
 	| { kind: 'session'; sessionId: string }
+	/** A client reporting that it has finished with a session it attached to. */
+	| { kind: 'release'; sessionId: string }
 	| { kind: 'health' }
 	/** A websocket path reached over plain HTTP — the client must upgrade. */
 	| { kind: 'devtools' }
@@ -112,7 +138,64 @@ export function readDevtoolsSessionId(
 	// The id is one trailing segment. Anything deeper is a path we do not
 	// serve, and must not be mistaken for an id containing a slash.
 	const sessionId = pathname.slice(DEVTOOLS_PATH_PREFIX.length)
-	return sessionId.length > 0 && !sessionId.includes('/') ? sessionId : null
+	return isSessionSegment(sessionId) ? sessionId : null
+}
+
+/**
+ * @description Whether a path remainder is a session id rather than a deeper
+ * path — one non-empty segment, no slashes.
+ * @param segment - what followed a session-bearing path prefix
+ */
+export function isSessionSegment(segment: string): boolean {
+	return segment.length > 0 && !segment.includes('/')
+}
+
+/**
+ * @description Whether a session lookup is also announcing a connection, and
+ * so should cancel that session's idle reaper.
+ * @param searchParams - the lookup's query string
+ */
+export function shouldAttachSession(searchParams: URLSearchParams): boolean {
+	const value = searchParams.get(SESSION_ATTACH_PARAM)
+	return value !== null && value !== '0' && value !== 'false'
+}
+
+/**
+ * @description Read the connection a release is for.
+ * @param searchParams - the release request's query string
+ * @returns the connection id, or `undefined` to release whatever is attached
+ */
+export function readConnectionId(searchParams: URLSearchParams): string | undefined {
+	return searchParams.get(SESSION_CONNECTION_PARAM) || undefined
+}
+
+/**
+ * The two endpoints under {@link SESSION_PATH_PREFIX}: a lookup and a release.
+ * They share a prefix and nothing else — different methods, different depths.
+ *
+ * @param pathname - request path, without query string
+ * @param method - HTTP method, upper case
+ * @returns the route, or `null` when this is not a session endpoint
+ */
+function matchSessionRoute(pathname: string, method: string): ShimRoute | null {
+	if (!pathname.startsWith(SESSION_PATH_PREFIX)) return null
+
+	const rest = pathname.slice(SESSION_PATH_PREFIX.length)
+
+	if (method === 'POST' && rest.endsWith(SESSION_RELEASE_SUFFIX)) {
+		const sessionId = rest.slice(0, -SESSION_RELEASE_SUFFIX.length)
+		return isSessionSegment(sessionId) ? { kind: 'release', sessionId } : null
+	}
+
+	// An id is one trailing segment, as on the DevTools path. Without that
+	// `GET /v1/session/<id>/release` would read as a lookup of a session
+	// literally named `<id>/release` — a 404 whose text names an id nobody
+	// asked for.
+	if (method === 'GET' && isSessionSegment(rest)) {
+		return { kind: 'session', sessionId: rest }
+	}
+
+	return null
 }
 
 /**
@@ -140,9 +223,11 @@ export function matchShimRoute(pathname: string, method: string): ShimRoute {
 		if (pathname === '/v1/sessions') return { kind: 'sessions' }
 		if (pathname === '/v1/history') return { kind: 'history' }
 		if (pathname === '/v1/limits') return { kind: 'limits' }
-		if (pathname.startsWith(SESSION_PATH_PREFIX)) {
-			return { kind: 'session', sessionId: pathname.slice(SESSION_PATH_PREFIX.length) }
-		}
+	}
+
+	const sessionRoute = matchSessionRoute(pathname, method)
+	if (sessionRoute) {
+		return sessionRoute
 	}
 
 	if (pathname === HEALTH_PATH) {

@@ -5,7 +5,9 @@ import {
 	matchShimRoute,
 	normalizeKeepAlive,
 	readAcquireOptions,
-	readDevtoolsSessionId
+	readConnectionId,
+	readDevtoolsSessionId,
+	shouldAttachSession
 } from '../../../src/browser-shim/routes'
 
 const SESSION_ID = '0134a3b4-2f1c-4b9a-9a0e-1f2d3c4b5a60'
@@ -99,6 +101,28 @@ describe('browser-shim unmoved routes', () => {
 		})
 	})
 
+	// A session id is one trailing segment, as on the DevTools path. Without
+	// that, `/v1/session/<id>/release` reads as a lookup of a session literally
+	// named `<id>/release` — a 404 naming an id nobody asked for.
+	test('a deeper session path is not a lookup', () => {
+		expect(matchShimRoute(`/v1/session/${SESSION_ID}/release`, 'GET')).toEqual({
+			kind: 'not-found'
+		})
+		expect(matchShimRoute('/v1/session/', 'GET')).toEqual({ kind: 'not-found' })
+	})
+
+	test('release answers POST and carries the id it was asked for', () => {
+		expect(matchShimRoute(`/v1/session/${SESSION_ID}/release`, 'POST')).toEqual({
+			kind: 'release',
+			sessionId: SESSION_ID
+		})
+	})
+
+	test('release is POST-only, and needs a session to release', () => {
+		expect(matchShimRoute(`/v1/session/${SESSION_ID}`, 'POST')).toEqual({ kind: 'not-found' })
+		expect(matchShimRoute('/v1/session//release', 'POST')).toEqual({ kind: 'not-found' })
+	})
+
 	test('health answers any method', () => {
 		expect(matchShimRoute('/_devflare/browser/health', 'GET')).toEqual({ kind: 'health' })
 		expect(matchShimRoute('/_devflare/browser/health', 'POST')).toEqual({ kind: 'health' })
@@ -107,6 +131,28 @@ describe('browser-shim unmoved routes', () => {
 	test('anything else is not found', () => {
 		expect(matchShimRoute('/v1/nope', 'GET')).toEqual({ kind: 'not-found' })
 		expect(matchShimRoute('/v1/sessions', 'POST')).toEqual({ kind: 'not-found' })
+	})
+})
+
+describe('browser-shim connection reporting', () => {
+	// Only the binding worker's own lookup attaches. A bare read — /v1/sessions
+	// rendering a list, a human with curl — must not cancel a session's idle
+	// reaper by looking at it.
+	test('a lookup attaches only when it says so', () => {
+		expect(shouldAttachSession(query('attach=1'))).toBe(true)
+		expect(shouldAttachSession(query('attach'))).toBe(true)
+		expect(shouldAttachSession(query(''))).toBe(false)
+	})
+
+	test('an explicit negative does not attach', () => {
+		expect(shouldAttachSession(query('attach=0'))).toBe(false)
+		expect(shouldAttachSession(query('attach=false'))).toBe(false)
+	})
+
+	test('a release names the connection it is for, or none', () => {
+		expect(readConnectionId(query('connection=abc'))).toBe('abc')
+		expect(readConnectionId(query(''))).toBeUndefined()
+		expect(readConnectionId(query('connection='))).toBeUndefined()
 	})
 })
 

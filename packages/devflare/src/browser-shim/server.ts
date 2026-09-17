@@ -26,8 +26,10 @@
 // - GET /v1/limits → Return limits info
 // - GET /v1/history → Return session history
 // - GET /v1/session/X → Session info incl. wsEndpoint (devflare's own)
+// - POST /v1/session/X/release → The attached client has gone (devflare's own)
 //
-// The path table itself lives in ./routes.
+// The path table itself lives in ./routes, and the session lifecycle — acquire,
+// attach, release, reap — in ./sessions.
 //
 // Auto-installs Chrome Headless Shell using @puppeteer/browsers
 // Works with both Node.js and Bun runtimes
@@ -49,15 +51,24 @@ import {
 	resolveBuildId
 } from '@puppeteer/browsers'
 import type { ConsolaInstance } from 'consola'
-import puppeteerCore, { type Browser } from 'puppeteer-core'
+import puppeteerCore from 'puppeteer-core'
 import {
 	type AcquireOptions,
 	isDevtoolsPath,
 	matchShimRoute,
 	normalizeKeepAlive,
 	readAcquireOptions,
-	readDevtoolsSessionId
+	readConnectionId,
+	readDevtoolsSessionId,
+	shouldAttachSession
 } from './routes'
+import {
+	type BrowserSessionRegistry,
+	DEFAULT_KEEP_ALIVE_MS,
+	DEFAULT_MAX_CONCURRENT_SESSIONS,
+	SessionLimitError,
+	createSessionRegistry
+} from './sessions'
 
 // -----------------------------------------------------------------------------
 // Types
@@ -72,8 +83,18 @@ export interface BrowserShimOptions {
 	logger?: ConsolaInstance
 	/** Enable verbose logging */
 	verbose?: boolean
-	/** Keep alive timeout in ms (default: 60000 = 1 minute) */
+	/**
+	 * Idle milliseconds a session with no client attached is kept before its
+	 * Chrome is closed (default: 60000 = 1 minute). A client's own `keep_alive`
+	 * acquire option overrides it per session; `0` disables idle reaping.
+	 */
 	keepAlive?: number
+	/**
+	 * Concurrent browser sessions this shim will hold (default: 10, the figure
+	 * `/v1/limits` reports). An acquire past the ceiling answers 429 rather
+	 * than launching an unbounded number of Chrome processes.
+	 */
+	maxConcurrentSessions?: number
 	/** Custom cache directory for Chrome (default: ~/.devflare/chrome) */
 	cacheDir?: string
 	/**
@@ -94,24 +115,6 @@ export interface BrowserShim {
 	stop(): Promise<void>
 	/** Get the server URL (for creating Fetcher) */
 	getUrl(): string
-}
-
-interface BrowserSession {
-	sessionId: string
-	browser: Browser
-	wsEndpoint: string
-	connectionId?: string
-	connectionStartTime?: number
-	startTime: number
-	idleTimeout?: ReturnType<typeof setTimeout>
-}
-
-interface ClosedSession {
-	sessionId: string
-	startTime: number
-	endTime: number
-	closeReason: number
-	closeReasonText: string
 }
 
 // Cached browser executable path
@@ -288,181 +291,106 @@ async function ensureChrome(cacheDir: string, logger?: ConsolaInstance): Promise
 }
 
 // -----------------------------------------------------------------------------
-// Browser Shim Server Implementation (Node.js compatible)
+// HTTP request handling
 // -----------------------------------------------------------------------------
+/*
+	Kept out of createBrowserShim() on purpose. start() downloads Chrome before
+	it will listen, so anything inside that closure can only be reached by a
+	real dev server — which is how the shim came to serve a `/v1/limits` nobody
+	enforced and, until the session registry landed beside it, an idle reaper
+	that closed live sessions.
 
-export function createBrowserShim(options: BrowserShimOptions = {}): BrowserShim {
-	const {
-		port = 8788,
-		host = '127.0.0.1',
-		logger,
-		verbose = false,
-		keepAlive = 60000,
-		cacheDir = join(homedir(), '.devflare', 'chrome'),
-		allowNoSandbox = false
-	} = options
+	→ the handler takes a registry rather than owning one, so a test can drive
+	  every route against stub browsers.
+*/
 
-	const chromeLaunchArgs = resolveChromeFlags({ allowNoSandbox })
-	if (allowNoSandbox) {
-		logger?.warn(
-			'[BrowserShim] Launching Chrome with --no-sandbox (allowNoSandbox=true). ' +
-				'Only use this in trusted CI/rootless environments.'
+/** What the request handler needs from the shim that owns it. */
+export interface ShimRequestContext {
+	/** The session lifecycle the routes read and write. */
+	registry: BrowserSessionRegistry
+	logger?: ConsolaInstance
+	/** Origin the shim listens on; resolves the relative URLs node reports. */
+	baseUrl: string
+	/** Chrome's path for the health route — null until `start()` has resolved it. */
+	getExecutablePath?: () => string | null
+}
+
+const MAX_REQUEST_BODY_BYTES = 1024 * 1024
+
+/**
+ * @description Read a request's `Origin`, tolerating node's array form.
+ * @param req - the incoming request
+ * @returns the origin, or `null` for origin-less tool traffic
+ */
+export function getRequestOrigin(req: IncomingMessage): string | null {
+	const origin = req.headers.origin
+	if (typeof origin === 'string') {
+		return origin
+	}
+
+	if (Array.isArray(origin) && origin[0]) {
+		return origin[0]
+	}
+
+	return null
+}
+
+/**
+ * @description Whether an origin is one of this machine's own loopback names —
+ * the only browser origins the shim serves.
+ * @param origin - an `Origin` header value
+ */
+export function isLoopbackOrigin(origin: string): boolean {
+	try {
+		const url = new URL(origin)
+		return (
+			url.hostname === '127.0.0.1' ||
+			url.hostname === 'localhost' ||
+			url.hostname === '::1' ||
+			url.hostname === '[::1]'
 		)
+	} catch {
+		return false
 	}
+}
 
-	let server: HttpServer | null = null
-	let executablePath: string | null = null
-	const sessions = new Map<string, BrowserSession>()
-	const history: ClosedSession[] = []
-
-	// Dynamic import of ws package (may not be installed)
-	let WebSocketServerClass: any = null
-	let WebSocketClass: any = null
-	const maxRequestBodyBytes = 1024 * 1024
-
-	function getRequestOrigin(req: IncomingMessage): string | null {
-		const origin = req.headers.origin
-		if (typeof origin === 'string') {
-			return origin
-		}
-
-		if (Array.isArray(origin) && origin[0]) {
-			return origin[0]
-		}
-
-		return null
-	}
-
-	function isLoopbackOrigin(origin: string): boolean {
-		try {
-			const url = new URL(origin)
-			return (
-				url.hostname === '127.0.0.1' ||
-				url.hostname === 'localhost' ||
-				url.hostname === '::1' ||
-				url.hostname === '[::1]'
-			)
-		} catch {
-			return false
-		}
-	}
-
-	function applyCorsHeaders(req: IncomingMessage, res: ServerResponse): boolean {
-		const origin = getRequestOrigin(req)
-		if (!origin) {
-			return true
-		}
-
-		if (!isLoopbackOrigin(origin)) {
-			res.writeHead(403, { 'Content-Type': 'application/json' })
-			res.end(JSON.stringify({ error: 'Forbidden origin' }))
-			return false
-		}
-
-		res.setHeader('Access-Control-Allow-Origin', origin)
-		res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-		res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
-		res.setHeader('Vary', 'Origin')
+/**
+ * Apply the shim's CORS posture, answering 403 itself when the origin is not
+ * loopback. Returns whether the caller should carry on serving the request.
+ */
+function applyCorsHeaders(req: IncomingMessage, res: ServerResponse): boolean {
+	const origin = getRequestOrigin(req)
+	if (!origin) {
 		return true
 	}
 
-	/**
-	 * Launch a new browser and create a session
-	 */
-	async function acquireSession(acquireOptions?: AcquireOptions): Promise<{ sessionId: string }> {
-		if (!executablePath) {
-			throw new Error('Chrome not initialized')
-		}
-
-		// Launch browser with remote debugging enabled
-		// Additional flags for stability with complex pages
-		const browser = await puppeteerCore.launch({
-			executablePath,
-			headless: true,
-			// Increase protocol timeout for complex pages
-			protocolTimeout: 120000,
-			args: chromeLaunchArgs
-		})
-
-		const wsEndpoint = browser.wsEndpoint()
-		const sessionId = crypto.randomUUID()
-
-		const session: BrowserSession = {
-			sessionId,
-			browser,
-			wsEndpoint,
-			startTime: Date.now()
-		}
-
-		sessions.set(sessionId, session)
-
-		// Set up idle timeout
-		const timeout = acquireOptions?.keep_alive ?? keepAlive
-		if (timeout > 0) {
-			session.idleTimeout = setTimeout(async () => {
-				const s = sessions.get(sessionId)
-				if (s && !s.connectionId) {
-					// No active connection, close browser
-					await closeSession(sessionId, 2, 'BrowserIdle')
-				}
-			}, timeout)
-		}
-
-		if (verbose) {
-			logger?.debug(`[BrowserShim] Acquired session ${sessionId}`)
-		}
-
-		return { sessionId }
+	if (!isLoopbackOrigin(origin)) {
+		res.writeHead(403, { 'Content-Type': 'application/json' })
+		res.end(JSON.stringify({ error: 'Forbidden origin' }))
+		return false
 	}
 
-	/**
-	 * Close a browser session
-	 */
-	async function closeSession(
-		sessionId: string,
-		closeReason = 1,
-		closeReasonText = 'NormalClosure'
-	): Promise<void> {
-		const session = sessions.get(sessionId)
-		if (!session) return
+	res.setHeader('Access-Control-Allow-Origin', origin)
+	res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+	res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+	res.setHeader('Vary', 'Origin')
+	return true
+}
 
-		// Clear idle timeout
-		if (session.idleTimeout) {
-			clearTimeout(session.idleTimeout)
-		}
+/**
+ * @description Build the shim's HTTP handler over a session registry.
+ * @param context - the registry, logger and listening origin; see
+ * {@link ShimRequestContext}
+ * @returns a node request handler; it rejects rather than answering 500 itself,
+ * so the caller decides what an unhandled fault looks like on the wire
+ */
+export function createShimRequestHandler(
+	context: ShimRequestContext
+): (req: IncomingMessage, res: ServerResponse) => Promise<void> {
+	const { registry, logger, baseUrl, getExecutablePath } = context
 
-		try {
-			await session.browser.close()
-		} catch {
-			// Ignore errors closing browser
-		}
-
-		sessions.delete(sessionId)
-
-		// Add to history
-		history.unshift({
-			sessionId,
-			startTime: session.startTime,
-			endTime: Date.now(),
-			closeReason,
-			closeReasonText
-		})
-
-		// Keep only last 100 entries
-		if (history.length > 100) {
-			history.pop()
-		}
-
-		if (verbose) {
-			logger?.debug(`[BrowserShim] Closed session ${sessionId}: ${closeReasonText}`)
-		}
-	}
-
-	/**
-	 * Handle HTTP requests
-	 */
-	async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
-		const url = new URL(req.url || '/', `http://${host}:${port}`)
+	return async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
+		const url = new URL(req.url || '/', baseUrl)
 		const method = req.method || 'GET'
 
 		// Always log incoming requests for debugging
@@ -484,9 +412,18 @@ export function createBrowserShim(options: BrowserShimOptions = {}): BrowserShim
 			// Launch a new browser
 			case 'acquire': {
 				try {
-					const result = await acquireSession(await readAcquire(req, url, method))
+					const result = await registry.acquire(await readAcquire(req, url, method))
 					sendJson(res, 200, result)
 				} catch (error) {
+					// A refused acquire is the shim at capacity, not a fault: 429
+					// is what Browser Rendering answers, and what a client can
+					// tell apart from "Chrome would not start".
+					if (error instanceof SessionLimitError) {
+						logger?.warn(`[BrowserShim] ${error.message}`)
+						sendJson(res, 429, { error: error.message, maxConcurrentSessions: error.limit })
+						return
+					}
+
 					const msg = error instanceof Error ? error.message : 'Failed to acquire browser'
 					logger?.error(`[BrowserShim] Acquire failed: ${msg}`)
 					sendJson(res, 500, { error: msg })
@@ -497,45 +434,54 @@ export function createBrowserShim(options: BrowserShimOptions = {}): BrowserShim
 			// List active sessions. Named field, not a bare array: every
 			// @cloudflare/puppeteer version reads `JSON.parse(text).sessions`,
 			// so an array reaches the caller of sessions() as undefined.
-			case 'sessions': {
-				const activeSessions = Array.from(sessions.values()).map((s) => ({
-					sessionId: s.sessionId,
-					startTime: s.startTime,
-					connectionId: s.connectionId,
-					connectionStartTime: s.connectionStartTime
-				}))
-				sendJson(res, 200, { sessions: activeSessions })
+			case 'sessions':
+				sendJson(res, 200, { sessions: registry.list() })
 				return
-			}
 
 			// List recent sessions, likewise read off `.history`
 			case 'history':
-				sendJson(res, 200, { history: history.slice(0, 50) })
+				sendJson(res, 200, { history: registry.history() })
 				return
 
 			case 'limits':
-				sendJson(res, 200, {
-					activeSessions: Array.from(sessions.keys()).map((id) => ({ id })),
-					allowedBrowserAcquisitions: 10,
-					maxConcurrentSessions: 10,
-					timeUntilNextAllowedBrowserAcquisition: 0
-				})
+				sendJson(res, 200, registry.limits())
 				return
 
 			// Session info including wsEndpoint, used by the browser rendering
-			// worker to connect to Chrome directly
+			// worker to connect to Chrome directly.
+			//
+			// → KEY: with `?attach=1` this is also the live path's only "a client
+			//   is connecting now" signal — the binding worker dials Chrome's own
+			//   DevTools port, so the shim never sees that socket open. Attaching
+			//   cancels the idle reaper until the worker releases the session; a
+			//   lookup without the flag stays a pure read.
 			case 'session': {
-				const session = sessions.get(route.sessionId)
+				const session = shouldAttachSession(url.searchParams)
+					? registry.attach(route.sessionId)
+					: registry.get(route.sessionId)
+
 				if (!session) {
 					sendJson(res, 404, { error: 'Session not found' })
 					return
 				}
+
+				sendJson(res, 200, session)
+				return
+			}
+
+			// The other half of that signal: the client has gone, so keep_alive
+			// starts counting and the session becomes reapable again.
+			case 'release': {
+				if (!registry.get(route.sessionId)) {
+					sendJson(res, 404, { error: 'Session not found' })
+					return
+				}
+
+				// Idempotent: a relay whose two ends both close reports twice,
+				// and the second call finds nothing attached. `released` says
+				// which one did the work.
 				sendJson(res, 200, {
-					sessionId: session.sessionId,
-					wsEndpoint: session.wsEndpoint,
-					startTime: session.startTime,
-					connectionId: session.connectionId,
-					connectionStartTime: session.connectionStartTime
+					released: registry.release(route.sessionId, readConnectionId(url.searchParams))
 				})
 				return
 			}
@@ -543,9 +489,9 @@ export function createBrowserShim(options: BrowserShimOptions = {}): BrowserShim
 			case 'health':
 				sendJson(res, 200, {
 					ok: true,
-					activeSessions: sessions.size,
-					historySize: history.length,
-					executablePath
+					activeSessions: registry.size,
+					historySize: registry.historySize,
+					executablePath: getExecutablePath?.() ?? null
 				})
 				return
 
@@ -561,66 +507,139 @@ export function createBrowserShim(options: BrowserShimOptions = {}): BrowserShim
 				return
 		}
 	}
+}
+
+/**
+ * Read the options an acquire request asked for.
+ *
+ * Both client generations pass them in the query string. A JSON body is
+ * optional and wins where it overlaps — 1.1.0 onwards sends none, but a
+ * `POST /v1/acquire` from an older integration could, and used to be the
+ * only place this looked.
+ */
+async function readAcquire(
+	req: IncomingMessage,
+	url: URL,
+	method: string
+): Promise<AcquireOptions> {
+	const options = readAcquireOptions(url.searchParams)
+
+	const body = method === 'POST' ? (await readBody(req)).trim() : ''
+	if (body) {
+		const keepAlive = normalizeKeepAlive((JSON.parse(body) as AcquireOptions).keep_alive)
+		if (keepAlive !== undefined) {
+			options.keep_alive = keepAlive
+		}
+	}
+
+	return options
+}
+
+/**
+ * Read request body as string
+ */
+function readBody(req: IncomingMessage): Promise<string> {
+	return new Promise((resolve, reject) => {
+		const chunks: Buffer[] = []
+		let totalBytes = 0
+
+		req.on('data', (chunk: Buffer) => {
+			totalBytes += chunk.length
+			if (totalBytes > MAX_REQUEST_BODY_BYTES) {
+				req.destroy()
+				reject(new Error(`Request body exceeds ${MAX_REQUEST_BODY_BYTES} bytes`))
+				return
+			}
+
+			chunks.push(chunk)
+		})
+		req.on('end', () => resolve(Buffer.concat(chunks).toString()))
+		req.on('error', reject)
+	})
+}
+
+/**
+ * Send JSON response
+ */
+function sendJson(res: ServerResponse, status: number, data: unknown): void {
+	const body = JSON.stringify(data)
+	res.writeHead(status, {
+		'Content-Type': 'application/json',
+		'Content-Length': Buffer.byteLength(body)
+	})
+	res.end(body)
+}
+
+// -----------------------------------------------------------------------------
+// Browser Shim Server Implementation (Node.js compatible)
+// -----------------------------------------------------------------------------
+
+export function createBrowserShim(options: BrowserShimOptions = {}): BrowserShim {
+	const {
+		port = 8788,
+		host = '127.0.0.1',
+		logger,
+		verbose = false,
+		keepAlive = DEFAULT_KEEP_ALIVE_MS,
+		maxConcurrentSessions = DEFAULT_MAX_CONCURRENT_SESSIONS,
+		cacheDir = join(homedir(), '.devflare', 'chrome'),
+		allowNoSandbox = false
+	} = options
+
+	const chromeLaunchArgs = resolveChromeFlags({ allowNoSandbox })
+	if (allowNoSandbox) {
+		logger?.warn(
+			'[BrowserShim] Launching Chrome with --no-sandbox (allowNoSandbox=true). ' +
+				'Only use this in trusted CI/rootless environments.'
+		)
+	}
+
+	let server: HttpServer | null = null
+	let executablePath: string | null = null
+
+	// The lifecycle lives in ./sessions, which knows nothing about Chrome or
+	// HTTP — this shim cannot start without downloading a browser, so anything
+	// kept in here is reachable only by running a dev server, and the idle
+	// reaper spent months killing live sessions because of exactly that.
+	const registry = createSessionRegistry({
+		launch: launchChrome,
+		keepAlive,
+		maxConcurrentSessions,
+		logger,
+		verbose
+	})
+
+	// Dynamic import of ws package (may not be installed)
+	let WebSocketServerClass: any = null
+	let WebSocketClass: any = null
+
+	const handleRequest = createShimRequestHandler({
+		registry,
+		logger,
+		baseUrl: `http://${host}:${port}`,
+		getExecutablePath: () => executablePath
+	})
 
 	/**
-	 * Read the options an acquire request asked for.
+	 * Start one headless Chrome with remote debugging enabled.
 	 *
-	 * Both client generations pass them in the query string. A JSON body is
-	 * optional and wins where it overlaps — 1.1.0 onwards sends none, but a
-	 * `POST /v1/acquire` from an older integration could, and used to be the
-	 * only place this looked.
+	 * The registry's sole route to a browser; everything about what happens to
+	 * that browser afterwards lives in ./sessions.
 	 */
-	async function readAcquire(
-		req: IncomingMessage,
-		url: URL,
-		method: string
-	): Promise<AcquireOptions> {
-		const options = readAcquireOptions(url.searchParams)
-
-		const body = method === 'POST' ? (await readBody(req)).trim() : ''
-		if (body) {
-			const keepAlive = normalizeKeepAlive((JSON.parse(body) as AcquireOptions).keep_alive)
-			if (keepAlive !== undefined) {
-				options.keep_alive = keepAlive
-			}
+	async function launchChrome() {
+		if (!executablePath) {
+			throw new Error('Chrome not initialized')
 		}
 
-		return options
-	}
-
-	/**
-	 * Read request body as string
-	 */
-	function readBody(req: IncomingMessage): Promise<string> {
-		return new Promise((resolve, reject) => {
-			const chunks: Buffer[] = []
-			let totalBytes = 0
-
-			req.on('data', (chunk: Buffer) => {
-				totalBytes += chunk.length
-				if (totalBytes > maxRequestBodyBytes) {
-					req.destroy()
-					reject(new Error(`Request body exceeds ${maxRequestBodyBytes} bytes`))
-					return
-				}
-
-				chunks.push(chunk)
-			})
-			req.on('end', () => resolve(Buffer.concat(chunks).toString()))
-			req.on('error', reject)
+		const browser = await puppeteerCore.launch({
+			executablePath,
+			headless: true,
+			// Increase protocol timeout for complex pages
+			protocolTimeout: 120000,
+			args: chromeLaunchArgs
 		})
-	}
 
-	/**
-	 * Send JSON response
-	 */
-	function sendJson(res: ServerResponse, status: number, data: unknown): void {
-		const body = JSON.stringify(data)
-		res.writeHead(status, {
-			'Content-Type': 'application/json',
-			'Content-Length': Buffer.byteLength(body)
-		})
-		res.end(body)
+		return { browser, wsEndpoint: browser.wsEndpoint() }
 	}
 
 	/**
@@ -685,23 +704,16 @@ export function createBrowserShim(options: BrowserShimOptions = {}): BrowserShim
 					return
 				}
 
-				const session = sessions.get(sessionId)
+				// Attaching here is what the live dev path cannot do: this handler
+				// owns the client's socket, so it sees both edges itself.
+				const session = registry.attach(sessionId)
 				if (!session) {
 					socket.write('HTTP/1.1 404 Not Found\r\n\r\n')
 					socket.destroy()
 					return
 				}
 
-				// Mark session as connected
-				const connectionId = crypto.randomUUID()
-				session.connectionId = connectionId
-				session.connectionStartTime = Date.now()
-
-				// Clear idle timeout since we have an active connection
-				if (session.idleTimeout) {
-					clearTimeout(session.idleTimeout)
-					session.idleTimeout = undefined
-				}
+				const connectionId = session.connectionId
 
 				wss.handleUpgrade(request, socket, head, (ws: any) => {
 					if (verbose) {
@@ -712,6 +724,12 @@ export function createBrowserShim(options: BrowserShimOptions = {}): BrowserShim
 					const chromeWs = new WebSocketClass(session.wsEndpoint)
 					let chromeConnected = false
 
+					// Which end went first. Tearing the relay down closes this
+					// socket too, and without knowing who started it the close
+					// below reads its own teardown as "Chrome disconnected" and
+					// closes a session the client was entitled to reconnect to.
+					let clientGone = false
+
 					// Set a connection timeout
 					const connectTimeout = setTimeout(() => {
 						if (!chromeConnected) {
@@ -719,10 +737,12 @@ export function createBrowserShim(options: BrowserShimOptions = {}): BrowserShim
 							try {
 								ws.close(1011, 'Chrome connection timeout')
 								chromeWs.close()
-							} catch {
-								// Ignore errors
+							} catch (error) {
+								logger?.error('[BrowserShim] Error closing sockets after Chrome timeout:', error)
 							}
-							closeSession(sessionId, 5, 'ChromeConnectionTimeout').catch(() => {})
+							registry.close(sessionId, 5, 'ChromeConnectionTimeout').catch((err) => {
+								logger?.error('[BrowserShim] Error closing session after Chrome timeout:', err)
+							})
 						}
 					}, 10000) // 10 second timeout
 
@@ -749,13 +769,17 @@ export function createBrowserShim(options: BrowserShimOptions = {}): BrowserShim
 						const validCode = typeof code === 'number' && code >= 1000 && code <= 4999 ? code : 1000
 						try {
 							ws.close(validCode, reason?.toString?.() || '')
-						} catch {
-							// Ignore errors when closing already closed socket
+						} catch (error) {
+							logger?.error('[BrowserShim] Error closing client socket after Chrome closed:', error)
 						}
 
-						// Chrome connection closed - clean up the session entirely
-						// This handles crashes, timeouts, and normal closures
-						closeSession(sessionId, 2, 'ChromeDisconnected').catch((err) => {
+						// Nothing but this relay's own teardown closes this socket
+						// once the client has gone, and that is a release, not a
+						// Chrome that died. Otherwise: a crash, a kill or a real
+						// close, and the session is spent.
+						if (clientGone) return
+
+						registry.close(sessionId, 2, 'ChromeDisconnected').catch((err) => {
 							logger?.error('[BrowserShim] Error closing session after Chrome disconnect:', err)
 						})
 					})
@@ -764,12 +788,12 @@ export function createBrowserShim(options: BrowserShimOptions = {}): BrowserShim
 						logger?.error('[BrowserShim] Chrome WS error:', error.message)
 						try {
 							ws.close(1011, 'Chrome WebSocket error')
-						} catch {
-							// Ignore errors when closing already closed socket
+						} catch (error2) {
+							logger?.error('[BrowserShim] Error closing client socket after Chrome error:', error2)
 						}
 
 						// Chrome error - clean up the session
-						closeSession(sessionId, 4, 'ChromeError').catch((err) => {
+						registry.close(sessionId, 4, 'ChromeError').catch((err) => {
 							logger?.error('[BrowserShim] Error closing session after Chrome error:', err)
 						})
 					})
@@ -785,35 +809,35 @@ export function createBrowserShim(options: BrowserShimOptions = {}): BrowserShim
 						if (verbose) {
 							logger?.debug(`[BrowserShim] Client WS closed for session ${sessionId}`)
 						}
+
+						clientGone = true
+
 						// Ensure valid close code (1000-4999)
 						const validCode = typeof code === 'number' && code >= 1000 && code <= 4999 ? code : 1000
 						try {
 							chromeWs.close(validCode, reason?.toString?.() || '')
-						} catch {
-							// Ignore errors when closing already closed socket
+						} catch (error) {
+							logger?.error('[BrowserShim] Error closing Chrome socket after disconnect:', error)
 						}
 
-						// Clear connection from session and close browser immediately
-						// This prevents zombie browsers from accumulating
-						const s = sessions.get(sessionId)
-						if (s && s.connectionId === connectionId) {
-							s.connectionId = undefined
-							s.connectionStartTime = undefined
-
-							// Close the browser session immediately when client disconnects
-							// Don't wait for idle timeout - clean up now
-							closeSession(sessionId, 1, 'ClientDisconnected').catch((err) => {
-								logger?.error('[BrowserShim] Error closing session after disconnect:', err)
-							})
-						}
+						// Release rather than close: `keep_alive` is the budget a
+						// detached session gets, and until it runs out the client
+						// can reconnect to this same session by id — the reuse
+						// pattern /v1/sessions exists for. The connection id keeps
+						// a late close from a superseded client from detaching a
+						// newer one.
+						registry.release(sessionId, connectionId)
 					})
 
 					ws.on('error', (error: Error) => {
 						logger?.error('[BrowserShim] Client WS error:', error.message)
 						try {
 							chromeWs.close()
-						} catch {
-							// Ignore errors when closing already closed socket
+						} catch (closeError) {
+							logger?.error(
+								'[BrowserShim] Error closing Chrome socket after client error:',
+								closeError
+							)
 						}
 					})
 				})
@@ -835,10 +859,9 @@ export function createBrowserShim(options: BrowserShimOptions = {}): BrowserShim
 	 * Stop the server and close all browsers
 	 */
 	async function stop(): Promise<void> {
-		// Close all browser sessions
-		for (const sessionId of Array.from(sessions.keys())) {
-			await closeSession(sessionId, 3, 'ServerShutdown')
-		}
+		// Close all browser sessions — the backstop for any session still
+		// attached because its client went away without saying so.
+		await registry.closeAll(3, 'ServerShutdown')
 
 		// Stop server
 		if (server) {

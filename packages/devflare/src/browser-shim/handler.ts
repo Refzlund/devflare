@@ -7,10 +7,14 @@
 // - Manages browser sessions
 // - Provides WebSocket proxy to Chrome DevTools
 //
-// Why this exists:
-// - workerd's fetch() cannot make outgoing WebSocket connections to external servers
-// - Using a browser worker inside Miniflare fails for WebSocket DevTools connections
-// - Miniflare's custom fetch handler runs in Node.js with full networking
+// → GOTCHA: NOT the path `devflare dev` takes, and the reason once given here
+//   for it — "workerd's fetch() cannot make outgoing WebSocket connections to
+//   external servers" — is not true of the runtime devflare ships. The BROWSER
+//   binding is wired in dev-server/miniflare-dev-config.ts to the workerd script
+//   from ./binding-worker, which upgrades an outgoing fetch to Chrome's DevTools
+//   port and relays through a WebSocketPair. Nothing in this package calls the
+//   factory below; it is kept as the Node-side alternative for a host where a
+//   custom Miniflare fetch handler is the only seam available.
 //
 // WebSocket Architecture:
 // - For WebSocket upgrade requests, we use Miniflare's WebSocketPair and coupleWebSocket
