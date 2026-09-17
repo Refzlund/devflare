@@ -38,6 +38,7 @@
     "bridge-superseded-socket-isolation",
     "browser-shim-port-flag",
     "browser-shim-puppeteer-1-1-endpoints",
+    "browser-shim-session-lifecycle",
     "browser-shim-sessions-envelope",
     "builtin-subpath-externals",
     "cf-binding-remote-preview-fields",
