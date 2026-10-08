@@ -76,6 +76,7 @@
     "fix-typed-env-vars-proxy-assignability",
     "generated-dir-override",
     "generated-dir-remaining-sites",
+    "miniflare-5",
     "packaging-license-hygiene",
     "phase-b-code-paths",
     "phase-f-docs-debt",
