@@ -45,7 +45,7 @@ export const devflareDocsPart1: DocPage[] = [
 		highlights: [
 			'Every deployable package still starts with one authored `devflare.config.ts` file.',
 			'Worker surfaces like `fetch`, routes, queue, scheduled, email, Durable Objects, entrypoints, workflows, and transport should each live in explicit files when the package actually owns them.',
-			'Hosted Vite or SvelteKit apps add package-local host files like `vite.config.ts` and `svelte.config.js`, but they still keep Devflare config as the Cloudflare-facing source of truth.',
+			'Hosted Vite or SvelteKit apps add package-local host files like `vite.config.ts` (and `svelte.config.js` on SvelteKit 2), but they still keep Devflare config as the Cloudflare-facing source of truth.',
 			'Generated files like `env.d.ts`, `.devflare/**`, and `.wrangler/deploy/**` are outputs, not the authored architecture.',
 			'In a monorepo, Turbo can orchestrate validation across the workspace, but package-local `devflare` commands still decide what actually builds or deploys.'
 		],
@@ -70,7 +70,6 @@ export const devflareDocsPart1: DocPage[] = [
 			'apps/documentation/package.json',
 			'apps/documentation/devflare.config.ts',
 			'apps/documentation/vite.config.ts',
-			'apps/documentation/svelte.config.js',
 			'apps/testing/README.md',
 			'apps/testing/devflare.config.ts',
 			'apps/testing/workers/auth-service/devflare.config.ts',
@@ -140,7 +139,7 @@ export const devflareDocsPart1: DocPage[] = [
 							'Generated binding and entrypoint types. Do not hand-edit it.'
 						],
 						[
-							'`vite.config.ts`, `svelte.config.js`, `src/routes/+page.svelte`',
+							'`vite.config.ts`, `src/routes/+page.svelte` (plus `svelte.config.js` on SvelteKit 2)',
 							'The package is a hosted Vite or SvelteKit app',
 							'Host-app files that sit around the Devflare worker story instead of replacing it.'
 						],
@@ -279,7 +278,7 @@ export const devflareDocsPart1: DocPage[] = [
 				id: 'hosted-apps',
 				title: 'Hosted apps add Vite or SvelteKit around the worker, not instead of it',
 				paragraphs: [
-					'The docs app in this repo is the simplest real example of a hosted package: it has `package.json`, `devflare.config.ts`, `vite.config.ts`, `svelte.config.js`, Svelte route files, and static assets. Devflare still owns the Cloudflare-facing config and generated Wrangler output, while Vite and SvelteKit own the host-app shell.',
+					'The docs app in this repo is the simplest real example of a hosted package: it has `package.json`, `devflare.config.ts`, a `vite.config.ts` that also holds its SvelteKit 3 config, Svelte route files, and static assets. Devflare still owns the Cloudflare-facing config and generated Wrangler output, while Vite and SvelteKit own the host-app shell.',
 					'The repo also includes a fuller SvelteKit case that points `files.fetch` at the generated Cloudflare worker output while still discovering Durable Objects and transport hooks from source. That is the important hosted-app lesson: the framework shell and the worker surfaces can coexist in one package when the file ownership stays explicit.'
 				],
 				snippets: [
@@ -314,7 +313,7 @@ export const devflareDocsPart1: DocPage[] = [
 					}
 				],
 				bullets: [
-					'Package-local host files like `vite.config.ts` and `svelte.config.js` belong beside the Devflare config, not in a separate orchestration package.',
+					'Package-local host files like `vite.config.ts` (and `svelte.config.js` on SvelteKit 2) belong beside the Devflare config, not in a separate orchestration package.',
 					'Hosted apps can point at generated framework worker output, or they can mix that output with extra Devflare-owned surfaces like Durable Objects and transport hooks.',
 					'The generated worker file still belongs on the generated side of the boundary; the authored source remains the config plus the source files that feed it.'
 				]

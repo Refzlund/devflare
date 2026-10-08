@@ -1,8 +1,9 @@
 <script lang="ts">
 import { onMount } from 'svelte'
 import { afterNavigate } from '$app/navigation'
-import { base } from '$app/paths'
+import { asset } from '$app/paths'
 import { page } from '$app/state'
+import type { AssetPath } from '$app/types'
 import Tooltip from '$lib/components/layout/Tooltip.svelte'
 import Sidebar from '$lib/components/navigation/Sidebar.svelte'
 import type { DocPage } from '$lib/docs/types'
@@ -51,7 +52,7 @@ const readingViewportLinks: readonly ReadingViewportLink[] = [
 	}
 ] as const
 
-const brandLogoPath = `${base}/devflare-logo.svg`
+const brandLogoPath = asset('devflare-logo.svg')
 
 let { children } = $props()
 let sidebarOpen = $state(false)
@@ -60,7 +61,9 @@ const currentDoc = $derived(page.data.doc as DocPage | undefined)
 const socialTitle = $derived(getSocialTitle(currentDoc))
 const socialDescription = $derived(getSocialDescription(currentDoc))
 const socialImageAlt = $derived(getSocialImageAlt(currentDoc))
-const socialCardPath = $derived(`${base}${getSocialCardPath(currentDoc)}`)
+// Every social card is generated into static/ before a build, but its path is built from a doc
+// slug, which SvelteKit's generated AssetPath union cannot follow.
+const socialCardPath = $derived(asset(getSocialCardPath(currentDoc).slice(1) as AssetPath))
 const socialUrl = $derived(toAbsoluteUrl(page.url.origin, page.url.pathname))
 const socialImageUrl = $derived(toAbsoluteUrl(page.url.origin, socialCardPath))
 

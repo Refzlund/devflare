@@ -14,6 +14,8 @@ import {
 } from '../dev-server/runtime-status'
 import { createFetchEvent, runWithEventContext } from '../runtime/context'
 import { extractBindingHints } from '../test/binding-hints'
+import { createInProcessExecutionContext } from '../utils/in-process-context'
+import { getSvelteKitDevState } from './cloudflare-workers-dev'
 import { buildSvelteKitLocalBindings, overlayLocalBindings } from './local-bindings'
 
 // -----------------------------------------------------------------------------
@@ -91,17 +93,15 @@ function shouldUseCachedPlatform(localBindings: Record<string, unknown>): boolea
  * for parity with existing behavior.
  */
 function createDevExecutionContext(pendingErrors: unknown[]): ExecutionContext {
-	return {
-		waitUntil: (promise: Promise<unknown>) => {
+	return createInProcessExecutionContext({
+		waitUntil: (promise) => {
 			promise.catch((err) => {
 				console.error('[devflare] waitUntil error:', err)
 				pendingErrors.push(err)
 			})
 		},
-		passThroughOnException: () => {
-			// No-op in dev mode
-		}
-	} as ExecutionContext
+		host: "devflare's SvelteKit dev server runs the app in Vite's Node process"
+	})
 }
 
 /**
@@ -621,7 +621,9 @@ async function createPlatformOrReport(
 }
 
 /**
- * Attach a built platform to the event and resolve the request under its context.
+ * Serve a request with a built platform: its bindings reach the app through
+ * `cloudflare:workers` (SvelteKit 3) or `event.platform` (SvelteKit 2), and
+ * through devflare's own runtime context either way.
  *
  * @param event - the SvelteKit request event.
  * @param resolve - SvelteKit's resolve for this handle.
@@ -631,8 +633,15 @@ function serveWithPlatform<
 	TEvent extends { platform?: unknown; request?: Request },
 	TResolve extends (event: unknown) => Response | Promise<Response>
 >(event: TEvent, resolve: TResolve, platform: Platform): Response | Promise<Response> {
-	event.platform = platform as typeof event.platform
-	return resolveWithPlatformContext(event, resolve, platform)
+	const devState = getSvelteKitDevState()
+	// When devflare serves `cloudflare:workers`, the app is on SvelteKit 3's adapter, which puts
+	// nothing on `event.platform` once deployed; filling it in dev would hide that until then.
+	if (!devState.cloudflareWorkers) {
+		event.platform = platform as typeof event.platform
+	}
+	return devState.requests.run({ env: platform.env, context: platform.context }, () =>
+		resolveWithPlatformContext(event, resolve, platform)
+	)
 }
 
 async function getAutoPlatformOptions(): Promise<DevflarePlatformOptions> {

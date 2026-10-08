@@ -1,11 +1,13 @@
+import { env } from 'cloudflare:workers'
 import { json } from '@sveltejs/kit'
 import type { RequestHandler } from './$types'
 
-export const GET: RequestHandler = ({ platform }) => {
+// SvelteKit 3's Cloudflare adapter serves the bindings from `cloudflare:workers`, not `platform`.
+export const GET: RequestHandler = () => {
 	return json(
 		{
-			buildSha: platform?.env.BUILD_SHA ?? 'unknown',
-			buildTime: platform?.env.BUILD_TIME ?? 'unknown'
+			buildSha: env.BUILD_SHA ?? 'unknown',
+			buildTime: env.BUILD_TIME ?? 'unknown'
 		},
 		{
 			headers: {

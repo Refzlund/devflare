@@ -1,5 +1,4 @@
-import type { Handle } from '@sveltejs/kit'
-import { sequence } from '@sveltejs/kit/hooks'
+import { type Handle, sequence } from '@sveltejs/kit/hooks'
 import { getTextDirection } from '$lib/paraglide/runtime'
 import { paraglideMiddleware } from '$lib/paraglide/server'
 
@@ -20,7 +19,9 @@ const handleDevflarePlatform: Handle = async ({ event, resolve }) => {
 
 const handleDocumentLocale: Handle = ({ event, resolve }) =>
 	paraglideMiddleware(event.request, ({ request: localizedRequest, locale }) => {
-		event.request = localizedRequest
+		// SvelteKit 3 types `event.request` as readonly; the event is still a plain object, and
+		// the routes after this hook keep reading the localized request, as they did on Kit 2.
+		Object.assign(event, { request: localizedRequest })
 
 		return resolve(event, {
 			transformPageChunk: ({ html }) =>

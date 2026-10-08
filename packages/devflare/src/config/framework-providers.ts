@@ -20,11 +20,25 @@ interface FrameworkProvider {
 	resolve(context: FrameworkProviderContext): Promise<FrameworkProviderResolution | null>
 }
 
+/** Where SvelteKit 2 reads its config, adapter included. */
 const SVELTE_CONFIG_FILES = [
 	'svelte.config.js',
 	'svelte.config.mjs',
 	'svelte.config.ts',
 	'svelte.config.cjs'
+] as const
+
+/**
+ * Where SvelteKit 3 reads its config: the options of `sveltekit()` in the Vite config. Kit 3
+ * refuses a `svelte.config.*` outright, and Kit 2 since 2.62 accepts its config here too.
+ */
+const VITE_CONFIG_FILES = [
+	'vite.config.ts',
+	'vite.config.mts',
+	'vite.config.cts',
+	'vite.config.js',
+	'vite.config.mjs',
+	'vite.config.cjs'
 ] as const
 
 async function readTextIfExists(path: string): Promise<string | null> {
@@ -80,12 +94,14 @@ const svelteKitCloudflareProvider: FrameworkProvider = {
 			return null
 		}
 
-		const svelteConfigText = await findFirstExistingTextFile(context.cwd, SVELTE_CONFIG_FILES)
-		if (!svelteConfigText) {
-			return null
-		}
-
-		if (!/@sveltejs\/adapter-cloudflare|adapter-cloudflare/.test(svelteConfigText)) {
+		const configTexts = await Promise.all([
+			findFirstExistingTextFile(context.cwd, SVELTE_CONFIG_FILES),
+			findFirstExistingTextFile(context.cwd, VITE_CONFIG_FILES)
+		])
+		const configuresAdapter = configTexts.some(
+			(text) => text !== null && /@sveltejs\/adapter-cloudflare|adapter-cloudflare/.test(text)
+		)
+		if (!configuresAdapter) {
 			return null
 		}
 

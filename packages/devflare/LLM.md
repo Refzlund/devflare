@@ -61,7 +61,7 @@ Keep the day-to-day Devflare surfaces easy to scan: runtime model, HTTP split, a
 - **Frameworks** — Choose the right host lane for worker-rendered Svelte, standalone Vite apps, and full SvelteKit shells without losing the worker-first mental model.
   - [Svelte in workers](/docs/svelte-with-rolldown) — When a worker-only fetch surface or Durable Object imports `.svelte`, add the Svelte compiler to `rolldown.options.plugins`. That compilation belongs to Devflare’s worker bundler, not the main Vite plugin chain.
   - [Vite standalone](/docs/vite-standalone) — An effective Vite config is what opts the package into Vite-backed flows: a local `vite.config.*`, a non-empty `config.vite`, or both together. Use `devflare/vite` when the package really is a Vite app and you want Devflare to keep Worker config, Durable Objects, and generated Wrangler output aligned underneath it.
-  - [SvelteKit](/docs/sveltekit-with-devflare) — Hand SvelteKit's Cloudflare adapter output to Devflare via `wrangler.passthrough.main` (the adapter worker is a build artifact and does not exist until `vite build` runs), keep `sveltekit()` in `vite.config.ts`, and compose `devflare/sveltekit` into `src/hooks.server.ts` so local platform bindings line up with the Worker runtime Devflare manages.
+  - [SvelteKit](/docs/sveltekit-with-devflare) — Hand SvelteKit's Cloudflare adapter output to Devflare via `wrangler.passthrough.main` (the adapter worker is a build artifact and does not exist until `vite build` runs), keep `sveltekit()` in `vite.config.ts`, and compose `devflare/sveltekit` into `src/hooks.server.ts` so local bindings line up with the Worker runtime Devflare manages. SvelteKit 2 and SvelteKit 3 both work.
 
 ### Ship & operate
 Deploy explicitly, choose the right preview model, manage preview lifecycle cleanly, and keep CI/CD plus verification honest.
@@ -1486,7 +1486,7 @@ That split is what keeps the project reviewable. If a file describes package int
 | `src/workflows/**/*.ts` | The package owns workflow definitions | Additional discovered runtime modules that stay explicit in config review. |
 | `src/transport.ts` | Local RPC-style bridge calls must preserve custom values | Custom encode/decode rules for local bridge-backed calls, most often in tests or Durable Object method round-trips. |
 | `env.d.ts` | You run `devflare types` | Generated binding and entrypoint types. Do not hand-edit it. |
-| `vite.config.ts`, `svelte.config.js`, `src/routes/+page.svelte` | The package is a hosted Vite or SvelteKit app | Host-app files that sit around the Devflare worker story instead of replacing it. |
+| `vite.config.ts`, `src/routes/+page.svelte` (plus `svelte.config.js` on SvelteKit 2) | The package is a hosted Vite or SvelteKit app | Host-app files that sit around the Devflare worker story instead of replacing it. |
 | `.devflare/**`, `.wrangler/deploy/**` | Devflare has built, checked, or prepared deploy output | Generated build and deploy artifacts. Useful to inspect, not the authored architecture. |
 
 > **Tip — A good architecture rule**
@@ -1656,13 +1656,13 @@ export class SessionRoom extends DurableObject<DevflareEnv> {
 
 #### Hosted apps add Vite or SvelteKit around the worker, not instead of it
 
-The docs app in this repo is the simplest real example of a hosted package: it has `package.json`, `devflare.config.ts`, `vite.config.ts`, `svelte.config.js`, Svelte route files, and static assets. Devflare still owns the Cloudflare-facing config and generated Wrangler output, while Vite and SvelteKit own the host-app shell.
+The docs app in this repo is the simplest real example of a hosted package: it has `package.json`, `devflare.config.ts`, a `vite.config.ts` that also holds its SvelteKit 3 config, Svelte route files, and static assets. Devflare still owns the Cloudflare-facing config and generated Wrangler output, while Vite and SvelteKit own the host-app shell.
 
 The repo also includes a fuller SvelteKit case that points `files.fetch` at the generated Cloudflare worker output while still discovering Durable Objects and transport hooks from source. That is the important hosted-app lesson: the framework shell and the worker surfaces can coexist in one package when the file ownership stays explicit.
 
 ##### Key points
 
-- Package-local host files like `vite.config.ts` and `svelte.config.js` belong beside the Devflare config, not in a separate orchestration package.
+- Package-local host files like `vite.config.ts` (and `svelte.config.js` on SvelteKit 2) belong beside the Devflare config, not in a separate orchestration package.
 - Hosted apps can point at generated framework worker output, or they can mix that output with extra Devflare-owned surfaces like Durable Objects and transport hooks.
 - The generated worker file still belongs on the generated side of the boundary; the authored source remains the config plus the source files that feed it.
 
@@ -5289,7 +5289,7 @@ That means you should think in terms of host ownership, not a separate CLI mode.
 
 ### Compose Devflare with SvelteKit by letting SvelteKit host the app and Devflare supply the Worker platform
 
-> Hand SvelteKit's Cloudflare adapter output to Devflare via `wrangler.passthrough.main` (the adapter worker is a build artifact and does not exist until `vite build` runs), keep `sveltekit()` in `vite.config.ts`, and compose `devflare/sveltekit` into `src/hooks.server.ts` so local platform bindings line up with the Worker runtime Devflare manages.
+> Hand SvelteKit's Cloudflare adapter output to Devflare via `wrangler.passthrough.main` (the adapter worker is a build artifact and does not exist until `vite build` runs), keep `sveltekit()` in `vite.config.ts`, and compose `devflare/sveltekit` into `src/hooks.server.ts` so local bindings line up with the Worker runtime Devflare manages. SvelteKit 2 and SvelteKit 3 both work.
 
 | Field | Value |
 | --- | --- |
@@ -5311,6 +5311,8 @@ This is the path for full SvelteKit apps where the framework owns the outer shel
 #### Wire the SvelteKit package like a SvelteKit app first
 
 SvelteKit still owns the app shell, routing, and framework build. Devflare plugs Worker-aware config, generated Wrangler output, and any Durable Object discovery into that Vite-driven flow.
+
+Devflare recognises a SvelteKit app on `@sveltejs/adapter-cloudflare` from either place the adapter is configured: `svelte.config.js` on SvelteKit 2, or the `sveltekit()` options in `vite.config.ts` on SvelteKit 3.
 
 The adapter worker is a **build artifact** — `@sveltejs/adapter-cloudflare` only writes `.svelte-kit/cloudflare/_worker.js` (or your repo's equivalent, like `.adapter-cloudflare/_worker.js`) during `vite build`. Devflare resolves handler paths *before* the framework build runs, so pointing `files.fetch` at that path fails on a clean checkout with `Configured fetch handler "…" was not found`. Use `wrangler.passthrough.main` instead: devflare skips composition entirely for the worker entry, and wrangler picks up the adapter output post-build.
 
@@ -5338,7 +5340,25 @@ export default defineConfig({
 })
 ```
 
-##### Example — `vite.config.ts`
+##### Example — `vite.config.ts` (SvelteKit 3)
+
+```ts
+import adapter from '@sveltejs/adapter-cloudflare'
+import { sveltekit } from '@sveltejs/kit/vite'
+import { devflarePlugin } from 'devflare/vite'
+import { defineConfig } from 'vite'
+
+export default defineConfig({
+	plugins: [
+		devflarePlugin(),
+		sveltekit({
+			adapter: adapter({ config: '.devflare/wrangler.jsonc' })
+		})
+	]
+})
+```
+
+##### Example — `vite.config.ts` (SvelteKit 2, with the adapter in `svelte.config.js`)
 
 ```ts
 import { defineConfig } from 'vite'
@@ -5354,7 +5374,7 @@ export default defineConfig({
 
 > **Important — Why the order matters**
 >
-> The Devflare handle is the piece that prepares `event.platform` in local dev. Put it first so later middleware sees the same platform shape the app expects.
+> The Devflare handle is the piece that prepares the bindings in local dev. Put it first so later middleware sees the same bindings the app expects.
 
 ##### Example — Simple composed handle
 
@@ -5382,6 +5402,51 @@ const devflareHandle = createHandle({
 })
 
 export const handle = sequence(devflareHandle)
+```
+
+#### Read bindings the way your SvelteKit version does
+
+##### Key points
+
+- SvelteKit 3's adapter no longer puts bindings on `event.platform`, so Devflare leaves it unset there too: an app that still reads `platform.env` fails in dev instead of only once deployed.
+- Under `devflare dev`, `cloudflare:workers` resolves to a Devflare module whose `env`, `waitUntil` and `tracing` belong to the request the handle is serving. A plain `vite dev` keeps the adapter's own module.
+- Bindings are per request in dev, so read `env` inside a load, action, endpoint or hook. Reading it at module top level throws there, with a message saying so.
+- `exports` and `cache` from `cloudflare:workers` need workerd, so they throw in dev rather than answer with something that only looks right.
+
+##### Example — SvelteKit 3: `cloudflare:workers`
+
+###### File — src/routes/api/notes/+server.ts
+
+```ts
+import { env } from 'cloudflare:workers'
+
+export async function GET() {
+	return Response.json(await env.DB.prepare('SELECT * FROM notes').all())
+}
+```
+
+##### Example — SvelteKit 3: type `env` from the generated `DevflareEnv`
+
+###### File — src/app.d.ts
+
+```ts
+declare global {
+	namespace Cloudflare {
+		interface Env extends DevflareEnv {}
+	}
+}
+
+export {}
+```
+
+##### Example — SvelteKit 2: `event.platform`
+
+###### File — src/routes/api/notes/+server.ts
+
+```ts
+export async function GET({ platform }) {
+	return Response.json(await platform.env.DB.prepare('SELECT * FROM notes').all())
+}
 ```
 
 #### Reach for `createHandle()` only when the simple handle is not enough

@@ -325,14 +325,15 @@ export default defineConfig(async () => {
 		title:
 			'Compose Devflare with SvelteKit by letting SvelteKit host the app and Devflare supply the Worker platform',
 		summary:
-			"Hand SvelteKit's Cloudflare adapter output to Devflare via `wrangler.passthrough.main` (the adapter worker is a build artifact and does not exist until `vite build` runs), keep `sveltekit()` in `vite.config.ts`, and compose `devflare/sveltekit` into `src/hooks.server.ts` so local platform bindings line up with the Worker runtime Devflare manages.",
+			"Hand SvelteKit's Cloudflare adapter output to Devflare via `wrangler.passthrough.main` (the adapter worker is a build artifact and does not exist until `vite build` runs), keep `sveltekit()` in `vite.config.ts`, and compose `devflare/sveltekit` into `src/hooks.server.ts` so local bindings line up with the Worker runtime Devflare manages. SvelteKit 2 and SvelteKit 3 both work.",
 		description:
 			'This is the path for full SvelteKit apps where the framework owns the outer shell and Devflare keeps the Worker-facing platform story coherent. It matches the repository’s real documentation app and the SvelteKit integration example in the public docs.',
 		highlights: [
 			'Use `wrangler.passthrough.main` (not `files.fetch`) to point at the adapter\'s `_worker.js`. The adapter writes that file during `vite build`, after Devflare has already resolved its handler paths — so `files.fetch` would fail with "Configured fetch handler … was not found" on a clean checkout.',
-			'Keep `devflarePlugin()` and `sveltekit()` together in `vite.config.ts` so Vite stays the app host while Devflare wires Worker config underneath it.',
+			'Keep `devflarePlugin()` and `sveltekit()` together in `vite.config.ts` so Vite stays the app host while Devflare wires Worker config underneath it. On SvelteKit 3 the adapter is passed to `sveltekit()` there too, because SvelteKit 3 refuses `svelte.config.js`.',
 			'`handle` from `devflare/sveltekit` is the simplest hook path, and `createHandle()` is the escape hatch when you need custom hints or enable rules.',
-			'When composing with other hooks, put the Devflare handle first so `event.platform` is ready before downstream middleware reads it.'
+			'SvelteKit 3 apps read bindings from `cloudflare:workers`; under `devflare dev`, Devflare serves that module with the bindings its handle prepared for the request. SvelteKit 2 apps read `event.platform.env`, which the same handle fills in.',
+			'When composing with other hooks, put the Devflare handle first so the bindings are ready before downstream middleware reads them.'
 		],
 		facts: [
 			{ label: 'Best for', value: 'Full SvelteKit apps that deploy through Devflare' },
@@ -375,7 +376,24 @@ export default defineConfig({
 })`
 					},
 					{
-						title: '`vite.config.ts`',
+						title: '`vite.config.ts` (SvelteKit 3)',
+						language: 'ts',
+						code: String.raw`import adapter from '@sveltejs/adapter-cloudflare'
+import { sveltekit } from '@sveltejs/kit/vite'
+import { devflarePlugin } from 'devflare/vite'
+import { defineConfig } from 'vite'
+
+export default defineConfig({
+	plugins: [
+		devflarePlugin(),
+		sveltekit({
+			adapter: adapter({ config: '.devflare/wrangler.jsonc' })
+		})
+	]
+})`
+					},
+					{
+						title: '`vite.config.ts` (SvelteKit 2, with the adapter in `svelte.config.js`)',
 						language: 'ts',
 						code: String.raw`import { defineConfig } from 'vite'
 import { sveltekit } from '@sveltejs/kit/vite'
@@ -388,6 +406,7 @@ export default defineConfig({
 				],
 				paragraphs: [
 					'SvelteKit still owns the app shell, routing, and framework build. Devflare plugs Worker-aware config, generated Wrangler output, and any Durable Object discovery into that Vite-driven flow.',
+					'Devflare recognises a SvelteKit app on `@sveltejs/adapter-cloudflare` from either place the adapter is configured: `svelte.config.js` on SvelteKit 2, or the `sveltekit()` options in `vite.config.ts` on SvelteKit 3.',
 					'The adapter worker is a **build artifact** — `@sveltejs/adapter-cloudflare` only writes `.svelte-kit/cloudflare/_worker.js` (or your repo\'s equivalent, like `.adapter-cloudflare/_worker.js`) during `vite build`. Devflare resolves handler paths *before* the framework build runs, so pointing `files.fetch` at that path fails on a clean checkout with `Configured fetch handler "…" was not found`. Use `wrangler.passthrough.main` instead: devflare skips composition entirely for the worker entry, and wrangler picks up the adapter output post-build.',
 					'If you also have queue handlers, scheduled handlers, durable objects, or routes, keep those in `files.queue` / `files.scheduled` / `files.durableObjects` / `files.routes` as normal source files — composition still applies to those surfaces.'
 				]
@@ -428,9 +447,51 @@ export const handle = sequence(devflareHandle)`
 						tone: 'accent',
 						title: 'Why the order matters',
 						body: [
-							'The Devflare handle is the piece that prepares `event.platform` in local dev. Put it first so later middleware sees the same platform shape the app expects.'
+							'The Devflare handle is the piece that prepares the bindings in local dev. Put it first so later middleware sees the same bindings the app expects.'
 						]
 					}
+				]
+			},
+			{
+				id: 'read-bindings',
+				title: 'Read bindings the way your SvelteKit version does',
+				snippets: [
+					{
+						title: 'SvelteKit 3: `cloudflare:workers`',
+						filename: 'src/routes/api/notes/+server.ts',
+						language: 'ts',
+						code: String.raw`import { env } from 'cloudflare:workers'
+
+export async function GET() {
+	return Response.json(await env.DB.prepare('SELECT * FROM notes').all())
+}`
+					},
+					{
+						title: 'SvelteKit 3: type `env` from the generated `DevflareEnv`',
+						filename: 'src/app.d.ts',
+						language: 'ts',
+						code: String.raw`declare global {
+	namespace Cloudflare {
+		interface Env extends DevflareEnv {}
+	}
+}
+
+export {}`
+					},
+					{
+						title: 'SvelteKit 2: `event.platform`',
+						filename: 'src/routes/api/notes/+server.ts',
+						language: 'ts',
+						code: String.raw`export async function GET({ platform }) {
+	return Response.json(await platform.env.DB.prepare('SELECT * FROM notes').all())
+}`
+					}
+				],
+				bullets: [
+					"SvelteKit 3's adapter no longer puts bindings on `event.platform`, so Devflare leaves it unset there too: an app that still reads `platform.env` fails in dev instead of only once deployed.",
+					"Under `devflare dev`, `cloudflare:workers` resolves to a Devflare module whose `env`, `waitUntil` and `tracing` belong to the request the handle is serving. A plain `vite dev` keeps the adapter's own module.",
+					'Bindings are per request in dev, so read `env` inside a load, action, endpoint or hook. Reading it at module top level throws there, with a message saying so.',
+					'`exports` and `cache` from `cloudflare:workers` need workerd, so they throw in dev rather than answer with something that only looks right.'
 				]
 			},
 			{

@@ -1,0 +1,25 @@
+{
+	"name": "@devflare/case20-sveltekit3",
+	"version": "0.0.1",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "devflare dev",
+		"build": "vite build",
+		"preview": "vite preview",
+		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"types": "devflare types"
+	},
+	"devDependencies": {
+		"@cloudflare/workers-types": "^5.20261008.1",
+		"@sveltejs/adapter-cloudflare": "^8.0.0",
+		"@sveltejs/kit": "^3.0.1",
+		"@sveltejs/vite-plugin-svelte": "^7.3.1",
+		"devflare": "workspace:*",
+		"svelte": "^5.57.2",
+		"svelte-check": "^4.7.6",
+		"typescript": "^6.0.3",
+		"vite": "^8.3.3",
+		"wrangler": "^4.148.0"
+	}
+}

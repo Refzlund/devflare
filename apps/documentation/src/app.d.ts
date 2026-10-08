@@ -3,14 +3,13 @@
 // DevflareEnv is declared globally by env.d.ts, generated via `bun run types`.
 
 declare global {
-	namespace App {
-		interface Platform {
-			env: DevflareEnv
-			context: ExecutionContext
-			caches: CacheStorage
-			cf: Record<string, unknown>
-		}
+	// SvelteKit 3's Cloudflare adapter serves the bindings from `cloudflare:workers`,
+	// whose `env` is typed as `Cloudflare.Env`.
+	namespace Cloudflare {
+		interface Env extends DevflareEnv {}
+	}
 
+	namespace App {
 		// interface Error {}
 		// interface Locals {}
 		// interface PageData {}

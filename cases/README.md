@@ -37,6 +37,7 @@ bun test --filter "case*"
 | 17 | [Plugin Namespace Example](#case-17-plugin-namespace-example) | Rolldown plugin namespace behavior | `/docs/project-architecture` | Internal regression |
 | 18 | [SvelteKit DO](#case-18-sveltekit-do) | SvelteKit platform plus DO binding | `/docs/sveltekit-with-devflare` | Full local |
 | 19 | [Transport & DO RPC](#case-19-transport--do-rpc) | Custom class transport over DO RPC | `/docs/transport-file`, `/docs/bindings/durable-objects` | Full local |
+| 20 | [SvelteKit 3 Local Bindings](#case-20-sveltekit-3-local-bindings) | SvelteKit 3 reading the case18 binding matrix from `cloudflare:workers` | `/docs/sveltekit-with-devflare` | Full local |
 
 ## Shared Shape
 
@@ -208,4 +209,13 @@ Generated Devflare and Wrangler outputs belong under `.devflare/` and
 - Run command: `cd cases/case19 && bun test`.
 - What it proves: `src/transport.ts` can preserve custom classes across local DO method calls.
 - Docs links: `/docs/transport-file`, `/docs/bindings/durable-objects`.
+- Support status: full local example.
+
+### Case 20: SvelteKit 3 Local Bindings
+
+- Purpose: SvelteKit 3, whose config lives in `vite.config.ts` and whose bindings come from `cloudflare:workers`, with the local binding matrix case18 runs on SvelteKit 2.
+- File map: `vite.config.ts`, `devflare.config.ts`, `devflare.service-api.config.ts`, `api/src/ep.api.ts`, `src/wf.order.ts`, `src/hooks.server.ts`, `src/routes/**`, `src/app.d.ts`.
+- Run command: `cd cases/case20 && bun run check`; the dev-server matrix runs from `packages/devflare/tests/integration/dev-server/sveltekit-local-bindings.test.ts`.
+- What it proves: under `devflare dev`, `cloudflare:workers` serves the bindings devflare's handle prepared for the request, on workers-types 5.
+- Docs links: `/docs/sveltekit-with-devflare`.
 - Support status: full local example.

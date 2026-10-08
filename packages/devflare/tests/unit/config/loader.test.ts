@@ -180,6 +180,49 @@ export default config
 		})
 	})
 
+	test('infers the same outputs for SvelteKit 3, whose adapter is configured in the Vite config', async () => {
+		const projectDir = join(TEST_DIR, 'sveltekit3-inferred')
+		await mkdir(projectDir, { recursive: true })
+
+		await writeFile(
+			join(projectDir, 'package.json'),
+			JSON.stringify({
+				name: 'kit3-app',
+				devDependencies: {
+					'@sveltejs/adapter-cloudflare': '^8.0.0',
+					'@sveltejs/kit': '^3.0.1'
+				}
+			})
+		)
+		await writeFile(
+			join(projectDir, 'vite.config.ts'),
+			`
+			import adapter from '@sveltejs/adapter-cloudflare'
+			import { sveltekit } from '@sveltejs/kit/vite'
+			import { defineConfig } from 'vite'
+
+			export default defineConfig({ plugins: [sveltekit({ adapter: adapter() })] })
+		`
+		)
+		await writeFile(
+			join(projectDir, 'devflare.config.ts'),
+			`
+			export default {
+				name: 'kit3-worker',
+				compatibilityDate: '2025-01-07'
+			}
+		`
+		)
+
+		const config = await loadConfig({ cwd: projectDir })
+
+		expect(config.files?.fetch).toBe('.adapter-cloudflare/_worker.js')
+		expect(config.assets).toEqual({
+			binding: 'ASSETS',
+			directory: '.adapter-cloudflare'
+		})
+	})
+
 	test('keeps explicit worker and asset settings over inferred framework defaults', async () => {
 		const projectDir = join(TEST_DIR, 'sveltekit-explicit')
 		await mkdir(projectDir, { recursive: true })

@@ -18,7 +18,18 @@ import type { Plugin, ResolvedConfig, ViteDevServer } from 'vite'
 import type { WranglerConfig } from '../config/compiler'
 import { loadConfig } from '../config/loader'
 import type { DevflareConfig } from '../config/schema'
+import {
+	cloudflareWorkersDevModuleSource,
+	createCloudflareWorkersDevModule,
+	getSvelteKitDevState
+} from '../sveltekit/cloudflare-workers-dev'
 import { generatedDirName } from '../utils/generated-dir'
+import {
+	CLOUDFLARE_WORKERS_ID,
+	RESOLVED_CLOUDFLARE_WORKERS_DEV,
+	runsInThisProcess,
+	shouldServeCloudflareWorkers
+} from './plugin-cloudflare-workers'
 import { buildPluginConfigHookResult } from './plugin-config-hook'
 import {
 	buildPluginContextState,
@@ -118,6 +129,8 @@ interface PluginInstanceState {
 	projectRoot: string
 	devflareConfig: DevflareConfig | null
 	resolvedPluginConfigPath: string | null
+	/** Whether this dev server resolves `cloudflare:workers` to devflare's module. */
+	servesCloudflareWorkers: boolean
 }
 
 function createPluginState(): PluginInstanceState {
@@ -133,7 +146,8 @@ function createPluginState(): PluginInstanceState {
 		},
 		projectRoot: process.cwd(),
 		devflareConfig: null,
-		resolvedPluginConfigPath: null
+		resolvedPluginConfigPath: null,
+		servesCloudflareWorkers: false
 	}
 }
 
@@ -259,6 +273,13 @@ export function devflarePlugin(options: DevflarePluginOptions = {}): Plugin {
 			if (id.startsWith(VIRTUAL_SERVICE_WORKER_PREFIX)) {
 				return '\0' + id
 			}
+			if (
+				id === CLOUDFLARE_WORKERS_ID &&
+				state.servesCloudflareWorkers &&
+				runsInThisProcess(this.environment)
+			) {
+				return RESOLVED_CLOUDFLARE_WORKERS_DEV
+			}
 			return null
 		},
 
@@ -273,6 +294,9 @@ export function devflarePlugin(options: DevflarePluginOptions = {}): Plugin {
 			if (id.startsWith(RESOLVED_VIRTUAL_SERVICE_WORKER_PREFIX)) {
 				return state.context.serviceWorkerVirtualModules.get(id) ?? null
 			}
+			if (id === RESOLVED_CLOUDFLARE_WORKERS_DEV) {
+				return cloudflareWorkersDevModuleSource()
+			}
 			return null
 		},
 
@@ -280,6 +304,12 @@ export function devflarePlugin(options: DevflarePluginOptions = {}): Plugin {
 			state.projectRoot = config.root
 			state.context.projectRoot = state.projectRoot
 			state.resolvedPluginConfigPath = await resolvePluginConfigPath(state.projectRoot, configPath)
+
+			state.servesCloudflareWorkers = shouldServeCloudflareWorkers(config)
+			if (state.servesCloudflareWorkers) {
+				const devState = getSvelteKitDevState()
+				devState.cloudflareWorkers ??= createCloudflareWorkersDevModule(devState)
+			}
 
 			try {
 				await loadAndApplyConfig(

@@ -230,7 +230,6 @@ export const projectArchitectureHostedAppStructure: DocCodeTreeEntry[] = [
 	{ path: 'apps/documentation/package.json' },
 	{ path: 'apps/documentation/devflare.config.ts' },
 	{ path: 'apps/documentation/vite.config.ts' },
-	{ path: 'apps/documentation/svelte.config.js' },
 	{ path: 'apps/documentation/src', kind: 'folder' },
 	{ path: 'apps/documentation/src/routes', kind: 'folder' },
 	{ path: 'apps/documentation/src/routes/+layout.svelte' },
