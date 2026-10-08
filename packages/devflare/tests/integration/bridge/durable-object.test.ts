@@ -6,6 +6,7 @@
 
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import type { MiniflareInstance } from '../../../src/bridge/miniflare'
+import { toMiniflareOptions } from '../../../src/utils/miniflare-options'
 import { PORTS, callDoRpc, counterDoWorkerScript, wrapMiniflare } from './_fixtures'
 
 // =============================================================================
@@ -16,16 +17,19 @@ describe('Durable Object Integration', () => {
 	let mf: MiniflareInstance
 
 	beforeAll(async () => {
-		const { Miniflare } = await import('miniflare')
+		const miniflareModule = await import('miniflare')
+		const { Miniflare } = miniflareModule
 
-		const miniflare = new Miniflare({
-			modules: true,
-			script: counterDoWorkerScript,
-			durableObjects: {
-				COUNTER: 'CounterDO'
-			},
-			port: PORTS.durableObject
-		})
+		const miniflare = new Miniflare(
+			await toMiniflareOptions(miniflareModule, {
+				modules: true,
+				script: counterDoWorkerScript,
+				durableObjects: {
+					COUNTER: 'CounterDO'
+				},
+				port: PORTS.durableObject
+			})
+		)
 
 		await miniflare.ready
 		mf = wrapMiniflare(miniflare)

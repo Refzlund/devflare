@@ -19,6 +19,7 @@ import { loadConfig } from '../config/loader'
 import { applyLocalDevVarsToConfig } from '../config/local-dev-vars'
 import { resolveServiceBindings } from '../test/resolve-service-bindings'
 import { generatedDir } from '../utils/generated-dir'
+import { toMiniflareOptions } from '../utils/miniflare-options'
 import { prepareComposedWorkerEntrypoint } from '../worker-entry/composed-worker'
 import { discoverRoutes } from '../worker-entry/routes'
 import { bundleWorkflowEntrypointScript } from '../workflows/local-workflow-entrypoints'
@@ -44,9 +45,9 @@ import {
 	dialableHost,
 	probeTcpReachable
 } from './runtime-health'
+import { createRuntimeLogForwarder } from './runtime-logs'
 import type { DevRuntimeState } from './runtime-status'
 import { startRuntimeStatusService } from './runtime-status-service'
-import { createRuntimeStdioForwarder } from './runtime-stdio'
 import {
 	logMiniflareBindingDiagnostics,
 	logMiniflareConfigDiagnostics,
@@ -203,17 +204,18 @@ export function createDevServer(options: DevServerOptions): DevServer {
 
 			if (!state.miniflare) return
 
-			const { Log, LogLevel } = await import('miniflare')
+			const miniflareModule = await import('miniflare')
+			const { Log, LogLevel } = miniflareModule
 			const mfConfig = buildMiniflareConfig(state.currentDoResult)
 			// Always enable debug logging to see worker load errors
 			const log = createMiniflareLog(Log, LogLevel, 'DEBUG', logger)
 			if (log) {
 				mfConfig.log = log as typeof mfConfig.log
 			}
-			mfConfig.handleRuntimeStdio = createRuntimeStdioForwarder(logger)
+			mfConfig.handleStructuredLogs = createRuntimeLogForwarder(logger)
 
 			logger?.info('Reloading Miniflare...')
-			await state.miniflare.setOptions(mfConfig)
+			await state.miniflare.setOptions(await toMiniflareOptions(miniflareModule, mfConfig))
 			logger?.success('Miniflare reloaded')
 		},
 		logger
@@ -322,14 +324,15 @@ export function createDevServer(options: DevServerOptions): DevServer {
 	 * Start Miniflare with current config
 	 */
 	async function startMiniflare(doResult: DOBundleResult | null): Promise<void> {
-		const { Miniflare, Log, LogLevel } = await import('miniflare')
+		const miniflareModule = await import('miniflare')
+		const { Miniflare, Log, LogLevel } = miniflareModule
 
 		const mfConfig = buildMiniflareConfig(doResult)
 		const log = createMiniflareLog(Log, LogLevel, 'DEBUG', logger)
 		if (log) {
 			mfConfig.log = log as typeof mfConfig.log
 		}
-		mfConfig.handleRuntimeStdio = createRuntimeStdioForwarder(logger)
+		mfConfig.handleStructuredLogs = createRuntimeLogForwarder(logger)
 		const shouldLogMiniflareDiagnostics = verbose || debug
 
 		if (shouldLogMiniflareDiagnostics) {
@@ -338,7 +341,7 @@ export function createDevServer(options: DevServerOptions): DevServer {
 
 		// Constructed into a local first: Miniflare validates synchronously and can throw, and assigning
 		// only what was built keeps a failed rebuild from leaving a half-set field behind.
-		const miniflare = new Miniflare(mfConfig)
+		const miniflare = new Miniflare(await toMiniflareOptions(miniflareModule, mfConfig))
 		state.miniflare = miniflare
 		await miniflare.ready
 

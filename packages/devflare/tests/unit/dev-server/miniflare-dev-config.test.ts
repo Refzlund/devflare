@@ -86,7 +86,7 @@ describe('buildMiniflareDevConfig', () => {
 		expect(mfConfig.port).toBe(3000)
 	})
 
-	test('threads the dev server block (https/inspectorPort/inspectorHost/upstream/liveReload/verbose/logRequests/cf/publicUrl) into shared options', () => {
+	test('threads the dev server block (https/inspectorPort/inspectorHost/upstream/verbose/logRequests/cf/publicUrl) into shared options', () => {
 		const mfConfig = buildMiniflareDevConfig(
 			buildBaseInput({
 				config: {
@@ -115,7 +115,8 @@ describe('buildMiniflareDevConfig', () => {
 		expect(mfConfig.inspectorPort).toBe(9229)
 		expect(mfConfig.inspectorHost).toBe('0.0.0.0')
 		expect(mfConfig.upstream).toBe('https://example.com')
-		expect(mfConfig.liveReload).toBe(true)
+		// Miniflare 5 has no live reload; the gateway serves it (see the live-reload test below).
+		expect(mfConfig.liveReload).toBeUndefined()
 		expect(mfConfig.verbose).toBe(true)
 		expect(mfConfig.logRequests).toBe(false)
 		expect(mfConfig.cf).toEqual({ colo: 'SFO', country: 'US' })
@@ -135,15 +136,31 @@ describe('buildMiniflareDevConfig', () => {
 		expect(mfConfig.publicUrl).toBeUndefined()
 	})
 
-	test('sets cachePersist alongside the sibling *Persist options when persisting', () => {
+	test('persists every resource under one resourcePersistencePath when persisting', () => {
 		const mfConfig = buildMiniflareDevConfig(buildBaseInput({ persist: true }))
-		expect(mfConfig.cachePersist).toBe(mfConfig.kvPersist.replace(/\/kv$/, '/cache'))
-		expect(typeof mfConfig.cachePersist).toBe('string')
+		// The per-resource `*Persist` paths sat at `<data>/<plugin>`; Miniflare 5 derives the same
+		// dirs from this root, so the root must be that `<data>` dir and nothing deeper.
+		expect(mfConfig.resourcePersistencePath).toMatch(/[\\/]\.devflare[\\/]data$/)
+		expect(mfConfig.kvPersist).toBeUndefined()
+		expect(mfConfig.cachePersist).toBeUndefined()
 	})
 
-	test('leaves cachePersist undefined when not persisting', () => {
+	test('leaves resourcePersistencePath undefined when not persisting', () => {
 		const mfConfig = buildMiniflareDevConfig(buildBaseInput({ persist: false }))
-		expect(mfConfig.cachePersist).toBeUndefined()
+		expect(mfConfig.resourcePersistencePath).toBeUndefined()
+	})
+
+	test('serves live reload from the gateway when server.liveReload is on', () => {
+		const gatewayScript = (server: Record<string, unknown> | undefined) =>
+			buildMiniflareDevConfig(
+				buildBaseInput({
+					config: { name: 'site-worker', compatibilityDate: '2026-04-28', server }
+				})
+			).workers.find((worker: { name: string }) => worker.name === 'gateway').script as string
+
+		expect(gatewayScript({ liveReload: true })).toContain('const LIVE_RELOAD = true')
+		expect(gatewayScript({ liveReload: false })).toContain('const LIVE_RELOAD = false')
+		expect(gatewayScript(undefined)).toContain('const LIVE_RELOAD = false')
 	})
 
 	test('points the browser binding worker at the requested browser shim port', () => {

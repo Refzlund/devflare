@@ -125,11 +125,11 @@ export const serverConfigSchema = z
 		host: z.string().min(1).optional(),
 		/** Port the dev runtime binds to. @default 8787 */
 		port: z.number().int().min(1).max(65535).optional(),
-		/** Serve the dev runtime over HTTPS (Miniflare self-signs unless key/cert paths are given). */
+		/** Serve the dev runtime over HTTPS (a built-in self-signed certificate unless both key and cert paths are given). */
 		https: z.boolean().optional(),
-		/** Path to a TLS private key (PEM) used when `https` is enabled. Maps to Miniflare's `httpsKeyPath`. */
+		/** Path to a TLS private key (PEM), read only together with `httpsCertPath`; relative to the directory devflare runs in. */
 		httpsKeyPath: z.string().min(1).optional(),
-		/** Path to a TLS certificate chain (PEM) used when `https` is enabled. Maps to Miniflare's `httpsCertPath`. */
+		/** Path to a TLS certificate chain (PEM), read only together with `httpsKeyPath`; relative to the directory devflare runs in. */
 		httpsCertPath: z.string().min(1).optional(),
 		/** Port the V8 inspector (DevTools) binds to. Maps to Miniflare's `inspectorPort`. */
 		inspectorPort: z.number().int().min(1).max(65535).optional(),
@@ -142,9 +142,9 @@ export const serverConfigSchema = z
 		/** Origin to proxy unmatched requests to (and to base the request URL on). Maps to Miniflare's `upstream`. */
 		upstream: z.string().min(1).optional(),
 		/**
-		 * Inject Miniflare's in-browser live-reload script into HTML responses so
-		 * the page auto-refreshes when the dev runtime reloads. Maps to Miniflare's
-		 * `liveReload`. Local-dev only; complements Devflare's own source watcher.
+		 * Inject a live-reload script into HTML responses from the dev runtime so
+		 * the page auto-refreshes when the runtime reloads. Served by devflare's dev
+		 * gateway. Local-dev only; complements Devflare's own source watcher.
 		 */
 		liveReload: z.boolean().optional(),
 		/**

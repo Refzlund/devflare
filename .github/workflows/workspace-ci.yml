@@ -50,6 +50,13 @@ jobs:
         with:
           bun-version: 1.3.12
 
+      # Vite and Miniflare run under Node in this lane; Miniflare 5 and Vite 8 need
+      # Node >= 22.12, which the runner image's default Node is not guaranteed to be.
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
       - name: Restore Bun install cache
         uses: actions/cache@v4
         with:

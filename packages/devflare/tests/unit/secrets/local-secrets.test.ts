@@ -3,10 +3,11 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
+import type { Miniflare } from 'miniflare'
 import { startMiniflareFromConfig } from '../../../src/bridge/miniflare'
 import type { DevflareConfig } from '../../../src/config'
 import {
-	buildLocalSecretWrappedBindingConfig,
+	buildLocalSecretServiceBindingConfig,
 	deleteLocalSecret,
 	listLocalSecrets,
 	readLocalSecret,
@@ -131,7 +132,7 @@ describe('local Secrets Store file', () => {
 		await expect(seedMiniflareLocalSecrets({}, config, cwd)).resolves.toBeUndefined()
 	})
 
-	test('builds wrapped binding workers for locally stored Secrets Store values', async () => {
+	test('builds service-bound secret workers for locally stored Secrets Store values', async () => {
 		const cwd = createTempDir()
 		writeLocalSecret({ cwd, storeId: 'store-123', name: 'api-token', value: 'local-secret' })
 
@@ -148,21 +149,22 @@ describe('local Secrets Store file', () => {
 			}
 		} satisfies DevflareConfig
 
-		const wrapped = buildLocalSecretWrappedBindingConfig(config, cwd)
+		const local = buildLocalSecretServiceBindingConfig(config, cwd)
 
-		expect(wrapped.localBindingNames).toEqual(['API_TOKEN'])
-		expect(wrapped.wrappedBindings.API_TOKEN).toEqual({
-			scriptName: 'devflare-local-secret-0-api-token',
-			bindings: {
-				value: 'local-secret'
-			}
-		})
-		expect(wrapped.workers).toHaveLength(1)
-		expect(wrapped.workers[0]).toMatchObject({
+		expect(local.localBindingNames).toEqual(['API_TOKEN'])
+		expect(local.serviceBindings.API_TOKEN).toEqual({
 			name: 'devflare-local-secret-0-api-token',
-			modules: true
+			entrypoint: 'LocalSecretsStoreSecret'
 		})
-		expect(wrapped.workers[0]?.script).toContain('async get()')
+		expect(local.workers).toHaveLength(1)
+		expect(local.workers[0]).toMatchObject({
+			name: 'devflare-local-secret-0-api-token',
+			modules: true,
+			bindings: { value: 'local-secret' }
+		})
+		expect(local.workers[0]?.script).toContain(
+			'class LocalSecretsStoreSecret extends WorkerEntrypoint'
+		)
 	})
 
 	test('seeds an actual Miniflare Secrets Store binding from local values', async () => {
@@ -185,6 +187,11 @@ describe('local Secrets Store file', () => {
 		try {
 			const bindings = await instance.getBindings()
 			expect(await (bindings.API_TOKEN as SecretsStoreSecret).get()).toBe('local-secret')
+
+			// `getBindings()` layers a Node-side shim over the result, so it answers even when
+			// the worker's own binding is broken. Read the binding workerd actually holds.
+			const workerBindings = await (instance._mf as Miniflare).getBindings()
+			expect(await (workerBindings.API_TOKEN as SecretsStoreSecret).get()).toBe('local-secret')
 		} finally {
 			await instance.dispose()
 		}

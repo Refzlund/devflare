@@ -92,9 +92,8 @@ describe('buildMergedWorkspaceConfig', () => {
 
 		// Entry socket is ephemeral by default; browsers use the direct sockets.
 		expect(config.port).toBe(0)
-		// One persist block for the whole instance.
-		expect(config.d1Persist).toContain('ws-data')
-		expect(config.r2Persist).toContain('ws-data')
+		// One persistence root for the whole instance.
+		expect(config.resourcePersistencePath).toContain('ws-data')
 
 		expect(directSockets).toEqual([
 			{ appName: 'api', gatewayWorkerName: 'api-gateway', port: 8789 },
@@ -109,8 +108,7 @@ describe('buildMergedWorkspaceConfig', () => {
 			persist: false,
 			persistDir: '/tmp/ws-data'
 		})
-		expect(config.d1Persist).toBeUndefined()
-		expect(config.durableObjectsPersist).toBeUndefined()
+		expect(config.resourcePersistencePath).toBeUndefined()
 	})
 
 	test('honors an explicit entry port', () => {

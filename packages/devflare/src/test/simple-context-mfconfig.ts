@@ -28,7 +28,7 @@ import {
 	buildStreamingTailConsumersConfig,
 	buildTailConsumersConfig
 } from '../dev-server/miniflare-bindings'
-import { buildLocalSecretWrappedBindingConfig } from '../secrets/local-secrets'
+import { buildLocalSecretServiceBindingConfig } from '../secrets/local-secrets'
 import { buildLocalBindingShimServiceConfig } from '../shims/local-media-bindings'
 
 export interface BuildInlineBridgeMfConfigOptions {
@@ -61,11 +61,11 @@ export function buildInlineBridgeMfConfig(
 	options: BuildInlineBridgeMfConfigOptions = {}
 ): any {
 	const localWorkerBindings: Record<string, unknown> = config.vars ?? {}
-	const localSecretWrappedBindingConfig = options.cwd
-		? buildLocalSecretWrappedBindingConfig(config, options.cwd)
+	const localSecretServiceBindingConfig = options.cwd
+		? buildLocalSecretServiceBindingConfig(config, options.cwd)
 		: undefined
 	const localBindingShimServiceConfig = buildLocalBindingShimServiceConfig(config)
-	const localSecretBindingNames = new Set(localSecretWrappedBindingConfig?.localBindingNames ?? [])
+	const localSecretBindingNames = new Set(localSecretServiceBindingConfig?.localBindingNames ?? [])
 	const mfConfig: any = {
 		modules: true,
 		compatibilityDate: config.compatibilityDate ?? '2025-01-01',
@@ -273,22 +273,19 @@ export function buildInlineBridgeMfConfig(
 		}
 	}
 
-	const wrappedBindings = {
-		...(localSecretWrappedBindingConfig?.wrappedBindings ?? {})
-	}
 	const localBindingWorkers = [
-		...(localSecretWrappedBindingConfig?.workers ?? []),
+		...(localSecretServiceBindingConfig?.workers ?? []),
 		...localBindingShimServiceConfig.workers
 	]
 
-	if (Object.keys(wrappedBindings).length > 0) {
-		mfConfig.wrappedBindings = wrappedBindings
+	const localServiceBindings = {
+		...localBindingShimServiceConfig.serviceBindings,
+		...(localSecretServiceBindingConfig?.serviceBindings ?? {})
 	}
-
-	if (localBindingShimServiceConfig.localBindingNames.length > 0) {
+	if (Object.keys(localServiceBindings).length > 0) {
 		mfConfig.serviceBindings = {
 			...(mfConfig.serviceBindings ?? {}),
-			...localBindingShimServiceConfig.serviceBindings
+			...localServiceBindings
 		}
 	}
 

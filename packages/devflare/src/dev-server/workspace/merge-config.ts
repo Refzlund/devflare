@@ -48,16 +48,10 @@ export interface WorkspaceAppWorkers {
 	directSocketPort: number
 }
 
-/** The subset of persist paths an instance can carry (one dir per storage plugin). */
+/** The persistence an instance carries: one root, under which Miniflare keeps a dir per storage plugin. */
 export interface WorkspacePersistPaths {
-	kvPersist?: string
-	r2Persist?: string
-	d1Persist?: string
-	cachePersist?: string
-	durableObjectsPersist?: string
-	workflowsPersist?: string
-	imagesPersist?: string
-	streamPersist?: string
+	/** Root for every app's KV, R2, D1, cache, Durable Object, workflow, images and stream state. */
+	resourcePersistencePath: string
 }
 
 /**
@@ -165,16 +159,9 @@ export function resolveWorkspacePersistPaths(
 	if (!persist) {
 		return undefined
 	}
-	return {
-		kvPersist: resolve(persistDir, 'kv'),
-		r2Persist: resolve(persistDir, 'r2'),
-		d1Persist: resolve(persistDir, 'd1'),
-		cachePersist: resolve(persistDir, 'cache'),
-		durableObjectsPersist: resolve(persistDir, 'do'),
-		workflowsPersist: resolve(persistDir, 'workflows'),
-		imagesPersist: resolve(persistDir, 'images'),
-		streamPersist: resolve(persistDir, 'stream')
-	}
+	// Miniflare places each plugin at `<root>/<plugin>` (kv, r2, d1, cache, do, workflows, images,
+	// stream): the same dirs the per-resource `*Persist` paths named before Miniflare 5.
+	return { resourcePersistencePath: resolve(persistDir) }
 }
 
 /** Input for {@link buildMergedWorkspaceConfig}. */

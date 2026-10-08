@@ -107,13 +107,15 @@ const isProvided = (spec: string): boolean =>
 	spec === 'devflare' ||
 	spec.startsWith('devflare/')
 
-await init
+await init()
 const undeclared = new Map<string, string>() // package -> first dist file seen in
 for await (const rel of new Glob('**/*.js').scan(resolve(pkgDir, 'dist'))) {
 	const text = await Bun.file(resolve(pkgDir, 'dist', rel)).text()
 	const [imports] = parse(text)
 	for (const imp of imports) {
-		const spec = imp.n // statically-resolvable specifier (undefined for dynamic exprs)
+		// Statically resolvable specifiers only: a template-literal import() is
+		// reported as a glob (`./locales/*.js`) and names no single package.
+		const spec = imp.type === 'dynamic' && imp.glob ? undefined : imp.specifier
 		if (!spec || spec.startsWith('.') || isProvided(spec)) continue
 		const name = packageOf(spec)
 		if (!declared.has(name) && !undeclared.has(name)) undeclared.set(name, rel)

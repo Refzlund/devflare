@@ -2,6 +2,30 @@ import { GATEWAY_RUNTIME_JS } from '../bridge/gateway-runtime'
 import { R2_PRESIGN_RUNTIME_JS } from '../bridge/r2-presign-runtime'
 import type { WsRouteConfig } from '../config'
 
+/** Path the live-reload client dials; Miniflare 4's, so pages served before the upgrade keep working. */
+const LIVE_RELOAD_PATH = '/cdn-cgi/mf/reload'
+
+/**
+ * The script injected into HTML when `server.liveReload` is on. It holds a socket
+ * to {@link LIVE_RELOAD_PATH}; when a runtime reload drops it, it retries every
+ * second and reloads the page as soon as a retry connects. A clean close (1000,
+ * 1001 — the tab navigating away) is not a reload.
+ */
+const LIVE_RELOAD_CLIENT_SCRIPT = `<script defer type="application/javascript">
+(function () {
+	var url = new URL('${LIVE_RELOAD_PATH}', location.origin);
+	url.protocol = url.protocol.replace('http', 'ws');
+	function connect(reconnected) {
+		var ws = new WebSocket(url);
+		if (reconnected) ws.onopen = function () { location.reload(); };
+		ws.onclose = function (event) {
+			if (event.code !== 1000 && event.code !== 1001) setTimeout(connect, 1000, true);
+		};
+	}
+	connect();
+})();
+</script>`
+
 /**
  * Generates the dev-server gateway worker script inline.
  *
@@ -16,18 +40,23 @@ import type { WsRouteConfig } from '../config'
  *   - D1 migration endpoint
  *   - Inbound email ingestion endpoint
  *   - Service-binding fallthrough to the app worker
+ *   - `server.liveReload` (Miniflare 5 dropped its own live reload)
  *
  * @param wsRoutes - WebSocket routes for DO proxying
  * @param debug - Enable debug logging in gateway
  * @param appServiceBindingName - Service binding name for the app worker (if any)
+ * @param liveReload - Inject the live-reload client into the app worker's HTML responses
+ *   and hold its socket open, so the page reloads after every runtime reload
  */
 export function getGatewayScript(
 	wsRoutes: WsRouteConfig[] = [],
 	debug = false,
-	appServiceBindingName: string | null = null
+	appServiceBindingName: string | null = null,
+	liveReload = false
 ): string {
 	const wsRoutesJson = JSON.stringify(wsRoutes)
 	const appServiceBindingJson = JSON.stringify(appServiceBindingName)
+	const liveReloadScriptJson = JSON.stringify(LIVE_RELOAD_CLIENT_SCRIPT)
 
 	return `
 ${GATEWAY_RUNTIME_JS}
@@ -43,6 +72,8 @@ const log = (...args) => DEBUG && console.log('[Gateway]', ...args)
 
 const WS_ROUTES = ${wsRoutesJson}
 const APP_SERVICE_BINDING = ${appServiceBindingJson}
+const LIVE_RELOAD = ${liveReload}
+const LIVE_RELOAD_SCRIPT = ${liveReloadScriptJson}
 
 export default {
 	async fetch(request, env, ctx) {
@@ -50,6 +81,9 @@ export default {
 		const isWebSocket = request.headers.get('Upgrade') === 'websocket'
 
 		if (isWebSocket) {
+			if (LIVE_RELOAD && url.pathname === LIVE_RELOAD_PATH) {
+				return acceptLiveReloadSocket()
+			}
 			// Bridge DO connect(): a real pass-through upgrade to a Durable Object
 			// (hibernation-correct), distinct from the bridge RPC/relay socket.
 			if (url.pathname === '/_devflare/do-ws') {
@@ -115,7 +149,8 @@ export default {
 		if (APP_SERVICE_BINDING) {
 			const appWorker = env[APP_SERVICE_BINDING]
 			if (appWorker && typeof appWorker.fetch === 'function') {
-				return appWorker.fetch(request)
+				const response = await appWorker.fetch(request)
+				return LIVE_RELOAD ? withLiveReloadScript(response) : response
 			}
 		}
 
@@ -310,6 +345,25 @@ async function forwardWebSocketToApp(request, env) {
 		return new Response('App service binding is not bound: ' + APP_SERVICE_BINDING, { status: 500 })
 	}
 	return appWorker.fetch(request)
+}
+
+// The live-reload socket carries no messages. A runtime reload restarts workerd,
+// which drops it; the client script reconnects and reloads the page once the new
+// runtime answers — the protocol Miniflare 4's own live reload used.
+const LIVE_RELOAD_PATH = '${LIVE_RELOAD_PATH}'
+
+function acceptLiveReloadSocket() {
+	const [client, server] = Object.values(new WebSocketPair())
+	server.accept()
+	return new Response(null, { status: 101, webSocket: client })
+}
+
+function withLiveReloadScript(response) {
+	const contentType = response.headers.get('Content-Type') ?? ''
+	if (!contentType.toLowerCase().includes('text/html')) return response
+	return new HTMLRewriter()
+		.onDocument({ end(end) { end.append(LIVE_RELOAD_SCRIPT, { html: true }) } })
+		.transform(response)
 }
 
 async function handleDoWebSocket(request, env, url, route) {

@@ -17,6 +17,7 @@
 import { join } from 'path'
 import type { Message, MessageBatch } from '@cloudflare/workers-types'
 import { createQueueEvent, runWithEventContext } from '../runtime'
+import { createTestExecutionContext } from './execution-context'
 
 // -----------------------------------------------------------------------------
 // Types
@@ -218,13 +219,7 @@ async function trigger<T = unknown>(
 
 	// Create execution context
 	const waitUntilPromises: Promise<unknown>[] = []
-	const ctx: ExecutionContext = {
-		waitUntil(promise: Promise<unknown>) {
-			waitUntilPromises.push(promise)
-		},
-		passThroughOnException() {},
-		props: {}
-	}
+	const ctx = createTestExecutionContext(waitUntilPromises)
 
 	// Get the test env
 	const env = testEnvGetter()

@@ -35,6 +35,7 @@ import {
 import type { OutboxListener, SentEmailRecord } from '../email/outbox'
 import { createEmailEvent, runWithEventContext } from '../runtime'
 import { clearEmailDeliverySink } from '../utils/email-delivery'
+import { createTestExecutionContext } from './execution-context'
 
 // -----------------------------------------------------------------------------
 // Types
@@ -236,13 +237,7 @@ async function send(options: EmailSendOptions): Promise<Response> {
 		}
 
 		const waitUntilPromises: Promise<unknown>[] = []
-		const ctx: ExecutionContext = {
-			waitUntil(promise: Promise<unknown>) {
-				waitUntilPromises.push(promise)
-			},
-			passThroughOnException() {},
-			props: {}
-		}
+		const ctx = createTestExecutionContext(waitUntilPromises)
 
 		const runtimeEnv = testEnvGetter()
 		const timestamp = new Date()

@@ -1,3 +1,6 @@
+import { dispatchFetchToRuntime } from '../utils/miniflare-dispatch'
+import { toMiniflareOptions } from '../utils/miniflare-options'
+
 const activeWorkerLoaderRuntimes = new Set<{ dispose(): Promise<void> }>()
 
 type WorkerLoaderCodeModule = WorkerLoaderWorkerCode['modules'][string]
@@ -25,16 +28,18 @@ function createRequestInit(request: Request): RequestInit {
 }
 
 async function createRuntime(code: WorkerLoaderWorkerCode): Promise<any> {
-	const { Miniflare } = await import('miniflare')
+	const miniflareModule = await import('miniflare')
 	const mainModule = code.mainModule
 	const script = getModuleSource(code.modules[mainModule], mainModule)
-	const miniflare = new Miniflare({
-		modules: true,
-		compatibilityDate: code.compatibilityDate,
-		...(code.compatibilityFlags && { compatibilityFlags: code.compatibilityFlags }),
-		...(code.env && { bindings: code.env }),
-		script
-	})
+	const miniflare = new miniflareModule.Miniflare(
+		await toMiniflareOptions(miniflareModule, {
+			modules: true,
+			compatibilityDate: code.compatibilityDate,
+			...(code.compatibilityFlags && { compatibilityFlags: code.compatibilityFlags }),
+			...(code.env && { bindings: code.env }),
+			script
+		})
+	)
 
 	await miniflare.ready
 	activeWorkerLoaderRuntimes.add(miniflare)
@@ -55,7 +60,12 @@ function createLocalWorkerStub(
 		async fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
 			const request = input instanceof Request ? input : new Request(input, init)
 			const runtime = await getRuntime()
-			return runtime.dispatchFetch(request.url, createRequestInit(request))
+			// Miniflare types its Request/Response with undici's classes; the runtime objects are the globals.
+			return (await dispatchFetchToRuntime(
+				runtime,
+				request.url,
+				createRequestInit(request) as never
+			)) as unknown as Response
 		}
 	}
 

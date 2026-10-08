@@ -13,7 +13,7 @@ import {
 	getLocalKVNamespaceIdentifier,
 	normalizeR2Binding
 } from '../config/schema'
-import type { LocalSecretWrappedBindingConfig } from '../secrets/local-secrets'
+import type { LocalSecretServiceBindingConfig } from '../secrets/local-secrets'
 import type {
 	buildAiSearchInstancesConfig,
 	buildAiSearchNamespacesConfig,
@@ -119,7 +119,6 @@ export interface MakeMiniflareWorkerOptions {
 	durableObjects?: Record<string, string | { className: string; scriptName: string }>
 	serviceBindings?: Record<string, MiniflareServiceBinding>
 	queueConsumers?: Record<string, Record<string, unknown>>
-	triggers?: { crons?: string[] }
 	/**
 	 * Dev/test-only: route this worker's outbound `fetch()` to a named service.
 	 * Maps to Miniflare's per-worker `outboundService` option. This is NOT a
@@ -153,7 +152,8 @@ export interface MakeMiniflareWorkerContext {
 	aiSearchNamespacesConfig: AiSearchNamespacesConfig
 	aiSearchInstancesConfig: AiSearchInstancesConfig
 	secretsStoreConfig: SecretsStoreConfig
-	localSecretWrappedBindingConfig?: LocalSecretWrappedBindingConfig
+	/** Local Secrets Store values, bound into every worker as RPC service bindings. */
+	localSecretServiceBindingConfig?: LocalSecretServiceBindingConfig
 	queueProducers: Record<string, { queueName: string; deliveryDelay?: number }> | undefined
 	/**
 	 * Devflare-internal plain-string vars merged into every worker's
@@ -196,7 +196,7 @@ export function makeMiniflareWorker(
 		aiSearchNamespacesConfig,
 		aiSearchInstancesConfig,
 		secretsStoreConfig,
-		localSecretWrappedBindingConfig,
+		localSecretServiceBindingConfig,
 		queueProducers
 	} = context
 
@@ -208,8 +208,9 @@ export function makeMiniflareWorker(
 		...(loadedConfig.vars ?? {}),
 		...(context.injectedVars ?? {})
 	}
-	const localWrappedBindings = {
-		...(localSecretWrappedBindingConfig?.wrappedBindings ?? {})
+	const serviceBindings = {
+		...(localSecretServiceBindingConfig?.serviceBindings ?? {}),
+		...(options.serviceBindings ?? {})
 	}
 
 	const workerConfig: any = {
@@ -259,10 +260,8 @@ export function makeMiniflareWorker(
 		...(aiSearchNamespacesConfig && { aiSearchNamespaces: aiSearchNamespacesConfig }),
 		...(aiSearchInstancesConfig && { aiSearchInstances: aiSearchInstancesConfig }),
 		...(secretsStoreConfig && { secretsStoreSecrets: secretsStoreConfig }),
-		...(Object.keys(localWrappedBindings).length > 0 && { wrappedBindings: localWrappedBindings }),
 		...(queueProducers && { queueProducers }),
-		...(options.queueConsumers && { queueConsumers: options.queueConsumers }),
-		...(options.triggers && { triggers: options.triggers })
+		...(options.queueConsumers && { queueConsumers: options.queueConsumers })
 	}
 
 	if (options.scriptPath) {
@@ -282,8 +281,8 @@ export function makeMiniflareWorker(
 		workerConfig.durableObjects = options.durableObjects
 	}
 
-	if (options.serviceBindings && Object.keys(options.serviceBindings).length > 0) {
-		workerConfig.serviceBindings = options.serviceBindings
+	if (Object.keys(serviceBindings).length > 0) {
+		workerConfig.serviceBindings = serviceBindings
 	}
 
 	if (options.outboundService !== undefined) {

@@ -1,11 +1,51 @@
 import { describe, expect, test } from 'bun:test'
 import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 
 const packageRoot = join(import.meta.dir, '..', '..', '..')
 const repoRoot = join(packageRoot, '..', '..')
 const thisFile = 'packages/devflare/tests/unit/cli/wrangler-v4-compat.test.ts'
+
+/** The parts of a package manifest the engine check reads. */
+interface PackageManifest {
+	/** Runtime dependencies by name; each one's own `engines.node` binds devflare's. */
+	dependencies?: Record<string, string>
+	/** Declared runtime ranges, of which only `node` is read. */
+	engines?: Record<string, string>
+}
+
+/** Parses the package manifest at `manifestPath`. */
+function readManifest(manifestPath: string): PackageManifest {
+	return JSON.parse(readFileSync(manifestPath, 'utf8')) as PackageManifest
+}
+
+/**
+ * Reads the lowest Node version devflare's own `engines.node` admits, as a
+ * semver string. Only the `>=X[.Y[.Z]]` form is accepted: anything else fails
+ * here rather than being compared wrongly.
+ */
+function readOwnNodeFloor(): string {
+	const range = readManifest(join(packageRoot, 'package.json')).engines?.node ?? ''
+	const match = /^>=\s*(\d+)(?:\.(\d+))?(?:\.(\d+))?$/.exec(range)
+	if (!match) throw new Error(`devflare has an engines.node this test cannot read: ${range}`)
+	return `${match[1]}.${match[2] ?? 0}.${match[3] ?? 0}`
+}
+
+/**
+ * Finds the manifest of the installed dependency `name` the way Node resolves
+ * a package directory: the nearest `node_modules/<name>` above devflare.
+ * → Read from disk rather than through `require.resolve('<name>/package.json')`,
+ *   which a package's `exports` map may refuse.
+ * @throws when the dependency is not installed at all
+ */
+function findInstalledManifest(name: string): string {
+	for (let dir = packageRoot; ; dir = dirname(dir)) {
+		const candidate = join(dir, 'node_modules', name, 'package.json')
+		if (existsSync(candidate)) return candidate
+		if (dirname(dir) === dir) throw new Error(`${name} is not installed above ${packageRoot}`)
+	}
+}
 
 interface ScanFinding {
 	file: string
@@ -93,11 +133,18 @@ describe('Wrangler v4 compatibility audit', () => {
 		expect(findings).toEqual([])
 	})
 
-	test('keeps the package Node engine compatible with Wrangler v4', () => {
-		const packageJson = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8')) as {
-			engines?: Record<string, string>
-		}
+	test('declares a Node engine every installed runtime dependency accepts at its floor', () => {
+		const ownFloor = readOwnNodeFloor()
+		const dependencies = Object.keys(
+			readManifest(join(packageRoot, 'package.json')).dependencies ?? {}
+		)
+		const declared = dependencies.flatMap((name) => {
+			const range = readManifest(findInstalledManifest(name)).engines?.node
+			return range ? [{ name, range }] : []
+		})
 
-		expect(packageJson.engines?.node).toBe('>=20')
+		// Premise: the check reads real ranges. An empty list would pass whatever the floor said.
+		expect(declared.length).toBeGreaterThan(0)
+		expect(declared.filter(({ range }) => !Bun.semver.satisfies(ownFloor, range))).toEqual([])
 	})
 })

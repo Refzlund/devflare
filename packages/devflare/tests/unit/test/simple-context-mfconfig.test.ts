@@ -128,7 +128,7 @@ describe('buildInlineBridgeMfConfig', () => {
 		})
 	})
 
-	test('uses wrapped bindings for createTestContext local Secrets Store values', () => {
+	test('serves createTestContext local Secrets Store values through a service binding', () => {
 		const cwd = createTempDir()
 		writeLocalSecret({ cwd, storeId: 'store-123', name: 'api-token', value: 'local-secret' })
 
@@ -154,15 +154,18 @@ describe('buildInlineBridgeMfConfig', () => {
 				secret_name: 'remote-only'
 			}
 		})
-		expect(mfConfig.wrappedBindings).toEqual({
+		expect(mfConfig.wrappedBindings).toBeUndefined()
+		expect(mfConfig.serviceBindings).toEqual({
 			API_TOKEN: {
-				scriptName: 'devflare-local-secret-0-api-token',
-				bindings: {
-					value: 'local-secret'
-				}
+				name: 'devflare-local-secret-0-api-token',
+				entrypoint: 'LocalSecretsStoreSecret'
 			}
 		})
 		expect(mfConfig.__devflareLocalBindingWorkers).toHaveLength(1)
+		expect(mfConfig.__devflareLocalBindingWorkers[0]).toMatchObject({
+			name: 'devflare-local-secret-0-api-token',
+			bindings: { value: 'local-secret' }
+		})
 	})
 
 	test('adds Miniflare Worker Loader bindings for createTestContext', () => {

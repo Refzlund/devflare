@@ -5,6 +5,7 @@
 import { describe, expect, test } from 'bun:test'
 import { runWithContext } from '../../../src/runtime/context'
 import { ContextAccessError, createContextProxy } from '../../../src/runtime/validation'
+import { createTestExecutionContext } from '../../../src/test/execution-context'
 
 describe('createContextProxy', () => {
 	test('allows access when context is available', () => {
@@ -104,11 +105,7 @@ describe('createContextProxy', () => {
 describe('integration with runWithContext', () => {
 	test('proxy works correctly within context', () => {
 		const mockEnv = { API_KEY: 'secret' }
-		const mockCtx: ExecutionContext = {
-			waitUntil: () => {},
-			passThroughOnException: () => {},
-			props: {}
-		}
+		const mockCtx = createTestExecutionContext([])
 
 		let envValue: typeof mockEnv | undefined
 		const envProxy = createContextProxy(() => envValue, 'env')

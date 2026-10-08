@@ -25,14 +25,11 @@ import {
 	runWithEventContext
 } from '../../../src/runtime/context'
 import { ContextAccessError } from '../../../src/runtime/validation'
+import { createTestExecutionContext } from '../../../src/test/execution-context'
 
 /** Helper to create a mock ExecutionContext */
 function createMockCtx(): ExecutionContext {
-	return {
-		waitUntil: () => {},
-		passThroughOnException: () => {},
-		props: {}
-	} as ExecutionContext
+	return createTestExecutionContext([])
 }
 
 function createMockState(): DurableObjectState {

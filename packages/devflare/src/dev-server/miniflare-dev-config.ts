@@ -13,7 +13,7 @@ import { getBrowserBindingScript } from '../browser-shim/binding-worker'
 import type { DOBundleResult } from '../bundler'
 import type { DevflareConfig } from '../config'
 import { getSingleBrowserBindingName } from '../config/schema'
-import { buildLocalSecretWrappedBindingConfig } from '../secrets/local-secrets'
+import { buildLocalSecretServiceBindingConfig } from '../secrets/local-secrets'
 import { buildLocalBindingShimServiceConfig } from '../shims/local-media-bindings'
 import type { resolveServiceBindings } from '../test/resolve-service-bindings'
 import { generatedDir } from '../utils/generated-dir'
@@ -156,14 +156,10 @@ export function buildMiniflareDevConfig(input: BuildMiniflareDevConfigInput): an
 	const sharedOptions: any = {
 		port: miniflarePort,
 		host: miniflareHost,
-		kvPersist: persist ? `${persistPath}/kv` : undefined,
-		r2Persist: persist ? `${persistPath}/r2` : undefined,
-		d1Persist: persist ? `${persistPath}/d1` : undefined,
-		cachePersist: persist ? `${persistPath}/cache` : undefined,
-		durableObjectsPersist: persist ? `${persistPath}/do` : undefined,
-		workflowsPersist: persist ? `${persistPath}/workflows` : undefined,
-		imagesPersist: persist ? `${persistPath}/images` : undefined,
-		streamPersist: persist ? `${persistPath}/stream` : undefined,
+		// Miniflare stores each resource in `<root>/<plugin>` (kv, r2, d1, cache, do, workflows,
+		// images, stream) — the exact layout the per-resource `*Persist` paths used to spell out,
+		// so data persisted before Miniflare 5 is found where it was left.
+		resourcePersistencePath: persist ? persistPath : undefined,
 		...(serverConfig?.https !== undefined && { https: serverConfig.https }),
 		...(serverConfig?.httpsKeyPath !== undefined && { httpsKeyPath: serverConfig.httpsKeyPath }),
 		...(serverConfig?.httpsCertPath !== undefined && {
@@ -176,7 +172,6 @@ export function buildMiniflareDevConfig(input: BuildMiniflareDevConfigInput): an
 			inspectorHost: serverConfig.inspectorHost
 		}),
 		...(serverConfig?.upstream !== undefined && { upstream: serverConfig.upstream }),
-		...(serverConfig?.liveReload !== undefined && { liveReload: serverConfig.liveReload }),
 		...(serverConfig?.verbose !== undefined && { verbose: serverConfig.verbose }),
 		...(serverConfig?.logRequests !== undefined && { logRequests: serverConfig.logRequests }),
 		...(serverConfig?.cf !== undefined && { cf: serverConfig.cf }),
@@ -210,8 +205,8 @@ export function buildMiniflareDevConfig(input: BuildMiniflareDevConfigInput): an
 	const artifactsConfig = buildArtifactsConfig(bindings)
 	const aiSearchNamespacesConfig = buildAiSearchNamespacesConfig(bindings)
 	const aiSearchInstancesConfig = buildAiSearchInstancesConfig(bindings)
-	const localSecretWrappedBindingConfig = buildLocalSecretWrappedBindingConfig(loadedConfig, cwd)
-	const localSecretBindingNames = new Set(localSecretWrappedBindingConfig.localBindingNames)
+	const localSecretServiceBindingConfig = buildLocalSecretServiceBindingConfig(loadedConfig, cwd)
+	const localSecretBindingNames = new Set(localSecretServiceBindingConfig.localBindingNames)
 	const secretsStoreConfig = buildSecretsStoreConfig(
 		bindings,
 		loadedConfig.secretsStoreId,
@@ -265,7 +260,7 @@ export function buildMiniflareDevConfig(input: BuildMiniflareDevConfigInput): an
 		aiSearchNamespacesConfig,
 		aiSearchInstancesConfig,
 		secretsStoreConfig,
-		localSecretWrappedBindingConfig,
+		localSecretServiceBindingConfig,
 		queueProducers,
 		injectedVars
 	}
@@ -280,7 +275,9 @@ export function buildMiniflareDevConfig(input: BuildMiniflareDevConfigInput): an
 			getGatewayScript(
 				loadedConfig.wsRoutes,
 				debug,
-				shouldRunMainWorker ? INTERNAL_APP_SERVICE_BINDING : null
+				shouldRunMainWorker ? INTERNAL_APP_SERVICE_BINDING : null,
+				// Miniflare 5 has no live reload; the gateway fronts the app worker, so it serves it.
+				serverConfig?.liveReload === true
 			)
 		]
 			.filter(Boolean)
@@ -318,10 +315,11 @@ export function buildMiniflareDevConfig(input: BuildMiniflareDevConfigInput): an
 			name: appWorkerName,
 			scriptPath: bundledMainWorkerScriptPath ?? mainWorkerScriptPath,
 			serviceBindings: mainWorkerServiceBindings,
-			queueConsumers,
-			triggers: loadedConfig.triggers?.crons?.length
-				? { crons: loadedConfig.triggers.crons }
-				: undefined
+			// → NOTE: cron schedules are not registered here. Miniflare has no `triggers` worker
+			// option: v4 silently dropped the `triggers: { crons }` this used to pass, and v5 rejects
+			// it, so dropping it keeps local behaviour unchanged. Registering them would be
+			// `cronTriggers` — a behaviour change to make deliberately, not as part of an upgrade.
+			queueConsumers
 		})
 
 		workers.push(mainWorkerConfig)
@@ -391,7 +389,7 @@ export function buildMiniflareDevConfig(input: BuildMiniflareDevConfigInput): an
 			gatewayWorker,
 			...workers,
 			...(serviceBindingResolution?.workers ?? []),
-			...localSecretWrappedBindingConfig.workers,
+			...localSecretServiceBindingConfig.workers,
 			...localBindingShimServiceConfig.workers
 		]
 	}

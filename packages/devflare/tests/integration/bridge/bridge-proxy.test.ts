@@ -9,6 +9,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import type { Miniflare } from 'miniflare'
 import { BridgeClient } from '../../../src/bridge/client'
 import { createEnvProxy, setBindingHints } from '../../../src/bridge/proxy'
+import { toMiniflareOptions } from '../../../src/utils/miniflare-options'
 import { PORTS, gatewayWorkerScript } from './_fixtures'
 
 // =============================================================================
@@ -41,17 +42,20 @@ describe('Bridge Proxy Integration', () => {
 
 	beforeAll(async () => {
 		// Start Miniflare with gateway worker
-		const { Miniflare } = await import('miniflare')
+		const miniflareModule = await import('miniflare')
+		const { Miniflare } = miniflareModule
 
-		miniflare = new Miniflare({
-			modules: true,
-			script: gatewayWorkerScript,
-			durableObjects: {
-				COUNTER: 'CounterDO'
-			},
-			kvNamespaces: ['TEST_KV'],
-			port: BRIDGE_PORT
-		})
+		miniflare = new Miniflare(
+			await toMiniflareOptions(miniflareModule, {
+				modules: true,
+				script: gatewayWorkerScript,
+				durableObjects: {
+					COUNTER: 'CounterDO'
+				},
+				kvNamespaces: ['TEST_KV'],
+				port: BRIDGE_PORT
+			})
+		)
 
 		await miniflare.ready
 

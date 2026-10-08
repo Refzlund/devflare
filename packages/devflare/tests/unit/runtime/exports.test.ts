@@ -5,17 +5,14 @@
 import { describe, expect, test } from 'bun:test'
 import { createFetchEvent, runWithContext, runWithEventContext } from '../../../src/runtime/context'
 import { ContextAccessError } from '../../../src/runtime/validation'
+import { createTestExecutionContext } from '../../../src/test/execution-context'
 
 // Import the actual exports we'll create
 import { ctx, env, event, locals, vars } from '../../../src/runtime/exports'
 
 /** Helper to create a mock ExecutionContext */
 function createMockCtx(): ExecutionContext {
-	return {
-		waitUntil: () => {},
-		passThroughOnException: () => {},
-		props: {}
-	} as ExecutionContext
+	return createTestExecutionContext([])
 }
 
 describe('env proxy', () => {
@@ -86,11 +83,7 @@ describe('ctx proxy', () => {
 	test('provides access to ExecutionContext within context', () => {
 		const mockEnv = {}
 		const waitUntilFn = () => {}
-		const mockCtx: ExecutionContext = {
-			waitUntil: waitUntilFn,
-			passThroughOnException: () => {},
-			props: {}
-		}
+		const mockCtx: ExecutionContext = { ...createTestExecutionContext([]), waitUntil: waitUntilFn }
 
 		runWithContext(mockEnv, mockCtx, null, () => {
 			expect((ctx as ExecutionContext).waitUntil).toBe(waitUntilFn)
@@ -178,13 +171,7 @@ describe('combined usage', () => {
 		const mockEnv = { API_KEY: 'secret' }
 		const mockRequest = new Request('https://api.example.com/users')
 		const waitUntilPromises: Promise<unknown>[] = []
-		const mockCtx: ExecutionContext = {
-			waitUntil: (p: Promise<unknown>) => {
-				waitUntilPromises.push(p)
-			},
-			passThroughOnException: () => {},
-			props: {}
-		}
+		const mockCtx = createTestExecutionContext(waitUntilPromises)
 
 		await runWithContext(mockEnv, mockCtx, mockRequest, async () => {
 			// Access env

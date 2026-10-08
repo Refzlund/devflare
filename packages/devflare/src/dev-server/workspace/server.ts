@@ -28,11 +28,12 @@ import { startInboundEmailPoller } from '../../email/inbound-poller'
 import { type ResolvedEmailRuntime, resolveEmailRuntime } from '../../email/runtime-config'
 import { clearEmailDeliverySink, setEmailDeliverySink } from '../../utils/email-delivery'
 import { generatedDir } from '../../utils/generated-dir'
+import { toMiniflareOptions } from '../../utils/miniflare-options'
 import { setLocalSendEmailBindings } from '../../utils/send-email'
 import { runD1Migrations } from '../d1-migrations'
 import { resolveR2PresignOrigin } from '../miniflare-dev-config'
 import { createMiniflareLog } from '../miniflare-log'
-import { createRuntimeStdioForwarder } from '../runtime-stdio'
+import { createRuntimeLogForwarder } from '../runtime-logs'
 import { startViteProcess } from '../vite-process'
 import { buildMergedWorkspaceConfig } from './merge-config'
 import { type PreparedWorkspaceApp, prepareWorkspaceApp } from './prepare-app'
@@ -224,7 +225,8 @@ export function createWorkspaceDevServer(options: WorkspaceDevServerOptions): Wo
 	}
 
 	async function startMiniflare(apps: PreparedWorkspaceApp[]): Promise<void> {
-		const { Miniflare, Log, LogLevel } = await import('miniflare')
+		const miniflareModule = await import('miniflare')
+		const { Miniflare, Log, LogLevel } = miniflareModule
 
 		const { config, directSockets } = buildMergedWorkspaceConfig({
 			apps: apps.map((app) => ({
@@ -242,9 +244,9 @@ export function createWorkspaceDevServer(options: WorkspaceDevServerOptions): Wo
 		if (log) {
 			config.log = log
 		}
-		config.handleRuntimeStdio = createRuntimeStdioForwarder(logger)
+		config.handleStructuredLogs = createRuntimeLogForwarder(logger)
 
-		miniflare = new Miniflare(config as ConstructorParameters<typeof Miniflare>[0])
+		miniflare = new Miniflare(await toMiniflareOptions(miniflareModule, config))
 		await miniflare.ready
 
 		// Resolve + record each app's browser origin from its direct socket.

@@ -4,124 +4,97 @@
 // When the user's devflare config declares cross-worker service or DO
 // bindings, the test bridge needs Miniflare to spin up a worker-per-target
 // instead of running everything inline as the bridge gateway script.
-// This pure helper takes the in-progress single-worker `mfConfig`, the
-// resolution results from resolve-service-bindings, and the user config,
-// and rewrites `mfConfig` in place into a multi-worker layout.
+// This helper takes the in-progress single-worker `mfConfig`, the resolution
+// results from resolve-service-bindings, and the user config, and rewrites
+// `mfConfig` in place into a multi-worker layout.
+//
+// → Every per-worker option moves onto the primary worker. Which options stay
+//   at the top level comes from Miniflare's own schema (splitSharedOptions),
+//   never from a list here: a hand-kept list of bindings to copy is how
+//   queue producers and Hyperdrive were once left behind and lost.
 // =============================================================================
 
 import type { DevflareConfig } from '../config'
+import { type SharedOptionsRuntime, splitSharedOptions } from '../utils/miniflare-options'
 import type { resolveDOBindings, resolveServiceBindings } from './resolve-service-bindings'
 
 type ServiceBindingResolution = Awaited<ReturnType<typeof resolveServiceBindings>>
 type DOBindingResolution = Awaited<ReturnType<typeof resolveDOBindings>>
 
+/** An auxiliary worker entry, as the binding resolutions and local shims emit them. */
+type AuxiliaryWorker = ServiceBindingResolution['workers'][number]
+
 /**
- * Convert the in-progress single-worker `mfConfig` into a multi-worker
- * Miniflare config. Mutates `mfConfig` in place.
- *
- * The first worker (the "primary") inherits the bridge gateway script and the
- * KV/R2/D1/email/DO settings that were set on the top-level mfConfig;
- * additional workers come from `serviceBindingResolution.workers` and
- * `doBindingResolution.workers`, deduplicated by name.
+ * @description Converts the in-progress single-worker `mfConfig` into a
+ * multi-worker Miniflare config, in place. The first worker (the "primary")
+ * receives every per-worker option the single-worker config carried — the
+ * bridge gateway script, compatibility settings and all bindings — plus the
+ * cross-worker DO and service bindings. Additional workers come from the two
+ * resolutions and devflare's local shim workers, deduplicated by name.
+ * @param mfConfig - the single-worker config; replaced by the multi-worker one
+ * @param config - the user's devflare config (primary name and compat date)
+ * @param serviceBindingResolution - workers and primary bindings for `services`
+ * @param doBindingResolution - workers and primary bindings for cross-worker DOs
+ * @param runtime - the loaded `miniflare` module, whose schema names the
+ *   Miniflare-wide options that stay at the top level
  */
 export function applyMultiWorkerConfig(
 	mfConfig: any,
 	config: DevflareConfig,
 	serviceBindingResolution: ServiceBindingResolution | null,
-	doBindingResolution: DOBindingResolution | null
+	doBindingResolution: DOBindingResolution | null,
+	runtime: SharedOptionsRuntime
 ): void {
+	const { __devflareLocalSecretWorkers, __devflareLocalBindingWorkers, ...singleWorkerOptions } =
+		mfConfig
+	const { shared, worker } = splitSharedOptions(runtime, singleWorkerOptions)
+	const { durableObjects, serviceBindings, ...workerOptions } = worker
+
 	const primaryDurableObjects = {
-		...(mfConfig.durableObjects || {}),
-		...(doBindingResolution?.crossWorkerDOBindings || {})
+		...(durableObjects as Record<string, unknown> | undefined),
+		...doBindingResolution?.crossWorkerDOBindings
+	}
+	const primaryServiceBindings = {
+		...(serviceBindings as Record<string, unknown> | undefined),
+		...serviceBindingResolution?.primaryServiceBindings
 	}
 
 	const primaryWorker: Record<string, unknown> = {
+		...workerOptions,
 		name: config.name ?? 'primary',
 		modules: true,
-		script: mfConfig.script,
 		compatibilityDate: config.compatibilityDate ?? '2025-01-01',
-		...(mfConfig.kvNamespaces && { kvNamespaces: mfConfig.kvNamespaces }),
-		...(mfConfig.r2Buckets && { r2Buckets: mfConfig.r2Buckets }),
-		...(mfConfig.d1Databases && { d1Databases: mfConfig.d1Databases }),
-		...(mfConfig.ratelimits && { ratelimits: mfConfig.ratelimits }),
-		...(mfConfig.versionMetadata && { versionMetadata: mfConfig.versionMetadata }),
-		...(mfConfig.workerLoaders && { workerLoaders: mfConfig.workerLoaders }),
-		...(mfConfig.mtlsCertificates && { mtlsCertificates: mfConfig.mtlsCertificates }),
-		...(mfConfig.dispatchNamespaces && { dispatchNamespaces: mfConfig.dispatchNamespaces }),
-		...(mfConfig.workflows && { workflows: mfConfig.workflows }),
-		...(mfConfig.pipelines && { pipelines: mfConfig.pipelines }),
-		...(mfConfig.images && { images: mfConfig.images }),
-		...(mfConfig.media && { media: mfConfig.media }),
-		...(mfConfig.analyticsEngineDatasets && {
-			analyticsEngineDatasets: mfConfig.analyticsEngineDatasets
-		}),
-		...(mfConfig.tails && { tails: mfConfig.tails }),
-		...(mfConfig.artifacts && { artifacts: mfConfig.artifacts }),
-		...(mfConfig.secretsStoreSecrets && { secretsStoreSecrets: mfConfig.secretsStoreSecrets }),
-		...(mfConfig.wrappedBindings && { wrappedBindings: mfConfig.wrappedBindings }),
-		// Vars/plain bindings (incl. the injected R2 presign secret) must ride on
-		// the primary worker — Miniflare ignores per-worker options left top-level
-		// once a `workers` array is present.
-		...(mfConfig.bindings && { bindings: mfConfig.bindings }),
-		...(mfConfig.email && { email: mfConfig.email }),
 		...(Object.keys(primaryDurableObjects).length > 0 && { durableObjects: primaryDurableObjects }),
-		...(mfConfig.serviceBindings || serviceBindingResolution?.primaryServiceBindings
-			? {
-					serviceBindings: {
-						...(mfConfig.serviceBindings ?? {}),
-						...(serviceBindingResolution?.primaryServiceBindings ?? {})
-					}
-				}
-			: {})
+		...(Object.keys(primaryServiceBindings).length > 0 && {
+			serviceBindings: primaryServiceBindings
+		})
 	}
 
-	const additionalWorkers = [
+	const additionalWorkers: AuxiliaryWorker[] = [
 		...(serviceBindingResolution?.workers || []),
 		...(doBindingResolution?.workers || []),
-		...(mfConfig.__devflareLocalSecretWorkers || []),
-		...(mfConfig.__devflareLocalBindingWorkers || [])
+		...(__devflareLocalSecretWorkers || []),
+		...(__devflareLocalBindingWorkers || [])
 	]
-	const workersByName = new Map<string, (typeof additionalWorkers)[0]>()
+	const workersByName = new Map<string, AuxiliaryWorker>()
 
-	for (const worker of additionalWorkers) {
-		if (!workersByName.has(worker.name)) {
-			workersByName.set(worker.name, worker)
+	for (const additional of additionalWorkers) {
+		if (!workersByName.has(additional.name)) {
+			workersByName.set(additional.name, additional)
 			continue
 		}
 
-		const existing = workersByName.get(worker.name)!
-		if (worker.durableObjects) {
+		const existing = workersByName.get(additional.name)!
+		if (additional.durableObjects) {
 			existing.durableObjects = {
 				...(existing.durableObjects || {}),
-				...worker.durableObjects
+				...additional.durableObjects
 			}
 		}
 	}
 
-	const workers = [primaryWorker, ...workersByName.values()]
-	delete mfConfig.script
-	delete mfConfig.modules
-	delete mfConfig.kvNamespaces
-	delete mfConfig.r2Buckets
-	delete mfConfig.d1Databases
-	delete mfConfig.ratelimits
-	delete mfConfig.versionMetadata
-	delete mfConfig.workerLoaders
-	delete mfConfig.mtlsCertificates
-	delete mfConfig.dispatchNamespaces
-	delete mfConfig.workflows
-	delete mfConfig.pipelines
-	delete mfConfig.images
-	delete mfConfig.media
-	delete mfConfig.analyticsEngineDatasets
-	delete mfConfig.tails
-	delete mfConfig.artifacts
-	delete mfConfig.secretsStoreSecrets
-	delete mfConfig.wrappedBindings
-	delete mfConfig.bindings
-	delete mfConfig.serviceBindings
-	delete mfConfig.__devflareLocalSecretWorkers
-	delete mfConfig.__devflareLocalBindingWorkers
-	delete mfConfig.durableObjects
-	mfConfig.workers = workers
+	// The caller holds `mfConfig`, so it is rewritten in place: only the
+	// Miniflare-wide options stay beside `workers`.
+	for (const key of Object.keys(mfConfig)) delete mfConfig[key]
+	Object.assign(mfConfig, shared, { workers: [primaryWorker, ...workersByName.values()] })
 }

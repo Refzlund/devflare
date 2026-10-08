@@ -241,11 +241,12 @@ These knobs shape the **local** dev/test runtime rather than the deployed Worker
 - **`server` options** — beyond `host`/`port`, the `server` config also accepts
   `https`, `httpsKeyPath`, `httpsCertPath`, `inspectorPort`, `inspectorHost`,
   `upstream`, `liveReload`, `cf`, `verbose`, `logRequests`, and `publicUrl`, all
-  threaded into Miniflare's `CoreSharedOptions`. This enables local **HTTPS** dev
-  (with your own key/cert), a custom **inspector port/host** for the
-  DevTools/debugger, a custom **upstream** host, Miniflare's in-browser
-  **live-reload** script (`liveReload: true`, complementing Devflare's own source
-  watcher), a dev-time **`request.cf` override** (`cf: false` to omit it, a JSON
+  threaded into Miniflare's shared options. This enables local **HTTPS** dev
+  (with your own key/cert — devflare reads both files and hands Miniflare their
+  contents), a custom **inspector port/host** for the
+  DevTools/debugger, a custom **upstream** host, an in-browser **live-reload**
+  script (`liveReload: true`, injected by devflare's dev gateway, complementing
+  Devflare's own source watcher), a dev-time **`request.cf` override** (`cf: false` to omit it, a JSON
   file path, or an object injecting colo/country/TLS/bot-management metadata),
   runtime-log controls (`verbose`, `logRequests`), and a **public-URL** the local
   runtime advertises for itself (`publicUrl`, for when dev sits behind a reverse
@@ -256,9 +257,10 @@ These knobs shape the **local** dev/test runtime rather than the deployed Worker
   and intentionally not surfaced as `server` config.)
 - **Cache API (`caches` global)** — works **locally by default** through
   Miniflare (no binding to declare; `caches.default` and `caches.open(...)` are
-  available in dev/test). Cache contents now **persist across dev-server
-  restarts** when you set `cachePersist`, alongside the sibling
-  `kvPersist`/`r2Persist`/`d1Persist`/`durableObjectsPersist` options.
+  available in dev/test). Cache contents **persist across dev-server
+  restarts** whenever the dev server persists its data, alongside KV, R2, D1
+  and Durable Object storage — each in its own subdirectory of the persist root
+  (Miniflare's `resourcePersistencePath`).
 - **`outboundService`** — a **dev/test-only** option (not a Wrangler config
   field) that routes a Worker's outbound `fetch()` to a named service, so you can
   exercise cross-service calls locally. It has no deploy analogue.

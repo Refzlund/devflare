@@ -29,6 +29,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import type { Miniflare } from 'miniflare'
 import { getGatewayScript } from '../../../src/dev-server/gateway-script'
+import { toMiniflareOptions } from '../../../src/utils/miniflare-options'
 
 const PORT = 9805
 const APP_SERVICE_BINDING = '__DEVFLARE_APP'
@@ -134,35 +135,42 @@ describe('DO WebSocket via an app-worker route (gateway -> app -> stub.fetch)', 
 	let miniflare: Miniflare
 
 	beforeAll(async () => {
-		const { Miniflare } = await import('miniflare')
+		const miniflareModule = await import('miniflare')
+		const { Miniflare } = miniflareModule
 		const doRef = { className: 'DocRoom', scriptName: 'do-doc_room' }
-		miniflare = new Miniflare({
-			port: PORT,
-			compatibilityDate: '2026-04-28',
-			workers: [
-				{
-					name: 'gateway',
-					modules: true,
-					// Worker mode: the dev server passes the app service-binding name.
-					script: getGatewayScript([], false, APP_SERVICE_BINDING),
-					routes: ['*'],
-					durableObjects: { DOC_ROOM: doRef },
-					serviceBindings: { [APP_SERVICE_BINDING]: { name: 'app' } }
-				},
-				{
-					name: 'app',
-					modules: true,
-					script: appWorkerSource,
-					durableObjects: { DOC_ROOM: doRef }
-				},
-				{
-					name: 'do-doc_room',
-					modules: true,
-					script: docRoomSource,
-					durableObjects: { DOC_ROOM: 'DocRoom' }
-				}
-			]
-		})
+		miniflare = new Miniflare(
+			await toMiniflareOptions(miniflareModule, {
+				port: PORT,
+				// compatibilityDate is per worker: Miniflare reads only `workers[i]` once the array is
+				// present, so a top-level date silently left every worker on Miniflare's fallback.
+				workers: [
+					{
+						name: 'gateway',
+						compatibilityDate: '2026-04-28',
+						modules: true,
+						// Worker mode: the dev server passes the app service-binding name.
+						script: getGatewayScript([], false, APP_SERVICE_BINDING),
+						routes: ['*'],
+						durableObjects: { DOC_ROOM: doRef },
+						serviceBindings: { [APP_SERVICE_BINDING]: { name: 'app' } }
+					},
+					{
+						name: 'app',
+						compatibilityDate: '2026-04-28',
+						modules: true,
+						script: appWorkerSource,
+						durableObjects: { DOC_ROOM: doRef }
+					},
+					{
+						name: 'do-doc_room',
+						compatibilityDate: '2026-04-28',
+						modules: true,
+						script: docRoomSource,
+						durableObjects: { DOC_ROOM: 'DocRoom' }
+					}
+				]
+			})
+		)
 		await miniflare.ready
 	})
 

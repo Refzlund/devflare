@@ -23,6 +23,7 @@ import {
 } from '../runtime'
 import { createRouteResolve, matchFetchRoute } from '../runtime'
 import type { RouteSegment } from '../runtime/router/types'
+import { createTestExecutionContext } from './execution-context'
 
 // -----------------------------------------------------------------------------
 // Types
@@ -191,13 +192,7 @@ async function fetch(request: Request | string, options?: WorkerFetchOptions): P
 
 	// Create execution context
 	const waitUntilPromises: Promise<unknown>[] = []
-	const ctx: ExecutionContext = {
-		waitUntil(promise: Promise<unknown>) {
-			waitUntilPromises.push(promise)
-		},
-		passThroughOnException() {},
-		props: {}
-	}
+	const ctx = createTestExecutionContext(waitUntilPromises)
 
 	// Get the test env
 	const env = getEnv()

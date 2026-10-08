@@ -13,6 +13,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import type { Miniflare } from 'miniflare'
 import { BridgeClient } from '../../../src/bridge/client'
 import { createEnvProxy, setBindingHints } from '../../../src/bridge/proxy'
+import { toMiniflareOptions } from '../../../src/utils/miniflare-options'
 
 /** Top-level import hoisted above whichever gateway script embeds the DO body. */
 export const DOC_ROOM_IMPORT = `import { DurableObject } from 'cloudflare:workers'`
@@ -130,17 +131,20 @@ export function runHibernationSuite(label: string, script: string, port: number)
 		let env: Record<string, unknown>
 
 		beforeAll(async () => {
-			const { Miniflare } = await import('miniflare')
+			const miniflareModule = await import('miniflare')
+			const { Miniflare } = miniflareModule
 
-			miniflare = new Miniflare({
-				modules: true,
-				script,
-				// A recent compatibility date is required for native Durable Object
-				// RPC (the wsCount() probe) and the hibernation WebSocket API.
-				compatibilityDate: '2026-04-28',
-				durableObjects: { DOC_ROOM: 'DocRoom' },
-				port
-			})
+			miniflare = new Miniflare(
+				await toMiniflareOptions(miniflareModule, {
+					modules: true,
+					script,
+					// A recent compatibility date is required for native Durable Object
+					// RPC (the wsCount() probe) and the hibernation WebSocket API.
+					compatibilityDate: '2026-04-28',
+					durableObjects: { DOC_ROOM: 'DocRoom' },
+					port
+				})
+			)
 			await miniflare.ready
 
 			client = new BridgeClient({ url: `ws://127.0.0.1:${port}` })

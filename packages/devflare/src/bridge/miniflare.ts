@@ -4,7 +4,7 @@
 // Spawns and manages Miniflare instances with all binding types
 // =============================================================================
 
-import type { Miniflare as MiniflareType } from 'miniflare'
+import type { Miniflare as MiniflareType, V4SharedOptions } from 'miniflare'
 import {
 	type DevflareConfig,
 	getLocalD1DatabaseIdentifier,
@@ -29,12 +29,17 @@ import {
 } from '../dev-server/miniflare-bindings'
 import { createMiniflareLog } from '../dev-server/miniflare-log'
 import {
-	type LocalSecretWrappedBindingConfig,
+	type LocalSecretServiceBindingConfig,
 	buildLocalSecretNodeBindings,
-	buildLocalSecretWrappedBindingConfig
+	buildLocalSecretServiceBindingConfig
 } from '../secrets/local-secrets'
-import { buildLocalBindingShimServiceConfig } from '../shims/local-media-bindings'
+import {
+	type LocalBindingShimServiceConfig,
+	buildLocalBindingShimServiceConfig
+} from '../shims/local-media-bindings'
 import { generatedDirName } from '../utils/generated-dir'
+import { dispatchFetchToRuntime } from '../utils/miniflare-dispatch'
+import { splitSharedOptions, toMiniflareOptions } from '../utils/miniflare-options'
 import {
 	type R2PresignContext,
 	generateGatewayScript,
@@ -153,10 +158,11 @@ export interface MiniflareOptions {
 	bindings?: Record<string, unknown>
 	/** Service bindings */
 	serviceBindings?: Record<string, { name: string; entrypoint?: string }>
-	/** Wrapped bindings to expose object-shaped local binding shims */
-	wrappedBindings?: LocalSecretWrappedBindingConfig['wrappedBindings']
-	/** Additional module workers needed by wrapped bindings */
-	auxiliaryWorkers?: LocalSecretWrappedBindingConfig['workers']
+	/** Additional module workers serving local binding shims (Secrets Store, images, media) */
+	auxiliaryWorkers?: Array<
+		| LocalSecretServiceBindingConfig['workers'][number]
+		| LocalBindingShimServiceConfig['workers'][number]
+	>
 	/** Node-side binding shims merged into `getBindings()` results */
 	nodeBindingOverrides?: Record<string, unknown>
 	/** Project root used to load `.dev.vars`/`.env*` for config-based Miniflare */
@@ -182,16 +188,14 @@ interface MiniflareSendEmailConfig {
 }
 
 type MiniflareRuntime = Awaited<ReturnType<typeof loadMiniflareRuntime>>
-type MfOptions = ConstructorParameters<MiniflareRuntime['Miniflare']>[0]
+/** Miniflare 4-shaped options; {@link toMiniflareOptions} converts them for Miniflare 5. */
+type MfOptions = V4SharedOptions
 type MfOptionsWithEmail = MfOptions & {
 	bindings?: MiniflareOptions['bindings']
 	d1Databases?: MiniflareOptions['d1Databases']
-	d1Persist?: string
 	durableObjects?: MiniflareOptions['durableObjects']
-	durableObjectsPersist?: string
 	email?: MiniflareSendEmailConfig
 	kvNamespaces?: MiniflareOptions['kvNamespaces']
-	kvPersist?: string
 	queueProducers?: Record<string, { queueName: string; deliveryDelay?: number }>
 	ratelimits?: MiniflareOptions['rateLimits']
 	versionMetadata?: string
@@ -199,10 +203,8 @@ type MfOptionsWithEmail = MfOptions & {
 	mtlsCertificates?: MiniflareOptions['mtlsCertificates']
 	dispatchNamespaces?: MiniflareOptions['dispatchNamespaces']
 	workflows?: MiniflareOptions['workflows']
-	workflowsPersist?: string
 	pipelines?: MiniflareOptions['pipelines']
 	images?: MiniflareOptions['images']
-	imagesPersist?: string
 	media?: MiniflareOptions['media']
 	analyticsEngineDatasets?: MiniflareOptions['analyticsEngine']
 	tails?: MiniflareOptions['tailConsumers']
@@ -210,10 +212,8 @@ type MfOptionsWithEmail = MfOptions & {
 	artifacts?: MiniflareOptions['artifacts']
 	secretsStoreSecrets?: MiniflareOptions['secretsStore']
 	serviceBindings?: MiniflareOptions['serviceBindings']
-	wrappedBindings?: MiniflareOptions['wrappedBindings']
 	workers?: Array<Record<string, unknown>>
 	r2Buckets?: MiniflareOptions['r2Buckets']
-	r2Persist?: string
 }
 
 function resolvePersistPath(options: MiniflareOptions): string | undefined {
@@ -255,62 +255,46 @@ function createBaseMiniflareConfig(
 
 function applyKVNamespaceConfig(
 	config: MfOptionsWithEmail,
-	kvNamespaces: MiniflareOptions['kvNamespaces'],
-	persistPath: string | undefined
+	kvNamespaces: MiniflareOptions['kvNamespaces']
 ): void {
 	if (!hasNamedBindings(kvNamespaces)) {
 		return
 	}
 
 	config.kvNamespaces = kvNamespaces
-	if (persistPath) {
-		config.kvPersist = `${persistPath}/kv`
-	}
 }
 
 function applyR2BucketConfig(
 	config: MfOptionsWithEmail,
-	r2Buckets: MiniflareOptions['r2Buckets'],
-	persistPath: string | undefined
+	r2Buckets: MiniflareOptions['r2Buckets']
 ): void {
 	if (!hasNamedBindings(r2Buckets)) {
 		return
 	}
 
 	config.r2Buckets = r2Buckets
-	if (persistPath) {
-		config.r2Persist = `${persistPath}/r2`
-	}
 }
 
 function applyD1DatabaseConfig(
 	config: MfOptionsWithEmail,
-	d1Databases: MiniflareOptions['d1Databases'],
-	persistPath: string | undefined
+	d1Databases: MiniflareOptions['d1Databases']
 ): void {
 	if (!hasNamedBindings(d1Databases)) {
 		return
 	}
 
 	config.d1Databases = d1Databases
-	if (persistPath) {
-		config.d1Persist = `${persistPath}/d1`
-	}
 }
 
 function applyDurableObjectConfig(
 	config: MfOptionsWithEmail,
-	durableObjects: MiniflareOptions['durableObjects'],
-	persistPath: string | undefined
+	durableObjects: MiniflareOptions['durableObjects']
 ): void {
 	if (!durableObjects) {
 		return
 	}
 
 	config.durableObjects = durableObjects
-	if (persistPath) {
-		config.durableObjectsPersist = `${persistPath}/do`
-	}
 }
 
 function applySendEmailConfig(
@@ -414,17 +398,13 @@ function applyDispatchNamespaceConfig(
 
 function applyWorkflowConfig(
 	config: MfOptionsWithEmail,
-	workflows: MiniflareOptions['workflows'],
-	persistPath: string | undefined
+	workflows: MiniflareOptions['workflows']
 ): void {
 	if (!workflows || Object.keys(workflows).length === 0) {
 		return
 	}
 
 	config.workflows = workflows
-	if (persistPath) {
-		config.workflowsPersist = `${persistPath}/workflows`
-	}
 }
 
 function applyPipelineConfig(
@@ -438,19 +418,12 @@ function applyPipelineConfig(
 	config.pipelines = pipelines
 }
 
-function applyImagesConfig(
-	config: MfOptionsWithEmail,
-	images: MiniflareOptions['images'],
-	persistPath: string | undefined
-): void {
+function applyImagesConfig(config: MfOptionsWithEmail, images: MiniflareOptions['images']): void {
 	if (!images) {
 		return
 	}
 
 	config.images = images
-	if (persistPath) {
-		config.imagesPersist = `${persistPath}/images`
-	}
 }
 
 function applyMediaConfig(config: MfOptionsWithEmail, media: MiniflareOptions['media']): void {
@@ -505,56 +478,30 @@ function applyServiceBindingsConfig(
 	config.serviceBindings = serviceBindings
 }
 
-function applyWrappedBindingsConfig(
-	config: MfOptionsWithEmail,
-	wrappedBindings: MiniflareOptions['wrappedBindings']
-): void {
-	if (!wrappedBindings || Object.keys(wrappedBindings).length === 0) {
-		return
-	}
-
-	config.wrappedBindings = wrappedBindings
-}
-
+/**
+ * @description Adds auxiliary workers next to the gateway: Miniflare-wide
+ * options stay at the top level, every other option moves onto the gateway
+ * worker, since Miniflare reads per-worker options only from `workers`.
+ * @param config - the single-worker gateway config
+ * @param auxiliaryWorkers - workers to run beside it (local shims, secrets)
+ * @param runtime - the loaded `miniflare` module, whose schema names the
+ *   Miniflare-wide options
+ * @returns `config` unchanged when there are no auxiliary workers
+ */
 function createConfigWithAuxiliaryWorkers(
 	config: MfOptionsWithEmail,
-	auxiliaryWorkers: MiniflareOptions['auxiliaryWorkers']
+	auxiliaryWorkers: MiniflareOptions['auxiliaryWorkers'],
+	runtime: MiniflareRuntime
 ): MfOptionsWithEmail {
 	if (!auxiliaryWorkers || auxiliaryWorkers.length === 0) {
 		return config
 	}
 
-	const {
-		port,
-		host,
-		log,
-		kvPersist,
-		r2Persist,
-		d1Persist,
-		durableObjectsPersist,
-		workflowsPersist,
-		imagesPersist,
-		...primaryWorker
-	} = config
-	const primaryWorkerRecord = primaryWorker as Record<string, unknown>
-	const primaryWorkerName =
-		typeof primaryWorkerRecord.name === 'string' ? primaryWorkerRecord.name : 'devflare-gateway'
-
+	const { shared, worker } = splitSharedOptions(runtime, config as Record<string, unknown>)
 	return {
-		...(port !== undefined && { port }),
-		...(host && { host }),
-		...(log && { log }),
-		...(kvPersist && { kvPersist }),
-		...(r2Persist && { r2Persist }),
-		...(d1Persist && { d1Persist }),
-		...(durableObjectsPersist && { durableObjectsPersist }),
-		...(workflowsPersist && { workflowsPersist }),
-		...(imagesPersist && { imagesPersist }),
+		...shared,
 		workers: [
-			{
-				...primaryWorkerRecord,
-				name: primaryWorkerName
-			},
+			{ ...worker, name: typeof worker.name === 'string' ? worker.name : 'devflare-gateway' },
 			...auxiliaryWorkers
 		]
 	} as unknown as MfOptionsWithEmail
@@ -566,11 +513,16 @@ function createMiniflareConfig(
 ): MfOptionsWithEmail {
 	const persistPath = resolvePersistPath(options)
 	const config = createBaseMiniflareConfig(options, runtime)
+	// One root for every resource: Miniflare stores each under `<root>/<plugin>` (kv, r2, d1,
+	// do, workflows, images, …) — the layout the per-resource `*Persist` paths used to spell out.
+	if (persistPath) {
+		config.resourcePersistencePath = persistPath
+	}
 
-	applyKVNamespaceConfig(config, options.kvNamespaces, persistPath)
-	applyR2BucketConfig(config, options.r2Buckets, persistPath)
-	applyD1DatabaseConfig(config, options.d1Databases, persistPath)
-	applyDurableObjectConfig(config, options.durableObjects, persistPath)
+	applyKVNamespaceConfig(config, options.kvNamespaces)
+	applyR2BucketConfig(config, options.r2Buckets)
+	applyD1DatabaseConfig(config, options.d1Databases)
+	applyDurableObjectConfig(config, options.durableObjects)
 	applySendEmailConfig(config, options.sendEmail)
 	applyBindingsConfig(config, options.bindings)
 	applyQueueConfig(config, options.queues)
@@ -579,9 +531,9 @@ function createMiniflareConfig(
 	applyWorkerLoaderConfig(config, options.workerLoaders)
 	applyMtlsCertificateConfig(config, options.mtlsCertificates)
 	applyDispatchNamespaceConfig(config, options.dispatchNamespaces)
-	applyWorkflowConfig(config, options.workflows, persistPath)
+	applyWorkflowConfig(config, options.workflows)
 	applyPipelineConfig(config, options.pipelines)
-	applyImagesConfig(config, options.images, persistPath)
+	applyImagesConfig(config, options.images)
 	applyMediaConfig(config, options.media)
 	applyAnalyticsEngineConfig(config, options.analyticsEngine)
 	if (options.tailConsumers && options.tailConsumers.length > 0) {
@@ -593,9 +545,8 @@ function createMiniflareConfig(
 	applyArtifactsConfig(config, options.artifacts)
 	applySecretsStoreConfig(config, options.secretsStore)
 	applyServiceBindingsConfig(config, options.serviceBindings)
-	applyWrappedBindingsConfig(config, options.wrappedBindings)
 
-	return createConfigWithAuxiliaryWorkers(config, options.auxiliaryWorkers)
+	return createConfigWithAuxiliaryWorkers(config, options.auxiliaryWorkers, runtime)
 }
 
 function bindMiniflareMethod<TMethodName extends keyof MiniflareType>(
@@ -658,7 +609,7 @@ export function createMiniflareInstanceHandle(
 		getR2Bucket: bindMiniflareMethod(mf, 'getR2Bucket'),
 		getD1Database: bindMiniflareMethod(mf, 'getD1Database'),
 		getDurableObjectNamespace: bindMiniflareMethod(mf, 'getDurableObjectNamespace'),
-		dispatchFetch: bindMiniflareMethod(mf, 'dispatchFetch'),
+		dispatchFetch: (input, init) => dispatchFetchToRuntime(mf, input, init),
 
 		_mf: mf
 	}
@@ -675,7 +626,7 @@ export async function startMiniflare(options: MiniflareOptions = {}): Promise<Mi
 	const runtime = await loadMiniflareRuntime()
 	const presignSetup = resolveR2PresignSetup(options)
 	const mfConfig = createMiniflareConfig(presignSetup.options, runtime)
-	const mf = new runtime.Miniflare(mfConfig as MfOptions)
+	const mf = new runtime.Miniflare(await toMiniflareOptions(runtime, mfConfig))
 	await mf.ready
 
 	return createMiniflareInstanceHandle(
@@ -712,19 +663,16 @@ export async function startMiniflareFromConfig(
 			)
 		: config
 	const bindings = runtimeConfig.bindings ?? {}
-	const localSecretWrappedBindingConfig = options.cwd
-		? buildLocalSecretWrappedBindingConfig(runtimeConfig, options.cwd)
+	const localSecretServiceBindingConfig = options.cwd
+		? buildLocalSecretServiceBindingConfig(runtimeConfig, options.cwd)
 		: undefined
 	const localSecretNodeBindings = options.cwd
 		? buildLocalSecretNodeBindings(runtimeConfig, options.cwd)
 		: undefined
-	const localSecretBindingNames = new Set(localSecretWrappedBindingConfig?.localBindingNames ?? [])
+	const localSecretBindingNames = new Set(localSecretServiceBindingConfig?.localBindingNames ?? [])
 	const localBindingShimServiceConfig = buildLocalBindingShimServiceConfig(runtimeConfig)
-	const wrappedBindings = {
-		...(localSecretWrappedBindingConfig?.wrappedBindings ?? {})
-	}
 	const auxiliaryWorkers = [
-		...(localSecretWrappedBindingConfig?.workers ?? []),
+		...(localSecretServiceBindingConfig?.workers ?? []),
 		...localBindingShimServiceConfig.workers
 	]
 
@@ -889,9 +837,9 @@ export async function startMiniflareFromConfig(
 		bindings: runtimeConfig.vars,
 		serviceBindings: {
 			...(options.serviceBindings ?? {}),
-			...localBindingShimServiceConfig.serviceBindings
+			...localBindingShimServiceConfig.serviceBindings,
+			...(localSecretServiceBindingConfig?.serviceBindings ?? {})
 		},
-		wrappedBindings: Object.keys(wrappedBindings).length > 0 ? wrappedBindings : undefined,
 		auxiliaryWorkers: auxiliaryWorkers.length > 0 ? auxiliaryWorkers : undefined,
 		nodeBindingOverrides: localSecretNodeBindings,
 		durableObjects: bindings.durableObjects

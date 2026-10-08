@@ -146,7 +146,13 @@ export async function createTestContext(configPath?: string): Promise<void> {
 	const hasMultiWorkerDOs = doBindingResolution && doBindingResolution.workers.length > 0
 
 	if (hasMultiWorkerServices || hasMultiWorkerDOs) {
-		applyMultiWorkerConfig(mfConfig, config, serviceBindingResolution, doBindingResolution)
+		applyMultiWorkerConfig(
+			mfConfig,
+			config,
+			serviceBindingResolution,
+			doBindingResolution,
+			await import('miniflare')
+		)
 	}
 
 	const usesMultiWorker = Boolean(hasMultiWorkerServices || hasMultiWorkerDOs)

@@ -10,13 +10,10 @@ import {
 	invokeFetchHandler,
 	sequence
 } from '../../../src/runtime/middleware'
+import { createTestExecutionContext } from '../../../src/test/execution-context'
 
 function createMockCtx(): ExecutionContext {
-	return {
-		waitUntil: () => {},
-		passThroughOnException: () => {},
-		props: {}
-	} as ExecutionContext
+	return createTestExecutionContext([])
 }
 
 function createEvent(url = 'https://example.com/') {

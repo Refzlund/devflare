@@ -22,6 +22,8 @@ import {
 	type SerializedResponse,
 	deserializeResponse
 } from '../../../src/bridge/v2/value-serialization'
+import { dispatchFetchToRuntime } from '../../../src/utils/miniflare-dispatch'
+import { toMiniflareOptions } from '../../../src/utils/miniflare-options'
 
 const COOKIE_A = 'a=1; Path=/; SameSite=Lax'
 const COOKIE_B = 'b=2; Path=/; HttpOnly'
@@ -53,21 +55,24 @@ async function fetchThroughBridge(compatibilityDate: string): Promise<{
 	rawSetCookieEntries: [string, string][]
 	response: Response
 }> {
-	const { Miniflare } = await import('miniflare')
-	const mf: Miniflare = new Miniflare({
-		modules: true,
-		script: `${cookieDoClass}\n${generateGatewayScript()}`,
-		durableObjects: { COOKIE_DO: 'CookieDO' },
-		compatibilityDate,
-		port: 0
-	})
+	const miniflareModule = await import('miniflare')
+	const { Miniflare } = miniflareModule
+	const mf: Miniflare = new Miniflare(
+		await toMiniflareOptions(miniflareModule, {
+			modules: true,
+			script: `${cookieDoClass}\n${generateGatewayScript()}`,
+			durableObjects: { COOKIE_DO: 'CookieDO' },
+			compatibilityDate,
+			port: 0
+		})
+	)
 	await mf.ready
 
 	const rpc = async (
 		method: string,
 		params: unknown[]
 	): Promise<{ ok: boolean; result: unknown }> => {
-		const res = await mf.dispatchFetch('http://localhost/_devflare/rpc', {
+		const res = await dispatchFetchToRuntime(mf, 'http://localhost/_devflare/rpc', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ method, params })

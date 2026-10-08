@@ -13,6 +13,7 @@ import type { Miniflare } from 'miniflare'
 import { BridgeClient } from '../../../src/bridge/client'
 import { createEnvProxy, setBindingHints } from '../../../src/bridge/proxy'
 import { getGatewayScript } from '../../../src/dev-server/gateway-script'
+import { toMiniflareOptions } from '../../../src/utils/miniflare-options'
 
 const PORT = 9796
 
@@ -49,14 +50,17 @@ describe('DO WebSocket relay (real gateway runtime)', () => {
 	let env: Record<string, unknown>
 
 	beforeAll(async () => {
-		const { Miniflare } = await import('miniflare')
+		const miniflareModule = await import('miniflare')
+		const { Miniflare } = miniflareModule
 
-		miniflare = new Miniflare({
-			modules: true,
-			script: `${echoDoSource}\n${getGatewayScript([])}`,
-			durableObjects: { ECHO: 'EchoWsDO' },
-			port: PORT
-		})
+		miniflare = new Miniflare(
+			await toMiniflareOptions(miniflareModule, {
+				modules: true,
+				script: `${echoDoSource}\n${getGatewayScript([])}`,
+				durableObjects: { ECHO: 'EchoWsDO' },
+				port: PORT
+			})
+		)
 		await miniflare.ready
 
 		client = new BridgeClient({ url: `ws://127.0.0.1:${PORT}` })

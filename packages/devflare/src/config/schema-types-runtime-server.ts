@@ -40,8 +40,8 @@ export interface ServerConfigInput {
 	port?: number
 
 	/**
-	 * Serve the local dev runtime over HTTPS. Miniflare self-signs a
-	 * certificate unless `httpsKeyPath`/`httpsCertPath` are provided.
+	 * Serve the local dev runtime over HTTPS, with a built-in self-signed
+	 * certificate unless both `httpsKeyPath` and `httpsCertPath` are provided.
 	 *
 	 * @default `false`
 	 *
@@ -53,10 +53,11 @@ export interface ServerConfigInput {
 	https?: boolean
 
 	/**
-	 * Path to a TLS private key (PEM) used when `https` is enabled. Maps to
-	 * Miniflare's `httpsKeyPath`.
+	 * Path to a TLS private key (PEM) used when `https` is enabled. Devflare
+	 * reads it only when `httpsCertPath` is given too, resolving a relative path
+	 * against the directory devflare runs in.
 	 *
-	 * @default Miniflare self-signed key.
+	 * @default the built-in self-signed key.
 	 *
 	 * @example
 	 * ```ts
@@ -66,10 +67,11 @@ export interface ServerConfigInput {
 	httpsKeyPath?: string
 
 	/**
-	 * Path to a TLS certificate chain (PEM) used when `https` is enabled. Maps
-	 * to Miniflare's `httpsCertPath`.
+	 * Path to a TLS certificate chain (PEM) used when `https` is enabled.
+	 * Devflare reads it only when `httpsKeyPath` is given too, resolving a
+	 * relative path against the directory devflare runs in.
 	 *
-	 * @default Miniflare self-signed certificate.
+	 * @default the built-in self-signed certificate.
 	 *
 	 * @example
 	 * ```ts
@@ -145,9 +147,9 @@ export interface ServerConfigInput {
 	upstream?: string
 
 	/**
-	 * Inject Miniflare's in-browser live-reload script into HTML responses so the
-	 * page auto-refreshes when the local dev runtime reloads. Maps to Miniflare's
-	 * `liveReload`. Local-dev only; complements Devflare's own source watcher.
+	 * Inject a live-reload script into HTML responses from the local dev runtime
+	 * so the page auto-refreshes when the runtime reloads. Served by devflare's
+	 * dev gateway. Local-dev only; complements Devflare's own source watcher.
 	 *
 	 * @default `false`
 	 *

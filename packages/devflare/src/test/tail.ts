@@ -19,6 +19,7 @@
 import { join } from 'path'
 import type { TraceException, TraceItem, TraceLog } from '@cloudflare/workers-types'
 import { createTailEvent, runWithEventContext } from '../runtime'
+import { createTestExecutionContext } from './execution-context'
 
 // -----------------------------------------------------------------------------
 // Types
@@ -198,13 +199,7 @@ async function trigger(items: Array<TraceItem | TraceItemOptions>): Promise<Tail
 
 	// Create execution context
 	const waitUntilPromises: Promise<unknown>[] = []
-	const ctx: ExecutionContext = {
-		waitUntil(promise: Promise<unknown>) {
-			waitUntilPromises.push(promise)
-		},
-		passThroughOnException() {},
-		props: {}
-	}
+	const ctx = createTestExecutionContext(waitUntilPromises)
 
 	// Get the test env
 	const env = testEnvGetter()

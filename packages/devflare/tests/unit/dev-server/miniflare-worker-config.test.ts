@@ -64,7 +64,7 @@ describe('makeMiniflareWorker', () => {
 		})
 	})
 
-	test('adds local Secrets Store wrapped bindings to worker configs', () => {
+	test('binds local Secrets Store values into worker configs as service bindings', () => {
 		const context: MakeMiniflareWorkerContext = {
 			cwd: 'C:/project',
 			loadedConfig: {
@@ -97,14 +97,12 @@ describe('makeMiniflareWorker', () => {
 					secret_name: 'remote-only'
 				}
 			},
-			localSecretWrappedBindingConfig: {
+			localSecretServiceBindingConfig: {
 				localBindingNames: ['API_TOKEN'],
-				wrappedBindings: {
+				serviceBindings: {
 					API_TOKEN: {
-						scriptName: 'devflare-local-secret-0-api-token',
-						bindings: {
-							value: 'local-secret'
-						}
+						name: 'devflare-local-secret-0-api-token',
+						entrypoint: 'LocalSecretsStoreSecret'
 					}
 				},
 				workers: []
@@ -114,7 +112,8 @@ describe('makeMiniflareWorker', () => {
 
 		const workerConfig = makeMiniflareWorker(context, {
 			name: 'app-worker',
-			script: 'export default {}'
+			script: 'export default {}',
+			serviceBindings: { API: { name: 'api-worker' } }
 		})
 
 		expect(workerConfig.secretsStoreSecrets).toEqual({
@@ -123,13 +122,14 @@ describe('makeMiniflareWorker', () => {
 				secret_name: 'remote-only'
 			}
 		})
-		expect(workerConfig.wrappedBindings).toEqual({
+		expect(workerConfig.wrappedBindings).toBeUndefined()
+		// Merged with, not replacing, the worker's own service bindings.
+		expect(workerConfig.serviceBindings).toEqual({
 			API_TOKEN: {
-				scriptName: 'devflare-local-secret-0-api-token',
-				bindings: {
-					value: 'local-secret'
-				}
-			}
+				name: 'devflare-local-secret-0-api-token',
+				entrypoint: 'LocalSecretsStoreSecret'
+			},
+			API: { name: 'api-worker' }
 		})
 	})
 

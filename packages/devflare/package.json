@@ -94,37 +94,37 @@
 		"check": "bun run typecheck"
 	},
 	"dependencies": {
-		"@puppeteer/browsers": "^2.10.3",
+		"@puppeteer/browsers": "^3.2.3",
 		"aws4fetch": "^1.0.20",
-		"c12": "^2.0.1",
-		"chokidar": "^4.0.3",
-		"citty": "^0.1.6",
-		"consola": "^3.4.0",
-		"defu": "^6.1.4",
-		"es-module-lexer": "^1.6.0",
-		"execa": "^9.5.2",
+		"c12": "^2.0.4",
+		"chokidar": "^5.0.0",
+		"citty": "^0.2.2",
+		"consola": "^3.4.2",
+		"defu": "^6.1.7",
+		"es-module-lexer": "^3.0.3",
+		"execa": "^10.1.0",
 		"fast-glob": "^3.3.3",
-		"globby": "^16.1.0",
+		"globby": "^16.2.4",
 		"jsonc-parser": "^3.3.1",
-		"magic-string": "^0.30.17",
-		"miniflare": "^4.20260424.0",
-		"pathe": "^2.0.2",
-		"picomatch": "^4.0.3",
-		"puppeteer-core": "^24.5.0",
-		"rolldown": "^1.0.0-rc.12",
-		"smol-toml": "^1.6.1",
-		"typescript": "^5.7.2",
-		"wrangler": "^4.85.0",
-		"ws": "^8.19.0",
-		"zod": "^3.25.0"
+		"magic-string": "^1.4.3",
+		"miniflare": "^5.20261006.0-alpha",
+		"pathe": "^2.0.3",
+		"picomatch": "^4.0.7",
+		"puppeteer-core": "^25.12.0",
+		"rolldown": "^1.2.13",
+		"smol-toml": "^1.9.0",
+		"typescript": "^6.0.3",
+		"wrangler": "^4.148.0",
+		"ws": "^8.22.0",
+		"zod": "^3.25.76"
 	},
 	"devDependencies": {
-		"@cloudflare/vite-plugin": "^1.0.0",
-		"@cloudflare/workers-types": "^4.20260426.1",
-		"@types/bun": "^1.1.14",
-		"@types/picomatch": "^4.0.2",
-		"@types/ws": "^8.18.1",
-		"vite": "^6.0.0"
+		"@cloudflare/vite-plugin": "^1.63.0",
+		"@cloudflare/workers-types": "^4.20260702.1",
+		"@types/bun": "^1.4.2",
+		"@types/picomatch": "^4.0.3",
+		"@types/ws": "^8.18.2",
+		"vite": "^8.3.3"
 	},
 	"peerDependencies": {
 		"@cloudflare/vite-plugin": "^1.0.0",
@@ -143,7 +143,7 @@
 		}
 	},
 	"engines": {
-		"node": ">=20",
+		"node": ">=22.12.0",
 		"bun": ">=1.1"
 	},
 	"keywords": [

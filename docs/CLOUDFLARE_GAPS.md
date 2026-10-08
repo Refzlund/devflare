@@ -230,7 +230,7 @@ Miniflare worker), **dev-only** (a local-runtime knob with no Wrangler field), o
 | Service binding `props` unmodeled | schema, deploy, local-dev | **Local-wired.** Accept + emit `props` (read via `ctx.props`) **and** thread it into Miniflare `serviceBindings`, so cross-service `props` delivery is testable in dev/test. | ✅ |
 | `streamingTailConsumers` unmodeled | schema, deploy, local-dev, docs | **Local-wired** (like `tailConsumers` but **service-only** — see CF-17). Compile to `streaming_tail_consumers` for deploy **and** thread into Miniflare `streamingTails`; cross-Worker delivery works when the consumer Worker is present locally, degrades cleanly otherwise. | ✅ |
 | `server` config missing `https`/`inspectorPort`/`upstream` | schema, local-dev | **Local-wired (dev-runtime).** `server` now also accepts `https`/`httpsKeyPath`/`httpsCertPath`/`inspectorPort`/`upstream`, threaded into Miniflare `CoreSharedOptions` — local HTTPS dev, custom inspector port, custom upstream. No deploy effect. | ✅ |
-| Cache API contents don't persist across dev-server restarts | local-dev | **Local-wired (dev-runtime).** `cachePersist` persists the Cache API (`caches` global, on by default) across restarts, alongside the sibling kv/r2/d1/DO persist options. | ✅ |
+| Cache API contents don't persist across dev-server restarts | local-dev | **Local-wired (dev-runtime).** The Cache API (`caches` global, on by default) persists across restarts alongside kv/r2/d1/DO data (originally `cachePersist`; since Miniflare 5 one `resourcePersistencePath` covers every resource). | ✅ |
 | No local outbound-fetch routing to a named service | local-dev | **Dev-only.** New `outboundService` (not a Wrangler field) routes a Worker's outbound `fetch()` to a named service for local cross-service testing. No deploy analogue. | ✅ |
 | `send_email` `remote` flag unmodeled | schema, deploy, docs | **Deploy-only (honest nuance).** Accept a `remote?` flag on the `sendEmail` binding and emit it into the Wrangler config for deploy. Miniflare's local `send_email` has **no** `remote` field (only an internal remote-proxy connection string, exactly like mTLS), so the flag is a **deploy-time directive stripped locally** — no local remote behavior is claimed. | ✅ |
 | Legacy Worker **`site`** (static assets) undocumented | docs | **Docs.** Legacy `site` is superseded by `assets`; passthrough-reachable via `wrangler.passthrough` for verbatim porting (deploy-only, no local wiring). Documented in the matrix "Passthrough-only / legacy module globals" section alongside `wasm_modules`/`text_blobs`/`data_blobs` (CF-8 gap #8). | ✅ |
@@ -252,7 +252,8 @@ How covered (CF-9):
   config's `https`/`httpsKeyPath`/`httpsCertPath`/`inspectorPort`/`upstream`,
   threaded into Miniflare `CoreSharedOptions`; `cachePersist`, which persists the
   Cache API across dev-server restarts alongside the sibling kv/r2/d1/DO persist
-  options.
+  options (since Miniflare 5 the per-resource persist options are one
+  `resourcePersistencePath`, and devflare reads the two TLS paths itself).
 - **Dev-only (a local-runtime knob, not a Wrangler field):** `outboundService`
   routes a Worker's outbound `fetch()` to a named service for local cross-service
   testing.
@@ -324,8 +325,9 @@ How covered (CF-15): both are pure local-dev Miniflare `CoreSharedOptions` knobs
 direct siblings of the `server.https`/`inspectorPort`/`upstream` added in CF-9 —
 added to `serverConfigSchema` + `ServerConfigInput` and threaded into the dev
 Miniflare `sharedOptions` (`miniflare-dev-config.ts`) with the same
-`serverConfig?.x !== undefined && { x }` pattern. `liveReload` injects Miniflare's
-in-browser auto-reload (complementing Devflare's source watcher); `cf` overrides
+`serverConfig?.x !== undefined && { x }` pattern. `liveReload` injects an
+in-browser auto-reload (Miniflare's own until Miniflare 5 removed it; now
+devflare's dev gateway) (complementing Devflare's source watcher); `cf` overrides
 the local `request.cf` (`false` to omit, a JSON file path, or an object injecting
 colo/country/TLS/bot-management). Deploy-inert; tested in
 `miniflare-dev-config.test.ts`.

@@ -18,6 +18,7 @@ import type { Miniflare } from 'miniflare'
 import { BridgeClient } from '../../../src/bridge/client'
 import { createEnvProxy, setBindingHints } from '../../../src/bridge/proxy'
 import { getGatewayScript } from '../../../src/dev-server/gateway-script'
+import { toMiniflareOptions } from '../../../src/utils/miniflare-options'
 
 const PORT = 9798
 
@@ -64,16 +65,19 @@ describe('DO native RPC through the real gateway (past a custom fetch handler)',
 	let env: Record<string, unknown>
 
 	beforeAll(async () => {
-		const { Miniflare } = await import('miniflare')
+		const miniflareModule = await import('miniflare')
+		const { Miniflare } = miniflareModule
 
-		miniflare = new Miniflare({
-			modules: true,
-			script: `${rpcDoSource}\n${getGatewayScript([])}`,
-			// A recent compatibility date is required for native Durable Object RPC.
-			compatibilityDate: '2026-04-28',
-			durableObjects: { DOC_ROOM: 'DocRoom' },
-			port: PORT
-		})
+		miniflare = new Miniflare(
+			await toMiniflareOptions(miniflareModule, {
+				modules: true,
+				script: `${rpcDoSource}\n${getGatewayScript([])}`,
+				// A recent compatibility date is required for native Durable Object RPC.
+				compatibilityDate: '2026-04-28',
+				durableObjects: { DOC_ROOM: 'DocRoom' },
+				port: PORT
+			})
+		)
 		await miniflare.ready
 
 		client = new BridgeClient({ url: `ws://127.0.0.1:${PORT}` })

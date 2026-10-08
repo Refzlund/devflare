@@ -7,6 +7,11 @@
 // =============================================================================
 
 import { BridgeClient } from '../bridge/client'
+import {
+	type SharedOptionsRuntime,
+	splitSharedOptions,
+	toMiniflareOptions
+} from '../utils/miniflare-options'
 import { wrapEnvSendEmailBindings } from '../utils/send-email'
 import { addR2PresignOriginVar } from './simple-context-mfconfig'
 import { getAvailablePort } from './simple-context-paths'
@@ -75,48 +80,32 @@ export async function connectBridgeClientWithRetry(url: string): Promise<BridgeC
 		: new Error('Bridge-backed test context could not connect to the WebSocket gateway.')
 }
 
-function expandLocalBindingWorkers(mfConfig: any): any {
+/**
+ * @description Turns a single-worker test config that carries devflare's local
+ * shim workers into a multi-worker one: Miniflare-wide options stay at the top
+ * level, every other option moves onto the primary worker.
+ * @param mfConfig - the single-worker config, possibly carrying shim workers
+ * @param runtime - the loaded `miniflare` module, whose schema names the
+ *   Miniflare-wide options
+ * @returns the config unchanged when there are no shim workers, else the
+ *   multi-worker form
+ */
+function expandLocalBindingWorkers(mfConfig: any, runtime: SharedOptionsRuntime): any {
+	const { __devflareLocalSecretWorkers, __devflareLocalBindingWorkers, ...singleWorkerOptions } =
+		mfConfig
 	const auxiliaryWorkers = [
-		...(mfConfig.__devflareLocalSecretWorkers ?? []),
-		...(mfConfig.__devflareLocalBindingWorkers ?? [])
+		...(__devflareLocalSecretWorkers ?? []),
+		...(__devflareLocalBindingWorkers ?? [])
 	]
-	if (!Array.isArray(auxiliaryWorkers) || auxiliaryWorkers.length === 0) {
-		return mfConfig
+	if (auxiliaryWorkers.length === 0) {
+		return singleWorkerOptions
 	}
 
-	const {
-		__devflareLocalSecretWorkers,
-		__devflareLocalBindingWorkers,
-		port,
-		host,
-		log,
-		kvPersist,
-		r2Persist,
-		d1Persist,
-		cachePersist,
-		durableObjectsPersist,
-		workflowsPersist,
-		imagesPersist,
-		...primaryWorker
-	} = mfConfig
-	const primaryWorkerName = typeof primaryWorker.name === 'string' ? primaryWorker.name : 'primary'
-
+	const { shared, worker } = splitSharedOptions(runtime, singleWorkerOptions)
 	return {
-		...(port !== undefined && { port }),
-		...(host && { host }),
-		...(log && { log }),
-		...(kvPersist && { kvPersist }),
-		...(r2Persist && { r2Persist }),
-		...(d1Persist && { d1Persist }),
-		...(cachePersist && { cachePersist }),
-		...(durableObjectsPersist && { durableObjectsPersist }),
-		...(workflowsPersist && { workflowsPersist }),
-		...(imagesPersist && { imagesPersist }),
+		...shared,
 		workers: [
-			{
-				...primaryWorker,
-				name: primaryWorkerName
-			},
+			{ ...worker, name: typeof worker.name === 'string' ? worker.name : 'primary' },
 			...auxiliaryWorkers
 		]
 	}
@@ -125,7 +114,7 @@ function expandLocalBindingWorkers(mfConfig: any): any {
 export async function startBridgeBackedTestContext(
 	mfConfig: any
 ): Promise<StartedBridgeBackedTestContext> {
-	const { Miniflare } = await import('miniflare')
+	const miniflareModule = await import('miniflare')
 
 	for (let attempt = 1; attempt <= TEST_CONTEXT_STARTUP_RETRY_ATTEMPTS; attempt++) {
 		const port = await getAvailablePort()
@@ -139,7 +128,12 @@ export async function startBridgeBackedTestContext(
 				attemptConfig.bindings = bindingsWithOrigin
 			}
 
-			miniflare = new Miniflare(expandLocalBindingWorkers(attemptConfig))
+			miniflare = new miniflareModule.Miniflare(
+				await toMiniflareOptions(
+					miniflareModule,
+					expandLocalBindingWorkers(attemptConfig, miniflareModule)
+				)
+			)
 			await miniflare.ready
 
 			const miniflareBindings = wrapEnvSendEmailBindings(await miniflare.getBindings())

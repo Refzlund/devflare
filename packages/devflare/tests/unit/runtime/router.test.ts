@@ -7,13 +7,10 @@ import {
 	matchFetchRoute
 } from '../../../src/runtime/router'
 import type { RouteModuleDefinition } from '../../../src/runtime/router/types'
+import { createTestExecutionContext } from '../../../src/test/execution-context'
 
 function createMockCtx(): ExecutionContext {
-	return {
-		waitUntil: () => {},
-		passThroughOnException: () => {},
-		props: {}
-	} as ExecutionContext
+	return createTestExecutionContext([])
 }
 
 describe('runtime file router', () => {

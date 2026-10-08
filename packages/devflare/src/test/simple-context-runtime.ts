@@ -8,6 +8,7 @@
 // =============================================================================
 
 import type { BridgeClient } from '../bridge/client'
+import { toMiniflareOptions } from '../utils/miniflare-options'
 import { wrapEnvSendEmailBindings } from '../utils/send-email'
 import { addR2PresignOriginVar } from './simple-context-mfconfig'
 import { getAvailablePort } from './simple-context-paths'
@@ -35,7 +36,7 @@ export async function bootTestRuntime(
 	usesMultiWorker: boolean
 ): Promise<BootedTestRuntime> {
 	if (usesMultiWorker) {
-		const { Miniflare } = await import('miniflare')
+		const miniflareModule = await import('miniflare')
 		const activePort = await getAvailablePort()
 
 		// The multi-worker rewrite already moved plain bindings onto the primary
@@ -46,10 +47,9 @@ export async function bootTestRuntime(
 			primaryWorker.bindings = primaryBindings
 		}
 
-		const miniflare = new Miniflare({
-			...mfConfig,
-			port: activePort
-		})
+		const miniflare = new miniflareModule.Miniflare(
+			await toMiniflareOptions(miniflareModule, { ...mfConfig, port: activePort })
+		)
 		await miniflare.ready
 		const miniflareBindings = wrapEnvSendEmailBindings(await miniflare.getBindings())
 		return { activePort, miniflare, miniflareBindings, client: null }

@@ -15,6 +15,7 @@ import { join } from 'path'
 import type { ScheduledController } from '@cloudflare/workers-types'
 import { assertValidCronExpression } from '../config/cron'
 import { createScheduledEvent, runWithEventContext } from '../runtime'
+import { createTestExecutionContext } from './execution-context'
 
 // -----------------------------------------------------------------------------
 // Types
@@ -157,13 +158,7 @@ async function trigger(
 
 	// Create execution context
 	const waitUntilPromises: Promise<unknown>[] = []
-	const ctx: ExecutionContext = {
-		waitUntil(promise: Promise<unknown>) {
-			waitUntilPromises.push(promise)
-		},
-		passThroughOnException() {},
-		props: {}
-	}
+	const ctx = createTestExecutionContext(waitUntilPromises)
 
 	// Get the test env
 	const env = testEnvGetter()

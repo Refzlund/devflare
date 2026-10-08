@@ -49,29 +49,56 @@ interface MiniflareSecretsStoreSeeder {
 	): Promise<SecretsStoreSecretAdmin | (() => SecretsStoreSecretAdmin)>
 }
 
-export interface LocalSecretWrappedBindingConfig {
+/**
+ * Local Secrets Store values exposed as service bindings to one tiny worker per
+ * secret, whose `get()` RPC method answers with the locally stored value.
+ *
+ * → Miniflare 4 offered `wrappedBindings` for this; Miniflare 5 removed them, so
+ *   the binding is now an RPC entrypoint — the shape the local media/images
+ *   shims (`shims/local-media-bindings.ts`) already use. `await env.X.get()`
+ *   reads the same either way.
+ */
+export interface LocalSecretServiceBindingConfig {
+	/** Secrets Store binding names served locally (left out of the native `secretsStoreSecrets`). */
 	localBindingNames: string[]
-	wrappedBindings: Record<string, { scriptName: string; bindings: { value: string } }>
-	workers: Array<{ name: string; modules: true; script: string }>
+	/** Per binding name, the secret worker and entrypoint to bind it to. */
+	serviceBindings: Record<string, { name: string; entrypoint: string }>
+	/** The secret workers, each carrying its value as the `value` var. */
+	workers: Array<{
+		name: string
+		modules: true
+		script: string
+		compatibilityDate: string
+		bindings: { value: string }
+	}>
 }
 
 export interface LocalSecretsStoreSecretBinding {
 	get(): Promise<string>
 }
 
-const LOCAL_SECRET_WRAPPED_BINDING_SCRIPT = `
-class LocalSecretsStoreSecret {
-	constructor(env) {
-		this.value = env.value
-	}
+/** Entrypoint class each local secret worker exports. */
+const LOCAL_SECRET_ENTRYPOINT = 'LocalSecretsStoreSecret'
 
+/**
+ * Fixed rather than the user's date: the worker is devflare's own and only needs
+ * RPC (2024-04-03+). A user config pinned before that must not take it away.
+ */
+const LOCAL_SECRET_COMPATIBILITY_DATE = '2025-01-01'
+
+const LOCAL_SECRET_BINDING_SCRIPT = `
+import { WorkerEntrypoint } from 'cloudflare:workers'
+
+export class ${LOCAL_SECRET_ENTRYPOINT} extends WorkerEntrypoint {
 	async get() {
-		return this.value
+		return this.env.value
 	}
 }
 
-export default function makeBinding(env) {
-	return new LocalSecretsStoreSecret(env)
+export default {
+	fetch() {
+		return new Response('Local Secrets Store binding: call get()', { status: 404 })
+	}
 }
 `
 
@@ -191,31 +218,35 @@ function toLocalSecretWorkerName(bindingName: string, index: number): string {
 	return `devflare-local-secret-${index}-${slug}`
 }
 
-export function buildLocalSecretWrappedBindingConfig(
+/**
+ * @description Builds the service bindings and secret workers that serve each
+ * Secrets Store binding with a value in `.devflare/secrets.local.json`.
+ * Bindings without a local value are absent, so they keep resolving through the
+ * native Secrets Store binding.
+ * @param config - the bindings and default store id to resolve
+ * @param cwd - project root holding `.devflare/secrets.local.json`
+ * @returns the bindings to merge into each worker and the workers to add
+ */
+export function buildLocalSecretServiceBindingConfig(
 	config: Pick<DevflareConfig, 'bindings' | 'secretsStoreId'>,
 	cwd: string
-): LocalSecretWrappedBindingConfig {
-	const values = resolveLocalSecretValuesForBindings(config, cwd)
-	const entries = Object.entries(values)
+): LocalSecretServiceBindingConfig {
+	const entries = Object.entries(resolveLocalSecretValuesForBindings(config, cwd))
 
 	return {
 		localBindingNames: entries.map(([bindingName]) => bindingName),
-		wrappedBindings: Object.fromEntries(
-			entries.map(([bindingName, value], index) => {
-				const scriptName = toLocalSecretWorkerName(bindingName, index)
-				return [
-					bindingName,
-					{
-						scriptName,
-						bindings: { value }
-					}
-				]
-			})
+		serviceBindings: Object.fromEntries(
+			entries.map(([bindingName], index) => [
+				bindingName,
+				{ name: toLocalSecretWorkerName(bindingName, index), entrypoint: LOCAL_SECRET_ENTRYPOINT }
+			])
 		),
-		workers: entries.map(([bindingName], index) => ({
+		workers: entries.map(([bindingName, value], index) => ({
 			name: toLocalSecretWorkerName(bindingName, index),
 			modules: true,
-			script: LOCAL_SECRET_WRAPPED_BINDING_SCRIPT
+			script: LOCAL_SECRET_BINDING_SCRIPT,
+			compatibilityDate: LOCAL_SECRET_COMPATIBILITY_DATE,
+			bindings: { value }
 		}))
 	}
 }

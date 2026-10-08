@@ -74,7 +74,7 @@ export interface CliDependencies {
  */
 export async function createRealDependencies(): Promise<CliDependencies> {
 	const fs = await import('node:fs/promises')
-	const { execa, execaCommand } = await import('execa')
+	const { execa } = await import('execa')
 	const { spawn } = await import('node:child_process')
 
 	return {

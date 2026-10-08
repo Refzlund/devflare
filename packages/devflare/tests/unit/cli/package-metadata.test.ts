@@ -58,7 +58,18 @@ describe('package metadata', () => {
 			throw new Error('Expected root package.json to declare @cloudflare/workers-types')
 		}
 		expect(packageJson.devDependencies?.['@cloudflare/workers-types']).toBe(rootWorkersTypes)
-		expect(packageJson.peerDependencies?.['@cloudflare/workers-types']).toBe(rootWorkersTypes)
+
+		// The peer range is a floor consumers may sit on, and only ever widens, so it can
+		// trail the version devflare develops against — but it must admit that version.
+		const peerWorkersTypes = packageJson.peerDependencies?.['@cloudflare/workers-types'] ?? ''
+		const developedAgainst = rootWorkersTypes.replace(/^[\^~]/, '')
+		expect({
+			peerWorkersTypes,
+			admitsDevelopedVersion: Bun.semver.satisfies(developedAgainst, peerWorkersTypes)
+		}).toEqual({
+			peerWorkersTypes,
+			admitsDevelopedVersion: true
+		})
 	})
 
 	test('documents the supported Cloudflare toolchain policy', () => {
@@ -66,7 +77,7 @@ describe('package metadata', () => {
 
 		expect(readme).toContain('## Cloudflare toolchain support')
 		expect(readme).toContain('Wrangler 4')
-		expect(readme).toContain('Miniflare 4')
+		expect(readme).toContain('Miniflare 5')
 		expect(readme).toContain('@cloudflare/workers-types 4')
 		expect(readme).toContain('Devflare does not support Wrangler 3')
 	})

@@ -40,7 +40,11 @@ mock.module('../../../src/test/simple-context-paths', () => ({
 	resolveTransportFile: () => null
 }))
 
+// Loaded before the mock is installed: only the Miniflare class is faked, so the
+// real v4→v5 option conversion (toMiniflareOptions) still runs on the boot path.
+const realMiniflare = await import('miniflare')
 mock.module('miniflare', () => ({
+	...realMiniflare,
 	Miniflare: FakeMiniflare
 }))
 
@@ -73,11 +77,18 @@ describe('bootTestRuntime', () => {
 		startBridgeBackedTestContextMock.mockClear()
 		miniflareCtorCalls.length = 0
 
-		const result = await bootTestRuntime({ workers: [{ name: 'main' }, { name: 'svc' }] }, true)
+		const worker = (name: string) => ({ name, modules: true, script: 'export default {}' })
+		const result = await bootTestRuntime({ workers: [worker('main'), worker('svc')] }, true)
 
 		expect(startBridgeBackedTestContextMock).not.toHaveBeenCalled()
 		expect(miniflareCtorCalls.length).toBe(1)
 		expect(miniflareCtorCalls[0].port).toBe(5678)
+		// Miniflare 5's shape: the converter moved each worker under `config`.
+		expect(
+			miniflareCtorCalls[0].workers.map(
+				(worker: { config: { name: string } }) => worker.config.name
+			)
+		).toEqual(['main', 'svc'])
 		expect(result.activePort).toBe(5678)
 		expect(result.client).toBeNull()
 		expect(result.miniflareBindings).toEqual({ MW: 5678 })
