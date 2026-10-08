@@ -20,7 +20,7 @@ inputs:
   bun-version:
     description: "Bun version to install"
     required: false
-    default: "1.3.12"
+    default: "1.4.2"
   install-command:
     description: "Dependency installation command to run before deploy"
     required: false
