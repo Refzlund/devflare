@@ -1,7 +1,7 @@
 import {
-	type CliTheme,
 	accent,
 	bold,
+	type CliTheme,
 	createCliTheme,
 	cyan,
 	cyanBold,
@@ -9,7 +9,7 @@ import {
 	formatBullet,
 	formatCommand
 } from '../ui'
-import { COMMANDS, COMMAND_ALIASES, type Command } from './shared'
+import { COMMAND_ALIASES, COMMANDS, type Command } from './shared'
 import type { HelpEntry, HelpPage } from './types'
 
 export function createHelpPageMap(pages: HelpPage[]): Map<string, HelpPage> {

@@ -1,4 +1,4 @@
-import { type APIClientOptions, CloudflareAPIError, apiDelete, apiGetAll, apiPost } from './api'
+import { type APIClientOptions, apiDelete, apiGetAll, apiPost, CloudflareAPIError } from './api'
 import type {
 	AIModel,
 	AIModelInfo,

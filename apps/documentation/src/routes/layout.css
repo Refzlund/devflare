@@ -1,6 +1,6 @@
 @import "tailwindcss";
-@plugin '@tailwindcss/typography';
-@plugin '@iconify/tailwind4' {
+@plugin "@tailwindcss/typography";
+@plugin "@iconify/tailwind4" {
 	prefixes: fluent, logos, material-icon-theme, twemoji;
 }
 
@@ -110,7 +110,10 @@ body {
 	background: var(--docs-bg-app);
 	color: var(--docs-text-base);
 	font-kerning: normal;
-	font-feature-settings: "ss01" 1, "ss03" 1, "cv11" 1;
+	font-feature-settings:
+		"ss01" 1,
+		"ss03" 1,
+		"cv11" 1;
 	text-rendering: optimizeLegibility;
 	-webkit-font-smoothing: antialiased;
 }
@@ -127,13 +130,15 @@ a {
 
 code,
 pre {
-	font-family: "Geist Mono", "SFMono-Regular", ui-monospace, "Cascadia Code", "Source Code Pro",
-		Menlo, Consolas, monospace;
+	font-family:
+		"Geist Mono", "SFMono-Regular", ui-monospace, "Cascadia Code", "Source Code Pro", Menlo,
+		Consolas, monospace;
 }
 
 .docs-inline-code {
-	font-family: "Geist Mono", "SFMono-Regular", ui-monospace, "Cascadia Code", "Source Code Pro",
-		Menlo, Consolas, monospace;
+	font-family:
+		"Geist Mono", "SFMono-Regular", ui-monospace, "Cascadia Code", "Source Code Pro", Menlo,
+		Consolas, monospace;
 	font-size: 0.92em;
 	font-variant-ligatures: none;
 	background: var(--docs-bg-code);
@@ -150,8 +155,11 @@ pre {
 	display: inline-flex;
 	line-height: inherit;
 	text-align: inherit;
-	transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease, box-shadow
-		0.18s ease;
+	transition:
+		background-color 0.18s ease,
+		border-color 0.18s ease,
+		color 0.18s ease,
+		box-shadow 0.18s ease;
 	vertical-align: baseline;
 }
 
@@ -206,8 +214,11 @@ pre {
 	box-shadow: none;
 	color: var(--docs-text-strong);
 	text-decoration: none;
-	transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s
-		ease;
+	transition:
+		background-color 0.2s ease,
+		border-color 0.2s ease,
+		color 0.2s ease,
+		box-shadow 0.2s ease;
 }
 
 .docs-reading-viewport-action:hover {
@@ -240,7 +251,9 @@ pre {
 .docs-reading-viewport-action-icon {
 	display: inline-block;
 	flex: 0 0 auto;
-	transition: color 0.2s ease, opacity 0.2s ease;
+	transition:
+		color 0.2s ease,
+		opacity 0.2s ease;
 }
 
 .docs-reading-viewport-action-icon-github {
@@ -265,7 +278,9 @@ pre {
 	backdrop-filter: blur(16px) saturate(1.08);
 	border: 1px solid color-mix(in srgb, var(--docs-border) 84%, transparent);
 	border-radius: 0.5rem;
-	box-shadow: 0 10px 30px rgba(18, 16, 14, 0.12), 0 2px 8px rgba(18, 16, 14, 0.06);
+	box-shadow:
+		0 10px 30px rgba(18, 16, 14, 0.12),
+		0 2px 8px rgba(18, 16, 14, 0.06);
 	color: var(--docs-text-strong);
 	font-size: 0.74rem;
 	font-weight: 600;
@@ -287,7 +302,9 @@ pre {
 	backdrop-filter: blur(18px) saturate(1.08);
 	border: 1px solid color-mix(in srgb, var(--docs-border-strong) 88%, transparent);
 	border-radius: 0.82rem;
-	box-shadow: 0 18px 46px rgba(18, 16, 14, 0.14), 0 2px 10px rgba(18, 16, 14, 0.08);
+	box-shadow:
+		0 18px 46px rgba(18, 16, 14, 0.14),
+		0 2px 10px rgba(18, 16, 14, 0.08);
 	color: var(--docs-text-strong);
 	max-width: min(24.5rem, calc(100vw - 1rem));
 	overflow: hidden;
@@ -468,8 +485,11 @@ pre {
 }
 
 .docs-surface-transition {
-	transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s
-		ease;
+	transition:
+		background-color 0.2s ease,
+		border-color 0.2s ease,
+		color 0.2s ease,
+		box-shadow 0.2s ease;
 }
 
 .docs-border {
@@ -647,7 +667,9 @@ pre {
 	padding-inline-end: 0.55rem;
 	padding-inline-start: 0.8rem;
 	text-decoration: none;
-	transition: border-color 0.18s ease, color 0.18s ease;
+	transition:
+		border-color 0.18s ease,
+		color 0.18s ease;
 }
 
 .docs-floating-toc-link:hover {
@@ -885,7 +907,9 @@ pre {
 	padding-inline: 0.42rem;
 	position: relative;
 	width: var(--docs-theme-switch-width);
-	transition: background-color 0.18s ease, border-color 0.18s ease;
+	transition:
+		background-color 0.18s ease,
+		border-color 0.18s ease;
 }
 
 .docs-theme-switch:hover .docs-theme-switch-track {
@@ -902,7 +926,9 @@ pre {
 	opacity: 0.88;
 	position: relative;
 	z-index: 0;
-	transition: color 0.18s ease, opacity 0.18s ease;
+	transition:
+		color 0.18s ease,
+		opacity 0.18s ease;
 }
 
 .docs-theme-switch-icon svg {
@@ -925,7 +951,10 @@ pre {
 	position: absolute;
 	top: var(--docs-theme-switch-padding);
 	transform: translateX(0);
-	transition: transform 0.2s ease, background-color 0.18s ease, border-color 0.18s ease;
+	transition:
+		transform 0.2s ease,
+		background-color 0.18s ease,
+		border-color 0.18s ease;
 	width: var(--docs-theme-switch-thumb-size);
 	z-index: 1;
 }
@@ -987,7 +1016,9 @@ pre {
 .docs-code-shell {
 	background: var(--docs-code-surface);
 	border: 1px solid var(--docs-code-border);
-	box-shadow: 0 1px 1px rgba(23, 18, 13, 0.08), 0 16px 34px rgba(23, 18, 13, 0.08);
+	box-shadow:
+		0 1px 1px rgba(23, 18, 13, 0.08),
+		0 16px 34px rgba(23, 18, 13, 0.08);
 	color: var(--docs-code-text);
 }
 
@@ -1065,7 +1096,10 @@ pre {
 	max-width: 100%;
 	padding: 0.8rem 1rem 0.72rem;
 	position: relative;
-	transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+	transition:
+		background-color 0.18s ease,
+		border-color 0.18s ease,
+		color 0.18s ease;
 }
 
 .docs-code-tab:not(.docs-code-tab-active):hover {
@@ -1232,8 +1266,11 @@ pre {
 	border-radius: 0.5rem;
 	color: var(--docs-code-token-soft);
 	opacity: 0.14;
-	transition: opacity 0.18s ease, background-color 0.18s ease, border-color 0.18s ease, color 0.18s
-		ease;
+	transition:
+		opacity 0.18s ease,
+		background-color 0.18s ease,
+		border-color 0.18s ease,
+		color 0.18s ease;
 }
 
 .docs-code-pane:hover .docs-code-copy-button,
@@ -1259,7 +1296,10 @@ pre {
 	text-decoration-line: underline;
 	text-decoration-style: dotted;
 	text-underline-offset: 0.22em;
-	transition: background-color 0.18s ease, color 0.18s ease, text-decoration-color 0.18s ease;
+	transition:
+		background-color 0.18s ease,
+		color 0.18s ease,
+		text-decoration-color 0.18s ease;
 }
 
 .docs-code-intellisense-token:hover {
@@ -1276,8 +1316,9 @@ pre {
 
 .docs-code-pre {
 	--docs-code-gutter-width: 3.75rem;
-	font-family: "Geist Mono", "SFMono-Regular", ui-monospace, "Cascadia Code", "Source Code Pro",
-		Menlo, Consolas, monospace;
+	font-family:
+		"Geist Mono", "SFMono-Regular", ui-monospace, "Cascadia Code", "Source Code Pro", Menlo,
+		Consolas, monospace;
 	font-size: 13px;
 	line-height: 1.45rem;
 	margin: 0;
@@ -1330,7 +1371,10 @@ pre {
 	line-height: inherit;
 	min-width: 0;
 	position: relative;
-	transition: opacity 0.18s ease, background-color 0.18s ease, border-color 0.18s ease;
+	transition:
+		opacity 0.18s ease,
+		background-color 0.18s ease,
+		border-color 0.18s ease;
 	z-index: 1;
 }
 
@@ -1344,7 +1388,9 @@ pre {
 	line-height: inherit;
 	padding: 0;
 	text-align: inherit;
-	transition: background-color 0.18s ease, color 0.18s ease;
+	transition:
+		background-color 0.18s ease,
+		color 0.18s ease;
 	width: 100%;
 }
 
@@ -1572,7 +1618,7 @@ pre {
 
 .docs-display {
 	font-size: clamp(2.2rem, 1.7rem + 2.5vw, 3.6rem);
-	line-height: 1.0;
+	line-height: 1;
 	font-weight: 650;
 	letter-spacing: -0.04em;
 	max-width: 18ch;

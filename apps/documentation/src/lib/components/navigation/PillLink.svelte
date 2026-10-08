@@ -21,18 +21,13 @@ let {
 } = $props()
 
 const variantClasses: Record<PillLinkVariant, string> = {
-	primary:
-		'docs-primary-button px-5 py-3 font-semibold',
-	secondary:
-		'docs-secondary-button px-5 py-3 font-semibold',
-	nav:
-		'docs-nav-link px-3 py-2 font-medium',
-	chip:
-		'docs-chip-button px-3 py-2 font-medium'
+	primary: 'docs-primary-button px-5 py-3 font-semibold',
+	secondary: 'docs-secondary-button px-5 py-3 font-semibold',
+	nav: 'docs-nav-link px-3 py-2 font-medium',
+	chip: 'docs-chip-button px-3 py-2 font-medium'
 }
 
-const activeClasses =
-	'docs-nav-link-active px-3 py-2'
+const activeClasses = 'docs-nav-link-active px-3 py-2'
 </script>
 
 <a

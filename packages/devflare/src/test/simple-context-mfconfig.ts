@@ -8,6 +8,7 @@
 // are detected.
 // =============================================================================
 
+import type { DevflareConfig } from '../config'
 import {
 	getLocalD1DatabaseIdentifier,
 	normalizeArtifactsBinding,
@@ -20,7 +21,6 @@ import {
 	normalizeSecretsStoreBinding,
 	normalizeWorkflowBinding
 } from '../config'
-import type { DevflareConfig } from '../config'
 import {
 	buildAnalyticsEngineConfig,
 	buildHyperdrivesConfig,

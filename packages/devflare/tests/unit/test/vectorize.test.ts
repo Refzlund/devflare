@@ -129,7 +129,7 @@ describe('createMockVectorize', () => {
 		expect(match.values).toEqual([1, 0])
 		// Mutating a returned values/metadata array must not corrupt the store.
 		match.values?.splice(0, match.values.length, 42)
-		;(match.metadata?.tags as string[]).push('leak')
+		;(match.metadata!.tags as string[]).push('leak')
 
 		const again = await index.query([1, 0], { topK: 1, returnValues: true, returnMetadata: true })
 		expect(again.matches[0].values).toEqual([1, 0])

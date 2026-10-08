@@ -1,4 +1,4 @@
-import { readFile, readdir, stat } from 'node:fs/promises'
+import { readdir, readFile, stat } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'pathe'
 
@@ -91,9 +91,7 @@ async function getLatestModifiedTime(path: string): Promise<number | undefined> 
 }
 
 export async function getLocalWorkspaceBuildStatus(
-	options: {
-		packageRoot?: string
-	} = {}
+	options: { packageRoot?: string } = {}
 ): Promise<LocalWorkspaceBuildStatus> {
 	const packageRoot =
 		options.packageRoot ??

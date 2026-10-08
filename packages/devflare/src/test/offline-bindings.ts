@@ -10,22 +10,12 @@ import { type DevflareConfig, normalizeHyperdriveBinding } from '../config'
 import { resolveLocalSecretValuesForBindings } from '../secrets/local-secrets'
 import type { LocalSendEmailBindingConfig } from '../utils/send-email'
 import {
-	type MockAISearchInstanceOptions,
-	type MockAISearchNamespaceOptions,
 	createMockAISearchInstance,
-	createMockAISearchNamespace
+	createMockAISearchNamespace,
+	type MockAISearchInstanceOptions,
+	type MockAISearchNamespaceOptions
 } from './ai-search'
 import {
-	type MockArtifactsOptions,
-	type MockDispatchNamespaceOptions,
-	type MockFetcherHandler,
-	type MockFlagshipBindingOptions,
-	type MockImagesBindingOptions,
-	type MockMediaBindingOptions,
-	type MockStreamBindingOptions,
-	type MockVectorizeOptions,
-	type MockWorkerLoaderOptions,
-	type MockWorkflowOptions,
 	createMockAnalyticsEngine,
 	createMockArtifacts,
 	createMockD1,
@@ -34,8 +24,8 @@ import {
 	createMockHyperdrive,
 	createMockImagesBinding,
 	createMockKV,
-	createMockMTLSCertificate,
 	createMockMediaBinding,
+	createMockMTLSCertificate,
 	createMockPipeline,
 	createMockQueue,
 	createMockR2,
@@ -46,7 +36,17 @@ import {
 	createMockVectorize,
 	createMockVersionMetadata,
 	createMockWorkerLoader,
-	createMockWorkflow
+	createMockWorkflow,
+	type MockArtifactsOptions,
+	type MockDispatchNamespaceOptions,
+	type MockFetcherHandler,
+	type MockFlagshipBindingOptions,
+	type MockImagesBindingOptions,
+	type MockMediaBindingOptions,
+	type MockStreamBindingOptions,
+	type MockVectorizeOptions,
+	type MockWorkerLoaderOptions,
+	type MockWorkflowOptions
 } from './utilities'
 
 export type OfflineSupportTier = 'offline-native' | 'offline-fixture' | 'remote-boundary'

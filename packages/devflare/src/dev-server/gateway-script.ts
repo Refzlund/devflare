@@ -268,7 +268,7 @@ async function handleMigration(request, env) {
 		}
 
 		try {
-			const tables = await db.prepare(\"SELECT name FROM sqlite_master WHERE type='table'\").all()
+			const tables = await db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all()
 			log('Tables after migration:', JSON.stringify(tables))
 		} catch (e) {
 			log('Error listing tables:', e.message)

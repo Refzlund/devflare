@@ -12,10 +12,7 @@
 		"sourceMap": true,
 		"strict": true,
 		"moduleResolution": "bundler",
-		"types": [
-			"@cloudflare/workers-types",
-			"@sveltejs/kit"
-		]
+		"types": ["@cloudflare/workers-types", "@sveltejs/kit"]
 	},
 	"include": [
 		"env.d.ts",

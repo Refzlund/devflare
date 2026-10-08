@@ -7,8 +7,8 @@ import {
 	createDeferredCleanupPath,
 	findWorkspaceLocalBinary,
 	getViteBuildCleanupTargets,
-	isRunningUnderBun,
 	isolateViteBuildOutputPaths,
+	isRunningUnderBun,
 	removePathWithRetries,
 	resolveLocalViteExecutable
 } from '../../../src/cli/commands/build-artifacts'

@@ -3,81 +3,87 @@
 // =============================================================================
 
 // Protocol & Message Types
+
 export {
-	type JsonMsg,
-	type RpcCall,
-	type RpcOk,
-	type RpcErr,
-	type StreamPull,
-	type StreamOpen,
-	type StreamEnd,
-	type StreamAbort,
-	type WsOpen,
-	type WsOpened,
-	type WsClose,
-	type EventMsg,
-	type HttpTransfer,
-	type DecodedBinaryFrame,
-	BinaryKind,
-	BinaryFlags,
 	BINARY_HEADER_SIZE,
-	encodeBinaryFrame,
+	BinaryFlags,
+	BinaryKind,
+	DEFAULT_BRIDGE_PORT,
+	DEFAULT_CHUNK_SIZE,
+	DEFAULT_HTTP_PORT,
+	type DecodedBinaryFrame,
 	decodeBinaryFrame,
+	type EventMsg,
+	encodeBinaryFrame,
+	HTTP_TRANSFER_THRESHOLD,
+	type HttpTransfer,
 	isFin,
 	isText,
-	parseJsonMsg,
-	stringifyJsonMsg,
+	type JsonMsg,
 	nextRpcId,
 	nextStreamId,
 	nextWsId,
+	parseJsonMsg,
+	type RpcCall,
+	type RpcErr,
+	type RpcOk,
 	resetIdCounters,
-	DEFAULT_CHUNK_SIZE,
-	HTTP_TRANSFER_THRESHOLD,
-	DEFAULT_BRIDGE_PORT,
-	DEFAULT_HTTP_PORT
+	type StreamAbort,
+	type StreamEnd,
+	type StreamOpen,
+	type StreamPull,
+	stringifyJsonMsg,
+	type WsClose,
+	type WsOpen,
+	type WsOpened
 } from './v2/wire'
 
 // Serialization
+
 export {
+	type BodyRef,
+	deserializeRequest,
+	deserializeResponse,
+	deserializeValue,
 	type SerializedRequest,
 	type SerializedResponse,
-	type BodyRef,
+	serializeDOId,
 	serializeRequest,
-	deserializeRequest,
 	serializeResponse,
-	deserializeResponse,
-	serializeValue,
-	deserializeValue,
-	serializeDOId
+	serializeValue
 } from './v2/value-serialization'
 
 // Client
+
 export {
-	type BridgeClientOptions,
-	type PendingCall,
 	BridgeClient,
-	getClient
+	type BridgeClientOptions,
+	getClient,
+	type PendingCall
 } from './client'
 
 // Proxy
+
 export {
-	type EnvProxyOptions,
 	type BindingHints,
-	createEnvProxy,
 	bridgeEnv,
+	createEnvProxy,
+	type EnvProxyOptions,
 	initEnv,
 	setBindingHints
 } from './proxy'
 
 // Miniflare Orchestration
+
 export {
+	getMiniflare,
+	type MiniflareInstance,
+	type MiniflareOptions,
 	startMiniflare,
 	startMiniflareFromConfig,
-	getMiniflare,
-	stopMiniflare,
-	type MiniflareInstance,
-	type MiniflareOptions
+	stopMiniflare
 } from './miniflare'
 
 // Gateway Worker (Server-side)
+
 export { default as gateway } from './server'

@@ -4,11 +4,10 @@
 
 import { describe, expect, test } from 'bun:test'
 import { createFetchEvent, runWithContext, runWithEventContext } from '../../../src/runtime/context'
-import { ContextAccessError } from '../../../src/runtime/validation'
-import { createTestExecutionContext } from '../../../src/test/execution-context'
-
 // Import the actual exports we'll create
 import { ctx, env, event, locals, vars } from '../../../src/runtime/exports'
+import { ContextAccessError } from '../../../src/runtime/validation'
+import { createTestExecutionContext } from '../../../src/test/execution-context'
 
 /** Helper to create a mock ExecutionContext */
 function createMockCtx(): ExecutionContext {

@@ -7,7 +7,7 @@
 // Note: Miniflare's Hyperdrive stub provides `connectionString` as a property.
 // =============================================================================
 
-import { describe, test, expect, beforeAll, afterAll } from 'bun:test'
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { createTestContext, env } from 'devflare/test'
 import fetch from '../src/fetch'
 
@@ -44,7 +44,7 @@ describe('Fetch Handler', () => {
 		const response = await fetch(request)
 
 		expect(response.status).toBe(200)
-		const body = await response.json() as { status: string; binding: string }
+		const body = (await response.json()) as { status: string; binding: string }
 		expect(body.status).toBe('ok')
 		expect(body.binding).toBe('hyperdrive')
 	})
@@ -54,7 +54,7 @@ describe('Fetch Handler', () => {
 		const response = await fetch(request)
 
 		expect(response.status).toBe(200)
-		const body = await response.json() as { hasBinding: boolean, hasConnectionString: boolean }
+		const body = (await response.json()) as { hasBinding: boolean; hasConnectionString: boolean }
 		expect(body.hasBinding).toBe(true)
 		expect(body.hasConnectionString).toBe(true)
 	})

@@ -10,7 +10,7 @@
 
 import { describe, expect, test } from 'bun:test'
 import { compileConfig } from '../../../src/config/compiler'
-import { type LocalConfig, brandAsLocalConfig } from '../../../src/config/resolve-phased'
+import { brandAsLocalConfig, type LocalConfig } from '../../../src/config/resolve-phased'
 import type { DevflareConfigInput } from '../../../src/config/schema'
 import { configSchema } from '../../../src/config/schema'
 

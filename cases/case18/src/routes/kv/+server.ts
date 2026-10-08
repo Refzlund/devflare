@@ -48,7 +48,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 	}
 
 	try {
-		const body = await request.json() as {
+		const body = (await request.json()) as {
 			key: string
 			value: unknown
 			expirationTtl?: number
@@ -59,9 +59,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 			return Response.json({ error: 'Key is required' }, { status: 400 })
 		}
 
-		const value = typeof body.value === 'string'
-			? body.value
-			: JSON.stringify(body.value)
+		const value = typeof body.value === 'string' ? body.value : JSON.stringify(body.value)
 
 		await platform.env.CACHE.put(body.key, value, {
 			expirationTtl: body.expirationTtl,

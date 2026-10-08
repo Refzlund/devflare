@@ -52,7 +52,6 @@ import type {
 	RetirePreviewRegistryResult
 } from './preview-registry-types'
 
-export { DEVFLARE_PREVIEW_REGISTRY_DATABASE } from './preview-registry-types'
 export type {
 	CleanupPreviewRegistryOptions,
 	CleanupPreviewRegistryResult,
@@ -64,6 +63,7 @@ export type {
 	RetirePreviewRegistryOptions,
 	RetirePreviewRegistryResult
 } from './preview-registry-types'
+export { DEVFLARE_PREVIEW_REGISTRY_DATABASE } from './preview-registry-types'
 
 async function withRegistryReadRecovery<T>(
 	registry: PreviewRegistryContext,

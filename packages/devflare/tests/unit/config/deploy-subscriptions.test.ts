@@ -1,10 +1,10 @@
 import { describe, expect, mock, test } from 'bun:test'
 import { prepareMaterializedConfigResourcesForDeploy } from '../../../src/config/deploy-resources'
 import {
+	provisionEventSubscriptions,
 	type SubscriptionProvisionApi,
 	SubscriptionProvisionError,
-	type SubscriptionProvisionResult,
-	provisionEventSubscriptions
+	type SubscriptionProvisionResult
 } from '../../../src/config/deploy-subscriptions'
 import type { DevflareConfig } from '../../../src/config/schema'
 

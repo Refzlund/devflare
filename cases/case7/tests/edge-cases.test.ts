@@ -4,9 +4,9 @@
 // Tests edge case handlers using REAL Miniflare KV via createTestContext
 // =============================================================================
 
-import { describe, test, expect, beforeAll, afterAll } from 'bun:test'
-import { createTestContext, cf } from 'devflare/test'
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { env } from 'devflare'
+import { cf, createTestContext } from 'devflare/test'
 
 beforeAll(async () => {
 	await createTestContext()
@@ -22,7 +22,7 @@ describe('Case 7: Edge Cases & Advanced Patterns', () => {
 			const response = await cf.worker.get('/error-handled')
 
 			expect(response.status).toBe(500)
-			const data = await response.json() as { error: string; message: string }
+			const data = (await response.json()) as { error: string; message: string }
 			expect(data.error).toBe('Something went wrong')
 			expect(data.message).toBe('Handled error')
 		})
@@ -39,11 +39,9 @@ describe('Case 7: Edge Cases & Advanced Patterns', () => {
 		})
 
 		test('POST /echo preserves content type', async () => {
-			const response = await cf.worker.post(
-				'/echo',
-				JSON.stringify({ key: 'value' }),
-				{ 'Content-Type': 'application/json' }
-			)
+			const response = await cf.worker.post('/echo', JSON.stringify({ key: 'value' }), {
+				'Content-Type': 'application/json'
+			})
 
 			expect(response.headers.get('Content-Type')).toBe('application/json')
 		})
@@ -53,11 +51,11 @@ describe('Case 7: Edge Cases & Advanced Patterns', () => {
 		test('GET /headers returns request headers', async () => {
 			const response = await cf.worker.get('/headers', {
 				'X-Custom-Header': 'test-value',
-				'Accept': 'application/json'
+				Accept: 'application/json'
 			})
 
 			expect(response.status).toBe(200)
-			const data = await response.json() as { headers: Record<string, string> }
+			const data = (await response.json()) as { headers: Record<string, string> }
 			expect(data.headers['x-custom-header']).toBe('test-value')
 		})
 	})
@@ -89,7 +87,7 @@ describe('Case 7: Edge Cases & Advanced Patterns', () => {
 			const response = await cf.worker.get('/')
 
 			expect(response.status).toBe(200)
-			const data = await response.json() as { name: string; endpoints: string[] }
+			const data = (await response.json()) as { name: string; endpoints: string[] }
 			expect(data.name).toBe('Case 7: Edge Cases')
 			expect(data.endpoints).toContain('/stream')
 		})

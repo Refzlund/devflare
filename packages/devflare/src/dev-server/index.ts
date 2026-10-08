@@ -6,7 +6,7 @@
 // =============================================================================
 
 export {
-	type DevServerOptions,
+	createDevServer,
 	type DevServer,
-	createDevServer
+	type DevServerOptions
 } from './server'

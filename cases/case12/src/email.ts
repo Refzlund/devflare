@@ -5,10 +5,10 @@
 // Demonstrates: parsing, replying, forwarding, and logging emails
 // =============================================================================
 
-import * as PostalMime from 'postal-mime'
-import { createMimeMessage } from 'mimetext'
+import type { EmailMessage, ForwardableEmailMessage } from '@cloudflare/workers-types'
 import { env } from 'devflare'
-import type { ForwardableEmailMessage, EmailMessage } from '@cloudflare/workers-types'
+import { createMimeMessage } from 'mimetext'
+import * as PostalMime from 'postal-mime'
 
 // -----------------------------------------------------------------------------
 // Types
@@ -92,7 +92,7 @@ export async function email(message: ForwardableEmailMessage): Promise<void> {
 	// Parse the incoming email
 	const parser = new PostalMime.default()
 	const rawEmail = new Response(message.raw as unknown as ReadableStream)
-	const parsed = await parser.parse(await rawEmail.arrayBuffer()) as ParsedEmail
+	const parsed = (await parser.parse(await rawEmail.arrayBuffer())) as ParsedEmail
 
 	// Log the email to KV
 	const emailId = crypto.randomUUID()

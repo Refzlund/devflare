@@ -28,10 +28,10 @@ import {
 import {
 	type AuxiliaryWorkerConfig,
 	type DODiscoveryResult,
-	RESOLVED_VIRTUAL_DO_ENTRY,
-	VIRTUAL_DO_ENTRY,
 	generateVirtualDOEntry,
-	logDiscoveredDurableObjects
+	logDiscoveredDurableObjects,
+	RESOLVED_VIRTUAL_DO_ENTRY,
+	VIRTUAL_DO_ENTRY
 } from './plugin-durable-objects'
 import {
 	RESOLVED_VIRTUAL_SERVICE_WORKER_PREFIX,

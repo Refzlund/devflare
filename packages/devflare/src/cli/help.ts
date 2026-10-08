@@ -8,8 +8,8 @@ import {
 import { COMMANDS, type Command } from './help-pages/shared'
 import type { RenderedHelp } from './help-pages/types'
 
-export { COMMANDS }
 export type { Command }
+export { COMMANDS }
 
 const HELP_PAGE_MAP = createHelpPageMap(HELP_PAGES)
 

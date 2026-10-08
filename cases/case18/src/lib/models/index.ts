@@ -3,6 +3,6 @@
 // =============================================================================
 
 export { ChatMessage, type ChatMessageData } from './chat-message'
-export { UserPresence, type UserPresenceData } from './user-presence'
-export { PdfRequest, type PdfRequestData, type PdfOptions } from './pdf-request'
+export { type PdfOptions, PdfRequest, type PdfRequestData } from './pdf-request'
 export { PdfResult, type PdfResultData } from './pdf-result'
+export { UserPresence, type UserPresenceData } from './user-presence'

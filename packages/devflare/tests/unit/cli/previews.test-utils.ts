@@ -1,10 +1,9 @@
 import { runPreviewsCommand } from '../../../src/cli/commands/previews'
 import { createD1ResultsResponse, jsonResponse } from '../../helpers/cloudflare-api'
-import { type TestLogger, createLogger, renderMessages, stripAnsi } from '../../helpers/mock-logger'
+import { createLogger, renderMessages, stripAnsi, type TestLogger } from '../../helpers/mock-logger'
 
 export type { TestLogger }
-export { createLogger, renderMessages, stripAnsi }
-export { createD1ResultsResponse, jsonResponse }
+export { createD1ResultsResponse, createLogger, jsonResponse, renderMessages, stripAnsi }
 
 export interface PreviewTestEnvironmentSnapshot {
 	fetch: typeof fetch
@@ -129,11 +128,7 @@ export function createPreviewRegistryFetch(
 }
 
 export async function runTrackedPreviewsCommand(
-	options: {
-		args?: string[]
-		account?: string
-		cwd?: string
-	} = {}
+	options: { args?: string[]; account?: string; cwd?: string } = {}
 ): Promise<{
 	logger: TestLogger
 	result: Awaited<ReturnType<typeof runPreviewsCommand>>

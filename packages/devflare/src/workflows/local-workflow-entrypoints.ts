@@ -84,7 +84,7 @@ async function resolveLocalWorkflowEntrypoints(
 		if (!scriptPath) {
 			throw new Error(
 				`Workflow binding ${bindingName} (className: '${normalized.className}') not found.\n` +
-					`Either set files.workflows to match the workflow source file, or set scriptName when the workflow lives in another worker.`
+					'Either set files.workflows to match the workflow source file, or set scriptName when the workflow lives in another worker.'
 			)
 		}
 

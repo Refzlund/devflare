@@ -1,10 +1,10 @@
 <script lang="ts">
-import type { DocCodeFile, DocCodeSnippet, DocCodeTreeEntry } from '$lib/docs/types'
 import { onDestroy } from 'svelte'
+import type { DocCodeFile, DocCodeSnippet, DocCodeTreeEntry } from '$lib/docs/types'
+import { getCopyCode, normalizeSnippet } from './block'
 import Pane from './Pane.svelte'
 import Tabs from './Tabs.svelte'
 import Tree from './Tree.svelte'
-import { getCopyCode, normalizeSnippet } from './block'
 
 const {
 	title,

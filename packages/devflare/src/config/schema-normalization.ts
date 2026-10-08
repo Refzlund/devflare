@@ -5,6 +5,8 @@ import {
 	type DispatchNamespaceBinding,
 	type DurableObjectBinding,
 	type FlagshipBinding,
+	formatBrowserBindingLimitMessage,
+	getBrowserBindingNames,
 	type HyperdriveBinding,
 	type ImagesBinding,
 	type KVBinding,
@@ -17,9 +19,7 @@ import {
 	type StreamBinding,
 	type VpcNetworkBinding,
 	type VpcServiceBinding,
-	type WorkflowBinding,
-	formatBrowserBindingLimitMessage,
-	getBrowserBindingNames
+	type WorkflowBinding
 } from './schema-bindings'
 
 // Re-exported so call sites can format the same message Zod uses without

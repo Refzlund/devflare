@@ -5,54 +5,61 @@
 // =============================================================================
 
 // Config utilities
+
 export {
-	defineConfig,
-	defineWorkspace,
-	type WorkspaceManifest,
-	type WorkspaceManifestInput,
-	type WorkspaceApp,
-	preview,
-	loadConfig,
-	loadResolvedConfig,
-	compileConfig,
-	stringifyConfig,
-	configSchema,
 	ConfigNotFoundError,
-	ConfigValidationError,
 	ConfigResourceResolutionError,
+	ConfigValidationError,
+	compileConfig,
+	configSchema,
 	type DevflareConfig,
 	type DevflareConfigInput,
-	type PreviewScopeFn,
-	type PreviewScopeOptions,
+	defineConfig,
+	defineWorkspace,
+	type LoadResolvedConfigOptions,
+	loadConfig,
+	loadResolvedConfig,
 	type PreviewScopedName,
 	type PreviewScopedNameOptions,
-	type LoadResolvedConfigOptions
+	type PreviewScopeFn,
+	type PreviewScopeOptions,
+	preview,
+	stringifyConfig,
+	type WorkspaceApp,
+	type WorkspaceManifest,
+	type WorkspaceManifestInput
 } from './config'
 
 // Cross-config referencing
+
 export {
-	ref,
 	type RefResult,
+	ref,
 	type WorkerBinding,
 	type WorkerBindingAccessor
 } from './config'
 
 // Worker name (build-time injected)
+
 export { workerName } from './workerName'
 
 // Decorators
+
 export {
+	type DurableObjectOptions,
 	durableObject,
-	getDurableObjectOptions,
-	type DurableObjectOptions
+	getDurableObjectOptions
 } from './decorators'
 
 // CLI
-export { runCli, parseArgs } from './cli'
-export type { ParsedArgs, CliOptions, CliResult } from './cli'
+
+export type { CliOptions, CliResult, ParsedArgs } from './cli'
+export { parseArgs, runCli } from './cli'
 
 // Unified env / vars — tries request context first, falls back to bridge
+
 export { env, vars } from './env'
 
 // Re-export defineConfig as default for convenience
+
 export { defineConfig as default } from './config'

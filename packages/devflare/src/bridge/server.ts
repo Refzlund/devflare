@@ -7,31 +7,31 @@
 import { normalizeSendEmailMessage } from '../utils/send-email'
 import { callDurableObjectRpc } from './do-rpc-dispatch'
 import {
-	type SerializedRequest,
-	type StreamRef,
 	base64Decode,
 	base64Encode,
 	deserializeDOId,
 	deserializeRequest,
 	deserializeValue,
+	type SerializedRequest,
+	type StreamRef,
 	serializeDOId,
 	serializeValue
 } from './v2/value-serialization'
 import {
 	BinaryFlags,
 	BinaryKind,
+	decodeBinaryFrame,
+	encodeBinaryFrame,
 	type JsonMsg,
+	parseJsonMsg,
 	type RpcCall,
 	type RpcErr,
 	type RpcOk,
 	type StreamOpen,
 	type StreamPull,
+	stringifyJsonMsg,
 	type WsClose,
-	type WsOpen,
-	decodeBinaryFrame,
-	encodeBinaryFrame,
-	parseJsonMsg,
-	stringifyJsonMsg
+	type WsOpen
 } from './v2/wire'
 
 // -----------------------------------------------------------------------------

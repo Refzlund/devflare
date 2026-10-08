@@ -1,18 +1,20 @@
 // Test Miniflare with ChatRoom bundle
-import { Miniflare, Log, LogLevel } from '../../packages/devflare/node_modules/miniflare'
+import { Log, LogLevel, Miniflare } from '../../packages/devflare/node_modules/miniflare'
 
 async function test() {
 	const mf = new Miniflare({
 		modules: true,
 		script: `export default { async fetch() { return new Response('ok') } }`,
-		workers: [{
-			name: 'do-chatroom',
-			modules: true,
-			scriptPath: '.devflare/do-bundles/ChatRoom/index.js',
-			compatibilityDate: '2025-01-07',
-			compatibilityFlags: ['nodejs_compat'],
-			durableObjects: { CHAT_ROOM: 'ChatRoom' }
-		}],
+		workers: [
+			{
+				name: 'do-chatroom',
+				modules: true,
+				scriptPath: '.devflare/do-bundles/ChatRoom/index.js',
+				compatibilityDate: '2025-01-07',
+				compatibilityFlags: ['nodejs_compat'],
+				durableObjects: { CHAT_ROOM: 'ChatRoom' }
+			}
+		],
 		durableObjects: { CHAT_ROOM: { className: 'ChatRoom', scriptName: 'do-chatroom' } },
 		log: new Log(LogLevel.DEBUG)
 	})
@@ -33,7 +35,7 @@ async function test() {
 	console.log('✅ Miniflare disposed - ChatRoom DO works!')
 }
 
-test().catch(e => {
+test().catch((e) => {
 	console.error('❌ Test error:', e)
 	process.exit(1)
 })

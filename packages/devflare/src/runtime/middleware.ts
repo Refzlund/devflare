@@ -406,7 +406,7 @@ function assertSinglePrimaryFetchEntry(candidates: PrimaryFetchEntryCandidate[])
 
 	const foundEntries = candidates.map(({ name }) => `"${name}"`).join(', ')
 	throw new Error(
-		`Ambiguous fetch entry module. Export exactly one primary fetch entry per module. ` +
+		'Ambiguous fetch entry module. Export exactly one primary fetch entry per module. ' +
 			`Use either "fetch" or "handle" (or one default equivalent), not both. ` +
 			`Found: ${foundEntries}`
 	)

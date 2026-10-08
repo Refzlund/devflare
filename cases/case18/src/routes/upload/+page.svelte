@@ -1,65 +1,65 @@
 <script lang="ts">
-	let files: FileList | null = $state(null)
-	let uploading = $state(false)
-	let result = $state<{
-		success: boolean
-		filename?: string
-		originalName?: string
-		size?: number
-		url?: string
-		error?: string
-	} | null>(null)
-	let dragOver = $state(false)
+let files: FileList | null = $state(null)
+let uploading = $state(false)
+let result = $state<{
+	success: boolean
+	filename?: string
+	originalName?: string
+	size?: number
+	url?: string
+	error?: string
+} | null>(null)
+let dragOver = $state(false)
 
-	async function handleUpload() {
-		if (!files || files.length === 0) return
+async function handleUpload() {
+	if (!files || files.length === 0) return
 
-		uploading = true
-		result = null
+	uploading = true
+	result = null
 
-		try {
-			const formData = new FormData()
-			formData.append('file', files[0])
+	try {
+		const formData = new FormData()
+		formData.append('file', files[0])
 
-			const response = await fetch('/upload', {
-				method: 'POST',
-				body: formData
-			})
+		const response = await fetch('/upload', {
+			method: 'POST',
+			body: formData
+		})
 
-			result = await response.json()
-		} catch (error) {
-			result = {
-				success: false,
-				error: error instanceof Error ? error.message : 'Upload failed'
-			}
-		} finally {
-			uploading = false
+		result = await response.json()
+	} catch (error) {
+		result = {
+			success: false,
+			error: error instanceof Error ? error.message : 'Upload failed'
 		}
+	} finally {
+		uploading = false
 	}
+}
 
-	function handleDrop(event: DragEvent) {
-		event.preventDefault()
-		dragOver = false
-		
-		if (event.dataTransfer?.files) {
-			files = event.dataTransfer.files
-		}
-	}
+function handleDrop(event: DragEvent) {
+	event.preventDefault()
+	dragOver = false
 
-	function handleDragOver(event: DragEvent) {
-		event.preventDefault()
-		dragOver = true
+	if (event.dataTransfer?.files) {
+		files = event.dataTransfer.files
 	}
+}
 
-	function handleDragLeave() {
-		dragOver = false
-	}
+function handleDragOver(event: DragEvent) {
+	event.preventDefault()
+	dragOver = true
+}
 
-	function formatSize(bytes: number): string {
-		if (bytes < 1024) return `${bytes} B`
-		if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-		return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-	}
+function handleDragLeave() {
+	dragOver = false
+}
+
+function formatSize(bytes: number): string {
+	if (bytes < 1024) return `${bytes} B`
+	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
 </script>
 
 <div class="upload-page">

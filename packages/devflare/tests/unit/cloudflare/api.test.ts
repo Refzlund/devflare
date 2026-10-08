@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, mock, test } from 'bun:test'
-import { CloudflareAPIError, apiGet, apiGetAll, kvDelete } from '../../../src/cloudflare/api'
+import { apiGet, apiGetAll, CloudflareAPIError, kvDelete } from '../../../src/cloudflare/api'
 import { jsonResponse } from '../../helpers/cloudflare-api'
 import { installTrackedTimeouts } from '../../helpers/tracked-timeouts'
 

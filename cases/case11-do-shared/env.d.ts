@@ -5,14 +5,16 @@ import type { DurableObjectNamespace, Rpc } from '@cloudflare/workers-types'
 
 declare global {
 	interface DevflareEnv {
-		SESSION_STORE: DurableObjectNamespace<Rpc.DurableObjectBranded & import('./src/do.session').SessionStore>
+		SESSION_STORE: DurableObjectNamespace<
+			Rpc.DurableObjectBranded & import('./src/do.session').SessionStore
+		>
 	}
 }
 
 declare module 'devflare/test' {
 	interface DevflareEnv {
-		SESSION_STORE: DurableObjectNamespace<Rpc.DurableObjectBranded & import('./src/do.session').SessionStore>
+		SESSION_STORE: DurableObjectNamespace<
+			Rpc.DurableObjectBranded & import('./src/do.session').SessionStore
+		>
 	}
 }
-
-export {}

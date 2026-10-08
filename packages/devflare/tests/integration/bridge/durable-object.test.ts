@@ -7,7 +7,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import type { MiniflareInstance } from '../../../src/bridge/miniflare'
 import { toMiniflareOptions } from '../../../src/utils/miniflare-options'
-import { PORTS, callDoRpc, counterDoWorkerScript, wrapMiniflare } from './_fixtures'
+import { callDoRpc, counterDoWorkerScript, PORTS, wrapMiniflare } from './_fixtures'
 
 // =============================================================================
 // Tests

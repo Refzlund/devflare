@@ -16,7 +16,7 @@ import type { EmailDelivery } from '../utils/email-delivery'
 import { rewriteHeaders } from './mime-headers'
 import type { ResolvedEmailRelay } from './runtime-config'
 import { RELAY_HEADER_VALUE } from './runtime-config'
-import { type SmtpSocketFactory, parseSmtpUrl, sendSmtpMessage } from './smtp'
+import { parseSmtpUrl, type SmtpSocketFactory, sendSmtpMessage } from './smtp'
 
 /** A delivery rewritten for relay: pinned recipients, marked document. */
 export interface PinnedDelivery {

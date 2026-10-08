@@ -1,9 +1,9 @@
 <script lang="ts">
+import { m } from '$lib/paraglide/messages'
 import InlineText from '../content/InlineText.svelte'
 import SectionHeading from '../content/SectionHeading.svelte'
 import Surface from '../layout/Surface.svelte'
 import MiniSnippet from './MiniSnippet.svelte'
-import { m } from '$lib/paraglide/messages'
 
 const outcomeCards = [
 	{

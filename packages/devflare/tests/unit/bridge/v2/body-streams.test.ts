@@ -4,12 +4,12 @@
 
 import { describe, expect, test } from 'bun:test'
 import {
+	decodeTransportV2BinaryFrame,
+	parseTransportV2ControlMsg,
 	TRANSPORT_V2_BINARY_HEADER_SIZE,
 	TransportV2BinaryFlags,
 	TransportV2BinaryKind,
 	TransportV2BodyReaderRegistry,
-	decodeTransportV2BinaryFrame,
-	parseTransportV2ControlMsg,
 	writeTransportV2Body
 } from '../../../../src/bridge/v2'
 

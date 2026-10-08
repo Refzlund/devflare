@@ -12,9 +12,7 @@ import { cleanupOldResults, generateWeeklyReport } from './lib/tasks'
  * Scheduled handler
  * Runs on cron triggers defined in devflare.config.ts
  */
-export default async function scheduled(
-	event: ScheduledEvent
-): Promise<void> {
+export default async function scheduled(event: ScheduledEvent): Promise<void> {
 	const cron = event.cron
 
 	// Every 6 hours - cleanup old results

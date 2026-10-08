@@ -1,48 +1,48 @@
 <script lang="ts">
-	const features = [
-		{
-			title: 'Image Upload',
-			description: 'Upload images to Cloudflare R2 bucket',
-			icon: '📷',
-			href: '/upload',
-			binding: 'R2'
-		},
-		{
-			title: 'Image Gallery',
-			description: 'View uploaded images from R2',
-			icon: '🖼️',
-			href: '/images',
-			binding: 'R2'
-		},
-		{
-			title: 'Real-time Chat',
-			description: 'WebSocket chat via Durable Object with hibernation',
-			icon: '💬',
-			href: '/chat',
-			binding: 'DO + WebSocket'
-		},
-		{
-			title: 'KV Storage',
-			description: 'Key-value storage operations',
-			icon: '🗄️',
-			href: '/kv',
-			binding: 'KV'
-		},
-		{
-			title: 'Database CRUD',
-			description: 'D1 SQLite database operations',
-			icon: '🗃️',
-			href: '/db',
-			binding: 'D1'
-		},
-		{
-			title: 'PDF Generator',
-			description: 'Generate PDFs from URLs using Browser Rendering',
-			icon: '📄',
-			href: '/pdf',
-			binding: 'Browser + DO'
-		}
-	]
+const features = [
+	{
+		title: 'Image Upload',
+		description: 'Upload images to Cloudflare R2 bucket',
+		icon: '📷',
+		href: '/upload',
+		binding: 'R2'
+	},
+	{
+		title: 'Image Gallery',
+		description: 'View uploaded images from R2',
+		icon: '🖼️',
+		href: '/images',
+		binding: 'R2'
+	},
+	{
+		title: 'Real-time Chat',
+		description: 'WebSocket chat via Durable Object with hibernation',
+		icon: '💬',
+		href: '/chat',
+		binding: 'DO + WebSocket'
+	},
+	{
+		title: 'KV Storage',
+		description: 'Key-value storage operations',
+		icon: '🗄️',
+		href: '/kv',
+		binding: 'KV'
+	},
+	{
+		title: 'Database CRUD',
+		description: 'D1 SQLite database operations',
+		icon: '🗃️',
+		href: '/db',
+		binding: 'D1'
+	},
+	{
+		title: 'PDF Generator',
+		description: 'Generate PDFs from URLs using Browser Rendering',
+		icon: '📄',
+		href: '/pdf',
+		binding: 'Browser + DO'
+	}
+]
 </script>
 
 <div class="home">

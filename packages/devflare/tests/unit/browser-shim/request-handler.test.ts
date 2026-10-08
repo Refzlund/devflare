@@ -3,8 +3,8 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createShimRequestHandler } from '../../../src/browser-shim/server'
 import {
 	type BrowserSessionRegistry,
-	type SessionBrowser,
-	createSessionRegistry
+	createSessionRegistry,
+	type SessionBrowser
 } from '../../../src/browser-shim/sessions'
 
 // The routes over a real registry with stub browsers. Nothing here starts a

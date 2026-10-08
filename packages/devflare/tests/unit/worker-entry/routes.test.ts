@@ -2,7 +2,7 @@ import { afterAll, describe, expect, test } from 'bun:test'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'pathe'
-import { type DevflareConfigInput, configSchema } from '../../../src/config'
+import { configSchema, type DevflareConfigInput } from '../../../src/config'
 import { DEFAULT_ROUTE_DIR, discoverRoutes } from '../../../src/worker-entry/routes'
 
 const tempDirs: string[] = []

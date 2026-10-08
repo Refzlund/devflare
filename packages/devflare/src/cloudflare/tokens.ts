@@ -427,7 +427,7 @@ export function selectAllReusablePermissionGroups(
 
 	if (selectedPermissionGroups.length > MAX_ACCOUNT_OWNED_TOKEN_PERMISSION_GROUPS) {
 		throw new Error(
-			`Devflare selected ${selectedPermissionGroups.length} permission groups, which exceeds Cloudflare\'s ${MAX_ACCOUNT_OWNED_TOKEN_PERMISSION_GROUPS}-group limit for account-owned tokens.`
+			`Devflare selected ${selectedPermissionGroups.length} permission groups, which exceeds Cloudflare's ${MAX_ACCOUNT_OWNED_TOKEN_PERMISSION_GROUPS}-group limit for account-owned tokens.`
 		)
 	}
 

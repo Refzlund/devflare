@@ -1,9 +1,9 @@
 import { describe, expect, test } from 'bun:test'
 import {
-	SHARED_DEPLOY_INFRASTRUCTURE_PATTERNS,
 	createGlobalDependencyPatterns,
-	matchesAnyPattern
-	// @ts-ignore - JS module with no declarations
+	matchesAnyPattern,
+	SHARED_DEPLOY_INFRASTRUCTURE_PATTERNS
+	// @ts-expect-error - JS module with no declarations
 } from '../../../../../.github/scripts/resolve-deploy-impact.mjs'
 
 describe('resolve deploy impact script', () => {

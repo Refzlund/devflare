@@ -1,10 +1,4 @@
 {
 	"extends": "../tsconfig.base.json",
-	"include": [
-		"env.d.ts",
-		"devflare.config.ts",
-		"src/**/*",
-		"tests/**/*",
-		"do-service/**/*"
-	]
+	"include": ["env.d.ts", "devflare.config.ts", "src/**/*", "tests/**/*", "do-service/**/*"]
 }

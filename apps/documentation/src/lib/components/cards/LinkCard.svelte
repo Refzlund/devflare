@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { tooltip } from '$lib/components/layout/Tooltip.svelte'
+import { tooltip } from '$lib/components/layout/Tooltip.svelte'
 import InlineText from '../content/InlineText.svelte'
 import Badge from './Badge.svelte'
 
@@ -37,10 +37,8 @@ let {
 } = $props()
 
 const variantClasses: Record<LinkCardVariant, string> = {
-	default:
-		'rounded-xl px-5 py-5',
-	compact:
-		'rounded-lg px-3 py-3'
+	default: 'rounded-xl px-5 py-5',
+	compact: 'rounded-lg px-3 py-3'
 }
 
 const toneClasses: Record<LinkCardTone, string> = {
@@ -53,8 +51,7 @@ const labelToneClasses: Record<LabelTone, string> = {
 	slate: 'docs-text-muted'
 }
 
-const activeClasses =
-	'docs-active-card'
+const activeClasses = 'docs-active-card'
 
 function getResolvedTone(
 	selectedVariant: LinkCardVariant,
@@ -73,9 +70,7 @@ function getTitleClass(selectedVariant: LinkCardVariant): string {
 
 function getDescriptionClass(selectedVariant: LinkCardVariant): string {
 	if (selectedVariant === 'compact') {
-		return active
-			? 'docs-copy-sm mt-2 docs-text-body'
-			: 'docs-copy-sm mt-2 docs-text-muted'
+		return active ? 'docs-copy-sm mt-2 docs-text-body' : 'docs-copy-sm mt-2 docs-text-muted'
 	}
 
 	return active ? 'docs-copy-sm mt-3 docs-text-body' : 'docs-copy-sm mt-3 docs-text-body'

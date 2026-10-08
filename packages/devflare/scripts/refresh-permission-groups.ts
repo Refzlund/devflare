@@ -33,8 +33,10 @@ import { writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { KNOWN_PERMISSION_GROUP_IDS_DATA } from '../src/cloudflare/known-permission-group-ids.generated'
-import { listAccountTokenPermissionGroups } from '../src/cloudflare/tokens'
-import { KNOWN_PERMISSION_GROUP_DISPLAY_NAMES } from '../src/cloudflare/tokens'
+import {
+	KNOWN_PERMISSION_GROUP_DISPLAY_NAMES,
+	listAccountTokenPermissionGroups
+} from '../src/cloudflare/tokens'
 
 interface RefreshOptions {
 	accountId: string

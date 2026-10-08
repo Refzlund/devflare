@@ -6,7 +6,7 @@
 // handler trails
 // =============================================================================
 
-import { type EventContext, type RuntimeContextValue, getContextOrNull } from './context'
+import { type EventContext, getContextOrNull, type RuntimeContextValue } from './context'
 import { createContextProxy } from './validation'
 // Side-effect import to ensure the canonical `declare global { interface
 // DevflareEnv {} }` from `src/env.ts` is loaded so the type used below

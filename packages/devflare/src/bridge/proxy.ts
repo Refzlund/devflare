@@ -6,9 +6,9 @@
 
 import { type BridgeClient, getClient } from './client'
 import {
-	type SerializedResponse,
 	deserializeResponse,
 	deserializeValue,
+	type SerializedResponse,
 	serializeRequest
 } from './v2/value-serialization'
 import { HTTP_TRANSFER_THRESHOLD } from './v2/wire'

@@ -106,17 +106,11 @@ export function resolvePackageSpecifier(specifier: string, fromDir: string): str
 	// For scoped packages like @scope/pkg/subpath, we need to find the package root
 	// and then navigate to the subpath
 	const parts = specifier.startsWith('@')
-		? specifier
-				.split('/')
-				.slice(0, 2)
-				.join('/') // @scope/pkg
+		? specifier.split('/').slice(0, 2).join('/') // @scope/pkg
 		: specifier.split('/')[0] // pkg
 
 	const subpath = specifier.startsWith('@')
-		? specifier
-				.split('/')
-				.slice(2)
-				.join('/') // subpath after @scope/pkg
+		? specifier.split('/').slice(2).join('/') // subpath after @scope/pkg
 		: specifier.split('/').slice(1).join('/') // subpath after pkg
 
 	// Find the package's own package.json. A node_modules walk is tried first

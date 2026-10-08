@@ -11,9 +11,10 @@ import type { FetchEvent } from 'devflare/runtime'
 import { Router } from './lib/router'
 
 // Import route handlers
+
+import * as apiRoutes from './routes/api/[...path]'
 import * as indexRoutes from './routes/index'
 import * as userRoutes from './routes/users/[id]'
-import * as apiRoutes from './routes/api/[...path]'
 
 // Build router from file-based routes
 const router = new Router()
@@ -36,4 +37,5 @@ export async function fetch({ request }: FetchEvent): Promise<Response> {
 }
 
 // Re-export Router for testing
+
 export { Router } from './lib/router'

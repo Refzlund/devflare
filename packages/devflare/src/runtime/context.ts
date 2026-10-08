@@ -35,16 +35,16 @@ import type {
 import { ContextAccessError } from './validation'
 
 export {
+	createDurableObjectAlarmEvent,
+	createDurableObjectFetchEvent,
+	createDurableObjectWebSocketCloseEvent,
+	createDurableObjectWebSocketErrorEvent,
+	createDurableObjectWebSocketMessageEvent,
+	createEmailEvent,
 	createFetchEvent,
 	createQueueEvent,
 	createScheduledEvent,
-	createEmailEvent,
-	createTailEvent,
-	createDurableObjectFetchEvent,
-	createDurableObjectAlarmEvent,
-	createDurableObjectWebSocketMessageEvent,
-	createDurableObjectWebSocketCloseEvent,
-	createDurableObjectWebSocketErrorEvent
+	createTailEvent
 } from './context-events'
 
 export type {

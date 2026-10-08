@@ -6,9 +6,9 @@
 // Queue handler is tested via cf.queue.trigger() for direct handler invocation.
 // =============================================================================
 
-import { describe, test, expect, beforeAll, afterAll } from 'bun:test'
-import { createTestContext, cf } from 'devflare/test'
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { env } from 'devflare'
+import { cf, createTestContext } from 'devflare/test'
 import { processTask } from '../src/lib/tasks'
 import type { Task } from '../src/lib/types'
 
@@ -79,9 +79,7 @@ describe('Case 6: Queues & Crons', () => {
 				createdAt: Date.now()
 			}
 
-			await expect(processTask(task)).rejects.toThrow(
-				'Unknown task type: unknown'
-			)
+			await expect(processTask(task)).rejects.toThrow('Unknown task type: unknown')
 		})
 	})
 
@@ -98,16 +96,14 @@ describe('Case 6: Queues & Crons', () => {
 				createdAt: Date.now()
 			}
 
-			const result = await cf.queue.trigger<Task>([
-				{ id: 'msg-1', body: task }
-			])
+			const result = await cf.queue.trigger<Task>([{ id: 'msg-1', body: task }])
 
 			// Verify message was acknowledged
 			expect(result.acked).toContain('msg-1')
 			expect(result.total).toBe(1)
 
 			// Verify result was stored in REAL KV
-			const stored = await env.RESULTS.get('result:queue-test-1', 'json') as {
+			const stored = (await env.RESULTS.get('result:queue-test-1', 'json')) as {
 				status: string
 				result: { processed: boolean; data: { value: number } }
 			} | null
@@ -145,9 +141,7 @@ describe('Case 6: Queues & Crons', () => {
 				createdAt: Date.now()
 			}
 
-			const result = await cf.queue.trigger<Task>([
-				{ id: 'error-msg', body: task }
-			])
+			const result = await cf.queue.trigger<Task>([{ id: 'error-msg', body: task }])
 
 			// Unknown task type throws, so message should be retried
 			expect(result.retried).toContain('error-msg')
@@ -167,7 +161,7 @@ describe('Case 6: Queues & Crons', () => {
 
 			expect(response.status).toBe(202)
 
-			const data = await response.json() as { queued: boolean; taskId: string }
+			const data = (await response.json()) as { queued: boolean; taskId: string }
 			expect(data.queued).toBe(true)
 			expect(data.taskId).toBeDefined()
 		})
@@ -182,7 +176,7 @@ describe('Case 6: Queues & Crons', () => {
 			const response = await cf.worker.get('/results/task-123')
 
 			expect(response.status).toBe(200)
-			const data = await response.json() as { status: string }
+			const data = (await response.json()) as { status: string }
 			expect(data.status).toBe('completed')
 		})
 
@@ -190,7 +184,7 @@ describe('Case 6: Queues & Crons', () => {
 			const response = await cf.worker.get('/results/unknown')
 
 			expect(response.status).toBe(200)
-			const data = await response.json() as { status: string }
+			const data = (await response.json()) as { status: string }
 			expect(data.status).toBe('pending')
 		})
 	})

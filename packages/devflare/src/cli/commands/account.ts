@@ -8,8 +8,8 @@ import type { ConsolaInstance } from 'consola'
 import {
 	type APIClientOptions,
 	AuthenticationError,
-	CloudflareAPIError,
-	account
+	account,
+	CloudflareAPIError
 } from '../../cloudflare'
 import {
 	getGlobalDefaultAccountId,
@@ -21,8 +21,8 @@ import { CYAN, CYAN_BOLD, DIM, RESET } from '../colors'
 import { getConfiguredAccountId } from '../command-utils'
 import type { CliOptions, CliResult, ParsedArgs } from '../index'
 import {
-	type CliTheme,
 	bold,
+	type CliTheme,
 	createCliTheme,
 	dim,
 	formatCommand,

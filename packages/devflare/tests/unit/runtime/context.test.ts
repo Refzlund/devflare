@@ -191,7 +191,7 @@ describe('getContextOrNull', () => {
 		runWithContext(mockEnv, mockCtx, null, () => {
 			const result = getContextOrNull()
 			expect(result).not.toBeNull()
-			expect((result?.env as { test: boolean }).test).toBe(true)
+			expect((result!.env as { test: boolean }).test).toBe(true)
 		})
 	})
 })

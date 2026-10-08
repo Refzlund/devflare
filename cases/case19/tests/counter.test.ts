@@ -1,6 +1,6 @@
-import { test, expect, beforeAll, afterAll, describe } from 'bun:test'
-import { createTestContext } from 'devflare/test'
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { env } from 'devflare'
+import { createTestContext } from 'devflare/test'
 import { DoubleableNumber } from '../src/DoubleableNumber'
 
 // =============================================================================
@@ -8,7 +8,7 @@ import { DoubleableNumber } from '../src/DoubleableNumber'
 // =============================================================================
 // NOTE: This test times out when running in parallel with other DO tests
 // due to Miniflare port conflicts (all instances try to use port 9799).
-// 
+//
 // This test is skipped in the full test suite to avoid hangs.
 // Run standalone with: DEVFLARE_RUN_DO_TESTS=1 bun test cases/case19
 //
@@ -25,10 +25,14 @@ describe.skipIf(!runDOTests)('Counter DO', () => {
 
 	afterAll(() => env.dispose())
 
-	test('getValue returns DoubleableNumber', async () => {
-		const counter = env.COUNTER.getByName('main')
-		const result = await counter.getValue()
-		expect(result.double).toBe(0)
-		expect(result).toBeInstanceOf(DoubleableNumber)
-	}, { timeout: 30000 })
+	test(
+		'getValue returns DoubleableNumber',
+		async () => {
+			const counter = env.COUNTER.getByName('main')
+			const result = await counter.getValue()
+			expect(result.double).toBe(0)
+			expect(result).toBeInstanceOf(DoubleableNumber)
+		},
+		{ timeout: 30000 }
+	)
 })

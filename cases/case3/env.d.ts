@@ -5,10 +5,18 @@ import type { DurableObjectNamespace, Rpc } from '@cloudflare/workers-types'
 
 declare global {
 	interface DevflareEnv {
-		SESSION: DurableObjectNamespace<Rpc.DurableObjectBranded & import('./src/do.session').SessionStore>
-		TRACKER: DurableObjectNamespace<Rpc.DurableObjectBranded & import('./src/do.tracker').RequestTracker>
-		COUNTER: DurableObjectNamespace<Rpc.DurableObjectBranded & import('./do-service/do.counter').Counter>
-		RATE_LIMITER: DurableObjectNamespace<Rpc.DurableObjectBranded & import('./do-service/do.rate-limiter').RateLimiter>
+		SESSION: DurableObjectNamespace<
+			Rpc.DurableObjectBranded & import('./src/do.session').SessionStore
+		>
+		TRACKER: DurableObjectNamespace<
+			Rpc.DurableObjectBranded & import('./src/do.tracker').RequestTracker
+		>
+		COUNTER: DurableObjectNamespace<
+			Rpc.DurableObjectBranded & import('./do-service/do.counter').Counter
+		>
+		RATE_LIMITER: DurableObjectNamespace<
+			Rpc.DurableObjectBranded & import('./do-service/do.rate-limiter').RateLimiter
+		>
 	}
 }
 

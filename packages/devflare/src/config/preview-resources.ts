@@ -1,15 +1,10 @@
 import {
-	type D1DatabaseInfo,
-	type HyperdriveConfigInfo,
-	type KVNamespaceInfo,
-	type QueueInfo,
-	type R2BucketInfo,
-	type VectorizeIndexInfo,
 	createD1Database,
 	createKVNamespace,
 	createQueue,
 	createR2Bucket,
 	createVectorizeIndex,
+	type D1DatabaseInfo,
 	deleteD1Database,
 	deleteHyperdrive,
 	deleteKVNamespace,
@@ -17,19 +12,24 @@ import {
 	deleteR2Bucket,
 	deleteVectorizeIndex,
 	getPrimaryAccount,
+	type HyperdriveConfigInfo,
+	type KVNamespaceInfo,
 	listD1Databases,
 	listHyperdrives,
 	listKVNamespaces,
 	listQueues,
 	listR2Buckets,
-	listVectorizeIndexes
+	listVectorizeIndexes,
+	type QueueInfo,
+	type R2BucketInfo,
+	type VectorizeIndexInfo
 } from '../cloudflare/account'
 import { getEffectiveAccountId } from '../cloudflare/preferences'
 import {
-	type PreviewResolutionOptions,
 	isPreviewScopedName,
 	materializePreviewScopedConfig,
-	materializePreviewScopedString
+	materializePreviewScopedString,
+	type PreviewResolutionOptions
 } from './preview'
 import { mergeConfigForEnvironment } from './resolve'
 import { type DevflareConfig, normalizeQueueProducer, normalizeR2Binding } from './schema'

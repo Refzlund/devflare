@@ -3,8 +3,8 @@
 // =============================================================================
 
 import { type Mock, mock } from 'bun:test'
-import { type MockExeca, createEmptyMockExeca, createMockExeca } from './mock-execa'
-import { type VirtualFileSystem, createVirtualFS } from './virtual-fs'
+import { createEmptyMockExeca, createMockExeca, type MockExeca } from './mock-execa'
+import { createVirtualFS, type VirtualFileSystem } from './virtual-fs'
 
 /**
  * Test harness configuration

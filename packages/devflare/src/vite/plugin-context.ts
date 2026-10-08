@@ -12,12 +12,12 @@
 import { isAbsolute, relative, resolve } from 'pathe'
 import { resolveConfigEnvVars, resolveResources } from '../config'
 import {
-	type WranglerConfig,
 	compileBuildConfig,
 	compileConfig,
 	compileToProgrammaticConfig,
 	isolateViteBuildOutputPaths,
 	rebaseWranglerConfigPaths,
+	type WranglerConfig,
 	writeWranglerConfig
 } from '../config/compiler'
 import { resolveConfigPath } from '../config/loader'
@@ -29,8 +29,8 @@ import { DEFAULT_DO_PATTERN } from '../utils/glob'
 import { prepareComposedWorkerEntrypoint } from '../worker-entry/composed-worker'
 import {
 	type AuxiliaryWorkerConfig,
-	type DODiscoveryResult,
 	createAuxiliaryWorkerConfig,
+	type DODiscoveryResult,
 	discoverDurableObjects
 } from './plugin-durable-objects'
 import { createAuxiliaryServiceWorkerConfigs } from './plugin-service-bindings'

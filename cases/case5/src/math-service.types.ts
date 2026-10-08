@@ -21,7 +21,7 @@ export interface StatsResult {
 
 /**
  * Interface for MathService RPC methods
- * 
+ *
  * This mirrors the public methods of the MathService WorkerEntrypoint class.
  * Service bindings provide this interface at runtime via RPC.
  */
@@ -49,7 +49,7 @@ export interface MathServiceInterface {
 
 /**
  * Interface for AdminEntrypoint RPC methods
- * 
+ *
  * Admin-only operations for privileged access.
  * Referenced via mathWorker.worker('AdminEntrypoint') in config.
  */

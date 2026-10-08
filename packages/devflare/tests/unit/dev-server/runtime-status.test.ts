@@ -13,8 +13,8 @@
 import { afterEach, describe, expect, test } from 'bun:test'
 import {
 	type DevRuntimeState,
-	RUNTIME_STATUS_URL_ENV,
 	getRuntimeStatusUrl,
+	RUNTIME_STATUS_URL_ENV,
 	readDevRuntimeState
 } from '../../../src/dev-server/runtime-status'
 import {

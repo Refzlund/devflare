@@ -42,9 +42,9 @@ import {
 } from './deploy/prepare'
 import { resolveLocalWranglerExecutable } from './deploy/runtime'
 import {
-	type WranglerUploadKind,
 	describeMissingUploadEvidence,
-	readWranglerUploadReport
+	readWranglerUploadReport,
+	type WranglerUploadKind
 } from './deploy/upload-evidence'
 import {
 	normalizeCloudflareAccountId,

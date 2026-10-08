@@ -5,10 +5,10 @@ import { join } from 'pathe'
 import { runBuildCommand } from '../../../src/cli/commands/build'
 import { clearDependencies, setDependencies } from '../../../src/cli/dependencies'
 import {
-	type ExecInvocation,
 	createCliDependencies,
 	createLogger,
 	createProcessRunner,
+	type ExecInvocation,
 	extractViteEntryPath,
 	isViteBuildExecution,
 	readGeneratedDeployConfig,

@@ -9,7 +9,7 @@ interface Todo {
 
 /**
  * GET /db - List todos
- * 
+ *
  * Note: Table is created via migration (migrations/0001_create_todos.sql)
  * Run: wrangler d1 migrations apply DB --local
  */
@@ -42,15 +42,13 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 	}
 
 	try {
-		const body = await request.json() as { title: string }
+		const body = (await request.json()) as { title: string }
 
 		if (!body.title?.trim()) {
 			return Response.json({ error: 'Title is required' }, { status: 400 })
 		}
 
-		const result = await platform.env.DB.prepare(
-			'INSERT INTO todos (title) VALUES (?) RETURNING *'
-		)
+		const result = await platform.env.DB.prepare('INSERT INTO todos (title) VALUES (?) RETURNING *')
 			.bind(body.title.trim())
 			.first<Todo>()
 
@@ -73,7 +71,7 @@ export const PATCH: RequestHandler = async ({ request, platform }) => {
 	}
 
 	try {
-		const body = await request.json() as {
+		const body = (await request.json()) as {
 			id: number
 			title?: string
 			completed?: boolean
@@ -137,9 +135,7 @@ export const DELETE: RequestHandler = async ({ url, platform }) => {
 			return Response.json({ error: 'ID is required' }, { status: 400 })
 		}
 
-		await platform.env.DB.prepare('DELETE FROM todos WHERE id = ?')
-			.bind(parseInt(id))
-			.run()
+		await platform.env.DB.prepare('DELETE FROM todos WHERE id = ?').bind(parseInt(id)).run()
 
 		return Response.json({ success: true, deleted: parseInt(id) })
 	} catch (error) {

@@ -1,4 +1,4 @@
-import { PREVIEWS_COMMON_OPTIONS, createPreviewSubcommandPage, entry } from '../shared'
+import { createPreviewSubcommandPage, entry, PREVIEWS_COMMON_OPTIONS } from '../shared'
 import type { HelpPage } from '../types'
 
 export const PREVIEW_HELP_PAGES: HelpPage[] = [

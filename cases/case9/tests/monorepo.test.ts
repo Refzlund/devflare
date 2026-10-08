@@ -5,12 +5,7 @@
 // =============================================================================
 
 import { describe, expect, it } from 'bun:test'
-import {
-	formatResponse,
-	formatError,
-	paginate,
-	CONSTANTS
-} from '@devflare/case9-shared'
+import { CONSTANTS, formatError, formatResponse, paginate } from '@devflare/case9-shared'
 
 describe('Case 9: Monorepo', () => {
 	describe('formatResponse', () => {

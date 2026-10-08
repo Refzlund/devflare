@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, test } from 'bun:test'
+import type { Pipeline } from 'cloudflare:pipelines'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import type { Pipeline } from 'cloudflare:pipelines'
 import { writeLocalSecret } from '../../../src/secrets/local-secrets'
 import {
 	createMockSendEmail,

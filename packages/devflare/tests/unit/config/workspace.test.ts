@@ -3,12 +3,12 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'pathe'
 import {
-	WorkspaceManifestNotFoundError,
-	WorkspaceManifestValidationError,
 	assertSharedBindingIds,
 	defineWorkspace,
 	loadWorkspaceManifest,
-	resolveAppDirectSocketPort
+	resolveAppDirectSocketPort,
+	WorkspaceManifestNotFoundError,
+	WorkspaceManifestValidationError
 } from '../../../src/config/workspace'
 
 describe('defineWorkspace', () => {

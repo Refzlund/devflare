@@ -327,7 +327,7 @@ export function createStructureEntryFromPattern(
 		return undefined
 	}
 
-	const wildcardIndex = normalizedPattern.search(/[\*\{\[]/)
+	const wildcardIndex = normalizedPattern.search(/[*{[]/)
 	const path = (
 		wildcardIndex === -1 ? normalizedPattern : normalizedPattern.slice(0, wildcardIndex)
 	).replace(/\/+$/, '')

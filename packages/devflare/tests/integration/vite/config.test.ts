@@ -9,7 +9,7 @@ import { join } from 'pathe'
 import { clearDependencies, setDependencies } from '../../../src/cli/dependencies'
 import { resolveViteUserConfig } from '../../../src/vite'
 import { devflarePlugin, getPluginContext } from '../../../src/vite/plugin'
-import { type TestHarness, createMockProcessRunner, createTestHarness } from '../mocks'
+import { createMockProcessRunner, createTestHarness, type TestHarness } from '../mocks'
 
 describe('vite plugin config generation', () => {
 	let harness: TestHarness
@@ -133,9 +133,10 @@ describe('vite plugin config generation', () => {
 				].join('\n'),
 				files: {
 					'src/fetch.ts': `export async function fetch(): Promise<Response> { return new Response('ok') }`,
-					'src/queue.ts': `export async function queue(): Promise<void> { return undefined }`,
-					'src/scheduled.ts': `export async function scheduled(): Promise<void> { return undefined }`,
-					'src/email.ts': `export async function email() { return undefined }`
+					'src/queue.ts': 'export async function queue(): Promise<void> { return undefined }',
+					'src/scheduled.ts':
+						'export async function scheduled(): Promise<void> { return undefined }',
+					'src/email.ts': 'export async function email() { return undefined }'
 				},
 				assert: async (projectDir) => {
 					const wranglerConfig = await readFile(
@@ -196,15 +197,15 @@ export default {
 				)
 				await writeFile(
 					join(projectDir, 'src', 'queue.ts'),
-					`export async function queue(): Promise<void> { return undefined }`
+					'export async function queue(): Promise<void> { return undefined }'
 				)
 				await writeFile(
 					join(projectDir, 'src', 'scheduled.ts'),
-					`export async function scheduled(): Promise<void> { return undefined }`
+					'export async function scheduled(): Promise<void> { return undefined }'
 				)
 				await writeFile(
 					join(projectDir, 'src', 'email.ts'),
-					`export async function email() { return undefined }`
+					'export async function email() { return undefined }'
 				)
 				await writeFile(
 					join(projectDir, 'src', 'custom-main.ts'),

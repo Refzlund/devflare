@@ -8,7 +8,6 @@ import { getContext, hasContext } from '../../../src/runtime/context'
 import { env, locals } from '../../../src/runtime/exports'
 import { HYPERDRIVE_CONNECT_MESSAGE } from '../../../src/shims/local-hyperdrive'
 import {
-	type TestContextOptions,
 	createMockArtifacts,
 	createMockD1,
 	createMockDispatchNamespace,
@@ -16,8 +15,8 @@ import {
 	createMockHyperdrive,
 	createMockImagesBinding,
 	createMockKV,
-	createMockMTLSCertificate,
 	createMockMediaBinding,
+	createMockMTLSCertificate,
 	createMockPipeline,
 	createMockR2,
 	createMockRateLimit,
@@ -26,6 +25,7 @@ import {
 	createMockVersionMetadata,
 	createMockWorkerLoader,
 	createMockWorkflow,
+	type TestContextOptions,
 	withTestContext
 } from '../../../src/test/utilities'
 

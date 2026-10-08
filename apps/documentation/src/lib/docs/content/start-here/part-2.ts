@@ -156,7 +156,7 @@ export const startHereDocsPart2: DocPage[] = [
 					'The additive move after the first worker is not a different app. It is the same worker with one tiny fetch entry, one route tree, and one shared request helper.',
 				paragraphs: [
 					'Once the first worker responds and maybe already has one small test, the next step is to keep `src/fetch.ts` tiny. Let it do request-wide setup, then let `src/routes/**` own the individual URLs.',
-					"That shape also lets helper modules read the active request path, route params, request body, or request id through `getFetchEvent()` and `locals` without turning every function signature into plumbing."
+					'That shape also lets helper modules read the active request path, route params, request body, or request id through `getFetchEvent()` and `locals` without turning every function signature into plumbing.'
 				],
 				steps: [
 					'Keep `src/fetch.ts` for request-wide setup only.',

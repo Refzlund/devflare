@@ -1,75 +1,75 @@
 <script lang="ts">
-	interface ImageInfo {
-		key: string
-		size: number
-		uploaded: string
-		etag: string
-	}
+interface ImageInfo {
+	key: string
+	size: number
+	uploaded: string
+	etag: string
+}
 
-	interface ImageListResponse {
-		images?: ImageInfo[]
-		error?: string
-	}
+interface ImageListResponse {
+	images?: ImageInfo[]
+	error?: string
+}
 
-	interface DeleteResponse {
-		success?: boolean
-		error?: string
-	}
+interface DeleteResponse {
+	success?: boolean
+	error?: string
+}
 
-	let images = $state<ImageInfo[]>([])
-	let loading = $state(true)
-	let error = $state<string | null>(null)
+let images = $state<ImageInfo[]>([])
+let loading = $state(true)
+let error = $state<string | null>(null)
 
-	$effect(() => {
-		loadImages()
-	})
+$effect(() => {
+	loadImages()
+})
 
-	async function loadImages() {
-		loading = true
-		error = null
+async function loadImages() {
+	loading = true
+	error = null
 
-		try {
-			const response = await fetch('/images')
-			const data: ImageListResponse = await response.json()
+	try {
+		const response = await fetch('/images')
+		const data: ImageListResponse = await response.json()
 
-			if (data.error) {
-				error = data.error
-			} else if (data.images) {
-				images = data.images
-			}
-		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to load images'
-		} finally {
-			loading = false
+		if (data.error) {
+			error = data.error
+		} else if (data.images) {
+			images = data.images
 		}
+	} catch (e) {
+		error = e instanceof Error ? e.message : 'Failed to load images'
+	} finally {
+		loading = false
 	}
+}
 
-	async function deleteImage(key: string) {
-		if (!confirm(`Delete ${key}?`)) return
+async function deleteImage(key: string) {
+	if (!confirm(`Delete ${key}?`)) return
 
-		try {
-			const response = await fetch(`/images/${key}`, { method: 'DELETE' })
-			const data: DeleteResponse = await response.json()
+	try {
+		const response = await fetch(`/images/${key}`, { method: 'DELETE' })
+		const data: DeleteResponse = await response.json()
 
-			if (data.success) {
-				images = images.filter((img) => img.key !== key)
-			} else {
-				alert(`Failed to delete: ${data.error}`)
-			}
-		} catch (e) {
-			alert(`Error: ${e instanceof Error ? e.message : 'Unknown error'}`)
+		if (data.success) {
+			images = images.filter((img) => img.key !== key)
+		} else {
+			alert(`Failed to delete: ${data.error}`)
 		}
+	} catch (e) {
+		alert(`Error: ${e instanceof Error ? e.message : 'Unknown error'}`)
 	}
+}
 
-	function formatSize(bytes: number): string {
-		if (bytes < 1024) return `${bytes} B`
-		if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-		return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-	}
+function formatSize(bytes: number): string {
+	if (bytes < 1024) return `${bytes} B`
+	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
 
-	function formatDate(iso: string): string {
-		return new Date(iso).toLocaleString()
-	}
+function formatDate(iso: string): string {
+	return new Date(iso).toLocaleString()
+}
 </script>
 
 <div class="gallery-page">

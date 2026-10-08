@@ -4,8 +4,8 @@ import {
 	existsSync,
 	mkdirSync,
 	mkdtempSync,
-	readFileSync,
 	readdirSync,
+	readFileSync,
 	rmSync
 } from 'node:fs'
 import { platform, tmpdir } from 'node:os'

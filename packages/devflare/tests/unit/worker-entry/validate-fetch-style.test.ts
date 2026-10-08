@@ -97,10 +97,10 @@ describe('validateFetchHandlerStyle — no false positives', () => {
 	test('passes for a sequence(...) composition', async () => {
 		const filePath = writeFetchModule(
 			`import { sequence } from '${runtimeImportSpecifier()}'\n` +
-				`export const handle = sequence(\n` +
-				`  async (event: any, resolve: any) => resolve(event),\n` +
+				'export const handle = sequence(\n' +
+				'  async (event: any, resolve: any) => resolve(event),\n' +
 				`  async (event: any) => new Response('ok')\n` +
-				`)\n`
+				')\n'
 		)
 
 		await expect(validateFetchHandlerStyle(filePath)).resolves.toBeUndefined()
@@ -125,7 +125,7 @@ describe('validateFetchHandlerStyle — no false positives', () => {
 	})
 
 	test('is a no-op for a module with no fetch export', async () => {
-		const filePath = writeFetchModule(`export const unrelated = 1\n`)
+		const filePath = writeFetchModule('export const unrelated = 1\n')
 
 		await expect(validateFetchHandlerStyle(filePath)).resolves.toBeUndefined()
 	})

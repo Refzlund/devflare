@@ -13,10 +13,10 @@ import type { ConsolaInstance } from 'consola'
 import { resolve } from 'pathe'
 import { type BrowserShim, createBrowserShim } from '../../browser-shim'
 import {
-	type DOBundleResult,
-	type DOBundler,
 	bundleWorkerEntry,
-	createDOBundler
+	createDOBundler,
+	type DOBundleResult,
+	type DOBundler
 } from '../../bundler'
 import type { DevflareConfig } from '../../config'
 import { resolveConfigEnvVars } from '../../config/env-vars'

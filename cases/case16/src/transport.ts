@@ -7,23 +7,21 @@
 
 import {
 	Order,
-	StepResult,
-	WorkflowInstance,
 	type OrderData,
+	StepResult,
 	type StepResultData,
+	WorkflowInstance,
 	type WorkflowInstanceData
 } from './models'
 
 export const transport = {
 	Order: {
-		encode: (v: unknown): OrderData | false =>
-			v instanceof Order && v.toData(),
+		encode: (v: unknown): OrderData | false => v instanceof Order && v.toData(),
 		decode: (v: OrderData) => new Order(v)
 	},
 
 	StepResult: {
-		encode: (v: unknown): StepResultData | false =>
-			v instanceof StepResult && v.toData(),
+		encode: (v: unknown): StepResultData | false => v instanceof StepResult && v.toData(),
 		decode: (v: StepResultData) => new StepResult(v)
 	},
 

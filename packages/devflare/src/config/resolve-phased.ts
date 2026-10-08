@@ -32,7 +32,7 @@ import {
 	type PrepareMaterializedConfigResourcesForDeployOptions,
 	prepareMaterializedConfigResourcesForDeploy
 } from './deploy-resources'
-import { type PreviewResolutionOptions, materializePreviewScopedConfig } from './preview'
+import { materializePreviewScopedConfig, type PreviewResolutionOptions } from './preview'
 import { mergeConfigForEnvironment } from './resolve'
 import {
 	type ResolveMaterializedConfigResourcesOptions,

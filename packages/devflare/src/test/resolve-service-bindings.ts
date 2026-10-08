@@ -8,10 +8,10 @@
 import { existsSync, readFileSync } from 'fs'
 import { dirname, join, resolve } from 'path'
 import {
-	type DOBindingRef,
-	type DevflareConfig,
-	type DurableObjectBinding,
 	configSchema,
+	type DevflareConfig,
+	type DOBindingRef,
+	type DurableObjectBinding,
 	getLocalD1DatabaseIdentifier,
 	getLocalKVNamespaceIdentifier,
 	normalizeDOBinding,

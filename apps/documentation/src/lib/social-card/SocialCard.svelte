@@ -1,38 +1,38 @@
 <script lang="ts">
-	export interface SocialCardBlob {
-		x: number
-		y: number
-		width: number
-		height: number
-		rotation: number
-		opacity: number
-		tone: 'orange' | 'amber'
-	}
+export interface SocialCardBlob {
+	x: number
+	y: number
+	width: number
+	height: number
+	rotation: number
+	opacity: number
+	tone: 'orange' | 'amber'
+}
 
-	let {
-		title,
-		description,
-		logoDataUrl,
-		npmLogoDataUrl,
-		blobs
-	}: {
-		title: string
-		description: string
-		logoDataUrl: string
-		npmLogoDataUrl: string
-		blobs: readonly SocialCardBlob[]
-	} = $props()
+let {
+	title,
+	description,
+	logoDataUrl,
+	npmLogoDataUrl,
+	blobs
+}: {
+	title: string
+	description: string
+	logoDataUrl: string
+	npmLogoDataUrl: string
+	blobs: readonly SocialCardBlob[]
+} = $props()
 
-	function toBlobStyle(blob: SocialCardBlob): string {
-		return [
-			`left: ${blob.x}px`,
-			`top: ${blob.y}px`,
-			`width: ${blob.width}px`,
-			`height: ${blob.height}px`,
-			`transform: rotate(${blob.rotation}deg)`,
-			`opacity: ${blob.opacity}`
-		].join('; ')
-	}
+function toBlobStyle(blob: SocialCardBlob): string {
+	return [
+		`left: ${blob.x}px`,
+		`top: ${blob.y}px`,
+		`width: ${blob.width}px`,
+		`height: ${blob.height}px`,
+		`transform: rotate(${blob.rotation}deg)`,
+		`opacity: ${blob.opacity}`
+	].join('; ')
+}
 </script>
 
 <svelte:head>

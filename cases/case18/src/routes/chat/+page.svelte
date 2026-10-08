@@ -1,153 +1,155 @@
 <script lang="ts">
-	import { browser } from '$app/environment'
-	import type { ChatMessageData } from '$lib/models'
+import { browser } from '$app/environment'
+import type { ChatMessageData } from '$lib/models'
 
-	interface Message {
-		id: string
-		userId: string
-		username: string
-		content: string
-		timestamp: number
-		isSystem: boolean
+interface Message {
+	id: string
+	userId: string
+	username: string
+	content: string
+	timestamp: number
+	isSystem: boolean
+}
+
+let username = $state('')
+let roomId = $state('lobby')
+let userId = $state('')
+let connected = $state(false)
+let connecting = $state(false)
+let messages = $state<Message[]>([])
+let inputMessage = $state('')
+let onlineCount = $state(0)
+let ws: WebSocket | null = $state(null)
+let typingUsers = $state<Set<string>>(new Set())
+let messagesContainer: HTMLDivElement | null = $state(null)
+
+// Generate user ID on mount
+$effect(() => {
+	if (browser && !userId) {
+		userId = localStorage.getItem('chat-user-id') || crypto.randomUUID()
+		localStorage.setItem('chat-user-id', userId)
+
+		const savedUsername = localStorage.getItem('chat-username')
+		if (savedUsername) {
+			username = savedUsername
+		}
+	}
+})
+
+// Auto-scroll on new messages
+$effect(() => {
+	if (messagesContainer && messages.length > 0) {
+		messagesContainer.scrollTop = messagesContainer.scrollHeight
+	}
+})
+
+function connect() {
+	if (!username.trim()) {
+		alert('Please enter a username')
+		return
 	}
 
-	let username = $state('')
-	let roomId = $state('lobby')
-	let userId = $state('')
-	let connected = $state(false)
-	let connecting = $state(false)
-	let messages = $state<Message[]>([])
-	let inputMessage = $state('')
-	let onlineCount = $state(0)
-	let ws: WebSocket | null = $state(null)
-	let typingUsers = $state<Set<string>>(new Set())
-	let messagesContainer: HTMLDivElement | null = $state(null)
+	localStorage.setItem('chat-username', username)
+	connecting = true
 
-	// Generate user ID on mount
-	$effect(() => {
-		if (browser && !userId) {
-			userId = localStorage.getItem('chat-user-id') || crypto.randomUUID()
-			localStorage.setItem('chat-user-id', userId)
-			
-			const savedUsername = localStorage.getItem('chat-username')
-			if (savedUsername) {
-				username = savedUsername
-			}
-		}
-	})
+	const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+	const wsUrl = `${protocol}//${window.location.host}/chat/api?roomId=${encodeURIComponent(roomId)}&username=${encodeURIComponent(username)}&userId=${encodeURIComponent(userId)}`
 
-	// Auto-scroll on new messages
-	$effect(() => {
-		if (messagesContainer && messages.length > 0) {
-			messagesContainer.scrollTop = messagesContainer.scrollHeight
-		}
-	})
+	ws = new WebSocket(wsUrl)
 
-	function connect() {
-		if (!username.trim()) {
-			alert('Please enter a username')
-			return
-		}
+	ws.onopen = () => {
+		connecting = false
+		connected = true
+	}
 
-		localStorage.setItem('chat-username', username)
-		connecting = true
+	ws.onmessage = (event) => {
+		try {
+			const data = JSON.parse(event.data)
 
-		const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-		const wsUrl = `${protocol}//${window.location.host}/chat/api?roomId=${encodeURIComponent(roomId)}&username=${encodeURIComponent(username)}&userId=${encodeURIComponent(userId)}`
-
-		ws = new WebSocket(wsUrl)
-
-		ws.onopen = () => {
-			connecting = false
-			connected = true
-		}
-
-		ws.onmessage = (event) => {
-			try {
-				const data = JSON.parse(event.data)
-
-				if (data.type === 'welcome') {
-					onlineCount = data.onlineCount
-				} else if (data.type === 'message') {
-					const msg = data.data as ChatMessageData
-					messages = [
-						...messages,
-						{
-							id: msg.id,
-							userId: msg.userId,
-							username: msg.username,
-							content: msg.content,
-							timestamp: msg.timestamp,
-							isSystem: msg.userId === 'system'
-						}
-					]
-					// Clear typing indicator for this user
-					typingUsers.delete(msg.userId)
+			if (data.type === 'welcome') {
+				onlineCount = data.onlineCount
+			} else if (data.type === 'message') {
+				const msg = data.data as ChatMessageData
+				messages = [
+					...messages,
+					{
+						id: msg.id,
+						userId: msg.userId,
+						username: msg.username,
+						content: msg.content,
+						timestamp: msg.timestamp,
+						isSystem: msg.userId === 'system'
+					}
+				]
+				// Clear typing indicator for this user
+				typingUsers.delete(msg.userId)
+				typingUsers = new Set(typingUsers)
+			} else if (data.type === 'typing') {
+				typingUsers.add(data.username)
+				typingUsers = new Set(typingUsers)
+				// Clear after 3 seconds
+				setTimeout(() => {
+					typingUsers.delete(data.username)
 					typingUsers = new Set(typingUsers)
-				} else if (data.type === 'typing') {
-					typingUsers.add(data.username)
-					typingUsers = new Set(typingUsers)
-					// Clear after 3 seconds
-					setTimeout(() => {
-						typingUsers.delete(data.username)
-						typingUsers = new Set(typingUsers)
-					}, 3000)
-				} else if (data.error) {
-					console.error('WebSocket error:', data.error)
-				}
-			} catch (e) {
-				console.error('Failed to parse message:', e)
+				}, 3000)
+			} else if (data.error) {
+				console.error('WebSocket error:', data.error)
 			}
-		}
-
-		ws.onclose = () => {
-			connected = false
-			connecting = false
-			ws = null
-		}
-
-		ws.onerror = (error) => {
-			console.error('WebSocket error:', error)
-			connecting = false
+		} catch (e) {
+			console.error('Failed to parse message:', e)
 		}
 	}
 
-	function disconnect() {
-		if (ws) {
-			ws.close()
-		}
+	ws.onclose = () => {
+		connected = false
+		connecting = false
+		ws = null
 	}
 
-	function sendMessage() {
-		if (!ws || !inputMessage.trim()) return
+	ws.onerror = (error) => {
+		console.error('WebSocket error:', error)
+		connecting = false
+	}
+}
 
-		ws.send(JSON.stringify({
+function disconnect() {
+	if (ws) {
+		ws.close()
+	}
+}
+
+function sendMessage() {
+	if (!ws || !inputMessage.trim()) return
+
+	ws.send(
+		JSON.stringify({
 			type: 'message',
 			content: inputMessage.trim()
-		}))
-
-		inputMessage = ''
-	}
-
-	function sendTyping() {
-		if (ws && connected) {
-			ws.send(JSON.stringify({ type: 'typing' }))
-		}
-	}
-
-	function handleKeyDown(event: KeyboardEvent) {
-		if (event.key === 'Enter' && !event.shiftKey) {
-			event.preventDefault()
-			sendMessage()
-		}
-	}
-
-	function formatTime(timestamp: number): string {
-		return new Date(timestamp).toLocaleTimeString([], {
-			hour: '2-digit',
-			minute: '2-digit'
 		})
+	)
+
+	inputMessage = ''
+}
+
+function sendTyping() {
+	if (ws && connected) {
+		ws.send(JSON.stringify({ type: 'typing' }))
 	}
+}
+
+function handleKeyDown(event: KeyboardEvent) {
+	if (event.key === 'Enter' && !event.shiftKey) {
+		event.preventDefault()
+		sendMessage()
+	}
+}
+
+function formatTime(timestamp: number): string {
+	return new Date(timestamp).toLocaleTimeString([], {
+		hour: '2-digit',
+		minute: '2-digit'
+	})
+}
 </script>
 
 <div class="chat-page">

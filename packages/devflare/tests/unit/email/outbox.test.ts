@@ -1,14 +1,14 @@
 import { afterEach, describe, expect, test } from 'bun:test'
+import type { SentEmailRecord } from '../../../src/email/outbox'
 import {
-	OUTBOX_CAPACITY,
 	clearOutbox,
 	getOutbox,
 	getSentMessages,
+	OUTBOX_CAPACITY,
 	onOutboxEntry,
 	recordOutboxEntry,
 	resetOutbox
 } from '../../../src/email/outbox'
-import type { SentEmailRecord } from '../../../src/email/outbox'
 
 afterEach(() => {
 	resetOutbox()

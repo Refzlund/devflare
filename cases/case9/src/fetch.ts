@@ -6,11 +6,11 @@
 // =============================================================================
 
 import {
-	formatResponse,
-	formatError,
-	paginate,
 	CONSTANTS,
-	type PaginatedRequest
+	formatError,
+	formatResponse,
+	type PaginatedRequest,
+	paginate
 } from '@devflare/case9-shared'
 
 /**
@@ -51,9 +51,7 @@ export default async function fetch(
 		const start = (page - 1) * pageSize
 		const items = allItems.slice(start, start + pageSize)
 
-		return Response.json(
-			formatResponse(paginate(items, allItems.length, page, pageSize))
-		)
+		return Response.json(formatResponse(paginate(items, allItems.length, page, pageSize)))
 	}
 
 	// Route: GET /error

@@ -5,7 +5,7 @@
 // Uses wf.*.ts naming convention (like do.*.ts for Durable Objects).
 // =============================================================================
 
-import { Order, StepResult, WorkflowInstance, type OrderData } from './models'
+import { Order, type OrderData, StepResult, WorkflowInstance } from './models'
 
 /**
  * Workflow event containing input parameters
@@ -46,7 +46,7 @@ export interface OrderProcessingOutput {
 
 /**
  * Order Processing Workflow
- * 
+ *
  * Steps:
  * 1. Validate order
  * 2. Reserve inventory
@@ -86,7 +86,7 @@ export class OrderProcessingWorkflow {
 			// Step 1: Validate order
 			const validation = await step.do('validate-order', async () => {
 				const start = Date.now()
-				
+
 				// Validation logic
 				if (order.items.length === 0) {
 					throw new Error('Order has no items')
@@ -106,14 +106,16 @@ export class OrderProcessingWorkflow {
 				}
 			})
 
-			instance.addStep(new StepResult({
-				stepName: 'validate-order',
-				success: true,
-				output: validation,
-				startedAt: new Date().toISOString(),
-				completedAt: new Date().toISOString(),
-				retryCount: 0
-			}))
+			instance.addStep(
+				new StepResult({
+					stepName: 'validate-order',
+					success: true,
+					output: validation,
+					startedAt: new Date().toISOString(),
+					completedAt: new Date().toISOString(),
+					retryCount: 0
+				})
+			)
 
 			// Step 2: Reserve inventory
 			instance.currentStep = 'reserve-inventory'
@@ -128,14 +130,16 @@ export class OrderProcessingWorkflow {
 				return { reserved, allAvailable: true }
 			})
 
-			instance.addStep(new StepResult({
-				stepName: 'reserve-inventory',
-				success: true,
-				output: inventory,
-				startedAt: new Date().toISOString(),
-				completedAt: new Date().toISOString(),
-				retryCount: 0
-			}))
+			instance.addStep(
+				new StepResult({
+					stepName: 'reserve-inventory',
+					success: true,
+					output: inventory,
+					startedAt: new Date().toISOString(),
+					completedAt: new Date().toISOString(),
+					retryCount: 0
+				})
+			)
 
 			// Step 3: Process payment
 			instance.currentStep = 'process-payment'
@@ -148,14 +152,16 @@ export class OrderProcessingWorkflow {
 				}
 			})
 
-			instance.addStep(new StepResult({
-				stepName: 'process-payment',
-				success: true,
-				output: payment,
-				startedAt: new Date().toISOString(),
-				completedAt: new Date().toISOString(),
-				retryCount: 0
-			}))
+			instance.addStep(
+				new StepResult({
+					stepName: 'process-payment',
+					success: true,
+					output: payment,
+					startedAt: new Date().toISOString(),
+					completedAt: new Date().toISOString(),
+					retryCount: 0
+				})
+			)
 
 			// Step 4: Generate shipping label
 			instance.currentStep = 'generate-shipping'
@@ -167,14 +173,16 @@ export class OrderProcessingWorkflow {
 				return { trackingNumber, shippingLabel: label }
 			})
 
-			instance.addStep(new StepResult({
-				stepName: 'generate-shipping-label',
-				success: true,
-				output: shipping,
-				startedAt: new Date().toISOString(),
-				completedAt: new Date().toISOString(),
-				retryCount: 0
-			}))
+			instance.addStep(
+				new StepResult({
+					stepName: 'generate-shipping-label',
+					success: true,
+					output: shipping,
+					startedAt: new Date().toISOString(),
+					completedAt: new Date().toISOString(),
+					retryCount: 0
+				})
+			)
 
 			// Step 5: Send confirmation (with small delay)
 			instance.currentStep = 'send-confirmation'
@@ -189,14 +197,16 @@ export class OrderProcessingWorkflow {
 				}
 			})
 
-			instance.addStep(new StepResult({
-				stepName: 'send-confirmation',
-				success: true,
-				output: confirmation,
-				startedAt: new Date().toISOString(),
-				completedAt: new Date().toISOString(),
-				retryCount: 0
-			}))
+			instance.addStep(
+				new StepResult({
+					stepName: 'send-confirmation',
+					success: true,
+					output: confirmation,
+					startedAt: new Date().toISOString(),
+					completedAt: new Date().toISOString(),
+					retryCount: 0
+				})
+			)
 
 			// Update order status
 			order.updateStatus('shipped')
@@ -218,10 +228,9 @@ export class OrderProcessingWorkflow {
 			)
 
 			return output
-
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : String(error)
-			
+
 			instance.fail(errorMessage)
 
 			await this.env.WORKFLOW_STATE.put(

@@ -24,12 +24,9 @@ let {
 } = $props()
 
 const toneClasses: Record<SurfaceTone, string> = {
-	panel:
-		'docs-surface-panel',
-	glass:
-		'docs-surface-glass',
-	nav:
-		'docs-surface-nav'
+	panel: 'docs-surface-panel',
+	glass: 'docs-surface-glass',
+	nav: 'docs-surface-nav'
 }
 
 const paddingClasses: Record<SurfacePadding, string> = {

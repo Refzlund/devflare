@@ -1,147 +1,143 @@
 <script lang="ts">
-	interface Todo {
-		id: number
-		title: string
-		completed: boolean
-		created_at: string
-	}
+interface Todo {
+	id: number
+	title: string
+	completed: boolean
+	created_at: string
+}
 
-	interface TodoListResponse {
-		todos?: Todo[]
-		error?: string
-	}
+interface TodoListResponse {
+	todos?: Todo[]
+	error?: string
+}
 
-	interface TodoResponse {
-		success?: boolean
-		todo?: Todo
-		error?: string
-	}
+interface TodoResponse {
+	success?: boolean
+	todo?: Todo
+	error?: string
+}
 
-	let todos = $state<Todo[]>([])
-	let loading = $state(true)
-	let error = $state<string | null>(null)
-	let newTodoTitle = $state('')
-	let adding = $state(false)
-	let editingId = $state<number | null>(null)
-	let editingTitle = $state('')
+let todos = $state<Todo[]>([])
+let loading = $state(true)
+let error = $state<string | null>(null)
+let newTodoTitle = $state('')
+let adding = $state(false)
+let editingId = $state<number | null>(null)
+let editingTitle = $state('')
 
-	$effect(() => {
-		loadTodos()
-	})
+$effect(() => {
+	loadTodos()
+})
 
-	async function loadTodos() {
-		loading = true
-		error = null
+async function loadTodos() {
+	loading = true
+	error = null
 
-		try {
-			const response = await fetch('/db')
-			const data: TodoListResponse = await response.json()
+	try {
+		const response = await fetch('/db')
+		const data: TodoListResponse = await response.json()
 
-			if (data.error) {
-				error = data.error
-			} else if (data.todos) {
-				todos = data.todos
-			}
-		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to load todos'
-		} finally {
-			loading = false
+		if (data.error) {
+			error = data.error
+		} else if (data.todos) {
+			todos = data.todos
 		}
+	} catch (e) {
+		error = e instanceof Error ? e.message : 'Failed to load todos'
+	} finally {
+		loading = false
 	}
+}
 
-	async function addTodo() {
-		if (!newTodoTitle.trim()) return
+async function addTodo() {
+	if (!newTodoTitle.trim()) return
 
-		adding = true
-		try {
-			const response = await fetch('/db', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ title: newTodoTitle })
-			})
-			const data: TodoResponse = await response.json()
+	adding = true
+	try {
+		const response = await fetch('/db', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ title: newTodoTitle })
+		})
+		const data: TodoResponse = await response.json()
 
-			if (data.success && data.todo) {
-				todos = [data.todo, ...todos]
-				newTodoTitle = ''
-			} else if (data.error) {
-				error = data.error
-			}
-		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to add todo'
-		} finally {
-			adding = false
+		if (data.success && data.todo) {
+			todos = [data.todo, ...todos]
+			newTodoTitle = ''
+		} else if (data.error) {
+			error = data.error
 		}
+	} catch (e) {
+		error = e instanceof Error ? e.message : 'Failed to add todo'
+	} finally {
+		adding = false
 	}
+}
 
-	async function toggleTodo(todo: Todo) {
-		try {
-			const response = await fetch('/db', {
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ id: todo.id, completed: !todo.completed })
-			})
-			const data: TodoResponse = await response.json()
+async function toggleTodo(todo: Todo) {
+	try {
+		const response = await fetch('/db', {
+			method: 'PATCH',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ id: todo.id, completed: !todo.completed })
+		})
+		const data: TodoResponse = await response.json()
 
-			if (data.success && data.todo) {
-				todos = todos.map((t) =>
-					t.id === todo.id ? data.todo! : t
-				)
-			}
-		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to update todo'
+		if (data.success && data.todo) {
+			todos = todos.map((t) => (t.id === todo.id ? data.todo! : t))
 		}
+	} catch (e) {
+		error = e instanceof Error ? e.message : 'Failed to update todo'
 	}
+}
 
-	async function deleteTodo(id: number) {
-		try {
-			const response = await fetch(`/db?id=${id}`, { method: 'DELETE' })
-			const data: { success?: boolean } = await response.json()
+async function deleteTodo(id: number) {
+	try {
+		const response = await fetch(`/db?id=${id}`, { method: 'DELETE' })
+		const data: { success?: boolean } = await response.json()
 
-			if (data.success) {
-				todos = todos.filter((t) => t.id !== id)
-			}
-		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to delete todo'
+		if (data.success) {
+			todos = todos.filter((t) => t.id !== id)
 		}
+	} catch (e) {
+		error = e instanceof Error ? e.message : 'Failed to delete todo'
+	}
+}
+
+function startEdit(todo: Todo) {
+	editingId = todo.id
+	editingTitle = todo.title
+}
+
+async function saveEdit() {
+	if (!editingId || !editingTitle.trim()) {
+		editingId = null
+		return
 	}
 
-	function startEdit(todo: Todo) {
-		editingId = todo.id
-		editingTitle = todo.title
-	}
+	try {
+		const response = await fetch('/db', {
+			method: 'PATCH',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ id: editingId, title: editingTitle })
+		})
+		const data: TodoResponse = await response.json()
 
-	async function saveEdit() {
-		if (!editingId || !editingTitle.trim()) {
-			editingId = null
-			return
+		if (data.success && data.todo) {
+			todos = todos.map((t) => (t.id === editingId ? data.todo! : t))
 		}
-
-		try {
-			const response = await fetch('/db', {
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ id: editingId, title: editingTitle })
-			})
-			const data: TodoResponse = await response.json()
-
-			if (data.success && data.todo) {
-				todos = todos.map((t) =>
-					t.id === editingId ? data.todo! : t
-				)
-			}
-		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to update todo'
-		} finally {
-			editingId = null
-		}
+	} catch (e) {
+		error = e instanceof Error ? e.message : 'Failed to update todo'
+	} finally {
+		editingId = null
 	}
+}
 
-	function formatDate(iso: string): string {
-		return new Date(iso).toLocaleDateString()
-	}
+function formatDate(iso: string): string {
+	return new Date(iso).toLocaleDateString()
+}
 
-	const completedCount = $derived(todos.filter((t) => t.completed).length)
+const completedCount = $derived(todos.filter((t) => t.completed).length)
 </script>
 
 <div class="db-page">

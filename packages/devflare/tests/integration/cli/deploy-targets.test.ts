@@ -7,9 +7,9 @@ import { runDeployCommand } from '../../../src/cli/commands/deploy'
 import { clearDependencies, setDependencies } from '../../../src/cli/dependencies'
 import { createLogger, renderMessages } from '../../helpers/mock-logger'
 import {
-	type ExecInvocation,
 	createCliDependencies,
 	createProcessRunner,
+	type ExecInvocation,
 	successResult
 } from './build-deploy-worker-only.test-utils'
 

@@ -2,7 +2,7 @@
 // Case 8: File-Based Routing - Tests
 // =============================================================================
 
-import { describe, test, expect } from 'bun:test'
+import { describe, expect, test } from 'bun:test'
 import { Router } from '../src/lib/router'
 
 describe('Case 8: File-Based Routing', () => {
@@ -28,7 +28,7 @@ describe('Case 8: File-Based Routing', () => {
 			const response = await router.handle(request)
 
 			expect(response.status).toBe(200)
-			const data = await response.json() as { id: string }
+			const data = (await response.json()) as { id: string }
 			expect(data.id).toBe('123')
 		})
 
@@ -42,7 +42,7 @@ describe('Case 8: File-Based Routing', () => {
 			const response = await router.handle(request)
 
 			expect(response.status).toBe(200)
-			const data = await response.json() as { path: string }
+			const data = (await response.json()) as { path: string }
 			expect(data.path).toBe('users/123/posts')
 		})
 
@@ -81,7 +81,7 @@ describe('Case 8: File-Based Routing', () => {
 			const response = await GET(request, {})
 
 			expect(response.status).toBe(200)
-			const data = await response.json() as { message: string }
+			const data = (await response.json()) as { message: string }
 			expect(data.message).toBe('Welcome to the home page')
 		})
 
@@ -92,7 +92,7 @@ describe('Case 8: File-Based Routing', () => {
 			const response = await GET(request, { id: '42' })
 
 			expect(response.status).toBe(200)
-			const data = await response.json() as { user: { id: string } }
+			const data = (await response.json()) as { user: { id: string } }
 			expect(data.user.id).toBe('42')
 		})
 
@@ -103,7 +103,7 @@ describe('Case 8: File-Based Routing', () => {
 			const response = await GET(request, { path: 'a/b/c' })
 
 			expect(response.status).toBe(200)
-			const data = await response.json() as { segments: string[] }
+			const data = (await response.json()) as { segments: string[] }
 			expect(data.segments).toEqual(['a', 'b', 'c'])
 		})
 	})

@@ -19,27 +19,27 @@ import type {
 	WebSocketLikeCloseEvent,
 	WebSocketLikeMessageEvent
 } from './v2/transport'
-import { type StreamRef, deserializeValue, serializeValue } from './v2/value-serialization'
+import { deserializeValue, type StreamRef, serializeValue } from './v2/value-serialization'
 import {
 	BinaryFlags,
 	BinaryKind,
 	DEFAULT_BRIDGE_PORT,
 	DEFAULT_CHUNK_SIZE,
-	type JsonMsg,
-	type StreamPull,
-	type WsClose,
-	type WsOpen,
-	type WsOpened,
 	decodeBinaryFrame,
 	encodeBinaryFrame,
+	type JsonMsg,
 	nextWsId,
 	parseJsonMsg,
-	stringifyJsonMsg
+	type StreamPull,
+	stringifyJsonMsg,
+	type WsClose,
+	type WsOpen,
+	type WsOpened
 } from './v2/wire'
 import {
-	type WebSocketConstructor,
 	getRuntimeWebSocketConstructor,
-	importWsPackageConstructor
+	importWsPackageConstructor,
+	type WebSocketConstructor
 } from './websocket-constructor'
 
 // Re-exported for callers that historically imported it from the client module.

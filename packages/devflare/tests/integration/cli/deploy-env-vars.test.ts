@@ -5,12 +5,12 @@ import { join } from 'pathe'
 import { runDeployCommand } from '../../../src/cli/commands/deploy'
 import { clearDependencies, setDependencies } from '../../../src/cli/dependencies'
 import {
-	type ExecInvocation,
 	classifyWranglerUploadExecution,
 	createCliDependencies,
 	createLogger,
 	createProcessRunner,
 	disableCloudflareAccountResolution,
+	type ExecInvocation,
 	readGeneratedDeployConfig,
 	recordWranglerUpload,
 	successResult

@@ -18,9 +18,9 @@ import type { ConsolaInstance } from 'consola'
 import type { Miniflare as MiniflareType } from 'miniflare'
 import { dirname, resolve } from 'pathe'
 import {
-	type WorkspaceManifest,
 	assertSharedBindingIds,
-	resolveAppDirectSocketPort
+	resolveAppDirectSocketPort,
+	type WorkspaceManifest
 } from '../../config/workspace'
 import { startOutboundEmailService } from '../../email/host-service'
 import { createHostEmailDeliverySink } from '../../email/host-sink'

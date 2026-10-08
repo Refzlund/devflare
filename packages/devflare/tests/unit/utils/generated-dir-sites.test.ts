@@ -10,7 +10,7 @@
 	kept honest by the compiler of record: the filesystem.
 */
 import { describe, expect, test } from 'bun:test'
-import { readFileSync, readdirSync, statSync } from 'node:fs'
+import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 
 const SOURCE_ROOT = resolve(import.meta.dir, '../../../src')

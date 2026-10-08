@@ -249,7 +249,7 @@ export class WorkspaceManifestNotFoundError extends Error {
 		super(
 			`No workspace manifest found in ${cwd}.\n` +
 				`Expected one of: ${WORKSPACE_MANIFEST_FILES.join(', ')}\n` +
-				`Create one that exports \`defineWorkspace({ apps: [...] })\`.`
+				'Create one that exports `defineWorkspace({ apps: [...] })`.'
 		)
 		this.name = 'WorkspaceManifestNotFoundError'
 	}

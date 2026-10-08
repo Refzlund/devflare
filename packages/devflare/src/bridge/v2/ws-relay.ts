@@ -9,21 +9,21 @@
 // =============================================================================
 
 import type { TransportV2Codec } from './codec'
-import { parseTransportV2AuxMsg, stringifyTransportV2AuxMsg } from './control-messages'
 import type {
 	TransportV2AuxMsg,
 	TransportV2WsCloseMsg,
 	TransportV2WsOpenMsg,
 	TransportV2WsTextMsg
 } from './control-messages'
+import { parseTransportV2AuxMsg, stringifyTransportV2AuxMsg } from './control-messages'
+import type { TransportV2DecodedBinaryFrame } from './frames'
 import {
+	encodeTransportV2BinaryFrame,
 	TransportV2BinaryFlags,
 	TransportV2BinaryKind,
-	encodeTransportV2BinaryFrame,
 	transportV2IsFin,
 	transportV2IsText
 } from './frames'
-import type { TransportV2DecodedBinaryFrame } from './frames'
 
 export interface TransportV2WsProxyHandlers {
 	onMessage?: (data: string | Uint8Array) => void

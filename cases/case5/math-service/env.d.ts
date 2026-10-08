@@ -2,13 +2,11 @@
 // Run `devflare types` to regenerate
 
 declare global {
-	interface DevflareEnv {
-	}
+	interface DevflareEnv {}
 }
 
 declare module 'devflare/test' {
-	interface DevflareEnv {
-	}
+	interface DevflareEnv {}
 }
 
 /**
@@ -16,5 +14,3 @@ declare module 'devflare/test' {
  * Use with defineConfig<Entrypoints>() for type-safe cross-worker references.
  */
 export type Entrypoints = 'AdminEntrypoint'
-
-export { }

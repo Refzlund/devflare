@@ -39,7 +39,7 @@
 		"dev": "bun run devflare:dev"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "^1.9.4",
+		"@biomejs/biome": "^2.5.15",
 		"@changesets/cli": "^2.31.1",
 		"@cloudflare/workers-types": "^4.20260702.1",
 		"@types/bun": "^1.4.2",

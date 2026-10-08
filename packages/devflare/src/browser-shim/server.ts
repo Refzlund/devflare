@@ -37,10 +37,10 @@
 
 import { existsSync } from 'node:fs'
 import {
+	createServer,
 	type Server as HttpServer,
 	type IncomingMessage,
-	type ServerResponse,
-	createServer
+	type ServerResponse
 } from 'node:http'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -64,10 +64,10 @@ import {
 } from './routes'
 import {
 	type BrowserSessionRegistry,
+	createSessionRegistry,
 	DEFAULT_KEEP_ALIVE_MS,
 	DEFAULT_MAX_CONCURRENT_SESSIONS,
-	SessionLimitError,
-	createSessionRegistry
+	SessionLimitError
 } from './sessions'
 
 // -----------------------------------------------------------------------------

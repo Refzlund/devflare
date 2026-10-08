@@ -4,23 +4,23 @@
 
 import { describe, expect, test } from 'bun:test'
 import {
-	type FetchEvent,
 	createFetchEvent,
+	type FetchEvent,
 	runWithEventContext
 } from '../../../src/runtime/context'
 import {
-	type FetchMiddleware,
-	type ResolveFetch,
 	assertExplicitQueueHandlerStyle,
 	assertExplicitScheduledHandlerStyle,
 	createResolveFetch,
 	defineFetchHandler,
 	defineQueueHandler,
 	defineScheduledHandler,
+	type FetchMiddleware,
 	invokeFetchHandler,
 	invokeFetchModule,
 	markResolveStyle,
 	markWorkerStyle,
+	type ResolveFetch,
 	resolveFetchHandler,
 	sequence
 } from '../../../src/runtime/middleware'

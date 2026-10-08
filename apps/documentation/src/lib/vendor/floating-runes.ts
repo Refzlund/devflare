@@ -12,7 +12,7 @@ export type FloatingRunesAction = Action<HTMLElement> & {
 	arrow: Action<HTMLElement>
 }
 
-// @ts-ignore VS Code's Svelte language service can miss Bun-hoisted package metadata here,
+// @ts-expect-error VS Code's Svelte language service can miss Bun-hoisted package metadata here,
 // but the dependency is installed and resolves correctly in check/build.
 import floatingUIUntyped, {
 	createSingleton as createSingletonUntyped,

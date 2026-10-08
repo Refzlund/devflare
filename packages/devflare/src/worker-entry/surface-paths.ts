@@ -65,22 +65,22 @@ export async function resolveWorkerHandlerPath(
 			if (looksLikeBuildArtifactPath(configuredPath)) {
 				throw new Error(
 					`Configured ${surfaceName} handler "${configuredPath}" was not found.\n` +
-						`\n` +
-						`This path looks like a framework build output (e.g. SvelteKit / Vite / Next).\n` +
-						`Devflare resolves handler paths BEFORE your framework runs its build, so the file\n` +
-						`does not exist yet at this stage.\n` +
-						`\n` +
-						`Recommended fix — point devflare at the build artifact via wrangler passthrough\n` +
+						'\n' +
+						'This path looks like a framework build output (e.g. SvelteKit / Vite / Next).\n' +
+						'Devflare resolves handler paths BEFORE your framework runs its build, so the file\n' +
+						'does not exist yet at this stage.\n' +
+						'\n' +
+						'Recommended fix — point devflare at the build artifact via wrangler passthrough\n' +
 						`instead of files.${surfaceName}, so devflare skips composition and lets your\n` +
-						`framework write the worker entry that wrangler/vite then picks up:\n` +
-						`\n` +
+						'framework write the worker entry that wrangler/vite then picks up:\n' +
+						'\n' +
 						`    files: { ${surfaceName}: false },\n` +
-						`    wrangler: {\n` +
+						'    wrangler: {\n' +
 						`        passthrough: { main: '${configuredPath}' }\n` +
-						`    }\n` +
-						`\n` +
-						`Alternatively, run your framework build (e.g. \`vite build\`) before \`devflare build\`,\n` +
-						`or move the handler to a source file that exists at config time.`
+						'    }\n' +
+						'\n' +
+						'Alternatively, run your framework build (e.g. `vite build`) before `devflare build`,\n' +
+						'or move the handler to a source file that exists at config time.'
 				)
 			}
 			throw new Error(`Configured ${surfaceName} handler "${configuredPath}" was not found`)

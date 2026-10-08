@@ -3,18 +3,18 @@
 // =============================================================================
 
 export {
-	transformDurableObject,
 	findDurableObjectClasses,
 	generateWrapper,
-	type TransformResult
+	type TransformResult,
+	transformDurableObject
 } from './durable-object'
 
 export {
-	transformWorkerEntrypoint,
-	findExportedFunctions,
-	shouldTransformWorker,
-	generateRpcInterface,
 	type ExportedFunction,
+	findExportedFunctions,
+	generateRpcInterface,
+	shouldTransformWorker,
+	transformWorkerEntrypoint,
 	type WorkerTransformOptions,
 	type WorkerTransformResult
 } from './worker-entrypoint'

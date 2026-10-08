@@ -38,9 +38,9 @@ import { applyMultiWorkerConfig } from './simple-context-multi-worker'
 import { resolveTransportFile } from './simple-context-paths'
 import { bootTestRuntime } from './simple-context-runtime'
 import {
-	type TransportDecoderMap,
 	decodeTransportValue,
-	loadTransportDecoders
+	loadTransportDecoders,
+	type TransportDecoderMap
 } from './simple-context-transport'
 
 // Handler helper configuration

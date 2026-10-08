@@ -1,7 +1,7 @@
 <script lang="ts">
-import { tooltip } from '$lib/components/layout/Tooltip.svelte'
-import { onDestroy } from 'svelte'
 import type { Snippet } from 'svelte'
+import { onDestroy } from 'svelte'
+import { tooltip } from '$lib/components/layout/Tooltip.svelte'
 
 const COPY_LABEL = 'Copy inline code'
 const COPIED_LABEL = 'Copied inline code'

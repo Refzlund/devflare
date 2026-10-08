@@ -5,11 +5,11 @@ import { normalizeDOBinding } from '../config/schema'
 import { generatedDir } from '../utils/generated-dir'
 import { DEFAULT_DO_PATTERN } from '../utils/glob'
 import { discoverDurableObjectFiles } from './durable-object-discovery'
-import { type RouteDiscoveryResult, discoverRoutes } from './routes'
+import { discoverRoutes, type RouteDiscoveryResult } from './routes'
 import {
-	type WorkerSurfacePaths,
 	looksLikeBuildArtifactPath,
-	resolveWorkerSurfacePaths
+	resolveWorkerSurfacePaths,
+	type WorkerSurfacePaths
 } from './surface-paths'
 import { validateFetchHandlerStyle } from './validate-fetch-style'
 
@@ -486,7 +486,7 @@ async function createGeneratedDurableObjectExports(
 	if (missingClassNames.length > 0) {
 		throw new Error(
 			`Failed to discover local Durable Object class${missingClassNames.length === 1 ? '' : 'es'} ${missingClassNames.join(', ')} for worker composition. ` +
-				`Ensure files.durableObjects matches the source file pattern for your do.* files.`
+				'Ensure files.durableObjects matches the source file pattern for your do.* files.'
 		)
 	}
 
@@ -557,7 +557,7 @@ export async function prepareComposedWorkerEntrypoint(
 	const resolvedConfig = resolveConfigForEnvironment(config, environment)
 	if (
 		resolvedConfig.wrangler?.passthrough &&
-		Object.prototype.hasOwnProperty.call(resolvedConfig.wrangler.passthrough, 'main')
+		Object.hasOwn(resolvedConfig.wrangler.passthrough, 'main')
 	) {
 		return null
 	}

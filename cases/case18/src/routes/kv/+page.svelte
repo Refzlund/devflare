@@ -1,152 +1,152 @@
 <script lang="ts">
-	interface KvKey {
-		name: string
-		expiration?: number
-		metadata?: Record<string, string>
-	}
+interface KvKey {
+	name: string
+	expiration?: number
+	metadata?: Record<string, string>
+}
 
-	interface KvListResponse {
-		keys?: KvKey[]
-		error?: string
-	}
+interface KvListResponse {
+	keys?: KvKey[]
+	error?: string
+}
 
-	interface KvValueResponse {
-		value?: unknown
-		error?: string
-	}
+interface KvValueResponse {
+	value?: unknown
+	error?: string
+}
 
-	interface KvMutationResponse {
-		success?: boolean
-		error?: string
-	}
+interface KvMutationResponse {
+	success?: boolean
+	error?: string
+}
 
-	let keys = $state<KvKey[]>([])
-	let loading = $state(true)
-	let error = $state<string | null>(null)
-	
-	// Form state
-	let newKey = $state('')
-	let newValue = $state('')
-	let newTtl = $state<number | undefined>(undefined)
-	let saving = $state(false)
-	
-	// Selected key view
-	let selectedKey = $state<string | null>(null)
-	let selectedValue = $state<unknown>(null)
-	let loadingValue = $state(false)
+let keys = $state<KvKey[]>([])
+let loading = $state(true)
+let error = $state<string | null>(null)
 
-	$effect(() => {
-		loadKeys()
-	})
+// Form state
+let newKey = $state('')
+let newValue = $state('')
+let newTtl = $state<number | undefined>(undefined)
+let saving = $state(false)
 
-	async function loadKeys() {
-		loading = true
-		error = null
+// Selected key view
+let selectedKey = $state<string | null>(null)
+let selectedValue = $state<unknown>(null)
+let loadingValue = $state(false)
 
-		try {
-			const response = await fetch('/kv')
-			const data: KvListResponse = await response.json()
+$effect(() => {
+	loadKeys()
+})
 
-			if (data.error) {
-				error = data.error
-			} else if (data.keys) {
-				keys = data.keys
-			}
-		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to load keys'
-		} finally {
-			loading = false
+async function loadKeys() {
+	loading = true
+	error = null
+
+	try {
+		const response = await fetch('/kv')
+		const data: KvListResponse = await response.json()
+
+		if (data.error) {
+			error = data.error
+		} else if (data.keys) {
+			keys = data.keys
 		}
+	} catch (e) {
+		error = e instanceof Error ? e.message : 'Failed to load keys'
+	} finally {
+		loading = false
 	}
+}
 
-	async function saveKey() {
-		if (!newKey.trim()) return
+async function saveKey() {
+	if (!newKey.trim()) return
 
-		saving = true
-		error = null
+	saving = true
+	error = null
 
+	try {
+		// Try to parse as JSON
+		let value: unknown
 		try {
-			// Try to parse as JSON
-			let value: unknown
-			try {
-				value = JSON.parse(newValue)
-			} catch {
-				value = newValue
-			}
+			value = JSON.parse(newValue)
+		} catch {
+			value = newValue
+		}
 
-			const response = await fetch('/kv', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					key: newKey,
-					value,
-					expirationTtl: newTtl
-				})
+		const response = await fetch('/kv', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				key: newKey,
+				value,
+				expirationTtl: newTtl
 			})
+		})
 
-			const data: KvMutationResponse = await response.json()
+		const data: KvMutationResponse = await response.json()
 
-			if (data.success) {
-				newKey = ''
-				newValue = ''
-				newTtl = undefined
-				await loadKeys()
-			} else if (data.error) {
-				error = data.error
-			}
-		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to save'
-		} finally {
-			saving = false
+		if (data.success) {
+			newKey = ''
+			newValue = ''
+			newTtl = undefined
+			await loadKeys()
+		} else if (data.error) {
+			error = data.error
 		}
+	} catch (e) {
+		error = e instanceof Error ? e.message : 'Failed to save'
+	} finally {
+		saving = false
 	}
+}
 
-	async function deleteKey(key: string) {
-		if (!confirm(`Delete key "${key}"?`)) return
+async function deleteKey(key: string) {
+	if (!confirm(`Delete key "${key}"?`)) return
 
-		try {
-			const response = await fetch(`/kv?key=${encodeURIComponent(key)}`, {
-				method: 'DELETE'
-			})
-			const data: KvMutationResponse = await response.json()
+	try {
+		const response = await fetch(`/kv?key=${encodeURIComponent(key)}`, {
+			method: 'DELETE'
+		})
+		const data: KvMutationResponse = await response.json()
 
-			if (data.success) {
-				keys = keys.filter((k) => k.name !== key)
-				if (selectedKey === key) {
-					selectedKey = null
-					selectedValue = null
-				}
-			}
-		} catch (e) {
-			alert('Failed to delete key')
-		}
-	}
-
-	async function viewKey(key: string) {
-		selectedKey = key
-		loadingValue = true
-
-		try {
-			const response = await fetch(`/kv?key=${encodeURIComponent(key)}`)
-			const data: KvValueResponse = await response.json()
-
-			if (data.error) {
+		if (data.success) {
+			keys = keys.filter((k) => k.name !== key)
+			if (selectedKey === key) {
+				selectedKey = null
 				selectedValue = null
-				error = data.error
-			} else {
-				selectedValue = data.value
 			}
-		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to load value'
-		} finally {
-			loadingValue = false
 		}
+	} catch (e) {
+		alert('Failed to delete key')
 	}
+}
 
-	function formatExpiration(exp?: number): string {
-		if (!exp) return 'Never'
-		return new Date(exp * 1000).toLocaleString()
+async function viewKey(key: string) {
+	selectedKey = key
+	loadingValue = true
+
+	try {
+		const response = await fetch(`/kv?key=${encodeURIComponent(key)}`)
+		const data: KvValueResponse = await response.json()
+
+		if (data.error) {
+			selectedValue = null
+			error = data.error
+		} else {
+			selectedValue = data.value
+		}
+	} catch (e) {
+		error = e instanceof Error ? e.message : 'Failed to load value'
+	} finally {
+		loadingValue = false
 	}
+}
+
+function formatExpiration(exp?: number): string {
+	if (!exp) return 'Never'
+	return new Date(exp * 1000).toLocaleString()
+}
 </script>
 
 <div class="kv-page">

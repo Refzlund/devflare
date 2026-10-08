@@ -14,8 +14,8 @@
 //   await cf.queue.send({ type: 'process', data: { x: 1 } })
 // =============================================================================
 
-import { join } from 'path'
 import type { Message, MessageBatch } from '@cloudflare/workers-types'
+import { join } from 'path'
 import { createQueueEvent, runWithEventContext } from '../runtime'
 import { createTestExecutionContext } from './execution-context'
 
@@ -199,7 +199,7 @@ async function trigger<T = unknown>(
 	if (typeof queueHandler !== 'function') {
 		throw new Error(
 			`Queue handler at "${queueHandlerPath}" must export a default function or named "queue" export.\n` +
-				`Expected: export async function queue(event) { ... }`
+				'Expected: export async function queue(event) { ... }'
 		)
 	}
 

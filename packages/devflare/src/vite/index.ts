@@ -3,22 +3,21 @@
 // =============================================================================
 
 export {
-	devflarePlugin,
-	getPluginContext,
-	getCloudflareConfig,
-	getDevflareConfigs,
-	type DevflarePluginOptions,
-	type DevflarePluginContext,
-	type AuxiliaryWorkerConfig,
-	type DODiscoveryResult
-} from './plugin'
-export {
+	type EffectiveViteProjectDetection,
 	hasInlineViteConfig,
 	resolveEffectiveViteProject,
 	resolveViteUserConfig,
-	writeGeneratedViteConfig,
-	type EffectiveViteProjectDetection
+	writeGeneratedViteConfig
 } from './config-file'
-
 // Re-export as default for convenience
-export { devflarePlugin as default } from './plugin'
+export {
+	type AuxiliaryWorkerConfig,
+	type DevflarePluginContext,
+	type DevflarePluginOptions,
+	type DODiscoveryResult,
+	devflarePlugin,
+	devflarePlugin as default,
+	getCloudflareConfig,
+	getDevflareConfigs,
+	getPluginContext
+} from './plugin'

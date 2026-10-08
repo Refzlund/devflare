@@ -6,10 +6,10 @@
 // plus the recorded reply/forward side effects exposed by the helper.
 // =============================================================================
 
-import { describe, test, expect, beforeAll, afterAll, beforeEach } from 'bun:test'
-import { createTestContext, email } from 'devflare/test'
+import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'bun:test'
 import { env } from 'devflare'
 import type { ReceivedEmail } from 'devflare/test'
+import { createTestContext, email } from 'devflare/test'
 
 // -----------------------------------------------------------------------------
 // Helpers
@@ -86,8 +86,12 @@ describe('Email Handler', () => {
 
 		const sentEmails = email.getSentEmails()
 		expect(sentEmails).toHaveLength(2)
-		expect(sentEmails.some((msg) => msg.type === 'reply' && msg.to === 'sender@example.com')).toBe(true)
-		expect(sentEmails.some((msg) => msg.type === 'forward' && msg.to === 'admin@example.com')).toBe(true)
+		expect(sentEmails.some((msg) => msg.type === 'reply' && msg.to === 'sender@example.com')).toBe(
+			true
+		)
+		expect(sentEmails.some((msg) => msg.type === 'forward' && msg.to === 'admin@example.com')).toBe(
+			true
+		)
 	})
 
 	test('email.send() accepts raw email content and still reaches the handler', async () => {
@@ -144,7 +148,7 @@ describe('Email Listeners', () => {
 	})
 
 	test('should clear sent emails history', () => {
-		email.onReceive(() => { })()
+		email.onReceive(() => {})()
 		email.clearSentEmails()
 		const sentEmails = email.getSentEmails()
 		expect(sentEmails.length).toBe(0)
@@ -170,4 +174,3 @@ describe('Environment Variables', () => {
 		expect(env.FORWARD_ADDRESS).toBe('admin@example.com')
 	})
 })
-

@@ -2,8 +2,8 @@
 // Route: /cache/:key
 // =============================================================================
 
-import type { FetchEvent } from 'devflare/runtime'
 import { env } from 'devflare'
+import type { FetchEvent } from 'devflare/runtime'
 
 type CacheRouteEvent = FetchEvent<DevflareEnv, { key: string }>
 

@@ -9,7 +9,6 @@
 
 import { describe, expect, test } from 'bun:test'
 import {
-	TRANSPORT_V2_DO_ID_TYPE,
 	base64Decode,
 	base64Encode,
 	deserializeTransportV2DOId,
@@ -17,7 +16,8 @@ import {
 	serializeR2Object,
 	serializeR2ObjectBody,
 	serializeTransportV2DOId,
-	serializeTransportV2Value
+	serializeTransportV2Value,
+	TRANSPORT_V2_DO_ID_TYPE
 } from '../../../../src/bridge/v2/value-codec'
 
 async function jsonRoundTrip<T>(value: T): Promise<unknown> {

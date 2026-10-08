@@ -47,9 +47,9 @@ async function createBundleResult(
 	await writeFile(
 		join(tempDir, 'entry.ts'),
 		`import { ${importedNames} } from '${importSource}'\n` +
-			`export async function fetch() {\n` +
+			'export async function fetch() {\n' +
 			`\t\treturn new Response(String(Boolean(${importedNames.split(',')[0].trim()})))\n` +
-			`}\n`
+			'}\n'
 	)
 
 	return await bun.build({

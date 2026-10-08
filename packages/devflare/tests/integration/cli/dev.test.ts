@@ -4,7 +4,7 @@
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { clearDependencies, setDependencies } from '../../../src/cli/dependencies'
-import { type TestHarness, createMockProcessRunner, createTestHarness } from '../mocks'
+import { createMockProcessRunner, createTestHarness, type TestHarness } from '../mocks'
 
 /**
  * Note: Dev command requires config loading via c12.

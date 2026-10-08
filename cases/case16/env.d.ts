@@ -4,6 +4,7 @@
 import type { KVNamespace } from '@cloudflare/workers-types'
 
 import type { InferConfigVars } from 'devflare/config'
+
 type __DevflareConfigVars = InferConfigVars<Awaited<typeof import('./devflare.config').default>>
 
 declare global {

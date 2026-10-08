@@ -18,8 +18,13 @@ function sanitizeBranchFragment(rawValue: string): string {
 	return sanitized
 }
 
-function clampBranchFragment(baseName: string, branchFragment: string, reservedSuffix: string): string {
-	const maxBranchLength = CLOUDFLARE_WORKER_NAME_MAX_LENGTH - baseName.length - reservedSuffix.length - 1
+function clampBranchFragment(
+	baseName: string,
+	branchFragment: string,
+	reservedSuffix: string
+): string {
+	const maxBranchLength =
+		CLOUDFLARE_WORKER_NAME_MAX_LENGTH - baseName.length - reservedSuffix.length - 1
 
 	if (maxBranchLength < 1) {
 		throw new Error(`Worker name "${baseName}" leaves no room for a branch-scoped preview suffix.`)
@@ -29,7 +34,11 @@ function clampBranchFragment(baseName: string, branchFragment: string, reservedS
 	return clamped || 'preview'
 }
 
-function buildTestingWorkerName(baseName: string, branchName?: string, reservedSuffix = ''): string {
+function buildTestingWorkerName(
+	baseName: string,
+	branchName?: string,
+	reservedSuffix = ''
+): string {
 	if (!branchName?.trim()) {
 		return baseName
 	}
@@ -46,7 +55,15 @@ function buildTestingWorkerName(baseName: string, branchName?: string, reservedS
 export function resolveTestingWorkerNames(branchName = process.env.DEVFLARE_PREVIEW_BRANCH) {
 	return {
 		authServiceName: buildTestingWorkerName('devflare-testing-auth-service', branchName),
-		searchServiceName: buildTestingWorkerName('devflare-testing-search-service', branchName, '-staging'),
-		mainWorkerName: buildTestingWorkerName('devflare-testing-binding-matrix', branchName, '-preview')
+		searchServiceName: buildTestingWorkerName(
+			'devflare-testing-search-service',
+			branchName,
+			'-staging'
+		),
+		mainWorkerName: buildTestingWorkerName(
+			'devflare-testing-binding-matrix',
+			branchName,
+			'-preview'
+		)
 	}
 }

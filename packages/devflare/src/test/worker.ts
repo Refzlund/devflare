@@ -17,11 +17,12 @@
 import { join } from 'path'
 import {
 	createFetchEvent,
+	createRouteResolve,
 	invokeFetchModule,
+	matchFetchRoute,
 	resolveFetchHandler,
 	runWithEventContext
 } from '../runtime'
-import { createRouteResolve, matchFetchRoute } from '../runtime'
 import type { RouteSegment } from '../runtime/router/types'
 import { createTestExecutionContext } from './execution-context'
 
@@ -183,10 +184,10 @@ async function fetch(request: Request | string, options?: WorkerFetchOptions): P
 	if (!resolveFetchHandler(handlerModule) && !hasMethodHandler && routeModules.length === 0) {
 		throw new Error(
 			`Fetch handler at "${fetchHandlerPath}" must export one of:\n` +
-				`- request-wide \"handle\" middleware\n` +
-				`- named \"fetch\"\n` +
-				`- default fetch handler\n` +
-				`- HTTP method exports such as \"GET\" or \"POST\"`
+				`- request-wide "handle" middleware\n` +
+				`- named "fetch"\n` +
+				'- default fetch handler\n' +
+				`- HTTP method exports such as "GET" or "POST"`
 		)
 	}
 

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from 'bun:test'
-import { type Server as HttpServer, createServer as createHttpServer } from 'node:http'
-import { type Server, connect, createServer } from 'node:net'
+import { createServer as createHttpServer, type Server as HttpServer } from 'node:http'
+import { connect, createServer, type Server } from 'node:net'
 import {
 	INBOUND_EMAIL_PATH,
 	readEnvelopeRecipient,

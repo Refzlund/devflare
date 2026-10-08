@@ -8,7 +8,7 @@ import type { ConsolaInstance } from 'consola'
 import type { Miniflare as MiniflareType } from 'miniflare'
 import { dirname, resolve } from 'pathe'
 import { isIgnorableMiniflareDisposeError } from '../bridge/miniflare'
-import { type DOBundleResult, bundleWorkerEntry } from '../bundler'
+import { bundleWorkerEntry, type DOBundleResult } from '../bundler'
 import { checkRemoteBindingRequirements } from '../cli/wrangler-auth'
 import {
 	EnvVarResolutionError,
@@ -25,8 +25,8 @@ import { discoverRoutes } from '../worker-entry/routes'
 import { bundleWorkflowEntrypointScript } from '../workflows/local-workflow-entrypoints'
 import { runD1Migrations } from './d1-migrations'
 import {
-	type DevServerState,
 	createDevServerState,
+	type DevServerState,
 	disposeDevServerState
 } from './dev-server-state'
 import {
@@ -39,11 +39,11 @@ import { buildMiniflareDevConfig, resolveR2PresignOrigin } from './miniflare-dev
 import { createMiniflareLog } from './miniflare-log'
 import { createReloadQueue } from './reload-queue'
 import {
-	RUNTIME_STATUS_PROBE_TIMEOUT_MS,
-	type RuntimeWatchdog,
 	createRuntimeWatchdog,
 	dialableHost,
-	probeTcpReachable
+	probeTcpReachable,
+	RUNTIME_STATUS_PROBE_TIMEOUT_MS,
+	type RuntimeWatchdog
 } from './runtime-health'
 import { createRuntimeLogForwarder } from './runtime-logs'
 import type { DevRuntimeState } from './runtime-status'

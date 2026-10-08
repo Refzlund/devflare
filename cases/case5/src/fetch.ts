@@ -4,7 +4,7 @@
 // Demonstrates devflare's patterns for multi-worker setups with RPC:
 // - Service bindings for worker-to-worker RPC calls
 // - Type-safe method invocation via WorkerEntrypoint pattern
-// 
+//
 // See: https://developers.cloudflare.com/workers/runtime-apis/bindings/service-bindings/rpc/
 // =============================================================================
 
@@ -65,7 +65,10 @@ export default async function fetch(
 	// Calls MATH_SERVICE.calculateStats(numbers) via RPC
 	if (url.pathname === '/stats') {
 		const numbersParam = url.searchParams.get('numbers') ?? ''
-		const numbers = numbersParam.split(',').map((s) => parseFloat(s.trim())).filter((n) => !isNaN(n))
+		const numbers = numbersParam
+			.split(',')
+			.map((s) => parseFloat(s.trim()))
+			.filter((n) => !isNaN(n))
 
 		const stats = await env.MATH_SERVICE.calculateStats(numbers)
 		return Response.json({ operation: 'stats', numbers, ...stats })

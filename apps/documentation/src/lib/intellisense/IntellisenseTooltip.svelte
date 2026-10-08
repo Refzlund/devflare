@@ -1,42 +1,38 @@
 <script lang="ts">
-	import { localizeHref } from '$lib/paraglide/runtime'
-	import { portal } from '$lib/vendor/floating-runes'
-	import {
-		cancelHideIntellisense,
-		intellisense,
-		setIntellisenseTooltipHovered
-	} from './controller'
-	import type { IntellisenseEntry, IntellisenseKind, IntellisenseLink } from './types'
+import { localizeHref } from '$lib/paraglide/runtime'
+import { portal } from '$lib/vendor/floating-runes'
+import { cancelHideIntellisense, intellisense, setIntellisenseTooltipHovered } from './controller'
+import type { IntellisenseEntry, IntellisenseKind, IntellisenseLink } from './types'
 
-	const kindLabels: Record<IntellisenseKind, string> = {
-		module: 'Module',
-		config: 'Config',
-		binding: 'Binding',
-		runtime: 'Runtime',
-		test: 'Testing',
-		cli: 'CLI',
-		flag: 'Flag',
-		env: 'Env'
-	}
+const kindLabels: Record<IntellisenseKind, string> = {
+	module: 'Module',
+	config: 'Config',
+	binding: 'Binding',
+	runtime: 'Runtime',
+	test: 'Testing',
+	cli: 'CLI',
+	flag: 'Flag',
+	env: 'Env'
+}
 
-	function resolveHref(link: IntellisenseLink): string {
-		return link.external ? link.href : localizeHref(link.href)
-	}
+function resolveHref(link: IntellisenseLink): string {
+	return link.external ? link.href : localizeHref(link.href)
+}
 
-	function isCloudflareReference(link: IntellisenseLink): boolean {
-		return link.citation === 'Cloudflare Docs' || link.href.includes('developers.cloudflare.com')
-	}
+function isCloudflareReference(link: IntellisenseLink): boolean {
+	return link.citation === 'Cloudflare Docs' || link.href.includes('developers.cloudflare.com')
+}
 
-	function getRequirementLabel(requirement: IntellisenseEntry['requirement']): string | undefined {
-		switch (requirement) {
-			case 'required':
-				return 'Required'
-			case 'contextual':
-				return 'Contextual'
-			default:
-				return undefined
-		}
+function getRequirementLabel(requirement: IntellisenseEntry['requirement']): string | undefined {
+	switch (requirement) {
+		case 'required':
+			return 'Required'
+		case 'contextual':
+			return 'Contextual'
+		default:
+			return undefined
 	}
+}
 </script>
 
 {#if intellisense.visible && intellisense.content}

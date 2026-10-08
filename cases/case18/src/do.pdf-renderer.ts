@@ -10,7 +10,7 @@
 
 import { DurableObject } from 'cloudflare:workers'
 import type { DurableObjectNamespace, Fetcher } from '@cloudflare/workers-types'
-import { PdfRequest, PdfResult, type PdfRequestData, type PdfResultData } from '$lib/models'
+import { PdfRequest, type PdfRequestData, PdfResult, type PdfResultData } from '$lib/models'
 
 interface CachedPdf {
 	pdfBase64: string
@@ -24,7 +24,6 @@ interface Env {
 }
 
 export class PdfRenderer extends DurableObject<Env> {
-
 	/**
 	 * Handle HTTP requests
 	 */
@@ -67,7 +66,7 @@ export class PdfRenderer extends DurableObject<Env> {
 		const start = Date.now()
 
 		try {
-			const body = await request.json() as PdfRequestData
+			const body = (await request.json()) as PdfRequestData
 			const pdfRequest = new PdfRequest(body)
 
 			// Check cache first
@@ -79,7 +78,10 @@ export class PdfRenderer extends DurableObject<Env> {
 				// Use chunked decode to avoid memory issues with large PDFs
 				const pdfBytes = this.base64ToUint8Array(cached.pdfBase64)
 				// Cast to ArrayBuffer for Response body compatibility
-				const bodyBuffer = pdfBytes.buffer.slice(pdfBytes.byteOffset, pdfBytes.byteOffset + pdfBytes.byteLength) as ArrayBuffer
+				const bodyBuffer = pdfBytes.buffer.slice(
+					pdfBytes.byteOffset,
+					pdfBytes.byteOffset + pdfBytes.byteLength
+				) as ArrayBuffer
 
 				return new Response(bodyBuffer, {
 					headers: {
@@ -106,7 +108,10 @@ export class PdfRenderer extends DurableObject<Env> {
 			await this.incrementStat('generated')
 
 			// Cast to ArrayBuffer for Response body compatibility
-			const bodyBuffer = pdfData.buffer.slice(pdfData.byteOffset, pdfData.byteOffset + pdfData.byteLength) as ArrayBuffer
+			const bodyBuffer = pdfData.buffer.slice(
+				pdfData.byteOffset,
+				pdfData.byteOffset + pdfData.byteLength
+			) as ArrayBuffer
 
 			return new Response(bodyBuffer, {
 				headers: {
@@ -117,8 +122,7 @@ export class PdfRenderer extends DurableObject<Env> {
 				}
 			})
 		} catch (error) {
-			const errorMessage =
-				error instanceof Error ? error.message : 'Unknown error'
+			const errorMessage = error instanceof Error ? error.message : 'Unknown error'
 
 			await this.incrementStat('errors')
 
@@ -151,23 +155,26 @@ export class PdfRenderer extends DurableObject<Env> {
 			} catch (error) {
 				lastError = error instanceof Error ? error : new Error(String(error))
 				const errorMsg = lastError.message
-				
+
 				// Check if error is retryable (connection/protocol errors)
-				const isRetryable = errorMsg.includes('Protocol error') ||
+				const isRetryable =
+					errorMsg.includes('Protocol error') ||
 					errorMsg.includes('Target closed') ||
 					errorMsg.includes('Connection closed') ||
 					errorMsg.includes('Network connection lost') ||
 					errorMsg.includes('Session closed') ||
 					errorMsg.includes('Navigation timeout')
-				
-				console.warn(`[PdfRenderer] Attempt ${attempt}/${MAX_RETRIES} failed for ${request.url}: ${errorMsg}`)
-				
+
+				console.warn(
+					`[PdfRenderer] Attempt ${attempt}/${MAX_RETRIES} failed for ${request.url}: ${errorMsg}`
+				)
+
 				if (!isRetryable || attempt >= MAX_RETRIES) {
 					break
 				}
-				
+
 				// Exponential backoff: 500ms, 1000ms, 2000ms...
-				const delay = BASE_DELAY_MS * Math.pow(2, attempt - 1)
+				const delay = BASE_DELAY_MS * 2 ** (attempt - 1)
 				await new Promise((resolve) => setTimeout(resolve, delay))
 			}
 		}
@@ -183,10 +190,12 @@ export class PdfRenderer extends DurableObject<Env> {
 	private async attemptGeneratePdf(request: PdfRequest): Promise<Uint8Array> {
 		const { default: puppeteer } = await import('@cloudflare/puppeteer')
 		// Launch browser via Browser Rendering binding
-		const browser = await puppeteer.launch(this.env.BROWSER as unknown as Parameters<typeof puppeteer.launch>[0])
+		const browser = await puppeteer.launch(
+			this.env.BROWSER as unknown as Parameters<typeof puppeteer.launch>[0]
+		)
 
 		let page: Awaited<ReturnType<typeof browser.newPage>> | null = null
-		
+
 		try {
 			page = await browser.newPage()
 
@@ -234,7 +243,7 @@ export class PdfRenderer extends DurableObject<Env> {
 					// Ignore page close errors
 				}
 			}
-			
+
 			// Gracefully close browser - ignore errors if already closed
 			try {
 				await browser.close()
@@ -255,11 +264,12 @@ export class PdfRenderer extends DurableObject<Env> {
 			return new Response('PDF not found', { status: 404 })
 		}
 
-		const pdfData = new Uint8Array(
-			[...atob(cached.pdfBase64)].map((c) => c.charCodeAt(0))
-		)
+		const pdfData = new Uint8Array([...atob(cached.pdfBase64)].map((c) => c.charCodeAt(0)))
 		// Cast to ArrayBuffer for Response body compatibility
-		const bodyBuffer = pdfData.buffer.slice(pdfData.byteOffset, pdfData.byteOffset + pdfData.byteLength) as ArrayBuffer
+		const bodyBuffer = pdfData.buffer.slice(
+			pdfData.byteOffset,
+			pdfData.byteOffset + pdfData.byteLength
+		) as ArrayBuffer
 
 		return new Response(bodyBuffer, {
 			headers: {
@@ -417,4 +427,3 @@ export class PdfRenderer extends DurableObject<Env> {
 		}
 	}
 }
-

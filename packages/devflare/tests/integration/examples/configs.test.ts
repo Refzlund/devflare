@@ -3,9 +3,9 @@ import { existsSync, readdirSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import { resolve } from 'pathe'
 import {
-	type DevflareConfig,
 	compileBuildConfig,
 	compileConfig,
+	type DevflareConfig,
 	isPreviewScopedName,
 	loadConfig,
 	resolveConfigForEnvironment
@@ -525,7 +525,7 @@ describe('repo example app configs', () => {
 		expect(isPreviewScopedName(config.bindings?.queues?.producers?.JOBS)).toBe(true)
 		expect(isPreviewScopedName(config.bindings?.vectorize?.DOCUMENT_INDEX.indexName)).toBe(true)
 		expect(
-			isPreviewScopedName((config.bindings?.hyperdrive?.POSTGRES as { name: string }).name)
+			isPreviewScopedName((config.bindings!.hyperdrive!.POSTGRES as { name: string }).name)
 		).toBe(true)
 		expect(isPreviewScopedName(config.bindings?.browser?.BROWSER)).toBe(true)
 		expect(isPreviewScopedName(config.bindings?.analyticsEngine?.APP_ANALYTICS.dataset)).toBe(true)

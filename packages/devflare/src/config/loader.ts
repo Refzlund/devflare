@@ -7,7 +7,7 @@ import { createRequire } from 'node:module'
 import { dirname, join, resolve } from 'pathe'
 import { loadDevflareDotenvIntoProcess } from './env-vars'
 import { applyFrameworkConfigProviders } from './framework-providers'
-import { type DevflareConfig, configSchema } from './schema'
+import { configSchema, type DevflareConfig } from './schema'
 
 type C12LoadConfig = typeof import('c12')['loadConfig']
 
@@ -154,7 +154,7 @@ export class ConfigValidationError extends Error {
 }
 
 export {
-	loadResolvedConfig,
 	ConfigResourceResolutionError,
-	type LoadResolvedConfigOptions
+	type LoadResolvedConfigOptions,
+	loadResolvedConfig
 } from './resource-resolution'

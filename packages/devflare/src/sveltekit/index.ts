@@ -5,18 +5,18 @@
 // =============================================================================
 
 export {
-	// Pre-configured handle — just re-export for simplest usage
-	handle,
+	type CreateHandleOptions,
 	// Factory for custom configuration
 	createDevflarePlatform,
 	createHandle,
-	// Utilities
-	resetPlatform,
-	resetConfigCache,
-	isDevflareDev,
+	type DevflarePlatformOptions,
 	getBridgePort,
+	// Pre-configured handle — just re-export for simplest usage
+	handle,
+	isDevflareDev,
 	// Types
 	type Platform,
-	type DevflarePlatformOptions,
-	type CreateHandleOptions
+	resetConfigCache,
+	// Utilities
+	resetPlatform
 } from './platform'

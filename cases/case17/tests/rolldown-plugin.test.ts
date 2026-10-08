@@ -27,7 +27,7 @@ function createBuildMetadataTransform(buildTime: string): TransformFn {
 /**
  * Creates an env info transform
  */
-function createEnvInfoTransform(env: { mode: string, nodeVersion: string }): TransformFn {
+function createEnvInfoTransform(env: { mode: string; nodeVersion: string }): TransformFn {
 	return (code: string, id: string) => {
 		if (id.endsWith('.ts')) {
 			return code
@@ -148,7 +148,7 @@ describe('Case 17: Plugin Namespace Example', () => {
 
 			const result = resolver.load('\0virtual:config')
 
-			expect(result).toContain("export const config")
+			expect(result).toContain('export const config')
 			expect(result).toContain("name: 'test'")
 		})
 

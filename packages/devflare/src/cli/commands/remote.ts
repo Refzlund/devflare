@@ -48,9 +48,9 @@ function showStatus(): void {
 
 	log()
 	log(`${DIM}Commands:${RESET}`)
-	log(`  devflare remote enable [minutes]  Enable for N minutes (default: 30)`)
-	log(`  devflare remote disable           Disable immediately`)
-	log(`  devflare remote status            Show current status`)
+	log('  devflare remote enable [minutes]  Enable for N minutes (default: 30)')
+	log('  devflare remote disable           Disable immediately')
+	log('  devflare remote status            Show current status')
 	log()
 }
 
@@ -84,9 +84,9 @@ function disable(): void {
 		log(
 			`${YELLOW}⚠${RESET}  Note: ${BOLD}DEVFLARE_REMOTE${RESET} environment variable is still set.`
 		)
-		log(`   Remote mode will remain active until you unset it.`)
+		log('   Remote mode will remain active until you unset it.')
 	} else {
-		log(`  Remote-only tests (AI, Vectorize) will now be skipped.`)
+		log('  Remote-only tests (AI, Vectorize) will now be skipped.')
 	}
 	log()
 }

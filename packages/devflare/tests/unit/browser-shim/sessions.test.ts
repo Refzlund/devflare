@@ -1,10 +1,10 @@
 import { describe, expect, test } from 'bun:test'
 import {
 	type BrowserSessionRegistry,
+	createSessionRegistry,
 	type LaunchedBrowser,
 	type SessionBrowser,
-	SessionLimitError,
-	createSessionRegistry
+	SessionLimitError
 } from '../../../src/browser-shim/sessions'
 
 // The shim server cannot start without downloading Chrome, so until the

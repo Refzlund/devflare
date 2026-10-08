@@ -7,33 +7,28 @@
 // =============================================================================
 
 export {
-	defineConfig,
 	type DefineConfigInput,
+	defineConfig,
+	defineConfig as default,
 	type TypedConfig
 } from './config/define'
-
 export {
-	env,
 	type EnvVarDescriptor,
+	env,
 	type InferConfigVars
 } from './config/env-vars'
-
 export {
-	preview,
+	type PreviewScopedName,
+	type PreviewScopedNameOptions,
 	type PreviewScopeFn,
 	type PreviewScopeOptions,
-	type PreviewScopedName,
-	type PreviewScopedNameOptions
+	preview
 } from './config/preview'
-
 export {
-	ref,
+	type DOBindingRef,
 	type RefResult,
+	ref,
 	type WorkerBinding,
-	type WorkerBindingAccessor,
-	type DOBindingRef
+	type WorkerBindingAccessor
 } from './config/ref'
-
 export type * from './config/schema-types'
-
-export { defineConfig as default } from './config/define'

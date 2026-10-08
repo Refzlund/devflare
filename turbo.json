@@ -10,14 +10,10 @@
 	],
 	"tasks": {
 		"transit": {
-			"dependsOn": [
-				"^transit"
-			]
+			"dependsOn": ["^transit"]
 		},
 		"build": {
-			"dependsOn": [
-				"^build"
-			],
+			"dependsOn": ["^build"],
 			"outputs": [
 				"dist/**",
 				".svelte-kit/**",
@@ -28,10 +24,7 @@
 			]
 		},
 		"test": {
-			"dependsOn": [
-				"^build",
-				"transit"
-			],
+			"dependsOn": ["^build", "transit"],
 			"outputs": []
 		},
 		"test:watch": {
@@ -39,30 +32,16 @@
 			"persistent": true
 		},
 		"types": {
-			"dependsOn": [
-				"^build",
-				"transit"
-			],
-			"outputs": [
-				"env.d.ts"
-			]
+			"dependsOn": ["^build", "transit"],
+			"outputs": ["env.d.ts"]
 		},
 		"typecheck": {
-			"dependsOn": [
-				"transit"
-			],
+			"dependsOn": ["transit"],
 			"outputs": []
 		},
 		"check": {
-			"dependsOn": [
-				"^build",
-				"transit"
-			],
-			"outputs": [
-				".svelte-kit/**",
-				"src/lib/paraglide/**",
-				"env.d.ts"
-			]
+			"dependsOn": ["^build", "transit"],
+			"outputs": [".svelte-kit/**", "src/lib/paraglide/**", "env.d.ts"]
 		},
 		"dev": {
 			"cache": false,

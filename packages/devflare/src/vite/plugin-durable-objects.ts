@@ -22,7 +22,7 @@ export const VIRTUAL_DO_ENTRY = 'virtual:devflare-do-entry'
 export const RESOLVED_VIRTUAL_DO_ENTRY = '\0' + VIRTUAL_DO_ENTRY
 
 // Re-exported from the shared helper so existing import paths keep working.
-export { discoverDurableObjects, type DODiscoveryResult }
+export { type DODiscoveryResult, discoverDurableObjects }
 
 export interface AuxiliaryWorkerConfig {
 	config: Record<string, unknown>

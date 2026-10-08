@@ -34,9 +34,9 @@ export function shouldRegenerateLLMDocuments(filePath: string): boolean {
 	return LLM_SOURCE_MATCHERS.some((matcher) => normalizedFilePath.includes(matcher))
 }
 
-export async function generateLLMDocuments(options: {
-	outputDirs?: readonly string[]
-} = {}): Promise<GenerateLLMDocumentsResult> {
+export async function generateLLMDocuments(
+	options: { outputDirs?: readonly string[] } = {}
+): Promise<GenerateLLMDocumentsResult> {
 	const outputDirs = options.outputDirs ?? getGeneratedLLMOutputDirs()
 	const documents: Record<GeneratedLLMFileName, string> = {
 		'LLM.md': `${buildLLMDocument().trimEnd()}\n`,

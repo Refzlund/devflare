@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import {
-	EMAIL_MAX_MESSAGE_BYTES,
 	buildEmailMessage,
+	EMAIL_MAX_MESSAGE_BYTES,
 	formatAddressHeader,
 	parseEmailMessage,
 	toBareAddressList

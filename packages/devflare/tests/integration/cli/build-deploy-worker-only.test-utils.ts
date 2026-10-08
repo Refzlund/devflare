@@ -3,18 +3,19 @@ import { dirname, join } from 'pathe'
 import { runDeployCommand } from '../../../src/cli/commands/deploy'
 import { setDependencies } from '../../../src/cli/dependencies'
 import { jsonResponse } from '../../helpers/cloudflare-api'
-import { type TestLogger, createLogger } from '../../helpers/mock-logger'
+import { createLogger, type TestLogger } from '../../helpers/mock-logger'
 import {
-	type ExecInvocation,
 	createCliDependencies,
 	createProcessRunner,
+	type ExecInvocation,
 	successResult
 } from '../../helpers/process-runner'
+
 export {
 	createCliDependencies,
 	createProcessRunner,
-	successResult,
-	type ExecInvocation
+	type ExecInvocation,
+	successResult
 } from '../../helpers/process-runner'
 export { createLogger, type TestLogger }
 
@@ -210,10 +211,7 @@ export async function runWorkerOnlyDeploy(projectDir: string, logger: TestLogger
 }
 
 export function createWranglerDeployProcessRunner(
-	options: {
-		stdout?: string
-		structuredOutput?: Record<string, unknown>
-	} = {}
+	options: { stdout?: string; structuredOutput?: Record<string, unknown> } = {}
 ): Parameters<typeof createProcessRunner>[0] {
 	return async (command, args, executionOptions) => {
 		if (command === 'bunx' && args[0] === 'wrangler' && args[1] === 'deploy') {

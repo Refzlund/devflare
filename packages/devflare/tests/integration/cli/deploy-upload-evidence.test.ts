@@ -4,8 +4,6 @@ import { tmpdir } from 'node:os'
 import { join } from 'pathe'
 import { clearDependencies } from '../../../src/cli/dependencies'
 import {
-	TEST_ACCOUNT_ID,
-	TEST_UPLOAD_VERSION_ID,
 	captureDeployEnvironmentSnapshot,
 	classifyWranglerUploadExecution,
 	cloudflareApiResponse,
@@ -19,6 +17,8 @@ import {
 	restoreDeployEnvironmentSnapshot,
 	runWorkerOnlyDeploy,
 	successResult,
+	TEST_ACCOUNT_ID,
+	TEST_UPLOAD_VERSION_ID,
 	writeAccountProjectFiles,
 	writeProjectFiles
 } from './build-deploy-worker-only.test-utils'

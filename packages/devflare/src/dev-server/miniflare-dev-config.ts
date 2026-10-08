@@ -44,12 +44,12 @@ import {
 	buildWorkflowsConfig
 } from './miniflare-bindings'
 import {
+	buildServiceBindings,
 	type MakeMiniflareWorkerContext,
 	type MiniflareServiceBinding,
-	buildServiceBindings,
 	makeMiniflareWorker
 } from './miniflare-worker-config'
-import { type WorkerSurfacePaths, hasWorkerSurfacePaths } from './worker-surface-paths'
+import { hasWorkerSurfacePaths, type WorkerSurfacePaths } from './worker-surface-paths'
 
 const INTERNAL_APP_SERVICE_BINDING = '__DEVFLARE_APP'
 type ServiceBindingResolution = Awaited<ReturnType<typeof resolveServiceBindings>>

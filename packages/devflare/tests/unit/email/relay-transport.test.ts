@@ -9,7 +9,7 @@
 // =============================================================================
 
 import { afterEach, describe, expect, test } from 'bun:test'
-import { type Server, connect, createServer } from 'node:net'
+import { connect, createServer, type Server } from 'node:net'
 import { createHostEmailDeliverySink } from '../../../src/email/host-sink'
 import { getOutbox, resetOutbox } from '../../../src/email/outbox'
 import type { ResolvedEmailRuntime } from '../../../src/email/runtime-config'

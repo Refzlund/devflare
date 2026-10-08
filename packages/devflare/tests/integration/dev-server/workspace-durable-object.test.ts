@@ -16,8 +16,8 @@ import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'pathe'
 import {
-	type WorkspaceDevServer,
-	createWorkspaceDevServer
+	createWorkspaceDevServer,
+	type WorkspaceDevServer
 } from '../../../src/dev-server/workspace/server'
 import {
 	cleanupTempDirs,

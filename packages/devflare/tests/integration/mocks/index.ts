@@ -2,22 +2,22 @@
 // Integration Test Mocks — Index
 // =============================================================================
 
-export { createVirtualFS, VirtualFileSystem } from './virtual-fs'
 export {
-	createMockExeca,
-	createEmptyMockExeca,
-	createMockProcessRunner,
-	MockExeca,
-	type CommandExecution,
-	type MockExecResult,
-	type CommandMatcher
-} from './mock-execa'
-export {
-	createTestHarness,
-	createStandardProjectHarness,
 	createParsedArgs,
+	createStandardProjectHarness,
+	createTestHarness,
 	STANDARD_PROJECT_FILES,
 	type TestHarness,
 	type TestHarnessOptions,
 	type TestLogger
 } from './harness'
+export {
+	type CommandExecution,
+	type CommandMatcher,
+	createEmptyMockExeca,
+	createMockExeca,
+	createMockProcessRunner,
+	MockExeca,
+	type MockExecResult
+} from './mock-execa'
+export { createVirtualFS, VirtualFileSystem } from './virtual-fs'

@@ -12,20 +12,20 @@
 // reader-side queue.
 // =============================================================================
 
-import {
-	TransportV2BinaryFlags,
-	TransportV2BinaryKind,
-	encodeTransportV2BinaryFrame,
-	stringifyTransportV2ControlMsg,
-	transportV2IsAbort,
-	transportV2IsFin
-} from './frames'
 import type {
 	TransportV2BodyAbort,
 	TransportV2BodyEnd,
 	TransportV2BodyKind,
 	TransportV2BodyOpen,
 	TransportV2DecodedBinaryFrame
+} from './frames'
+import {
+	encodeTransportV2BinaryFrame,
+	stringifyTransportV2ControlMsg,
+	TransportV2BinaryFlags,
+	TransportV2BinaryKind,
+	transportV2IsAbort,
+	transportV2IsFin
 } from './frames'
 
 /** Default maximum payload size per body chunk frame (256 KiB). */

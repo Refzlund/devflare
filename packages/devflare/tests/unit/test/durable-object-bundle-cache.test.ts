@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeEach, describe, expect, test } from 'bun:test'
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { DevflareConfig } from '../../../src/config'
 import { __resetDurableObjectBundleCache } from '../../../src/test/durable-object-bundle-cache'
@@ -63,13 +63,13 @@ function createProject(): string {
 function durableObjectSource(marker: string): string {
 	return [
 		`import { GREETING } from './shared'`,
-		``,
-		`export class Counter {`,
-		`	greet() {`,
+		'',
+		'export class Counter {',
+		'	greet() {',
 		`		return GREETING + '${marker}'`,
-		`	}`,
-		`}`,
-		``
+		'	}',
+		'}',
+		''
 	].join('\n')
 }
 
@@ -139,13 +139,13 @@ describe('durable object bundle cache', () => {
 			join(projectDir, 'src', 'do.counter.ts'),
 			[
 				`import { MODE } from './mode'`,
-				``,
-				`export class Counter {`,
-				`	greet() {`,
-				`		return MODE`,
-				`	}`,
-				`}`,
-				``
+				'',
+				'export class Counter {',
+				'	greet() {',
+				'		return MODE',
+				'	}',
+				'}',
+				''
 			].join('\n')
 		)
 		expect((await buildGateway(projectDir)).includes('from-js')).toBe(true)

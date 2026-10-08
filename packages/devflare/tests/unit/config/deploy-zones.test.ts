@@ -2,11 +2,11 @@ import { describe, expect, mock, test } from 'bun:test'
 import { prepareMaterializedConfigResourcesForDeploy } from '../../../src/config/deploy-resources'
 import {
 	DEVFLARE_RECORD_COMMENT,
+	provisionZoneResources,
+	qualifyRecordName,
 	type ZoneProvisionApi,
 	ZoneProvisionError,
-	type ZoneProvisionResult,
-	provisionZoneResources,
-	qualifyRecordName
+	type ZoneProvisionResult
 } from '../../../src/config/deploy-zones'
 import type { DevflareConfig } from '../../../src/config/schema'
 

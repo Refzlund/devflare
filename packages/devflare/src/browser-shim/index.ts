@@ -8,5 +8,5 @@
 // it would to Cloudflare's Browser Rendering service.
 // =============================================================================
 
-export { createBrowserShim, type BrowserShimOptions, type BrowserShim } from './server'
-export { createBrowserNodeHandler, type BrowserNodeHandlerOptions } from './handler'
+export { type BrowserNodeHandlerOptions, createBrowserNodeHandler } from './handler'
+export { type BrowserShim, type BrowserShimOptions, createBrowserShim } from './server'

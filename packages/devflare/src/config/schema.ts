@@ -273,6 +273,98 @@ export const configSchema = canonicalConfigSchema
 export type DevflareConfig = z.output<typeof configSchema>
 
 export type {
+	ArtifactsBinding,
+	BrowserBindings,
+	D1Binding,
+	DispatchNamespaceBinding,
+	DurableObjectBinding,
+	FlagshipBinding,
+	HyperdriveBinding,
+	ImagesBinding,
+	KVBinding,
+	MediaBinding,
+	MtlsCertificateBinding,
+	PipelineBinding,
+	QueueConsumer,
+	QueueProducer,
+	QueuesConfig,
+	R2Binding,
+	RateLimitBinding,
+	SecretsStoreBinding,
+	ServiceBinding,
+	StreamBinding,
+	VersionMetadataBinding,
+	VpcNetworkBinding,
+	VpcServiceBinding,
+	WorkerLoaderBinding,
+	WorkflowBinding
+} from './schema-bindings'
+export { browserBindingSchema, formatBrowserBindingLimitMessage } from './schema-bindings'
+export type {
+	DevflareRolldownOptions,
+	DevflareRolldownOutputOptions,
+	RolldownConfig,
+	ViteConfig
+} from './schema-build'
+export type { DevflareEnvConfig } from './schema-env'
+export type {
+	NormalizedArtifactsBinding,
+	NormalizedD1Binding,
+	NormalizedDispatchNamespaceBinding,
+	NormalizedDOBinding,
+	NormalizedFlagshipBinding,
+	NormalizedHyperdriveBinding,
+	NormalizedImagesBinding,
+	NormalizedKVBinding,
+	NormalizedMediaBinding,
+	NormalizedMtlsCertificateBinding,
+	NormalizedPipelineBinding,
+	NormalizedQueueProducer,
+	NormalizedR2Binding,
+	NormalizedSecretsStoreBinding,
+	NormalizedStreamBinding,
+	NormalizedVpcNetworkBinding,
+	NormalizedVpcServiceBinding,
+	NormalizedWorkflowBinding
+} from './schema-normalization'
+export {
+	getLocalD1DatabaseIdentifier,
+	getLocalHyperdriveConfigIdentifier,
+	getLocalKVNamespaceIdentifier,
+	getSingleBrowserBindingName,
+	normalizeArtifactsBinding,
+	normalizeD1Binding,
+	normalizeDispatchNamespaceBinding,
+	normalizeDOBinding,
+	normalizeFlagshipBinding,
+	normalizeHyperdriveBinding,
+	normalizeImagesBinding,
+	normalizeKVBinding,
+	normalizeMediaBinding,
+	normalizeMtlsCertificateBinding,
+	normalizePipelineBinding,
+	normalizeQueueProducer,
+	normalizeR2Binding,
+	normalizeSecretsStoreBinding,
+	normalizeStreamBinding,
+	normalizeVpcNetworkBinding,
+	normalizeVpcServiceBinding,
+	normalizeWorkflowBinding
+} from './schema-normalization'
+export type {
+	AssetsConfig,
+	ContainerConfig,
+	MigrationConfig,
+	ModuleRuleConfig,
+	PlacementConfig,
+	PreviewConfig,
+	RouteConfig,
+	ServerConfig,
+	StreamingTailConsumerConfig,
+	TailConsumerConfig,
+	WsRouteConfig
+} from './schema-runtime'
+export type {
 	AiBindingInput,
 	AiSearchInstanceBindingInput,
 	AiSearchNamespaceBindingInput,
@@ -340,8 +432,8 @@ export type {
 	StreamingTailConsumerObjectConfigInput,
 	TailConsumerConfigInput,
 	TailConsumerObjectConfigInput,
-	TargetedHostPlacementConfigInput,
 	TargetedHostnamePlacementConfigInput,
+	TargetedHostPlacementConfigInput,
 	TargetedRegionPlacementConfigInput,
 	TriggersConfigInput,
 	VectorizeBindingInput,
@@ -351,102 +443,9 @@ export type {
 	VpcNetworkByNetworkInput,
 	VpcNetworkByTunnelInput,
 	VpcServiceBindingInput,
+	WorkerLoaderBindingInput,
 	WorkflowBindingInput,
 	WorkflowLimitsInput,
-	WorkerLoaderBindingInput,
 	WranglerConfigInput,
 	WsRouteConfigInput
 } from './schema-types'
-
-export type {
-	DevflareRolldownOptions,
-	DevflareRolldownOutputOptions,
-	RolldownConfig,
-	ViteConfig
-} from './schema-build'
-export type {
-	BrowserBindings,
-	D1Binding,
-	DurableObjectBinding,
-	HyperdriveBinding,
-	KVBinding,
-	R2Binding,
-	QueueProducer,
-	QueueConsumer,
-	QueuesConfig,
-	RateLimitBinding,
-	VersionMetadataBinding,
-	WorkerLoaderBinding,
-	SecretsStoreBinding,
-	DispatchNamespaceBinding,
-	WorkflowBinding,
-	PipelineBinding,
-	ImagesBinding,
-	MediaBinding,
-	ArtifactsBinding,
-	StreamBinding,
-	VpcServiceBinding,
-	VpcNetworkBinding,
-	FlagshipBinding,
-	ServiceBinding,
-	MtlsCertificateBinding
-} from './schema-bindings'
-export type { DevflareEnvConfig } from './schema-env'
-export type {
-	AssetsConfig,
-	ContainerConfig,
-	MigrationConfig,
-	ModuleRuleConfig,
-	PlacementConfig,
-	PreviewConfig,
-	RouteConfig,
-	ServerConfig,
-	StreamingTailConsumerConfig,
-	TailConsumerConfig,
-	WsRouteConfig
-} from './schema-runtime'
-export type {
-	NormalizedD1Binding,
-	NormalizedDispatchNamespaceBinding,
-	NormalizedDOBinding,
-	NormalizedHyperdriveBinding,
-	NormalizedKVBinding,
-	NormalizedR2Binding,
-	NormalizedQueueProducer,
-	NormalizedMtlsCertificateBinding,
-	NormalizedWorkflowBinding,
-	NormalizedPipelineBinding,
-	NormalizedImagesBinding,
-	NormalizedMediaBinding,
-	NormalizedArtifactsBinding,
-	NormalizedStreamBinding,
-	NormalizedVpcServiceBinding,
-	NormalizedVpcNetworkBinding,
-	NormalizedFlagshipBinding,
-	NormalizedSecretsStoreBinding
-} from './schema-normalization'
-export {
-	getLocalD1DatabaseIdentifier,
-	getLocalHyperdriveConfigIdentifier,
-	getLocalKVNamespaceIdentifier,
-	getSingleBrowserBindingName,
-	normalizeD1Binding,
-	normalizeDispatchNamespaceBinding,
-	normalizeDOBinding,
-	normalizeHyperdriveBinding,
-	normalizeKVBinding,
-	normalizeR2Binding,
-	normalizeQueueProducer,
-	normalizeMtlsCertificateBinding,
-	normalizeWorkflowBinding,
-	normalizePipelineBinding,
-	normalizeImagesBinding,
-	normalizeMediaBinding,
-	normalizeStreamBinding,
-	normalizeVpcServiceBinding,
-	normalizeVpcNetworkBinding,
-	normalizeFlagshipBinding,
-	normalizeSecretsStoreBinding,
-	normalizeArtifactsBinding
-} from './schema-normalization'
-export { browserBindingSchema, formatBrowserBindingLimitMessage } from './schema-bindings'

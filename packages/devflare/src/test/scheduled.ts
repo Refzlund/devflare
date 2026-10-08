@@ -11,8 +11,8 @@
 //   await cf.scheduled.trigger()
 // =============================================================================
 
-import { join } from 'path'
 import type { ScheduledController } from '@cloudflare/workers-types'
+import { join } from 'path'
 import { assertValidCronExpression } from '../config/cron'
 import { createScheduledEvent, runWithEventContext } from '../runtime'
 import { createTestExecutionContext } from './execution-context'
@@ -143,7 +143,7 @@ async function trigger(
 	if (typeof scheduledHandler !== 'function') {
 		throw new Error(
 			`Scheduled handler at "${scheduledHandlerPath}" must export a default function or named "scheduled" export.\n` +
-				`Expected: export async function scheduled(event) { ... }`
+				'Expected: export async function scheduled(event) { ... }'
 		)
 	}
 

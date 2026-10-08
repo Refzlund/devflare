@@ -16,21 +16,21 @@
 // =============================================================================
 
 import { TransportV2BodyReaderRegistry } from './body-streams'
-import {
-	TRANSPORT_V2_PROTOCOL_VERSION,
-	TRANSPORT_V2_UNSUPPORTED_VERSION_CLOSE_CODE,
-	TransportV2BinaryKind,
-	decodeTransportV2BinaryFrame,
-	negotiateTransportV2Capabilities,
-	parseTransportV2ControlMsg,
-	stringifyTransportV2ControlMsg
-} from './frames'
 import type {
 	TransportV2BodyKind,
 	TransportV2ControlMsg,
 	TransportV2DecodedBinaryFrame,
 	TransportV2Hello,
 	TransportV2Welcome
+} from './frames'
+import {
+	decodeTransportV2BinaryFrame,
+	negotiateTransportV2Capabilities,
+	parseTransportV2ControlMsg,
+	stringifyTransportV2ControlMsg,
+	TRANSPORT_V2_PROTOCOL_VERSION,
+	TRANSPORT_V2_UNSUPPORTED_VERSION_CLOSE_CODE,
+	TransportV2BinaryKind
 } from './frames'
 import type { WebSocketLike, WebSocketLikeMessageEvent } from './transport'
 

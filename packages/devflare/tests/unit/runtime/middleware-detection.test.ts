@@ -5,8 +5,8 @@
 import { describe, expect, test } from 'bun:test'
 import { createFetchEvent, runWithEventContext } from '../../../src/runtime/context'
 import {
-	type FetchMiddleware,
 	defineFetchHandler,
+	type FetchMiddleware,
 	invokeFetchHandler,
 	sequence
 } from '../../../src/runtime/middleware'

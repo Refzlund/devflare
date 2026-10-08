@@ -13,16 +13,23 @@ import type { RequestHandler } from './$types'
 export const GET: RequestHandler = async ({ request, platform, url }) => {
 	try {
 		if (!platform?.env?.CHAT_ROOM) {
-			return new Response(JSON.stringify({
-				error: 'CHAT_ROOM binding not available',
-				hint: 'In dev mode, DOs require SvelteKit 3.0 (PR #14008). Use build-first approach: vite build && wrangler dev -c .devflare/wrangler.jsonc -c .devflare/wrangler.do.jsonc',
-				hasPlatform: !!platform,
-				hasEnv: !!platform?.env,
-				envKeys: platform?.env ? Object.keys(platform.env) : []
-			}, null, 2), {
-				status: 503,
-				headers: { 'Content-Type': 'application/json' }
-			})
+			return new Response(
+				JSON.stringify(
+					{
+						error: 'CHAT_ROOM binding not available',
+						hint: 'In dev mode, DOs require SvelteKit 3.0 (PR #14008). Use build-first approach: vite build && wrangler dev -c .devflare/wrangler.jsonc -c .devflare/wrangler.do.jsonc',
+						hasPlatform: !!platform,
+						hasEnv: !!platform?.env,
+						envKeys: platform?.env ? Object.keys(platform.env) : []
+					},
+					null,
+					2
+				),
+				{
+					status: 503,
+					headers: { 'Content-Type': 'application/json' }
+				}
+			)
 		}
 
 		const roomId = url.searchParams.get('roomId') || 'default'
@@ -59,12 +66,19 @@ export const GET: RequestHandler = async ({ request, platform, url }) => {
 		})
 	} catch (error) {
 		console.error('[chat/api] Error:', error)
-		return new Response(JSON.stringify({
-			error: error instanceof Error ? error.message : String(error),
-			hint: 'In dev mode, stub.fetch() to external DO workers does not work with getPlatformProxy. See GitHub issue #5918.'
-		}, null, 2), {
-			status: 500,
-			headers: { 'Content-Type': 'application/json' }
-		})
+		return new Response(
+			JSON.stringify(
+				{
+					error: error instanceof Error ? error.message : String(error),
+					hint: 'In dev mode, stub.fetch() to external DO workers does not work with getPlatformProxy. See GitHub issue #5918.'
+				},
+				null,
+				2
+			),
+			{
+				status: 500,
+				headers: { 'Content-Type': 'application/json' }
+			}
+		)
 	}
 }

@@ -3,8 +3,8 @@
 // =============================================================================
 
 import { describe, expect, test } from 'bun:test'
-import { executeRpcMethod } from '../../../src/bridge/server'
 import type { GatewayEnv } from '../../../src/bridge/server'
+import { executeRpcMethod } from '../../../src/bridge/server'
 import { serializeRequest } from '../../../src/bridge/v2/value-serialization'
 
 const noopCtx = {

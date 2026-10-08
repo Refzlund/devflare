@@ -15,8 +15,8 @@ import {
 	getAllServiceStatus,
 	getPrimaryAccount,
 	getServiceStatus,
-	getWorkerVersionDetail,
 	getWorkersSubdomain,
+	getWorkerVersionDetail,
 	hasService,
 	listAIModels,
 	listD1Databases,
@@ -24,37 +24,12 @@ import {
 	listR2Buckets,
 	listVectorizeIndexes,
 	listWorkerDeployments,
-	listWorkerVersions,
 	listWorkers,
+	listWorkerVersions,
 	queryD1Database,
 	rawD1DatabaseQuery,
 	renameWorker
 } from './account'
-
-import {
-	canProceedWithTest,
-	getAllUsageSummaries,
-	getLimits,
-	getUsage,
-	getUsageSummary,
-	isWithinLimits,
-	recordTestUsage,
-	recordUsage,
-	resetUsage,
-	setLimits,
-	setLimitsEnabled,
-	shouldSkip
-} from './usage'
-
-import {
-	clearGlobalDefaultAccountId,
-	getEffectiveAccountId,
-	getGlobalDefaultAccountId,
-	getWorkspaceAccountId,
-	setGlobalDefaultAccountId,
-	setWorkspaceAccountId
-} from './preferences'
-
 import { type APIClientOptions, AuthenticationError, CloudflareAPIError } from './api'
 import {
 	getApiToken,
@@ -64,8 +39,16 @@ import {
 	isAuthenticated
 } from './auth'
 import {
-	DEVFLARE_PREVIEW_REGISTRY_DATABASE,
+	clearGlobalDefaultAccountId,
+	getEffectiveAccountId,
+	getGlobalDefaultAccountId,
+	getWorkspaceAccountId,
+	setGlobalDefaultAccountId,
+	setWorkspaceAccountId
+} from './preferences'
+import {
 	cleanupPreviewRegistry,
+	DEVFLARE_PREVIEW_REGISTRY_DATABASE,
 	ensurePreviewRegistry,
 	getPreviewRegistryContext,
 	listTrackedDeploymentRecords,
@@ -82,19 +65,33 @@ import {
 	listAccountTokenPermissionGroups,
 	normalizeDevflareTokenName
 } from './tokens'
+import {
+	canProceedWithTest,
+	getAllUsageSummaries,
+	getLimits,
+	getUsage,
+	getUsageSummary,
+	isWithinLimits,
+	recordTestUsage,
+	recordUsage,
+	resetUsage,
+	setLimits,
+	setLimitsEnabled,
+	shouldSkip
+} from './usage'
 
 export {
-	devflareAccountRecordSchema,
 	createDevflareAccountRecordSchema,
-	devflareRecordSourceSchema,
-	devflarePreviewStatusSchema,
-	devflarePreviewScopeStatusSchema,
+	devflareAccountLayerRecordSchema,
+	devflareAccountRecordSchema,
 	devflareDeploymentChannelSchema,
+	devflareDeploymentRecordSchema,
 	devflareDeploymentStatusSchema,
 	devflarePreviewRecordSchema,
 	devflarePreviewScopeRecordSchema,
-	devflareDeploymentRecordSchema,
-	devflareAccountLayerRecordSchema
+	devflarePreviewScopeStatusSchema,
+	devflarePreviewStatusSchema,
+	devflareRecordSourceSchema
 } from './registry-schema'
 
 // -----------------------------------------------------------------------------
@@ -342,68 +339,64 @@ export const account = {
 // Type Exports
 // -----------------------------------------------------------------------------
 
+export type { RenamedWorkerInfo } from './account'
+export type {
+	CleanupPreviewRegistryResult,
+	PreviewRegistryContext,
+	ReconcilePreviewRegistryResult,
+	RetirePreviewRegistryResult
+} from './preview-registry'
+export {
+	cleanupPreviewRegistry,
+	DEVFLARE_PREVIEW_REGISTRY_DATABASE,
+	ensurePreviewRegistry,
+	getPreviewRegistryContext,
+	listTrackedDeploymentRecords,
+	listTrackedPreviewRecords,
+	listTrackedPreviewScopeRecords,
+	listTrackedRegistryState,
+	reconcilePreviewRegistry,
+	retirePreviewRegistry
+} from './preview-registry'
+export type {
+	CloudflareUserId,
+	DevflareAccountLayerRecord,
+	DevflareAccountRecord,
+	DevflareDeploymentChannel,
+	DevflareDeploymentRecord,
+	DevflareDeploymentStatus,
+	DevflarePreviewRecord,
+	DevflarePreviewScopeRecord,
+	DevflarePreviewScopeStatus,
+	DevflarePreviewStatus,
+	DevflareRecordSource
+} from './registry-schema'
 export type {
 	AccountInfo,
+	AccountOwnedAPIToken,
+	AccountOwnedAPITokenDeleteResult,
+	AccountOwnedAPITokenPermissionGroup,
+	AccountOwnedAPITokenPolicy,
+	AccountTokenPermissionGroup,
+	AIModelInfo,
 	CloudflareAccount,
 	CloudflareService,
-	ServiceStatus,
-	WorkerInfo,
-	WorkerVersionInfo,
-	WorkerDeploymentInfo,
-	KVNamespaceInfo,
 	D1DatabaseInfo,
 	D1QueryParameter,
 	D1QueryResult,
 	D1RawQueryResult,
+	KVNamespaceInfo,
 	R2BucketInfo,
-	VectorizeIndexInfo,
-	AIModelInfo,
-	UsageRecord,
+	ServiceStatus,
 	UsageLimits,
+	UsageRecord,
 	UsageSummary,
-	WranglerAuth,
-	AccountTokenPermissionGroup,
-	AccountOwnedAPIToken,
-	AccountOwnedAPITokenDeleteResult,
-	AccountOwnedAPITokenPermissionGroup,
-	AccountOwnedAPITokenPolicy
+	VectorizeIndexInfo,
+	WorkerDeploymentInfo,
+	WorkerInfo,
+	WorkerVersionInfo,
+	WranglerAuth
 } from './types'
-
-export type { RenamedWorkerInfo } from './account'
-
-export type {
-	CloudflareUserId,
-	DevflareAccountRecord,
-	DevflareRecordSource,
-	DevflarePreviewStatus,
-	DevflarePreviewScopeStatus,
-	DevflareDeploymentChannel,
-	DevflareDeploymentStatus,
-	DevflarePreviewRecord,
-	DevflarePreviewScopeRecord,
-	DevflareDeploymentRecord,
-	DevflareAccountLayerRecord
-} from './registry-schema'
-
-export type {
-	PreviewRegistryContext,
-	ReconcilePreviewRegistryResult,
-	CleanupPreviewRegistryResult,
-	RetirePreviewRegistryResult
-} from './preview-registry'
-
-export {
-	ensurePreviewRegistry,
-	getPreviewRegistryContext,
-	listTrackedRegistryState,
-	listTrackedPreviewRecords,
-	listTrackedPreviewScopeRecords,
-	listTrackedDeploymentRecords,
-	reconcilePreviewRegistry,
-	cleanupPreviewRegistry,
-	retirePreviewRegistry,
-	DEVFLARE_PREVIEW_REGISTRY_DATABASE
-} from './preview-registry'
 
 // -----------------------------------------------------------------------------
 // Zone-scoped Exports
@@ -411,45 +404,44 @@ export {
 // Everything above is account-scoped. These reach a ZONE, which is a different
 // identifier, a different lookup, and a different token scope.
 
-export {
-	resolveZone,
-	getEmailRoutingSettings,
-	enableEmailRouting,
-	listEmailRoutingRules,
-	createEmailRoutingRule,
-	getEmailRoutingCatchAll,
-	setEmailRoutingCatchAll,
-	listDnsRecords,
-	createDnsRecord,
-	updateDnsRecord,
-	listSendingDomains,
-	createSendingDomain,
-	getSendingDomainDnsStatus
-} from './zone-resources'
-export type {
-	ZoneInfo,
-	ResolvedZone,
-	EmailRoutingMatcher,
-	EmailRoutingAction,
-	EmailRoutingRule,
-	EmailRoutingSettings,
-	DnsRecord,
-	SendingDomain,
-	SendingDomainDnsStatus
-} from './zone-resources'
-
-export { listDestinationAddresses, createDestinationAddress } from './email-addresses'
 export type { DestinationAddress } from './email-addresses'
-export { listEventSubscriptions, createEventSubscription } from './event-subscriptions'
+export { createDestinationAddress, listDestinationAddresses } from './email-addresses'
 export type {
 	EventSubscription,
-	EventSubscriptionSource,
-	EventSubscriptionDestination
+	EventSubscriptionDestination,
+	EventSubscriptionSource
 } from './event-subscriptions'
+export { createEventSubscription, listEventSubscriptions } from './event-subscriptions'
+export type {
+	DnsRecord,
+	EmailRoutingAction,
+	EmailRoutingMatcher,
+	EmailRoutingRule,
+	EmailRoutingSettings,
+	ResolvedZone,
+	SendingDomain,
+	SendingDomainDnsStatus,
+	ZoneInfo
+} from './zone-resources'
+export {
+	createDnsRecord,
+	createEmailRoutingRule,
+	createSendingDomain,
+	enableEmailRouting,
+	getEmailRoutingCatchAll,
+	getEmailRoutingSettings,
+	getSendingDomainDnsStatus,
+	listDnsRecords,
+	listEmailRoutingRules,
+	listSendingDomains,
+	resolveZone,
+	setEmailRoutingCatchAll,
+	updateDnsRecord
+} from './zone-resources'
 
 // -----------------------------------------------------------------------------
 // Error Exports
 // -----------------------------------------------------------------------------
 
-export { CloudflareAPIError, AuthenticationError }
 export type { APIClientOptions }
+export { AuthenticationError, CloudflareAPIError }

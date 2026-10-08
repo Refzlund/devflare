@@ -6,7 +6,6 @@ import {
 } from '../cloudflare/account'
 import { getEffectiveAccountId } from '../cloudflare/preferences'
 import {
-	type PendingNameBinding,
 	collectPendingNameBindings,
 	formatMissingBindings,
 	materializeHyperdriveIdBindings,
@@ -15,16 +14,17 @@ import {
 	normalizeD1NameBinding,
 	normalizeHyperdriveNameBinding,
 	normalizeKVNameBinding,
+	type PendingNameBinding,
 	withResolvedIdBindings
 } from './binding-resolution-helpers'
 import { type LoadConfigOptions, loadConfig } from './loader'
 import type { PreviewResolutionOptions } from './preview'
 import { resolveConfigForEnvironment } from './resolve'
 import {
-	type DeployConfig,
-	type LocalConfig,
 	brandAsDeployConfig,
 	brandAsLocalConfig,
+	type DeployConfig,
+	type LocalConfig,
 	resolveResources
 } from './resolve-phased'
 import {

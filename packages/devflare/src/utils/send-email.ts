@@ -13,11 +13,11 @@
 import { getEmailDeliverySink } from './email-delivery'
 import {
 	type BuiltEmailMessage,
-	type ComposedEmailMessage,
-	RAW_EMAIL_KEY,
 	buildEmailMessage,
+	type ComposedEmailMessage,
 	createMessageId,
 	parseEmailMessage,
+	RAW_EMAIL_KEY,
 	toBareAddressList
 } from './email-message'
 
@@ -38,7 +38,7 @@ const wrappedEnvBindings = new WeakMap<object, object>()
 const localSendEmailBindings = new Map<string, SendEmail>()
 
 function hasOwn<T extends object>(value: T, key: PropertyKey): key is keyof T {
-	return Object.prototype.hasOwnProperty.call(value, key)
+	return Object.hasOwn(value, key)
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

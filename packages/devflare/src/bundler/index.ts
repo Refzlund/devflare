@@ -9,19 +9,19 @@
 // =============================================================================
 
 export {
-	type DOBundlerOptions,
+	bundleDOs,
+	createDOBundler,
 	type DOBundleResult,
 	type DOBundler,
-	createDOBundler,
-	bundleDOs
+	type DOBundlerOptions
 } from './do-bundler'
-export {
-	type WorkerBundlerOptions,
-	bundleWorkerEntry
-} from './worker-bundler'
 export {
 	type AliasEntry,
 	type AliasInput,
 	mergeAliases,
 	normalizeAliasEntries
 } from './rolldown-shared'
+export {
+	bundleWorkerEntry,
+	type WorkerBundlerOptions
+} from './worker-bundler'

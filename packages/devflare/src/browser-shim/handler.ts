@@ -225,7 +225,7 @@ async function handleWebSocketUpgrade(
 			browserShimSocket.once('open', () => {
 				clearTimeout(connectTimeout)
 				if (verbose) {
-					logger?.debug(`[BrowserHandler] WebSocket connection opened to shim`)
+					logger?.debug('[BrowserHandler] WebSocket connection opened to shim')
 				}
 				resolve()
 			})
@@ -255,7 +255,7 @@ async function handleWebSocketUpgrade(
 		await coupleWebSocket(browserShimSocket, client)
 
 		if (verbose) {
-			logger?.debug(`[BrowserHandler] WebSocket coupled successfully, returning 101 response`)
+			logger?.debug('[BrowserHandler] WebSocket coupled successfully, returning 101 response')
 		}
 
 		// Return a 101 Switching Protocols response with the worker end of the pair

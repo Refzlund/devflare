@@ -1,5 +1,5 @@
+import { type PdfOptions, PdfRequest, type PdfRequestData } from '$lib/models'
 import type { RequestHandler } from './$types'
-import { PdfRequest, type PdfOptions, type PdfRequestData } from '$lib/models'
 
 /**
  * POST /pdf - Generate a PDF from URL via PDF_RENDERER Durable Object
@@ -14,7 +14,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 	}
 
 	try {
-		const body = await request.json() as { url: string; options?: Partial<PdfOptions> }
+		const body = (await request.json()) as { url: string; options?: Partial<PdfOptions> }
 
 		if (!body.url) {
 			return Response.json({ error: 'URL is required' }, { status: 400 })
@@ -54,7 +54,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 
 		// Reconstruct Response to ensure type compatibility
 		const arrayBuffer = await doResponse.arrayBuffer()
-		
+
 		const headers = new Headers()
 
 		// Copy relevant headers

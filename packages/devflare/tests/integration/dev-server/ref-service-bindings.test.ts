@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'pathe'
-import { type DevServer, createDevServer } from '../../../src/dev-server'
+import { createDevServer, type DevServer } from '../../../src/dev-server'
 import { getAvailablePort } from '../helpers/built-devflare.helpers'
 import { createCapturedLogger } from './worker-only-multi-surface.helpers'
 

@@ -6,15 +6,17 @@ import type { DurableObjectNamespace, Rpc } from '@cloudflare/workers-types'
 declare global {
 	interface DevflareEnv {
 		COUNTER: DurableObjectNamespace<Rpc.DurableObjectBranded & import('./do.counter').Counter>
-		RATE_LIMITER: DurableObjectNamespace<Rpc.DurableObjectBranded & import('./do.rate-limiter').RateLimiter>
+		RATE_LIMITER: DurableObjectNamespace<
+			Rpc.DurableObjectBranded & import('./do.rate-limiter').RateLimiter
+		>
 	}
 }
 
 declare module 'devflare/test' {
 	interface DevflareEnv {
 		COUNTER: DurableObjectNamespace<Rpc.DurableObjectBranded & import('./do.counter').Counter>
-		RATE_LIMITER: DurableObjectNamespace<Rpc.DurableObjectBranded & import('./do.rate-limiter').RateLimiter>
+		RATE_LIMITER: DurableObjectNamespace<
+			Rpc.DurableObjectBranded & import('./do.rate-limiter').RateLimiter
+		>
 	}
 }
-
-export { }

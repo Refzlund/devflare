@@ -7,7 +7,7 @@
 // =============================================================================
 
 import type { ConsolaInstance } from 'consola'
-import { type ImapSocketFactory, fetchImapMessages, parseImapUrl } from './imap-client'
+import { fetchImapMessages, type ImapSocketFactory, parseImapUrl } from './imap-client'
 import {
 	postInboundEmail,
 	readEnvelopeRecipient,

@@ -9,8 +9,8 @@
 
 import { dirname, resolve } from 'path'
 import type { BridgeClient } from '../bridge/client'
-import { loadConfig, resolveConfigEnvVars } from '../config'
 import type { DevflareConfig } from '../config'
+import { loadConfig, resolveConfigEnvVars } from '../config'
 import { applyLocalDevVarsToConfig } from '../config/local-dev-vars'
 import { __clearTestContext } from '../env'
 import { disposeLocalWorkerLoaderBindings } from '../shims/local-worker-loader'
@@ -75,7 +75,7 @@ export async function resolveTestContextConfig(
 		if (!found) {
 			throw new Error(
 				`Could not find a devflare config file. Searched upward from: ${callerDir}\n` +
-					`Expected one of: devflare.config.ts, devflare.config.mts, devflare.config.js, devflare.config.mjs\n` +
+					'Expected one of: devflare.config.ts, devflare.config.mts, devflare.config.js, devflare.config.mjs\n' +
 					`Either create a config file or provide an explicit path: createTestContext('./path/to/config.ts')`
 			)
 		}

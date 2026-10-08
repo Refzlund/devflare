@@ -7,28 +7,32 @@
 // =============================================================================
 
 // Safe config utilities
+
 export { defineConfig } from './config/define'
 export { ref } from './config/ref'
 
 // Safe runtime-facing exports
-export { workerName } from './workerName'
+
 export { env, vars } from './env'
+export { workerName } from './workerName'
 
 // Bridge utilities that are safe in worker/browser bundles
-export {
-	setBindingHints,
-	createEnvProxy,
-	initEnv
-} from './bridge/proxy'
-export type { EnvProxyOptions, BindingHints } from './bridge/proxy'
-export { BridgeClient, getClient } from './bridge/client'
+
 export type { BridgeClientOptions } from './bridge/client'
+export { BridgeClient, getClient } from './bridge/client'
+export type { BindingHints, EnvProxyOptions } from './bridge/proxy'
+export {
+	createEnvProxy,
+	initEnv,
+	setBindingHints
+} from './bridge/proxy'
 
 // Decorators
+
 export {
+	type DurableObjectOptions,
 	durableObject,
-	getDurableObjectOptions,
-	type DurableObjectOptions
+	getDurableObjectOptions
 } from './decorators'
 
 type CliModule = typeof import('./cli')

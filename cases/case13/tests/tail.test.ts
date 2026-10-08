@@ -6,9 +6,9 @@
 // No mocks - these tests use actual KV operations.
 // =============================================================================
 
-import { describe, test, expect, beforeAll, afterAll } from 'bun:test'
-import { createTestContext, cf, env } from 'devflare/test'
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import type { TraceItem } from '@cloudflare/workers-types'
+import { cf, createTestContext, env } from 'devflare/test'
 import type { LogEntry } from '../src/tail'
 
 // -----------------------------------------------------------------------------
@@ -189,9 +189,7 @@ describe('Log Level Filtering (Pure Logic)', () => {
 			scriptName: 'exception-only-test',
 			eventTimestamp: timestamp,
 			logs: [],
-			exceptions: [
-				{ name: 'Error', message: 'Something failed', timestamp: Date.now() }
-			]
+			exceptions: [{ name: 'Error', message: 'Something failed', timestamp: Date.now() }]
 		})
 
 		const result = await cf.tail.trigger([event])
@@ -211,9 +209,7 @@ describe('Log Level Filtering (Pure Logic)', () => {
 		const event = createTraceItem({
 			scriptName: 'skip-empty-test',
 			eventTimestamp: timestamp,
-			logs: [
-				{ level: 'debug', message: ['Only debug'], timestamp: Date.now() }
-			],
+			logs: [{ level: 'debug', message: ['Only debug'], timestamp: Date.now() }],
 			exceptions: []
 		})
 
@@ -264,9 +260,7 @@ describe('Edge Cases with Real KV', () => {
 			scriptName: 'no-event-test',
 			eventTimestamp: timestamp,
 			event: undefined as unknown as TraceItem['event'],
-			exceptions: [
-				{ name: 'Error', message: 'Test', timestamp: Date.now() }
-			]
+			exceptions: [{ name: 'Error', message: 'Test', timestamp: Date.now() }]
 		})
 
 		const result = await cf.tail.trigger([event])

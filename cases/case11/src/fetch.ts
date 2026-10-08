@@ -8,8 +8,8 @@
 //   import type { SessionData } from '@devflare/case11-do-shared'
 // =============================================================================
 
+import type { JsonValue, SessionData } from '@devflare/case11-do-shared'
 import { env } from 'devflare'
-import type { SessionData, JsonValue } from '@devflare/case11-do-shared'
 
 /**
  * Main fetch handler
@@ -44,7 +44,10 @@ export default async function fetch(request: Request): Promise<Response> {
 
 		if (request.method === 'POST') {
 			// Create/update session via RPC
-			const body = await request.json() as { data?: { [key: string]: JsonValue }; expiresAt?: number }
+			const body = (await request.json()) as {
+				data?: { [key: string]: JsonValue }
+				expiresAt?: number
+			}
 			const session = await stub.setSession(userId, body.data ?? {}, body.expiresAt)
 			return Response.json(session, { status: 201 })
 		}

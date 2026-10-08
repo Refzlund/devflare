@@ -6,7 +6,6 @@ import { runBuildCommand } from '../../../src/cli/commands/build'
 import { runDeployCommand } from '../../../src/cli/commands/deploy'
 import { clearDependencies, setDependencies } from '../../../src/cli/dependencies'
 import {
-	type ExecInvocation,
 	captureDeployEnvironmentSnapshot,
 	cloudflareApiResponse,
 	createCliDependencies,
@@ -14,6 +13,7 @@ import {
 	createLogger,
 	createProcessRunner,
 	createWranglerDeployProcessRunner,
+	type ExecInvocation,
 	isViteBuildExecution,
 	readGeneratedDeployConfig,
 	successResult,

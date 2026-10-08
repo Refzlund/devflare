@@ -11,21 +11,17 @@
 //   bun test cases/case15
 // =============================================================================
 
-import { describe, test, expect, beforeAll, afterAll } from 'bun:test'
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { createTestContext, env, shouldSkip } from 'devflare/test'
-import {
+import fetchHandler, {
 	generateEmbedding,
 	generateText,
-	searchSimilar,
-	insertVector
+	insertVector,
+	searchSimilar
 } from '../src/fetch'
-import fetchHandler from '../src/fetch'
 
 // Skip conditions resolved in parallel at module load
-const [skipAI, skipVectorize] = await Promise.all([
-	shouldSkip.ai,
-	shouldSkip.vectorize
-])
+const [skipAI, skipVectorize] = await Promise.all([shouldSkip.ai, shouldSkip.vectorize])
 
 const requiresRemoteContext = !skipAI || !skipVectorize
 
@@ -102,7 +98,9 @@ describe.skipIf(skipVectorize)('Vectorize Integration', () => {
 			// If the index doesn't exist, skip with a helpful message
 			if (error instanceof Error && error.message.includes('index was not found')) {
 				console.log('⏭️  Vectorize test skipped: Index "embeddings-index" not found.')
-				console.log('   Create it with: wrangler vectorize create embeddings-index --dimensions=384 --metric=cosine')
+				console.log(
+					'   Create it with: wrangler vectorize create embeddings-index --dimensions=384 --metric=cosine'
+				)
 				return
 			}
 			throw error
@@ -126,5 +124,3 @@ describe('Module Smoke Test', () => {
 		expect(typeof insertVector).toBe('function')
 	})
 })
-
-

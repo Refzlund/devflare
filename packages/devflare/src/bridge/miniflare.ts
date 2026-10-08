@@ -10,8 +10,8 @@ import {
 	getLocalD1DatabaseIdentifier,
 	getLocalKVNamespaceIdentifier,
 	normalizeArtifactsBinding,
-	normalizeDOBinding,
 	normalizeDispatchNamespaceBinding,
+	normalizeDOBinding,
 	normalizeImagesBinding,
 	normalizeMediaBinding,
 	normalizeMtlsCertificateBinding,
@@ -29,21 +29,21 @@ import {
 } from '../dev-server/miniflare-bindings'
 import { createMiniflareLog } from '../dev-server/miniflare-log'
 import {
-	type LocalSecretServiceBindingConfig,
 	buildLocalSecretNodeBindings,
-	buildLocalSecretServiceBindingConfig
+	buildLocalSecretServiceBindingConfig,
+	type LocalSecretServiceBindingConfig
 } from '../secrets/local-secrets'
 import {
-	type LocalBindingShimServiceConfig,
-	buildLocalBindingShimServiceConfig
+	buildLocalBindingShimServiceConfig,
+	type LocalBindingShimServiceConfig
 } from '../shims/local-media-bindings'
 import { generatedDirName } from '../utils/generated-dir'
 import { dispatchFetchToRuntime } from '../utils/miniflare-dispatch'
 import { splitSharedOptions, toMiniflareOptions } from '../utils/miniflare-options'
 import {
-	type R2PresignContext,
 	generateGatewayScript,
 	hasNamedBindings,
+	type R2PresignContext,
 	resolveR2PresignSetup
 } from './miniflare-gateway'
 

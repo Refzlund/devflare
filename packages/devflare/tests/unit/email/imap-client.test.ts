@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test'
-import { type Server, connect, createServer } from 'node:net'
+import { connect, createServer, type Server } from 'node:net'
 import { fetchImapMessages, parseImapUrl } from '../../../src/email/imap-client'
 
 let server: Server | null = null

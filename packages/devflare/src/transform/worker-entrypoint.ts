@@ -365,17 +365,17 @@ export function transformWorkerEntrypoint(
 			? 'async fetch(request: Request): Promise<Response>'
 			: 'async fetch(request)'
 		classBody += `\t${fetchSig} {\n`
-		classBody += `\t\tconst __devflareEvent = createFetchEvent(request, this.env, this.ctx)\n`
+		classBody += '\t\tconst __devflareEvent = createFetchEvent(request, this.env, this.ctx)\n'
 
 		if (injectContext) {
-			classBody += `\t\treturn runWithEventContext(\n`
-			classBody += `\t\t\t__devflareEvent,\n`
-			classBody += `\t\t\t() => invokeFetchHandler(__originalFetch, __devflareEvent)\n`
-			classBody += `\t\t)\n`
-			classBody += `\t}\n`
+			classBody += '\t\treturn runWithEventContext(\n'
+			classBody += '\t\t\t__devflareEvent,\n'
+			classBody += '\t\t\t() => invokeFetchHandler(__originalFetch, __devflareEvent)\n'
+			classBody += '\t\t)\n'
+			classBody += '\t}\n'
 		} else {
-			classBody += `\t\treturn invokeFetchHandler(__originalFetch, __devflareEvent)\n`
-			classBody += `\t}\n`
+			classBody += '\t\treturn invokeFetchHandler(__originalFetch, __devflareEvent)\n'
+			classBody += '\t}\n'
 		}
 	}
 
@@ -390,14 +390,14 @@ export function transformWorkerEntrypoint(
 
 		classBody += `\n\t${asyncPrefix}${fn.name}(${signatureParams})${returnType} {\n`
 		classBody += `\t\treturn __original_${fn.name}(${paramNames})\n`
-		classBody += `\t}\n`
+		classBody += '\t}\n'
 	}
 
-	classBody += `}\n\n`
+	classBody += '}\n\n'
 	// Export the class both as named (for entrypoint) and as default (for worker)
 	classBody += `export { ${className} }\n`
 	classBody += `export { ${className} as default }\n`
-	classBody += `// ============ End Devflare WorkerEntrypoint ============\n`
+	classBody += '// ============ End Devflare WorkerEntrypoint ============\n'
 
 	// Append the class at the end
 	s.append(classBody)
@@ -477,7 +477,7 @@ export function generateRpcInterface(functions: ExportedFunction[], interfaceNam
 		output += `\t${fn.name}(${fn.params}): ${promiseReturn}\n`
 	}
 
-	output += `}\n`
+	output += '}\n'
 
 	return output
 }

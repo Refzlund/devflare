@@ -5,7 +5,9 @@ import type { DurableObjectNamespace, Rpc } from '@cloudflare/workers-types'
 
 declare global {
 	interface DevflareEnv {
-		SESSION_STORE: DurableObjectNamespace<Rpc.DurableObjectBranded & import('../case11-do-shared/src/do.session').SessionStore>
+		SESSION_STORE: DurableObjectNamespace<
+			Rpc.DurableObjectBranded & import('../case11-do-shared/src/do.session').SessionStore
+		>
 	}
 }
 

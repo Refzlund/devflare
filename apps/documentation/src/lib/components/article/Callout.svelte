@@ -1,39 +1,39 @@
 <script lang="ts">
-	import type { DocCallout, DocCalloutTone } from '$lib/docs/types'
-	import { localizeHref } from '$lib/paraglide/runtime'
-	import InlineText from '../content/InlineText.svelte'
-	import PillLink from '../navigation/PillLink.svelte'
+import type { DocCallout, DocCalloutTone } from '$lib/docs/types'
+import { localizeHref } from '$lib/paraglide/runtime'
+import InlineText from '../content/InlineText.svelte'
+import PillLink from '../navigation/PillLink.svelte'
 
-	let { tone = 'info', title, body, cta }: DocCallout = $props()
+let { tone = 'info', title, body, cta }: DocCallout = $props()
 
-	function isExternalHref(href: string): boolean {
-		return /^[a-z]+:/i.test(href) || href.startsWith('//')
-	}
+function isExternalHref(href: string): boolean {
+	return /^[a-z]+:/i.test(href) || href.startsWith('//')
+}
 
-	function resolveHref(href: string): string {
-		return isExternalHref(href) ? href : localizeHref(href)
-	}
+function resolveHref(href: string): string {
+	return isExternalHref(href) ? href : localizeHref(href)
+}
 
-	const toneClasses: Record<DocCalloutTone, string> = {
-		info: 'border border-(--docs-accent-soft-strong) bg-(--docs-accent-soft) text-(--docs-text-strong)',
-		success: 'border border-emerald-500/20 bg-emerald-500/10 text-(--docs-text-strong)',
-		warning: 'border border-amber-500/25 bg-amber-500/12 text-(--docs-text-strong)',
-		accent: 'docs-surface-glass text-(--docs-text-strong)'
-	}
+const toneClasses: Record<DocCalloutTone, string> = {
+	info: 'border border-(--docs-accent-soft-strong) bg-(--docs-accent-soft) text-(--docs-text-strong)',
+	success: 'border border-emerald-500/20 bg-emerald-500/10 text-(--docs-text-strong)',
+	warning: 'border border-amber-500/25 bg-amber-500/12 text-(--docs-text-strong)',
+	accent: 'docs-surface-glass text-(--docs-text-strong)'
+}
 
-	const barClasses: Record<DocCalloutTone, string> = {
-		info: 'bg-(--docs-accent)',
-		success: 'bg-emerald-300/80',
-		warning: 'bg-amber-300/80',
-		accent: 'bg-(--docs-text-subtle)'
-	}
+const barClasses: Record<DocCalloutTone, string> = {
+	info: 'bg-(--docs-accent)',
+	success: 'bg-emerald-300/80',
+	warning: 'bg-amber-300/80',
+	accent: 'bg-(--docs-text-subtle)'
+}
 
-	const iconClasses: Record<DocCalloutTone, string> = {
-		info: 'fluent--info-20-regular text-(--docs-accent)',
-		success: 'fluent--checkmark-circle-20-regular text-emerald-300/90',
-		warning: 'fluent--warning-20-regular text-amber-300/90',
-		accent: 'fluent--lightbulb-20-regular text-(--docs-text-subtle)'
-	}
+const iconClasses: Record<DocCalloutTone, string> = {
+	info: 'fluent--info-20-regular text-(--docs-accent)',
+	success: 'fluent--checkmark-circle-20-regular text-emerald-300/90',
+	warning: 'fluent--warning-20-regular text-amber-300/90',
+	accent: 'fluent--lightbulb-20-regular text-(--docs-text-subtle)'
+}
 </script>
 
 <div class={`docs-surface-transition grid grid-cols-[0.35rem_minmax(0,1fr)] gap-4 rounded-lg px-4 py-4 ${toneClasses[tone]}`}>

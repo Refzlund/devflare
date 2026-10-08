@@ -46,8 +46,11 @@ export async function cleanupOldResults(): Promise<void> {
 export async function generateWeeklyReport(): Promise<void> {
 	const list = await env.RESULTS.list({ prefix: 'result:' })
 
-	await env.RESULTS.put('report:weekly', JSON.stringify({
-		totalTasks: list.keys.length,
-		generatedAt: Date.now()
-	}))
+	await env.RESULTS.put(
+		'report:weekly',
+		JSON.stringify({
+			totalTasks: list.keys.length,
+			generatedAt: Date.now()
+		})
+	)
 }

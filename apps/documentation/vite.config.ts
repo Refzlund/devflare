@@ -1,10 +1,10 @@
 import { paraglideVitePlugin } from '@inlang/paraglide-js'
-import tailwindcss from '@tailwindcss/vite'
 import { sveltekit } from '@sveltejs/kit/vite'
+import tailwindcss from '@tailwindcss/vite'
+import { defineConfig, type Plugin } from 'vite'
+import { devflarePlugin } from '../../packages/devflare/src/vite/index'
 import { documentationUrlPatterns } from './paraglide-routing'
 import { generateLLMDocuments, shouldRegenerateLLMDocuments } from './scripts/llm-documents'
-import { devflarePlugin } from '../../packages/devflare/src/vite/index'
-import { defineConfig, type Plugin } from 'vite'
 
 function llmDocumentsVitePlugin(): Plugin {
 	let activeGeneration: Promise<void> | null = null

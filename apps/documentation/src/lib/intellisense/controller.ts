@@ -4,11 +4,7 @@ import type { IntellisenseEntry } from './types'
 export const intellisense = createSingleton<IntellisenseEntry>({
 	placement: 'top-start',
 	strategy: 'fixed',
-	middleware: [
-		offset(12),
-		flip({ padding: 12 }),
-		shift({ padding: 12 })
-	],
+	middleware: [offset(12), flip({ padding: 12 }), shift({ padding: 12 })],
 	showDelay: 0,
 	hideDelay: 0,
 	showOn: [],

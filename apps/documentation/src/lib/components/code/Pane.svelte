@@ -1,4 +1,5 @@
 <script lang="ts">
+import { onDestroy, onMount, tick } from 'svelte'
 import { tooltip } from '$lib/components/layout/Tooltip.svelte'
 import {
 	cancelHideIntellisense,
@@ -9,8 +10,7 @@ import {
 } from '$lib/intellisense/controller'
 import { getIntellisenseEntryById } from '$lib/intellisense/registry'
 import { m } from '$lib/paraglide/messages'
-import { onDestroy, onMount, tick } from 'svelte'
-import { type PreparedText, type PretextModule, loadPretext } from '../../vendor/pretext'
+import { loadPretext, type PreparedText, type PretextModule } from '../../vendor/pretext'
 import type { NormalizedCodeFile, NormalizedCodeLine } from './block'
 
 const COPIED_TOOLTIP = 'Copied!'

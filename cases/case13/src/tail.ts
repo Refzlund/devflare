@@ -5,8 +5,8 @@
 // Logs are batched and delivered after producer worker execution completes.
 // =============================================================================
 
-import { env } from 'devflare'
 import type { TraceItem, TraceLog } from '@cloudflare/workers-types'
+import { env } from 'devflare'
 
 /**
  * Log entry structure for storage
@@ -49,12 +49,13 @@ function processTraceItem(event: TraceItem): LogEntry {
 	}))
 
 	// Extract request info if available
-	const request = event.event && 'request' in event.event
-		? {
-			url: (event.event.request as { url: string }).url,
-			method: (event.event.request as { method: string }).method
-		}
-		: undefined
+	const request =
+		event.event && 'request' in event.event
+			? {
+					url: (event.event.request as { url: string }).url,
+					method: (event.event.request as { method: string }).method
+				}
+			: undefined
 
 	return {
 		id: `${event.scriptName}-${event.eventTimestamp}`,

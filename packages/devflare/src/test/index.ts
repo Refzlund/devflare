@@ -3,56 +3,58 @@
 // =============================================================================
 
 // Simple test context API (recommended for single-worker tests)
+
 export {
 	createTestContext,
-	env,
 	type DevflareEnv,
+	env,
 	type TestEnv
 } from './simple-context'
 
 // Cloudflare test helpers — unified API for triggering all handler types
-export { cf } from './cf'
+
 export { alarm } from './alarm'
+export { cf } from './cf'
 export { email } from './email'
 export { queue } from './queue'
 export { scheduled } from './scheduled'
-export { worker } from './worker'
 export { tail } from './tail'
+export { worker } from './worker'
 
 // Helper types
-export type { AlarmTriggerTarget, AlarmTriggerOptions, AlarmTriggerResult } from './alarm'
-export type { EmailSendOptions, ReceivedEmail, EmailReceiveCallback } from './email'
+
+export type { AlarmTriggerOptions, AlarmTriggerResult, AlarmTriggerTarget } from './alarm'
+export type { EmailReceiveCallback, EmailSendOptions, ReceivedEmail } from './email'
 export type { QueueMessageOptions, QueueTriggerResult } from './queue'
 export type { ScheduledTriggerOptions, ScheduledTriggerResult } from './scheduled'
+export type { TailTriggerResult, TraceItemOptions } from './tail'
 export type { WorkerFetchOptions } from './worker'
-export type { TraceItemOptions, TailTriggerResult } from './tail'
 
 // Service binding resolution (internal use)
+
 export {
-	hasServiceBindings,
-	resolveServiceBindings,
-	hasCrossWorkerDOs,
-	resolveDOBindings,
 	clearBundleCache,
+	type DOBindingResolution,
+	hasCrossWorkerDOs,
+	hasServiceBindings,
 	type ResolvedWorker,
-	type ServiceBindingResolution,
-	type DOBindingResolution
+	resolveDOBindings,
+	resolveServiceBindings,
+	type ServiceBindingResolution
 } from './resolve-service-bindings'
 
 // Cache resets — for a suite that rewrites the tree it is testing, mid-process
+
 export { __resetDurableObjectBundleCache } from './durable-object-bundle-cache'
 export { __resetTestContextConfigCache } from './simple-context-lifecycle'
 
 // Skip helper for conditional test execution
+
 export { shouldSkip } from './should-skip'
 
 // Local Cloudflare Containers testing helpers
+
 export {
-	containers,
-	createContainerManager,
-	detectContainerEngine,
-	getContainerSkipReason,
-	stopActiveContainers,
 	type ContainerCommandResult,
 	type ContainerCommandRunner,
 	type ContainerEngineCheck,
@@ -61,12 +63,18 @@ export {
 	type ContainerEngineStatus,
 	type ContainerManager,
 	type ContainerManagerOptions,
+	containers,
+	createContainerManager,
 	type DevflareContainerInstance,
+	detectContainerEngine,
+	getContainerSkipReason,
 	type LocalContainerState,
-	type StartContainerOptions
+	type StartContainerOptions,
+	stopActiveContainers
 } from './containers'
 
 // Offline-first support matrix and config-derived pure-test env helpers
+
 export {
 	createOfflineBindings,
 	createOfflineEnv,
@@ -81,6 +89,7 @@ export {
 } from './offline-bindings'
 
 // AI Search pure unit-test mocks
+
 export {
 	createMockAISearchInstance,
 	createMockAISearchNamespace,
@@ -92,51 +101,52 @@ export {
 } from './ai-search'
 
 // Mock utilities (for unit testing without Miniflare)
+
 export {
-	createMockTestContext,
-	createMockKV,
-	createMockD1,
-	createMockR2,
-	createMockQueue,
-	createMockRateLimit,
-	createMockVersionMetadata,
-	createMockHyperdrive,
-	createMockWorkerLoader,
-	createMockMTLSCertificate,
-	createMockDispatchNamespace,
-	createMockWorkflow,
-	createMockPipeline,
-	createMockImagesBinding,
-	createMockMediaBinding,
-	createMockStreamBinding,
-	createMockFlagshipBinding,
-	createMockArtifacts,
-	createMockVectorize,
-	createMockAnalyticsEngine,
-	createMockSendEmail,
 	createLocalSendEmailBinding,
-	createMockSecretsStoreSecret,
+	createMockAnalyticsEngine,
+	createMockArtifacts,
+	createMockD1,
+	createMockDispatchNamespace,
 	createMockEnv,
-	withTestContext,
-	type TestContext,
-	type TestContextOptions,
-	type MockEnvOptions,
-	type MockRateLimitOptions,
-	type MockWorkerLoaderOptions,
-	type MockFetchInput,
-	type MockFetcherHandler,
+	createMockFlagshipBinding,
+	createMockHyperdrive,
+	createMockImagesBinding,
+	createMockKV,
+	createMockMediaBinding,
+	createMockMTLSCertificate,
+	createMockPipeline,
+	createMockQueue,
+	createMockR2,
+	createMockRateLimit,
+	createMockSecretsStoreSecret,
+	createMockSendEmail,
+	createMockStreamBinding,
+	createMockTestContext,
+	createMockVectorize,
+	createMockVersionMetadata,
+	createMockWorkerLoader,
+	createMockWorkflow,
+	type LocalSendEmailBindingConfig,
+	type MockAnalyticsEngineDataset,
+	type MockArtifactsOptions,
 	type MockDispatchNamespaceOptions,
-	type MockWorkflowOptions,
-	type MockWorkflowInstanceOptions,
-	type MockPipeline,
+	type MockEnvOptions,
+	type MockFetcherHandler,
+	type MockFetchInput,
+	type MockFlagshipBindingOptions,
 	type MockImagesBindingOptions,
 	type MockMediaBindingOptions,
-	type MockStreamBindingOptions,
-	type MockFlagshipBindingOptions,
-	type MockArtifactsOptions,
-	type MockVectorizeOptions,
-	type MockVectorizeIndex,
-	type MockAnalyticsEngineDataset,
+	type MockPipeline,
+	type MockRateLimitOptions,
 	type MockSendEmailBinding,
-	type LocalSendEmailBindingConfig
+	type MockStreamBindingOptions,
+	type MockVectorizeIndex,
+	type MockVectorizeOptions,
+	type MockWorkerLoaderOptions,
+	type MockWorkflowInstanceOptions,
+	type MockWorkflowOptions,
+	type TestContext,
+	type TestContextOptions,
+	withTestContext
 } from './utilities'

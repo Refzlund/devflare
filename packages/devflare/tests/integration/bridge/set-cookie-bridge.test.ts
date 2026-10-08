@@ -19,8 +19,8 @@ import { afterAll, describe, expect, test } from 'bun:test'
 import type { Miniflare } from 'miniflare'
 import { generateGatewayScript } from '../../../src/bridge/miniflare-gateway'
 import {
-	type SerializedResponse,
-	deserializeResponse
+	deserializeResponse,
+	type SerializedResponse
 } from '../../../src/bridge/v2/value-serialization'
 import { dispatchFetchToRuntime } from '../../../src/utils/miniflare-dispatch'
 import { toMiniflareOptions } from '../../../src/utils/miniflare-options'

@@ -2,8 +2,8 @@
 // Test Route — Demonstrates unified env from devflare
 // =============================================================================
 
-import type { RequestHandler } from './$types'
 import { env } from 'devflare'
+import type { RequestHandler } from './$types'
 
 /**
  * GET /api/test-env - Test unified env from devflare
@@ -16,9 +16,12 @@ export const GET: RequestHandler = async () => {
 
 		return Response.json({ ok: true, value })
 	} catch (e) {
-		return Response.json({
-			ok: false,
-			error: e instanceof Error ? e.message : String(e)
-		}, { status: 500 })
+		return Response.json(
+			{
+				ok: false,
+				error: e instanceof Error ? e.message : String(e)
+			},
+			{ status: 500 }
+		)
 	}
 }

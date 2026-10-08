@@ -22,8 +22,12 @@ declare global {
 		CACHE: KVNamespace
 		DB: D1Database
 		IMAGES: R2Bucket
-		CHAT_ROOM: DurableObjectNamespace<Rpc.DurableObjectBranded & import('./src/do.chat-room').ChatRoom>
-		PDF_RENDERER: DurableObjectNamespace<Rpc.DurableObjectBranded & import('./src/do.pdf-renderer').PdfRenderer>
+		CHAT_ROOM: DurableObjectNamespace<
+			Rpc.DurableObjectBranded & import('./src/do.chat-room').ChatRoom
+		>
+		PDF_RENDERER: DurableObjectNamespace<
+			Rpc.DurableObjectBranded & import('./src/do.pdf-renderer').PdfRenderer
+		>
 		BROWSER: Fetcher
 		POSTGRES: Hyperdrive
 		WORKER_LOADER: WorkerLoader
@@ -40,8 +44,12 @@ declare module 'devflare/test' {
 		CACHE: KVNamespace
 		DB: D1Database
 		IMAGES: R2Bucket
-		CHAT_ROOM: DurableObjectNamespace<Rpc.DurableObjectBranded & import('./src/do.chat-room').ChatRoom>
-		PDF_RENDERER: DurableObjectNamespace<Rpc.DurableObjectBranded & import('./src/do.pdf-renderer').PdfRenderer>
+		CHAT_ROOM: DurableObjectNamespace<
+			Rpc.DurableObjectBranded & import('./src/do.chat-room').ChatRoom
+		>
+		PDF_RENDERER: DurableObjectNamespace<
+			Rpc.DurableObjectBranded & import('./src/do.pdf-renderer').PdfRenderer
+		>
 		BROWSER: Fetcher
 		POSTGRES: Hyperdrive
 		WORKER_LOADER: WorkerLoader
@@ -52,5 +60,3 @@ declare module 'devflare/test' {
 		EMAIL: SendEmail
 	}
 }
-
-export {}

@@ -2,17 +2,17 @@ import type { ConsolaInstance } from 'consola'
 import { dirname, relative, resolve } from 'pathe'
 import { bundleWorkerEntry } from '../../bundler'
 import {
-	type DevflareConfig,
 	compileBuildConfig,
+	type DevflareConfig,
 	loadConfig,
 	resolveConfigEnvVars,
 	resolveConfigForEnvironment
 } from '../../config'
 import {
-	type WranglerConfig,
 	compileConfig,
 	isolateViteBuildOutputPaths as isolateCompiledViteBuildOutputPaths,
 	rebaseWranglerConfigPaths,
+	type WranglerConfig,
 	writeWranglerConfig
 } from '../../config/compiler'
 import { detectViteProject } from '../../dev-server/vite-utils'
@@ -494,22 +494,22 @@ export async function prepareBuildArtifacts(
 		if (buildProc.exitCode !== 0) {
 			throw new Error(
 				`Vite build failed (exit code ${buildProc.exitCode}).\n` +
-					`\n` +
+					'\n' +
 					`Command: ${buildCommand} ${buildArgs.join(' ')}\n` +
 					`Working directory: ${cwd}\n` +
 					`Vite executable: ${viteExecutablePath}\n` +
 					`Runtime: ${useBunRuntime ? 'bun --bun' : 'node (default execa runtime)'}\n` +
-					`\n` +
+					'\n' +
 					`Vite's own output is printed above. If you only see "UNHANDLED PROMISE REJECTION"\n` +
-					`with no other detail, common causes are:\n` +
-					`  - A Vite plugin or transitive dependency (e.g. rolldown) cannot be resolved\n` +
+					'with no other detail, common causes are:\n' +
+					'  - A Vite plugin or transitive dependency (e.g. rolldown) cannot be resolved\n' +
 					`    from the executable's physical path. This commonly happens when the package\n` +
-					`    manager resolves the Vite binary to a global cache directory outside the\n` +
+					'    manager resolves the Vite binary to a global cache directory outside the\n' +
 					`    workspace's node_modules tree. Try reinstalling, or run vite directly to\n` +
 					`    isolate: \`bunx --bun vite build --config ${relative(cwd, generatedViteConfigPath).replace(/\\/g, '/')}\`.\n` +
 					`  - A peer dependency or framework adapter is missing. Re-check the package's\n` +
 					`    devDependencies against the framework's documented requirements.\n` +
-					`  - The generated vite config references a path that does not yet exist.`
+					'  - The generated vite config references a path that does not yet exist.'
 			)
 		}
 

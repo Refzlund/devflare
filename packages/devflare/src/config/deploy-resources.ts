@@ -1,21 +1,21 @@
 import {
-	type D1DatabaseInfo,
-	type HyperdriveConfigInfo,
-	type KVNamespaceInfo,
-	type QueueInfo,
-	type R2BucketInfo,
-	type VectorizeIndexInfo,
 	createD1Database,
 	createKVNamespace,
 	createQueue,
 	createR2Bucket,
+	type D1DatabaseInfo,
 	getPrimaryAccount,
+	type HyperdriveConfigInfo,
+	type KVNamespaceInfo,
 	listD1Databases,
 	listHyperdrives,
 	listKVNamespaces,
 	listQueues,
 	listR2Buckets,
-	listVectorizeIndexes
+	listVectorizeIndexes,
+	type QueueInfo,
+	type R2BucketInfo,
+	type VectorizeIndexInfo
 } from '../cloudflare/account'
 import { createDestinationAddress, listDestinationAddresses } from '../cloudflare/email-addresses'
 import { createEventSubscription, listEventSubscriptions } from '../cloudflare/event-subscriptions'
@@ -36,7 +36,6 @@ import {
 	updateDnsRecord
 } from '../cloudflare/zone-resources'
 import {
-	type PendingNameBinding,
 	collectPendingNameBindings,
 	formatMissingBindings,
 	materializeHyperdriveIdBindings,
@@ -45,12 +44,13 @@ import {
 	normalizeD1NameBinding,
 	normalizeHyperdriveNameBinding,
 	normalizeKVNameBinding,
+	type PendingNameBinding,
 	withResolvedIdBindings
 } from './binding-resolution-helpers'
-import { type SubscriptionProvisionApi, provisionEventSubscriptions } from './deploy-subscriptions'
-import { type ZoneProvisionApi, provisionZoneResources } from './deploy-zones'
+import { provisionEventSubscriptions, type SubscriptionProvisionApi } from './deploy-subscriptions'
+import { provisionZoneResources, type ZoneProvisionApi } from './deploy-zones'
 import type { PreviewResolutionOptions } from './preview'
-import { type DeployConfig, brandAsDeployConfig, resolveResources } from './resolve-phased'
+import { brandAsDeployConfig, type DeployConfig, resolveResources } from './resolve-phased'
 import { ConfigResourceResolutionError } from './resource-resolution'
 import {
 	type DevflareConfig,
@@ -230,9 +230,9 @@ function decorateOrphanError(err: unknown, created: DeployResourceNames): Error 
 	if (summaryParts.length === 0) return base
 
 	const orphanFooter =
-		`\n\nDeploy preparation failed AFTER provisioning the following Cloudflare resources, ` +
+		'\n\nDeploy preparation failed AFTER provisioning the following Cloudflare resources, ' +
 		`which were left in your account:\n  - ${summaryParts.join('\n  - ')}\n` +
-		`Re-run \`devflare deploy\` after fixing the error to reuse them, or delete them manually if abandoning the deploy.`
+		'Re-run `devflare deploy` after fixing the error to reuse them, or delete them manually if abandoning the deploy.'
 
 	const decorated = new Error(`${base.message}${orphanFooter}`)
 	if ('cause' in base && base.cause !== undefined) {

@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
 	main
-	// @ts-ignore - JS module with no declarations
+	// @ts-expect-error - JS module with no declarations
 } from '../../../../.github/actions/devflare-github-feedback/index.js'
 
 const originalFetch = globalThis.fetch

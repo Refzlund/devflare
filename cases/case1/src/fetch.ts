@@ -36,9 +36,7 @@ export default async function fetch(
 
 		if (request.method === 'GET') {
 			const value = await env.CACHE.get(key)
-			return value
-				? new Response(value)
-				: new Response('Not found', { status: 404 })
+			return value ? new Response(value) : new Response('Not found', { status: 404 })
 		}
 
 		if (request.method === 'PUT') {

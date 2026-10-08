@@ -5,4 +5,4 @@
 // This file is the package entrypoint (see package.json exports).
 // =============================================================================
 
-export { SessionStore, type SessionData, type JsonPrimitive, type JsonValue } from './do.session'
+export { type JsonPrimitive, type JsonValue, type SessionData, SessionStore } from './do.session'

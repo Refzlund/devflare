@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'pathe'
-import { type DevServer, createDevServer } from '../../../src/dev-server'
+import { createDevServer, type DevServer } from '../../../src/dev-server'
 import {
 	deleteLocalSecret,
 	readLocalSecret,

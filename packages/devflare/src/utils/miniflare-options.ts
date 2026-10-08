@@ -29,8 +29,8 @@
 
 import { readFileSync } from 'node:fs'
 import {
-	type Import as ModuleImport,
 	init as initModuleLexer,
+	type Import as ModuleImport,
 	parse as parseModule
 } from 'es-module-lexer'
 import type { CompiledModuleRule, MiniflareOptions, V4ModuleDefinition } from 'miniflare'

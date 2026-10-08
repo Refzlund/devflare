@@ -2,7 +2,7 @@
 // Case 10: Path Aliases - Lib
 // =============================================================================
 
-import type { User, ApiResponse, ErrorResponse } from '../types/index'
+import type { ApiResponse, ErrorResponse, User } from '../types/index'
 import { generateId, timestamp } from '../utils/index'
 
 export function createUser(name: string, email: string): User {

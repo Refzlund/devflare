@@ -1,6 +1,6 @@
 export {
-	formatWorkersDevUrl,
-	formatVersionPreviewUrl
+	formatVersionPreviewUrl,
+	formatWorkersDevUrl
 } from '../cloudflare/preview-urls'
 
 export interface ParsedWranglerDeployOutput {

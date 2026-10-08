@@ -1,6 +1,6 @@
 import { mkdirSync, rmSync, writeFileSync } from 'fs'
-import { dirname, join, resolve } from 'path'
 import { readFile } from 'fs/promises'
+import { dirname, join, resolve } from 'path'
 import { getPackageVersion } from '../cli/package-metadata'
 import { type DevflareConfig, loadConfig, normalizeDOBinding } from '../config'
 import { DEFAULT_DO_PATTERN, findFiles } from '../utils/glob'
@@ -114,7 +114,7 @@ async function resolveLocalDurableObjects(
 			if (!discoveredClass) {
 				throw new Error(
 					`Durable object ${name} (className: '${doInfo.className}') not found.\n` +
-						`Either:\n` +
+						'Either:\n' +
 						`  1. Set files.durableObjects pattern in config (e.g., 'src/do.*.ts')\n` +
 						`  2. Use explicit scriptName: { className: '${doInfo.className}', scriptName: 'do.file.ts' }`
 				)

@@ -1,6 +1,6 @@
 <script lang="ts">
-import InlineText from '../content/InlineText.svelte'
 import { m } from '$lib/paraglide/messages'
+import InlineText from '../content/InlineText.svelte'
 
 let {
 	href,

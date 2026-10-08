@@ -7,10 +7,10 @@ import { runInitCommand } from '../../../src/cli/commands/init'
 import { clearDependencies, setDependencies } from '../../../src/cli/dependencies'
 import { getInitDependencyVersions } from '../../../src/cli/package-metadata'
 import {
-	type TestHarness,
 	createMockProcessRunner,
 	createParsedArgs,
-	createTestHarness
+	createTestHarness,
+	type TestHarness
 } from '../mocks'
 
 describe('init command integration', () => {

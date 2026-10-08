@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test'
 import {
+	createDownloadProgressLogger,
 	DEFAULT_CHROME_FLAGS,
 	NO_SANDBOX_FLAGS,
-	createDownloadProgressLogger,
 	resolveChromeFlags
 } from '../../../src/browser-shim/server'
 

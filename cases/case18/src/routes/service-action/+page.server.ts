@@ -28,15 +28,14 @@ export const actions: Actions = {
 			}
 		}
 
-		const response = await api.fetch(new Request(
-			'https://case18-service-api.local/auth/magic-link/request',
-			{
+		const response = await api.fetch(
+			new Request('https://case18-service-api.local/auth/magic-link/request', {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
 				body: JSON.stringify({ email })
-			}
-		))
-		const payload = await response.json() as {
+			})
+		)
+		const payload = (await response.json()) as {
 			ok: boolean
 			email?: string
 			prefix?: string

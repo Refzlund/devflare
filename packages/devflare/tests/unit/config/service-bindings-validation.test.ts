@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test'
 import type { DevflareConfig } from '../../../src/config/schema'
 import {
-	ServiceBindingValidationError,
 	collectReferencedServiceNames,
+	ServiceBindingValidationError,
 	validateServiceBindings
 } from '../../../src/config/service-bindings-validation'
 

@@ -17,7 +17,7 @@ export const GET: RequestHandler = async ({ params, platform }) => {
 
 		// Build headers manually to avoid miniflare serialization issues
 		const headers = new Headers()
-		
+
 		// Get content type from http metadata if available
 		const contentType = object.httpMetadata?.contentType || 'application/octet-stream'
 		headers.set('Content-Type', contentType)

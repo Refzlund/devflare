@@ -12,7 +12,7 @@
 //   can reach it, and it takes no port a user could have configured.
 // =============================================================================
 
-import { type Server, createServer } from 'node:http'
+import { createServer, type Server } from 'node:http'
 import type { EmailDelivery } from '../utils/email-delivery'
 import { handleHostDelivery } from './host-sink'
 import type { ResolvedEmailRuntime } from './runtime-config'

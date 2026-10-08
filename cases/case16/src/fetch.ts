@@ -5,9 +5,9 @@
 // =============================================================================
 
 import { env } from 'devflare'
-import { OrderProcessingWorkflow, type OrderProcessingInput } from './wf.order-processor'
-import { DataPipelineWorkflow, type DataPipelineInput } from './wf.data-pipeline'
+import { type DataPipelineInput, DataPipelineWorkflow } from './wf.data-pipeline'
 import type { WorkflowStep } from './wf.order-processor'
+import { type OrderProcessingInput, OrderProcessingWorkflow } from './wf.order-processor'
 
 /**
  * Create a mock workflow step for testing
@@ -42,11 +42,16 @@ function parseDuration(duration: string): number {
 	const unit = match[2]
 
 	switch (unit) {
-		case 'ms': return value
-		case 's': return value * 1000
-		case 'm': return value * 60 * 1000
-		case 'h': return value * 60 * 60 * 1000
-		default: return 0
+		case 'ms':
+			return value
+		case 's':
+			return value * 1000
+		case 'm':
+			return value * 60 * 1000
+		case 'h':
+			return value * 60 * 60 * 1000
+		default:
+			return 0
 	}
 }
 
@@ -58,30 +63,24 @@ export default async function fetch(request: Request): Promise<Response> {
 
 	// Trigger order processing workflow
 	if (url.pathname === '/workflows/order' && request.method === 'POST') {
-		const input = await request.json() as OrderProcessingInput
+		const input = (await request.json()) as OrderProcessingInput
 
 		const workflow = new OrderProcessingWorkflow(env as unknown as DevflareEnv)
 		const step = createMockStep()
 
-		const result = await workflow.run(
-			{ params: input, timestamp: new Date() },
-			step
-		)
+		const result = await workflow.run({ params: input, timestamp: new Date() }, step)
 
 		return Response.json(result)
 	}
 
 	// Trigger data pipeline workflow
 	if (url.pathname === '/workflows/pipeline' && request.method === 'POST') {
-		const input = await request.json() as DataPipelineInput
+		const input = (await request.json()) as DataPipelineInput
 
 		const workflow = new DataPipelineWorkflow(env as unknown as DevflareEnv)
 		const step = createMockStep()
 
-		const result = await workflow.run(
-			{ params: input, timestamp: new Date() },
-			step
-		)
+		const result = await workflow.run({ params: input, timestamp: new Date() }, step)
 
 		return Response.json(result)
 	}

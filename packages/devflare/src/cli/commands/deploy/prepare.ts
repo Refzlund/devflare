@@ -3,17 +3,17 @@ import type { ConsolaInstance } from 'consola'
 import { basename, dirname, isAbsolute, resolve } from 'pathe'
 import { listWorkers } from '../../../cloudflare/account-workers'
 import {
+	compileConfig,
 	type DeployResourceNames,
 	type DevflareConfig,
-	type PrepareConfigResourcesForDeployResult,
-	ServiceBindingValidationError,
-	type WranglerConfig,
-	compileConfig,
 	loadConfig,
+	type PrepareConfigResourcesForDeployResult,
 	prepareConfigResourcesForDeploy,
 	readWranglerConfig,
 	resolveConfigEnvVars,
-	validateServiceBindings
+	ServiceBindingValidationError,
+	validateServiceBindings,
+	type WranglerConfig
 } from '../../../config'
 import { rebaseWranglerConfigPaths, writeWranglerConfig } from '../../../config/compiler'
 import { preparePreviewScopedResourcesForDeploy } from '../../../config/preview-resources'

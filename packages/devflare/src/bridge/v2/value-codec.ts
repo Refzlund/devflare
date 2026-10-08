@@ -11,13 +11,13 @@
 
 import { writeTransportV2Body } from './body-streams'
 import type { TransportV2Codec } from './codec'
+import type { TransportV2SerializedRequest, TransportV2SerializedResponse } from './serialization'
 import {
 	deserializeRequestV2,
 	deserializeResponseV2,
 	serializeRequestV2,
 	serializeResponseV2
 } from './serialization'
-import type { TransportV2SerializedRequest, TransportV2SerializedResponse } from './serialization'
 
 // -----------------------------------------------------------------------------
 // Tagged shapes

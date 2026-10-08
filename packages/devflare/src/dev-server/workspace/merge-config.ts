@@ -214,7 +214,7 @@ export function buildMergedWorkspaceConfig(input: BuildMergedWorkspaceConfigInpu
 		if (portOwner !== undefined) {
 			throw new Error(
 				`Workspace apps "${portOwner}" and "${app.appName}" both use port ${app.directSocketPort}. ` +
-					`Each app needs a distinct direct-socket port.`
+					'Each app needs a distinct direct-socket port.'
 			)
 		}
 		seenPorts.set(app.directSocketPort, app.appName)
@@ -238,7 +238,7 @@ export function buildMergedWorkspaceConfig(input: BuildMergedWorkspaceConfigInpu
 		if (seenWorkerNames.has(workerName)) {
 			throw new Error(
 				`Workspace produced two workers named "${workerName}" after namespacing. ` +
-					`Rename one of the conflicting apps so their namespaced worker names stay distinct.`
+					'Rename one of the conflicting apps so their namespaced worker names stay distinct.'
 			)
 		}
 		seenWorkerNames.add(workerName)

@@ -8,22 +8,22 @@
 // =============================================================================
 
 import { describe, expect, test } from 'bun:test'
+import type { TransportV2ControlMsg } from '../../../../src/bridge/v2'
 import {
-	TRANSPORT_V2_BINARY_HEADER_SIZE,
-	TRANSPORT_V2_PROTOCOL_VERSION,
-	TRANSPORT_V2_UNSUPPORTED_VERSION_CLOSE_CODE,
-	TransportV2BinaryFlags,
-	TransportV2BinaryKind,
 	decodeTransportV2BinaryFrame,
 	encodeTransportV2BinaryFrame,
 	negotiateTransportV2Capabilities,
 	parseTransportV2ControlMsg,
 	stringifyTransportV2ControlMsg,
+	TRANSPORT_V2_BINARY_HEADER_SIZE,
+	TRANSPORT_V2_PROTOCOL_VERSION,
+	TRANSPORT_V2_UNSUPPORTED_VERSION_CLOSE_CODE,
+	TransportV2BinaryFlags,
+	TransportV2BinaryKind,
 	transportV2IsAbort,
 	transportV2IsFin,
 	transportV2IsText
 } from '../../../../src/bridge/v2'
-import type { TransportV2ControlMsg } from '../../../../src/bridge/v2'
 
 describe('transport v2 — protocol constants', () => {
 	test('protocol version is pinned at 2', () => {

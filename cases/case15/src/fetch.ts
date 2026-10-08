@@ -39,7 +39,7 @@ export async function generateEmbedding(
 	text: string,
 	model: string
 ): Promise<number[]> {
-	const result = await ai.run(model as keyof AiModels, { text: [text] }) as EmbeddingResult
+	const result = (await ai.run(model as keyof AiModels, { text: [text] })) as EmbeddingResult
 	return result.data[0]
 }
 
@@ -52,11 +52,11 @@ export async function generateText(
 	model: string,
 	options?: { maxTokens?: number; temperature?: number }
 ): Promise<string> {
-	const result = await ai.run(model as keyof AiModels, {
+	const result = (await ai.run(model as keyof AiModels, {
 		prompt,
 		max_tokens: options?.maxTokens ?? 256,
 		temperature: options?.temperature ?? 0.7
-	}) as TextGenerationResult
+	})) as TextGenerationResult
 
 	return result.response
 }
@@ -145,7 +145,7 @@ export default async function fetch(request: Request): Promise<Response> {
 
 	// Index a document
 	if (url.pathname === '/index' && request.method === 'POST') {
-		const body = await request.json() as {
+		const body = (await request.json()) as {
 			id: string
 			text: string
 			metadata?: Record<string, unknown>
@@ -178,7 +178,7 @@ export default async function fetch(request: Request): Promise<Response> {
 
 		// Step 3: Build context from retrieved documents
 		const context = matches
-			.map((m) => m.metadata?.text as string ?? '')
+			.map((m) => (m.metadata?.text as string) ?? '')
 			.filter(Boolean)
 			.join('\n\n')
 

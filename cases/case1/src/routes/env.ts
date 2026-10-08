@@ -2,8 +2,8 @@
 // Route: GET /env
 // =============================================================================
 
-import type { FetchEvent } from 'devflare/runtime'
 import { env } from 'devflare'
+import type { FetchEvent } from 'devflare/runtime'
 
 /**
  * GET /env - Returns environment variables via unified env

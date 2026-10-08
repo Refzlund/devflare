@@ -5,54 +5,52 @@
 // =============================================================================
 
 export {
+	getAccountById,
 	getAccounts,
-	getPrimaryAccount,
-	getAccountById
+	getPrimaryAccount
 } from './account-core'
-
 export {
-	listWorkers,
-	renameWorker,
-	deleteWorker,
-	listWorkerVersions,
-	getWorkerVersionDetail,
-	listWorkerDeployments,
-	getWorkersSubdomain
-} from './account-workers'
-
-export {
-	listKVNamespaces,
-	createKVNamespace,
-	deleteKVNamespace,
-	listD1Databases,
 	createD1Database,
-	deleteD1Database,
-	queryD1Database,
-	rawD1DatabaseQuery,
-	listQueues,
+	createKVNamespace,
 	createQueue,
-	deleteQueue,
-	listR2Buckets,
 	createR2Bucket,
-	deleteR2Bucket,
-	listHyperdrives,
-	deleteHyperdrive,
-	listVectorizeIndexes,
 	createVectorizeIndex,
+	deleteD1Database,
+	deleteHyperdrive,
+	deleteKVNamespace,
+	deleteQueue,
+	deleteR2Bucket,
 	deleteVectorizeIndex,
-	listAIModels
+	listAIModels,
+	listD1Databases,
+	listHyperdrives,
+	listKVNamespaces,
+	listQueues,
+	listR2Buckets,
+	listVectorizeIndexes,
+	queryD1Database,
+	rawD1DatabaseQuery
 } from './account-resources'
+export type { AccountSummary } from './account-status'
 
 export {
-	getServiceStatus,
-	getAllServiceStatus,
 	checkAuth,
-	hasService,
-	getAccountSummary
+	getAccountSummary,
+	getAllServiceStatus,
+	getServiceStatus,
+	hasService
 } from './account-status'
 
 export type { RenamedWorkerInfo } from './account-workers'
-export type { AccountSummary } from './account-status'
+export {
+	deleteWorker,
+	getWorkersSubdomain,
+	getWorkerVersionDetail,
+	listWorkerDeployments,
+	listWorkers,
+	listWorkerVersions,
+	renameWorker
+} from './account-workers'
 export type {
 	D1DatabaseInfo,
 	HyperdriveConfigInfo,

@@ -1,5 +1,5 @@
-import type { RequestHandler } from './$types'
 import { env } from 'devflare'
+import type { RequestHandler } from './$types'
 
 const PNG_1X1_BASE64 =
 	'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII='

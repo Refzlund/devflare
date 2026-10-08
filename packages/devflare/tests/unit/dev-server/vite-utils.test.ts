@@ -2,11 +2,11 @@ import { describe, expect, test } from 'bun:test'
 import { EventEmitter } from 'node:events'
 import { PassThrough } from 'node:stream'
 import {
-	type SpawnedLikeProcess,
-	type ViteProjectFileSystem,
 	detectViteProject,
 	extractViteReadyUrl,
+	type SpawnedLikeProcess,
 	stopSpawnedProcessTree,
+	type ViteProjectFileSystem,
 	waitForViteReady
 } from '../../../src/dev-server/vite-utils'
 

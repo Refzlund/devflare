@@ -1,9 +1,9 @@
-import { svelte } from '@sveltejs/vite-plugin-svelte'
-import puppeteer, { type Browser } from 'puppeteer-core'
 import { createHash } from 'node:crypto'
-import { access, mkdir, readFile, readdir, rm } from 'node:fs/promises'
+import { access, mkdir, readdir, readFile, rm } from 'node:fs/promises'
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { svelte } from '@sveltejs/vite-plugin-svelte'
+import puppeteer, { type Browser } from 'puppeteer-core'
 import { render } from 'svelte/server'
 import { createServer } from 'vite'
 import { docs } from '../src/lib/docs/content'
@@ -208,7 +208,8 @@ async function resolveSocialCardAssets(
 	options: SocialCardAssets = {}
 ): Promise<ResolvedSocialCardAssets> {
 	const logoSvg =
-		options.logoSvg ?? (await readFile(resolve(getDocumentationStaticDir(), 'devflare-logo.svg'), 'utf8'))
+		options.logoSvg ??
+		(await readFile(resolve(getDocumentationStaticDir(), 'devflare-logo.svg'), 'utf8'))
 	const npmLogoPng = options.npmLogoPng ?? (await readFile(getNpmLogoAssetPath()))
 
 	return {
@@ -342,10 +343,11 @@ async function getChromiumExecutableCandidates(): Promise<string[]> {
 		const userProfile = process.env.USERPROFILE
 
 		candidates.push(
-			...(await collectVersionedExecutableCandidates(localAppData && join(localAppData, 'ms-playwright'), 'chromium-', [
-				'chrome-win64',
-				'chrome.exe'
-			])),
+			...(await collectVersionedExecutableCandidates(
+				localAppData && join(localAppData, 'ms-playwright'),
+				'chromium-',
+				['chrome-win64', 'chrome.exe']
+			)),
 			...(await collectVersionedExecutableCandidates(
 				localAppData && join(localAppData, 'xdg.cache', '.wrangler', 'chrome'),
 				'win64-',
@@ -356,10 +358,34 @@ async function getChromiumExecutableCandidates(): Promise<string[]> {
 				'win64-',
 				['chrome-win64', 'chrome.exe']
 			)),
-			join(process.env.ProgramFiles ?? 'C:\\Program Files', 'Google', 'Chrome', 'Application', 'chrome.exe'),
-			join(process.env['ProgramFiles(x86)'] ?? 'C:\\Program Files (x86)', 'Google', 'Chrome', 'Application', 'chrome.exe'),
-			join(process.env.ProgramFiles ?? 'C:\\Program Files', 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
-			join(process.env['ProgramFiles(x86)'] ?? 'C:\\Program Files (x86)', 'Microsoft', 'Edge', 'Application', 'msedge.exe')
+			join(
+				process.env.ProgramFiles ?? 'C:\\Program Files',
+				'Google',
+				'Chrome',
+				'Application',
+				'chrome.exe'
+			),
+			join(
+				process.env['ProgramFiles(x86)'] ?? 'C:\\Program Files (x86)',
+				'Google',
+				'Chrome',
+				'Application',
+				'chrome.exe'
+			),
+			join(
+				process.env.ProgramFiles ?? 'C:\\Program Files',
+				'Microsoft',
+				'Edge',
+				'Application',
+				'msedge.exe'
+			),
+			join(
+				process.env['ProgramFiles(x86)'] ?? 'C:\\Program Files (x86)',
+				'Microsoft',
+				'Edge',
+				'Application',
+				'msedge.exe'
+			)
 		)
 	} else if (process.platform === 'darwin') {
 		const home = process.env.HOME
@@ -372,13 +398,17 @@ async function getChromiumExecutableCandidates(): Promise<string[]> {
 				'chromium-',
 				['chrome-mac', 'Chromium.app', 'Contents', 'MacOS', 'Chromium']
 			)),
-			...(await collectVersionedExecutableCandidates(home && join(home, '.cache', 'puppeteer', 'chrome'), 'mac-', [
-				'chrome-mac-x64',
-				'Google Chrome for Testing.app',
-				'Contents',
-				'MacOS',
-				'Google Chrome for Testing'
-			]))
+			...(await collectVersionedExecutableCandidates(
+				home && join(home, '.cache', 'puppeteer', 'chrome'),
+				'mac-',
+				[
+					'chrome-mac-x64',
+					'Google Chrome for Testing.app',
+					'Contents',
+					'MacOS',
+					'Google Chrome for Testing'
+				]
+			))
 		)
 	} else {
 		const home = process.env.HOME
@@ -389,14 +419,16 @@ async function getChromiumExecutableCandidates(): Promise<string[]> {
 			'/usr/bin/chromium',
 			'/usr/bin/chromium-browser',
 			'/snap/bin/chromium',
-			...(await collectVersionedExecutableCandidates(home && join(home, '.cache', 'ms-playwright'), 'chromium-', [
-				'chrome-linux',
-				'chrome'
-			])),
-			...(await collectVersionedExecutableCandidates(home && join(home, '.cache', 'puppeteer', 'chrome'), 'linux-', [
-				'chrome-linux64',
-				'chrome'
-			]))
+			...(await collectVersionedExecutableCandidates(
+				home && join(home, '.cache', 'ms-playwright'),
+				'chromium-',
+				['chrome-linux', 'chrome']
+			)),
+			...(await collectVersionedExecutableCandidates(
+				home && join(home, '.cache', 'puppeteer', 'chrome'),
+				'linux-',
+				['chrome-linux64', 'chrome']
+			))
 		)
 	}
 
@@ -465,7 +497,11 @@ export async function generateSocialCards(
 	const fingerprint = await createSocialCardsFingerprint(pages, assets)
 	const force = options.force ?? process.env.DEVFLARE_SOCIAL_CARDS_FORCE === '1'
 
-	if (!force && (await readManifestFingerprint(outputDir)) === fingerprint && (await allFilesExist(outputFiles))) {
+	if (
+		!force &&
+		(await readManifestFingerprint(outputDir)) === fingerprint &&
+		(await allFilesExist(outputFiles))
+	) {
 		return {
 			outputDir,
 			outputFiles,

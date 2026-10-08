@@ -13,9 +13,7 @@ import type { Task } from './lib/types'
 /**
  * HTTP handler - accepts tasks and sends to queue
  */
-export default async function fetch(
-	request: Request
-): Promise<Response> {
+export default async function fetch(request: Request): Promise<Response> {
 	const url = new URL(request.url)
 
 	// Route: GET /

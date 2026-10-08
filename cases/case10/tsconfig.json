@@ -2,23 +2,11 @@
 	"extends": "../tsconfig.base.json",
 	"compilerOptions": {
 		"paths": {
-			"@/*": [
-				"./src/*"
-			],
-			"@lib/*": [
-				"./src/lib/*"
-			],
-			"@utils/*": [
-				"./src/utils/*"
-			],
-			"#types/*": [
-				"./src/types/*"
-			]
+			"@/*": ["./src/*"],
+			"@lib/*": ["./src/lib/*"],
+			"@utils/*": ["./src/utils/*"],
+			"#types/*": ["./src/types/*"]
 		}
 	},
-	"include": [
-		"env.d.ts",
-		"src/**/*",
-		"tests/**/*"
-	]
+	"include": ["env.d.ts", "src/**/*", "tests/**/*"]
 }

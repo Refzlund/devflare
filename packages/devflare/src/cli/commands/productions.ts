@@ -1,10 +1,10 @@
 import type { ConsolaInstance } from 'consola'
 import {
 	type APIClientOptions,
+	account,
 	type WorkerDeploymentInfo,
 	type WorkerInfo,
-	type WorkerVersionInfo,
-	account
+	type WorkerVersionInfo
 } from '../../cloudflare'
 import { ConfigNotFoundError, loadConfig } from '../../config/loader'
 import { findFiles } from '../../utils/glob'
@@ -16,9 +16,9 @@ import {
 import { getDependencies } from '../dependencies'
 import type { CliOptions, CliResult, ParsedArgs } from '../index'
 import {
+	bold,
 	type CliTableColumn,
 	type CliTheme,
-	bold,
 	createCliTheme,
 	cyanBold,
 	dim,

@@ -15,7 +15,11 @@ interface QueueEnv {
 	APP_NAME: string
 }
 
-export async function queue(batch: QueueBatch, env: QueueEnv, _ctx: ExecutionContext): Promise<void> {
+export async function queue(
+	batch: QueueBatch,
+	env: QueueEnv,
+	_ctx: ExecutionContext
+): Promise<void> {
 	const key = batch.queue.includes('emails') ? stateKeys.queueEmails : stateKeys.queueJobs
 	const lastMessage = batch.messages.at(-1)?.body ?? null
 

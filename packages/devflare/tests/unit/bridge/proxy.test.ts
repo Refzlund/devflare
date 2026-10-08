@@ -43,7 +43,7 @@ describe('createEnvProxy service bindings', () => {
 		expect(response.headers.get('x-service')).toBe('ok')
 		expect(await response.text()).toBe('service-ok')
 		expect(calls[0]?.method).toBe('API.service.fetch')
-		expect((calls[0]?.params[0] as { method?: string }).method).toBe('POST')
+		expect((calls[0]!.params[0] as { method?: string }).method).toBe('POST')
 	})
 })
 

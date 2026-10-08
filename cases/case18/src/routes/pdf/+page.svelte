@@ -1,109 +1,109 @@
 <script lang="ts">
-	interface PdfStats {
-		generated: number
-		errors: number
-		cacheSize: number
-		successRate: number
-	}
+interface PdfStats {
+	generated: number
+	errors: number
+	cacheSize: number
+	successRate: number
+}
 
-	interface PdfErrorResponse {
-		error?: string
-	}
+interface PdfErrorResponse {
+	error?: string
+}
 
-	let url = $state('https://example.com')
-	let format = $state<'A4' | 'Letter' | 'Legal'>('A4')
-	let landscape = $state(false)
-	let printBackground = $state(true)
-	let generating = $state(false)
-	let error = $state<string | null>(null)
-	let result = $state<{
-		success: boolean
-		pdfUrl?: string
-		requestId?: string
-		cached?: boolean
-		durationMs?: number
-	} | null>(null)
-	let stats = $state<PdfStats | null>(null)
+let url = $state('https://example.com')
+let format = $state<'A4' | 'Letter' | 'Legal'>('A4')
+let landscape = $state(false)
+let printBackground = $state(true)
+let generating = $state(false)
+let error = $state<string | null>(null)
+let result = $state<{
+	success: boolean
+	pdfUrl?: string
+	requestId?: string
+	cached?: boolean
+	durationMs?: number
+} | null>(null)
+let stats = $state<PdfStats | null>(null)
 
-	$effect(() => {
-		loadStats()
-	})
+$effect(() => {
+	loadStats()
+})
 
-	async function loadStats() {
-		try {
-			const response = await fetch('/pdf')
-			const data: PdfStats & { error?: string } = await response.json()
-			if (!data.error) {
-				stats = data
-			}
-		} catch {
-			// Ignore stats errors
+async function loadStats() {
+	try {
+		const response = await fetch('/pdf')
+		const data: PdfStats & { error?: string } = await response.json()
+		if (!data.error) {
+			stats = data
 		}
+	} catch {
+		// Ignore stats errors
 	}
+}
 
-	async function generatePdf() {
-		if (!url.trim()) return
+async function generatePdf() {
+	if (!url.trim()) return
 
-		generating = true
-		error = null
-		result = null
+	generating = true
+	error = null
+	result = null
 
-		try {
-			const response = await fetch('/pdf', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					url,
-					options: {
-						format,
-						landscape,
-						printBackground
-					}
-				})
-			})
-
-			const requestId = response.headers.get('X-Request-Id')
-			const cached = response.headers.get('X-Cached') === 'true'
-			const durationMs = parseInt(response.headers.get('X-Duration-Ms') || '0')
-
-			if (response.ok) {
-				// Create blob URL for the PDF
-				const blob = await response.blob()
-				const pdfUrl = URL.createObjectURL(blob)
-
-				result = {
-					success: true,
-					pdfUrl,
-					requestId: requestId || undefined,
-					cached,
-					durationMs
+	try {
+		const response = await fetch('/pdf', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				url,
+				options: {
+					format,
+					landscape,
+					printBackground
 				}
+			})
+		})
 
-				// Refresh stats
-				loadStats()
-			} else {
-				const data: PdfErrorResponse = await response.json()
-				error = data.error || 'PDF generation failed'
-				result = { success: false }
+		const requestId = response.headers.get('X-Request-Id')
+		const cached = response.headers.get('X-Cached') === 'true'
+		const durationMs = parseInt(response.headers.get('X-Duration-Ms') || '0')
+
+		if (response.ok) {
+			// Create blob URL for the PDF
+			const blob = await response.blob()
+			const pdfUrl = URL.createObjectURL(blob)
+
+			result = {
+				success: true,
+				pdfUrl,
+				requestId: requestId || undefined,
+				cached,
+				durationMs
 			}
-		} catch (e) {
-			error = e instanceof Error ? e.message : 'Request failed'
+
+			// Refresh stats
+			loadStats()
+		} else {
+			const data: PdfErrorResponse = await response.json()
+			error = data.error || 'PDF generation failed'
 			result = { success: false }
-		} finally {
-			generating = false
 		}
+	} catch (e) {
+		error = e instanceof Error ? e.message : 'Request failed'
+		result = { success: false }
+	} finally {
+		generating = false
 	}
+}
 
-	function downloadPdf() {
-		if (!result?.pdfUrl) return
+function downloadPdf() {
+	if (!result?.pdfUrl) return
 
-		const a = document.createElement('a')
-		a.href = result.pdfUrl
-		a.download = `pdf-${Date.now()}.pdf`
-		document.body.appendChild(a)
-		a.click()
-		document.body.removeChild(a)
-	}
+	const a = document.createElement('a')
+	a.href = result.pdfUrl
+	a.download = `pdf-${Date.now()}.pdf`
+	document.body.appendChild(a)
+	a.click()
+	document.body.removeChild(a)
+}
 </script>
 
 <div class="pdf-page">

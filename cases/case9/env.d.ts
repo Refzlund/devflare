@@ -2,8 +2,7 @@
 // Run `devflare types` to regenerate
 
 declare global {
-	interface DevflareEnv {
-	}
+	interface DevflareEnv {}
 }
 
 /**

@@ -350,5 +350,5 @@ export interface BindingsConfigInput {
 	flagship?: Record<string, FlagshipBindingInput>
 }
 
-export type * from './schema-types-bindings-resources'
 export type * from './schema-types-bindings-platform'
+export type * from './schema-types-bindings-resources'

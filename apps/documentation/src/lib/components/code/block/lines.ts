@@ -82,5 +82,5 @@ function isTrailingClosureLine(line: string): boolean {
 		return false
 	}
 
-	return /^[\]\)\}]+[,;\]\)\}]*$/.test(trimmed) || /^<\/[a-z][\w:-]*>$/.test(trimmed)
+	return /^[\])}]+[,;\])}]*$/.test(trimmed) || /^<\/[a-z][\w:-]*>$/.test(trimmed)
 }

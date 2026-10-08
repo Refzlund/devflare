@@ -1,159 +1,161 @@
 <script lang="ts">
-	import { base } from '$app/paths'
-	import { afterNavigate } from '$app/navigation'
-	import { page } from '$app/state'
-	import { onMount } from 'svelte'
-	import Tooltip from '$lib/components/layout/Tooltip.svelte'
-	import IntellisenseTooltip from '$lib/intellisense/IntellisenseTooltip.svelte'
-	import Sidebar from '$lib/components/navigation/Sidebar.svelte'
-	import type { DocPage } from '$lib/docs/types'
-	import { m } from '$lib/paraglide/messages'
-	import { localizeHref } from '$lib/paraglide/runtime'
-	import {
-		BRAND_COLOR,
-		getSocialCardPath,
-		getSocialDescription,
-		getSocialImageAlt,
-		getSocialTitle,
-		toAbsoluteUrl
-	} from '$lib/site/social'
-	import './layout.css'
+import { onMount } from 'svelte'
+import { afterNavigate } from '$app/navigation'
+import { base } from '$app/paths'
+import { page } from '$app/state'
+import Tooltip from '$lib/components/layout/Tooltip.svelte'
+import Sidebar from '$lib/components/navigation/Sidebar.svelte'
+import type { DocPage } from '$lib/docs/types'
+import IntellisenseTooltip from '$lib/intellisense/IntellisenseTooltip.svelte'
+import { m } from '$lib/paraglide/messages'
+import { localizeHref } from '$lib/paraglide/runtime'
+import {
+	BRAND_COLOR,
+	getSocialCardPath,
+	getSocialDescription,
+	getSocialImageAlt,
+	getSocialTitle,
+	toAbsoluteUrl
+} from '$lib/site/social'
+import './layout.css'
 
-	type ThemeMode = 'light' | 'dark'
+type ThemeMode = 'light' | 'dark'
 
-	const THEME_STORAGE_KEY = 'documentation-theme'
-	const THEME_MEDIA_QUERY = '(prefers-color-scheme: dark)'
-	const themeMetaColors: Record<ThemeMode, string> = {
-		light: '#f5f3ef',
-		dark: '#161616'
+const THEME_STORAGE_KEY = 'documentation-theme'
+const THEME_MEDIA_QUERY = '(prefers-color-scheme: dark)'
+const themeMetaColors: Record<ThemeMode, string> = {
+	light: '#f5f3ef',
+	dark: '#161616'
+}
+type ReadingViewportLink = {
+	id: 'github' | 'npm'
+	label: string
+	href: string
+	ariaLabel: string
+	iconClass?: string
+}
+
+const readingViewportLinks: readonly ReadingViewportLink[] = [
+	{
+		id: 'github',
+		label: 'Refzlund/devflare',
+		href: 'https://github.com/Refzlund/devflare',
+		ariaLabel: 'Open Refzlund/devflare on GitHub'
+	},
+	{
+		id: 'npm',
+		label: 'npm',
+		href: 'https://www.npmjs.com/package/devflare',
+		iconClass: 'logos--npm-icon',
+		ariaLabel: 'Open Devflare on npm'
 	}
-	type ReadingViewportLink = {
-		id: 'github' | 'npm'
-		label: string
-		href: string
-		ariaLabel: string
-		iconClass?: string
-	}
+] as const
 
-	const readingViewportLinks: readonly ReadingViewportLink[] = [
-		{
-			id: 'github',
-			label: 'Refzlund/devflare',
-			href: 'https://github.com/Refzlund/devflare',
-			ariaLabel: 'Open Refzlund/devflare on GitHub'
-		},
-		{
-			id: 'npm',
-			label: 'npm',
-			href: 'https://www.npmjs.com/package/devflare',
-			iconClass: 'logos--npm-icon',
-			ariaLabel: 'Open Devflare on npm'
-		}
-	] as const
+const brandLogoPath = `${base}/devflare-logo.svg`
 
-	const brandLogoPath = `${base}/devflare-logo.svg`
+let { children } = $props()
+let sidebarOpen = $state(false)
+let theme = $state<ThemeMode>('light')
+const currentDoc = $derived(page.data.doc as DocPage | undefined)
+const socialTitle = $derived(getSocialTitle(currentDoc))
+const socialDescription = $derived(getSocialDescription(currentDoc))
+const socialImageAlt = $derived(getSocialImageAlt(currentDoc))
+const socialCardPath = $derived(`${base}${getSocialCardPath(currentDoc)}`)
+const socialUrl = $derived(toAbsoluteUrl(page.url.origin, page.url.pathname))
+const socialImageUrl = $derived(toAbsoluteUrl(page.url.origin, socialCardPath))
 
-	let { children } = $props()
-	let sidebarOpen = $state(false)
-	let theme = $state<ThemeMode>('light')
-	const currentDoc = $derived(page.data.doc as DocPage | undefined)
-	const socialTitle = $derived(getSocialTitle(currentDoc))
-	const socialDescription = $derived(getSocialDescription(currentDoc))
-	const socialImageAlt = $derived(getSocialImageAlt(currentDoc))
-	const socialCardPath = $derived(`${base}${getSocialCardPath(currentDoc)}`)
-	const socialUrl = $derived(toAbsoluteUrl(page.url.origin, page.url.pathname))
-	const socialImageUrl = $derived(toAbsoluteUrl(page.url.origin, socialCardPath))
-
-	function getStoredTheme(): ThemeMode | undefined {
-		if (typeof window === 'undefined') {
-			return undefined
-		}
-
-		const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY)
-		if (storedTheme === 'light' || storedTheme === 'dark') {
-			return storedTheme
-		}
-
+function getStoredTheme(): ThemeMode | undefined {
+	if (typeof window === 'undefined') {
 		return undefined
 	}
 
-	function getSystemTheme(): ThemeMode {
-		if (typeof window === 'undefined') {
-			return 'light'
-		}
-
-		return window.matchMedia(THEME_MEDIA_QUERY).matches ? 'dark' : 'light'
+	const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY)
+	if (storedTheme === 'light' || storedTheme === 'dark') {
+		return storedTheme
 	}
 
-	function getResolvedTheme(): ThemeMode {
-		return getStoredTheme() ?? getSystemTheme()
+	return undefined
+}
+
+function getSystemTheme(): ThemeMode {
+	if (typeof window === 'undefined') {
+		return 'light'
 	}
 
-	function applyTheme(nextTheme: ThemeMode): void {
-		theme = nextTheme
+	return window.matchMedia(THEME_MEDIA_QUERY).matches ? 'dark' : 'light'
+}
 
-		if (typeof document === 'undefined') {
+function getResolvedTheme(): ThemeMode {
+	return getStoredTheme() ?? getSystemTheme()
+}
+
+function applyTheme(nextTheme: ThemeMode): void {
+	theme = nextTheme
+
+	if (typeof document === 'undefined') {
+		return
+	}
+
+	document.documentElement.dataset.theme = nextTheme
+	document.documentElement.style.colorScheme = nextTheme
+	document
+		.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
+		?.setAttribute('content', themeMetaColors[nextTheme])
+}
+
+function setStoredTheme(nextTheme: ThemeMode): void {
+	if (typeof window === 'undefined') {
+		return
+	}
+
+	window.localStorage.setItem(THEME_STORAGE_KEY, nextTheme)
+}
+
+function setTheme(nextTheme: ThemeMode): void {
+	applyTheme(nextTheme)
+	setStoredTheme(nextTheme)
+}
+
+function toggleTheme(): void {
+	setTheme(theme === 'dark' ? 'light' : 'dark')
+}
+
+const themeSwitchLabel = $derived(
+	theme === 'dark' ? m.theme_switch_to_light() : m.theme_switch_to_dark()
+)
+
+onMount(() => {
+	const mediaQuery = window.matchMedia(THEME_MEDIA_QUERY)
+
+	const handleThemePreferenceChange = (event: MediaQueryListEvent): void => {
+		if (getStoredTheme()) {
 			return
 		}
 
-		document.documentElement.dataset.theme = nextTheme
-		document.documentElement.style.colorScheme = nextTheme
-		document
-			.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
-			?.setAttribute('content', themeMetaColors[nextTheme])
+		applyTheme(event.matches ? 'dark' : 'light')
 	}
 
-	function setStoredTheme(nextTheme: ThemeMode): void {
-		if (typeof window === 'undefined') {
+	const handleStorageChange = (event: StorageEvent): void => {
+		if (event.key !== null && event.key !== THEME_STORAGE_KEY) {
 			return
-		}
-
-		window.localStorage.setItem(THEME_STORAGE_KEY, nextTheme)
-	}
-
-	function setTheme(nextTheme: ThemeMode): void {
-		applyTheme(nextTheme)
-		setStoredTheme(nextTheme)
-	}
-
-	function toggleTheme(): void {
-		setTheme(theme === 'dark' ? 'light' : 'dark')
-	}
-
-	const themeSwitchLabel = $derived(theme === 'dark' ? m.theme_switch_to_light() : m.theme_switch_to_dark())
-
-	onMount(() => {
-		const mediaQuery = window.matchMedia(THEME_MEDIA_QUERY)
-
-		const handleThemePreferenceChange = (event: MediaQueryListEvent): void => {
-			if (getStoredTheme()) {
-				return
-			}
-
-			applyTheme(event.matches ? 'dark' : 'light')
-		}
-
-		const handleStorageChange = (event: StorageEvent): void => {
-			if (event.key !== null && event.key !== THEME_STORAGE_KEY) {
-				return
-			}
-
-			applyTheme(getResolvedTheme())
 		}
 
 		applyTheme(getResolvedTheme())
-		mediaQuery.addEventListener('change', handleThemePreferenceChange)
-		window.addEventListener('storage', handleStorageChange)
+	}
 
-		return () => {
-			mediaQuery.removeEventListener('change', handleThemePreferenceChange)
-			window.removeEventListener('storage', handleStorageChange)
-		}
-	})
+	applyTheme(getResolvedTheme())
+	mediaQuery.addEventListener('change', handleThemePreferenceChange)
+	window.addEventListener('storage', handleStorageChange)
 
-	afterNavigate(() => {
-		sidebarOpen = false
-	})
+	return () => {
+		mediaQuery.removeEventListener('change', handleThemePreferenceChange)
+		window.removeEventListener('storage', handleStorageChange)
+	}
+})
+
+afterNavigate(() => {
+	sidebarOpen = false
+})
 </script>
 
 <svelte:head>

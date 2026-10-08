@@ -1,25 +1,25 @@
 <script lang="ts">
-	import { page } from '$app/state'
-	import { docGroups, docPath } from '$lib/docs/content'
-	import type { DocCategory, DocPage } from '$lib/docs/types'
-	import { m } from '$lib/paraglide/messages'
-	import { localizeHref } from '$lib/paraglide/runtime'
+import { page } from '$app/state'
+import { docGroups, docPath } from '$lib/docs/content'
+import type { DocCategory, DocPage } from '$lib/docs/types'
+import { m } from '$lib/paraglide/messages'
+import { localizeHref } from '$lib/paraglide/runtime'
 
-	function href(path: string): string {
-		return localizeHref(path)
-	}
+function href(path: string): string {
+	return localizeHref(path)
+}
 
-	function isActive(path: string): boolean {
-		return page.url.pathname === href(path)
-	}
+function isActive(path: string): boolean {
+	return page.url.pathname === href(path)
+}
 
-	function getSidebarItems(category: DocCategory): DocPage[] {
-		return (category.sidebarItems ?? category.items).filter((item) => !item.sidebarHidden)
-	}
+function getSidebarItems(category: DocCategory): DocPage[] {
+	return (category.sidebarItems ?? category.items).filter((item) => !item.sidebarHidden)
+}
 
-	const linkBase = 'block rounded-md px-2.5 py-1.5 transition'
-	const linkIdle = 'docs-nav-link'
-	const linkOn = 'docs-nav-link-active font-medium'
+const linkBase = 'block rounded-md px-2.5 py-1.5 transition'
+const linkIdle = 'docs-nav-link'
+const linkOn = 'docs-nav-link-active font-medium'
 </script>
 
 <nav aria-label={m.nav_documentation_aria()} class="flex h-full flex-col text-[0.875rem] leading-6">

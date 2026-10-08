@@ -8,4 +8,4 @@ export class DoubleableNumber {
 	get double() {
 		return this.value * 2
 	}
-} 
+}

@@ -17,11 +17,11 @@ export class ContextAccessError extends Error {
 		super(
 			message ??
 				`Cannot access ${contextName}.${propertyName} outside of an active Devflare handler trail.\n\n` +
-					`This typically happens when:\n` +
+					'This typically happens when:\n' +
 					`  1. Accessing ${contextName} at module top-level (during import)\n` +
 					`  2. Accessing ${contextName} in a callback that runs after the handler ends\n` +
 					`  3. Accessing ${contextName} in a setTimeout/setInterval callback\n\n` +
-					`Move the access inside your handler function or middleware.`
+					'Move the access inside your handler function or middleware.'
 		)
 		this.name = 'ContextAccessError'
 		this.contextName = contextName
@@ -38,13 +38,13 @@ export class ContextAccessError extends Error {
 			'context',
 			'<unavailable>',
 			message ??
-				`Context not available. Devflare uses AsyncLocalStorage to carry the active event through fetch, queue, scheduled, email, tail, and Durable Object handler call chains.\n\n` +
-					`This usually means one of:\n\n` +
-					`1. Accessing context at module top-level (runs at cold start, not per-request)\n` +
-					`2. Accessing context in setTimeout/setInterval callbacks\n` +
+				'Context not available. Devflare uses AsyncLocalStorage to carry the active event through fetch, queue, scheduled, email, tail, and Durable Object handler call chains.\n\n' +
+					'This usually means one of:\n\n' +
+					'1. Accessing context at module top-level (runs at cold start, not per-request)\n' +
+					'2. Accessing context in setTimeout/setInterval callbacks\n' +
 					`3. Missing 'nodejs_compat' compatibility flag in your worker config\n\n` +
-					`Fix: Move the access inside your handler, middleware, or a helper called from that handler trail.\n` +
-					`Learn more: https://devflare.dev/docs/context-errors`
+					'Fix: Move the access inside your handler, middleware, or a helper called from that handler trail.\n' +
+					'Learn more: https://devflare.dev/docs/context-errors'
 		)
 	}
 }

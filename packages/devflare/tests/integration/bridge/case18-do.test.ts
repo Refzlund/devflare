@@ -10,7 +10,7 @@ import type { Miniflare } from 'miniflare'
 import { BridgeClient } from '../../../src/bridge/client'
 import { createEnvProxy, setBindingHints } from '../../../src/bridge/proxy'
 import { toMiniflareOptions } from '../../../src/utils/miniflare-options'
-import { PORTS, createGatewayScript } from './_fixtures'
+import { createGatewayScript, PORTS } from './_fixtures'
 
 // =============================================================================
 // Helper Types - RPC stubs return `any` for dynamic method access

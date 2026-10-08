@@ -1,4 +1,4 @@
-import { type APIClientOptions, type WorkerDeploymentInfo, account } from '../cloudflare'
+import { type APIClientOptions, account, type WorkerDeploymentInfo } from '../cloudflare'
 import { compileBuildConfig } from '../config/compiler'
 import type { DevflareConfig } from '../config/schema'
 import type { ProcessRunner } from './dependencies'

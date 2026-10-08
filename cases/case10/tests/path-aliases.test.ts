@@ -6,10 +6,9 @@
 // =============================================================================
 
 import { describe, expect, it } from 'bun:test'
-
-import { generateId, timestamp, slugify } from '../src/utils/index'
-import { createUser, successResponse, errorResponse } from '../src/lib/index'
-import type { User, ApiResponse, ErrorResponse } from '../src/types/index'
+import { createUser, errorResponse, successResponse } from '../src/lib/index'
+import type { ApiResponse, ErrorResponse, User } from '../src/types/index'
+import { generateId, slugify, timestamp } from '../src/utils/index'
 
 describe('Case 10: Path Aliases', () => {
 	describe('@utils', () => {
@@ -17,9 +16,7 @@ describe('Case 10: Path Aliases', () => {
 			it('generates UUID format', () => {
 				const id = generateId()
 
-				expect(id).toMatch(
-					/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
-				)
+				expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/)
 			})
 
 			it('generates unique IDs', () => {

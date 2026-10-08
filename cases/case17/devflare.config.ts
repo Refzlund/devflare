@@ -78,10 +78,6 @@ export default defineConfig({
 	compatibilityDate: '2026-04-26',
 
 	vite: {
-		plugins: [
-			buildMetadataPlugin(),
-			envInfoPlugin(),
-			virtualModulesPlugin()
-		]
+		plugins: [buildMetadataPlugin(), envInfoPlugin(), virtualModulesPlugin()]
 	}
 })

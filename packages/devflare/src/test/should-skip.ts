@@ -92,8 +92,8 @@ async function computeSkip(service: CloudflareService): Promise<boolean> {
 			console.log(
 				`⏭️  ${service.toUpperCase()} tests skipped: Remote-only service.\n` +
 					`   Enable with: ${status.isEnabled ? '' : 'devflare remote enable'}\n` +
-					`   Or set: DEVFLARE_REMOTE=1\n` +
-					`   See: https://github.com/ArthurvdVenne/devflare#remote-testing`
+					'   Or set: DEVFLARE_REMOTE=1\n' +
+					'   See: https://github.com/ArthurvdVenne/devflare#remote-testing'
 			)
 			return true
 		}
@@ -103,7 +103,7 @@ async function computeSkip(service: CloudflareService): Promise<boolean> {
 		if (!isAuth) {
 			console.log(
 				`⏭️  ${service.toUpperCase()} tests skipped: Not authenticated. Run: bunx wrangler login\n` +
-					`   See: https://github.com/ArthurvdVenne/devflare#authentication`
+					'   See: https://github.com/ArthurvdVenne/devflare#authentication'
 			)
 			return true
 		}
@@ -113,7 +113,7 @@ async function computeSkip(service: CloudflareService): Promise<boolean> {
 		if (!primary) {
 			console.log(
 				`⏭️  ${service.toUpperCase()} tests skipped: No Cloudflare account found\n` +
-					`   See: https://github.com/ArthurvdVenne/devflare#authentication`
+					'   See: https://github.com/ArthurvdVenne/devflare#authentication'
 			)
 			return true
 		}

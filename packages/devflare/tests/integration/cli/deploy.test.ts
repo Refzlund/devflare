@@ -5,10 +5,10 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { clearDependencies, setDependencies } from '../../../src/cli/dependencies'
 import {
-	type TestHarness,
 	createMockProcessRunner,
 	createParsedArgs,
-	createTestHarness
+	createTestHarness,
+	type TestHarness
 } from '../mocks'
 
 /**

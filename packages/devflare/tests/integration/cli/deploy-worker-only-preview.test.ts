@@ -5,8 +5,6 @@ import { join } from 'pathe'
 import { runDeployCommand } from '../../../src/cli/commands/deploy'
 import { clearDependencies, setDependencies } from '../../../src/cli/dependencies'
 import {
-	type ExecInvocation,
-	TEST_ACCOUNT_ID,
 	captureDeployEnvironmentSnapshot,
 	classifyWranglerUploadExecution,
 	cloudflareApiResponse,
@@ -15,11 +13,13 @@ import {
 	createProcessRunner,
 	createWorkerVersionDetail,
 	disableCloudflareAccountResolution,
+	type ExecInvocation,
 	enableStrictDeployVerification,
 	isViteBuildExecution,
 	recordWranglerUpload,
 	restoreDeployEnvironmentSnapshot,
 	successResult,
+	TEST_ACCOUNT_ID,
 	writeAccountProjectFiles,
 	writeProjectFiles
 } from './build-deploy-worker-only.test-utils'

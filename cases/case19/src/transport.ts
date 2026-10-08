@@ -1,4 +1,4 @@
-import { DoubleableNumber } from "./DoubleableNumber"
+import { DoubleableNumber } from './DoubleableNumber'
 
 // SvelteKit transport signature
 export const transport = {

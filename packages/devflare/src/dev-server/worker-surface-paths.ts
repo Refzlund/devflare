@@ -6,9 +6,9 @@ import {
 	DEFAULT_FETCH_ENTRY_FILES,
 	DEFAULT_QUEUE_ENTRY_FILES,
 	DEFAULT_SCHEDULED_ENTRY_FILES,
-	type WorkerSurfacePaths,
 	hasWorkerSurfacePaths,
-	resolveWorkerSurfacePaths
+	resolveWorkerSurfacePaths,
+	type WorkerSurfacePaths
 } from '../worker-entry/surface-paths'
 
 const DEFAULT_TRANSPORT_ENTRY_FILES = [

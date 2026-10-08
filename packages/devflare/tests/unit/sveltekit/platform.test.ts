@@ -2,9 +2,9 @@ import { describe, expect, test } from 'bun:test'
 import type { DevRuntimeReading } from '../../../src/dev-server/runtime-status'
 import {
 	BridgeUnavailableError,
-	type Platform,
 	connectBridgeWithRetry,
-	drainWaitUntilErrors
+	drainWaitUntilErrors,
+	type Platform
 } from '../../../src/sveltekit/platform'
 
 function buildTestPlatform(): Platform {

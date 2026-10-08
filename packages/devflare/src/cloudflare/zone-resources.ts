@@ -83,7 +83,7 @@ export async function resolveZone(
 
 	throw new Error(
 		`No Cloudflare zone found for "${domain}". Checked it and every parent domain in this ` +
-			`account — add the zone to Cloudflare DNS, or correct the domain.`
+			'account — add the zone to Cloudflare DNS, or correct the domain.'
 	)
 }
 

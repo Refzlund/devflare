@@ -50,7 +50,9 @@ function resolveDefaultPreviewScope(): string | undefined {
 	return undefined
 }
 
-export function resolveDocumentationWorkerName(previewScope = resolveDefaultPreviewScope()): string {
+export function resolveDocumentationWorkerName(
+	previewScope = resolveDefaultPreviewScope()
+): string {
 	const resolvedPreviewScope = previewScope?.trim()
 	if (!resolvedPreviewScope) {
 		return DOCUMENTATION_WORKER_NAME

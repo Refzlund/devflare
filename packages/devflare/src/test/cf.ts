@@ -32,20 +32,22 @@ import { tail } from './tail'
 import { worker } from './worker'
 
 // Re-export individual helpers for tree-shaking
+
 export { alarm } from './alarm'
 export { email } from './email'
 export { queue } from './queue'
 export { scheduled } from './scheduled'
-export { worker } from './worker'
 export { tail } from './tail'
+export { worker } from './worker'
 
 // Re-export types
-export type { AlarmTriggerTarget, AlarmTriggerOptions, AlarmTriggerResult } from './alarm'
-export type { EmailSendOptions, ReceivedEmail, EmailReceiveCallback } from './email'
+
+export type { AlarmTriggerOptions, AlarmTriggerResult, AlarmTriggerTarget } from './alarm'
+export type { EmailReceiveCallback, EmailSendOptions, ReceivedEmail } from './email'
 export type { QueueMessageOptions, QueueTriggerResult } from './queue'
 export type { ScheduledTriggerOptions, ScheduledTriggerResult } from './scheduled'
+export type { TailTriggerResult, TraceItemOptions } from './tail'
 export type { WorkerFetchOptions } from './worker'
-export type { TraceItemOptions, TailTriggerResult } from './tail'
 
 /**
  * Unified Cloudflare test helpers.

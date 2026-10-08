@@ -180,11 +180,12 @@ export type DevflareVarInput =
  */
 export type DevflareVarsInput = Record<string, DevflareVarInput>
 
-export type InferEnvVarDescriptor<T> = T extends EnvVarDescriptor<infer TValue, infer TOptional>
-	? TOptional extends true
-		? TValue | undefined
-		: TValue
-	: never
+export type InferEnvVarDescriptor<T> =
+	T extends EnvVarDescriptor<infer TValue, infer TOptional>
+		? TOptional extends true
+			? TValue | undefined
+			: TValue
+		: never
 
 type InferOptionalKeys<T extends Record<string, unknown>> = {
 	[K in keyof T]-?: undefined extends InferConfigVars<T[K]> ? K : never

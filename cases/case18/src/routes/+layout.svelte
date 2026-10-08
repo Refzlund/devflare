@@ -1,21 +1,21 @@
 <script lang="ts">
-	import type { Snippet } from 'svelte'
-	
-	interface Props {
-		children: Snippet
-	}
-	
-	let { children }: Props = $props()
-	
-	const navItems = [
-		{ href: '/', label: 'Home', icon: '🏠' },
-		{ href: '/upload', label: 'Image Upload (R2)', icon: '📷' },
-		{ href: '/images', label: 'Gallery (R2)', icon: '🖼️' },
-		{ href: '/chat', label: 'Chat (WebSocket DO)', icon: '💬' },
-		{ href: '/kv', label: 'KV Storage', icon: '🗄️' },
-		{ href: '/db', label: 'Database (D1)', icon: '🗃️' },
-		{ href: '/pdf', label: 'PDF Generator', icon: '📄' }
-	]
+import type { Snippet } from 'svelte'
+
+interface Props {
+	children: Snippet
+}
+
+let { children }: Props = $props()
+
+const navItems = [
+	{ href: '/', label: 'Home', icon: '🏠' },
+	{ href: '/upload', label: 'Image Upload (R2)', icon: '📷' },
+	{ href: '/images', label: 'Gallery (R2)', icon: '🖼️' },
+	{ href: '/chat', label: 'Chat (WebSocket DO)', icon: '💬' },
+	{ href: '/kv', label: 'KV Storage', icon: '🗄️' },
+	{ href: '/db', label: 'Database (D1)', icon: '🗃️' },
+	{ href: '/pdf', label: 'PDF Generator', icon: '📄' }
+]
 </script>
 
 <div class="app">

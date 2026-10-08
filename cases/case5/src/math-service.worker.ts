@@ -13,7 +13,7 @@ import type { StatsResult } from './math-service.types'
 
 /**
  * MathService WorkerEntrypoint
- * 
+ *
  * Extends WorkerEntrypoint to expose RPC methods that other workers can call.
  * Each public method becomes an RPC endpoint accessible via service binding.
  */

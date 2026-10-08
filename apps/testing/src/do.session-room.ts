@@ -7,10 +7,12 @@ interface SessionRoomState {
 
 export class SessionRoom extends DurableObject<DevflareEnv> {
 	private async readState(): Promise<SessionRoomState> {
-		return (await this.ctx.storage.get<SessionRoomState>('session-room')) ?? {
-			activeMembers: [],
-			updatedAt: new Date(0).toISOString()
-		}
+		return (
+			(await this.ctx.storage.get<SessionRoomState>('session-room')) ?? {
+				activeMembers: [],
+				updatedAt: new Date(0).toISOString()
+			}
+		)
 	}
 
 	async touchMember(memberId: string): Promise<SessionRoomState> {

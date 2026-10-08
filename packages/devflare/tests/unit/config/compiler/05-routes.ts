@@ -14,9 +14,8 @@ import {
 } from '../../../../src/config/compiler'
 
 import { brandAsLocalConfig } from '../../../../src/config/resolve-phased'
-
-import { configSchema } from '../../../../src/config/schema'
 import type { DevflareConfig } from '../../../../src/config/schema'
+import { configSchema } from '../../../../src/config/schema'
 
 const baseConfig = brandAsLocalConfig({
 	name: 'my-worker',

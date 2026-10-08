@@ -25,6 +25,7 @@
 
 import { join } from 'path'
 import { postInboundEmail } from '../email/inbound'
+import type { OutboxListener, SentEmailRecord } from '../email/outbox'
 import {
 	clearOutbox,
 	getOutbox,
@@ -32,7 +33,6 @@ import {
 	onOutboxEntry,
 	resetOutbox
 } from '../email/outbox'
-import type { OutboxListener, SentEmailRecord } from '../email/outbox'
 import { createEmailEvent, runWithEventContext } from '../runtime'
 import { clearEmailDeliverySink } from '../utils/email-delivery'
 import { createTestExecutionContext } from './execution-context'
@@ -232,7 +232,7 @@ async function send(options: EmailSendOptions): Promise<Response> {
 		if (!emailHandler) {
 			throw new Error(
 				`Email handler at "${emailHandlerPath}" must export a default function or named "email" export.\n` +
-					`Expected: export async function email(message) { ... }`
+					'Expected: export async function email(message) { ... }'
 			)
 		}
 
@@ -385,7 +385,7 @@ function onOutbound(listener: OutboxListener): () => void {
 // Export
 // -----------------------------------------------------------------------------
 
-export type { SentEmailRecord, OutboxListener }
+export type { OutboxListener, SentEmailRecord }
 
 export const email = {
 	send,

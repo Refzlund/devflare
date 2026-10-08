@@ -39,7 +39,7 @@ interface DataRecord {
 
 /**
  * Data Pipeline Workflow
- * 
+ *
  * Steps:
  * 1. Extract data from source
  * 2. Transform data (apply transformations)
@@ -92,14 +92,16 @@ export class DataPipelineWorkflow {
 				return records
 			})
 
-			instance.addStep(new StepResult({
-				stepName: 'extract-data',
-				success: true,
-				output: { recordCount: extracted.length },
-				startedAt: new Date().toISOString(),
-				completedAt: new Date().toISOString(),
-				retryCount: 0
-			}))
+			instance.addStep(
+				new StepResult({
+					stepName: 'extract-data',
+					success: true,
+					output: { recordCount: extracted.length },
+					startedAt: new Date().toISOString(),
+					completedAt: new Date().toISOString(),
+					retryCount: 0
+				})
+			)
 
 			// Step 2: Transform (apply each transformation)
 			instance.currentStep = 'transform'
@@ -113,14 +115,16 @@ export class DataPipelineWorkflow {
 					}
 				)
 
-				instance.addStep(new StepResult({
-					stepName: `transform-${transformation}`,
-					success: true,
-					output: { transformation, recordCount: transformedData.length },
-					startedAt: new Date().toISOString(),
-					completedAt: new Date().toISOString(),
-					retryCount: 0
-				}))
+				instance.addStep(
+					new StepResult({
+						stepName: `transform-${transformation}`,
+						success: true,
+						output: { transformation, recordCount: transformedData.length },
+						startedAt: new Date().toISOString(),
+						completedAt: new Date().toISOString(),
+						retryCount: 0
+					})
+				)
 			}
 
 			// Step 3: Validate
@@ -136,17 +140,19 @@ export class DataPipelineWorkflow {
 				}
 			})
 
-			instance.addStep(new StepResult({
-				stepName: 'validate-data',
-				success: true,
-				output: {
-					validRecords: validation.validRecords,
-					invalidRecords: validation.invalidRecords
-				},
-				startedAt: new Date().toISOString(),
-				completedAt: new Date().toISOString(),
-				retryCount: 0
-			}))
+			instance.addStep(
+				new StepResult({
+					stepName: 'validate-data',
+					success: true,
+					output: {
+						validRecords: validation.validRecords,
+						invalidRecords: validation.invalidRecords
+					},
+					startedAt: new Date().toISOString(),
+					completedAt: new Date().toISOString(),
+					retryCount: 0
+				})
+			)
 
 			// Step 4: Load
 			instance.currentStep = 'load'
@@ -164,14 +170,16 @@ export class DataPipelineWorkflow {
 				return { loaded: validation.validRecords }
 			})
 
-			instance.addStep(new StepResult({
-				stepName: 'load-data',
-				success: true,
-				output: { loaded: validation.validRecords },
-				startedAt: new Date().toISOString(),
-				completedAt: new Date().toISOString(),
-				retryCount: 0
-			}))
+			instance.addStep(
+				new StepResult({
+					stepName: 'load-data',
+					success: true,
+					output: { loaded: validation.validRecords },
+					startedAt: new Date().toISOString(),
+					completedAt: new Date().toISOString(),
+					retryCount: 0
+				})
+			)
 
 			// Complete workflow
 			const output: DataPipelineOutput = {
@@ -189,7 +197,6 @@ export class DataPipelineWorkflow {
 			)
 
 			return output
-
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : String(error)
 			instance.fail(errorMessage)

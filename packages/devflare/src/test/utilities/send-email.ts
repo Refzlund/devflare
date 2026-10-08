@@ -13,8 +13,8 @@
 // =============================================================================
 
 import {
-	type LocalSendEmailBindingConfig,
-	createLocalSendEmailBinding
+	createLocalSendEmailBinding,
+	type LocalSendEmailBindingConfig
 } from '../../utils/send-email'
 
 // Re-export the pure local SendEmail simulator as part of the public test layer

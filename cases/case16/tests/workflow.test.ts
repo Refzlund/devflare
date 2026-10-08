@@ -7,20 +7,20 @@
 // Workflow INTEGRATION tests are skipped since Workflows require deployment.
 // =============================================================================
 
-import { describe, test, expect, beforeAll, afterAll } from 'bun:test'
-import { createTestContext } from 'devflare/test'
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { env } from 'devflare'
+import { createTestContext } from 'devflare/test'
 import {
 	Order,
-	StepResult,
-	WorkflowInstance,
 	type OrderData,
+	StepResult,
 	type StepResultData,
+	WorkflowInstance,
 	type WorkflowInstanceData
 } from '../src/models'
 import { transport } from '../src/transport'
-import { OrderProcessingWorkflow } from '../src/wf.order-processor'
 import { DataPipelineWorkflow } from '../src/wf.data-pipeline'
+import { OrderProcessingWorkflow } from '../src/wf.order-processor'
 
 // -----------------------------------------------------------------------------
 // Test Setup
@@ -43,8 +43,8 @@ describe('Order Model', () => {
 		id: 'order-123',
 		customerId: 'cust-456',
 		items: [
-			{ productId: 'prod-1', name: 'Widget', quantity: 2, price: 10.00 },
-			{ productId: 'prod-2', name: 'Gadget', quantity: 1, price: 25.00 }
+			{ productId: 'prod-1', name: 'Widget', quantity: 2, price: 10.0 },
+			{ productId: 'prod-2', name: 'Gadget', quantity: 1, price: 25.0 }
 		],
 		status: 'pending',
 		createdAt: '2025-01-01T00:00:00Z',
@@ -152,7 +152,14 @@ describe('WorkflowInstance Model', () => {
 			steps: [
 				{ stepName: 'step1', success: true, startedAt: now, completedAt: now, retryCount: 0 },
 				{ stepName: 'step2', success: true, startedAt: now, completedAt: now, retryCount: 0 },
-				{ stepName: 'step3', success: false, error: 'Failed', startedAt: now, completedAt: now, retryCount: 1 }
+				{
+					stepName: 'step3',
+					success: false,
+					error: 'Failed',
+					startedAt: now,
+					completedAt: now,
+					retryCount: 1
+				}
 			],
 			input: {},
 			startedAt: now
@@ -276,9 +283,7 @@ describe('Transport Encoding/Decoding', () => {
 				workflowName: 'TestWorkflow',
 				status: 'completed',
 				currentStep: 'done',
-				steps: [
-					{ stepName: 's1', success: true, startedAt: now, completedAt: now, retryCount: 0 }
-				],
+				steps: [{ stepName: 's1', success: true, startedAt: now, completedAt: now, retryCount: 0 }],
 				input: { key: 'value' },
 				output: { result: 'ok' },
 				startedAt: '2025-01-01T00:00:00Z',
@@ -318,7 +323,10 @@ describe('OrderProcessingWorkflow with Real KV', () => {
 			async sleepUntil(name: string, _timestamp: Date | string): Promise<void> {
 				stepsCalled.push(`sleepUntil:${name}`)
 			},
-			async waitForEvent<T>(name: string, _options: { event: string; timeout: string }): Promise<T> {
+			async waitForEvent<T>(
+				name: string,
+				_options: { event: string; timeout: string }
+			): Promise<T> {
 				stepsCalled.push(`waitForEvent:${name}`)
 				return {} as T
 			}
@@ -336,9 +344,7 @@ describe('OrderProcessingWorkflow with Real KV', () => {
 					order: {
 						id: 'order-test-1',
 						customerId: 'cust-1',
-						items: [
-							{ productId: 'p1', name: 'Widget', quantity: 2, price: 10 }
-						],
+						items: [{ productId: 'p1', name: 'Widget', quantity: 2, price: 10 }],
 						status: 'pending',
 						createdAt: new Date().toISOString(),
 						updatedAt: new Date().toISOString()
@@ -414,7 +420,7 @@ describe('OrderProcessingWorkflow with Real KV', () => {
 		const stateKey = list.keys.find((k) => k.name.includes('order-persist-test'))
 		expect(stateKey).toBeDefined()
 
-		const state = JSON.parse(await env.WORKFLOW_STATE.get(stateKey!.name) ?? '{}')
+		const state = JSON.parse((await env.WORKFLOW_STATE.get(stateKey!.name)) ?? '{}')
 		expect(state.status).toBe('completed')
 	})
 })
@@ -434,7 +440,10 @@ describe('DataPipelineWorkflow with Real KV', () => {
 			async sleepUntil(name: string, _timestamp: Date | string): Promise<void> {
 				stepsCalled.push(`sleepUntil:${name}`)
 			},
-			async waitForEvent<T>(name: string, _options: { event: string; timeout: string }): Promise<T> {
+			async waitForEvent<T>(
+				name: string,
+				_options: { event: string; timeout: string }
+			): Promise<T> {
 				stepsCalled.push(`waitForEvent:${name}`)
 				return {} as T
 			}

@@ -74,7 +74,9 @@ interface SearchServiceRpc {
 
 interface VectorizeBinding {
 	describe?(): Promise<unknown>
-	upsert?(vectors: Array<{ id: string; values: number[]; metadata?: Record<string, unknown> }>): Promise<unknown>
+	upsert?(
+		vectors: Array<{ id: string; values: number[]; metadata?: Record<string, unknown> }>
+	): Promise<unknown>
 	query?(vector: number[], options?: { topK?: number; returnMetadata?: boolean }): Promise<unknown>
 }
 
@@ -159,9 +161,7 @@ function formatError(error: unknown): string {
 }
 
 function truncatePreview(value: unknown): string {
-	const text = typeof value === 'string'
-		? value
-		: JSON.stringify(value)
+	const text = typeof value === 'string' ? value : JSON.stringify(value)
 
 	if (!text) return 'null'
 	return text.length > 240 ? `${text.slice(0, 237)}...` : text
@@ -276,7 +276,9 @@ async function buildStatusResponse(env: TestingEnv): Promise<Record<string, unkn
 			health: 'GET /health',
 			smoke: 'POST /smoke with X-Devflare-Smoke-Key'
 		},
-		hasDurableObjectBindings: Boolean(env.SESSION_ROOM && env.COLLABORATION_STATE && env.CROSS_WORKER_LOCK),
+		hasDurableObjectBindings: Boolean(
+			env.SESSION_ROOM && env.COLLABORATION_STATE && env.CROSS_WORKER_LOCK
+		),
 		hasServiceBindings: Boolean(env.AUTH_SERVICE && env.ADMIN_RPC && env.SEARCH_SERVICE),
 		hasVectorizeBindings: Boolean(env.DOCUMENT_INDEX && env.SEARCH_INDEX),
 		hasAnalyticsBindings: Boolean(env.APP_ANALYTICS && env.SEARCH_ANALYTICS),
@@ -289,13 +291,16 @@ async function buildStatusResponse(env: TestingEnv): Promise<Record<string, unkn
 		lastScheduledRun: lastScheduledRun.value,
 		...(Object.keys(stateReadErrors).length > 0
 			? {
-				stateReadErrors
-			}
+					stateReadErrors
+				}
 			: {})
 	}
 }
 
-function authorizeSmokeRequest(request: Request, env: TestingEnv): { ok: true } | { ok: false; status: number; error: string } {
+function authorizeSmokeRequest(
+	request: Request,
+	env: TestingEnv
+): { ok: true } | { ok: false; status: number; error: string } {
 	if (!env.SMOKE_KEY) {
 		return {
 			ok: false,
@@ -304,8 +309,9 @@ function authorizeSmokeRequest(request: Request, env: TestingEnv): { ok: true } 
 		}
 	}
 
-	const provided = request.headers.get('x-devflare-smoke-key')
-		?? request.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
+	const provided =
+		request.headers.get('x-devflare-smoke-key') ??
+		request.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
 
 	if (provided !== env.SMOKE_KEY) {
 		return {
@@ -378,7 +384,10 @@ async function smokeR2(env: TestingEnv, runId: string): Promise<Record<string, u
 	}
 }
 
-async function smokeDurableObjects(env: TestingEnv, runId: string): Promise<Record<string, unknown>> {
+async function smokeDurableObjects(
+	env: TestingEnv,
+	runId: string
+): Promise<Record<string, unknown>> {
 	const room = env.SESSION_ROOM.getByName('smoke-room')
 	const collaboration = env.COLLABORATION_STATE.getByName('smoke-room')
 	const lock = env.CROSS_WORKER_LOCK.getByName('smoke-lock')
@@ -519,7 +528,9 @@ async function smokeBrowser(env: TestingEnv): Promise<Record<string, unknown>> {
 		throw new Error('Browser binding does not expose fetch()')
 	}
 
-	const response = await env.BROWSER.fetch(new Request(env.BROWSER_TARGET_URL ?? 'https://example.com/'))
+	const response = await env.BROWSER.fetch(
+		new Request(env.BROWSER_TARGET_URL ?? 'https://example.com/')
+	)
 	return {
 		mode: 'fetch',
 		status: response.status,
@@ -590,7 +601,9 @@ async function runSmoke(env: TestingEnv): Promise<StoredSmokeResult> {
 
 	const results = Object.fromEntries(
 		await Promise.all(
-			Object.entries(checks).map(async ([name, operation]) => [name, await settle(operation)] as const)
+			Object.entries(checks).map(
+				async ([name, operation]) => [name, await settle(operation)] as const
+			)
 		)
 	)
 
@@ -606,7 +619,11 @@ async function runSmoke(env: TestingEnv): Promise<StoredSmokeResult> {
 	return smokeResult
 }
 
-export async function fetch(request: Request, env: TestingEnv, _ctx: ExecutionContext): Promise<Response> {
+export async function fetch(
+	request: Request,
+	env: TestingEnv,
+	_ctx: ExecutionContext
+): Promise<Response> {
 	const url = new URL(request.url)
 
 	if (url.pathname === '/' || url.pathname === '/status') {
@@ -624,13 +641,16 @@ export async function fetch(request: Request, env: TestingEnv, _ctx: ExecutionCo
 	if (url.pathname === '/smoke' && request.method === 'POST') {
 		const authorization = authorizeSmokeRequest(request, env)
 		if (!authorization.ok) {
-			return Response.json({
-				ok: false,
-				error: authorization.error,
-				smokeEnabled: Boolean(env.SMOKE_KEY)
-			}, {
-				status: authorization.status
-			})
+			return Response.json(
+				{
+					ok: false,
+					error: authorization.error,
+					smokeEnabled: Boolean(env.SMOKE_KEY)
+				},
+				{
+					status: authorization.status
+				}
+			)
 		}
 
 		const smokeResult = await runSmoke(env)
@@ -641,10 +661,13 @@ export async function fetch(request: Request, env: TestingEnv, _ctx: ExecutionCo
 		})
 	}
 
-	return Response.json({
-		ok: false,
-		error: 'Not found'
-	}, {
-		status: 404
-	})
+	return Response.json(
+		{
+			ok: false,
+			error: 'Not found'
+		},
+		{
+			status: 404
+		}
+	)
 }

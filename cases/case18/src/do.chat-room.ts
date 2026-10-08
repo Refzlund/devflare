@@ -10,7 +10,7 @@
 
 import { DurableObject } from 'cloudflare:workers'
 import type { DurableObjectNamespace } from '@cloudflare/workers-types'
-import { ChatMessage, UserPresence, type ChatMessageData, type UserPresenceData } from '$lib/models'
+import { ChatMessage, type ChatMessageData, UserPresence, type UserPresenceData } from '$lib/models'
 
 interface WebSocketData {
 	userId: string
@@ -65,10 +65,7 @@ export class ChatRoom extends DurableObject<Env> {
 	/**
 	 * Handle WebSocket upgrade
 	 */
-	private async handleWebSocketUpgrade(
-		request: Request,
-		url: URL
-	): Promise<Response> {
+	private async handleWebSocketUpgrade(request: Request, url: URL): Promise<Response> {
 		const username = url.searchParams.get('username')
 		const userId = url.searchParams.get('userId') || crypto.randomUUID()
 
@@ -100,10 +97,13 @@ export class ChatRoom extends DurableObject<Env> {
 			content: `${username} joined the chat`,
 			roomId: this.roomId
 		})
-		this.broadcast(JSON.stringify({
-			type: 'message',
-			data: this.serializeMessage(joinMessage)
-		}), server)
+		this.broadcast(
+			JSON.stringify({
+				type: 'message',
+				data: this.serializeMessage(joinMessage)
+			}),
+			server
+		)
 
 		// Send welcome message to new user
 		const welcomeMessage = {
@@ -181,10 +181,12 @@ export class ChatRoom extends DurableObject<Env> {
 			content: `${data.username} left the chat`,
 			roomId: this.roomId
 		})
-		this.broadcast(JSON.stringify({
-			type: 'message',
-			data: this.serializeMessage(leaveMessage)
-		}))
+		this.broadcast(
+			JSON.stringify({
+				type: 'message',
+				data: this.serializeMessage(leaveMessage)
+			})
+		)
 	}
 
 	/**

@@ -10,9 +10,9 @@
 //   - Access bindings via `import { env } from 'devflare'`
 // =============================================================================
 
-import { describe, test, expect, beforeAll, afterAll } from 'bun:test'
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { env } from 'devflare'
-import { createFetchEvent, runWithEventContext, type FetchEvent } from 'devflare/runtime'
+import { createFetchEvent, type FetchEvent, runWithEventContext } from 'devflare/runtime'
 import { createTestContext } from 'devflare/test'
 
 // Import fetch handler to test
@@ -32,8 +32,8 @@ afterAll(async () => {
 
 // Execution context mock (only what's needed for the handler)
 const ctx: ExecutionContext = {
-	waitUntil: () => { },
-	passThroughOnException: () => { },
+	waitUntil: () => {},
+	passThroughOnException: () => {},
 	props: {}
 }
 
@@ -73,7 +73,7 @@ describe('Case 1: Basic Worker with Real KV', () => {
 			const response = await fetchHandler(request, env as DevflareEnv, ctx)
 
 			expect(response.status).toBe(200)
-			const data = await response.json() as { LOG_LEVEL: string }
+			const data = (await response.json()) as { LOG_LEVEL: string }
 			expect(data.LOG_LEVEL).toBe('info')
 		})
 
@@ -149,7 +149,7 @@ describe('Case 1: Basic Worker with Real KV', () => {
 			const response = await invokeRoute(GET, request)
 
 			expect(response.status).toBe(200)
-			const data = await response.json() as { LOG_LEVEL: string }
+			const data = (await response.json()) as { LOG_LEVEL: string }
 			expect(data.LOG_LEVEL).toBe('info')
 		})
 
@@ -157,7 +157,10 @@ describe('Case 1: Basic Worker with Real KV', () => {
 			const { GET, PUT, DELETE } = await import('../src/routes/cache/[key]')
 
 			// PUT
-			const putReq = new Request('http://localhost/cache/route-test', { method: 'PUT', body: 'route-value' })
+			const putReq = new Request('http://localhost/cache/route-test', {
+				method: 'PUT',
+				body: 'route-value'
+			})
 			const putRes = await invokeRoute(PUT, putReq, { key: 'route-test' })
 			expect(putRes.status).toBe(201)
 

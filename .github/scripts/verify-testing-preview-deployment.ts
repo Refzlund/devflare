@@ -1,22 +1,22 @@
 import { dirname, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
-import {
-	account,
-	type APIClientOptions,
-	type WorkerDeploymentInfo
-} from '../../packages/devflare/src/cloudflare'
+import { resolveTestingWorkerNames } from '../../apps/testing/worker-names'
 import { getDependencies } from '../../packages/devflare/src/cli/dependencies'
 import {
-	parseWranglerVersionBindings,
-	type ParsedWranglerBindingRow
+	type ParsedWranglerBindingRow,
+	parseWranglerVersionBindings
 } from '../../packages/devflare/src/cli/preview-bindings'
 import {
+	type APIClientOptions,
+	account,
+	type WorkerDeploymentInfo
+} from '../../packages/devflare/src/cloudflare'
+import {
+	type DevflareConfig,
 	loadConfig,
-	resolveConfigForEnvironment,
-	type DevflareConfig
+	resolveConfigForEnvironment
 } from '../../packages/devflare/src/config'
-import { resolveTestingWorkerNames } from '../../apps/testing/worker-names'
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = resolve(SCRIPT_DIR, '..', '..')

@@ -78,7 +78,11 @@ export class SessionStore extends DurableObject<DevflareEnv> {
 	/**
 	 * RPC method: Create or update session
 	 */
-	async setSession(sessionId: string, data: { [key: string]: JsonValue }, expiresAt?: number): Promise<SessionData> {
+	async setSession(
+		sessionId: string,
+		data: { [key: string]: JsonValue },
+		expiresAt?: number
+	): Promise<SessionData> {
 		const session: SessionData = {
 			id: sessionId,
 			data,
@@ -96,7 +100,8 @@ export class SessionStore extends DurableObject<DevflareEnv> {
 	 * RPC method: Delete session
 	 */
 	async deleteSession(sessionId: string): Promise<boolean> {
-		const existed = this.sessions.has(sessionId) ||
+		const existed =
+			this.sessions.has(sessionId) ||
 			(await this.ctx.storage.get(`session:${sessionId}`)) !== undefined
 
 		this.sessions.delete(sessionId)

@@ -10,12 +10,12 @@
 
 import { describe, expect, test } from 'bun:test'
 import {
-	TransportV2Codec,
 	createTransportV2Pair,
 	deserializeRequestV2,
 	deserializeResponseV2,
 	serializeRequestV2,
-	serializeResponseV2
+	serializeResponseV2,
+	TransportV2Codec
 } from '../../../../src/bridge/v2'
 
 function pair(opts?: {
@@ -120,9 +120,8 @@ describe('serializeRequestV2 / deserializeRequestV2 â€” streaming bodies', 
 			server.setRpcCallHandler((call) => {
 				if (call.method !== 'upload') return
 				try {
-					const serialized = call.params[0] as import(
-						'../../../../src/bridge/v2'
-					).TransportV2SerializedRequest
+					const serialized = call
+						.params[0] as import('../../../../src/bridge/v2').TransportV2SerializedRequest
 					const reconstructed = deserializeRequestV2(serialized, server)
 					reconstructed
 						.text()
