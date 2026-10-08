@@ -41,6 +41,52 @@ function restoreBundling(): void {
 	;(Bun as unknown as { build: typeof Bun.build }).build = originalBunBuild
 }
 
+/** How long a one-line `Bun.build` may run before the bundler counts as stuck; it takes milliseconds. */
+const BUNDLER_ANSWER_MS = 5_000
+
+/**
+ * @description Fails fast, naming the cause, when Bun's bundler has stopped
+ * answering in this process. `createTestContext()` bundles the Durable Object
+ * graph with `Bun.build` and puts no bound on it, so a stuck bundler would
+ * otherwise show up only as this test's 30-second timeout, which reads as a
+ * devflare hang.
+ *
+ * → Seen with Bun 1.3.12 on Linux, depending on which test files ran earlier
+ *   in the same process; the same file order passes on Bun 1.4.2. At that
+ *   point even this build hangs, though it has no plugins and touches nothing
+ *   of the project, so the bundler itself is stuck.
+ * → GOTCHA: keep it right before the first context. A `Bun.build` in an
+ *   earlier test FILE was measured to keep the stall from happening at all.
+ *
+ * @throws when the build has not settled within {@link BUNDLER_ANSWER_MS}
+ */
+async function expectBundlerAnswers(): Promise<void> {
+	const probeDir = await mkdtemp(join(tmpdir(), 'devflare-bundler-probe-'))
+	tempDirs.push(probeDir)
+	const entry = join(probeDir, 'probe.ts')
+	await writeFile(entry, 'export const probe = 1\n')
+
+	let timer: ReturnType<typeof setTimeout> | undefined
+	const stuck = new Promise<'stuck'>((resolve) => {
+		timer = setTimeout(() => resolve('stuck'), BUNDLER_ANSWER_MS)
+	})
+	const outcome = await Promise.race([
+		originalBunBuild({ entrypoints: [entry], target: 'browser' }),
+		stuck
+	])
+	clearTimeout(timer)
+
+	if (outcome === 'stuck') {
+		throw new Error(
+			[
+				`Bun ${Bun.version}'s bundler did not finish a one-line build within ${BUNDLER_ANSWER_MS / 1000}s,`,
+				'so createTestContext(), which bundles Durable Objects with Bun.build, would hang.',
+				'The stall is in Bun, not devflare: this build has no plugins and does not touch the project.'
+			].join(' ')
+		)
+	}
+}
+
 async function createCounterProject(): Promise<string> {
 	const projectDir = await mkdtemp(join(tmpdir(), 'devflare-do-batching-'))
 	tempDirs.push(projectDir)
@@ -101,6 +147,7 @@ describe('createTestContext with durable objects, twice in one process', () => {
 		}
 		expect(step.STEP).toBe(3)
 
+		await expectBundlerAnswers()
 		await createTestContext(configPath)
 		try {
 			expect(await (env as any).COUNTER.getByName('main').increment()).toBe(3)
