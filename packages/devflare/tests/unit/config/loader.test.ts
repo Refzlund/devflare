@@ -53,6 +53,29 @@ describe('loadConfig', () => {
 		expect(config.name).toBe('test-worker')
 	})
 
+	test('reads a config file afresh after it changes, as a dev-server reload needs', async () => {
+		// Under Bun on Windows, jiti's native import kept the first evaluation of a file
+		// whatever moduleCache said, so a reload returned the config from before the edit.
+		const reloadDir = join(import.meta.dirname, `../.fixtures/config-loader-reload-${Date.now()}`)
+		await mkdir(reloadDir, { recursive: true })
+		const writeConfigNamed = (name: string) =>
+			writeFile(
+				join(reloadDir, 'devflare.config.ts'),
+				`export default { name: '${name}' satisfies string, compatibilityDate: '2025-01-07' }\n`
+			)
+
+		try {
+			await writeConfigNamed('before-edit')
+			const before = await loadConfig({ cwd: reloadDir })
+			await writeConfigNamed('after-edit')
+			const after = await loadConfig({ cwd: reloadDir })
+
+			expect([before.name, after.name]).toEqual(['before-edit', 'after-edit'])
+		} finally {
+			await rm(reloadDir, { recursive: true, force: true })
+		}
+	})
+
 	test('loads config from custom path', async () => {
 		// Use a unique directory + filename so jiti's absolute-path module cache
 		// can never collide with the `config-loader` fixture dir that sibling

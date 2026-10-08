@@ -12,12 +12,10 @@
 // =============================================================================
 
 import { existsSync } from 'node:fs'
-import { createRequire } from 'node:module'
 import { dirname, join, resolve } from 'pathe'
 import { z } from 'zod'
+import { loadWithC12 } from './c12'
 import { normalizeSchemaIssues, type SchemaIssue, type ValidationIssue } from './validation-issues'
-
-type C12LoadConfig = typeof import('c12')['loadConfig']
 
 /**
  * Per-app entry in a workspace manifest.
@@ -177,20 +175,6 @@ export interface LoadWorkspaceManifestOptions {
 }
 
 /**
- * c12 resolves TypeScript/ESM manifests via jiti. Prefer the target project's
- * own `c12` install (mirrors {@link loadConfig}) so a monorepo that vendors
- * devflare per-app still transpiles the manifest; fall back to devflare's own.
- */
-function resolveC12LoadConfig(cwd: string): C12LoadConfig {
-	const requireFromCwd = createRequire(join(cwd, '__devflare_workspace__.cjs'))
-	try {
-		return (requireFromCwd('c12') as typeof import('c12')).loadConfig
-	} catch {
-		return (createRequire(import.meta.url)('c12') as typeof import('c12')).loadConfig
-	}
-}
-
-/**
  * Load, transpile, and validate a workspace manifest.
  *
  * @param options - Search directory and optional explicit file.
@@ -215,9 +199,7 @@ export async function loadWorkspaceManifest(
 		throw new WorkspaceManifestNotFoundError(cwd)
 	}
 
-	const c12LoadConfig = resolveC12LoadConfig(cwd)
-
-	const { config, configFile: loadedFile } = await c12LoadConfig({
+	const { config, configFile: loadedFile } = await loadWithC12({
 		name: 'devflare',
 		cwd,
 		configFile,

@@ -96,7 +96,7 @@
 	"dependencies": {
 		"@puppeteer/browsers": "^3.2.3",
 		"aws4fetch": "^1.0.20",
-		"c12": "^2.0.4",
+		"c12": "^3.3.4",
 		"chokidar": "^5.0.0",
 		"consola": "^3.4.2",
 		"es-module-lexer": "^3.0.3",
