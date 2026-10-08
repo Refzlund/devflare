@@ -186,8 +186,11 @@ export async function waitForViteReady(
 			resolver()
 		}
 
-		const inspectChunk = (chunk: string | Buffer) => {
-			combinedOutput += typeof chunk === 'string' ? chunk : chunk.toString('utf-8')
+		// Decoded through `TextDecoder`, as `Buffer#toString('utf-8')` did. Workers-types 5.x declares
+		// its own global `Buffer`, beside which the checker types `Buffer#toString` as `() => string`.
+		const utf8 = new TextDecoder()
+		const inspectChunk = (chunk: string | Uint8Array) => {
+			combinedOutput += typeof chunk === 'string' ? chunk : utf8.decode(chunk)
 			const readyUrl = extractViteReadyUrl(combinedOutput)
 			if (readyUrl) {
 				settle(() => resolvePromise(readyUrl))

@@ -56,18 +56,25 @@ function createMockHostedImagesBinding(): HostedImagesBinding {
 		)
 	}
 
-	return {
+	// Built as variables rather than returned as literals: each carries the members of both
+	// workers-types majors (`signedUrl` and `createDirectUpload` are 5.x), and an object
+	// literal would be refused for the members the other major lacks.
+	const binding = {
 		image(_imageId: string): ImageHandle {
-			return {
+			const handle = {
 				details: unsupported,
 				bytes: unsupported,
+				signedUrl: unsupported,
 				update: unsupported,
 				delete: unsupported
-			} as ImageHandle
+			}
+			return handle
 		},
 		upload: unsupported,
-		list: unsupported
-	} as HostedImagesBinding
+		list: unsupported,
+		createDirectUpload: unsupported
+	}
+	return binding
 }
 
 /**

@@ -324,7 +324,7 @@
       },
       "devDependencies": {
         "@cloudflare/vite-plugin": "^1.63.0",
-        "@cloudflare/workers-types": "^4.20260702.1",
+        "@cloudflare/workers-types": "^5.20261008.1",
         "@types/bun": "^1.4.2",
         "@types/picomatch": "^4.0.3",
         "@types/ws": "^8.18.2",
@@ -332,7 +332,7 @@
       },
       "peerDependencies": {
         "@cloudflare/vite-plugin": "^1.0.0",
-        "@cloudflare/workers-types": "^4.20260426.1",
+        "@cloudflare/workers-types": "^4.20260426.1 || ^5.20261008.1",
         "vite": "^6.0.0 || ^7.0.0 || ^8.0.0",
       },
       "optionalPeers": [
@@ -1529,6 +1529,8 @@
     "css-tree/source-map-js": ["source-map-js@1.2.1", "", {}, "sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA=="],
 
     "csso/css-tree": ["css-tree@2.2.1", "", { "dependencies": { "mdn-data": "2.0.28", "source-map-js": "^1.0.1" } }, "sha512-OA0mILzGc1kCOCSJerOeqDxDQ4HOh+G8NbOJFOTgOCzpw7fCBubk0fEyxp8AgOL/jvLgYA/uV0cMbe43ElF1JA=="],
+
+    "devflare/@cloudflare/workers-types": ["@cloudflare/workers-types@5.20261008.1", "", {}, "sha512-Ya6zuPTAQPka+Mn5rMI5f8Zl5bihhm+ytqhHiMzMgpLDGrD24A1k/Z/JPSBIqhIC0bx0AclgYyoZoRs6UWVlmw=="],
 
     "extract-zip/get-stream": ["get-stream@5.2.0", "", { "dependencies": { "pump": "^3.0.0" } }, "sha512-nBF+F1rAZVCu/p7rjzgA+Yb4lfYXrpl7a6VmJrU8wF9I1CKvP/QwPNZHnOlwbTkY6dvtFIzFMSyQXbLoTQPRpA=="],
 

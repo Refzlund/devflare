@@ -1,4 +1,5 @@
 import { type RequestContext, runWithContext } from '../../runtime/context'
+import { createTestExecutionContext } from '../execution-context'
 
 // =============================================================================
 // Types
@@ -36,16 +37,7 @@ export function createMockTestContext<TEnv = Record<string, unknown>>(
 	options: TestContextOptions<TEnv> = {}
 ): TestContext<TEnv> {
 	const waitUntilPromises: Promise<unknown>[] = []
-
-	const ctx = {
-		waitUntil(promise: Promise<unknown>) {
-			waitUntilPromises.push(promise)
-		},
-		passThroughOnException() {
-			// No-op in tests
-		},
-		props: {}
-	} as ExecutionContext
+	const ctx = createTestExecutionContext(waitUntilPromises)
 
 	return {
 		env: (options.env ?? {}) as TEnv,

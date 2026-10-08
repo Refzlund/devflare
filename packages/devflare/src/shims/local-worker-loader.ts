@@ -10,7 +10,8 @@ function getModuleSource(module: WorkerLoaderCodeModule | undefined, mainModule:
 		return module
 	}
 
-	if (module && typeof module === 'object' && typeof module.js === 'string') {
+	// A compiled `WebAssembly.Module` (allowed by workers-types 5.x) carries no `js` and falls through.
+	if (module && typeof module === 'object' && 'js' in module && typeof module.js === 'string') {
 		return module.js
 	}
 

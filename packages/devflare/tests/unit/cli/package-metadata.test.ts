@@ -44,7 +44,7 @@ describe('package metadata', () => {
 		expect(getMajorVersion(miniflare)).toBeGreaterThanOrEqual(4)
 	})
 
-	test('aligns workers-types ranges across root and package manifests', () => {
+	test('compiles against the newest and the oldest workers-types major the peer range admits', () => {
 		const rootPackageJson = readJsonFile<{ devDependencies?: Record<string, string> }>(
 			join(import.meta.dir, '..', '..', '..', '..', '..', 'package.json')
 		)
@@ -53,22 +53,25 @@ describe('package metadata', () => {
 			peerDependencies?: Record<string, string>
 		}>(join(import.meta.dir, '..', '..', '..', 'package.json'))
 
-		const rootWorkersTypes = rootPackageJson.devDependencies?.['@cloudflare/workers-types']
-		if (!rootWorkersTypes) {
-			throw new Error('Expected root package.json to declare @cloudflare/workers-types')
-		}
-		expect(packageJson.devDependencies?.['@cloudflare/workers-types']).toBe(rootWorkersTypes)
-
-		// The peer range is a floor consumers may sit on, and only ever widens, so it can
-		// trail the version devflare develops against — but it must admit that version.
+		// The package builds against the newest major; the root type-checks the sources, the
+		// tests and the example projects against the oldest, so a consumer on either is covered.
+		const packageWorkersTypes = packageJson.devDependencies?.['@cloudflare/workers-types'] ?? ''
+		const rootWorkersTypes = rootPackageJson.devDependencies?.['@cloudflare/workers-types'] ?? ''
 		const peerWorkersTypes = packageJson.peerDependencies?.['@cloudflare/workers-types'] ?? ''
-		const developedAgainst = rootWorkersTypes.replace(/^[\^~]/, '')
+		const peerMajors = peerWorkersTypes.split('||').map((range) => getMajorVersion(range))
+		const admits = (range: string) =>
+			Bun.semver.satisfies(range.replace(/^[\^~]/, ''), peerWorkersTypes)
+
 		expect({
-			peerWorkersTypes,
-			admitsDevelopedVersion: Bun.semver.satisfies(developedAgainst, peerWorkersTypes)
+			packageMajor: getMajorVersion(packageWorkersTypes),
+			rootMajor: getMajorVersion(rootWorkersTypes),
+			peerAdmitsPackage: admits(packageWorkersTypes),
+			peerAdmitsRoot: admits(rootWorkersTypes)
 		}).toEqual({
-			peerWorkersTypes,
-			admitsDevelopedVersion: true
+			packageMajor: Math.max(...peerMajors),
+			rootMajor: Math.min(...peerMajors),
+			peerAdmitsPackage: true,
+			peerAdmitsRoot: true
 		})
 	})
 
@@ -78,7 +81,7 @@ describe('package metadata', () => {
 		expect(readme).toContain('## Cloudflare toolchain support')
 		expect(readme).toContain('Wrangler 4')
 		expect(readme).toContain('Miniflare 5')
-		expect(readme).toContain('@cloudflare/workers-types 4')
+		expect(readme).toContain('@cloudflare/workers-types 4 and 5')
 		expect(readme).toContain('Devflare does not support Wrangler 3')
 	})
 })

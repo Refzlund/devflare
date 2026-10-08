@@ -67,6 +67,12 @@ describe('createMockTestContext', () => {
 
 		expect(ctx.waitUntilPromises).toHaveLength(2)
 	})
+
+	test('provides the untraced tracing context the handler helpers pass', () => {
+		const ctx = createMockTestContext()
+
+		expect(ctx.ctx.tracing.enterSpan('load', (span) => span.isTraced)).toBe(false)
+	})
 })
 
 describe('withTestContext', () => {
@@ -624,6 +630,19 @@ describe('createMockEnv', () => {
 		expect(await result.response().text()).toBe('image')
 	})
 
+	test('refuses the hosted Images calls workers-types 5.x adds, as it does the rest of hosted', () => {
+		// The root type-checks tests against workers-types 4.x, which lacks both members.
+		const hosted = createMockImagesBinding().hosted as unknown as {
+			createDirectUpload(): Promise<unknown>
+			image(imageId: string): { signedUrl(options: { expiry: number }): Promise<string> }
+		}
+
+		expect(() => hosted.createDirectUpload()).toThrow(/hosted API is not implemented/)
+		expect(() => hosted.image('photo').signedUrl({ expiry: 60 })).toThrow(
+			/hosted API is not implemented/
+		)
+	})
+
 	test('creates env with Images bindings', async () => {
 		const mockEnv = createMockEnv({
 			images: 'IMAGES'
@@ -676,6 +695,57 @@ describe('createMockEnv', () => {
 		expect(created.name).toBe('starter-repo')
 		expect(repo.name).toBe('starter-repo')
 		expect(listed.repos.map((entry) => entry.name)).toEqual(['starter-repo'])
+	})
+
+	test('answers git reads on a created repo as an empty repo does', async () => {
+		const artifacts = createMockArtifacts()
+		const created = await artifacts.create('empty-repo')
+		const repo = artifactsRepoV5(await artifacts.get('empty-repo'))
+		const objectId = 'a'.repeat(40)
+
+		expect(created.tokenExpiresAt).toBeString()
+		expect((await repo.info()).name).toBe('empty-repo')
+		expect(await repo.readBlob(objectId)).toBeNull()
+		expect(await repo.readTree(objectId)).toBeNull()
+		expect(await repo.readCommit(objectId)).toBeNull()
+		expect(await repo.readFile({ ref: 'main', path: 'README.md' })).toBeNull()
+		expect(await repo.log()).toEqual([])
+	})
+
+	test('rejects a malformed object ID as the binding does', async () => {
+		const artifacts = createMockArtifacts()
+		await artifacts.create('empty-repo')
+		const repo = artifactsRepoV5(await artifacts.get('empty-repo'))
+
+		await expect(repo.readBlob('main')).rejects.toMatchObject({
+			name: 'ArtifactsError',
+			code: 'INVALID_INPUT'
+		})
+	})
+
+	test('refuses git reads on an imported or forked repo, whose commits the mock never held', async () => {
+		const artifacts = createMockArtifacts()
+		await artifacts.import({
+			source: { url: 'https://github.com/example/app.git' },
+			target: { name: 'imported' }
+		})
+		await artifacts.create('origin')
+		await artifactsRepoV5(await artifacts.get('origin')).fork('forked')
+
+		for (const name of ['imported', 'forked']) {
+			const repo = artifactsRepoV5(await artifacts.get(name))
+			await expect(repo.log()).rejects.toThrow(`repo "${name}" was imported or forked`)
+		}
+	})
+
+	test('looks a repo up afresh on info(), failing once it is deleted', async () => {
+		const artifacts = createMockArtifacts()
+		await artifacts.create('doomed')
+		const repo = artifactsRepoV5(await artifacts.get('doomed'))
+
+		await artifacts.delete('doomed')
+
+		await expect(repo.info()).rejects.toMatchObject({ name: 'ArtifactsError', code: 'NOT_FOUND' })
 	})
 
 	test('creates env with Artifacts bindings', async () => {
@@ -732,3 +802,24 @@ describe('createMockEnv', () => {
 		expect(mockEnv.MY_SERVICE).toBe(customService)
 	})
 })
+
+/** A repo handle as workers-types 5.x describes it, the members these tests call. */
+interface ArtifactsRepoV5 {
+	info(): Promise<{ name: string }>
+	readBlob(hash: string): Promise<unknown>
+	readTree(hash: string): Promise<unknown>
+	readCommit(hash: string): Promise<unknown>
+	readFile(args: { ref: string; path: string }): Promise<unknown>
+	log(): Promise<unknown[]>
+	fork(name: string): Promise<unknown>
+}
+
+/**
+ * @description Views a mock repo handle through its 5.x members. The root type-checks tests
+ * against workers-types 4.x, which describes the handle without them.
+ * @param repo - a handle from `createMockArtifacts().get()`; must exist
+ */
+function artifactsRepoV5(repo: unknown): ArtifactsRepoV5 {
+	expect(repo).not.toBeNull()
+	return repo as ArtifactsRepoV5
+}
