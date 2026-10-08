@@ -15,6 +15,7 @@ import { existsSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join, resolve } from 'pathe'
 import { z } from 'zod'
+import { normalizeSchemaIssues, type SchemaIssue, type ValidationIssue } from './validation-issues'
 
 type C12LoadConfig = typeof import('c12')['loadConfig']
 
@@ -60,7 +61,7 @@ const workspaceAppSchema = z
 		 * config's `vars`). Handy for one-shot dev seed flags such as
 		 * `{ DOC_API_DEV_SEED: '1' }`.
 		 */
-		env: z.record(z.string()).optional()
+		env: z.record(z.string(), z.string()).optional()
 	})
 	.strict()
 
@@ -259,13 +260,22 @@ export class WorkspaceManifestNotFoundError extends Error {
 export class WorkspaceManifestValidationError extends Error {
 	readonly code = 'WORKSPACE_MANIFEST_VALIDATION_ERROR'
 
+	/** Each problem found, with the path to the offending field. */
+	public readonly issues: ValidationIssue[]
+
+	/**
+	 * @param issues - the schema's issues, as zod reports them
+	 * @param manifestPath - the manifest that failed validation
+	 */
 	constructor(
-		public readonly issues: Array<{ path: (string | number)[]; message: string }>,
+		issues: ReadonlyArray<SchemaIssue>,
 		public readonly manifestPath: string
 	) {
-		const issueMessages = issues.map((issue) => `  - ${issue.path.join('.')}: ${issue.message}`)
+		const normalized = normalizeSchemaIssues(issues)
+		const issueMessages = normalized.map((issue) => `  - ${issue.path.join('.')}: ${issue.message}`)
 		super(`Invalid workspace manifest in ${manifestPath}:\n${issueMessages.join('\n')}`)
 		this.name = 'WorkspaceManifestValidationError'
+		this.issues = normalized
 	}
 }
 

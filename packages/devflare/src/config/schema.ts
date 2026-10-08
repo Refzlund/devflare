@@ -106,7 +106,9 @@ export const rootConfigShape = {
 	 * Used as the deployment target and in URLs.
 	 */
 	name: z.string({
-		required_error: 'Worker name is required'
+		// zod 4 dropped `required_error`; its `error` callback sees the input, so a missing
+		// name keeps its own message while a wrong type falls back to zod's default.
+		error: (issue) => (issue.input === undefined ? 'Worker name is required' : undefined)
 	}),
 
 	/**

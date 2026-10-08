@@ -31,6 +31,22 @@ describe('configSchema', () => {
 			}
 		})
 
+		test('leaves out of an environment every field it does not set, root defaults included', () => {
+			const parsed = configSchema.parse({
+				name: 'my-worker',
+				compatibilityDate: '2025-01-07',
+				env: {
+					staging: { vars: { DEBUG: 'true' } },
+					empty: {}
+				}
+			})
+
+			// A root default filled in here (zod 4 applies defaults inside optional fields)
+			// would replace the root's own compatibilityDate whenever the env is selected.
+			expect(parsed.env).toEqual({ staging: { vars: { DEBUG: 'true' } }, empty: {} })
+			expect(parsed.compatibilityDate).toBe('2025-01-07')
+		})
+
 		test('forces compatibility flags inside environment overrides', () => {
 			const result = configSchema.safeParse({
 				name: 'my-worker',

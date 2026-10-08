@@ -8,6 +8,7 @@ import { dirname, join, resolve } from 'pathe'
 import { loadDevflareDotenvIntoProcess } from './env-vars'
 import { applyFrameworkConfigProviders } from './framework-providers'
 import { configSchema, type DevflareConfig } from './schema'
+import { normalizeSchemaIssues, type SchemaIssue, type ValidationIssue } from './validation-issues'
 
 type C12LoadConfig = typeof import('c12')['loadConfig']
 
@@ -142,14 +143,23 @@ export class ConfigNotFoundError extends Error {
 export class ConfigValidationError extends Error {
 	readonly code = 'CONFIG_VALIDATION_ERROR'
 
+	/** Each problem found, with the path to the offending field. */
+	public readonly issues: ValidationIssue[]
+
+	/**
+	 * @param issues - the schema's issues, as zod reports them
+	 * @param configFile - the config file that failed validation
+	 */
 	constructor(
-		public readonly issues: Array<{ path: (string | number)[]; message: string }>,
+		issues: ReadonlyArray<SchemaIssue>,
 		public readonly configFile: string
 	) {
-		const issueMessages = issues.map((i) => `  - ${i.path.join('.')}: ${i.message}`).join('\n')
+		const normalized = normalizeSchemaIssues(issues)
+		const issueMessages = normalized.map((i) => `  - ${i.path.join('.')}: ${i.message}`).join('\n')
 
 		super(`Invalid config in ${configFile}:\n${issueMessages}`)
 		this.name = 'ConfigValidationError'
+		this.issues = normalized
 	}
 }
 
