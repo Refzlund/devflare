@@ -66,26 +66,13 @@ jobs:
 
       - name: Detect pending changesets
         id: changesets
-        run: |
-          # In prerelease (pre) mode, changesets 3 moves every changeset it has
-          # versioned into .changeset/pre/, so each one still in .changeset/
-          # itself is pending. The filter skips the files @changesets/read 1.x
-          # skips there. If the two ever disagree, `changeset version` finds
-          # nothing to release and fails the run instead of publishing nothing.
-          count=$(bun -e '
-            import { readdirSync } from "node:fs"
-            const notAChangeset = (f) =>
-              f.startsWith(".") || /^README\.md$/i.test(f) || ["AGENTS.md", "CLAUDE.md", "GEMINI.md"].includes(f)
-            const pending = readdirSync(".changeset").filter((f) => f.endsWith(".md") && !notAChangeset(f))
-            process.stdout.write(String(pending.length))
-          ')
-          echo "count=$count" >> "$GITHUB_OUTPUT"
-          if [ "$count" -gt 0 ]; then
-            echo "has=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "has=false" >> "$GITHUB_OUTPUT"
-          fi
-          echo "Pending (unconsumed) changesets: $count"
+        # In prerelease (pre) mode, changesets 3 moves every changeset it has
+        # versioned into .changeset/pre/, so each one still in .changeset/ itself
+        # is pending — except one naming only private packages, which changesets
+        # never versions. The script reports that one as a warning instead of
+        # counting it, or it would re-run this whole gate on every push. Why that
+        # and not a failure is written at the top of the script.
+        run: bun .github/scripts/pending-changesets.ts
 
       # Fail-fast quality gate BEFORE any version bump or npm publish, so a
       # broken commit on `next` can never be released. The build runs FIRST: the
