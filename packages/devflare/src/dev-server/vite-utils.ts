@@ -28,6 +28,10 @@ export interface SpawnedLikeProcess {
 	stdout: NodeJS.ReadableStream | null
 	stderr: NodeJS.ReadableStream | null
 	readonly killed: boolean
+	/** Set once the process has exited with a code (`ChildProcess.exitCode`); null before. */
+	readonly exitCode?: number | null
+	/** Set once the process has exited on a signal (`ChildProcess.signalCode`); null before. */
+	readonly signalCode?: NodeJS.Signals | null
 	kill(signal?: NodeJS.Signals): boolean
 	on(
 		event: 'exit',
@@ -265,10 +269,36 @@ function waitForProcessExit(
 	})
 }
 
+/** A process whose exit is already recorded, whether or not anyone heard the event. */
+type ExitRecordingProcess = Pick<SpawnedLikeProcess, 'exitCode' | 'signalCode'>
+
+/**
+ * @description Whether the process has already exited, read from its recorded
+ * exit status rather than from an `exit` event a late listener can miss.
+ * @param process - the spawned child
+ * @returns true once it has an exit code or an exit signal
+ */
+function hasExited(process: ExitRecordingProcess): boolean {
+	return (process.exitCode ?? null) !== null || (process.signalCode ?? null) !== null
+}
+
+/**
+ * @description Stops a spawned child and everything it started: `taskkill /t /f`
+ * on Windows, where the child is often a shim (`bunx`) whose own exit leaves its
+ * grandchildren running; `SIGTERM` elsewhere.
+ * @param process - the spawned child
+ * @param options - platform, wait budget and command runner, for tests
+ * @returns false when the Windows tree kill has still not seen the child exit
+ *   `timeoutMs` later — the kill failed or missed it, and it may still hold its
+ *   port; true otherwise.
+ *   → GOTCHA: outside Windows `true` only says a signal was delivered.
+ *   `waitForProcessExit` reads `killed`, which is set the moment a signal is
+ *   sent, as an exit, so it never waits there and the `SIGKILL` step never runs.
+ */
 export async function stopSpawnedProcessTree(
-	process: Pick<SpawnedLikeProcess, 'pid' | 'kill' | 'killed' | 'on'>,
+	process: Pick<SpawnedLikeProcess, 'pid' | 'kill' | 'killed' | 'on' | 'exitCode' | 'signalCode'>,
 	options: StopProcessTreeOptions = {}
-): Promise<void> {
+): Promise<boolean> {
 	const {
 		platform = globalThis.process?.platform ?? 'linux',
 		timeoutMs = 3000,
@@ -282,30 +312,32 @@ export async function stopSpawnedProcessTree(
 			try {
 				process.kill('SIGTERM')
 			} catch {
-				return
+				return hasExited(process)
 			}
 		}
 
-		await waitForProcessExit(process, timeoutMs)
-		return
+		// The child can exit while taskkill is still running, before the listener in
+		// waitForProcessExit is attached (measured under Node, 1 run in 5), so its
+		// recorded exit status counts as well as the event.
+		return (await waitForProcessExit(process, timeoutMs)) || hasExited(process)
 	}
 
 	try {
 		process.kill('SIGTERM')
 	} catch {
-		return
+		return hasExited(process)
 	}
 
 	const exited = await waitForProcessExit(process, timeoutMs)
 	if (exited) {
-		return
+		return true
 	}
 
 	try {
 		process.kill('SIGKILL')
 	} catch {
-		return
+		return hasExited(process)
 	}
 
-	await waitForProcessExit(process, timeoutMs)
+	return (await waitForProcessExit(process, timeoutMs)) || hasExited(process)
 }

@@ -163,4 +163,34 @@ describe("workspace dev hands a Vite app's manifest env to its Vite child", () =
 		},
 		HOOK_TIMEOUT_MS
 	)
+
+	// Windows only: there the child is a `bunx` shim whose kill() used to leave Vite
+	// serving on the port after stop(). Elsewhere stop() signals the child alone,
+	// as `devflare dev` does, and whether Vite exits depends on the shim.
+	test.if(process.platform === 'win32')(
+		'stopping the workspace ends the Vite child, not only its bunx shim',
+		async () => {
+			// Vite serves its own client module without SSR, so it never waits on the
+			// bridge: once Miniflare is gone, an app route would sit out the bridge's
+			// retry budget instead of answering, and read like a dead server.
+			const url = `http://localhost:${vitePort}/@vite/client`
+			// The premise: Vite is serving, so a refusal afterwards is the stop's doing.
+			const before = await fetch(url, { signal: AbortSignal.timeout(10_000) })
+			await before.text()
+			expect(before.status).toBe(200)
+
+			await devServer?.stop()
+			devServer = null
+
+			// A refused connection is the expected outcome, so it is a value here; a
+			// timeout is not a refusal and must not pass for one.
+			const outcome = await fetch(url, { signal: AbortSignal.timeout(5_000) }).then(
+				() => 'answered',
+				(error: unknown) =>
+					error instanceof Error && error.name === 'TimeoutError' ? 'timed out' : 'refused'
+			)
+			expect(outcome).toBe('refused')
+		},
+		HOOK_TIMEOUT_MS
+	)
 })

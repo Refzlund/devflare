@@ -31,6 +31,7 @@ class FakeSpawnedProcess extends EventEmitter implements SpawnedLikeProcess {
 	stdout: PassThrough | null
 	stderr: PassThrough | null
 	killed = false
+	exitCode: number | null = null
 	readonly killSignals: string[] = []
 
 	constructor(pid = 1234) {
@@ -183,7 +184,7 @@ describe('stopSpawnedProcessTree', () => {
 			}
 		})
 
-		await stopPromise
+		expect(await stopPromise).toBe(true)
 
 		expect(commands).toEqual([
 			{
@@ -191,5 +192,35 @@ describe('stopSpawnedProcessTree', () => {
 				args: ['/pid', '4242', '/t', '/f']
 			}
 		])
+	})
+
+	test('on Windows, reports a child that never exits after the tree kill', async () => {
+		const process = new FakeSpawnedProcess(4242)
+
+		const exited = await stopSpawnedProcessTree(process, {
+			platform: 'win32',
+			timeoutMs: 25,
+			// taskkill "succeeds" but the child neither exits nor records an exit.
+			runCommand: async () => {}
+		})
+
+		expect(exited).toBe(false)
+	})
+
+	test('on Windows, counts an exit that happened before the listener was attached', async () => {
+		const process = new FakeSpawnedProcess(4242)
+
+		const exited = await stopSpawnedProcessTree(process, {
+			platform: 'win32',
+			timeoutMs: 25,
+			// The child exits while taskkill runs, so its `exit` event fires before
+			// stopSpawnedProcessTree listens for one; only its exit code records it.
+			runCommand: async () => {
+				process.exitCode = 1
+				process.emit('exit', 1, null)
+			}
+		})
+
+		expect(exited).toBe(true)
 	})
 })

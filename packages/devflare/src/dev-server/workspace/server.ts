@@ -35,6 +35,7 @@ import { resolveR2PresignOrigin } from '../miniflare-dev-config'
 import { createMiniflareLog } from '../miniflare-log'
 import { createRuntimeLogForwarder } from '../runtime-logs'
 import { startViteProcess } from '../vite-process'
+import { stopSpawnedProcessTree } from '../vite-utils'
 import { buildMergedWorkspaceConfig } from './merge-config'
 import { type PreparedWorkspaceApp, prepareWorkspaceApp } from './prepare-app'
 
@@ -134,7 +135,8 @@ export function createWorkspaceDevServer(options: WorkspaceDevServerOptions): Wo
 	let emailRuntime: ResolvedEmailRuntime = resolveEmailRuntime(undefined, process.env)
 	let outboundEmailService: Awaited<ReturnType<typeof startOutboundEmailService>> | null = null
 	let inboundEmailPoller: ReturnType<typeof startInboundEmailPoller> | null = null
-	const viteChildren: ChildProcess[] = []
+	/** Each running Vite child, with what a report about it needs to name. */
+	const viteChildren: Array<{ appName: string; vitePort: number; child: ChildProcess }> = []
 	const appOrigins: WorkspaceAppOrigin[] = []
 
 	/**
@@ -305,7 +307,33 @@ export function createWorkspaceDevServer(options: WorkspaceDevServerOptions): Wo
 					: null,
 				logger
 			})
-			viteChildren.push(child)
+			viteChildren.push({ appName: app.appName, vitePort: app.vitePort, child })
+		}
+	}
+
+	/**
+	 * Stop every Vite child's whole process tree, as `devflare dev` does: the
+	 * child is `bunx`, and a plain kill() on Windows ends only that shim, leaving
+	 * Vite (and the workerd its adapter starts) running on the app's port. A
+	 * child the stop could not see exit is reported, not thrown: the rest of the
+	 * teardown still has to run.
+	 */
+	async function stopViteChildren(): Promise<void> {
+		const stopped = await Promise.all(
+			viteChildren.map(async (entry) => ({
+				entry,
+				exited: await stopSpawnedProcessTree(entry.child)
+			}))
+		)
+		viteChildren.length = 0
+
+		for (const { entry, exited } of stopped) {
+			if (!exited) {
+				logger?.warn(
+					`Vite for app "${entry.appName}" (pid ${entry.child.pid}) did not exit when the ` +
+						`workspace stopped; it may still be serving port ${entry.vitePort}.`
+				)
+			}
 		}
 	}
 
@@ -355,10 +383,7 @@ export function createWorkspaceDevServer(options: WorkspaceDevServerOptions): Wo
 			inboundEmailPoller = null
 		}
 
-		for (const child of viteChildren) {
-			child.kill()
-		}
-		viteChildren.length = 0
+		await stopViteChildren()
 
 		for (const app of preparedApps) {
 			try {
