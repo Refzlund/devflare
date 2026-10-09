@@ -55,20 +55,37 @@ async function importC12(cwd: string): Promise<C12Module> {
 }
 
 /**
+ * @description What a c12 load produced, narrowed to what devflare reads.
+ */
+export interface C12LoadResult<T> {
+	/** The loaded config. c12 hands back `{}` when no file was found, so never test this for absence. */
+	config: T
+	/** The file c12 actually loaded, or `undefined` when no config file exists. */
+	configFile: string | undefined
+}
+
+/**
  * @description Loads a config file through c12, then evicts it from the module
  * registry so the next load evaluates the file as it is then.
  * @param options - c12's own options; `cwd` is required
- * @returns c12's result: the loaded config and the file it came from
+ * @returns the loaded config and the file it came from — `configFile` is
+ * `undefined` when there was no file to load
  */
 export async function loadWithC12<T extends UserInputConfig>(
 	options: LoadConfigOptions<T> & { cwd: string }
-) {
+): Promise<C12LoadResult<T>> {
 	const { loadConfig } = await importC12(options.cwd)
 	const result = await loadConfig<T>(options)
 
-	// `_configFile` is set only when c12 actually found and loaded a file.
+	// → GOTCHA: c12 (2.x and 3.x) fills `configFile` even when nothing exists —
+	//   with the bare name it was asked for, e.g. `devflare.config` — and
+	//   returns `{}` as the config. Only `_configFile` is set solely when a file
+	//   was actually found and loaded, so that is the one handed on. Passing
+	//   c12's `configFile` through made a missing config read as a present,
+	//   empty one, and the user saw "Worker name is required" instead of
+	//   ConfigNotFoundError.
 	if (result._configFile) {
 		delete moduleRegistry[resolveNativePath(result._configFile)]
 	}
-	return result
+	return { config: result.config, configFile: result._configFile }
 }

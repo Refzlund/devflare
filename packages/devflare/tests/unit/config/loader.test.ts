@@ -5,7 +5,7 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { join, relative } from 'pathe'
-import { loadConfig, resolveConfigPath } from '../../../src/config/loader'
+import { ConfigNotFoundError, loadConfig, resolveConfigPath } from '../../../src/config/loader'
 
 const TEST_DIR = join(import.meta.dirname, '../.fixtures/config-loader')
 const WORKSPACE_ENV_KEYS = ['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN'] as const
@@ -110,8 +110,22 @@ export default config
 		}
 	})
 
-	test('throws when config file not found', async () => {
-		await expect(loadConfig({ cwd: TEST_DIR })).rejects.toThrow()
+	test('throws ConfigNotFoundError when no config file exists', async () => {
+		// c12 reports a missing file as an empty config, so a weaker assertion
+		// (any throw) passed while the user was told "Worker name is required".
+		const error = await loadConfig({ cwd: TEST_DIR }).catch((caught: unknown) => caught)
+
+		expect(error).toBeInstanceOf(ConfigNotFoundError)
+		expect((error as Error).message).toContain('Config file not found in')
+		expect((error as Error).message).toContain("Run 'devflare init'")
+	})
+
+	test('throws ConfigNotFoundError when an explicit config file does not exist', async () => {
+		const error = await loadConfig({ cwd: TEST_DIR, configFile: 'missing.config.ts' }).catch(
+			(caught: unknown) => caught
+		)
+
+		expect(error).toBeInstanceOf(ConfigNotFoundError)
 	})
 
 	test('validates loaded config', async () => {
