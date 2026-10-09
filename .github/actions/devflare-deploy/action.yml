@@ -78,7 +78,7 @@ outputs:
     description: "Deployment status reported by the action: success or failure"
     value: ${{ steps.finalize.outputs.status }}
   failure-stage:
-    description: "Stage where the action failed: setup, install, or deploy"
+    description: "Stage where the action failed: setup, install, build (an unbuilt workspace devflare only), or deploy"
     value: ${{ steps.finalize.outputs.failure_stage }}
   exit-code:
     description: "Exit code returned by devflare deploy"
@@ -137,9 +137,20 @@ runs:
 
         exit "$install_exit_code"
 
+    # Runs whether or not this action installed the dependencies itself: a caller
+    # that passes skip-install still deploys with whatever devflare resolves to,
+    # and inside the devflare monorepo that is an unbuilt workspace package.
+    - name: Build workspace Devflare
+      id: build-cli
+      if: ${{ (inputs.skip-setup == 'true' || steps.setup.outcome == 'success') && (inputs.skip-install == 'true' || steps.install.outcome == 'success') }}
+      continue-on-error: true
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: bash "${{ github.action_path }}/build-workspace-cli.sh"
+
     - name: Deploy with Devflare
       id: deploy
-      if: ${{ (inputs.skip-setup == 'true' || steps.setup.outcome == 'success') && (inputs.skip-install == 'true' || steps.install.outcome == 'success') }}
+      if: ${{ (inputs.skip-setup == 'true' || steps.setup.outcome == 'success') && (inputs.skip-install == 'true' || steps.install.outcome == 'success') && steps.build-cli.outcome == 'success' }}
       continue-on-error: true
       shell: bash
       working-directory: ${{ inputs.working-directory }}
@@ -294,6 +305,7 @@ runs:
         INSTALL_OUTCOME: ${{ inputs.skip-install == 'true' && 'success' || steps.install.outcome }}
         INSTALL_EXIT_CODE: ${{ steps.install.outputs.exit_code }}
         INSTALL_LOG_EXCERPT: ${{ steps.install.outputs.log_excerpt }}
+        BUILD_OUTCOME: ${{ steps.build-cli.outcome }}
         DEPLOY_OUTCOME: ${{ steps.deploy.outcome }}
         DEPLOY_STATUS: ${{ steps.deploy.outputs.status }}
         DEPLOY_EXIT_CODE: ${{ steps.deploy.outputs.exit_code }}
@@ -330,6 +342,10 @@ runs:
           if [ -z "$log_excerpt" ]; then
             log_excerpt='Dependency installation failed before the deploy command could start. Inspect the "Install dependencies" logs inside the Devflare deploy action.'
           fi
+        elif [ "$BUILD_OUTCOME" != 'success' ]; then
+          failure_stage='build'
+          deploy_status='failure'
+          log_excerpt='Building the workspace devflare package failed before the deploy command could start. Inspect the "Build workspace Devflare" logs inside the Devflare deploy action.'
         else
           deploy_status="$DEPLOY_STATUS"
           if [ -z "$deploy_status" ]; then
