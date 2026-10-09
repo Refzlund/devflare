@@ -1,6 +1,6 @@
 <script lang="ts">
-import { docPath } from '#lib/docs/content.js'
 import { workerOnlyRecipeFiles } from '#lib/docs/content/examples/shared.js'
+import { docPath } from '#lib/docs/content.js'
 import { localizeHref } from '#lib/paraglide/runtime.js'
 import Block from '../code/Block.svelte'
 import InlineText from '../content/InlineText.svelte'

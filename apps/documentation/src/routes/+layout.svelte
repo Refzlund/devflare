@@ -1,9 +1,5 @@
 <script lang="ts">
 import { onMount } from 'svelte'
-import { afterNavigate } from '$app/navigation'
-import { asset } from '$app/paths'
-import { page } from '$app/state'
-import type { AssetPath } from '$app/types'
 import Tooltip from '#lib/components/layout/Tooltip.svelte'
 import Sidebar from '#lib/components/navigation/Sidebar.svelte'
 import type { DocPage } from '#lib/docs/types.js'
@@ -18,6 +14,10 @@ import {
 	getSocialTitle,
 	toAbsoluteUrl
 } from '#lib/site/social.js'
+import { afterNavigate } from '$app/navigation'
+import { asset } from '$app/paths'
+import { page } from '$app/state'
+import type { AssetPath } from '$app/types'
 import './layout.css'
 
 type ThemeMode = 'light' | 'dark'

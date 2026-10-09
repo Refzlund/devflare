@@ -1,9 +1,9 @@
 <script lang="ts">
-import { page } from '$app/state'
 import { docGroups, docPath } from '#lib/docs/content.js'
 import type { DocCategory, DocPage } from '#lib/docs/types.js'
 import { m } from '#lib/paraglide/messages.js'
 import { localizeHref } from '#lib/paraglide/runtime.js'
+import { page } from '$app/state'
 
 function href(path: string): string {
 	return localizeHref(path)
