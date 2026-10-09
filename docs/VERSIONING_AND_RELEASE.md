@@ -65,10 +65,10 @@ pending (unconsumed) changeset publishes a new prerelease immediately.
 
 In pre mode `changeset publish` uses the pre tag (`next`) as the npm dist-tag
 and rejects an explicit `--tag`, so the workflow does not pass one. The one
-exception is a package whose every published version is a `next` prerelease,
-which goes to `latest` because npm gives a package's first version that tag
-anyway. `devflare@0.0.0` holds `latest`, so devflare never meets it. Only
-`devflare` is published; the workspace's other packages are private.
+exception is a package that has a `latest` tag while every published version is
+a `next` prerelease: changesets publishes that one to `latest`. `devflare@0.0.0`
+is not a prerelease, so devflare never meets it. Only `devflare` is published;
+the workspace's other packages are private.
 The publish step is idempotent (it only publishes versions not already on npm),
 so a manual re-run recovers a bump that committed but failed to publish.
 

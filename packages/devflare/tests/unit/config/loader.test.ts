@@ -56,6 +56,8 @@ describe('loadConfig', () => {
 	test('reads a config file afresh after it changes, as a dev-server reload needs', async () => {
 		// Under Bun on Windows, jiti's native import kept the first evaluation of a file
 		// whatever moduleCache said, so a reload returned the config from before the edit.
+		// → NOTE: it grades only on Bun on Windows. CI runs on Linux, where it passes with
+		//   the eviction in config/c12.ts removed, so a green CI run says nothing about it.
 		const reloadDir = join(import.meta.dirname, `../.fixtures/config-loader-reload-${Date.now()}`)
 		await mkdir(reloadDir, { recursive: true })
 		const writeConfigNamed = (name: string) =>

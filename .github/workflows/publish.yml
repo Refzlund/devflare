@@ -129,9 +129,10 @@ jobs:
           fi
 
       # No --tag: in pre mode `changeset publish` rejects one and uses the pre
-      # tag (`next`) as the npm dist-tag. The one exception is a package whose
-      # every published version is a `next` prerelease: that goes to `latest`.
-      # devflare@0.0.0 holds `latest`, so devflare never meets it.
+      # tag (`next`) as the npm dist-tag. The one exception is a package that has
+      # a `latest` tag while every published version is a `next` prerelease: that
+      # goes to `latest`. devflare@0.0.0 is not a prerelease, so devflare never
+      # meets it.
       # It publishes any package whose version is not yet on npm (idempotent),
       # so a manual re-run recovers a bump that was committed but failed to
       # publish. Private workspace packages are never published.
