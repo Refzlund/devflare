@@ -738,6 +738,19 @@ describe('createMockEnv', () => {
 		}
 	})
 
+	test('rejects get() for a repo that does not exist with NOT_FOUND, as the binding does', async () => {
+		const artifacts = createMockArtifacts()
+		await artifacts.create('doomed')
+		await artifacts.delete('doomed')
+
+		for (const name of ['never-created', 'doomed']) {
+			await expect(artifacts.get(name)).rejects.toMatchObject({
+				name: 'ArtifactsError',
+				code: 'NOT_FOUND'
+			})
+		}
+	})
+
 	test('looks a repo up afresh on info(), failing once it is deleted', async () => {
 		const artifacts = createMockArtifacts()
 		await artifacts.create('doomed')

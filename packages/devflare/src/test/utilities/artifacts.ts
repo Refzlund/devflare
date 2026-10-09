@@ -288,9 +288,14 @@ export function createMockArtifacts(options: MockArtifactsOptions = {}): Artifac
 			name: string,
 			opts?: { readOnly?: boolean; description?: string; setDefaultBranch?: string }
 		) => createRepo(name, opts),
-		async get(name: string): Promise<ArtifactsRepo | null> {
+		async get(name: string): Promise<ArtifactsRepo> {
+			// Both workers-types majors declare `Promise<ArtifactsRepo>` and document
+			// NOT_FOUND for a missing repo; the binding never resolves to null.
 			const repo = repos.get(name)
-			return repo ? createRepoHandle(repo) : null
+			if (!repo) {
+				throw createArtifactsError('NOT_FOUND', `Artifacts repo "${name}" does not exist`)
+			}
+			return createRepoHandle(repo)
 		},
 		async import(params: {
 			source: { url: string; branch?: string; depth?: number }
