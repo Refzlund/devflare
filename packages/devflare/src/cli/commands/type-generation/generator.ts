@@ -8,6 +8,7 @@ import type {
 } from '../../../config'
 import type { DiscoveredEntrypoint } from '../../../utils/entrypoint-discovery'
 import { generateImportPath } from './discovery'
+import { intersection, literalUnionAlias, printDoc, typeArguments, typeImport } from './layout'
 import type {
 	CrossWorkerDOInfo,
 	DiscoveredDO,
@@ -132,6 +133,25 @@ interface TypeGenerationConfig {
 	secrets?: Record<string, { required?: boolean }>
 }
 
+/**
+ * @description One `BINDING: DurableObjectNamespace<…>` member naming the DO class
+ * through an `import()` type, laid out as Biome would print it.
+ * @param indent - the member's indentation, tabs only
+ * @returns the member line, broken across lines when it is too long for one
+ */
+function durableObjectMember(
+	indent: string,
+	binding: string,
+	importPath: string,
+	className: string
+): string {
+	const classType = intersection('Rpc.DurableObjectBranded', `import('${importPath}').${className}`)
+	return printDoc(
+		[`${binding}: `, typeArguments('DurableObjectNamespace', classType)],
+		indent.length
+	)
+}
+
 function generateBindingMembers(
 	config: TypeGenerationConfig,
 	doClassMap: Map<string, { importPath: string; className: string }>,
@@ -168,9 +188,7 @@ function generateBindingMembers(
 				const crossWorkerDO = crossWorkerDOMap.get(binding)
 				if (crossWorkerDO) {
 					const importPath = generateImportPath(cwd, crossWorkerDO.filePath)
-					lines.push(
-						`${indent}${binding}: DurableObjectNamespace<Rpc.DurableObjectBranded & import('${importPath}').${crossWorkerDO.className}>`
-					)
+					lines.push(durableObjectMember(indent, binding, importPath, crossWorkerDO.className))
 					continue
 				}
 
@@ -179,7 +197,7 @@ function generateBindingMembers(
 					const classInfo = doClassMap.get(className)
 					if (classInfo) {
 						lines.push(
-							`${indent}${binding}: DurableObjectNamespace<Rpc.DurableObjectBranded & import('${classInfo.importPath}').${classInfo.className}>`
+							durableObjectMember(indent, binding, classInfo.importPath, classInfo.className)
 						)
 						continue
 					}
@@ -525,21 +543,20 @@ export function generateBindingTypes(
 	const hasDOsWithClasses = hasLocalDOsWithClasses || hasCrossWorkerDOs
 
 	if (usedTypes.size > 0) {
-		const sortedTypes = [...usedTypes].sort()
-		if (hasDOsWithClasses) {
-			lines.push(`import type { ${sortedTypes.join(', ')}, Rpc } from '@cloudflare/workers-types'`)
-		} else {
-			lines.push(`import type { ${sortedTypes.join(', ')} } from '@cloudflare/workers-types'`)
-		}
+		// Sorted with `Rpc` among the rest, as Biome's organize-imports orders specifiers.
+		const specifiers = [...usedTypes, ...(hasDOsWithClasses ? ['Rpc'] : [])].sort()
+		lines.push(printDoc(typeImport(specifiers, '@cloudflare/workers-types')))
 		lines.push('')
 	}
 
 	if (hasConfigVars) {
 		const configImportPath = options.configImportPath ?? './devflare.config'
 		lines.push("import type { InferConfigVars } from 'devflare/config'")
-		lines.push(
-			`type __DevflareConfigVars = InferConfigVars<Awaited<typeof import('${configImportPath}').default>>`
+		const configType = typeArguments(
+			'InferConfigVars',
+			typeArguments('Awaited', `typeof import('${configImportPath}').default`)
 		)
+		lines.push(printDoc(['type __DevflareConfigVars = ', configType]))
 		lines.push('')
 	}
 
@@ -561,26 +578,28 @@ export function generateBindingTypes(
 	lines.push('declare global {')
 	if (hasConfigVars) {
 		lines.push('\tinterface DevflareVars extends __DevflareConfigVars {}')
-		lines.push('\tinterface DevflareEnv extends __DevflareConfigVars {')
-	} else {
-		lines.push('\tinterface DevflareEnv {')
 	}
-	lines.push(...bindingMembers)
-	lines.push('\t}')
+	const envDeclaration = hasConfigVars
+		? '\tinterface DevflareEnv extends __DevflareConfigVars'
+		: '\tinterface DevflareEnv'
+	// An empty body is written `{}` on one line, as the formatter would collapse it.
+	if (bindingMembers.length === 0) {
+		lines.push(`${envDeclaration} {}`)
+	} else {
+		lines.push(`${envDeclaration} {`, ...bindingMembers, '\t}')
+	}
 	lines.push('}')
 	lines.push('')
 
 	lines.push(...generateModuleRuleDeclarations(config))
 
 	if (discoveredEntrypoints.length > 0) {
-		const entrypointNames = discoveredEntrypoints
-			.map((entrypoint) => `'${entrypoint.className}'`)
-			.join(' | ')
+		const entrypointNames = discoveredEntrypoints.map((entrypoint) => `'${entrypoint.className}'`)
 		lines.push('/**')
 		lines.push(' * Named entrypoints discovered from ep.*.ts files.')
 		lines.push(' * Use with defineConfig<Entrypoints>() for type-safe cross-worker references.')
 		lines.push(' */')
-		lines.push(`export type Entrypoints = ${entrypointNames}`)
+		lines.push(printDoc(literalUnionAlias('export type Entrypoints', entrypointNames)))
 	} else {
 		lines.push('/**')
 		lines.push(' * Named entrypoints (none discovered - add ep.*.ts files to enable).')
