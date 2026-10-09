@@ -4408,7 +4408,7 @@ When the package grows queues, schedules, email handlers, or Tail processing, th
 
 ##### Key points
 
-- `cf.worker.fetch()` returns when the handler resolves, so some `waitUntil()` side effects may still be running afterward.
+- `cf.worker.fetch()` returns when the handler resolves, so some `waitUntil()` side effects may still be running afterward. `env.dispose()` waits for them, for up to 2 seconds, before it shuts the runtime down.
 - `transport.ts` is for bridge-backed RPC-style calls, not a replacement for normal HTTP request or response serialization.
 - Remote-heavy bindings such as AI and Vectorize still need higher-fidelity or remote checks sooner than KV, D1, R2, or many Durable Object flows do.
 - Preview and CI validation still matter for Cloudflare ingress, routing, and deployment lifecycle questions that local tests do not pretend to answer completely.
@@ -4560,7 +4560,7 @@ Each surface is also exported standalone for tree-shaking — `cf.alarm.trigger(
 
 | Helper | Current behavior |
 | --- | --- |
-| `cf.worker.fetch()` | Returns when the handler resolves and does not eagerly wait for all `waitUntil()` work. |
+| `cf.worker.fetch()` | Returns when the handler resolves, without waiting for its `waitUntil()` work. `env.dispose()` waits for that work, for up to 2 seconds, before it tears the runtime down. |
 | `cf.queue.trigger()` | Waits for queued background work before it returns. |
 | `cf.scheduled.trigger()` | Waits for scheduled background work before it returns. |
 | `cf.email.send()` | In `createTestContext()` tests, directly invokes the configured local email handler and waits for its queued `waitUntil()` work; otherwise it falls back to the local email endpoint. |
@@ -4570,6 +4570,12 @@ Each surface is also exported standalone for tree-shaking — `cf.alarm.trigger(
 > **Warning — Do not assert the wrong timing contract**
 >
 > If a test depends on `waitUntil()` side effects being complete, a plain `cf.worker.fetch()` assertion may be too early. Either assert the side effect directly or move that check into a higher-fidelity path.
+
+> **Note — `env.dispose()` waits for the background work `cf.worker.fetch()` started**
+>
+> A handler’s `waitUntil()` work keeps running after `cf.worker.fetch()` returns, as it does in workerd. `env.dispose()` waits for it, for up to 2 seconds, before it shuts the runtime down, so the work never loses its bindings halfway through a call.
+>
+> A failure in that work is reported once, as a `WaitUntilError` that names the request, for example `cf.worker.fetch(GET http://localhost/api/trash)`, and carries the original error as its `cause`. If the work rejects while `env.dispose()` is waiting, `env.dispose()` throws the error after teardown. If it rejects earlier, the error is raised as an unhandled rejection, and Bun fails the test that is running at that moment, or reports it between tests. Work still running after 2 seconds is reported by `env.dispose()` the same way, and the runtime is shut down regardless.
 
 #### Tail handlers are a public config surface with a real test helper
 
@@ -6669,7 +6675,7 @@ The local harness pages own `createTestContext()` and binding nuance. This page 
 | --- | --- |
 | Best for | CI testing policy and preview validation |
 | Local harness owner | `/docs/create-test-context` plus binding guides |
-| Important nuance | `cf.worker.fetch()` is not a full `waitUntil()` drain |
+| Important nuance | `cf.worker.fetch()` returns before its `waitUntil()` work; `env.dispose()` drains it |
 | Workflow companion | `/docs/github-workflows` |
 
 #### Let the local testing pages own local harness detail
@@ -6698,13 +6704,15 @@ Promote the check that matches the behavior you need to trust.
 
 | When the check depends on... | Prefer | Why |
 | --- | --- | --- |
-| `waitUntil()` side effects from an HTTP handler | Assert the side effect directly or move to a higher-fidelity check. | `cf.worker.fetch()` returns when the handler resolves, not when every background task drains. |
+| `waitUntil()` side effects from an HTTP handler | Assert the side effect directly or move to a higher-fidelity check. | `cf.worker.fetch()` returns when the handler resolves; only `env.dispose()`, at the end of the suite, waits for its background work. |
 | Queue, scheduled, or tail background work | `cf.queue.trigger()`, `cf.scheduled.trigger()`, or `cf.tail.trigger()` | Those helpers wait for their background work before they return, so they are a better fit for async side-effect assertions. |
 | Binding-specific or transport-specific behavior | The binding guide or `create-test-context` page first | Different bindings and bridge-backed values have different honest harness rules, and the local testing pages already own those details. |
 
 > **Warning — Wrong completion contract = flaky CI**
 >
 > If a test depends on `waitUntil()` effects being complete, a plain `cf.worker.fetch()` assertion may be too early.
+>
+> A `waitUntil()` failure still fails the run: it is reported once, naming the request, either as an unhandled rejection when it happens or, if `env.dispose()` was already waiting for it, by `env.dispose()`.
 
 #### Promote the smallest useful checks
 

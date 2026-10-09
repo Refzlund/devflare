@@ -279,7 +279,7 @@ export const devflareDocsPart3: DocPage[] = [
 				id: 'keep-it-honest',
 				title: 'Caveats worth knowing',
 				bullets: [
-					'`cf.worker.fetch()` returns when the handler resolves, so some `waitUntil()` side effects may still be running afterward.',
+					'`cf.worker.fetch()` returns when the handler resolves, so some `waitUntil()` side effects may still be running afterward. `env.dispose()` waits for them, for up to 2 seconds, before it shuts the runtime down.',
 					'`transport.ts` is for bridge-backed RPC-style calls, not a replacement for normal HTTP request or response serialization.',
 					'Remote-heavy bindings such as AI and Vectorize still need higher-fidelity or remote checks sooner than KV, D1, R2, or many Durable Object flows do.',
 					'Preview and CI validation still matter for Cloudflare ingress, routing, and deployment lifecycle questions that local tests do not pretend to answer completely.'

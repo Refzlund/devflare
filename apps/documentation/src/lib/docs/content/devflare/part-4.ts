@@ -45,7 +45,7 @@ export const devflareDocsPart4: DocPage[] = [
 			'`createTestContext()` autodiscovers the nearest supported config when you omit the path.',
 			'It also autodiscovers conventional worker surfaces such as fetch, routes, queue, scheduled, email, and tail handlers.',
 			'The helpers are runtime-shaped and context-accurate for handler logic, but they do not try to replay every internal Cloudflare dispatch detail byte for byte.',
-			'`cf.worker.fetch()` does not eagerly wait for all `waitUntil()` work, while queue, scheduled, and tail helpers do wait for their background work.',
+			'`cf.worker.fetch()` returns without waiting for `waitUntil()` work, which `env.dispose()` waits for before teardown; queue, scheduled, and tail helpers wait for their background work before they return.',
 			'`src/transport.ts` stays optional and only matters when a local RPC-style bridge call under test—most commonly a Durable Object method round-trip—must preserve custom classes.'
 		],
 		facts: [
@@ -67,9 +67,11 @@ export const devflareDocsPart4: DocPage[] = [
 			'src/test/durable-object-bundle-cache.ts',
 			'src/test/cf.ts',
 			'src/test/tail.ts',
+			'src/test/wait-until-tracker.ts',
 			'src/runtime/context.ts',
 			'tests/integration/test-context/config-autodiscovery.test.ts',
-			'tests/integration/test-context/storage-isolation.test.ts'
+			'tests/integration/test-context/storage-isolation.test.ts',
+			'tests/integration/test-context/wait-until-drain.test.ts'
 		],
 		sections: [
 			{
@@ -94,7 +96,7 @@ export const devflareDocsPart4: DocPage[] = [
 					rows: [
 						[
 							'`cf.worker.fetch()`',
-							'Returns when the handler resolves and does not eagerly wait for all `waitUntil()` work.'
+							'Returns when the handler resolves, without waiting for its `waitUntil()` work. `env.dispose()` waits for that work, for up to 2 seconds, before it tears the runtime down.'
 						],
 						['`cf.queue.trigger()`', 'Waits for queued background work before it returns.'],
 						['`cf.scheduled.trigger()`', 'Waits for scheduled background work before it returns.'],
@@ -122,6 +124,14 @@ export const devflareDocsPart4: DocPage[] = [
 						title: 'Do not assert the wrong timing contract',
 						body: [
 							'If a test depends on `waitUntil()` side effects being complete, a plain `cf.worker.fetch()` assertion may be too early. Either assert the side effect directly or move that check into a higher-fidelity path.'
+						]
+					},
+					{
+						tone: 'info',
+						title: '`env.dispose()` waits for the background work `cf.worker.fetch()` started',
+						body: [
+							'A handler’s `waitUntil()` work keeps running after `cf.worker.fetch()` returns, as it does in workerd. `env.dispose()` waits for it, for up to 2 seconds, before it shuts the runtime down, so the work never loses its bindings halfway through a call.',
+							'A failure in that work is reported once, as a `WaitUntilError` that names the request, for example `cf.worker.fetch(GET http://localhost/api/trash)`, and carries the original error as its `cause`. If the work rejects while `env.dispose()` is waiting, `env.dispose()` throws the error after teardown. If it rejects earlier, the error is raised as an unhandled rejection, and Bun fails the test that is running at that moment, or reports it between tests. Work still running after 2 seconds is reported by `env.dispose()` the same way, and the runtime is shut down regardless.'
 						]
 					}
 				]

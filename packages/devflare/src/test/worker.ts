@@ -24,7 +24,7 @@ import {
 	runWithEventContext
 } from '../runtime'
 import type { RouteSegment } from '../runtime/router/types'
-import { createTestExecutionContext } from './execution-context'
+import { createTrackedTestExecutionContext } from './execution-context'
 
 // -----------------------------------------------------------------------------
 // Types
@@ -191,9 +191,14 @@ async function fetch(request: Request | string, options?: WorkerFetchOptions): P
 		)
 	}
 
-	// Create execution context
-	const waitUntilPromises: Promise<unknown>[] = []
-	const ctx = createTestExecutionContext(waitUntilPromises)
+	// The response goes back when the handler resolves, so its waitUntil work
+	// is handed to the tracker rather than awaited here: env.dispose() drains it
+	// before tearing down the bindings it may still be using.
+	const ctx = createTrackedTestExecutionContext({
+		helper: 'cf.worker.fetch',
+		method: req.method,
+		url: req.url
+	})
 
 	// Get the test env
 	const env = getEnv()
@@ -210,9 +215,6 @@ async function fetch(request: Request | string, options?: WorkerFetchOptions): P
 			routeModules.length > 0 ? createRouteResolve(routeModules, fetchEvent) : undefined
 		)
 	)
-
-	// Note: We don't wait for waitUntil promises here because the response
-	// should be returned immediately. waitUntil is for background work.
 
 	return response
 }

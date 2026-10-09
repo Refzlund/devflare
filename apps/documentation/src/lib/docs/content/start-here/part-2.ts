@@ -41,7 +41,7 @@ export const startHereDocsPart2: DocPage[] = [
 			'Keep the same `devflare.config.ts` and `src/fetch.ts`; add only one new test file.',
 			'Use `createTestContext()` before you invent custom mocks.',
 			'Hit the worker through `cf.worker.get()` for the first honest proof.',
-			'Call `env.dispose()` when the suite is done so the runtime shuts down cleanly.'
+			'Call `env.dispose()` when the suite is done: it waits for any `waitUntil()` work still running, then shuts the runtime down.'
 		],
 		facts: [
 			{ label: 'Best for', value: 'The first runtime-shaped test in a new worker package' },
