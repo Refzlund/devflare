@@ -25,10 +25,13 @@ let manifestPath
 try {
 	manifestPath = require.resolve("devflare/package.json", { paths: [process.cwd()] })
 } catch (error) {
-	// Not resolvable here: the deploy command reports that itself, with its own
-	// wording, so there is nothing for this step to build or to add.
-	if (error && error.code === "MODULE_NOT_FOUND") process.exit(0)
-	throw error
+	// Any resolution failure means nothing here for this step to build: absent
+	// (MODULE_NOT_FOUND), or a published devflare from before next.35 whose
+	// exports map has no "./package.json" (ERR_PACKAGE_PATH_NOT_EXPORTED). A
+	// workspace checkout always exports it. The deploy command reports a truly
+	// missing devflare itself, in its own words.
+	console.error("devflare/package.json does not resolve here (" + (error && error.code) + ").")
+	process.exit(0)
 }
 
 const packageDir = dirname(manifestPath)

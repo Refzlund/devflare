@@ -146,7 +146,29 @@ runs:
       continue-on-error: true
       shell: bash
       working-directory: ${{ inputs.working-directory }}
-      run: bash "${{ github.action_path }}/build-workspace-cli.sh"
+      run: |
+        set -euo pipefail
+
+        build_log="$(mktemp)"
+
+        set +e
+        bash "${{ github.action_path }}/build-workspace-cli.sh" 2>&1 | tee "$build_log"
+        build_exit_code="${PIPESTATUS[0]}"
+        set -e
+
+        log_excerpt="$(tail -n 40 "$build_log" | sed $'s/\r$//')"
+        log_delimiter="DEVFLARE_LOG_$(date +%s)_$$"
+
+        echo "exit_code=$build_exit_code" >> "$GITHUB_OUTPUT"
+        {
+          echo "log_excerpt<<$log_delimiter"
+          printf '%s\n' "$log_excerpt"
+          echo "$log_delimiter"
+        } >> "$GITHUB_OUTPUT"
+
+        rm -f "$build_log"
+
+        exit "$build_exit_code"
 
     - name: Deploy with Devflare
       id: deploy
@@ -306,6 +328,8 @@ runs:
         INSTALL_EXIT_CODE: ${{ steps.install.outputs.exit_code }}
         INSTALL_LOG_EXCERPT: ${{ steps.install.outputs.log_excerpt }}
         BUILD_OUTCOME: ${{ steps.build-cli.outcome }}
+        BUILD_EXIT_CODE: ${{ steps.build-cli.outputs.exit_code }}
+        BUILD_LOG_EXCERPT: ${{ steps.build-cli.outputs.log_excerpt }}
         DEPLOY_OUTCOME: ${{ steps.deploy.outcome }}
         DEPLOY_STATUS: ${{ steps.deploy.outputs.status }}
         DEPLOY_EXIT_CODE: ${{ steps.deploy.outputs.exit_code }}
@@ -345,7 +369,12 @@ runs:
         elif [ "$BUILD_OUTCOME" != 'success' ]; then
           failure_stage='build'
           deploy_status='failure'
-          log_excerpt='Building the workspace devflare package failed before the deploy command could start. Inspect the "Build workspace Devflare" logs inside the Devflare deploy action.'
+          exit_code="$BUILD_EXIT_CODE"
+          log_excerpt="$BUILD_LOG_EXCERPT"
+
+          if [ -z "$log_excerpt" ]; then
+            log_excerpt='Building the workspace devflare package failed before the deploy command could start. Inspect the "Build workspace Devflare" logs inside the Devflare deploy action.'
+          fi
         else
           deploy_status="$DEPLOY_STATUS"
           if [ -z "$deploy_status" ]; then
