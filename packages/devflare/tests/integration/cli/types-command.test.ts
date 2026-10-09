@@ -111,10 +111,9 @@ export interface AdminEntrypointRpc {
 		expect(result.exitCode).toBe(0)
 
 		const generatedTypes = await readFile(join(projectDir, 'env.d.ts'), 'utf8')
-		expect(generatedTypes).toContain(
-			"import type { AdminEntrypointRpc } from './auth/src/admin.types'"
-		)
-		expect(generatedTypes).toContain('AUTH: AdminEntrypointRpc')
+		// An `import()` type rather than an import statement, so the generated file
+		// has no second import block for Biome's organize-imports to reorder.
+		expect(generatedTypes).toContain("AUTH: import('./auth/src/admin.types').AdminEntrypointRpc")
 		expect(generatedTypes).not.toContain('AUTH: Fetcher')
 	})
 
