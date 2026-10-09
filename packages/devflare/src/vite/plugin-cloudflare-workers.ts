@@ -17,6 +17,16 @@
 	→ Only for an environment that runs in this process. One that runs its
 	  modules in workerd (the Cloudflare Vite plugin's) has the real module, and
 	  could not reach the state devflare's handle shares through `globalThis`.
+	→ NOTE: the adapter still starts its `getPlatformProxy()` — a second local
+	  runtime beside devflare's — from its plugin's `configureServer`, and
+	  devflare leaves it running on purpose. Adapter 8 offers no supported way to
+	  turn it off: `platformProxy` only passes options to `getPlatformProxy()`.
+	  The one switch is the adapter's own restart guard, an undocumented
+	  `globalThis.__sveltekit_cloudflare_platform`, and pre-setting it would also
+	  take away what the proxy still serves in dev: the adapter's `getRequest`
+	  copies the proxy's `cf` onto every request, and the proxy's `caches`
+	  becomes the global `caches`. devflare leaves `event.platform` unset under
+	  SvelteKit 3, so those two are the app's only `request.cf` and `caches`.
 */
 
 import type { ResolvedConfig } from 'vite'
