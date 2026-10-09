@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import {
 	classifyChangesets,
-	namedPackages,
+	readFrontmatter,
 	readPrivatePackages
 } from '../../../../../.github/scripts/pending-changesets'
 
@@ -40,12 +40,42 @@ function writeTree(files: Record<string, string>): string {
 }
 
 describe('pending-changesets', () => {
-	test('reads the packages a changeset names, in any quoting', () => {
+	test('reads the packages a changeset names, in any quoting, with comments', () => {
 		expect(
-			namedPackages('---\n"devflare": patch\n\'documentation\': minor\nbare: major\n---\n\nx')
-		).toEqual(['devflare', 'documentation', 'bare'])
-		expect(namedPackages('---\r\n"@scope/pkg": none\r\n---\r\n')).toEqual(['@scope/pkg'])
-		expect(namedPackages('---\n---\n\nEmpty.')).toEqual([])
+			readFrontmatter('---\n"devflare": patch\n\'documentation\': minor\nbare: major\n---\n\nx')
+		).toEqual({ names: ['devflare', 'documentation', 'bare'], fullyRead: true })
+		expect(readFrontmatter('---\r\n"@scope/pkg": none\r\n---\r\n')).toEqual({
+			names: ['@scope/pkg'],
+			fullyRead: true
+		})
+		expect(readFrontmatter('---\n---\n\nEmpty.')).toEqual({ names: [], fullyRead: true })
+		expect(
+			readFrontmatter('---\n# why\ndevflare: "patch"\ndocumentation: \'minor\' # docs too\n---\n')
+		).toEqual({ names: ['devflare', 'documentation'], fullyRead: true })
+	})
+
+	test('says so when a frontmatter line cannot be read', () => {
+		expect(readFrontmatter('---\n{ devflare: patch }\n---\n').fullyRead).toBe(false)
+		expect(readFrontmatter('---\ndevflare: patch\n').fullyRead).toBe(false)
+	})
+
+	test('keeps a mixed changeset pending however its public line is written', () => {
+		// Misreading the devflare line made this "private-only": a warning instead of
+		// the loud `changeset version` failure ("Found mixed changeset") it gets.
+		const mixedFrontmatters = [
+			'documentation: patch\ndevflare: "patch"',
+			'documentation: patch\ndevflare: patch # fix',
+			'documentation: patch\n{ devflare: patch }'
+		]
+		const result = classifyChangesets(
+			mixedFrontmatters.map((frontmatter, index) => ({
+				name: `mixed-${index}.md`,
+				content: `---\n${frontmatter}\n---\n\nMixed.`
+			})),
+			privatePackages
+		)
+
+		expect(result).toEqual({ pending: ['mixed-0.md', 'mixed-1.md', 'mixed-2.md'], privateOnly: [] })
 	})
 
 	test('counts a changeset naming only private packages as never pending', () => {

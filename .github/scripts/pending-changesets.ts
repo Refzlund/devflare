@@ -19,15 +19,22 @@
 	  while failing the gate on it would block every unrelated release until
 	  somebody deleted the file. The workflow prints a warning naming it.
 	→ A mixed changeset, or one naming an unknown package, stays counted, so
-	  `changeset version` fails the run loudly on it.
+	  `changeset version` fails the run loudly on it. So does a changeset whose
+	  frontmatter has a line this script cannot read (a flow map, say): it is
+	  filed as private-only only when EVERY line was read and every name found
+	  is private. A misread line would otherwise turn a mixed changeset into a
+	  mislabelled warning.
 */
 
 import { appendFileSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
 
-/** The bump types a changeset's frontmatter may give a package. */
-const BUMP_LINE = /^\s*(["']?)([^"':\s][^"':]*)\1\s*:\s*(major|minor|patch|none)\s*$/
+/**
+ * One `package: bump` line of a changeset's frontmatter. Either side may be
+ * quoted, and a trailing `# comment` is allowed, as YAML allows.
+ */
+const BUMP_LINE = /^\s*(["']?)([^"':\s][^"':]*)\1\s*:\s*(["']?)(major|minor|patch|none)\3\s*(#.*)?$/
 
 /**
  * @description Whether a file in `.changeset/` is not a changeset at all — the
@@ -42,28 +49,43 @@ function isNotAChangeset(fileName: string): boolean {
 	)
 }
 
+/** What a changeset's frontmatter names, and whether all of it could be read. */
+export interface ChangesetFrontmatter {
+	/** The package names it bumps, in the order written; empty for an empty changeset. */
+	names: string[]
+	/**
+	 * Whether every frontmatter line was a `package: bump` line, a comment or blank.
+	 * False when a line was unreadable or the frontmatter is not where it is expected.
+	 */
+	fullyRead: boolean
+}
+
 /**
- * @description The package names a changeset's frontmatter bumps.
+ * @description Reads the package names a changeset's frontmatter bumps.
  * @param content - the changeset file's text
- * @returns the named packages, in the order written; empty for an empty changeset
  */
-export function namedPackages(content: string): string[] {
+export function readFrontmatter(content: string): ChangesetFrontmatter {
 	const lines = content.replace(/\r\n/g, '\n').split('\n')
 	if (lines[0]?.trim() !== '---') {
-		return []
+		return { names: [], fullyRead: false }
 	}
 
 	const names: string[] = []
+	let fullyRead = true
 	for (const line of lines.slice(1)) {
-		if (line.trim() === '---') {
-			break
+		const trimmed = line.trim()
+		if (trimmed === '---') {
+			return { names, fullyRead }
 		}
 		const match = BUMP_LINE.exec(line)
 		if (match) {
 			names.push(match[2].trim())
+		} else if (trimmed !== '' && !trimmed.startsWith('#')) {
+			fullyRead = false
 		}
 	}
-	return names
+	// No closing `---`: not a frontmatter this script understands.
+	return { names, fullyRead: false }
 }
 
 /** What the detection found in `.changeset/`. */
@@ -89,8 +111,9 @@ export function classifyChangesets(
 		if (isNotAChangeset(file.name)) {
 			continue
 		}
-		const names = namedPackages(file.content)
-		const isPrivateOnly = names.length > 0 && names.every((name) => privatePackages.has(name))
+		const { names, fullyRead } = readFrontmatter(file.content)
+		const isPrivateOnly =
+			fullyRead && names.length > 0 && names.every((name) => privatePackages.has(name))
 		result[isPrivateOnly ? 'privateOnly' : 'pending'].push(file.name)
 	}
 	return result
