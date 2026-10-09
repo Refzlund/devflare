@@ -182,20 +182,22 @@ describe('createDisposeContext', () => {
 		expect(elapsed).toBeLessThan(1_000)
 	})
 
-	test('refuses a waitUntilTimeoutMs that is not a finite number of 0 or more, before tearing down', async () => {
+	test('refuses a waitUntilTimeoutMs no timer can honour, before tearing down', async () => {
 		const state = stateWithClient()
 		const dispose = createDisposeContext(state, scope)
 
-		for (const waitUntilTimeoutMs of [-1, Number.NaN, Number.POSITIVE_INFINITY]) {
+		// 2^31 is the first finite value a timer fires after ~1ms instead of honouring.
+		for (const waitUntilTimeoutMs of [-1, Number.NaN, Number.POSITIVE_INFINITY, 2 ** 31]) {
 			await expect(dispose({ waitUntilTimeoutMs })).rejects.toThrow(
-				`env.dispose({ waitUntilTimeoutMs }) needs a finite number of milliseconds, 0 or more; got ${waitUntilTimeoutMs}`
+				`env.dispose({ waitUntilTimeoutMs }) needs a number of milliseconds from 0 to 2147483647; got ${waitUntilTimeoutMs}`
 			)
 		}
 		expect(events).toEqual([])
 		expect(state.client).not.toBeNull()
 
-		// Still disposable with a usable budget afterwards.
+		// Still disposable with a usable budget afterwards; both ends are usable.
 		await dispose({ waitUntilTimeoutMs: 0 })
 		expect(events).toEqual(['disconnect'])
+		await dispose({ waitUntilTimeoutMs: 2_147_483_647 })
 	})
 })

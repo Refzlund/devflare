@@ -7,6 +7,7 @@ import {
 	openWaitUntilScope,
 	type WaitUntilError,
 	type WaitUntilOrigin,
+	WaitUntilScope,
 	waitUntilDrainError
 } from '../../../src/test/wait-until-tracker'
 
@@ -15,7 +16,9 @@ import {
 	unhandled rejection, so a test that waits through a rejection and passes
 	also shows the tracker raised nothing. What bun itself does with a
 	rejection the tracker must leave alone can only be seen from a separate
-	`bun test` run, as the last case here does.
+	`bun test` run, as the last cases here do. Scopes from openWaitUntilScope()
+	use Bun.peek; `new WaitUntilScope(null)` drives the fallback for runtimes
+	without it.
 */
 
 /** An origin naming `path`, as cf.worker.fetch would record it. */
@@ -27,6 +30,9 @@ function origin(path: string): WaitUntilOrigin {
 function delay(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms))
 }
+
+/** A Promise subclass, as SDK clients return (e.g. an `APIPromise extends Promise`). */
+class SdkPromise<T> extends Promise<T> {}
 
 /** console.error, replaced per test so the tracker's lines can be read and kept quiet. */
 let consoleError: ReturnType<typeof spyOn>
@@ -92,18 +98,77 @@ describe('WaitUntilScope.drain', () => {
 		expect(await scope.drain(30)).toEqual({ failures: [], abandoned: [] })
 	})
 
+	test('reports a rejection that lands in the next timer after it starts', async () => {
+		const scope = openWaitUntilScope()
+		const reason = new Error('rejected in the next timer')
+		scope.track(
+			new Promise((_, reject) => setTimeout(() => reject(reason), 0)),
+			origin('/next-timer')
+		)
+
+		const outcome = await scope.drain(100)
+
+		expect(outcome.failures.map((failure) => failure.cause)).toEqual([reason])
+		expect(outcome.abandoned).toEqual([])
+	})
+
 	test('ignores work that settled before it began, including a rejection the handler recovered from', async () => {
 		const scope = openWaitUntilScope()
 		const audit = (async () => {
 			await delay(5)
 			throw new Error('audit service down')
 		})()
+		// An SDK-style Promise subclass, which a resolve-based classification sees ticks late.
+		const sdkCall = new SdkPromise<string>((_, reject) => {
+			setTimeout(() => reject(new Error('sdk call failed')), 5)
+		})
 		scope.track(audit, origin('/handled'))
+		scope.track(sdkCall, origin('/sdk'))
 		scope.track(Promise.resolve('done'), origin('/done'))
-		// What the handler did: it awaited the same promise and recovered.
+		// What the handler did: it awaited the same promises and recovered.
 		expect(await audit.catch(() => 'recovered')).toBe('recovered')
+		expect(await sdkCall.catch(() => 'recovered')).toBe('recovered')
 
 		expect(await scope.drain(1_000)).toEqual({ failures: [], abandoned: [] })
+	})
+
+	test('resolves a thenable once, when it is registered, and never calls it again', async () => {
+		const scope = openWaitUntilScope()
+		let thenCalls = 0
+		// A lazy, query-builder-shaped thenable: each `then` call runs the query.
+		const query = {
+			// biome-ignore lint/suspicious/noThenProperty: a thenable is the subject under test.
+			then(_resolve: (value: unknown) => void, reject: (reason: unknown) => void) {
+				thenCalls++
+				setTimeout(() => reject(new Error('query failed')), 20)
+			}
+		}
+
+		scope.track(query, origin('/query'))
+		await delay(0)
+		expect(thenCalls).toBe(1)
+
+		const outcome = await scope.drain(1_000)
+
+		expect(thenCalls).toBe(1)
+		expect(outcome.failures.map((failure) => (failure.cause as Error).message)).toEqual([
+			'query failed'
+		])
+	})
+
+	test('prunes settled registrations as it grows, so it does not hold them until dispose', async () => {
+		const scope = openWaitUntilScope()
+		// Registered first, so the prune pass has to look at it and keep it.
+		scope.track(new Promise(() => {}), origin('/still-pending'))
+		for (let index = 0; index < 70; index++) {
+			scope.track(Promise.resolve(index), origin(`/settled-${index}`))
+		}
+
+		expect(scope.registeredCount).toBeLessThan(70)
+		expect(scope.undrainedOrigins).toEqual([origin('/still-pending')])
+		expect((await scope.drain(0)).abandoned.map((error) => error.origin)).toEqual([
+			origin('/still-pending')
+		])
 	})
 
 	test('counts its budget across rounds, so work that keeps registering more cannot hold it open', async () => {
@@ -255,35 +320,95 @@ describe('waitUntilDrainError', () => {
 	})
 })
 
+describe('WaitUntilScope without Bun.peek (the fallback for other runtimes)', () => {
+	test('reports a rejection of work still pending when it began', async () => {
+		const scope = new WaitUntilScope(null)
+		const reason = new Error('rejected later')
+		scope.track(
+			(async () => {
+				await delay(20)
+				throw reason
+			})(),
+			origin('/later')
+		)
+
+		const outcome = await scope.drain(1_000)
+
+		expect(outcome.failures.map((failure) => failure.cause)).toEqual([reason])
+	})
+
+	test('reports a rejection that lands in the timer right after it attaches', async () => {
+		const scope = new WaitUntilScope(null)
+		let reject: (reason: unknown) => void = () => {}
+		scope.track(
+			new Promise((_, rejectWork) => {
+				reject = rejectWork
+			}),
+			origin('/after-attach')
+		)
+		const reason = new Error('rejected after the attach')
+
+		// The drain schedules its yield first, so this timer runs after the attach.
+		const draining = scope.drain(1_000)
+		setTimeout(() => reject(reason), 0)
+		const outcome = await draining
+
+		expect(outcome.failures.map((failure) => failure.cause)).toEqual([reason])
+	})
+
+	test('ignores native work that settled before it began, including a recovered rejection', async () => {
+		const scope = new WaitUntilScope(null)
+		const audit = (async () => {
+			await delay(5)
+			throw new Error('audit service down')
+		})()
+		scope.track(audit, origin('/handled'))
+		scope.track(Promise.resolve('done'), origin('/done'))
+		expect(await audit.catch(() => 'recovered')).toBe('recovered')
+
+		expect(await scope.drain(1_000)).toEqual({ failures: [], abandoned: [] })
+	})
+})
+
 describe('a rejection that happened before the drain began', () => {
 	const fixtureDirectory = mkdtempSync(join(tmpdir(), 'devflare-wait-until-before-drain-'))
+	const trackerUrl = pathToFileURL(
+		join(import.meta.dir, '..', '..', '..', 'src', 'test', 'wait-until-tracker.ts')
+	).href
 
 	afterAll(() => {
 		rmSync(fixtureDirectory, { recursive: true, force: true })
 	})
 
-	// Attaching a handler in the same tick as an unhandled rejection hides it
-	// from bun, so the drain must give bun its turn first. Only a separate run
-	// can show bun reporting it, because bun fails whichever test it lands in.
-	test('is still reported by bun, unattributed, when the drain starts in the same tick', async () => {
-		const trackerUrl = pathToFileURL(
-			join(import.meta.dir, '..', '..', '..', 'src', 'test', 'wait-until-tracker.ts')
-		).href
-		const fixturePath = join(fixtureDirectory, 'same-tick.test.ts')
+	/**
+	 * @description Runs, in a separate `bun test`, a case that rejects a
+	 * registered promise and starts the drain in the same tick, and hands back
+	 * the run's exit code and output. bun fails whichever test an unhandled
+	 * rejection lands in, so only a separate run can show bun reporting it.
+	 * @param name - the fixture file's name, unique per case
+	 * @param openScope - the expression that opens the scope under test
+	 */
+	async function runSameTickFixture(
+		name: string,
+		openScope: string
+	): Promise<{ exitCode: number; output: string }> {
+		const fixturePath = join(fixtureDirectory, name)
 		writeFileSync(
 			fixturePath,
 			`
 import { test } from 'bun:test'
-import { openWaitUntilScope } from '${trackerUrl}'
+import { openWaitUntilScope, WaitUntilScope } from '${trackerUrl}'
 
 test('rejects just before the drain', async () => {
-	const scope = openWaitUntilScope()
+	const scope = ${openScope}
 	scope.track(Promise.reject(new Error('rejected-just-before-the-drain')), {
 		helper: 'cf.worker.fetch',
 		method: 'GET',
 		url: 'http://localhost/early'
 	})
 	await scope.drain(100)
+	void WaitUntilScope
+	void openWaitUntilScope
 })
 `.trim()
 		)
@@ -298,11 +423,31 @@ test('rejects just before the drain', async () => {
 			new Response(run.stderr).text(),
 			run.exited
 		])
-		const output = `${stdout}\n${stderr}`
+		return { exitCode, output: `${stdout}\n${stderr}` }
+	}
+
+	// Under bun the drain leaves a promise it reads as settled untouched.
+	test('is still reported by bun, unattributed, when the drain starts in the same tick', async () => {
+		const { exitCode, output } = await runSameTickFixture(
+			'same-tick.test.ts',
+			'openWaitUntilScope()'
+		)
 
 		expect(exitCode).not.toBe(0)
 		expect(output).toContain('error: rejected-just-before-the-drain')
 		expect(output).toContain('(fail) rejects just before the drain')
+		expect(output).not.toContain('WaitUntilError')
+	}, 30_000)
+
+	// Without Bun.peek the drain must give the runtime its turn before it attaches.
+	test('is still reported by the runtime when the fallback drain starts in the same tick', async () => {
+		const { exitCode, output } = await runSameTickFixture(
+			'same-tick-fallback.test.ts',
+			'new WaitUntilScope(null)'
+		)
+
+		expect(exitCode).not.toBe(0)
+		expect(output).toContain('error: rejected-just-before-the-drain')
 		expect(output).not.toContain('WaitUntilError')
 	}, 30_000)
 })

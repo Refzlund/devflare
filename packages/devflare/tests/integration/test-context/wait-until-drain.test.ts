@@ -124,6 +124,12 @@ export async function fetch(event) {
 		)
 	}
 
+	if (pathname === '/reject-next-timer') {
+		event.ctx.waitUntil(
+			new Promise((_, reject) => setTimeout(() => reject(new Error('rejected in the next timer')), 0))
+		)
+	}
+
 	if (pathname === '/never-settles') {
 		event.ctx.waitUntil(new Promise(() => {}))
 	}
@@ -183,6 +189,23 @@ describe('env.dispose() and cf.worker.fetch waitUntil work', () => {
 			// Once: had the tracker also raised it as an unhandled rejection, bun
 			// would have failed this test. A later drain not repeating it is
 			// graded in tests/unit/test/wait-until-tracker.test.ts.
+		})
+	}, 20_000)
+
+	// Nothing between the handler and `env.dispose()` here is a timer, so the
+	// work is still pending when dispose starts and rejects in the very next
+	// timer, the one bun runs alongside anything dispose itself schedules.
+	test('reports a rejection that lands in the next timer after dispose starts', async () => {
+		await withContext(async () => {
+			await cf.worker.get('/reject-next-timer')
+
+			const error = await disposeError()
+
+			expect((error as Error | null)?.name).toBe('WaitUntilError')
+			expect((error as Error).message).toContain(
+				'cf.worker.fetch(GET http://localhost/reject-next-timer)'
+			)
+			expect(((error as Error).cause as Error).message).toBe('rejected in the next timer')
 		})
 	}, 20_000)
 

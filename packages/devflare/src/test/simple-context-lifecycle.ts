@@ -142,21 +142,30 @@ export function __resetTestContextConfigCache(): void {
 export const DEFAULT_WAIT_UNTIL_TIMEOUT_MS = 2_000
 
 /**
+ * The longest delay a timer honours: 2^31-1 ms, about 24.8 days. A longer one,
+ * Infinity included, fires after about 1ms instead.
+ */
+const MAX_TIMER_DELAY_MS = 2_147_483_647
+
+/**
  * @description Reads the drain budget from `env.dispose()`'s options.
  * @param options - what the consumer passed, if anything
  * @returns the budget in milliseconds
- * @throws TypeError when `waitUntilTimeoutMs` is not a finite number of 0 or
- *   more. Infinity is refused because timers treat it as 1ms, which would
- *   abandon all work at once rather than wait for ever.
+ * @throws TypeError when `waitUntilTimeoutMs` is not a number from 0 to
+ *   {@link MAX_TIMER_DELAY_MS}. A larger one (Infinity included) is refused
+ *   rather than clamped: the timer would fire after about 1ms and abandon all
+ *   work at once, the opposite of what asking for a long wait means, and a
+ *   silent clamp would hide that the value was never usable.
  */
 function drainBudgetMs(options: EnvDisposeOptions | undefined): number {
 	const requested = options?.waitUntilTimeoutMs
 	if (requested === undefined) {
 		return DEFAULT_WAIT_UNTIL_TIMEOUT_MS
 	}
-	if (typeof requested !== 'number' || !Number.isFinite(requested) || requested < 0) {
+	const usable = typeof requested === 'number' && requested >= 0 && requested <= MAX_TIMER_DELAY_MS
+	if (!usable) {
 		throw new TypeError(
-			`env.dispose({ waitUntilTimeoutMs }) needs a finite number of milliseconds, 0 or more; got ${String(requested)}`
+			`env.dispose({ waitUntilTimeoutMs }) needs a number of milliseconds from 0 to ${MAX_TIMER_DELAY_MS}; got ${String(requested)}`
 		)
 	}
 	return requested

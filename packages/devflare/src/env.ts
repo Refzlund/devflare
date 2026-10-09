@@ -37,8 +37,9 @@ export interface EnvDisposeOptions {
 	/**
 	 * How long, in milliseconds, to wait for `waitUntil()` work that
 	 * `cf.worker.fetch()` left running before tearing the runtime down
-	 * regardless. A finite number, 0 or more; 2000 when omitted. Raise the hook's
-	 * own timeout to match, since bun gives an `afterAll` 5000ms by default.
+	 * regardless. From 0 to 2147483647 (the longest delay a timer honours); 2000
+	 * when omitted. Raise the hook's own timeout to match, since bun gives an
+	 * `afterAll` 5000ms by default.
 	 */
 	waitUntilTimeoutMs?: number
 }

@@ -9,22 +9,38 @@
 	scope, cf.worker.fetch registers every waitUntil promise into it, and
 	`env.dispose()` drains the scope before tearing the runtime down.
 
-	→ KEY: registering attaches NOTHING to the promise. Whether a rejection is
+	→ KEY: registering attaches NOTHING to a promise. Whether a rejection is
 	  unhandled is the runtime's call, and attaching a handler would decide it
 	  for the consumer: a handler that also awaits the promise and recovers
 	  (`ctx.waitUntil(audit); try { await audit } catch { … }`) would start to
-	  fail. So everything that settles before dispose behaves exactly as it did
-	  before this tracker existed: the runtime reports an unhandled rejection
-	  (unattributed), and a handled one is reported by nobody.
+	  fail. So work that settles before dispose is the runtime's: bun reports a
+	  rejection nothing handled (unattributed), and nobody reports one the
+	  handler recovered from.
+	→ A thenable that is not a Promise (a lazy query builder, say) is resolved
+	  once, when it is registered, as workerd's waitUntil resolves it when it is
+	  called; the native promise that produces is what is tracked, and nothing
+	  here calls `then` on the thenable again. That promise is waitUntil's own,
+	  so no handler in the consumer's code can be attached to it.
 	→ The drain takes responsibility only for work still PENDING when it
-	  starts. It first yields one macrotask so the runtime reports anything that
-	  already rejected; attaching in the same tick hides such a rejection from
-	  bun (measured on bun 1.4.2). It then attaches to every promise and tells
-	  settled from pending by microtask order: a promise that has settled queues
-	  its reaction immediately, ahead of a marker queued right after; a pending
-	  one can only queue its reaction when it settles, after the marker. Settled
-	  work is ignored. A rejection after the marker is the drain's to report,
-	  and `env.dispose()` throws it, attributed, once.
+	  starts. Under bun it reads each promise's state with `Bun.peek.status`,
+	  which attaches nothing (measured on bun 1.4.2, Promise subclasses
+	  included). Settled promises are left untouched; pending ones get a
+	  handler at once, synchronously, so they cannot reject unseen. Attaching
+	  first and classifying afterwards does NOT work under bun: it checks for
+	  unhandled rejections once per event-loop pass, so a rejection that landed
+	  earlier in the same pass is hidden by any handler attached after it.
+	→ Without `Bun.peek` (Node, say) the drain yields one macrotask, after
+	  which the runtime has reported every rejection so far (Node checks after
+	  each macrotask; measured on Node 25.9). It then attaches to every promise
+	  and tells settled from pending by microtask order: a promise that has
+	  settled queues its reaction at once, ahead of a marker queued right
+	  after, and a pending one only when it settles, after the marker.
+	  → GOTCHA: a Promise subclass reaches its reaction a few ticks late there,
+	    so one that had already settled is treated as pending: dispose reports a
+	    rejection that happened before it started, even one the handler
+	    recovered from. bun has no such gap.
+	→ A rejection the drain takes responsibility for is thrown by
+	  `env.dispose()`, attributed, once.
 	→ Work still pending when the budget runs out is abandoned, and dispose
 	  names it. If it rejects later, that is logged with console.error and
 	  never thrown: it would fail whichever unrelated test is running by then,
@@ -78,6 +94,20 @@ export class WaitUntilError extends Error {
 	}
 }
 
+/** A promise's state as `Bun.peek.status` reports it, read without attaching to it. */
+export type PromiseStatus = 'pending' | 'fulfilled' | 'rejected'
+
+/** Reads a promise's state without attaching anything to it. */
+export type PromiseStatusReader = (promise: Promise<unknown>) => PromiseStatus
+
+/** One registered piece of work: the native promise tracked, and where it came from. */
+interface Registration {
+	/** The promise itself, or the native promise a thenable was resolved into. */
+	promise: Promise<unknown>
+	/** The helper and request that started it. */
+	origin: WaitUntilOrigin
+}
+
 /** One promise a drain is watching. */
 interface Watch {
 	/** Where it came from. */
@@ -91,13 +121,14 @@ interface Watch {
 /** A drain in progress. */
 interface Drain {
 	/**
-	 * True until the classification marker runs. A reaction that runs while it
-	 * is true belongs to a promise that had settled before the drain began.
+	 * Only without `Bun.peek`: true until the classification marker runs. A
+	 * reaction that runs while it is true belongs to a promise that had settled
+	 * before the drain began. Always false under bun, which classifies first.
 	 */
 	classifying: boolean
 	/** Rejections of work that was pending when the drain began. */
 	failures: WaitUntilError[]
-	/** Every promise watched, keyed by the promise so one registered twice is watched once. */
+	/** Every promise watched, keyed by what was registered, so a repeat is watched once. */
 	watches: Map<PromiseLike<unknown>, Watch>
 }
 
@@ -193,7 +224,17 @@ function isThenable(work: unknown): work is PromiseLike<unknown> {
 	)
 }
 
-/** Resolves on the next macrotask, after the runtime's unhandled-rejection pass. */
+/**
+ * `Bun.peek.status` when running under bun, else `null`. Read through
+ * `globalThis` because devflare/test also loads outside bun.
+ */
+const runtimePromiseStatus: PromiseStatusReader | null = (() => {
+	const bun = (globalThis as { Bun?: { peek?: { status?: unknown } } }).Bun
+	const status = bun?.peek?.status
+	return typeof status === 'function' ? (status as PromiseStatusReader) : null
+})()
+
+/** Resolves on the next macrotask, after a per-macrotask runtime's unhandled-rejection pass. */
 function nextMacrotask(): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, 0))
 }
@@ -219,19 +260,21 @@ async function timedOut(settled: Promise<unknown>, ms: number): Promise<boolean>
 
 /**
  * @description Starts watching one promise for a drain, attaching the
- * reactions that classify and report it (see the file header).
+ * reactions that report it (see the file header).
  * @param drain - the drain in progress
- * @param work - the promise
+ * @param key - what was registered, for de-duplication
+ * @param promise - the native promise to watch
  * @param origin - where it came from
- * @sideeffect marks the promise handled; nothing is attached twice
+ * @sideeffect marks the promise handled
  */
-function watch(drain: Drain, work: PromiseLike<unknown>, origin: WaitUntilOrigin): void {
-	if (drain.watches.has(work)) {
-		return
-	}
-
+function watch(
+	drain: Drain,
+	key: PromiseLike<unknown>,
+	promise: Promise<unknown>,
+	origin: WaitUntilOrigin
+): void {
 	const entry: Watch = { origin, state: 'pending', settled: Promise.resolve() }
-	entry.settled = Promise.resolve(work).then(
+	entry.settled = Promise.resolve(promise).then(
 		() => {
 			if (entry.state === 'pending') entry.state = 'settled'
 		},
@@ -253,52 +296,106 @@ function watch(drain: Drain, work: PromiseLike<unknown>, origin: WaitUntilOrigin
 			drain.failures.push(rejectionError(origin, reason))
 		}
 	)
-	drain.watches.set(work, entry)
+	drain.watches.set(key, entry)
 }
+
+/** Below this many registrations a scope does not bother pruning settled ones. */
+const PRUNE_FLOOR = 64
 
 /**
  * The `waitUntil` work one test context's `cf.worker.fetch` calls registered,
  * drained once by that context's `env.dispose()`.
  */
 export class WaitUntilScope {
-	/** Registered and not yet drained, keyed by the promise so one registered twice counts once. */
-	readonly #registered = new Map<PromiseLike<unknown>, WaitUntilOrigin>()
+	/** Registered and not yet drained, keyed by what was registered so a repeat counts once. */
+	readonly #registered = new Map<PromiseLike<unknown>, Registration>()
+	/** How the drain tells settled from pending; `null` means by microtask order. */
+	readonly #readStatus: PromiseStatusReader | null
 	/** The drain in progress, which new registrations join directly. */
 	#drain: Drain | null = null
 	/** Set when the drain finishes; the scope takes nothing after that. */
 	#closed = false
+	/** The registration count at which settled ones are next pruned. */
+	#pruneAt = PRUNE_FLOOR
+
+	/**
+	 * @param readStatus - reads a promise's state without attaching to it;
+	 *   defaults to `Bun.peek.status` under bun. `null` selects the fallback for
+	 *   runtimes without one (see the file header); tests pass it to drive that
+	 *   path under bun.
+	 */
+	constructor(readStatus: PromiseStatusReader | null = runtimePromiseStatus) {
+		this.#readStatus = readStatus
+	}
 
 	/** Whether the scope has been drained, i.e. its context disposed. */
 	get closed(): boolean {
 		return this.#closed
 	}
 
-	/** Where every registered, not-yet-drained promise came from. */
-	get registeredOrigins(): WaitUntilOrigin[] {
+	/** How many registrations the scope holds now, settled ones not yet pruned included. */
+	get registeredCount(): number {
+		return this.#registered.size
+	}
+
+	/**
+	 * Where the undrained work came from: only what is still pending when the
+	 * state can be read without attaching, otherwise everything registered.
+	 */
+	get undrainedOrigins(): WaitUntilOrigin[] {
+		const readStatus = this.#readStatus
 		return [...this.#registered.values()]
+			.filter(({ promise }) => !readStatus || readStatus(promise) === 'pending')
+			.map(({ origin }) => origin)
 	}
 
 	/**
 	 * @description Registers a value passed to `ctx.waitUntil()`, attaching
-	 * nothing to it.
+	 * nothing to it. A thenable that is not a Promise is resolved now, once,
+	 * and the promise that produces is tracked instead (see the file header).
 	 * @param work - what the handler passed; a value that is not a thenable has
-	 *   nothing to drain and is ignored
+	 *   nothing to drain and is ignored, and so is a repeat
 	 * @param origin - the helper and request that started it
-	 * @sideeffect holds a reference to the promise until the scope is drained.
-	 *   After the scope is closed it is ignored: its context is gone, so any
-	 *   rejection stays the runtime's to report.
+	 * @sideeffect holds a reference to the promise until the scope is drained,
+	 *   or until it is found settled when the scope prunes. After the scope is
+	 *   closed it is ignored: its context is gone, so any rejection stays the
+	 *   runtime's to report.
 	 */
 	track(work: unknown, origin: WaitUntilOrigin): void {
-		if (!isThenable(work) || this.#closed) {
+		if (this.#closed || !isThenable(work)) {
 			return
 		}
+		if (this.#registered.has(work) || this.#drain?.watches.has(work)) {
+			return
+		}
+
+		const promise = work instanceof Promise ? work : Promise.resolve(work)
 		if (this.#drain) {
-			watch(this.#drain, work, origin)
+			watch(this.#drain, work, promise, origin)
 			return
 		}
-		if (!this.#registered.has(work)) {
-			this.#registered.set(work, origin)
+		this.#registered.set(work, { promise, origin })
+		this.#pruneSettled()
+	}
+
+	/**
+	 * @description Drops registrations already settled, once the scope has
+	 * grown to twice what the last prune left, so a context that runs many
+	 * requests does not hold every settled promise and its value until dispose.
+	 * The drain ignores settled work anyway, so this changes nothing it reports.
+	 * Only possible where a promise's state can be read without attaching.
+	 */
+	#pruneSettled(): void {
+		const readStatus = this.#readStatus
+		if (!readStatus || this.#registered.size < this.#pruneAt) {
+			return
 		}
+		for (const [key, { promise }] of this.#registered) {
+			if (readStatus(promise) !== 'pending') {
+				this.#registered.delete(key)
+			}
+		}
+		this.#pruneAt = Math.max(PRUNE_FLOOR, this.#registered.size * 2)
 	}
 
 	/**
@@ -308,26 +405,18 @@ export class WaitUntilScope {
 	 * @param budgetMs - the most to wait, in milliseconds, across every round
 	 * @returns the rejections that arrived while waiting and the work abandoned
 	 *   at the budget, each as an attributed error
-	 * @sideeffect marks every registered promise handled, closes the scope and
+	 * @sideeffect marks every pending promise handled, closes the scope and
 	 *   releases its references
 	 */
 	async drain(budgetMs: number): Promise<WaitUntilDrainOutcome> {
 		const deadline = Date.now() + budgetMs
-		await nextMacrotask()
-
-		const drain: Drain = { classifying: true, failures: [], watches: new Map() }
-		this.#drain = drain
+		const drain: Drain = { classifying: false, failures: [], watches: new Map() }
 		try {
-			for (const [work, origin] of this.#registered) {
-				watch(drain, work, origin)
+			if (this.#readStatus) {
+				this.#watchPending(drain, this.#readStatus)
+			} else {
+				await this.#watchPendingByMicrotaskOrder(drain)
 			}
-			this.#registered.clear()
-			await new Promise<void>((resolve) => {
-				queueMicrotask(() => {
-					drain.classifying = false
-					resolve()
-				})
-			})
 
 			// A round at a time, because work can register more work: a handler's
 			// background task may itself call `ctx.waitUntil()`.
@@ -353,6 +442,45 @@ export class WaitUntilScope {
 			this.#closed = true
 		}
 	}
+
+	/**
+	 * @description Starts the drain where a promise's state can be read without
+	 * attaching: synchronously, settled work is left untouched for the runtime
+	 * and pending work is watched before it can reject.
+	 * @param drain - the drain starting
+	 * @param readStatus - reads a promise's state without attaching to it
+	 */
+	#watchPending(drain: Drain, readStatus: PromiseStatusReader): void {
+		this.#drain = drain
+		for (const [key, { promise, origin }] of this.#registered) {
+			if (readStatus(promise) === 'pending') {
+				watch(drain, key, promise, origin)
+			}
+		}
+		this.#registered.clear()
+	}
+
+	/**
+	 * @description Starts the drain where nothing can read a promise's state
+	 * without attaching: lets the runtime report what already rejected, then
+	 * watches everything and tells settled from pending by microtask order.
+	 * @param drain - the drain starting
+	 */
+	async #watchPendingByMicrotaskOrder(drain: Drain): Promise<void> {
+		await nextMacrotask()
+		drain.classifying = true
+		this.#drain = drain
+		for (const [key, { promise, origin }] of this.#registered) {
+			watch(drain, key, promise, origin)
+		}
+		this.#registered.clear()
+		await new Promise<void>((resolve) => {
+			queueMicrotask(() => {
+				drain.classifying = false
+				resolve()
+			})
+		})
+	}
 }
 
 /** The scope opened last, checked for a missing dispose when the next one opens. */
@@ -360,15 +488,15 @@ let latestScope: WaitUntilScope | null = null
 
 /**
  * @description Opens the scope for a new test context. If the previous
- * context was never disposed and registered work, that work stays undrained,
- * and this says so on stderr rather than letting the new context drain or
- * blame it.
+ * context was never disposed and left work undrained, that work stays
+ * undrained, and this says so on stderr rather than letting the new context
+ * drain or blame it.
  * @returns the new context's scope
  */
 export function openWaitUntilScope(): WaitUntilScope {
 	const previous = latestScope
 	if (previous && !previous.closed) {
-		const origins = previous.registeredOrigins
+		const origins = previous.undrainedOrigins
 		if (origins.length > 0) {
 			console.error(neverDisposedMessage(origins))
 		}
