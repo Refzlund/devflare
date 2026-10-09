@@ -1,14 +1,14 @@
 <script lang="ts">
-import LinkCard from '$lib/components/cards/LinkCard.svelte'
-import InlineText from '$lib/components/content/InlineText.svelte'
-import SectionHeading from '$lib/components/content/SectionHeading.svelte'
-import HomeNext from '$lib/components/home/HomeNext.svelte'
-import MiniSnippet from '$lib/components/home/MiniSnippet.svelte'
-import Surface from '$lib/components/layout/Surface.svelte'
-import PillLink from '$lib/components/navigation/PillLink.svelte'
-import { docPath } from '$lib/docs/content'
-import { m } from '$lib/paraglide/messages'
-import { localizeHref } from '$lib/paraglide/runtime'
+import LinkCard from '#lib/components/cards/LinkCard.svelte'
+import InlineText from '#lib/components/content/InlineText.svelte'
+import SectionHeading from '#lib/components/content/SectionHeading.svelte'
+import HomeNext from '#lib/components/home/HomeNext.svelte'
+import MiniSnippet from '#lib/components/home/MiniSnippet.svelte'
+import Surface from '#lib/components/layout/Surface.svelte'
+import PillLink from '#lib/components/navigation/PillLink.svelte'
+import { docPath } from '#lib/docs/content.js'
+import { m } from '#lib/paraglide/messages.js'
+import { localizeHref } from '#lib/paraglide/runtime.js'
 
 const heroHighlights = [
 	m.home_cta_highlight_no_framework(),

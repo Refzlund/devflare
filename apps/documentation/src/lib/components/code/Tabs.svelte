@@ -1,5 +1,5 @@
 <script lang="ts">
-import { tooltip } from '$lib/components/layout/Tooltip.svelte'
+import { tooltip } from '#lib/components/layout/Tooltip.svelte'
 import type { NormalizedCodeFile } from './block'
 
 const {

@@ -1,4 +1,4 @@
-import { docPath, getCanonicalDocSlug } from '$lib/docs/content'
+import { docPath, getCanonicalDocSlug } from '#lib/docs/content.js'
 import type { IntellisenseDefinition, IntellisenseLink } from '../types'
 
 function docsReference(label: string, slug: string): IntellisenseLink {

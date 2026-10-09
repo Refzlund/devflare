@@ -1,4 +1,4 @@
-import type { DocCodeSnippet, DocCodeTreeEntry } from '$lib/docs/types'
+import type { DocCodeSnippet, DocCodeTreeEntry } from '#lib/docs/types.js'
 import {
 	createStructureEntryFromPattern,
 	inferConfigContextEntries,

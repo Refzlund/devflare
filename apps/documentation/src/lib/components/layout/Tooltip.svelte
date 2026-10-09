@@ -1,5 +1,5 @@
 <script module lang="ts">
-import { createSingleton, flip, offset, shift } from '$lib/vendor/floating-runes'
+import { createSingleton, flip, offset, shift } from '#lib/vendor/floating-runes.js'
 
 export const tooltip = createSingleton<string>({
 	placement: 'top',
@@ -11,7 +11,7 @@ export const tooltip = createSingleton<string>({
 </script>
 
 <script lang="ts">
-	import { portal } from '$lib/vendor/floating-runes'
+	import { portal } from '#lib/vendor/floating-runes.js'
 </script>
 
 {#if tooltip.visible && tooltip.content !== undefined}

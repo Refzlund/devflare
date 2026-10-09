@@ -1,4 +1,4 @@
-import { createLLMDocumentResponse } from '$lib/docs/llm-response'
+import { createLLMDocumentResponse } from '#lib/docs/llm-response.js'
 import type { RequestHandler } from './$types'
 
 export const GET: RequestHandler = () => {

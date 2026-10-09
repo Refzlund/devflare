@@ -1,4 +1,4 @@
-import { createSingleton, flip, offset, shift } from '$lib/vendor/floating-runes'
+import { createSingleton, flip, offset, shift } from '#lib/vendor/floating-runes.js'
 import type { IntellisenseEntry } from './types'
 
 export const intellisense = createSingleton<IntellisenseEntry>({

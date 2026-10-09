@@ -5,8 +5,8 @@ import 'prismjs/components/prism-bash'
 import 'prismjs/components/prism-yaml'
 import 'prismjs/components/prism-json'
 import 'prismjs/components/prism-markdown'
-import { resolveIntellisenseEntry } from '$lib/intellisense/registry'
-import type { IntellisenseRenderContext } from '$lib/intellisense/types'
+import { resolveIntellisenseEntry } from '#lib/intellisense/registry.js'
+import type { IntellisenseRenderContext } from '#lib/intellisense/types.js'
 import { getConfigLinePropertyPaths, isConfigSnippetCode, isDevflareConfigPath } from './config'
 
 let intellisenseHookRegistered = false

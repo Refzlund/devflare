@@ -1,5 +1,5 @@
 <script lang="ts">
-import { localizeHref } from '$lib/paraglide/runtime'
+import { localizeHref } from '#lib/paraglide/runtime.js'
 import Inline from '../code/Inline.svelte'
 import { parseInlineText } from './inline'
 

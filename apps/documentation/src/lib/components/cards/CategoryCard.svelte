@@ -1,8 +1,8 @@
 <script lang="ts">
-import { docPath } from '$lib/docs/content'
-import type { DocCategory } from '$lib/docs/types'
-import { m } from '$lib/paraglide/messages'
-import { localizeHref } from '$lib/paraglide/runtime'
+import { docPath } from '#lib/docs/content.js'
+import type { DocCategory } from '#lib/docs/types.js'
+import { m } from '#lib/paraglide/messages.js'
+import { localizeHref } from '#lib/paraglide/runtime.js'
 import InlineText from '../content/InlineText.svelte'
 import LinkCard from './LinkCard.svelte'
 

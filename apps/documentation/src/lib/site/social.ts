@@ -1,4 +1,4 @@
-import type { DocPage } from '$lib/docs/types'
+import type { DocPage } from '#lib/docs/types.js'
 
 type SocialDoc = Pick<DocPage, 'navTitle' | 'summary'>
 

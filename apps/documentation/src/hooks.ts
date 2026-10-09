@@ -1,5 +1,5 @@
 import type { Reroute, Transport } from '@sveltejs/kit/hooks'
-import { deLocalizeUrl } from '$lib/paraglide/runtime'
+import { deLocalizeUrl } from '#lib/paraglide/runtime.js'
 
 const routeAliases = {
 	'/llm.md': '/LLM.md',

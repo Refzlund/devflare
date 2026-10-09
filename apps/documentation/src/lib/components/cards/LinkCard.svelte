@@ -1,5 +1,5 @@
 <script lang="ts">
-import { tooltip } from '$lib/components/layout/Tooltip.svelte'
+import { tooltip } from '#lib/components/layout/Tooltip.svelte'
 import InlineText from '../content/InlineText.svelte'
 import Badge from './Badge.svelte'
 

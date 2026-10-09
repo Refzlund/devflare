@@ -1,4 +1,4 @@
-import type { DocCodeFile, DocCodeSnippet } from '$lib/docs/types'
+import type { DocCodeFile, DocCodeSnippet } from '#lib/docs/types.js'
 import { inferSnippetPath } from './block/config'
 import { highlightCodeLines } from './block/highlight'
 import {

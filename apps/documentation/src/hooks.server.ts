@@ -1,6 +1,6 @@
 import { type Handle, sequence } from '@sveltejs/kit/hooks'
-import { getTextDirection } from '$lib/paraglide/runtime'
-import { paraglideMiddleware } from '$lib/paraglide/server'
+import { getTextDirection } from '#lib/paraglide/runtime.js'
+import { paraglideMiddleware } from '#lib/paraglide/server.js'
 
 let devflareHandlePromise: Promise<Handle> | null = null
 

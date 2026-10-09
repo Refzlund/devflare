@@ -1,6 +1,6 @@
 import { error, redirect } from '@sveltejs/kit'
-import { docPath, getAdjacentDocs, getCanonicalDocSlug, getDoc } from '$lib/docs/content'
-import { extractLocaleFromUrl, localizeHref } from '$lib/paraglide/runtime'
+import { docPath, getAdjacentDocs, getCanonicalDocSlug, getDoc } from '#lib/docs/content.js'
+import { extractLocaleFromUrl, localizeHref } from '#lib/paraglide/runtime.js'
 
 export function load({ params, url }) {
 	const slug = params.slug

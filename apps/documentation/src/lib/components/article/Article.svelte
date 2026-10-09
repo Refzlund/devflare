@@ -1,9 +1,9 @@
 <script lang="ts">
 import { onMount, tick } from 'svelte'
-import { docPath } from '$lib/docs/content'
-import type { DocPage } from '$lib/docs/types'
-import { m } from '$lib/paraglide/messages'
-import { localizeHref } from '$lib/paraglide/runtime'
+import { docPath } from '#lib/docs/content.js'
+import type { DocPage } from '#lib/docs/types.js'
+import { m } from '#lib/paraglide/messages.js'
+import { localizeHref } from '#lib/paraglide/runtime.js'
 import FeatureCard from '../cards/FeatureCard.svelte'
 import LinkCard from '../cards/LinkCard.svelte'
 import Block from '../code/Block.svelte'

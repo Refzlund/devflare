@@ -1,4 +1,4 @@
-import type { DocCodeLineRange } from '$lib/docs/types'
+import type { DocCodeLineRange } from '#lib/docs/types.js'
 import type { LineState } from './types'
 
 export function extendFocusLines(

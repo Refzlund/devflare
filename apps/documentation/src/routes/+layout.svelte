@@ -4,12 +4,12 @@ import { afterNavigate } from '$app/navigation'
 import { asset } from '$app/paths'
 import { page } from '$app/state'
 import type { AssetPath } from '$app/types'
-import Tooltip from '$lib/components/layout/Tooltip.svelte'
-import Sidebar from '$lib/components/navigation/Sidebar.svelte'
-import type { DocPage } from '$lib/docs/types'
-import IntellisenseTooltip from '$lib/intellisense/IntellisenseTooltip.svelte'
-import { m } from '$lib/paraglide/messages'
-import { localizeHref } from '$lib/paraglide/runtime'
+import Tooltip from '#lib/components/layout/Tooltip.svelte'
+import Sidebar from '#lib/components/navigation/Sidebar.svelte'
+import type { DocPage } from '#lib/docs/types.js'
+import IntellisenseTooltip from '#lib/intellisense/IntellisenseTooltip.svelte'
+import { m } from '#lib/paraglide/messages.js'
+import { localizeHref } from '#lib/paraglide/runtime.js'
 import {
 	BRAND_COLOR,
 	getSocialCardPath,
@@ -17,7 +17,7 @@ import {
 	getSocialImageAlt,
 	getSocialTitle,
 	toAbsoluteUrl
-} from '$lib/site/social'
+} from '#lib/site/social.js'
 import './layout.css'
 
 type ThemeMode = 'light' | 'dark'

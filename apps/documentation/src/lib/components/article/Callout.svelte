@@ -1,6 +1,6 @@
 <script lang="ts">
-import type { DocCallout, DocCalloutTone } from '$lib/docs/types'
-import { localizeHref } from '$lib/paraglide/runtime'
+import type { DocCallout, DocCalloutTone } from '#lib/docs/types.js'
+import { localizeHref } from '#lib/paraglide/runtime.js'
 import InlineText from '../content/InlineText.svelte'
 import PillLink from '../navigation/PillLink.svelte'
 

@@ -1,6 +1,6 @@
 <script lang="ts">
-import { localizeHref } from '$lib/paraglide/runtime'
-import { portal } from '$lib/vendor/floating-runes'
+import { localizeHref } from '#lib/paraglide/runtime.js'
+import { portal } from '#lib/vendor/floating-runes.js'
 import { cancelHideIntellisense, intellisense, setIntellisenseTooltipHovered } from './controller'
 import type { IntellisenseEntry, IntellisenseKind, IntellisenseLink } from './types'
 

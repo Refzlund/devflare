@@ -1,6 +1,6 @@
 <script lang="ts">
-import Article from '$lib/components/article/Article.svelte'
-import type { DocPage } from '$lib/docs/types'
+import Article from '#lib/components/article/Article.svelte'
+import type { DocPage } from '#lib/docs/types.js'
 
 let {
 	data

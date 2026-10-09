@@ -72,11 +72,9 @@ export default defineConfig({
 				// Force runes mode for the project, except for libraries. Can be removed in svelte 6.
 				runes: ({ filename }) =>
 					filename.split(/[/\\]/).includes('node_modules') ? undefined : true
-			},
-			// SvelteKit 3 no longer provides `$lib`; this keeps the app's imports as they were.
-			alias: {
-				$lib: 'src/lib'
 			}
+			// `#lib` comes from package.json `imports`: SvelteKit 3 removed `$lib` and
+			// deprecated the `alias` option that kept it.
 		}),
 		paraglideVitePlugin({
 			project: './project.inlang',

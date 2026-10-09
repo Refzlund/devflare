@@ -3,6 +3,10 @@
 	"private": true,
 	"version": "0.0.1",
 	"type": "module",
+	"imports": {
+		"#lib": "./src/lib/index.js",
+		"#lib/*": "./src/lib/*"
+	},
 	"scripts": {
 		"llm:generate": "bun ./scripts/generate-llm-documents.ts",
 		"social:generate": "bun ./scripts/generate-social-cards.ts",
