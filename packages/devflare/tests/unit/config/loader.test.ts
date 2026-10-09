@@ -128,6 +128,17 @@ export default config
 		expect(error).toBeInstanceOf(ConfigNotFoundError)
 	})
 
+	test('throws ConfigNotFoundError for an ABSOLUTE explicit path that does not exist', async () => {
+		// c12 hands an absolute requested path back verbatim, found or not, so only the
+		// existence check can tell this case from a loaded file.
+		const error = await loadConfig({
+			cwd: TEST_DIR,
+			configFile: join(TEST_DIR, 'missing.config.ts')
+		}).catch((caught: unknown) => caught)
+
+		expect(error).toBeInstanceOf(ConfigNotFoundError)
+	})
+
 	test('loads through a project c12 2.x, which never sets `_configFile`', async () => {
 		// devflare loads with the project's own c12 when it has one. This stand-in
 		// answers in the shape c12 2.0.4 was measured to: a found file as an
