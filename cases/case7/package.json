@@ -11,7 +11,7 @@
 		"@cloudflare/workers-types": "^4.20260702.1",
 		"@types/bun": "^1.4.2",
 		"devflare": "workspace:*",
-		"miniflare": "^5.20261006.0-alpha",
+		"miniflare": "^5.20261006.1-alpha",
 		"typescript": "^6.0.3"
 	}
 }

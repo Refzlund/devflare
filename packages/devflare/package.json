@@ -94,7 +94,7 @@
 		"check": "bun run typecheck"
 	},
 	"dependencies": {
-		"@puppeteer/browsers": "^3.2.3",
+		"@puppeteer/browsers": "^3.2.4",
 		"aws4fetch": "^1.0.20",
 		"c12": "^3.3.4",
 		"chokidar": "^5.0.0",
@@ -104,24 +104,24 @@
 		"globby": "^16.2.4",
 		"jsonc-parser": "^3.3.1",
 		"magic-string": "^1.4.3",
-		"miniflare": "^5.20261006.0-alpha",
+		"miniflare": "^5.20261006.1-alpha",
 		"pathe": "^2.0.3",
 		"picomatch": "^4.0.7",
-		"puppeteer-core": "^25.12.0",
+		"puppeteer-core": "^25.13.0",
 		"rolldown": "^1.2.13",
 		"smol-toml": "^1.9.0",
 		"typescript": "^6.0.3",
-		"wrangler": "^4.148.0",
+		"wrangler": "^4.149.0",
 		"ws": "^8.22.0",
 		"zod": "^4.6.5"
 	},
 	"devDependencies": {
-		"@cloudflare/vite-plugin": "^1.63.0",
+		"@cloudflare/vite-plugin": "^1.63.1",
 		"@cloudflare/workers-types": "^5.20261008.1",
 		"@types/bun": "^1.4.2",
 		"@types/picomatch": "^4.0.3",
 		"@types/ws": "^8.18.2",
-		"vite": "^8.3.3"
+		"vite": "^8.3.4"
 	},
 	"peerDependencies": {
 		"@cloudflare/vite-plugin": "^1.0.0",

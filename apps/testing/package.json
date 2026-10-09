@@ -8,6 +8,6 @@
 		"testing-auth-service": "workspace:*",
 		"testing-lock-service": "workspace:*",
 		"testing-search-service": "workspace:*",
-		"wrangler": "4.148.0"
+		"wrangler": "4.149.0"
 	}
 }
