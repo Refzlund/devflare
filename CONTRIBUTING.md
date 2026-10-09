@@ -46,12 +46,15 @@ day-to-day workflow is:
 
    In pre mode, `changeset version` moves each changeset it releases into
    `.changeset/pre/`; only `.md` files directly in `.changeset/` trigger a
-   release. The files in `.changeset/pre/` make up the stable `1.0.0` changelog,
-   so delete one only to leave it out of that changelog.
+   release, and of those, not one that names only private packages. The files
+   in `.changeset/pre/` make up the stable `1.0.0` changelog, so delete one only
+   to leave it out of that changelog.
 
    Name only `devflare` in a changeset. The workspace's other packages are
    private and are not versioned, and changesets refuses a changeset that names
-   one of them alongside `devflare`.
+   one of them alongside `devflare`. A changeset that names only private
+   packages releases nothing and is never moved: the publish workflow warns
+   about it by name, and it stays until you delete it.
 
 3. **Pull** the bot's `chore(release): version packages` commit before
    continuing work on `next`.

@@ -52,8 +52,12 @@ pending (unconsumed) changeset publishes a new prerelease immediately.
 3. [`.github/workflows/publish.yml`](../.github/workflows/publish.yml) runs on
    that push (or on manual `workflow_dispatch`). It:
    - **Detects pending changesets.** In pre mode, `changeset version` moves
-     each changeset it releases into `.changeset/pre/`, so the workflow counts
-     the `.md` files directly in `.changeset/`: those are the pending ones.
+     each changeset it releases into `.changeset/pre/`, so the workflow
+     ([`pending-changesets.ts`](../.github/scripts/pending-changesets.ts))
+     counts the `.md` files directly in `.changeset/` as pending — except one
+     that names only private packages, which changesets never versions or
+     moves. That one gets a workflow warning naming the file instead; counted,
+     it would re-run this whole job on every push.
    - If there is at least one pending changeset, runs `changeset version`, which
      bumps `package.json`, appends to
      [`packages/devflare/CHANGELOG.md`](../packages/devflare/CHANGELOG.md), and
