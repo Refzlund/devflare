@@ -280,7 +280,11 @@ export function createWorkspaceDevServer(options: WorkspaceDevServerOptions): Wo
 		}
 	}
 
-	/** Spawn a Vite child per Vite app, pointed at its gateway's direct socket (bridge). */
+	/**
+	 * Spawn a Vite child per Vite app, pointed at its gateway's direct socket
+	 * (bridge). The app's manifest `env` goes with it: that child serves the
+	 * app's `platform.env` itself, so the vars on the app's workers never reach it.
+	 */
 	async function startViteChildren(apps: PreparedWorkspaceApp[]): Promise<void> {
 		for (const app of apps) {
 			if (!app.enableVite) {
@@ -292,6 +296,7 @@ export function createWorkspaceDevServer(options: WorkspaceDevServerOptions): Wo
 				vitePort: app.vitePort,
 				miniflarePort: app.directSocketPort,
 				generatedViteConfigPath: app.generatedViteConfigPath,
+				appEnv: app.env,
 				r2Presign: app.config.bindings?.r2
 					? {
 							secret: r2PresignSecret,

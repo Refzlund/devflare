@@ -5,6 +5,7 @@ import { join } from 'pathe'
 import {
 	assertSharedBindingIds,
 	defineWorkspace,
+	isReservedAppEnvKey,
 	loadWorkspaceManifest,
 	resolveAppDirectSocketPort,
 	WorkspaceManifestNotFoundError,
@@ -40,6 +41,30 @@ describe('resolveAppDirectSocketPort', () => {
 
 	test('worker app without port throws', () => {
 		expect(() => resolveAppDirectSocketPort({ config: 'x' }, 'api')).toThrow(/missing "port"/)
+	})
+})
+
+describe('isReservedAppEnvKey', () => {
+	const viteApp = { vite: true }
+	const workerApp = { vite: false }
+
+	test('reserves the DEVFLARE_ prefix on every app', () => {
+		for (const app of [viteApp, workerApp, {}]) {
+			expect(isReservedAppEnvKey('DEVFLARE_DEV', app)).toBe(true)
+			expect(isReservedAppEnvKey('DEVFLARE_R2_PRESIGN_SECRET', app)).toBe(true)
+		}
+	})
+
+	test('reserves FORCE_COLOR only on a Vite app, the only kind with a child to color', () => {
+		expect(isReservedAppEnvKey('FORCE_COLOR', viteApp)).toBe(true)
+		expect(isReservedAppEnvKey('FORCE_COLOR', workerApp)).toBe(false)
+		expect(isReservedAppEnvKey('FORCE_COLOR', {})).toBe(false)
+	})
+
+	test('reserves nothing else', () => {
+		for (const key of ['DOC_API_ORIGIN', 'MY_DEVFLARE_FLAG', 'devflare_dev']) {
+			expect(isReservedAppEnvKey(key, viteApp)).toBe(false)
+		}
 	})
 })
 
@@ -117,6 +142,64 @@ export default {
 			await expect(loadWorkspaceManifest({ cwd: dir })).rejects.toBeInstanceOf(
 				WorkspaceManifestNotFoundError
 			)
+		} finally {
+			await rm(dir, { recursive: true, force: true })
+		}
+	})
+
+	test("keeps an app's env as written", async () => {
+		const dir = await mkdtemp(join(tmpdir(), 'devflare-manifest-env-'))
+		try {
+			await writeFile(
+				join(dir, 'devflare.workspace.ts'),
+				`export default { apps: [{ config: './web.ts', vite: true, bridgePort: 8788, env: { DOC_API_ORIGIN: 'http://127.0.0.1:6281' } }] }`
+			)
+
+			const loaded = await loadWorkspaceManifest({ cwd: dir })
+			expect(loaded.manifest.apps[0].env).toEqual({ DOC_API_ORIGIN: 'http://127.0.0.1:6281' })
+		} finally {
+			await rm(dir, { recursive: true, force: true })
+		}
+	})
+
+	test('lets a worker app set FORCE_COLOR, which devflare sets only on a Vite child', async () => {
+		const dir = await mkdtemp(join(tmpdir(), 'devflare-manifest-worker-color-'))
+		try {
+			await writeFile(
+				join(dir, 'devflare.workspace.ts'),
+				`export default { apps: [{ config: './api.ts', port: 8789, env: { FORCE_COLOR: '1' } }] }`
+			)
+
+			const loaded = await loadWorkspaceManifest({ cwd: dir })
+			expect(loaded.manifest.apps[0].env).toEqual({ FORCE_COLOR: '1' })
+		} finally {
+			await rm(dir, { recursive: true, force: true })
+		}
+	})
+
+	test('refuses an env key devflare reserves, naming the app and the key', async () => {
+		const dir = await mkdtemp(join(tmpdir(), 'devflare-manifest-reserved-'))
+		try {
+			await writeFile(
+				join(dir, 'devflare.workspace.ts'),
+				`export default { apps: [
+	{ config: './api.ts', port: 8789, env: { SEED: '1', FORCE_COLOR: '1', DEVFLARE_R2_PRESIGN_SECRET: 'x' } },
+	{ config: './web.ts', name: 'web', vite: true, bridgePort: 8788, env: { DEVFLARE_BRIDGE_PORT: '1', FORCE_COLOR: '0' } }
+] }`
+			)
+
+			const error = await loadWorkspaceManifest({ cwd: dir }).catch((caught: unknown) => caught)
+			expect(error).toBeInstanceOf(WorkspaceManifestValidationError)
+			const issues = (error as WorkspaceManifestValidationError).issues
+			expect(issues.map((issue) => issue.path.join('.'))).toEqual([
+				'apps.0.env.DEVFLARE_R2_PRESIGN_SECRET',
+				'apps.1.env.DEVFLARE_BRIDGE_PORT',
+				'apps.1.env.FORCE_COLOR'
+			])
+			expect(issues[1].message).toContain('app "web"')
+			expect(issues[1].message).toContain('"DEVFLARE_BRIDGE_PORT"')
+			// An unnamed app is named by its config path.
+			expect(issues[0].message).toContain('app "./api.ts"')
 		} finally {
 			await rm(dir, { recursive: true, force: true })
 		}

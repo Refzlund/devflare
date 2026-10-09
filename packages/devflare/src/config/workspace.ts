@@ -18,6 +18,38 @@ import { loadWithC12 } from './c12'
 import { normalizeSchemaIssues, type SchemaIssue, type ValidationIssue } from './validation-issues'
 
 /**
+ * Prefix of the variables devflare sets for itself. A Vite app's child process
+ * and every app's workers receive `DEVFLARE_*` values devflare chose (bridge
+ * port, config path, R2 presign secret, …), so an app's `env` may not name one.
+ */
+const RESERVED_APP_ENV_PREFIX = 'DEVFLARE_'
+
+/**
+ * Variables devflare sets on a Vite child that do NOT carry its prefix. Workers
+ * never receive them, so they are reserved for Vite apps only. Kept in step
+ * with what `buildViteChildEnv` writes; a unit test checks every key it sets is
+ * reserved for a Vite app.
+ */
+const VITE_CHILD_RESERVED_KEYS: ReadonlySet<string> = new Set(['FORCE_COLOR'])
+
+/**
+ * @description Whether a manifest `env` key would collide with a value devflare
+ * sets itself for this app. Such a key is refused when the manifest loads,
+ * because one side would silently lose: the Vite child keeps devflare's value,
+ * while a worker would take the manifest's and break devflare's own wiring.
+ * @param key - a key from an app's manifest `env`
+ * @param app - the app it belongs to; `vite` decides whether the Vite child's
+ *   unprefixed keys collide, since only a Vite app has a child
+ * @returns true when devflare owns the name for this app
+ */
+export function isReservedAppEnvKey(key: string, app: { vite?: boolean }): boolean {
+	if (key.startsWith(RESERVED_APP_ENV_PREFIX)) {
+		return true
+	}
+	return app.vite === true && VITE_CHILD_RESERVED_KEYS.has(key)
+}
+
+/**
  * Per-app entry in a workspace manifest.
  *
  * A pure worker app is reached directly on {@link WorkspaceApp.port}; a Vite app
@@ -55,13 +87,50 @@ const workspaceAppSchema = z
 		 */
 		bridgePort: z.number().int().positive().max(65535).optional(),
 		/**
-		 * Extra vars injected into this app's workers (on top of the app
-		 * config's `vars`). Handy for one-shot dev seed flags such as
-		 * `{ DOC_API_DEV_SEED: '1' }`.
+		 * Extra vars for this app, layered over its config's `vars` (a key in
+		 * both takes this value). Handy for per-run values such as dev seed
+		 * flags (`{ DOC_API_DEV_SEED: '1' }`) or an origin.
+		 *
+		 * - Every app: each of its workers in the shared instance sees them as
+		 *   `env` vars.
+		 * - A Vite app, additionally: they are set in the Vite child's process
+		 *   environment (over anything inherited from the shell), so the app's
+		 *   config, which the child evaluates, reads them from `process.env`;
+		 *   and the `handle` exported by `devflare/sveltekit` serves them in
+		 *   `platform.env` (and SvelteKit 3's `cloudflare:workers` `env`) over
+		 *   the config's `vars`. Nothing else in the child layers them:
+		 *   `createHandle()` and the Vite plugin's generated `wrangler.jsonc`
+		 *   carry only what the config itself puts in `vars`.
+		 *
+		 * The coordinator's own read of the config, which decides the bindings
+		 * each app gets in the shared instance, does not see them in
+		 * `process.env`. So a config must not derive which bindings it declares
+		 * from a value only this `env` sets: the coordinator and the Vite child
+		 * would then disagree about which bindings the app has.
+		 *
+		 * Keys starting with `DEVFLARE_` are devflare's own and are refused on
+		 * every app; `FORCE_COLOR`, which devflare sets on the Vite child, is
+		 * refused on a Vite app.
 		 */
 		env: z.record(z.string(), z.string()).optional()
 	})
 	.strict()
+	.superRefine((app, ctx) => {
+		const viteOnly = app.vite
+			? `, and ${[...VITE_CHILD_RESERVED_KEYS].join(', ')} on a Vite app`
+			: ''
+		for (const key of Object.keys(app.env ?? {})) {
+			if (isReservedAppEnvKey(key, app)) {
+				ctx.addIssue({
+					code: z.ZodIssueCode.custom,
+					path: ['env', key],
+					message:
+						`app "${app.name ?? app.config}" sets "${key}", which devflare reserves for its own ` +
+						`wiring (keys starting with ${RESERVED_APP_ENV_PREFIX}${viteOnly}). Rename it.`
+				})
+			}
+		}
+	})
 
 const workspaceManifestSchema = z
 	.object({

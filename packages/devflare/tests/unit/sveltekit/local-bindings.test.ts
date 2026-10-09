@@ -18,6 +18,24 @@ describe('buildSvelteKitLocalBindings', () => {
 		expect(String(bindings.API_ORIGIN)).toBe('http://127.0.0.1:8791')
 	})
 
+	test("layers a workspace app's injected vars over the config's vars", () => {
+		const bindings = buildSvelteKitLocalBindings(
+			{
+				name: 'sveltekit-workspace-vars',
+				vars: {
+					API_ORIGIN: 'https://api.ui.localhost',
+					KEPT: 'from-config'
+				}
+			},
+			process.cwd(),
+			{ API_ORIGIN: 'http://127.0.0.1:6281', SEED: '1' }
+		)
+
+		expect(bindings.API_ORIGIN).toBe('http://127.0.0.1:6281')
+		expect(bindings.SEED).toBe('1')
+		expect(bindings.KEPT).toBe('from-config')
+	})
+
 	test('builds a Hyperdrive binding whose connect() throws the shared message', () => {
 		const bindings = buildSvelteKitLocalBindings(
 			{

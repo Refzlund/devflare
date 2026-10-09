@@ -54,7 +54,10 @@ export interface PrepareWorkspaceAppInput {
 	vite: boolean
 	/** Vite dev-server port (Vite apps only). */
 	vitePort: number
-	/** Extra worker vars from the manifest (`env`, e.g. seed flags). */
+	/**
+	 * The app's manifest `env`: layered over the config's `vars` on every worker
+	 * built here, and returned on the prepared app for its Vite child.
+	 */
 	env?: Record<string, string>
 	/** Persist toggle (the coordinator owns the actual shared persist dir). */
 	persist: boolean
@@ -99,6 +102,8 @@ export interface PreparedWorkspaceApp {
 	enableVite: boolean
 	/** Generated Vite config path to launch the child against (Vite apps only). */
 	generatedViteConfigPath: string | null
+	/** The app's manifest `env`, which its Vite child receives too (empty when none). */
+	env: Record<string, string>
 	/** The DO bundler (kept for teardown; not watched in the coordinator). */
 	doBundler: DOBundler | null
 	/** The browser-rendering shim, if the app binds one. */
@@ -259,6 +264,7 @@ export async function prepareWorkspaceApp(
 		vitePort: input.vitePort,
 		enableVite,
 		generatedViteConfigPath,
+		env: input.env ?? {},
 		doBundler,
 		browserShim,
 		sendEmailBindings: config.bindings?.sendEmail ?? {},

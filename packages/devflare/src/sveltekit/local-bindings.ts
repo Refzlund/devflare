@@ -18,12 +18,24 @@ function buildLocalHyperdriveBindings(config: DevflareConfig): Record<string, Hy
 	return bindings
 }
 
+/**
+ * @description Builds the bindings devflare's SvelteKit handle serves from this
+ * process rather than through the bridge: the config's `vars`, then local shims
+ * (Hyperdrive, Secrets Store, sendEmail, worker loaders, Images, Media).
+ * @param config - the app's devflare config, as read in this process
+ * @param cwd - the app's project root (local secrets resolve against it)
+ * @param injectedVars - a workspace app's manifest `env`, layered over the config's
+ *   `vars` exactly as the workspace layers it on the app's workers; empty outside a workspace
+ * @returns the bindings to prefer over the bridge-backed env
+ */
 export function buildSvelteKitLocalBindings(
 	config: DevflareConfig,
-	cwd: string
+	cwd: string,
+	injectedVars: Record<string, string> = {}
 ): Record<string, unknown> {
 	const bindings: Record<string, unknown> = {
 		...(config.vars ?? {}),
+		...injectedVars,
 		...buildLocalHyperdriveBindings(config),
 		...buildLocalSecretNodeBindings(config, cwd)
 	}

@@ -7,6 +7,7 @@
 
 import { type BindingHints, createEnvProxy, getClient, setBindingHints } from '../bridge'
 import { type DevflareConfig, loadConfig } from '../config'
+import { readInjectedVars } from '../config/injected-vars'
 import {
 	type DevRuntimeReading,
 	getRuntimeStatusUrl,
@@ -530,7 +531,7 @@ async function loadPlatformOptionsFromConfig(): Promise<
 
 	return {
 		hints: extractBindingHints(config),
-		localBindings: buildSvelteKitLocalBindings(config, cwd)
+		localBindings: buildSvelteKitLocalBindings(config, cwd, readInjectedVars(process.env))
 	}
 }
 

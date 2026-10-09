@@ -156,10 +156,11 @@ export interface MakeMiniflareWorkerContext {
 	localSecretServiceBindingConfig?: LocalSecretServiceBindingConfig
 	queueProducers: Record<string, { queueName: string; deliveryDelay?: number }> | undefined
 	/**
-	 * Devflare-internal plain-string vars merged into every worker's
-	 * `bindings` on top of `config.vars` (e.g. the local R2 presign
-	 * secret/origin). Collisions win over user vars — these names are
-	 * `DEVFLARE_`-prefixed and reserved.
+	 * Plain-string vars merged into every worker's `bindings` on top of
+	 * `config.vars`: devflare's own (the local R2 presign secret/origin) and,
+	 * in a workspace, the app's manifest `env`. Collisions win over the
+	 * config's vars. devflare's names are `DEVFLARE_`-prefixed, a prefix a
+	 * manifest `env` may not use.
 	 */
 	injectedVars?: Record<string, string>
 }
