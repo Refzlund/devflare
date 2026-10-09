@@ -1,37 +1,37 @@
 // =============================================================================
-// waitUntil Tracker — background work cf.worker.fetch started and nobody awaits
+// waitUntil Tracker — the background work cf.worker.fetch left running at dispose
 // =============================================================================
 /*
-	cf.worker.fetch returns as soon as the handler resolves, because that is when
-	workerd hands the response back. The handler's `ctx.waitUntil()` work keeps
-	running after that, and in workerd the bindings stay alive until it settles
-	(capped at 30s past the response). In the harness the bindings live exactly
-	as long as the test context, so the work is registered here and
-	`env.dispose()` drains it before tearing the runtime down.
+	cf.worker.fetch returns as soon as the handler resolves, as workerd does,
+	and the handler's `ctx.waitUntil()` work keeps running. In workerd the
+	bindings outlive that work (up to 30s past the response); in the harness
+	they live exactly as long as the test context. So each context opens a
+	scope, cf.worker.fetch registers every waitUntil promise into it, and
+	`env.dispose()` drains the scope before tearing the runtime down.
 
-	→ A rejection is reported exactly ONCE, through one of two channels chosen
-	  when it happens:
-	    - while `env.dispose()` is draining, it is handed to the drain, and
-	      dispose throws it after teardown (the `afterAll` that owns the context
-	      fails, naming the request);
-	    - otherwise it is re-raised as an unhandled rejection carrying the
-	      request and the original error as `cause`. That is the runtime's own
-	      boundary, so the test running at that moment fails, exactly as it
-	      would without devflare's handler, but no longer anonymously.
-	  The second channel is also what happens when `env.dispose()` is never
-	  called. Waiting for a dispose that may never come would drop the error,
-	  and bun's test runner fires neither `exit` nor `beforeExit` (measured on
-	  bun 1.4.2), so there is no later moment to report it at.
-	→ GOTCHA: the handler is attached when the work is REGISTERED, so the
-	  rejection is always handled as far as the runtime is concerned. That is
-	  why this module owns the reporting: without the re-raise above, a failing
-	  `waitUntil` would vanish.
-	→ Work still pending when the drain's budget runs out is ABANDONED: the
-	  drain reports it, by request, and its later outcome is not reported again.
-	  The teardown that follows is the likely cause of whatever it does next (a
-	  binding call after Miniflare is gone fails with ECONNRESET), and raising
-	  that would fail some unrelated later test, which is the defect this module
-	  exists to remove.
+	→ KEY: registering attaches NOTHING to the promise. Whether a rejection is
+	  unhandled is the runtime's call, and attaching a handler would decide it
+	  for the consumer: a handler that also awaits the promise and recovers
+	  (`ctx.waitUntil(audit); try { await audit } catch { … }`) would start to
+	  fail. So everything that settles before dispose behaves exactly as it did
+	  before this tracker existed: the runtime reports an unhandled rejection
+	  (unattributed), and a handled one is reported by nobody.
+	→ The drain takes responsibility only for work still PENDING when it
+	  starts. It first yields one macrotask so the runtime reports anything that
+	  already rejected; attaching in the same tick hides such a rejection from
+	  bun (measured on bun 1.4.2). It then attaches to every promise and tells
+	  settled from pending by microtask order: a promise that has settled queues
+	  its reaction immediately, ahead of a marker queued right after; a pending
+	  one can only queue its reaction when it settles, after the marker. Settled
+	  work is ignored. A rejection after the marker is the drain's to report,
+	  and `env.dispose()` throws it, attributed, once.
+	→ Work still pending when the budget runs out is abandoned, and dispose
+	  names it. If it rejects later, that is logged with console.error and
+	  never thrown: it would fail whichever unrelated test is running by then,
+	  and the teardown that followed is the likely cause.
+	→ Scopes belong to one context each. Work from an earlier context that was
+	  never disposed is not drained by, or blamed on, the next one; opening the
+	  next scope logs which work that was.
 */
 
 // -----------------------------------------------------------------------------
@@ -50,35 +50,20 @@ export interface WaitUntilOrigin {
 
 /** What a drain found, for `env.dispose()` to report after it has torn down. */
 export interface WaitUntilDrainOutcome {
-	/** Attributed errors for work that rejected while the drain was waiting. */
+	/** Attributed errors for work that was pending when the drain began and then rejected. */
 	failures: WaitUntilError[]
 	/** Errors naming the work still pending when the drain's budget ran out. */
 	abandoned: WaitUntilError[]
 }
 
-/** One registered piece of work. */
-interface TrackedWork {
-	/** Where it came from. */
-	origin: WaitUntilOrigin
-	/** Resolves once the work settles either way; never rejects. */
-	settled: Promise<void>
-	/** Set when a drain gave up on it, so its later outcome is not reported twice. */
-	abandoned: boolean
-}
-
-/** Collects the failures that settle while a drain is waiting. */
-interface DrainCollector {
-	/** Failures handed to this drain rather than re-raised. */
-	failures: WaitUntilError[]
-}
-
 /**
- * An error about `waitUntil` work a test helper started: it rejected, or it was
- * still pending when `env.dispose()` stopped waiting. The message names the
- * helper and the request; a rejection keeps the original error as `cause`.
+ * An error about `waitUntil` work `cf.worker.fetch()` started and `env.dispose()`
+ * waited for: the work rejected while dispose waited, or it was still pending
+ * when dispose stopped waiting. The message names the request; a rejection
+ * keeps the original error as `cause`.
  */
 export class WaitUntilError extends Error {
-	/** Where the work came from. */
+	/** The helper and request that started the work. */
 	readonly origin: WaitUntilOrigin
 
 	/**
@@ -93,18 +78,28 @@ export class WaitUntilError extends Error {
 	}
 }
 
-// -----------------------------------------------------------------------------
-// State
-// -----------------------------------------------------------------------------
+/** One promise a drain is watching. */
+interface Watch {
+	/** Where it came from. */
+	origin: WaitUntilOrigin
+	/** `abandoned` once the drain gave up on it, so a late rejection is logged, not thrown. */
+	state: 'pending' | 'settled' | 'abandoned'
+	/** Resolves once the promise settles either way; never rejects. */
+	settled: Promise<void>
+}
 
-/**
- * Every piece of work registered and not yet settled. Process-wide, as the
- * `cf.worker` helper it serves is: one test context is live at a time.
- */
-const pendingWork = new Set<TrackedWork>()
-
-/** The drain currently waiting, which rejections are handed to instead of re-raised. */
-let activeDrain: DrainCollector | null = null
+/** A drain in progress. */
+interface Drain {
+	/**
+	 * True until the classification marker runs. A reaction that runs while it
+	 * is true belongs to a promise that had settled before the drain began.
+	 */
+	classifying: boolean
+	/** Rejections of work that was pending when the drain began. */
+	failures: WaitUntilError[]
+	/** Every promise watched, keyed by the promise so one registered twice is watched once. */
+	watches: Map<PromiseLike<unknown>, Watch>
+}
 
 // -----------------------------------------------------------------------------
 // Messages
@@ -132,14 +127,15 @@ function describeReason(reason: unknown): string {
 }
 
 /**
- * @description Builds the attributed error for work that rejected.
+ * @description Builds the attributed error for work that rejected while a drain waited.
  * @param origin - the helper and request that started it
  * @param reason - what it rejected with, kept as `cause`
  */
 function rejectionError(origin: WaitUntilOrigin, reason: unknown): WaitUntilError {
 	return new WaitUntilError(
 		origin,
-		`waitUntil work started by ${describeOrigin(origin)} rejected: ${describeReason(reason)}`,
+		`waitUntil work started by ${describeOrigin(origin)} rejected while env.dispose() ` +
+			`was waiting for it: ${describeReason(reason)}`,
 		{ cause: reason }
 	)
 }
@@ -152,67 +148,55 @@ function rejectionError(origin: WaitUntilOrigin, reason: unknown): WaitUntilErro
 function abandonedError(origin: WaitUntilOrigin, budgetMs: number): WaitUntilError {
 	return new WaitUntilError(
 		origin,
-		`waitUntil work started by ${describeOrigin(origin)} had not settled when env.dispose() ` +
-			`stopped waiting for it after ${budgetMs}ms; the runtime was torn down regardless`
+		`waitUntil work started by ${describeOrigin(origin)} had not settled after ${budgetMs}ms, ` +
+			'so env.dispose() stopped waiting and tears the runtime down without it. To wait longer, ' +
+			'pass env.dispose({ waitUntilTimeoutMs }) and raise the hook timeout to match, e.g. ' +
+			'afterAll(() => env.dispose({ waitUntilTimeoutMs: 10_000 }), 15_000).'
+	)
+}
+
+/** How many origins the never-disposed warning lists before it summarises the rest. */
+const LISTED_ORIGINS = 5
+
+/**
+ * @description The warning for a scope whose context was never disposed.
+ * @param origins - where its undrained promises came from
+ */
+function neverDisposedMessage(origins: WaitUntilOrigin[]): string {
+	const distinct = [...new Set(origins.map(describeOrigin))]
+	const listed = distinct.slice(0, LISTED_ORIGINS).join(', ')
+	const more =
+		distinct.length > LISTED_ORIGINS ? `, and ${distinct.length - LISTED_ORIGINS} more` : ''
+	return (
+		'devflare: a test context created earlier was never disposed, so the ' +
+		`${origins.length} waitUntil promise(s) cf.worker.fetch registered under it were not drained, ` +
+		`and the new context's env.dispose() will neither wait for them nor report them: ${listed}${more}. ` +
+		'Call env.dispose() (usually in afterAll) for every createTestContext().'
 	)
 }
 
 // -----------------------------------------------------------------------------
-// Registration
+// Scope
 // -----------------------------------------------------------------------------
 
 /**
- * @description Registers a value passed to `ctx.waitUntil()` so `env.dispose()`
- * can drain it, and takes over reporting its rejection (see the file header).
- * @param work - what the handler passed; a non-promise settles immediately, as
- *   `Promise.resolve` would make it
- * @param origin - the helper and request that started it, named in any error
- * @sideeffect adds to the process-wide pending set until the work settles; a
- *   rejection outside a drain is re-raised as an unhandled rejection
+ * @description Whether a value passed to `ctx.waitUntil()` can still settle
+ * later. Anything else is settled already and has nothing to drain.
+ * @param work - the value the handler passed
  */
-export function trackWaitUntil(work: unknown, origin: WaitUntilOrigin): void {
-	const tracked: TrackedWork = {
-		origin,
-		abandoned: false,
-		settled: Promise.resolve(work).then(
-			() => {
-				pendingWork.delete(tracked)
-			},
-			(reason: unknown) => {
-				pendingWork.delete(tracked)
-				reportRejection(tracked, reason)
-			}
-		)
-	}
-	pendingWork.add(tracked)
+function isThenable(work: unknown): work is PromiseLike<unknown> {
+	const candidate = work as { then?: unknown } | null
+	return (
+		(typeof work === 'object' || typeof work === 'function') &&
+		candidate !== null &&
+		typeof candidate.then === 'function'
+	)
 }
 
-/**
- * @description Routes one rejection to exactly one reporter: the drain that is
- * waiting, or else the runtime's unhandled-rejection boundary.
- * @param tracked - the work that rejected
- * @param reason - what it rejected with
- */
-function reportRejection(tracked: TrackedWork, reason: unknown): void {
-	if (tracked.abandoned) {
-		// Already reported by the drain that gave up on it; see the file header.
-		return
-	}
-
-	const failure = rejectionError(tracked.origin, reason)
-	if (activeDrain) {
-		activeDrain.failures.push(failure)
-		return
-	}
-
-	// Deliberately left unhandled: nothing is collecting, and the runtime's own
-	// unhandled-rejection report is the boundary that fails the running test.
-	void Promise.reject(failure)
+/** Resolves on the next macrotask, after the runtime's unhandled-rejection pass. */
+function nextMacrotask(): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, 0))
 }
-
-// -----------------------------------------------------------------------------
-// Draining
-// -----------------------------------------------------------------------------
 
 /**
  * @description Resolves after `ms`, or as soon as `settled` does, whichever is
@@ -234,53 +218,170 @@ async function timedOut(settled: Promise<unknown>, ms: number): Promise<boolean>
 }
 
 /**
- * @description Waits for every registered piece of work to settle, including
- * work registered while waiting, for at most `budgetMs` in total. Whatever is
- * still pending then is abandoned and forgotten.
- * @param budgetMs - the most to wait, in milliseconds, across every round
- * @returns the rejections that arrived while waiting and the abandoned work,
- *   each as an attributed error; rejections from BEFORE the drain started were
- *   already re-raised when they happened and are not repeated
- * @sideeffect empties the process-wide pending set
+ * @description Starts watching one promise for a drain, attaching the
+ * reactions that classify and report it (see the file header).
+ * @param drain - the drain in progress
+ * @param work - the promise
+ * @param origin - where it came from
+ * @sideeffect marks the promise handled; nothing is attached twice
  */
-export async function drainWaitUntil(budgetMs: number): Promise<WaitUntilDrainOutcome> {
-	const collector: DrainCollector = { failures: [] }
-	activeDrain = collector
-	const deadline = Date.now() + budgetMs
+function watch(drain: Drain, work: PromiseLike<unknown>, origin: WaitUntilOrigin): void {
+	if (drain.watches.has(work)) {
+		return
+	}
 
-	try {
-		// A round at a time, because work can register more work: a handler's
-		// background task may itself call `ctx.waitUntil()`.
-		while (pendingWork.size > 0) {
-			const remaining = deadline - Date.now()
-			const round = Promise.all([...pendingWork].map((work) => work.settled))
-			if (remaining <= 0 || (await timedOut(round, remaining))) {
-				break
+	const entry: Watch = { origin, state: 'pending', settled: Promise.resolve() }
+	entry.settled = Promise.resolve(work).then(
+		() => {
+			if (entry.state === 'pending') entry.state = 'settled'
+		},
+		(reason: unknown) => {
+			if (drain.classifying) {
+				// Settled before the drain began: the runtime has already had its say.
+				entry.state = 'settled'
+				return
 			}
+			if (entry.state === 'abandoned') {
+				console.error(
+					`devflare: waitUntil work started by ${describeOrigin(origin)} rejected after ` +
+						'env.dispose() stopped waiting for it:',
+					reason
+				)
+				return
+			}
+			entry.state = 'settled'
+			drain.failures.push(rejectionError(origin, reason))
 		}
+	)
+	drain.watches.set(work, entry)
+}
 
-		const abandoned = [...pendingWork]
-		pendingWork.clear()
-		for (const work of abandoned) {
-			work.abandoned = true
-		}
+/**
+ * The `waitUntil` work one test context's `cf.worker.fetch` calls registered,
+ * drained once by that context's `env.dispose()`.
+ */
+export class WaitUntilScope {
+	/** Registered and not yet drained, keyed by the promise so one registered twice counts once. */
+	readonly #registered = new Map<PromiseLike<unknown>, WaitUntilOrigin>()
+	/** The drain in progress, which new registrations join directly. */
+	#drain: Drain | null = null
+	/** Set when the drain finishes; the scope takes nothing after that. */
+	#closed = false
 
-		return {
-			failures: collector.failures,
-			abandoned: abandoned.map((work) => abandonedError(work.origin, budgetMs))
+	/** Whether the scope has been drained, i.e. its context disposed. */
+	get closed(): boolean {
+		return this.#closed
+	}
+
+	/** Where every registered, not-yet-drained promise came from. */
+	get registeredOrigins(): WaitUntilOrigin[] {
+		return [...this.#registered.values()]
+	}
+
+	/**
+	 * @description Registers a value passed to `ctx.waitUntil()`, attaching
+	 * nothing to it.
+	 * @param work - what the handler passed; a value that is not a thenable has
+	 *   nothing to drain and is ignored
+	 * @param origin - the helper and request that started it
+	 * @sideeffect holds a reference to the promise until the scope is drained.
+	 *   After the scope is closed it is ignored: its context is gone, so any
+	 *   rejection stays the runtime's to report.
+	 */
+	track(work: unknown, origin: WaitUntilOrigin): void {
+		if (!isThenable(work) || this.#closed) {
+			return
 		}
-	} finally {
-		if (activeDrain === collector) {
-			activeDrain = null
+		if (this.#drain) {
+			watch(this.#drain, work, origin)
+			return
+		}
+		if (!this.#registered.has(work)) {
+			this.#registered.set(work, origin)
 		}
 	}
+
+	/**
+	 * @description Waits for the work that is still pending, including work
+	 * registered while waiting, for at most `budgetMs` in total, then closes
+	 * the scope. Work that had settled before the drain began is ignored.
+	 * @param budgetMs - the most to wait, in milliseconds, across every round
+	 * @returns the rejections that arrived while waiting and the work abandoned
+	 *   at the budget, each as an attributed error
+	 * @sideeffect marks every registered promise handled, closes the scope and
+	 *   releases its references
+	 */
+	async drain(budgetMs: number): Promise<WaitUntilDrainOutcome> {
+		const deadline = Date.now() + budgetMs
+		await nextMacrotask()
+
+		const drain: Drain = { classifying: true, failures: [], watches: new Map() }
+		this.#drain = drain
+		try {
+			for (const [work, origin] of this.#registered) {
+				watch(drain, work, origin)
+			}
+			this.#registered.clear()
+			await new Promise<void>((resolve) => {
+				queueMicrotask(() => {
+					drain.classifying = false
+					resolve()
+				})
+			})
+
+			// A round at a time, because work can register more work: a handler's
+			// background task may itself call `ctx.waitUntil()`.
+			while (true) {
+				const pending = [...drain.watches.values()].filter((entry) => entry.state === 'pending')
+				const remaining = deadline - Date.now()
+				if (pending.length === 0) break
+				if (remaining <= 0) break
+				if (await timedOut(Promise.all(pending.map((entry) => entry.settled)), remaining)) break
+			}
+
+			const abandoned: WaitUntilError[] = []
+			for (const entry of drain.watches.values()) {
+				if (entry.state === 'pending') {
+					entry.state = 'abandoned'
+					abandoned.push(abandonedError(entry.origin, budgetMs))
+				}
+			}
+			return { failures: drain.failures, abandoned }
+		} finally {
+			drain.watches.clear()
+			this.#drain = null
+			this.#closed = true
+		}
+	}
+}
+
+/** The scope opened last, checked for a missing dispose when the next one opens. */
+let latestScope: WaitUntilScope | null = null
+
+/**
+ * @description Opens the scope for a new test context. If the previous
+ * context was never disposed and registered work, that work stays undrained,
+ * and this says so on stderr rather than letting the new context drain or
+ * blame it.
+ * @returns the new context's scope
+ */
+export function openWaitUntilScope(): WaitUntilScope {
+	const previous = latestScope
+	if (previous && !previous.closed) {
+		const origins = previous.registeredOrigins
+		if (origins.length > 0) {
+			console.error(neverDisposedMessage(origins))
+		}
+	}
+	latestScope = new WaitUntilScope()
+	return latestScope
 }
 
 /**
  * @description Folds a drain's outcome into the one error `env.dispose()` throws.
  * @param outcome - what the drain found
- * @returns `null` when everything settled cleanly; the error itself when there
- *   is one; otherwise an `AggregateError` whose message lists every entry,
+ * @returns `null` when nothing needs reporting; the error itself when there is
+ *   one; otherwise an `AggregateError` whose message lists every entry,
  *   because bun prints an aggregate's message and not its `errors`
  */
 export function waitUntilDrainError(outcome: WaitUntilDrainOutcome): Error | null {

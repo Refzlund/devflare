@@ -13,7 +13,7 @@ import type { BridgeClient } from '../bridge/client'
 import type { DevflareConfig } from '../config'
 import { loadConfig, resolveConfigEnvVars } from '../config'
 import { applyLocalDevVarsToConfig } from '../config/local-dev-vars'
-import { __clearTestContext } from '../env'
+import { __clearTestContext, type EnvDisposeOptions } from '../env'
 import { disposeLocalWorkerLoaderBindings } from '../shims/local-worker-loader'
 import { stopActiveContainers } from './containers'
 import { resetEmailState } from './email'
@@ -21,7 +21,7 @@ import { resetQueueState } from './queue'
 import { resetScheduledState } from './scheduled'
 import { findNearestConfig, getCallerDirectory } from './simple-context-paths'
 import { resetTailState } from './tail'
-import { drainWaitUntil, waitUntilDrainError } from './wait-until-tracker'
+import { type WaitUntilScope, waitUntilDrainError } from './wait-until-tracker'
 import { resetWorkerState } from './worker'
 
 interface DisposeStateView {
@@ -123,41 +123,74 @@ export function __resetTestContextConfigCache(): void {
 }
 
 /**
- * How long `env.dispose()` waits for pending `cf.worker.fetch` waitUntil work
- * before tearing down regardless.
+ * How long `env.dispose()` waits, by default, for pending `cf.worker.fetch`
+ * waitUntil work before tearing down regardless. A consumer raises it per
+ * call with `env.dispose({ waitUntilTimeoutMs })`.
  *
  * → workerd lets waitUntil work run for 30s past the response, but a drain
  *   that long cannot finish where dispose is normally called. bun 1.4 fails an
  *   `afterAll` hook at 5s by default and moves on without running the rest of
  *   it, so a hook killed mid-drain never reaches the teardown and Miniflare is
- *   left running. The budget is therefore well inside 5s: the teardown after it
- *   measured 24-36ms for a single-worker context (a dispose whose work never
+ *   left running. The default is therefore well inside 5s: the teardown after
+ *   it measured 24-36ms for a single-worker context (a dispose whose work never
  *   settled took 2,024-2,036ms), and the remaining ~3s is for slower machines,
  *   multi-worker contexts and containers.
  * → Background work in a test is a few binding calls and settles in
- *   milliseconds; work that needs seconds is better awaited by the test.
+ *   milliseconds; work that needs seconds is better awaited by the test, or
+ *   given a larger budget together with a larger hook timeout.
  */
-export const WAIT_UNTIL_DRAIN_BUDGET_MS = 2_000
+export const DEFAULT_WAIT_UNTIL_TIMEOUT_MS = 2_000
+
+/**
+ * @description Reads the drain budget from `env.dispose()`'s options.
+ * @param options - what the consumer passed, if anything
+ * @returns the budget in milliseconds
+ * @throws TypeError when `waitUntilTimeoutMs` is not a finite number of 0 or
+ *   more. Infinity is refused because timers treat it as 1ms, which would
+ *   abandon all work at once rather than wait for ever.
+ */
+function drainBudgetMs(options: EnvDisposeOptions | undefined): number {
+	const requested = options?.waitUntilTimeoutMs
+	if (requested === undefined) {
+		return DEFAULT_WAIT_UNTIL_TIMEOUT_MS
+	}
+	if (typeof requested !== 'number' || !Number.isFinite(requested) || requested < 0) {
+		throw new TypeError(
+			`env.dispose({ waitUntilTimeoutMs }) needs a finite number of milliseconds, 0 or more; got ${String(requested)}`
+		)
+	}
+	return requested
+}
 
 /**
  * @description Builds the dispose() function that tears down a test context.
- * It first drains the waitUntil work `cf.worker.fetch` left running (for at
- * most {@link WAIT_UNTIL_DRAIN_BUDGET_MS}), then disconnects the bridge
- * client, disposes Miniflare, clears per-handler global state, and clears the
+ * It first drains the waitUntil work `cf.worker.fetch` left running in the
+ * context's scope (for at most {@link DEFAULT_WAIT_UNTIL_TIMEOUT_MS}, or the
+ * `waitUntilTimeoutMs` it is given), then disconnects the bridge client,
+ * disposes Miniflare, clears per-handler global state, and clears the
  * registered test-context env accessor.
  * @param state - the context's live handles, nulled as they are torn down
+ * @param waitUntilScope - the context's waitUntil scope; another context's
+ *   work is never drained here
  * @returns the dispose function
- * @throws from that function, AFTER the teardown has completed: the attributed
- *   error for waitUntil work that rejected during the drain or was still
- *   pending when it gave up (an `AggregateError` when there are several). A
- *   teardown failure is thrown as it was, or folded into an `AggregateError`
- *   with those when both happen, so neither hides the other.
+ * @throws from that function, before anything is torn down: a TypeError for a
+ *   bad `waitUntilTimeoutMs`, leaving the context in place to dispose again.
+ *   AFTER the teardown has completed: the attributed error for waitUntil work
+ *   that rejected during the drain or was still pending when it gave up (an
+ *   `AggregateError` when there are several). A teardown failure is thrown as
+ *   it was, or folded into an `AggregateError` with those when both happen,
+ *   so neither hides the other.
  */
-export function createDisposeContext(state: DisposeStateView): () => Promise<void> {
-	return async () => {
+export function createDisposeContext(
+	state: DisposeStateView,
+	waitUntilScope: WaitUntilScope
+): (options?: EnvDisposeOptions) => Promise<void> {
+	return async (options) => {
+		const budgetMs = drainBudgetMs(options)
+
 		// Before the teardown, never after: the work may still be calling the
 		// bindings the teardown is about to close.
-		const backgroundError = waitUntilDrainError(await drainWaitUntil(WAIT_UNTIL_DRAIN_BUDGET_MS))
+		const backgroundError = waitUntilDrainError(await waitUntilScope.drain(budgetMs))
 
 		try {
 			await tearDown(state)

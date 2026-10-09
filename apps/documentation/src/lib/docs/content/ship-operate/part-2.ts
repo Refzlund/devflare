@@ -451,7 +451,7 @@ bunx --bun devflare previews cleanup --all --apply`
 			'The local harness pages own `createTestContext()` and binding nuance. This page owns which checks move into preview validation and release automation.',
 		highlights: [
 			'Use `testing-overview`, `create-test-context`, and binding guides as the local-testing references.',
-			'Carry only the timing rules that matter in CI: `cf.worker.fetch()` returns before its `waitUntil()` work finishes and `env.dispose()` waits for that work; queue, scheduled, and tail helpers wait before they return.',
+			'Carry only the timing rules that matter in CI: `cf.worker.fetch()` returns before its `waitUntil()` work finishes and `env.dispose()` waits for whatever is still running; queue, scheduled, and tail helpers wait before they return.',
 			'Promote a small number of runtime-shaped smoke checks into CI.',
 			'Keep deploy execution and feedback separate.'
 		],
@@ -461,7 +461,7 @@ bunx --bun devflare previews cleanup --all --apply`
 			{
 				label: 'Important nuance',
 				value:
-					'`cf.worker.fetch()` returns before its `waitUntil()` work; `env.dispose()` drains it'
+					'`cf.worker.fetch()` returns before its `waitUntil()` work; `env.dispose()` drains what is left'
 			},
 			{ label: 'Workflow companion', value: '`/docs/github-workflows`' }
 		],
@@ -520,7 +520,7 @@ bunx --bun devflare previews cleanup --all --apply`
 						[
 							'`waitUntil()` side effects from an HTTP handler',
 							'Assert the side effect directly or move to a higher-fidelity check.',
-							'`cf.worker.fetch()` returns when the handler resolves; only `env.dispose()`, at the end of the suite, waits for its background work.'
+							'`cf.worker.fetch()` returns when the handler resolves; only `env.dispose()`, at the end of the suite, waits for the background work still running.'
 						],
 						[
 							'Queue, scheduled, or tail background work',
@@ -540,7 +540,7 @@ bunx --bun devflare previews cleanup --all --apply`
 						title: 'Wrong completion contract = flaky CI',
 						body: [
 							'If a test depends on `waitUntil()` effects being complete, a plain `cf.worker.fetch()` assertion may be too early.',
-							'A `waitUntil()` failure still fails the run: it is reported once, naming the request, either as an unhandled rejection when it happens or, if `env.dispose()` was already waiting for it, by `env.dispose()`.'
+							'A `waitUntil()` failure still fails the run, once. Bun reports a rejection nothing handled before `env.dispose()` was called; `env.dispose()` throws a `WaitUntilError` naming the request for work that rejects, or never finishes, while it waits.'
 						]
 					}
 				]

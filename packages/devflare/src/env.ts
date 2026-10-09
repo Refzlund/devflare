@@ -32,8 +32,19 @@ declare global {
 // Test Context State (set by createTestContext from devflare/test)
 // -----------------------------------------------------------------------------
 
+/** Options for `env.dispose()` in a test context created by `createTestContext()`. */
+export interface EnvDisposeOptions {
+	/**
+	 * How long, in milliseconds, to wait for `waitUntil()` work that
+	 * `cf.worker.fetch()` left running before tearing the runtime down
+	 * regardless. A finite number, 0 or more; 2000 when omitted. Raise the hook's
+	 * own timeout to match, since bun gives an `afterAll` 5000ms by default.
+	 */
+	waitUntilTimeoutMs?: number
+}
+
 let testContextEnv: Record<string, unknown> | null = null
-let testContextDispose: (() => Promise<void>) | null = null
+let testContextDispose: ((options?: EnvDisposeOptions) => Promise<void>) | null = null
 
 /**
  * Called by createTestContext to set up the unified env
@@ -41,7 +52,7 @@ let testContextDispose: (() => Promise<void>) | null = null
  */
 export function __setTestContext(
 	envBindings: Record<string, unknown>,
-	dispose: () => Promise<void>
+	dispose: (options?: EnvDisposeOptions) => Promise<void>
 ): void {
 	testContextEnv = envBindings
 	testContextDispose = dispose
@@ -68,7 +79,9 @@ export function __clearTestContext(): void {
  * - Test context (if set up by createTestContext)
  * - Bridge to Miniflare (if outside, in dev mode)
  *
- * Includes `dispose()` method for cleanup in tests.
+ * Includes `dispose(options?)` for cleanup in tests: it waits for the
+ * `waitUntil()` work `cf.worker.fetch()` left running (see
+ * {@link EnvDisposeOptions}), then tears the test context down.
  *
  * @example
  * ```ts
@@ -90,15 +103,15 @@ export function __clearTestContext(): void {
  * })
  * ```
  */
-export const env: DevflareEnv & { dispose(): Promise<void> } = new Proxy(
-	{} as DevflareEnv & { dispose(): Promise<void> },
+export const env: DevflareEnv & { dispose(options?: EnvDisposeOptions): Promise<void> } = new Proxy(
+	{} as DevflareEnv & { dispose(options?: EnvDisposeOptions): Promise<void> },
 	{
 		get(_target, prop: string | symbol) {
 			// Handle dispose() method
 			if (prop === 'dispose') {
-				return async () => {
+				return async (options?: EnvDisposeOptions) => {
 					if (testContextDispose) {
-						await testContextDispose()
+						await testContextDispose(options)
 						__clearTestContext()
 					}
 				}

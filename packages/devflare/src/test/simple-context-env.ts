@@ -12,6 +12,7 @@ import { configureQueue } from './queue'
 import { configureScheduled } from './scheduled'
 import type { ResolvedHandlerPaths } from './simple-context-handlers'
 import { configureTail } from './tail'
+import type { WaitUntilScope } from './wait-until-tracker'
 import { configureWorker } from './worker'
 
 interface TestStateView {
@@ -29,8 +30,10 @@ export function configureSurfaceHandlers(input: {
 	configDir: string
 	activePort: number
 	getEnv: () => Record<string, unknown>
+	/** The context's waitUntil scope, for the worker fetch helper to register into. */
+	waitUntilScope: WaitUntilScope
 }): void {
-	const { handlerPaths, configDir, activePort, getEnv } = input
+	const { handlerPaths, configDir, activePort, getEnv, waitUntilScope } = input
 
 	configureQueue({
 		handlerPath: handlerPaths.queue,
@@ -51,7 +54,8 @@ export function configureSurfaceHandlers(input: {
 				segments: route.segments
 			})) ?? [],
 		configDir,
-		getEnv
+		getEnv,
+		waitUntilScope
 	})
 	configureTail({
 		handlerPath: handlerPaths.tail,

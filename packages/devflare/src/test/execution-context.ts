@@ -9,7 +9,7 @@
 */
 
 import { createInProcessExecutionContext } from '../utils/in-process-context'
-import { trackWaitUntil, type WaitUntilOrigin } from './wait-until-tracker'
+import type { WaitUntilOrigin, WaitUntilScope } from './wait-until-tracker'
 
 /** Who runs a handler under the test helpers, for the errors `exports` and `abort()` throw. */
 const TEST_HELPER_HOST =
@@ -37,15 +37,19 @@ export function createTestExecutionContext(
 /**
  * @description Builds the ExecutionContext of a handler whose helper returns
  * before its `waitUntil()` work settles, as `cf.worker.fetch` does. Each promise
- * is registered with the waitUntil tracker the moment it is passed, so
- * `env.dispose()` drains it and its rejection is reported, naming `origin`.
+ * is registered in the test context's waitUntil scope, untouched, so that
+ * `env.dispose()` can drain whatever is still pending, naming `origin`.
+ * @param scope - the scope of the test context the request runs in
  * @param origin - the helper and request the handler is serving
  * @returns a context like {@link createTestExecutionContext}'s
  */
-export function createTrackedTestExecutionContext(origin: WaitUntilOrigin): ExecutionContext {
+export function createTrackedTestExecutionContext(
+	scope: WaitUntilScope,
+	origin: WaitUntilOrigin
+): ExecutionContext {
 	return createInProcessExecutionContext({
 		waitUntil: (promise) => {
-			trackWaitUntil(promise, origin)
+			scope.track(promise, origin)
 		},
 		host: TEST_HELPER_HOST
 	})

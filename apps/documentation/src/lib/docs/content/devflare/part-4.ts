@@ -45,7 +45,7 @@ export const devflareDocsPart4: DocPage[] = [
 			'`createTestContext()` autodiscovers the nearest supported config when you omit the path.',
 			'It also autodiscovers conventional worker surfaces such as fetch, routes, queue, scheduled, email, and tail handlers.',
 			'The helpers are runtime-shaped and context-accurate for handler logic, but they do not try to replay every internal Cloudflare dispatch detail byte for byte.',
-			'`cf.worker.fetch()` returns without waiting for `waitUntil()` work, which `env.dispose()` waits for before teardown; queue, scheduled, and tail helpers wait for their background work before they return.',
+			'`cf.worker.fetch()` returns without waiting for `waitUntil()` work, and `env.dispose()` waits for whatever of it is still running before teardown; queue, scheduled, and tail helpers wait for their background work before they return.',
 			'`src/transport.ts` stays optional and only matters when a local RPC-style bridge call under test—most commonly a Durable Object method round-trip—must preserve custom classes.'
 		],
 		facts: [
@@ -96,7 +96,7 @@ export const devflareDocsPart4: DocPage[] = [
 					rows: [
 						[
 							'`cf.worker.fetch()`',
-							'Returns when the handler resolves, without waiting for its `waitUntil()` work. `env.dispose()` waits for that work, for up to 2 seconds, before it tears the runtime down.'
+							'Returns when the handler resolves, without waiting for its `waitUntil()` work. `env.dispose()` waits for whatever of that work is still running, for up to 2 seconds by default, before it tears the runtime down.'
 						],
 						['`cf.queue.trigger()`', 'Waits for queued background work before it returns.'],
 						['`cf.scheduled.trigger()`', 'Waits for scheduled background work before it returns.'],
@@ -128,10 +128,12 @@ export const devflareDocsPart4: DocPage[] = [
 					},
 					{
 						tone: 'info',
-						title: '`env.dispose()` waits for the background work `cf.worker.fetch()` started',
+						title: '`env.dispose()` waits for the background work `cf.worker.fetch()` left running',
 						body: [
-							'A handler’s `waitUntil()` work keeps running after `cf.worker.fetch()` returns, as it does in workerd. `env.dispose()` waits for it, for up to 2 seconds, before it shuts the runtime down, so the work never loses its bindings halfway through a call.',
-							'A failure in that work is reported once, as a `WaitUntilError` that names the request, for example `cf.worker.fetch(GET http://localhost/api/trash)`, and carries the original error as its `cause`. If the work rejects while `env.dispose()` is waiting, `env.dispose()` throws the error after teardown. If it rejects earlier, the error is raised as an unhandled rejection, and Bun fails the test that is running at that moment, or reports it between tests. Work still running after 2 seconds is reported by `env.dispose()` the same way, and the runtime is shut down regardless.'
+							'A handler’s `waitUntil()` work keeps running after `cf.worker.fetch()` returns, as it does in workerd. When `env.dispose()` is called, it first waits for whatever of that work is still running, for up to 2 seconds, and only then shuts the runtime down. To wait longer, pass `env.dispose({ waitUntilTimeoutMs })` and raise the hook timeout to match, because Bun gives an `afterAll` hook 5 seconds by default: `afterAll(() => env.dispose({ waitUntilTimeoutMs: 10_000 }), 15_000)`.',
+							'Work that settles before `env.dispose()` is called is left to Bun, exactly as if nothing tracked it. A rejection nothing handled fails the test running at that moment, or is reported between tests, without naming the request. A rejection the handler awaited and recovered from is not reported at all.',
+							'Work still running when `env.dispose()` starts is reported by `env.dispose()`. If it rejects while dispose waits, `env.dispose()` throws a `WaitUntilError` after teardown that names the request, for example `cf.worker.fetch(GET http://localhost/api/trash)`, and carries the original error as its `cause`. If it is still running when the budget runs out, `env.dispose()` tears down anyway and throws a `WaitUntilError` naming the request; a rejection from that work after the teardown is logged with `console.error` and fails no test. `WaitUntilError` is exported from `devflare/test`.',
+							'Each `createTestContext()` drains only its own work. If an earlier context was never disposed, its work is neither waited for nor blamed on the next context, and creating the next context logs which requests started it.'
 						]
 					}
 				]

@@ -15,7 +15,7 @@ import type { BridgeClient } from '../bridge/client'
 import { type BindingHints, createEnvProxy, setBindingHints } from '../bridge/proxy'
 import { createHostEmailDeliverySink } from '../email/host-sink'
 import { resolveEmailRuntime } from '../email/runtime-config'
-import { __setTestContext } from '../env'
+import { __setTestContext, type EnvDisposeOptions } from '../env'
 import { setEmailDeliverySink } from '../utils/email-delivery'
 import { extractBindingHints } from './binding-hints'
 import {
@@ -42,6 +42,7 @@ import {
 	loadTransportDecoders,
 	type TransportDecoderMap
 } from './simple-context-transport'
+import { openWaitUntilScope } from './wait-until-tracker'
 
 // Handler helper configuration
 // -----------------------------------------------------------------------------
@@ -167,7 +168,10 @@ export async function createTestContext(configPath?: string): Promise<void> {
 		state.miniflareBindings.DEVFLARE_R2_PRESIGN_ORIGIN = `http://127.0.0.1:${activePort}`
 	}
 
-	const disposeContext = createDisposeContext(state)
+	// This context's cf.worker.fetch work is drained by this context's dispose,
+	// and by no other.
+	const waitUntilScope = openWaitUntilScope()
+	const disposeContext = createDisposeContext(state, waitUntilScope)
 
 	const getTestEnv = (): Record<string, unknown> => {
 		return new Proxy(
@@ -205,7 +209,8 @@ export async function createTestContext(configPath?: string): Promise<void> {
 		handlerPaths,
 		configDir,
 		activePort,
-		getEnv: getTestEnv
+		getEnv: getTestEnv,
+		waitUntilScope
 	})
 
 	if (usesMultiWorker) {
@@ -232,7 +237,11 @@ export async function createTestContext(configPath?: string): Promise<void> {
  * Test environment interface - extend this in your project's env.d.ts
  */
 export interface TestEnv {
-	dispose(): Promise<void>
+	/**
+	 * Drains the `waitUntil()` work `cf.worker.fetch()` left running, then tears
+	 * the context down. See {@link EnvDisposeOptions} for the wait's budget.
+	 */
+	dispose(options?: EnvDisposeOptions): Promise<void>
 }
 
 /**
@@ -244,4 +253,4 @@ export interface TestEnv {
  */
 export type DevflareEnv = globalThis.DevflareEnv
 
-export { env } from '../env'
+export { type EnvDisposeOptions, env } from '../env'

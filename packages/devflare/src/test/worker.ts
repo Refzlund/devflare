@@ -25,6 +25,7 @@ import {
 } from '../runtime'
 import type { RouteSegment } from '../runtime/router/types'
 import { createTrackedTestExecutionContext } from './execution-context'
+import type { WaitUntilScope } from './wait-until-tracker'
 
 // -----------------------------------------------------------------------------
 // Types
@@ -46,6 +47,8 @@ export interface WorkerFetchOptions {
 let fetchHandlerPath: string | null = null
 let configDir: string | null = null
 let testEnvGetter: (() => Record<string, unknown>) | null = null
+/** The live context's waitUntil scope, which each request captures when it starts. */
+let waitUntilScope: WaitUntilScope | null = null
 let fileRoutes: Array<{
 	filePath: string
 	routePath: string
@@ -69,11 +72,14 @@ export function configureWorker(options: {
 	}>
 	configDir: string
 	getEnv: () => Record<string, unknown>
+	/** Where the context collects the waitUntil work its env.dispose() drains. */
+	waitUntilScope: WaitUntilScope
 }): void {
 	fetchHandlerPath = options.handlerPath
 	fileRoutes = options.routes ?? []
 	configDir = options.configDir
 	testEnvGetter = options.getEnv
+	waitUntilScope = options.waitUntilScope
 }
 
 /**
@@ -85,6 +91,7 @@ export function resetWorkerState(): void {
 	fileRoutes = []
 	configDir = null
 	testEnvGetter = null
+	waitUntilScope = null
 }
 
 // -----------------------------------------------------------------------------
@@ -122,7 +129,7 @@ async function fetch(request: Request | string, options?: WorkerFetchOptions): P
 		)
 	}
 
-	if (!configDir || !testEnvGetter) {
+	if (!configDir || !testEnvGetter || !waitUntilScope) {
 		throw new Error(
 			'Worker helper not initialized. Call createTestContext() before using cf.worker.fetch()'
 		)
@@ -130,6 +137,8 @@ async function fetch(request: Request | string, options?: WorkerFetchOptions): P
 
 	const workerConfigDir = configDir
 	const getEnv = testEnvGetter
+	// Captured now, so work a request registers stays with the context it started in.
+	const scope = waitUntilScope
 
 	// Normalize request
 	let req: Request
@@ -192,9 +201,10 @@ async function fetch(request: Request | string, options?: WorkerFetchOptions): P
 	}
 
 	// The response goes back when the handler resolves, so its waitUntil work
-	// is handed to the tracker rather than awaited here: env.dispose() drains it
-	// before tearing down the bindings it may still be using.
-	const ctx = createTrackedTestExecutionContext({
+	// is registered in the context's scope rather than awaited here:
+	// env.dispose() drains what is still pending before tearing down the
+	// bindings it may be using.
+	const ctx = createTrackedTestExecutionContext(scope, {
 		helper: 'cf.worker.fetch',
 		method: req.method,
 		url: req.url

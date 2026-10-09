@@ -7,9 +7,14 @@
 export {
 	createTestContext,
 	type DevflareEnv,
+	type EnvDisposeOptions,
 	env,
 	type TestEnv
 } from './simple-context'
+
+// The error env.dispose() throws for cf.worker.fetch waitUntil work
+
+export { WaitUntilError, type WaitUntilOrigin } from './wait-until-tracker'
 
 // Cloudflare test helpers — unified API for triggering all handler types
 

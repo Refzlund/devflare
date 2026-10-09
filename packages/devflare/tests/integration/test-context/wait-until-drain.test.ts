@@ -5,12 +5,14 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { dirname, join } from 'pathe'
 import { env } from '../../../src'
 import { cf, createTestContext } from '../../../src/test'
-import { WAIT_UNTIL_DRAIN_BUDGET_MS } from '../../../src/test/simple-context-lifecycle'
+import { DEFAULT_WAIT_UNTIL_TIMEOUT_MS } from '../../../src/test/simple-context-lifecycle'
 
 /*
 	cf.worker.fetch returns before the handler's waitUntil work settles, and
-	env.dispose() must not tear the runtime down underneath that work. Each case
-	creates and disposes its own context, because dispose itself is the subject.
+	env.dispose() must not tear the runtime down underneath work still pending.
+	Work that settled before dispose must behave exactly as if nothing tracked
+	it. Each case creates and disposes its own context, because dispose itself
+	is the subject.
 */
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '../../../')
@@ -22,6 +24,7 @@ const PROBE_KEY = '__devflareWaitUntilDrainProbe'
 
 /** The fixture project's config path, written once in `beforeAll`. */
 let configPath = ''
+/** The fixture project's directory, removed in `afterAll`. */
 let projectDir = ''
 
 /** The probe the fixture writes into, reset per case. */
@@ -125,6 +128,19 @@ export async function fetch(event) {
 		event.ctx.waitUntil(new Promise(() => {}))
 	}
 
+	if (pathname === '/handled') {
+		const audit = (async () => {
+			await delay(5)
+			throw new Error('audit service down')
+		})()
+		event.ctx.waitUntil(audit)
+		try {
+			await audit
+		} catch {
+			return new Response('degraded', { status: 503 })
+		}
+	}
+
 	return new Response('accepted')
 }
 `.trim()
@@ -159,7 +175,8 @@ describe('env.dispose() and cf.worker.fetch waitUntil work', () => {
 			const failure = error as Error & { cause?: unknown }
 			expect(failure.name).toBe('WaitUntilError')
 			expect(failure.message).toContain(
-				'waitUntil work started by cf.worker.fetch(GET http://localhost/reject-later) rejected'
+				'waitUntil work started by cf.worker.fetch(GET http://localhost/reject-later) rejected while ' +
+					'env.dispose() was waiting for it'
 			)
 			expect(failure.cause).toBeInstanceOf(Error)
 			expect((failure.cause as Error).message).toBe('sweep exploded')
@@ -183,21 +200,32 @@ describe('env.dispose() and cf.worker.fetch waitUntil work', () => {
 			expect(abandoned.message).toContain(
 				'waitUntil work started by cf.worker.fetch(GET http://localhost/never-settles) had not settled'
 			)
-			expect(abandoned.message).toContain(`after ${WAIT_UNTIL_DRAIN_BUDGET_MS}ms`)
+			expect(abandoned.message).toContain(`after ${DEFAULT_WAIT_UNTIL_TIMEOUT_MS}ms`)
+			expect(abandoned.message).toContain('env.dispose({ waitUntilTimeoutMs })')
 
-			expect(elapsed).toBeGreaterThanOrEqual(WAIT_UNTIL_DRAIN_BUDGET_MS - 50)
-			expect(elapsed).toBeLessThan(WAIT_UNTIL_DRAIN_BUDGET_MS + 2_500)
+			expect(elapsed).toBeGreaterThanOrEqual(DEFAULT_WAIT_UNTIL_TIMEOUT_MS - 50)
+			expect(elapsed).toBeLessThan(DEFAULT_WAIT_UNTIL_TIMEOUT_MS + 2_500)
 
 			// The teardown ran to its end: the worker helper was reset.
 			await expect(cf.worker.get('/write-later')).rejects.toThrow('Fetch handler not configured')
 		})
 	}, 20_000)
 
-	// A rejection outside any drain is re-raised as an unhandled rejection, and
-	// bun's runner fails the running test on one whatever listeners are
-	// installed (measured on bun 1.4.2), so this channel can only be observed
-	// from a separate run.
-	test('reports a rejection outside the drain once, as the running test failing, naming the request', async () => {
+	test('leaves a rejection the handler recovered from alone, before and at dispose', async () => {
+		await withContext(async () => {
+			const response = await cf.worker.get('/handled')
+			expect(response.status).toBe(503)
+			expect(await response.text()).toBe('degraded')
+
+			// Settled before dispose, so dispose has nothing to say about it either.
+			expect(await disposeError()).toBeNull()
+		})
+	}, 20_000)
+
+	// A rejection before dispose is left to bun, which fails the running test on
+	// it whatever listeners are installed (measured on bun 1.4.2), so this can
+	// only be observed from a separate run.
+	test('leaves an unhandled rejection before dispose to bun, reported once, as before', async () => {
 		const fixturePath = join(projectDir, 'tests', 'outside-drain.test.ts')
 		await mkdir(dirname(fixturePath), { recursive: true })
 		await writeFile(
@@ -232,16 +260,15 @@ test('runs after the failure', () => {
 			run.exited
 		])
 		const output = `${stdout}\n${stderr}`
-		const attribution = 'waitUntil work started by cf.worker.fetch(GET http://localhost/reject-now)'
 
 		expect(exitCode).not.toBe(0)
 		expect(output).toContain('(fail) starts background work that fails while it is still running')
-		// Once: the attributed error, and nothing from dispose afterwards (an
-		// `afterAll` that threw would be a second failure).
-		expect(output.split(attribution).length - 1).toBe(1)
+		expect(output).toContain('error: sweep exploded')
+		// Once, by bun: nothing attributed, and nothing from dispose afterwards
+		// (an `afterAll` that threw would be a second failure).
+		expect(output).not.toContain('WaitUntilError')
 		expect(output).toMatch(/\b1 pass\b/)
 		expect(output).toMatch(/\b1 fail\b/)
-		expect(output).toContain('sweep exploded')
 		expect(output).not.toContain('Unhandled error between tests')
 	}, 60_000)
 })

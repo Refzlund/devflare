@@ -7,7 +7,7 @@ import {
 	createDisposeContext,
 	resolveTestContextConfig
 } from '../../../src/test/simple-context-lifecycle'
-import { trackWaitUntil } from '../../../src/test/wait-until-tracker'
+import { openWaitUntilScope, type WaitUntilScope } from '../../../src/test/wait-until-tracker'
 import { createTrackedTempDirectories } from '../../helpers/tracked-temp-directories'
 
 const tempDirectories = createTrackedTempDirectories()
@@ -73,6 +73,8 @@ describe('resolveTestContextConfig', () => {
 describe('createDisposeContext', () => {
 	/** The order things happened in, shared by the fake client and the tracked work. */
 	let events: string[]
+	/** The scope the case's work is registered in and its dispose drains. */
+	let scope: WaitUntilScope
 
 	/**
 	 * @description A dispose state whose only live handle is a bridge client
@@ -98,7 +100,7 @@ describe('createDisposeContext', () => {
 
 	/** Registers work that rejects with `message` after a short delay, as cf.worker.fetch would. */
 	function trackRejection(message: string): void {
-		trackWaitUntil(
+		scope.track(
 			(async () => {
 				await new Promise((resolve) => setTimeout(resolve, 20))
 				events.push('work settled')
@@ -110,13 +112,14 @@ describe('createDisposeContext', () => {
 
 	beforeEach(() => {
 		events = []
+		scope = openWaitUntilScope()
 	})
 
 	test('drains waitUntil work before tearing down, and throws its failure after the teardown', async () => {
 		trackRejection('sweep exploded')
 		const state = stateWithClient()
 
-		const error = await createDisposeContext(state)().then(
+		const error = await createDisposeContext(state, scope)().then(
 			() => null,
 			(thrown: unknown) => thrown
 		)
@@ -131,7 +134,7 @@ describe('createDisposeContext', () => {
 		trackRejection('sweep exploded')
 		const teardownError = new Error('disconnect failed')
 
-		const error = await createDisposeContext(stateWithClient(teardownError))().then(
+		const error = await createDisposeContext(stateWithClient(teardownError), scope)().then(
 			() => null,
 			(thrown: unknown) => thrown
 		)
@@ -142,13 +145,57 @@ describe('createDisposeContext', () => {
 		expect(second.name).toBe('WaitUntilError')
 		expect((error as Error).message).toContain('Error: disconnect failed')
 		expect((error as Error).message).toContain(
-			'cf.worker.fetch(GET http://localhost/sweep) rejected: Error: sweep exploded'
+			'cf.worker.fetch(GET http://localhost/sweep) rejected while env.dispose() was waiting for it: ' +
+				'Error: sweep exploded'
 		)
 	})
 
 	test('throws a teardown failure as it was when no waitUntil work failed', async () => {
 		const teardownError = new Error('disconnect failed')
 
-		await expect(createDisposeContext(stateWithClient(teardownError))()).rejects.toBe(teardownError)
+		await expect(createDisposeContext(stateWithClient(teardownError), scope)()).rejects.toBe(
+			teardownError
+		)
+	})
+
+	test('waits as long as waitUntilTimeoutMs says, and names that budget', async () => {
+		scope.track(new Promise(() => {}), {
+			helper: 'cf.worker.fetch',
+			method: 'GET',
+			url: 'http://localhost/hang'
+		})
+
+		const started = performance.now()
+		const error = await createDisposeContext(
+			stateWithClient(),
+			scope
+		)({
+			waitUntilTimeoutMs: 40
+		}).then(
+			() => null,
+			(thrown: unknown) => thrown
+		)
+		const elapsed = performance.now() - started
+
+		expect((error as Error).message).toContain('had not settled after 40ms')
+		expect(elapsed).toBeGreaterThanOrEqual(35)
+		expect(elapsed).toBeLessThan(1_000)
+	})
+
+	test('refuses a waitUntilTimeoutMs that is not a finite number of 0 or more, before tearing down', async () => {
+		const state = stateWithClient()
+		const dispose = createDisposeContext(state, scope)
+
+		for (const waitUntilTimeoutMs of [-1, Number.NaN, Number.POSITIVE_INFINITY]) {
+			await expect(dispose({ waitUntilTimeoutMs })).rejects.toThrow(
+				`env.dispose({ waitUntilTimeoutMs }) needs a finite number of milliseconds, 0 or more; got ${waitUntilTimeoutMs}`
+			)
+		}
+		expect(events).toEqual([])
+		expect(state.client).not.toBeNull()
+
+		// Still disposable with a usable budget afterwards.
+		await dispose({ waitUntilTimeoutMs: 0 })
+		expect(events).toEqual(['disconnect'])
 	})
 })
