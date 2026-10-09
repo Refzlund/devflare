@@ -128,6 +128,48 @@ export default config
 		expect(error).toBeInstanceOf(ConfigNotFoundError)
 	})
 
+	test('loads through a project c12 2.x, which never sets `_configFile`', async () => {
+		// devflare loads with the project's own c12 when it has one. This stand-in
+		// answers in the shape c12 2.0.4 was measured to: a found file as an
+		// absolute `configFile` and no `_configFile`; a missing one as the bare
+		// name asked for. Keying "found" on `_configFile` read every such project
+		// as having no config.
+		// A directory of its own: Bun remembers that TEST_DIR had no node_modules
+		// from the tests before this one, and would resolve past the stand-in.
+		const projectDir = join(import.meta.dirname, `../.fixtures/config-loader-c12v2-${Date.now()}`)
+		const c12Dir = join(projectDir, 'node_modules', 'c12')
+		await mkdir(c12Dir, { recursive: true })
+		await writeFile(
+			join(c12Dir, 'package.json'),
+			JSON.stringify({ name: 'c12', main: 'index.mjs' })
+		)
+		await writeFile(
+			join(c12Dir, 'index.mjs'),
+			`
+			import { existsSync } from 'node:fs'
+			import { join } from 'node:path'
+			export async function loadConfig({ cwd, configFile }) {
+				const path = join(cwd, 'devflare.config.ts').replaceAll('\\\\', '/')
+				return existsSync(path)
+					? { config: { name: 'from-c12-2', compatibilityDate: '2025-01-07' }, configFile: path }
+					: { config: {}, configFile }
+			}
+		`
+		)
+
+		try {
+			const missing = await loadConfig({ cwd: projectDir }).catch((caught: unknown) => caught)
+			expect(missing).toBeInstanceOf(ConfigNotFoundError)
+
+			// The file's own content is invalid, so a pass proves the stand-in answered.
+			await writeFile(join(projectDir, 'devflare.config.ts'), 'export default {}\n')
+			const config = await loadConfig({ cwd: projectDir })
+			expect(config.name).toBe('from-c12-2')
+		} finally {
+			await rm(projectDir, { recursive: true, force: true })
+		}
+	})
+
 	test('validates loaded config', async () => {
 		// The loader should validate configs. Since c12/jiti has caching
 		// issues in test environments, we test schema validation directly.

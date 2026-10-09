@@ -28,8 +28,9 @@
 	  own copy (a monorepo vendoring devflare per app) loads with that copy.
 */
 
+import { existsSync } from 'node:fs'
 import { createRequire } from 'node:module'
-import { resolve as resolveNativePath } from 'node:path'
+import { isAbsolute, resolve as resolveNativePath } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import type { LoadConfigOptions, UserInputConfig } from 'c12'
 import { join } from 'pathe'
@@ -77,15 +78,28 @@ export async function loadWithC12<T extends UserInputConfig>(
 	const { loadConfig } = await importC12(options.cwd)
 	const result = await loadConfig<T>(options)
 
-	// → GOTCHA: c12 (2.x and 3.x) fills `configFile` even when nothing exists —
-	//   with the bare name it was asked for, e.g. `devflare.config` — and
-	//   returns `{}` as the config. Only `_configFile` is set solely when a file
-	//   was actually found and loaded, so that is the one handed on. Passing
-	//   c12's `configFile` through made a missing config read as a present,
-	//   empty one, and the user saw "Worker name is required" instead of
-	//   ConfigNotFoundError.
-	if (result._configFile) {
-		delete moduleRegistry[resolveNativePath(result._configFile)]
+	const loadedFile = foundConfigFile(result.configFile)
+	if (loadedFile) {
+		delete moduleRegistry[resolveNativePath(loadedFile)]
 	}
-	return { config: result.config, configFile: result._configFile }
+	return { config: result.config, configFile: loadedFile }
+}
+
+/**
+ * @description Tells a config file c12 found from the name it was merely asked for.
+ *
+ * → GOTCHA: c12 fills `configFile` even when nothing exists — with the bare name
+ *   it was asked for, e.g. `devflare.config` — and returns `{}` as the config.
+ *   Passing that through made a missing config read as a present, empty one, and
+ *   the user saw "Worker name is required" instead of ConfigNotFoundError.
+ * → GOTCHA: `_configFile` is NOT the answer. c12 3.x sets it only for a found
+ *   file, but c12 2.0.4 never sets it at all — and c12 is resolved from the
+ *   project first, so a project with 2.x installed would read as having no
+ *   config. Measured on both: a found file comes back as an absolute path, a
+ *   missing one as the name requested, which is what this tests.
+ * @param configFile - c12's `configFile`
+ * @returns the path of the file c12 loaded, or `undefined` when it found none
+ */
+function foundConfigFile(configFile: string | undefined): string | undefined {
+	return configFile && isAbsolute(configFile) && existsSync(configFile) ? configFile : undefined
 }
