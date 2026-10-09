@@ -340,7 +340,9 @@ test('auto-discovers config during bun test hooks from built dist entry', () => 
 		)
 
 		expect(output).toContain('1 pass')
-	})
+		// ensurePackageBuilt() runs the whole package build (~5.5s on Windows) before
+		// the child `bun test`, so bun's 5s default timed this out on every run there.
+	}, 60_000)
 
 	test('auto-discovers src/transport.ts when files.transport is omitted', async () => {
 		const projectDir = await mkdtemp(join(tmpdir(), 'devflare-test-context-transport-auto-'))
