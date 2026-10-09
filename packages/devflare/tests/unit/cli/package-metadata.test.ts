@@ -63,16 +63,25 @@ describe('package metadata', () => {
 		const admits = (range: string) =>
 			Bun.semver.satisfies(range.replace(/^[\^~]/, ''), peerWorkersTypes)
 
+		// The root pins EXACTLY the oldest range's floor: a caret range resolves to the newest
+		// 4.x, so a type added after the floor would pass a check consumers on the floor fail.
+		const oldestRange = peerWorkersTypes
+			.split('||')
+			.map((range) => range.trim())
+			.find((range) => getMajorVersion(range) === Math.min(...peerMajors))
+
 		expect({
 			packageMajor: getMajorVersion(packageWorkersTypes),
 			rootMajor: getMajorVersion(rootWorkersTypes),
 			peerAdmitsPackage: admits(packageWorkersTypes),
-			peerAdmitsRoot: admits(rootWorkersTypes)
+			peerAdmitsRoot: admits(rootWorkersTypes),
+			rootIsTheFloor: rootWorkersTypes === oldestRange?.replace(/^[\^~]/, '')
 		}).toEqual({
 			packageMajor: Math.max(...peerMajors),
 			rootMajor: Math.min(...peerMajors),
 			peerAdmitsPackage: true,
-			peerAdmitsRoot: true
+			peerAdmitsRoot: true,
+			rootIsTheFloor: true
 		})
 	})
 
