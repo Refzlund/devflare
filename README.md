@@ -15,7 +15,7 @@ The clean contributor workflow for the core `devflare` package now lives behind 
 - `bun run devflare:dev` — run the package in watch mode
 - `bun run devflare:test:watch` — watch the package test suite
 - `bun run devflare:build` — build `devflare` and the documentation app
-- `bun run devflare:typecheck` — typecheck the `devflare` package itself
+- `bun run devflare:typecheck` — typecheck the `devflare` package against `@cloudflare/workers-types` 5 (its own devDependency), then its sources against 4 (`devflare:typecheck:wt4`)
 - `bun run devflare:test` — run the stable downstream test lane for `devflare` dependents
 - `bun run devflare:types` — regenerate dependent package types through Turbo
 - `bun run devflare:check` — run the documentation app check lane
@@ -31,7 +31,7 @@ Common aliases and broader monorepo lanes:
 - `bun run build` — workspace-wide build through Turbo
 - `bun run lint` / `bun run lint:fix` / `bun run lint:root` / `bun run lint:devflare` — Biome-based linting (whole workspace, root, or just the published package)
 - `bun run ci` — alias for `devflare:ci`
-- `bun run ci:strict` — root lint + root typecheck + `devflare:ci` (strict gate used in CI)
+- `bun run ci:strict` — root lint + root typecheck + `devflare:ci` (no workflow runs it; CI runs `devflare:ci`)
 
 ## Policy & reference docs
 

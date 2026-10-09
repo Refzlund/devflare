@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { parse as parseJsonc } from 'jsonc-parser'
 import { getInitDependencyVersions } from '../../../src/cli/package-metadata'
 
 function readJsonFile<T>(path: string): T {
@@ -53,8 +54,8 @@ describe('package metadata', () => {
 			peerDependencies?: Record<string, string>
 		}>(join(import.meta.dir, '..', '..', '..', 'package.json'))
 
-		// The package builds against the newest major; the root type-checks the sources, the
-		// tests and the example projects against the oldest, so a consumer on either is covered.
+		// The package builds against the newest major; the root resolves the oldest, which is the
+		// copy `devflare:typecheck:wt4` checks the sources against.
 		const packageWorkersTypes = packageJson.devDependencies?.['@cloudflare/workers-types'] ?? ''
 		const rootWorkersTypes = rootPackageJson.devDependencies?.['@cloudflare/workers-types'] ?? ''
 		const peerWorkersTypes = packageJson.peerDependencies?.['@cloudflare/workers-types'] ?? ''
@@ -72,6 +73,36 @@ describe('package metadata', () => {
 			rootMajor: Math.min(...peerMajors),
 			peerAdmitsPackage: true,
 			peerAdmitsRoot: true
+		})
+	})
+
+	test('the CI typecheck also checks the sources against the root workers-types', () => {
+		const repoRoot = join(import.meta.dir, '..', '..', '..', '..', '..')
+		const rootPackageJson = readJsonFile<{ scripts?: Record<string, string> }>(
+			join(repoRoot, 'package.json')
+		)
+		const olderMajorConfig = parseJsonc(
+			readFileSync(join(repoRoot, 'tsconfig.devflare-wt4.json'), 'utf8')
+		) as {
+			compilerOptions?: { paths?: Record<string, string[]> }
+			include?: string[]
+		}
+
+		// `devflare:typecheck` is what workspace-ci (via devflare:ci) and the publish gate run. The
+		// module mapping matters as much as `types`: three test helpers import from
+		// '@cloudflare/workers-types', and unmapped they resolve the package's 5.x copy.
+		expect({
+			typecheckRunsOlderMajor: rootPackageJson.scripts?.['devflare:typecheck']?.includes(
+				'bun run devflare:typecheck:wt4'
+			),
+			olderMajorCommand: rootPackageJson.scripts?.['devflare:typecheck:wt4'],
+			include: olderMajorConfig.include,
+			workersTypesModule: olderMajorConfig.compilerOptions?.paths?.['@cloudflare/workers-types']
+		}).toEqual({
+			typecheckRunsOlderMajor: true,
+			olderMajorCommand: 'tsgo --noEmit -p tsconfig.devflare-wt4.json',
+			include: ['packages/devflare/src/**/*.ts'],
+			workersTypesModule: ['./node_modules/@cloudflare/workers-types/index.ts']
 		})
 	})
 

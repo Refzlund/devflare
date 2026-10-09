@@ -33,9 +33,9 @@ Devflare targets Wrangler 4, Miniflare 5, and @cloudflare/workers-types 4 and 5.
 Devflare does not support Wrangler 3 in new projects. The package manifest pins
 the exact ranges that scaffolds, local runtime behavior, and generated types
 are validated against in CI. Devflare compiles against workers-types 5, which
-new projects are scaffolded with, and its repository checks its sources and
-example projects against workers-types 4, so a project on either major keeps
-working.
+new projects are scaffolded with. CI and the publish gate also type-check its
+sources against workers-types 4 (`bun run devflare:typecheck` runs both), so a
+type that only 5 declares fails the check.
 
 ## Quick Start
 
