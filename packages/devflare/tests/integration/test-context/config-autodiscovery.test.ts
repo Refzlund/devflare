@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, test } from 'bun:test'
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -18,6 +18,11 @@ interface TransportResult {
 	hasDouble: boolean
 	isDoubleableNumber: boolean
 }
+
+// ensurePackageBuilt() runs the whole package build — about 5.5s on Windows,
+// past bun's 5s test default — so it runs here, with its own budget, rather
+// than inside the first test that needs it.
+beforeAll(ensurePackageBuilt, 120_000)
 
 afterAll(async () => {
 	for (const tempDir of tempDirs) {
@@ -340,9 +345,7 @@ test('auto-discovers config during bun test hooks from built dist entry', () => 
 		)
 
 		expect(output).toContain('1 pass')
-		// ensurePackageBuilt() runs the whole package build (~5.5s on Windows) before
-		// the child `bun test`, so bun's 5s default timed this out on every run there.
-	}, 60_000)
+	})
 
 	test('auto-discovers src/transport.ts when files.transport is omitted', async () => {
 		const projectDir = await mkdtemp(join(tmpdir(), 'devflare-test-context-transport-auto-'))

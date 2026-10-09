@@ -1,8 +1,12 @@
-import { afterAll, describe, expect, test } from 'bun:test'
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'pathe'
-import { cleanupTempDirs, installBuiltDevflare } from '../helpers/built-devflare.helpers'
+import {
+	cleanupTempDirs,
+	ensurePackageBuilt,
+	installBuiltDevflare
+} from '../helpers/built-devflare.helpers'
 
 const tempDirs: string[] = []
 
@@ -60,6 +64,11 @@ async function createBundleResult(
 		format: 'esm'
 	})
 }
+
+// ensurePackageBuilt() runs the whole package build — about 5.5s on Windows,
+// past bun's 5s test default — so it runs here, with its own budget, rather
+// than inside the first test that needs it.
+beforeAll(ensurePackageBuilt, 120_000)
 
 afterAll(async () => {
 	await cleanupTempDirs(tempDirs)
