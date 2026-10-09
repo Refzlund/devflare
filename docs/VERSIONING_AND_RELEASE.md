@@ -51,21 +51,24 @@ pending (unconsumed) changeset publishes a new prerelease immediately.
 
 3. [`.github/workflows/publish.yml`](../.github/workflows/publish.yml) runs on
    that push (or on manual `workflow_dispatch`). It:
-   - **Detects pending changesets.** In pre mode, consumed changeset `.md`
-     files persist on disk and are listed in `.changeset/pre.json` under
-     `changesets`. The workflow counts only the `.md` files that are *not* in
-     that list — those are the unconsumed, pending ones.
+   - **Detects pending changesets.** In pre mode, `changeset version` moves
+     each changeset it releases into `.changeset/pre/`, so the workflow counts
+     the `.md` files directly in `.changeset/`: those are the pending ones.
    - If there is at least one pending changeset, runs `changeset version`, which
      bumps `package.json`, appends to
      [`packages/devflare/CHANGELOG.md`](../packages/devflare/CHANGELOG.md), and
-     records the now-consumed changeset(s) in `pre.json`.
+     moves the changeset(s) it released into `.changeset/pre/`.
    - Commits the bump back to `next` as `chore(release): version packages [skip ci]`.
    - Builds `devflare` and runs `changeset publish` to npm via **OIDC trusted
      publishing** (no NPM token; npm ≥ 11.5.1; `id-token: write`).
    - Pushes the git tags.
 
-In pre mode `changeset publish` always uses the pre tag (`next`) as the npm
-dist-tag and rejects an explicit `--tag`, so the workflow does not pass one.
+In pre mode `changeset publish` uses the pre tag (`next`) as the npm dist-tag
+and rejects an explicit `--tag`, so the workflow does not pass one. The one
+exception is a package whose every published version is a `next` prerelease,
+which goes to `latest` because npm gives a package's first version that tag
+anyway. `devflare@0.0.0` holds `latest`, so devflare never meets it. Only
+`devflare` is published; the workspace's other packages are private.
 The publish step is idempotent (it only publishes versions not already on npm),
 so a manual re-run recovers a bump that committed but failed to publish.
 
@@ -80,8 +83,9 @@ entry from the consumed changeset summaries. Do not hand-edit it.
 Exiting the prerelease lane is a deliberate, manual maintainer step:
 
 1. `bunx changeset pre exit` — leaves pre mode (updates `.changeset/pre.json`).
-2. `bunx changeset version` — consumes any remaining changesets and computes the
-   stable version, producing `1.0.0`.
+2. `bunx changeset version` — consumes any remaining changesets, together with
+   every changeset in `.changeset/pre/`, and computes the stable version,
+   producing `1.0.0`.
 3. Commit, then publish. With pre mode exited, `changeset publish` publishes to
    the **`latest`** dist-tag (the no-`--tag` behavior in `publish.yml` now
    targets `latest` instead of `next`), so this must be done intentionally.

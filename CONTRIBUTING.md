@@ -44,9 +44,14 @@ day-to-day workflow is:
    npm under the `next` dist-tag via OIDC trusted publishing. There is no
    release PR.
 
-   In pre mode, consumed changeset `.md` files stay on disk and are tracked in
-   `.changeset/pre.json`; only unconsumed `.md` files trigger a release. Do not
-   delete consumed changeset files.
+   In pre mode, `changeset version` moves each changeset it releases into
+   `.changeset/pre/`; only `.md` files directly in `.changeset/` trigger a
+   release. The files in `.changeset/pre/` make up the stable `1.0.0` changelog,
+   so delete one only to leave it out of that changelog.
+
+   Name only `devflare` in a changeset. The workspace's other packages are
+   private and are not versioned, and changesets refuses a changeset that names
+   one of them alongside `devflare`.
 
 3. **Pull** the bot's `chore(release): version packages` commit before
    continuing work on `next`.

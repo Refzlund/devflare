@@ -67,19 +67,16 @@ jobs:
       - name: Detect pending changesets
         id: changesets
         run: |
-          # In prerelease (pre) mode, consumed changeset files persist on disk
-          # and are tracked in .changeset/pre.json. Only UNconsumed changesets
-          # represent a pending release, so exclude the ones already applied.
+          # In prerelease (pre) mode, changesets 3 moves every changeset it has
+          # versioned into .changeset/pre/, so each one still in .changeset/
+          # itself is pending. The filter skips the files @changesets/read 1.x
+          # skips there. If the two ever disagree, `changeset version` finds
+          # nothing to release and fails the run instead of publishing nothing.
           count=$(bun -e '
-            import { existsSync, readFileSync, readdirSync } from "node:fs"
-            const consumed = new Set(
-              existsSync(".changeset/pre.json")
-                ? (JSON.parse(readFileSync(".changeset/pre.json", "utf8")).changesets ?? [])
-                : []
-            )
-            const pending = readdirSync(".changeset").filter(
-              (f) => f.endsWith(".md") && f !== "README.md" && !consumed.has(f.slice(0, -3))
-            )
+            import { readdirSync } from "node:fs"
+            const notAChangeset = (f) =>
+              f.startsWith(".") || /^README\.md$/i.test(f) || ["AGENTS.md", "CLAUDE.md", "GEMINI.md"].includes(f)
+            const pending = readdirSync(".changeset").filter((f) => f.endsWith(".md") && !notAChangeset(f))
             process.stdout.write(String(pending.length))
           ')
           echo "count=$count" >> "$GITHUB_OUTPUT"
@@ -131,10 +128,13 @@ jobs:
             git push origin HEAD:next
           fi
 
-      # No --tag: in pre mode `changeset publish` always uses the pre tag
-      # (`next`) as the npm dist-tag, and passing --tag is rejected. It publishes
-      # any package whose version is not yet on npm (idempotent), so a manual
-      # re-run recovers a bump that was committed but failed to publish.
+      # No --tag: in pre mode `changeset publish` rejects one and uses the pre
+      # tag (`next`) as the npm dist-tag. The one exception is a package whose
+      # every published version is a `next` prerelease: that goes to `latest`.
+      # devflare@0.0.0 holds `latest`, so devflare never meets it.
+      # It publishes any package whose version is not yet on npm (idempotent),
+      # so a manual re-run recovers a bump that was committed but failed to
+      # publish. Private workspace packages are never published.
       - name: Publish to npm (trusted publishing / OIDC)
         if: steps.changesets.outputs.has == 'true' || github.event_name == 'workflow_dispatch'
         run: bunx changeset publish
