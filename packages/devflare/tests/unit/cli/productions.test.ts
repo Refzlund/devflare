@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, mock, test } from 'bun:test'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { runProductionsCommand } from '../../../src/cli/commands/productions'
@@ -429,4 +429,100 @@ describe('productions command', () => {
 			)
 		).toBe(true)
 	})
+})
+
+describe('productions delete and rollback at a directory with no config of its own', () => {
+	/**
+	 * @description Writes one `devflare.config.ts` per package under a fresh root that
+	 * has none itself, which sends discovery into its scan of the tree.
+	 */
+	function createMonorepo(packages: Array<[directory: string, workerName: string]>): string {
+		const root = mkdtempSync(join(tmpdir(), 'devflare-productions-scan-'))
+		temporaryDirectories.add(root)
+		for (const [directory, workerName] of packages) {
+			mkdirSync(join(root, directory), { recursive: true })
+			writeFileSync(
+				join(root, directory, 'devflare.config.ts'),
+				`export default { name: '${workerName}', accountId: 'acc_123', compatibilityDate: '2026-04-12' }\n`
+			)
+		}
+		return root
+	}
+
+	/** @description Fails the test on any network call: a refusal must happen before one. */
+	function forbidNetwork(): void {
+		process.env.CLOUDFLARE_API_TOKEN = 'cf_test_token'
+		globalThis.fetch = mock(async (input: RequestInfo | URL) => {
+			throw new Error(`Unexpected fetch URL: ${String(input)}`)
+		}) as unknown as typeof fetch
+	}
+
+	for (const subcommand of ['delete', 'rollback'] as const) {
+		test(`${subcommand} refuses to pick one of two packages' workers by itself`, async () => {
+			forbidNetwork()
+			const root = createMonorepo([
+				['apps/web', 'web-production-worker'],
+				['apps/api', 'api-production-worker']
+			])
+
+			const logger = createLogger()
+			const result = await runProductionsCommand(
+				{ command: 'productions', args: [subcommand], options: { account: 'acc_123' } },
+				logger as any,
+				{ cwd: root }
+			)
+			const rendered = renderMessages(logger).join('\n')
+
+			expect(result.exitCode).not.toBe(0)
+			expect(rendered).toContain(`A worker name is required for productions ${subcommand}`)
+			expect(rendered).toContain('api-production-worker, web-production-worker')
+			expect(rendered).not.toContain('Would delete')
+			expect(globalThis.fetch).not.toHaveBeenCalled()
+		})
+	}
+
+	test('delete still defaults to the one primary worker the scan finds', async () => {
+		forbidNetwork()
+		const root = createMonorepo([['apps/api', 'api-production-worker']])
+
+		const logger = createLogger()
+		const result = await runProductionsCommand(
+			{ command: 'productions', args: ['delete'], options: { account: 'acc_123' } },
+			logger as any,
+			{ cwd: root }
+		)
+
+		expect(result.exitCode).toBe(0)
+		expect(renderMessages(logger).join('\n')).toContain(
+			'Would delete Worker script api-production-worker'
+		)
+	})
+})
+
+describe('productions with an explicit --config that does not exist', () => {
+	for (const subcommand of ['list', 'delete'] as const) {
+		test(`${subcommand} fails with ConfigNotFoundError instead of ignoring it`, async () => {
+			process.env.CLOUDFLARE_API_TOKEN = 'cf_test_token'
+			globalThis.fetch = mock(async (input: RequestInfo | URL) => {
+				throw new Error(`Unexpected fetch URL: ${String(input)}`)
+			}) as unknown as typeof fetch
+			const root = mkdtempSync(join(tmpdir(), 'devflare-productions-missing-config-'))
+			temporaryDirectories.add(root)
+
+			const logger = createLogger()
+			const result = await runProductionsCommand(
+				{
+					command: 'productions',
+					args: [subcommand],
+					options: { account: 'acc_123', config: 'missing.config.ts' }
+				},
+				logger as any,
+				{ cwd: root }
+			)
+
+			expect(result.exitCode).not.toBe(0)
+			expect(renderMessages(logger).join('\n')).toContain('Config file not found')
+			expect(globalThis.fetch).not.toHaveBeenCalled()
+		})
+	}
 })

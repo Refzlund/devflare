@@ -165,7 +165,12 @@ async function discoverPreviewListConfigs(
 	}
 
 	if (configFile) {
-		await loadAndCollect(configFile)
+		// An explicit --config that does not exist is the caller's mistake, never
+		// "no config here": swallowing it would quietly widen the command to
+		// whatever the account holds. Only the implicit lookups may come up empty.
+		if (!(await loadAndCollect(configFile))) {
+			throw new ConfigNotFoundError(cwd, configFile)
+		}
 	} else {
 		const directConfigPath = await resolveConfigPath(cwd)
 		const loadedDirectly = directConfigPath ? await loadAndCollect() : false
@@ -279,21 +284,15 @@ async function loadLocalConfig(
 		}
 	}
 
-	try {
-		const config = await loadConfig({
-			cwd,
-			configFile
-		})
-		return {
-			accountId: config.accountId,
-			name: config.name
-		}
-	} catch (error) {
-		if (error instanceof ConfigNotFoundError) {
-			return undefined
-		}
-
-		throw error
+	// An explicit --config is loaded or fails: a missing file is reported as
+	// ConfigNotFoundError rather than read as "no config here".
+	const config = await loadConfig({
+		cwd,
+		configFile
+	})
+	return {
+		accountId: config.accountId,
+		name: config.name
 	}
 }
 

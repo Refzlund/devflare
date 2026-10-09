@@ -290,3 +290,34 @@ describe('previews command', () => {
 		).toBe(true)
 	})
 })
+
+describe('previews with an explicit --config that does not exist', () => {
+	// Before ConfigNotFoundError could fire, a missing --config failed as "Invalid
+	// config". Swallowing the new error instead would quietly widen the command
+	// from one package to the whole account.
+	for (const subcommand of ['list', 'cleanup'] as const) {
+		test(`${subcommand} fails with ConfigNotFoundError instead of ignoring it`, async () => {
+			process.env.CLOUDFLARE_API_TOKEN = 'cf_test_token'
+			globalThis.fetch = mock(async (input: RequestInfo | URL) => {
+				throw new Error(`Unexpected fetch URL: ${String(input)}`)
+			}) as unknown as typeof fetch
+			const projectDir = temporaryCacheDirectories.create('devflare-previews-missing-config-')
+			writePreviewProject(projectDir, 'present-project')
+
+			const logger = createLogger()
+			const result = await runPreviewsCommand(
+				{
+					command: 'previews',
+					args: [subcommand],
+					options: { account: 'acc_123', config: 'missing.config.ts' }
+				},
+				logger as never,
+				{ cwd: projectDir }
+			)
+
+			expect(result.exitCode).not.toBe(0)
+			expect(renderMessages(logger).join('\n')).toContain('Config file not found')
+			expect(globalThis.fetch).not.toHaveBeenCalled()
+		})
+	}
+})

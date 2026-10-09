@@ -204,7 +204,12 @@ async function discoverProductionConfigs(
 	}
 
 	if (configFile) {
-		await loadAndCollect(configFile)
+		// An explicit --config that does not exist is the caller's mistake, never
+		// "no config here": swallowing it would quietly widen the command to
+		// whatever the account holds. Only the implicit lookups may come up empty.
+		if (!(await loadAndCollect(configFile))) {
+			throw new ConfigNotFoundError(cwd, configFile)
+		}
 	} else {
 		const loadedDirectly = await loadAndCollect()
 		if (!loadedDirectly) {
@@ -279,6 +284,43 @@ function resolveWorkerName(
 	}
 }
 
+/**
+ * @description Refuses a `rollback` or `delete` whose target Worker was not named
+ * and is not the one primary worker the configs describe.
+ *
+ * → GOTCHA: with no config in the current directory, discovery loads every
+ *   `devflare.config.*` below it and the first primary worker becomes the default.
+ *   For a read-only listing that is a convenience; for a destructive command it
+ *   picked whichever package sorted first. That scan never ran until `loadConfig`
+ *   could raise ConfigNotFoundError, which it now does.
+ * @param explicitWorkerName - `--worker`, or the positional argument; undefined when neither was given
+ * @throws when no worker name resolved, or when it came from discovery and discovery
+ *   found anything but exactly one primary worker
+ */
+function assertDestructiveTargetIsUnambiguous(
+	subcommand: 'rollback' | 'delete',
+	explicitWorkerName: string | undefined,
+	workerSelection: { workerName?: string },
+	discovery: ProductionDiscoveryResult
+): void {
+	if (explicitWorkerName) {
+		return
+	}
+
+	const primaries = discovery.primaryFamilyNames
+	if (workerSelection.workerName && primaries.length === 1) {
+		return
+	}
+
+	const found =
+		primaries.length > 1
+			? ` Found ${primaries.length} primary workers in the configs below this directory (${primaries.join(', ')}).`
+			: ''
+	throw new Error(
+		`A worker name is required for productions ${subcommand}.${found} Use --worker or run inside a configured package with a single primary worker.`
+	)
+}
+
 async function resolveContext(
 	parsed: ParsedArgs,
 	options: CliOptions,
@@ -309,10 +351,8 @@ async function resolveContext(
 		)
 	}
 
-	if ((subcommand === 'rollback' || subcommand === 'delete') && !workerSelection.workerName) {
-		throw new Error(
-			`A worker name is required for productions ${subcommand}. Use --worker or run inside a configured package with a single primary worker.`
-		)
+	if (subcommand === 'rollback' || subcommand === 'delete') {
+		assertDestructiveTargetIsUnambiguous(subcommand, explicitWorkerName, workerSelection, discovery)
 	}
 
 	return {
