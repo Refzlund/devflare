@@ -4,10 +4,12 @@
 
 Support SvelteKit 3 and `@cloudflare/workers-types` 5, and move devflare to zod 4 and c12 3.
 
-- **zod 4.** `configSchema`, exported from `devflare` and `devflare/config`, is now a zod 4
-  schema, and the published types import zod 4. Code that composes `configSchema` with its own
-  zod schemas needs zod 4. Every config validates to the same value as before, and a missing
-  `name` still reports "Worker name is required".
+- **zod 4.** `configSchema`, exported from `devflare`, is now a zod 4 schema, and the published
+  types import zod 4. Code that composes `configSchema` with its own zod schemas needs zod 4.
+  Every config validates to the same value as before, and a missing `name` still reports "Worker
+  name is required". Other validation messages now use zod 4's wording: an unknown key reports
+  `Unrecognized key: "nope"` where it reported `Unrecognized key(s) in object: 'nope'`, and a
+  wrong type reports `Invalid input: expected string, received number`.
 - **`@cloudflare/workers-types` 5.** The peer range is now `^4.20260426.1 || ^5.20261008.1`,
   and `devflare init` scaffolds 5.x. The test helpers' `ExecutionContext` (`cf.worker`,
   `cf.queue`, `cf.scheduled`, `cf.tail`, `cf.email`, `createMockTestContext`) has the members 5.x
@@ -22,8 +24,12 @@ Support SvelteKit 3 and `@cloudflare/workers-types` 5, and move devflare to zod 
   `devflare dev` with `@sveltejs/adapter-cloudflare` 8, `cloudflare:workers` gives the app the
   `env`, `waitUntil` and `tracing` of the request devflare's handle is serving. Reading `env`
   outside a request throws an error that names the handle. `exports` throws and the `cache`
-  methods reject, because both need workerd. In that mode the handle leaves `event.platform` unset, as the
-  adapter does in production. SvelteKit 2 apps are unchanged.
+  methods reject, because both need workerd. In that mode the handle leaves `event.platform`
+  unset, as the adapter does in production. SvelteKit 2 apps still get `event.platform`, and under
+  `devflare dev` its `context` now has the test helpers' members: `props`, `tracing`, an
+  `exports` that throws when you read an export, and an `abort()` that throws. Code that
+  feature-detects with `platform.context.exports?.X` now throws in dev instead of getting
+  `undefined`.
 - **c12 3.3.4** (was 2.0.4) loads `devflare.config.*` and `devflare.workspace.*`. Left to
   itself, c12 3 under Bun on Windows hands a reload the config from before the edit. devflare
   removes the config file from Bun's module cache after each load, so `devflare dev` still
