@@ -289,8 +289,9 @@ export function createMockArtifacts(options: MockArtifactsOptions = {}): Artifac
 			opts?: { readOnly?: boolean; description?: string; setDefaultBranch?: string }
 		) => createRepo(name, opts),
 		async get(name: string): Promise<ArtifactsRepo> {
-			// Both workers-types majors declare `Promise<ArtifactsRepo>` and document
-			// NOT_FOUND for a missing repo; the binding never resolves to null.
+			// Every supported workers-types declares `Promise<ArtifactsRepo>`, never null.
+			// From 4.20260702.1 (and in 5.x) it documents an ArtifactsError NOT_FOUND
+			// for a missing repo; the 4.x floor, 4.20260426.1, has no ArtifactsError yet.
 			const repo = repos.get(name)
 			if (!repo) {
 				throw createArtifactsError('NOT_FOUND', `Artifacts repo "${name}" does not exist`)
