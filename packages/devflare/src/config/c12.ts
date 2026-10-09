@@ -21,8 +21,9 @@
 	  "First argument must be an Error object", so any later
 	  `Error.captureStackTrace(object)` in the same process fails, and Vite's
 	  own module initialisation is one such call.
-	→ Only the config file itself is evicted. A module it imports stays cached
-	  under a native import, as it always has under Bun on every platform.
+	→ Only the config file itself is evicted. A module it imports keeps its
+	  first evaluation under Bun. That is not new: measured on Windows and on
+	  Linux, c12 2.0.4 and 3.3.4 both reuse an edited imported module.
 	→ c12 is resolved from the project first, so a project that installs its
 	  own copy (a monorepo vendoring devflare per app) loads with that copy.
 */
