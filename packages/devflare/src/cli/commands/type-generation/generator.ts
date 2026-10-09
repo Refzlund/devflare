@@ -160,9 +160,9 @@ function generateBindingMembers(
 	cwd: string,
 	indent: string,
 	options: { includeVarsAsMembers?: boolean } = {}
-): { lines: string[]; imports: string[] } {
+): { lines: string[]; usesPipelines: boolean } {
 	const lines: string[] = []
-	const imports: string[] = []
+	let usesPipelines = false
 
 	if (config.bindings) {
 		if (config.bindings.kv) {
@@ -248,7 +248,7 @@ function generateBindingMembers(
 		}
 
 		if (config.bindings.pipelines) {
-			imports.push("import type { Pipeline } from 'cloudflare:pipelines'")
+			usesPipelines = true
 			for (const binding of Object.keys(config.bindings.pipelines)) {
 				lines.push(`${indent}${binding}: Pipeline`)
 			}
@@ -306,10 +306,11 @@ function generateBindingMembers(
 			for (const binding of Object.keys(config.bindings.services)) {
 				const serviceInfo = serviceBindingMap.get(binding)
 				if (serviceInfo?.interfaceType && serviceInfo.interfaceImport) {
-					imports.push(
-						`import type { ${serviceInfo.interfaceType} } from '${serviceInfo.interfaceImport}'`
+					// An `import()` type, not an import statement: no import block to sort,
+					// and two services exporting the same interface name cannot collide.
+					lines.push(
+						`${indent}${binding}: import('${serviceInfo.interfaceImport}').${serviceInfo.interfaceType}`
 					)
-					lines.push(`${indent}${binding}: ${serviceInfo.interfaceType}`)
 					continue
 				}
 
@@ -376,7 +377,7 @@ function generateBindingMembers(
 		}
 	}
 
-	return { lines, imports }
+	return { lines, usesPipelines }
 }
 
 function normalizeModuleDeclarationGlob(glob: string): string {
@@ -542,25 +543,7 @@ export function generateBindingTypes(
 	const hasCrossWorkerDOs = crossWorkerDOMap.size > 0
 	const hasDOsWithClasses = hasLocalDOsWithClasses || hasCrossWorkerDOs
 
-	if (usedTypes.size > 0) {
-		// Sorted with `Rpc` among the rest, as Biome's organize-imports orders specifiers.
-		const specifiers = [...usedTypes, ...(hasDOsWithClasses ? ['Rpc'] : [])].sort()
-		lines.push(printDoc(typeImport(specifiers, '@cloudflare/workers-types')))
-		lines.push('')
-	}
-
-	if (hasConfigVars) {
-		const configImportPath = options.configImportPath ?? './devflare.config'
-		lines.push("import type { InferConfigVars } from 'devflare/config'")
-		const configType = typeArguments(
-			'InferConfigVars',
-			typeArguments('Awaited', `typeof import('${configImportPath}').default`)
-		)
-		lines.push(printDoc(['type __DevflareConfigVars = ', configType]))
-		lines.push('')
-	}
-
-	const { lines: bindingMembers, imports: serviceImports } = generateBindingMembers(
+	const { lines: bindingMembers, usesPipelines } = generateBindingMembers(
 		config,
 		doClassMap,
 		crossWorkerDOMap,
@@ -569,9 +552,35 @@ export function generateBindingTypes(
 		'\t\t',
 		{ includeVarsAsMembers: !hasConfigVars }
 	)
-	const uniqueImports = [...new Set(serviceImports)]
-	if (uniqueImports.length > 0) {
-		lines.push(...uniqueImports)
+
+	// → GOTCHA: Biome's organize-imports (`biome check`, the repo's `lint:fix`)
+	//   sorts every run of imports up to the next statement, blank lines or not,
+	//   by source: a `protocol:` source, then packages, then relative paths. So
+	//   the imports are one block, in that order, with each source's specifiers
+	//   sorted, and a blank line before the first statement. Everything else the
+	//   file names comes in through `import()` types, which no sort touches.
+	const imports: string[] = []
+	if (usesPipelines) {
+		imports.push("import type { Pipeline } from 'cloudflare:pipelines'")
+	}
+	if (usedTypes.size > 0) {
+		const specifiers = [...usedTypes, ...(hasDOsWithClasses ? ['Rpc'] : [])].sort()
+		imports.push(printDoc(typeImport(specifiers, '@cloudflare/workers-types')))
+	}
+	if (hasConfigVars) {
+		imports.push("import type { InferConfigVars } from 'devflare/config'")
+	}
+	if (imports.length > 0) {
+		lines.push(...imports, '')
+	}
+
+	if (hasConfigVars) {
+		const configImportPath = options.configImportPath ?? './devflare.config'
+		const configType = typeArguments(
+			'InferConfigVars',
+			typeArguments('Awaited', `typeof import('${configImportPath}').default`)
+		)
+		lines.push(printDoc(['type __DevflareConfigVars = ', configType]))
 		lines.push('')
 	}
 

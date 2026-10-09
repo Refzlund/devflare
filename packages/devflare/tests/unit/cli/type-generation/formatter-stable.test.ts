@@ -3,9 +3,11 @@
 // =============================================================================
 //
 // `devflare types` writes in devflare's house style, the repository's own
-// biome.json. This runs the repository's real Biome over the generator's
-// output for every shape that can outgrow a line and asserts it would change
-// nothing — the oracle is the formatter itself, not a copy of its rules.
+// biome.json. This runs the repository's real Biome — `biome check` with the
+// linter off, so the formatter AND the organize-imports assist the repo's
+// `lint:fix` applies — over the generator's output for every shape that can
+// outgrow a line or reorder an import, and asserts it would change nothing.
+// The oracle is Biome itself, not a copy of its rules.
 // =============================================================================
 
 import { afterAll, describe, expect, test } from 'bun:test'
@@ -88,6 +90,42 @@ const fixtures: Fixture[] = [
 		)
 	},
 	{
+		// Pipelines, workers-types with `Rpc` sorting between other names, the config
+		// vars import and service interfaces from shared and differing modules: every
+		// source the import block can hold, and the order organize-imports wants.
+		name: 'every import source at once, Rpc sorting mid-list',
+		source: generateBindingTypes(
+			{
+				bindings: {
+					kv: { KV: { id: 'kv' } },
+					durableObjects: { ROOM: { className: 'Room' } },
+					sendEmail: { EMAIL: {} },
+					workflows: { FLOW: { name: 'flow', className: 'Flow' } },
+					pipelines: { EVENTS: { pipeline: 'events' } },
+					services: { ZED: { service: 'z' }, ALPHA: { service: 'a' }, OTHER: { service: 'o' } }
+				},
+				vars: { MY_VAR: 'hello' }
+			} as never,
+			[{ className: 'Room', filePath: `${project}/src/do.room.ts`, bindingName: 'ROOM' }],
+			[],
+			[
+				{
+					varName: 'svc',
+					importPath: '../svc/devflare.config',
+					refDir: '/tmp/svc',
+					entrypoints: [],
+					durableObjects: [],
+					serviceBindings: [
+						{ bindingName: 'ZED', interfaceImport: '../svc/env', interfaceType: 'Zeta' },
+						{ bindingName: 'ALPHA', interfaceImport: '../svc/env', interfaceType: 'Alpha' },
+						{ bindingName: 'OTHER', interfaceImport: '../../a/env', interfaceType: 'Zeta' }
+					]
+				}
+			],
+			project
+		)
+	},
+	{
 		name: 'a config import path too long for one line',
 		source: generateBindingTypes({ vars: { A: 'a' } }, [], [], [], project, {
 			configImportPath: `../../${longDirectory}devflare.config`
@@ -134,16 +172,17 @@ afterAll(() => {
 })
 
 /**
- * @description Runs `biome format` (check mode, writes nothing) with the repository's
+ * @description Runs `biome check` with the linter off (formatter and assists; writes nothing) with the repository's
  * configuration over one file.
  * @returns Biome's exit code and output; a non-zero code means it would change the file
  */
-function biomeFormatCheck(path: string): { exitCode: number; output: string } {
+function biomeCheck(path: string): { exitCode: number; output: string } {
 	const result = Bun.spawnSync(
 		[
 			process.execPath,
 			biomeBin,
-			'format',
+			'check',
+			'--linter-enabled=false',
 			`--config-path=${join(repositoryRoot, 'biome.json')}`,
 			'--vcs-enabled=false',
 			path
@@ -163,7 +202,7 @@ describe('generateBindingTypes output is stable under the repository Biome confi
 			const path = join(workDirectory, `env-${index}.d.ts`)
 			writeFileSync(path, fixtures[index].source)
 
-			const result = biomeFormatCheck(path)
+			const result = biomeCheck(path)
 
 			expect(result.output).toContain('Checked 1 file')
 			expect(result.exitCode).toBe(0)
