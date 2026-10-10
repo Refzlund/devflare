@@ -5,13 +5,8 @@ import { createConnection } from 'node:net'
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { execa } from 'execa'
-import {
-	type ContainerConfig,
-	type DevflareConfig,
-	loadConfig,
-	resolveConfigEnvVars
-} from '../config'
-import { applyLocalDevVarsToConfig } from '../config/local-dev-vars'
+import { type ContainerConfig, type DevflareConfig, loadConfig } from '../config'
+import { resolveDevConfig } from '../config/dev-config'
 import { findNearestConfig, getAvailablePort, getCallerDirectory } from './simple-context-paths'
 
 export type ContainerEngineName = 'docker' | 'podman'
@@ -371,12 +366,7 @@ async function loadContainerConfig(
 		cwd: configDir,
 		configFile: basename(absolutePath)
 	})
-	const envResolvedConfig = await resolveConfigEnvVars(loadedConfig, {
-		cwd: configDir,
-		configPath: absolutePath,
-		mode: 'dev'
-	})
-	const config = await applyLocalDevVarsToConfig(envResolvedConfig, {
+	const config = await resolveDevConfig(loadedConfig, {
 		cwd: configDir,
 		configPath: absolutePath
 	})

@@ -18,10 +18,9 @@ import {
 	normalizePipelineBinding,
 	normalizeR2Binding,
 	normalizeSecretsStoreBinding,
-	normalizeWorkflowBinding,
-	resolveConfigEnvVars
+	normalizeWorkflowBinding
 } from '../config'
-import { applyLocalDevVarsToConfig } from '../config/local-dev-vars'
+import { resolveDevConfig } from '../config/dev-config'
 import {
 	buildRateLimitsConfig,
 	buildStreamingTailConsumersConfig,
@@ -649,18 +648,11 @@ export async function startMiniflareFromConfig(
 	options: Partial<MiniflareOptions> = {}
 ): Promise<MiniflareInstance> {
 	const runtimeConfig = options.cwd
-		? await applyLocalDevVarsToConfig(
-				await resolveConfigEnvVars(config, {
-					cwd: options.cwd,
-					configPath: options.configPath,
-					mode: 'dev'
-				}),
-				{
-					cwd: options.cwd,
-					configPath: options.configPath,
-					environment: options.environment
-				}
-			)
+		? await resolveDevConfig(config, {
+				cwd: options.cwd,
+				configPath: options.configPath,
+				environment: options.environment
+			})
 		: config
 	const bindings = runtimeConfig.bindings ?? {}
 	const localSecretServiceBindingConfig = options.cwd

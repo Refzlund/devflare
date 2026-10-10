@@ -10,13 +10,9 @@ import { dirname, resolve } from 'pathe'
 import { isIgnorableMiniflareDisposeError } from '../bridge/miniflare'
 import { bundleWorkerEntry, type DOBundleResult } from '../bundler'
 import { checkRemoteBindingRequirements } from '../cli/wrangler-auth'
-import {
-	EnvVarResolutionError,
-	getDevflareDotenvPaths,
-	resolveConfigEnvVars
-} from '../config/env-vars'
+import { resolveDevConfig } from '../config/dev-config'
+import { EnvVarResolutionError, getDevflareDotenvPaths } from '../config/env-vars'
 import { loadConfig } from '../config/loader'
-import { applyLocalDevVarsToConfig } from '../config/local-dev-vars'
 import { resolveServiceBindings } from '../test/resolve-service-bindings'
 import { generatedDir } from '../utils/generated-dir'
 import { toMiniflareOptions } from '../utils/miniflare-options'
@@ -429,14 +425,9 @@ export function createDevServer(options: DevServerOptions): DevServer {
 	async function loadRuntimeConfig(): Promise<void> {
 		state.resolvedWorkerConfigPath = await resolveWorkerConfigWatchPath(cwd, configPath)
 		const loadedConfig = await loadConfig({ cwd, configFile: configPath })
-		const envResolvedConfig = await resolveConfigEnvVars(loadedConfig, {
+		state.config = await resolveDevConfig(loadedConfig, {
 			cwd,
-			configPath: state.resolvedWorkerConfigPath ?? configPath,
-			mode: 'dev'
-		})
-		state.config = await applyLocalDevVarsToConfig(envResolvedConfig, {
-			cwd,
-			configPath: state.resolvedWorkerConfigPath ?? undefined
+			configPath: state.resolvedWorkerConfigPath ?? configPath
 		})
 		state.serviceBindingResolution = state.config.bindings?.services
 			? await resolveServiceBindings(

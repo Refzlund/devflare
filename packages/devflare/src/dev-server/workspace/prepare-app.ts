@@ -19,9 +19,8 @@ import {
 	type DOBundler
 } from '../../bundler'
 import type { DevflareConfig } from '../../config'
-import { resolveConfigEnvVars } from '../../config/env-vars'
+import { resolveDevConfig } from '../../config/dev-config'
 import { loadConfig } from '../../config/loader'
-import { applyLocalDevVarsToConfig } from '../../config/local-dev-vars'
 import {
 	getLocalD1DatabaseIdentifier,
 	getLocalKVNamespaceIdentifier,
@@ -132,8 +131,7 @@ export async function prepareWorkspaceApp(
 
 	// --- config load (mirrors createDevServer.loadRuntimeConfig) --------------
 	const loaded = await loadConfig({ cwd: appCwd, configFile: configPath })
-	const envResolved = await resolveConfigEnvVars(loaded, { cwd: appCwd, configPath, mode: 'dev' })
-	const config = await applyLocalDevVarsToConfig(envResolved, { cwd: appCwd, configPath })
+	const config = await resolveDevConfig(loaded, { cwd: appCwd, configPath })
 	const appName = input.appName ?? config.name
 	const serviceBindingResolution = config.bindings?.services
 		? await resolveServiceBindings(config, appCwd)

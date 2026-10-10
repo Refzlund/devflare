@@ -11,8 +11,8 @@
 import { dirname, resolve } from 'path'
 import type { BridgeClient } from '../bridge/client'
 import type { DevflareConfig } from '../config'
-import { loadConfig, resolveConfigEnvVars } from '../config'
-import { applyLocalDevVarsToConfig } from '../config/local-dev-vars'
+import { loadConfig } from '../config'
+import { resolveDevConfig } from '../config/dev-config'
 import { __clearTestContext, type EnvDisposeOptions } from '../env'
 import { disposeLocalWorkerLoaderBindings } from '../shims/local-worker-loader'
 import { stopActiveContainers } from './containers'
@@ -99,12 +99,7 @@ export async function resolveTestContextConfig(
 		cwd: configDir,
 		configFile: absolutePath.split(/[/\\]/).pop()
 	})
-	const envResolvedConfig = await resolveConfigEnvVars(loadedConfig, {
-		cwd: configDir,
-		configPath: absolutePath,
-		mode: 'dev'
-	})
-	const config = await applyLocalDevVarsToConfig(envResolvedConfig, {
+	const config = await resolveDevConfig(loadedConfig, {
 		cwd: configDir,
 		configPath: absolutePath
 	})

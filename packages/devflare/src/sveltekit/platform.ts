@@ -7,6 +7,7 @@
 
 import { type BindingHints, createEnvProxy, getClient, setBindingHints } from '../bridge'
 import { type DevflareConfig, loadConfig } from '../config'
+import { resolveDevConfig } from '../config/dev-config'
 import { readInjectedVars } from '../config/injected-vars'
 import {
 	type DevRuntimeReading,
@@ -493,45 +494,84 @@ let configCache: {
 	promise: Promise<DevflareConfig | null>
 } | null = null
 
-function getConfigFileFromEnv(): string | undefined {
-	return process.env.DEVFLARE_CONFIG_PATH
-}
-
-async function loadConfigFromCurrentCwd(): Promise<DevflareConfig | null> {
-	const cwd = process.cwd()
-	const configFile = getConfigFileFromEnv()
-
-	// Check if we have a cached promise for this cwd
-	if (configCache?.cwd === cwd && configCache.configFile === configFile) {
-		return configCache.promise
-	}
-
-	// Create new cache entry with promise (handles concurrent requests)
-	const promise = loadConfig({ cwd, configFile }).catch((err) => {
+/**
+ * @description Reads the app's devflare config through {@link resolveDevConfig}, the step the
+ * dev coordinator takes, so a var reads the same in `platform.env` as in the coordinator's workers.
+ * @param cwd - the app root
+ * @param configFile - the config the coordinator named, if any
+ * @returns `null` when no config could be loaded, which leaves the handle serving the bridge alone
+ * @throws {EnvVarResolutionError} When a required `env.NAME` var has no value. It is not degraded
+ *   to `null` like a config that will not load: that would drop every binding's hint as well, and
+ *   the app would see its bindings vanish with nothing saying why.
+ */
+async function loadDevConfig(
+	cwd: string,
+	configFile: string | undefined
+): Promise<DevflareConfig | null> {
+	const loaded = await loadConfig({ cwd, configFile }).catch((err) => {
 		// Log error in debug mode
 		if (process.env.DEVFLARE_DEBUG) {
 			console.warn('[devflare] Failed to load config for hints:', err.message)
 		}
 		return null
 	})
+	if (!loaded) {
+		return null
+	}
 
+	return resolveDevConfig(loaded, { cwd, configPath: configFile })
+}
+
+async function loadDevConfigCached(
+	cwd: string,
+	configFile: string | undefined
+): Promise<DevflareConfig | null> {
+	// Check if we have a cached promise for this cwd
+	if (configCache?.cwd === cwd && configCache.configFile === configFile) {
+		return configCache.promise
+	}
+
+	// Create new cache entry with promise (handles concurrent requests)
+	const promise = loadDevConfig(cwd, configFile)
 	configCache = { cwd, configFile, promise }
+
+	// A failed read is forgotten, never replayed: the developer adds the missing var to `.env`
+	// and the next request reads it. The failure itself still reaches the caller awaiting
+	// `promise`; this branch only evicts the entry.
+	promise.catch(() => {
+		if (configCache?.promise === promise) {
+			configCache = null
+		}
+	})
 
 	return promise
 }
 
-async function loadPlatformOptionsFromConfig(): Promise<
-	Pick<DevflarePlatformOptions, 'hints' | 'localBindings'>
-> {
-	const cwd = process.cwd()
-	const config = await loadConfigFromCurrentCwd()
+/**
+ * @description Builds what the pre-configured {@link handle} serves from the app's devflare
+ * config: binding hints, and the bindings served from this process rather than the bridge.
+ *
+ * Exported for unit testing; the handle calls it with no arguments.
+ *
+ * @param cwd - the app root, where the config is searched for
+ * @param environment - where devflare's own variables (`DEVFLARE_CONFIG_PATH`,
+ *   `DEVFLARE_INJECTED_VARS`) are read from
+ * @returns no hints and no local bindings when no config could be loaded
+ * @throws {EnvVarResolutionError} When a required `env.NAME` var has no value; the handle
+ *   reports it on the request (see {@link createPlatformOrReport}).
+ */
+export async function loadPlatformOptionsFromConfig(
+	cwd: string = process.cwd(),
+	environment: Record<string, string | undefined> = process.env
+): Promise<Pick<DevflarePlatformOptions, 'hints' | 'localBindings'>> {
+	const config = await loadDevConfigCached(cwd, environment.DEVFLARE_CONFIG_PATH)
 	if (!config) {
 		return { hints: {}, localBindings: {} }
 	}
 
 	return {
 		hints: extractBindingHints(config),
-		localBindings: buildSvelteKitLocalBindings(config, cwd, readInjectedVars(process.env))
+		localBindings: buildSvelteKitLocalBindings(config, cwd, readInjectedVars(environment))
 	}
 }
 
