@@ -3,7 +3,12 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { defineConfig, env } from '../../../src/config'
-import { EnvVarResolutionError } from '../../../src/config/env-vars'
+import {
+	EnvVarParseError,
+	EnvVarResolutionError,
+	getDevflareDotenvPaths,
+	loadDevflareDotenvIntoProcess
+} from '../../../src/config/env-vars'
 import type { RefResult } from '../../../src/config/ref'
 import type { DevflareConfig } from '../../../src/config/schema'
 import {
@@ -259,12 +264,15 @@ export async function ping(): Promise<string> {
 	 * `vars` hold one `env.NAME` descriptor, plus any files beside its config.
 	 * @param envKey - the variable the descriptor reads
 	 * @param files - files beside the referenced config, by name (`.env`, `.dev.vars`)
-	 * @returns the project root, and the gateway config that binds the referenced worker
+	 * @param parse - a parser to give the descriptor, if any
+	 * @returns the project root, the referenced worker's directory, and the gateway config
+	 *   that binds the referenced worker
 	 */
 	async function writeReferencedWorkerWithEnvVar(
 		envKey: string,
-		files: Record<string, string>
-	): Promise<{ projectDir: string; primaryConfig: DevflareConfig }> {
+		files: Record<string, string>,
+		parse?: (value: string) => unknown
+	): Promise<{ projectDir: string; workerDir: string; primaryConfig: DevflareConfig }> {
 		const projectDir = await mkdtemp(join(tmpdir(), 'devflare-service-bindings-env-'))
 		tempDirs.push(projectDir)
 
@@ -282,7 +290,7 @@ export async function ping(): Promise<string> {
 			name: 'api-worker',
 			compatibilityDate: '2026-04-28',
 			vars: {
-				ORIGIN: env[envKey],
+				ORIGIN: parse ? env[envKey].parse(parse) : env[envKey],
 				LABEL: 'plain'
 			}
 		})
@@ -300,7 +308,7 @@ export async function ping(): Promise<string> {
 			}
 		} as DevflareConfig
 
-		return { projectDir, primaryConfig }
+		return { projectDir, workerDir, primaryConfig }
 	}
 
 	test("resolves a referenced worker's env.NAME vars and .dev.vars from beside its own config", async () => {
@@ -320,19 +328,64 @@ export async function ping(): Promise<string> {
 		})
 	})
 
+	test("a referenced worker reads its own .env before the gateway's, which loadConfig copied into process.env", async () => {
+		const envKey = `DEVFLARE_REF_SHARED_${crypto.randomUUID().replaceAll('-', '_')}`
+		const { projectDir, primaryConfig } = await writeReferencedWorkerWithEnvVar(envKey, {
+			'.env': `${envKey}=from-the-workers-own-env\n`
+		})
+		await writeFile(join(projectDir, '.env'), `${envKey}=from-the-gateways-env\n`)
+
+		try {
+			// What `loadConfig` does with the gateway's config before its services are resolved.
+			await loadDevflareDotenvIntoProcess(projectDir)
+			const result = await resolveServiceBindings(primaryConfig, projectDir)
+
+			expect(result.workers[0]?.bindings?.ORIGIN).toBe('from-the-workers-own-env')
+		} finally {
+			delete process.env[envKey]
+		}
+	})
+
 	test('a referenced worker missing a required env.NAME var fails naming that worker', async () => {
 		const envKey = `DEVFLARE_REF_UNSET_${crypto.randomUUID().replaceAll('-', '_')}`
-		const { projectDir, primaryConfig } = await writeReferencedWorkerWithEnvVar(envKey, {})
+		const { projectDir, workerDir, primaryConfig } = await writeReferencedWorkerWithEnvVar(
+			envKey,
+			{}
+		)
 
 		const failure = await resolveServiceBindings(primaryConfig, projectDir).then(
 			() => null,
 			(error: unknown) => error
 		)
 
-		// The class is load-bearing: the dev server waits for `.env` to change on exactly this one.
+		// The class is load-bearing: the dev server waits for `.env` to change on exactly this one,
+		// watching the files it names, which must include the ones beside the worker's own config.
 		expect(failure).toBeInstanceOf(EnvVarResolutionError)
+		expect((failure as EnvVarResolutionError).dotenvPaths).toEqual(
+			getDevflareDotenvPaths(workerDir)
+		)
 		expect((failure as Error).message).toContain('"api-worker"')
+		expect((failure as Error).message).toContain('devflare.config.ts')
 		expect((failure as Error).message).toContain(envKey)
+	})
+
+	test("a referenced worker's var whose parser throws fails naming that worker", async () => {
+		const envKey = `DEVFLARE_REF_PARSED_${crypto.randomUUID().replaceAll('-', '_')}`
+		const { projectDir, primaryConfig } = await writeReferencedWorkerWithEnvVar(
+			envKey,
+			{ '.env': `${envKey}=not-a-number\n` },
+			() => {
+				throw new Error('expected a number')
+			}
+		)
+
+		const failure = await resolveServiceBindings(primaryConfig, projectDir).then(
+			() => null,
+			(error: unknown) => error
+		)
+
+		expect(failure).toBeInstanceOf(EnvVarParseError)
+		expect((failure as Error).message).toContain('"api-worker"')
 	})
 
 	test('wires local Durable Objects owned by referenced service workers', async () => {

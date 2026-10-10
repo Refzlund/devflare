@@ -505,6 +505,13 @@ export async function loadDevflareDotenv(startDir: string): Promise<LoadDevflare
 }
 
 /**
+ * The values {@link loadDevflareDotenvIntoProcess} copied into `process.env`, by name. They came
+ * from some config's `.env` file, not from the environment the process was started with, so
+ * {@link resolveConfigEnvVars} ranks them below the `.env` files of the config it is resolving.
+ */
+const copiedFromDotenv = new Map<string, string>()
+
+/**
  * Load Devflare `.env` values into `process.env` without overwriting existing
  * process-level values.
  *
@@ -521,10 +528,34 @@ export async function loadDevflareDotenvIntoProcess(
 	for (const [key, value] of Object.entries(loaded.values)) {
 		if (process.env[key] === undefined) {
 			process.env[key] = value
+			copiedFromDotenv.set(key, value)
 		}
 	}
 
 	return loaded
+}
+
+/**
+ * @description Splits `process.env` into the values devflare copied in from a `.env` file and
+ * the rest. A copied value that something has since overwritten counts as the environment's.
+ * @returns both halves, each keyed by variable name
+ */
+function partitionProcessEnv(): {
+	copied: Record<string, string>
+	environment: Record<string, string | undefined>
+} {
+	const copied: Record<string, string> = {}
+	const environment: Record<string, string | undefined> = {}
+
+	for (const [key, value] of Object.entries(process.env)) {
+		if (value !== undefined && copiedFromDotenv.get(key) === value) {
+			copied[key] = value
+		} else {
+			environment[key] = value
+		}
+	}
+
+	return { copied, environment }
 }
 
 export interface MissingEnvVar {
@@ -579,9 +610,16 @@ function formatMissingEnvTree(missing: MissingEnvVar[]): string {
 export class EnvVarResolutionError extends Error {
 	readonly code = 'ENV_VARS_MISSING'
 
+	/**
+	 * @param missing - every required variable that had no value
+	 * @param mode - the mode the config was resolved in
+	 * @param dotenvPaths - the `.env` files a value could have come from, so a caller can wait
+	 *   for one of them to change; empty when the resolution read no file
+	 */
 	constructor(
 		public readonly missing: MissingEnvVar[],
-		public readonly mode: EnvResolutionMode
+		public readonly mode: EnvResolutionMode,
+		public readonly dotenvPaths: readonly string[] = []
 	) {
 		super(
 			['These environment variables are missing:', '', formatMissingEnvTree(missing)].join('\n')
@@ -708,9 +746,8 @@ function resolveVarsObject(
 
 /**
  * @description Resolves the `env.NAME` descriptors under a config's `vars` from the values
- * given, reading no file. {@link resolveConfigEnvVars} applies it once it has gathered the
- * `.env` values. A surface with no directory to read applies it to `process.env` alone:
- * `createOfflineEnv`, and Miniflare started from a config without a `cwd`.
+ * given, reading no file. It is for a surface with no directory to read, which applies it to
+ * `process.env` alone: `createOfflineEnv`, and Miniflare started from a config without a `cwd`.
  * @param vars - a config's `vars`; plain values pass through as written
  * @param sources - the values a descriptor reads, by variable name
  * @param mode - `dev` honours `.dev()` and `.absentInDev()`; `build` does not
@@ -778,11 +815,22 @@ export async function resolveConfigEnvVars<TConfig extends DevflareConfig>(
 		? dirname(resolve(options.cwd, options.configPath))
 		: options.cwd
 	const dotenv = await loadDevflareDotenv(startDir)
+	// Lowest to highest: a value devflare copied into `process.env` from ANOTHER config's `.env`
+	// (`loadConfig` copies every config's, so a second config would otherwise read the first
+	// one's file before its own), then this config's own `.env` files, then the environment the
+	// process was started with. A copied value still fills a name this config's files lack.
+	const { copied, environment } = partitionProcessEnv()
 	const sources: Record<string, string | undefined> = {
+		...copied,
 		...dotenv.values,
-		...process.env
+		...environment
 	}
-	const vars = resolveVarsFromSources(config.vars, sources, options.mode)
+	const missing: MissingEnvVar[] = []
+	const vars = resolveVarsObject(config.vars, sources, options.mode, missing)
+
+	if (missing.length > 0) {
+		throw new EnvVarResolutionError(missing, options.mode, getDevflareDotenvPaths(startDir))
+	}
 
 	return vars === config.vars
 		? config

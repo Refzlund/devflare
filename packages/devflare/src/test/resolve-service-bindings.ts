@@ -315,7 +315,12 @@ function resolveReferencedConfigDir(ref: RefResult, parentConfigDir: string): st
  * @description Reads a referenced worker's config the way the dev coordinator reads the main
  * one ({@link resolveDevConfig}): its `env.NAME` vars resolved in dev mode, then the
  * `.dev.vars` beside the referenced config on top, as wrangler gives each worker its own.
- * Every consumer of this module builds a local runtime, so dev mode is always the right one.
+ *
+ * → GOTCHA: because of that overlay, a worker built here holds local secrets as plain vars, so
+ *   it must only ever feed a local runtime. `getDevflareConfigs()` (`vite/plugin-programmatic.ts`)
+ *   hands these workers' vars to `@cloudflare/vite-plugin`, which writes them into `dist` on
+ *   `vite build`. That path reaches no real `ref()` today only because `resolveResources` drops
+ *   the binding's `__ref`; whoever restores it must keep this overlay out of a build.
  * @param ref - the resolved ref
  * @param parentConfigDir - the directory the ref's `configPath` is relative to
  * @returns the config; its vars stay unresolved only when the ref carries no config path,

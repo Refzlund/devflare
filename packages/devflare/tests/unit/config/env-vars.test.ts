@@ -5,7 +5,9 @@ import { join } from 'node:path'
 import { defineConfig, env } from '../../../src/config'
 import {
 	EnvVarResolutionError,
+	getDevflareDotenvPaths,
 	loadDevflareDotenv,
+	loadDevflareDotenvIntoProcess,
 	resolveConfigEnvVars
 } from '../../../src/config/env-vars'
 
@@ -180,6 +182,89 @@ describe('resolveConfigEnvVars', () => {
 				process.env.DEVFLARE_TEST_PROCESS_OVERRIDE = previous
 			}
 		}
+	})
+
+	/**
+	 * @description Two sibling config directories, each with a `.env`, as a gateway and the
+	 * worker it references, or two workspace apps, lay out. Names are unique per call.
+	 * @returns both directories and the variable names their files set
+	 */
+	function writeSiblingConfigDirs() {
+		const root = makeTempProject()
+		const first = join(root, 'first')
+		const second = join(root, 'second')
+		mkdirSync(first)
+		mkdirSync(second)
+		const suffix = crypto.randomUUID().replaceAll('-', '_')
+		const shared = `DEVFLARE_COPIED_SHARED_${suffix}`
+		const onlyFirst = `DEVFLARE_COPIED_ONLY_FIRST_${suffix}`
+		writeProjectFile(first, '.env', `${shared}=from-first\n${onlyFirst}=only-in-first\n`)
+		writeProjectFile(second, '.env', `${shared}=from-second\n`)
+
+		const secondConfig = defineConfig({
+			name: 'second-worker',
+			compatibilityDate: '2026-05-01',
+			vars: { shared: env[shared], onlyFirst: env[onlyFirst] }
+		})
+		const resolveSecond = () =>
+			resolveConfigEnvVars(secondConfig, {
+				cwd: second,
+				configPath: join(second, 'devflare.config.ts'),
+				mode: 'dev'
+			})
+
+		return { first, shared, onlyFirst, resolveSecond }
+	}
+
+	test("a value copied from another config's .env ranks below this config's own, and still fills a gap", async () => {
+		// `loadConfig` copies each config's `.env` into `process.env`, so a second config would
+		// otherwise read the first one's file before its own.
+		const { first, shared, onlyFirst, resolveSecond } = writeSiblingConfigDirs()
+
+		try {
+			await loadDevflareDotenvIntoProcess(first)
+			const resolved = await resolveSecond()
+
+			expect(resolved.vars).toEqual({ shared: 'from-second', onlyFirst: 'only-in-first' })
+		} finally {
+			delete process.env[shared]
+			delete process.env[onlyFirst]
+		}
+	})
+
+	test('a copied value that has since been overwritten counts as the environment, and wins', async () => {
+		const { first, shared, onlyFirst, resolveSecond } = writeSiblingConfigDirs()
+
+		try {
+			await loadDevflareDotenvIntoProcess(first)
+			process.env[shared] = 'set-after-the-copy'
+			const resolved = await resolveSecond()
+
+			expect(resolved.vars).toEqual({ shared: 'set-after-the-copy', onlyFirst: 'only-in-first' })
+		} finally {
+			delete process.env[shared]
+			delete process.env[onlyFirst]
+		}
+	})
+
+	test('a missing variable names the .env files that could have supplied it', async () => {
+		const cwd = makeTempProject()
+		const missing = `DEVFLARE_MISSING_${crypto.randomUUID().replaceAll('-', '_')}`
+
+		const failure = await resolveConfigEnvVars(
+			defineConfig({
+				name: 'missing-worker',
+				compatibilityDate: '2026-05-01',
+				vars: { value: env[missing] }
+			}),
+			{ cwd, configPath: join(cwd, 'devflare.config.ts'), mode: 'dev' }
+		).then(
+			() => null,
+			(error: unknown) => error
+		)
+
+		expect(failure).toBeInstanceOf(EnvVarResolutionError)
+		expect((failure as EnvVarResolutionError).dotenvPaths).toEqual(getDevflareDotenvPaths(cwd))
 	})
 })
 

@@ -5,7 +5,7 @@ import { pathToFileURL } from 'node:url'
 import { join } from 'pathe'
 import { createDevServer, type DevServer } from '../../../src/dev-server'
 import { getAvailablePort } from '../helpers/built-devflare.helpers'
-import { createCapturedLogger } from './worker-only-multi-surface.helpers'
+import { createCapturedLogger, waitForLogEntry } from './worker-only-multi-surface.helpers'
 
 const TEST_TIMEOUT_MS = 60_000
 
@@ -42,7 +42,17 @@ async function waitForJson<T>(url: string, timeoutMs = 20_000): Promise<T> {
 	throw lastError instanceof Error ? lastError : new Error(`Timed out waiting for ${url}`)
 }
 
-async function writeFixture(projectDir: string): Promise<void> {
+/**
+ * Write a gateway worker that calls a referenced `api-worker` over RPC.
+ *
+ * @param projectDir - the gateway's root; the referenced worker lives in `api/`
+ * @param apiOrigin - the value the `.env` beside the referenced config gives its `ORIGIN` var,
+ *   or `null` to write no such file
+ */
+async function writeFixture(
+	projectDir: string,
+	apiOrigin: string | null = 'from-the-api-env'
+): Promise<void> {
 	await mkdir(join(projectDir, 'src'), { recursive: true })
 	await mkdir(join(projectDir, 'api', 'src'), { recursive: true })
 
@@ -87,7 +97,9 @@ export class Counter extends DurableObject {
 `.trim()
 	)
 
-	await writeFile(join(projectDir, 'api', '.env'), `${REF_ORIGIN_ENV}=from-the-api-env\n`)
+	if (apiOrigin !== null) {
+		await writeFile(join(projectDir, 'api', '.env'), `${REF_ORIGIN_ENV}=${apiOrigin}\n`)
+	}
 
 	await writeFile(
 		join(projectDir, 'api', 'devflare.config.ts'),
@@ -227,6 +239,64 @@ describe('dev server referenced service bindings', () => {
 			const payload = await waitForJson<{ result: string }>(`http://127.0.0.1:${miniflarePort}/`)
 
 			expect(payload).toEqual({ result: 'PONG:PONG:DO_PONG:enabled:from-the-api-env' })
+		},
+		TEST_TIMEOUT_MS
+	)
+})
+
+describe("dev server waiting on a referenced worker's missing var", () => {
+	test(
+		'starts once the .env beside the referenced config supplies it',
+		async () => {
+			const projectDir = await mkdtemp(join(tmpdir(), 'devflare-dev-ref-service-wait-'))
+			await writeFixture(projectDir, null)
+			const miniflarePort = await getAvailablePort()
+			const logger = createCapturedLogger()
+			const devServer = createDevServer({
+				cwd: projectDir,
+				miniflarePort,
+				enableVite: false,
+				persist: false,
+				logger: logger as never
+			})
+
+			const started = devServer.start()
+			let startDeadline: ReturnType<typeof setTimeout> | undefined
+			try {
+				// The premise: it is waiting, and on the referenced worker's var, not something else.
+				await waitForLogEntry(logger, 'waiting for .env')
+				expect(logger.messages.map((entry) => entry.message).join('\n')).toContain(
+					'Service-bound worker "api-worker"'
+				)
+
+				// The file the message points at. It is beside the referenced config, outside every
+				// directory the gateway's own `.env` files are searched in.
+				await writeFile(
+					join(projectDir, 'api', '.env'),
+					`${REF_ORIGIN_ENV}=written-while-waiting\n`
+				)
+				const notStarted = new Promise<never>((_, reject) => {
+					startDeadline = setTimeout(
+						() =>
+							reject(new Error('devflare dev did not start after the referenced .env was written')),
+						20_000
+					)
+				})
+				await Promise.race([started, notStarted])
+
+				const payload = await waitForJson<{ result: string }>(`http://127.0.0.1:${miniflarePort}/`)
+				expect(payload).toEqual({ result: 'PONG:PONG:DO_PONG:enabled:written-while-waiting' })
+			} finally {
+				clearTimeout(startDeadline)
+				await devServer.stop()
+				// On a failure above, `start()` may still be pending or reject once stopped; that outcome
+				// is not this test's verdict, which has already been decided by the failure itself.
+				await started.then(
+					() => undefined,
+					() => undefined
+				)
+				await rm(projectDir, { recursive: true, force: true })
+			}
 		},
 		TEST_TIMEOUT_MS
 	)

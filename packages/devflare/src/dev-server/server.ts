@@ -437,11 +437,17 @@ export function createDevServer(options: DevServerOptions): DevServer {
 			: null
 	}
 
-	async function waitForDotenvChange(): Promise<void> {
+	/**
+	 * Wait for a `.env` file that could supply a missing var to change.
+	 *
+	 * @param failedDotenvPaths - the files the failed resolution searched. The main config's are
+	 *   always watched as well; these add a referenced worker's, which live beside its own config.
+	 */
+	async function waitForDotenvChange(failedDotenvPaths: readonly string[]): Promise<void> {
 		const configWatchPath =
 			state.resolvedWorkerConfigPath ?? (await resolveWorkerConfigWatchPath(cwd, configPath))
 		const startDir = configWatchPath ? dirname(configWatchPath) : cwd
-		const watchPaths = getDevflareDotenvPaths(startDir)
+		const watchPaths = [...new Set([...getDevflareDotenvPaths(startDir), ...failedDotenvPaths])]
 		const { watch } = await import('chokidar')
 
 		await new Promise<void>((resolveWait, rejectWait) => {
@@ -475,7 +481,7 @@ export function createDevServer(options: DevServerOptions): DevServer {
 
 				logger?.warn(error.message)
 				logger?.info('Devflare dev is waiting for .env or .env.dev to change before starting.')
-				await waitForDotenvChange()
+				await waitForDotenvChange(error.dotenvPaths)
 			}
 		}
 	}

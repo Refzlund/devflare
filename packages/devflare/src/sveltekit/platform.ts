@@ -520,10 +520,13 @@ async function loadDevConfig(
 	}
 
 	// → GOTCHA: this resolves against THIS process's environment, and a workspace Vite child's
-	//   carries the app's manifest `env` key by key, which the coordinator's does not. So a
-	//   descriptor whose env NAME is also a manifest key, or a manifest `CLOUDFLARE_ENV`
-	//   (picking `.dev.vars.<env>`), resolves here to a different value than in the app's
-	//   workers. Closing it means the coordinator handing the child its resolved vars.
+	//   carries the app's manifest `env` key by key, which the coordinator's does not. It also
+	//   inherits every `.env` value the coordinator copied in, from every app's config, and here
+	//   they read as the environment the process started with, which outranks this app's own
+	//   `.env`; the coordinator ranks them below it. So a descriptor whose env NAME is also a
+	//   manifest key or another app's `.env` key, or a manifest `CLOUDFLARE_ENV` (picking
+	//   `.dev.vars.<env>`), resolves here to a different value than in the app's workers.
+	//   Closing it means the coordinator handing the child its resolved vars.
 	return resolveDevConfig(loaded, { cwd, configPath: configFile })
 }
 
