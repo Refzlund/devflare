@@ -1,12 +1,12 @@
 // =============================================================================
 // Dev config — a loaded config, as a local dev runtime serves it
 // =============================================================================
-// Every dev surface that builds an env from a config goes through this one
-// step: the dev coordinator, a workspace app, Miniflare started from a config,
-// the test contexts, and the SvelteKit handle in a Vite child. A surface that
-// hand-copies the step can drop half of it, and its env then disagrees with the
-// workers' — the SvelteKit handle served `env.NAME` descriptors as objects, and
-// no `.dev.vars` at all, until it came through here.
+// The dev coordinator, a workspace app, Miniflare started from a config with a
+// `cwd`, both test-context loaders, and the SvelteKit handle in a Vite child
+// all resolve a loaded config through this one step. A surface that hand-copies
+// the step can drop half of it, and its env then disagrees with the workers' —
+// the SvelteKit handle served `env.NAME` descriptors as objects, and no
+// `.dev.vars` at all, until it came through here.
 // =============================================================================
 
 import { resolveConfigEnvVars } from './env-vars'

@@ -10,6 +10,10 @@
 // case18 (SvelteKit 2, devflare's `handle`) is served through a workspace whose
 // manifest sets one value the config reads from `process.env`, and overrides one
 // of the config's `vars`. `/api/workspace-env` reports what the child saw.
+//
+// REGRESSION, the same shape: the child built `platform.env` from the config's
+// `vars` without resolving them, so a var declared with `env.NAME` reached the
+// app as devflare's descriptor object. `descriptor` is such a var.
 // =============================================================================
 
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
@@ -32,13 +36,15 @@ interface WorkspaceEnvPayload {
 	configSaw: string | null
 	manifestOnly: string | null
 	overridden: string | null
+	descriptor: unknown
 }
 
 /** Variables this test sets on its own process, restored afterwards. */
 const coordinatorEnv = {
 	// The manifest names this too, with a different value; the manifest's must win.
 	CASE18_WORKSPACE_ENV: 'from-the-coordinator-shell',
-	// Only the coordinator holds this; the child gets it by inheritance alone.
+	// Only the coordinator holds this; the child gets it by inheritance alone. The
+	// config's `CASE18_DESCRIPTOR_VAR` is `env.CASE18_COORDINATOR_ONLY`.
 	CASE18_COORDINATOR_ONLY: 'inherited-from-the-coordinator'
 }
 
@@ -158,7 +164,8 @@ describe("workspace dev hands a Vite app's manifest env to its Vite child", () =
 				inherited: 'inherited-from-the-coordinator',
 				configSaw: 'from-the-manifest',
 				manifestOnly: 'from-the-manifest',
-				overridden: 'manifest-overrides-config'
+				overridden: 'manifest-overrides-config',
+				descriptor: 'inherited-from-the-coordinator'
 			})
 		},
 		HOOK_TIMEOUT_MS

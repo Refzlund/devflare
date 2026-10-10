@@ -519,6 +519,11 @@ async function loadDevConfig(
 		return null
 	}
 
+	// → GOTCHA: this resolves against THIS process's environment, and a workspace Vite child's
+	//   carries the app's manifest `env` key by key, which the coordinator's does not. So a
+	//   descriptor whose env NAME is also a manifest key, or a manifest `CLOUDFLARE_ENV`
+	//   (picking `.dev.vars.<env>`), resolves here to a different value than in the app's
+	//   workers. Closing it means the coordinator handing the child its resolved vars.
 	return resolveDevConfig(loaded, { cwd, configPath: configFile })
 }
 

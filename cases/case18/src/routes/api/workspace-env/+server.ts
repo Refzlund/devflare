@@ -26,6 +26,8 @@ export const GET: RequestHandler = async ({ platform }) => {
 		/** A manifest key the config's `vars` never mention, in `platform.env`. */
 		manifestOnly: env.CASE18_WORKSPACE_ENV ?? null,
 		/** A config var the manifest overrides, in `platform.env`. */
-		overridden: env.CASE18_STRING_VAR ?? null
+		overridden: env.CASE18_STRING_VAR ?? null,
+		/** A config var declared with `env.NAME`, in `platform.env`. */
+		descriptor: env.CASE18_DESCRIPTOR_VAR ?? null
 	})
 }
