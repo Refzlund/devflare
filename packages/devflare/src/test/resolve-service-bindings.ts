@@ -8,7 +8,6 @@
 import { existsSync, readFileSync } from 'fs'
 import { dirname, join, resolve } from 'path'
 import {
-	configSchema,
 	type DevflareConfig,
 	type DOBindingRef,
 	type DurableObjectBinding,
@@ -17,8 +16,6 @@ import {
 	normalizeDOBinding,
 	normalizeR2Binding
 } from '../config'
-import { resolveDevConfig } from '../config/dev-config'
-import { EnvVarParseError, EnvVarResolutionError } from '../config/env-vars'
 import type { RefResult, WorkerBinding } from '../config/ref'
 import {
 	buildAiSearchInstancesConfig,
@@ -43,6 +40,11 @@ import { transformWorkerEntrypoint } from '../transform/worker-entrypoint'
 import { discoverEntrypointsSync } from '../utils/entrypoint-discovery'
 import { DEFAULT_DO_PATTERN, findFilesSync } from '../utils/glob'
 import { resolvePackageSpecifier } from '../utils/resolve-package'
+import {
+	type ReferencedEnv,
+	resolveReferencedConfig,
+	resolveReferencedConfigDir
+} from './referenced-config'
 
 // -----------------------------------------------------------------------------
 // Bun Runtime Detection
@@ -297,58 +299,13 @@ function buildReferencedWorkerRuntimeConfig(config: DevflareConfig): Partial<Res
 	}
 }
 
-function resolveReferencedConfigPath(ref: RefResult, parentConfigDir: string): string | null {
-	const configPath = ref.configPath
-	if (!configPath || configPath === '<resolved>') {
-		return null
-	}
-
-	return resolvePackageSpecifier(configPath, parentConfigDir)
-}
-
-function resolveReferencedConfigDir(ref: RefResult, parentConfigDir: string): string | null {
-	const configPath = resolveReferencedConfigPath(ref, parentConfigDir)
-	return configPath ? dirname(configPath) : null
-}
-
-/**
- * @description Reads a referenced worker's config the way the dev coordinator reads the main
- * one ({@link resolveDevConfig}): its `env.NAME` vars resolved in dev mode, then the
- * `.dev.vars` beside the referenced config on top, as wrangler gives each worker its own.
- *
- * → GOTCHA: because of that overlay, a worker built here holds local secrets as plain vars, so
- *   it must only ever feed a local runtime. `getDevflareConfigs()` (`vite/plugin-programmatic.ts`)
- *   hands these workers' vars to `@cloudflare/vite-plugin`, which writes them into `dist` on
- *   `vite build`. That path reaches no real `ref()` today only because `resolveResources` drops
- *   the binding's `__ref`; whoever restores it must keep this overlay out of a build.
- * @param ref - the resolved ref
- * @param parentConfigDir - the directory the ref's `configPath` is relative to
- * @returns the config; its vars stay unresolved only when the ref carries no config path,
- *   in which case no worker is built from it
- * @throws {EnvVarResolutionError} When a required var has no value; the message names the worker.
- * @throws {EnvVarParseError} When a var's parser throws; the message names the worker.
- */
-async function resolveReferencedConfig(
-	ref: RefResult,
-	parentConfigDir: string
-): Promise<DevflareConfig> {
-	const config = configSchema.parse(ref.config)
-	const configPath = resolveReferencedConfigPath(ref, parentConfigDir)
-	if (!configPath) {
-		return config
-	}
-
-	try {
-		return await resolveDevConfig(config, { cwd: dirname(configPath), configPath })
-	} catch (error) {
-		// The variable tree names a var, not the config that declared it, and with several workers
-		// that is the question. The class is kept on purpose: the dev server waits for `.env` to
-		// change on an EnvVarResolutionError, and wrapping it would turn that wait into a crash.
-		if (error instanceof EnvVarResolutionError || error instanceof EnvVarParseError) {
-			error.message = `Service-bound worker "${ref.name}" (${configPath}):\n${error.message}`
-		}
-		throw error
-	}
+/** Options for {@link resolveServiceBindingsFor}. */
+export interface ResolveServiceBindingsOptions {
+	/**
+	 * The env referenced workers get. There is no default on purpose: a caller whose result can
+	 * reach a build output must name a mode, and only one that cannot may say `'local'`.
+	 */
+	referencedEnv: ReferencedEnv
 }
 
 interface ReferencedDurableObjectResolution {
@@ -458,6 +415,26 @@ export async function resolveServiceBindings(
 	configDir: string,
 	seenWorkers: Set<string> = new Set()
 ): Promise<ServiceBindingResolution> {
+	return resolveServiceBindingsFor(config, configDir, { referencedEnv: 'local' }, seenWorkers)
+}
+
+/**
+ * @description {@link resolveServiceBindings}, with the referenced workers' env resolved for the
+ * runtime the result will feed. Kept off the public signature, which is the local-runtime one.
+ * @param config - the config whose `bindings.services` to resolve
+ * @param configDir - the directory each ref's `configPath` is relative to
+ * @param options - which env the referenced workers get; see {@link ResolveServiceBindingsOptions}
+ * @param seenWorkers - workers already resolved higher up a nested chain, to stop a cycle
+ * @returns the referenced workers and the primary worker's service bindings
+ * @throws {EnvVarResolutionError} When a referenced worker's required var has no value.
+ * @throws {EnvVarParseError} When a referenced worker's var parser throws.
+ */
+export async function resolveServiceBindingsFor(
+	config: DevflareConfig,
+	configDir: string,
+	options: ResolveServiceBindingsOptions,
+	seenWorkers: Set<string> = new Set()
+): Promise<ServiceBindingResolution> {
 	const services = config.bindings?.services
 	if (!services) {
 		return { workers: [], primaryServiceBindings: {} }
@@ -484,14 +461,15 @@ export async function resolveServiceBindings(
 			// bundleAllEntrypoints will include the default worker entrypoint plus
 			// all named entrypoints discovered from files.entrypoints.
 			if (!workersByName.has(workerName) && !seenWorkers.has(workerName)) {
-				const refConfig = await resolveReferencedConfig(ref, configDir)
+				const refConfig = await resolveReferencedConfig(ref, configDir, options.referencedEnv)
 				const worker = await resolveRefWorker(ref, entrypoint, configDir, refConfig)
 				if (worker) {
 					const refConfigDir = resolveReferencedConfigDir(ref, configDir)
 					if (ref.config && refConfigDir) {
-						const nested = await resolveServiceBindings(
+						const nested = await resolveServiceBindingsFor(
 							refConfig,
 							refConfigDir,
+							options,
 							new Set([...seenWorkers, workerName])
 						)
 						worker.serviceBindings = {

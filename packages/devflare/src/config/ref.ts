@@ -375,13 +375,26 @@ export function ref<
 				if (cached) return cached.name
 				// If name override is provided, use it directly
 				if (nameOverride) return nameOverride
-				// Otherwise, indicate pending (this will be resolved by test context)
+				// Otherwise pending. `loadConfig` resolves every ref a config declares, so only a
+				// config used without loading it reaches here.
 				return PENDING_REF_VALUE
 			},
 			entrypoint,
 			__ref: proxy
 		}
 	}
+
+	// The keys `.worker` answers as a binding. Its reflection (`in`, `Object.keys`, a spread) must
+	// report the same keys its `get` answers, because config transformers copy a binding with
+	// `{ ...binding }`.
+	// → GOTCHA: before the reflection traps below existed, every such copy produced an object
+	//   without `__ref`. `materializePreviewScopedConfig` makes that copy, so every Vite plugin path
+	//   lost the reference before `resolveServiceBindings` could build the worker it names.
+	//   `entrypoint` is left out on purpose: the default accessor has none, and a copy with an
+	//   `entrypoint: undefined` key would differ from the binding it replaced.
+	const accessorBindingKeys = ['service', '__ref'] as const
+	const isAccessorBindingKey = (prop: string | symbol): boolean =>
+		(accessorBindingKeys as readonly (string | symbol)[]).includes(prop)
 
 	// Worker accessor using a Proxy to defer property access
 	const workerAccessor = new Proxy((entrypoint: string) => createWorkerBinding(entrypoint), {
@@ -395,6 +408,30 @@ export function ref<
 			if (prop === 'entrypoint') return undefined
 			if (prop === '__ref') return proxy
 			return Reflect.get(target, prop)
+		},
+		has(target, prop) {
+			return isAccessorBindingKey(prop) || Reflect.has(target, prop)
+		},
+		ownKeys(target) {
+			// The target is an arrow function, whose own `length` and `name` are configurable, so the
+			// Proxy invariants allow leaving them out; they are not part of the binding.
+			return [
+				...accessorBindingKeys,
+				...Reflect.ownKeys(target).filter(
+					(key) => Reflect.getOwnPropertyDescriptor(target, key)?.configurable === false
+				)
+			]
+		},
+		getOwnPropertyDescriptor(target, prop) {
+			if (isAccessorBindingKey(prop)) {
+				return {
+					value: workerAccessor[prop as (typeof accessorBindingKeys)[number]],
+					writable: false,
+					enumerable: true,
+					configurable: true
+				}
+			}
+			return Reflect.getOwnPropertyDescriptor(target, prop)
 		}
 	}) as WorkerBindingAccessor
 

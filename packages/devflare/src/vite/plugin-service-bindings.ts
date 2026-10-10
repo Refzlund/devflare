@@ -124,6 +124,12 @@ function toWranglerWorkerConfig(worker: ResolvedWorker): WranglerConfig {
 	return config
 }
 
+/**
+ * @description Turns resolved service-binding workers into `@cloudflare/vite-plugin` auxiliary
+ * workers, each marked `devOnly`, plus the virtual modules that serve their bundled scripts.
+ * @param resolution - what `resolveServiceBindings` returned, if anything
+ * @returns the auxiliary worker configs and their virtual modules, keyed by resolved module id
+ */
 export function createAuxiliaryServiceWorkerConfigs(
 	resolution: ServiceBindingResolution | null | undefined
 ): AuxiliaryServiceWorkerResult {
@@ -136,7 +142,10 @@ export function createAuxiliaryServiceWorkerConfigs(
 		virtualModules.set(resolvedVirtualServiceWorkerId(worker.name), worker.script)
 
 		return {
-			config: toWranglerWorkerConfig(worker) as unknown as Record<string, unknown>
+			config: toWranglerWorkerConfig(worker) as unknown as Record<string, unknown>,
+			// Every worker here is one a `ref()` binding names, or one of its own helpers, and each is
+			// deployed from its own config. A `vite build` of THIS app must not build it into `dist`.
+			devOnly: true
 		}
 	})
 

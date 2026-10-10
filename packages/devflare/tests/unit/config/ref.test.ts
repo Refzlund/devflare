@@ -70,6 +70,24 @@ describe('ref', () => {
 		expect(binding.__ref).toBe(result)
 	})
 
+	test('.worker reflects the keys its get trap answers, so a copy keeps service and __ref', async () => {
+		const result = ref(async () => ({
+			default: { name: 'math-worker', compatibilityDate: '2025-01-07' }
+		}))
+		await result.resolve()
+		const binding = result.worker
+
+		// Every config transformer copies a binding with `{ ...binding }` or walks it with
+		// `Object.entries`, and a proxy whose reflection disagrees with its `get` loses `__ref` there.
+		expect('__ref' in binding).toBe(true)
+		expect('service' in binding).toBe(true)
+		expect(Object.keys(binding).sort()).toEqual(['__ref', 'service'])
+
+		const copy = { ...binding }
+		expect(copy.service).toBe('math-worker')
+		expect(copy.__ref).toBe(result)
+	})
+
 	test('handles direct export (no default)', async () => {
 		const mockConfig = {
 			name: 'direct-export-worker',

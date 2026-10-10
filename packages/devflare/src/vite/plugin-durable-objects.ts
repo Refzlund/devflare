@@ -24,8 +24,16 @@ export const RESOLVED_VIRTUAL_DO_ENTRY = '\0' + VIRTUAL_DO_ENTRY
 // Re-exported from the shared helper so existing import paths keep working.
 export { type DODiscoveryResult, discoverDurableObjects }
 
+/** One entry of `@cloudflare/vite-plugin`'s `auxiliaryWorkers` option, as devflare produces it. */
 export interface AuxiliaryWorkerConfig {
+	/** The worker's Wrangler config, inline. */
 	config: Record<string, unknown>
+	/**
+	 * `@cloudflare/vite-plugin`'s own flag (1.39.0 and later): the worker runs in `vite dev` and is
+	 * left out of `vite build` and its deploy config. Devflare sets it on a worker a `ref()` binding
+	 * names, which is deployed on its own and must not be built into this app's output.
+	 */
+	devOnly?: boolean
 }
 
 /**

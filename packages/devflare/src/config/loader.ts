@@ -5,6 +5,7 @@
 import { existsSync } from 'node:fs'
 import { dirname, join, resolve } from 'pathe'
 import { loadWithC12 } from './c12'
+import { resolveConfigRefs } from './config-refs'
 import { loadDevflareDotenvIntoProcess } from './env-vars'
 import { applyFrameworkConfigProviders } from './framework-providers'
 import { configSchema, type DevflareConfig } from './schema'
@@ -91,6 +92,9 @@ export async function loadConfig(options: LoadConfigOptions = {}): Promise<Devfl
 	if (!result.success) {
 		throw new ConfigValidationError(result.error.issues, loadedFile)
 	}
+
+	// Before any consumer reads a binding: an unresolved ref() names its worker `<pending>`.
+	await resolveConfigRefs(result.data, loadedFile)
 
 	return applyFrameworkConfigProviders(result.data, {
 		cwd,

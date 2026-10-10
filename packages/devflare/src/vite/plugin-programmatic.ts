@@ -9,8 +9,10 @@
 import { relative } from 'pathe'
 import { loadResolvedConfig, resolveConfigEnvVars, resolveResources } from '../config'
 import { compileConfig, compileToProgrammaticConfig } from '../config/compiler'
+import type { EnvResolutionMode } from '../config/env-vars'
 import { loadConfig } from '../config/loader'
-import { resolveServiceBindings } from '../test/resolve-service-bindings'
+import type { DevflareConfig } from '../config/schema'
+import { resolveServiceBindingsFor } from '../test/resolve-service-bindings'
 import { DEFAULT_DO_PATTERN } from '../utils/glob'
 import { prepareComposedWorkerEntrypoint } from '../worker-entry/composed-worker'
 import {
@@ -46,12 +48,15 @@ async function loadProgrammaticDevflareConfig(options: ProgrammaticConfigOptions
 					phase: 'local',
 					environment: options.environment
 				})
+	// The ONE mode every config this path emits resolves its `env.NAME` vars in, referenced
+	// workers included, so a declaration never resolves one way here and another there.
+	const envMode: EnvResolutionMode = strategy === 'remote' ? 'build' : 'dev'
 	const devflareConfig = await resolveConfigEnvVars(resourceResolvedConfig, {
 		cwd,
 		configPath: options.configPath,
-		mode: strategy === 'remote' ? 'build' : 'dev'
+		mode: envMode
 	})
-	return { cwd, devflareConfig }
+	return { cwd, devflareConfig, envMode }
 }
 
 interface ProgrammaticArtifacts {
@@ -61,6 +66,8 @@ interface ProgrammaticArtifacts {
 	wranglerConfig: ReturnType<typeof compileConfig>
 	cloudflareConfig: Record<string, unknown>
 	auxiliaryWorkers: AuxiliaryWorkerConfig[]
+	/** The mode `devflareConfig`'s vars were resolved in, which its referenced workers share. */
+	envMode: EnvResolutionMode
 }
 
 /**
@@ -70,13 +77,15 @@ interface ProgrammaticArtifacts {
  * out of this. The function loads the devflare config, prepares the composed
  * worker entrypoint, compiles the wrangler config, derives the matching
  * cloudflare-vite-plugin config (with optional `programmatic` projection),
- * and discovers auxiliary DO workers when applicable.
+ * and discovers auxiliary DO workers when applicable. The workers `ref()`
+ * service bindings name are added by `getDevflareConfigs` alone, since
+ * `getCloudflareConfig` returns no auxiliary workers to put them in.
  */
 async function buildProgrammaticArtifacts(
 	options: ProgrammaticConfigOptions,
 	mode: 'wrangler' | 'programmatic'
 ): Promise<ProgrammaticArtifacts> {
-	const { cwd, devflareConfig } = await loadProgrammaticDevflareConfig(options)
+	const { cwd, devflareConfig, envMode } = await loadProgrammaticDevflareConfig(options)
 	const composedMainEntry = await prepareComposedWorkerEntrypoint(cwd, devflareConfig)
 
 	const wranglerConfig = compileConfig(devflareConfig)
@@ -110,20 +119,14 @@ async function buildProgrammaticArtifacts(
 		}
 	}
 
-	if (devflareConfig.bindings?.services) {
-		const serviceBindingResolution = await resolveServiceBindings(devflareConfig, cwd)
-		auxiliaryWorkers.push(
-			...createAuxiliaryServiceWorkerConfigs(serviceBindingResolution).auxiliaryWorkers
-		)
-	}
-
 	return {
 		cwd,
 		devflareConfig,
 		composedMainEntry,
 		wranglerConfig,
 		cloudflareConfig,
-		auxiliaryWorkers
+		auxiliaryWorkers,
+		envMode
 	}
 }
 
@@ -146,8 +149,43 @@ export async function getCloudflareConfig(
 }
 
 /**
- * Get auxiliary worker configs for Durable Objects
+ * @description Builds the `devOnly` auxiliary workers for the workers a config's `ref()`
+ * service bindings name. Their `env.NAME` vars resolve in the main config's mode, and no
+ * `.dev.vars` is laid over them, because this path's output reaches `vite build` as well as
+ * `vite dev` and cannot tell which.
+ *
+ * → NOTE: `devOnly` keeps these workers out of a build on `@cloudflare/vite-plugin` 1.39.0 and
+ *   later. An older 1.x, which devflare's peer range still admits, ignores it and builds them, and
+ *   then a referenced worker's `.dev()` fallbacks reach `dist` exactly as the main config's do in
+ *   the `'offline-local'` strategy. `.dev.vars` secrets reach it on no version.
+ * @param devflareConfig - the loaded config, its refs already resolved
+ * @param cwd - the directory the refs' config paths are relative to
+ * @param envMode - the mode the main config's vars were resolved in
+ * @returns one auxiliary worker per referenced worker and per helper worker it needs
+ * @throws {EnvVarResolutionError} When a referenced worker's required var has no value.
+ */
+async function buildReferencedAuxiliaryWorkers(
+	devflareConfig: DevflareConfig,
+	cwd: string,
+	envMode: EnvResolutionMode
+): Promise<AuxiliaryWorkerConfig[]> {
+	if (!devflareConfig.bindings?.services) {
+		return []
+	}
+
+	const resolution = await resolveServiceBindingsFor(devflareConfig, cwd, {
+		referencedEnv: envMode
+	})
+	return createAuxiliaryServiceWorkerConfigs(resolution).auxiliaryWorkers
+}
+
+/**
+ * Get auxiliary worker configs for Durable Objects and `ref()` service bindings
  * Use this when configuring @cloudflare/vite-plugin's auxiliaryWorkers option
+ *
+ * A worker a `ref()` binding names is returned `devOnly`. Its vars resolve in the same mode as
+ * the main config's, and without its `.dev.vars`, because this function cannot tell `vite dev`
+ * from `vite build`.
  *
  * @example
  * ```ts
@@ -163,9 +201,13 @@ export async function getDevflareConfigs(options: ProgrammaticConfigOptions = {}
 	cloudflareConfig: Record<string, unknown>
 	auxiliaryWorkers: AuxiliaryWorkerConfig[]
 }> {
-	const { cloudflareConfig, auxiliaryWorkers } = await buildProgrammaticArtifacts(
-		options,
-		'wrangler'
-	)
-	return { cloudflareConfig, auxiliaryWorkers }
+	const { cwd, devflareConfig, cloudflareConfig, auxiliaryWorkers, envMode } =
+		await buildProgrammaticArtifacts(options, 'wrangler')
+	return {
+		cloudflareConfig,
+		auxiliaryWorkers: [
+			...auxiliaryWorkers,
+			...(await buildReferencedAuxiliaryWorkers(devflareConfig, cwd, envMode))
+		]
+	}
 }

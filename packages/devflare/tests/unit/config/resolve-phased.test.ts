@@ -12,6 +12,7 @@ import {
 	compileBuildConfig,
 	compileConfig,
 	preview,
+	ref,
 	resolveConfigForEnvironment,
 	resolveResources
 } from '../../../src/config'
@@ -117,6 +118,45 @@ describe('resolveResources facade', () => {
 		expect(cloudflare.createKVNamespace).toHaveBeenCalledTimes(0)
 		expect(cloudflare.createD1Database).toHaveBeenCalledTimes(0)
 	})
+
+	// A `ref().worker` binding is a Proxy over a function, and every Vite plugin path reads it
+	// through this seam before `resolveServiceBindings` looks for `__ref`. Losing it here meant the
+	// referenced worker was never built (measured: `__ref` present before, gone after).
+	test.each([
+		['build', undefined],
+		['local', undefined],
+		['deploy', undefined],
+		['local', 'production']
+	] as const)(
+		'phase=%s, environment=%p keeps a real ref() service binding resolvable',
+		async (phase, environment) => {
+			const apiRef = ref(async () => ({
+				default: { name: 'api-worker', compatibilityDate: '2025-01-07' }
+			}))
+			await apiRef.resolve()
+			const fixture: DevflareConfig = {
+				name: 'gateway-worker',
+				compatibilityDate: '2025-01-07',
+				bindings: { services: { API: apiRef.worker, ADMIN: apiRef.worker('AdminEntrypoint') } },
+				env: { production: { vars: { STAGE: 'production' } } }
+			}
+
+			const resolved = await resolveResources(fixture, {
+				phase,
+				environment,
+				...(phase === 'deploy' && { cloudflare: cloudflareMocks() })
+			} as Parameters<typeof resolveResources>[1])
+
+			const services = resolved.bindings?.services as Record<
+				string,
+				{ service: string; entrypoint?: string; __ref?: unknown }
+			>
+			expect(services.API.__ref).toBe(apiRef)
+			expect(services.API.service).toBe('api-worker')
+			expect(services.ADMIN.__ref).toBe(apiRef)
+			expect(services.ADMIN.entrypoint).toBe('AdminEntrypoint')
+		}
+	)
 
 	test('environment overrides apply before phase resolution', async () => {
 		const fixtureWithEnv: DevflareConfig = {

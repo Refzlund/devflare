@@ -23,7 +23,7 @@ import {
 import { resolveConfigPath } from '../config/loader'
 import type { ResolvedConfig as ResolvedDevflareConfig } from '../config/resolve-phased'
 import type { DevflareConfig } from '../config/schema'
-import { resolveServiceBindings } from '../test/resolve-service-bindings'
+import { resolveServiceBindingsFor } from '../test/resolve-service-bindings'
 import { generatedDir } from '../utils/generated-dir'
 import { DEFAULT_DO_PATTERN } from '../utils/glob'
 import { prepareComposedWorkerEntrypoint } from '../worker-entry/composed-worker'
@@ -146,8 +146,12 @@ export async function buildPluginContextState(
 		}
 	}
 
+	// Serve only. A build binds a referenced worker by name and leaves it out: it is deployed from
+	// its own config, and building it here would put its local env into this app's output.
 	if (mode === 'serve' && effectiveConfig.bindings?.services) {
-		const serviceBindingResolution = await resolveServiceBindings(effectiveConfig, configDir)
+		const serviceBindingResolution = await resolveServiceBindingsFor(effectiveConfig, configDir, {
+			referencedEnv: 'local'
+		})
 		const serviceWorkers = createAuxiliaryServiceWorkerConfigs(serviceBindingResolution)
 		serviceAuxiliaryWorkerConfigs = serviceWorkers.auxiliaryWorkers
 		serviceWorkerVirtualModules = serviceWorkers.virtualModules

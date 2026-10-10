@@ -4,10 +4,14 @@
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { mkdir, rm, writeFile } from 'node:fs/promises'
+import { pathToFileURL } from 'node:url'
 import { join, relative } from 'pathe'
+import { compileConfig } from '../../../src/config/compiler'
 import { ConfigNotFoundError, loadConfig, resolveConfigPath } from '../../../src/config/loader'
 
 const TEST_DIR = join(import.meta.dirname, '../.fixtures/config-loader')
+/** The real `ref()`, which a fixture config imports from source. */
+const REF_MODULE = pathToFileURL(join(import.meta.dirname, '../../../src/config/ref.ts')).href
 const WORKSPACE_ENV_KEYS = ['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN'] as const
 
 describe('loadConfig', () => {
@@ -405,6 +409,89 @@ export default config
 		const config = await loadConfig({ cwd: projectDir })
 
 		expect(config.accountId).toBe('workspace-account')
+	})
+
+	// Only `resolveServiceBindings` used to call `ref.resolve()`, so every other consumer — a
+	// Vite build, `devflare deploy` — compiled a ref()'s worker name as the `<pending>` sentinel.
+	test("resolves the config's own ref() bindings, so no consumer compiles <pending>", async () => {
+		const projectDir = join(TEST_DIR, 'ref-resolved')
+		await mkdir(join(projectDir, 'api'), { recursive: true })
+		await writeFile(
+			join(projectDir, 'api', 'devflare.config.ts'),
+			`
+			export default {
+				name: 'api-worker',
+				compatibilityDate: '2025-01-07',
+				bindings: { durableObjects: { COUNTER: 'Counter' } }
+			}
+		`
+		)
+		await writeFile(
+			join(projectDir, 'devflare.config.ts'),
+			`
+			import { ref } from '${REF_MODULE}'
+			// One ref per binding group on purpose: a ref caches its resolution, so a group that
+			// shared the services' ref would read as resolved whether or not it was walked.
+			const api = ref(() => import('./api/devflare.config.ts'))
+			const doHost = ref(() => import('./api/devflare.config.ts'))
+			const productionApi = ref(() => import('./api/devflare.config.ts'))
+			export default {
+				name: 'gateway-worker',
+				compatibilityDate: '2025-01-07',
+				bindings: {
+					services: { API: api.worker, ADMIN: api.worker('AdminEntrypoint') },
+					durableObjects: { COUNTER: doHost.COUNTER }
+				},
+				env: {
+					production: { bindings: { services: { PROD_API: productionApi.worker } } }
+				}
+			}
+		`
+		)
+
+		const config = await loadConfig({ cwd: projectDir })
+
+		const compiled = compileConfig(config as Parameters<typeof compileConfig>[0])
+		expect(compiled.services).toEqual([
+			{ binding: 'API', service: 'api-worker' },
+			{ binding: 'ADMIN', service: 'api-worker', entrypoint: 'AdminEntrypoint' }
+		])
+		expect(compiled.durable_objects?.bindings).toEqual([
+			{ name: 'COUNTER', class_name: 'Counter', script_name: 'api-worker' }
+		])
+		const production = config.env?.production?.bindings?.services as Record<
+			string,
+			{ service: string }
+		>
+		expect(production.PROD_API.service).toBe('api-worker')
+	})
+
+	test('fails loudly, naming the binding and the config, when a ref() cannot resolve', async () => {
+		const projectDir = join(TEST_DIR, 'ref-unresolvable')
+		await mkdir(projectDir, { recursive: true })
+		await writeFile(
+			join(projectDir, 'devflare.config.ts'),
+			`
+			import { ref } from '${REF_MODULE}'
+			export default {
+				name: 'gateway-worker',
+				compatibilityDate: '2025-01-07',
+				bindings: {
+					services: { API: ref(() => import('./missing/devflare.config.ts')).worker }
+				}
+			}
+		`
+		)
+
+		const error = await loadConfig({ cwd: projectDir }).then(
+			() => null,
+			(caught: unknown) => caught as Error
+		)
+
+		expect(error).toBeInstanceOf(Error)
+		expect(error?.message).toContain('bindings.services.API')
+		expect(error?.message).toContain(join(projectDir, 'devflare.config.ts'))
+		expect(error?.cause).toBeInstanceOf(Error)
 	})
 
 	test('prefers an explicit process env account id over the workspace-root .env', async () => {

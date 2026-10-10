@@ -13,7 +13,8 @@ import type { RefResult } from '../../../src/config/ref'
 import type { DevflareConfig } from '../../../src/config/schema'
 import {
 	clearBundleCache,
-	resolveServiceBindings
+	resolveServiceBindings,
+	resolveServiceBindingsFor
 } from '../../../src/test/resolve-service-bindings'
 
 const tempDirs: string[] = []
@@ -327,6 +328,25 @@ export async function ping(): Promise<string> {
 			SESSION_SECRET: 'from-the-workers-dev-vars'
 		})
 	})
+
+	test.each(['dev', 'build'] as const)(
+		"referencedEnv '%s' resolves a referenced worker's vars with no .dev.vars",
+		async (referencedEnv) => {
+			const envKey = `DEVFLARE_REF_MODE_${crypto.randomUUID().replaceAll('-', '_')}`
+			const { projectDir, primaryConfig } = await writeReferencedWorkerWithEnvVar(envKey, {
+				'.env': `${envKey}=from-the-workers-env\n`,
+				'.dev.vars': 'SESSION_SECRET=from-the-workers-dev-vars\n'
+			})
+
+			const result = await resolveServiceBindingsFor(primaryConfig, projectDir, { referencedEnv })
+
+			// What a build may carry: `getDevflareConfigs()` hands these vars to `@cloudflare/vite-plugin`.
+			expect(result.workers[0]?.bindings).toEqual({
+				ORIGIN: 'from-the-workers-env',
+				LABEL: 'plain'
+			})
+		}
+	)
 
 	test("a referenced worker reads its own .env before the gateway's, which loadConfig copied into process.env", async () => {
 		const envKey = `DEVFLARE_REF_SHARED_${crypto.randomUUID().replaceAll('-', '_')}`
