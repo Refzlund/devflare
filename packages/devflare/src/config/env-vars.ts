@@ -706,6 +706,33 @@ function resolveVarsObject(
 	return resolved === OMIT_VALUE ? undefined : (resolved as DevflareConfig['vars'])
 }
 
+/**
+ * @description Resolves the `env.NAME` descriptors under a config's `vars` from the values
+ * given, reading no file. {@link resolveConfigEnvVars} applies it once it has gathered the
+ * `.env` values. A surface with no directory to read applies it to `process.env` alone:
+ * `createOfflineEnv`, and Miniflare started from a config without a `cwd`.
+ * @param vars - a config's `vars`; plain values pass through as written
+ * @param sources - the values a descriptor reads, by variable name
+ * @param mode - `dev` honours `.dev()` and `.absentInDev()`; `build` does not
+ * @returns `vars` with each descriptor replaced by its value, or dropped when it may be missing and is
+ * @throws {EnvVarResolutionError} When a required variable has no value.
+ * @throws {EnvVarParseError} When a descriptor's parser throws.
+ */
+export function resolveVarsFromSources(
+	vars: DevflareConfig['vars'],
+	sources: Record<string, string | undefined>,
+	mode: EnvResolutionMode
+): DevflareConfig['vars'] {
+	const missing: MissingEnvVar[] = []
+	const resolved = resolveVarsObject(vars, sources, mode, missing)
+
+	if (missing.length > 0) {
+		throw new EnvVarResolutionError(missing, mode)
+	}
+
+	return resolved
+}
+
 export interface ResolveConfigEnvVarsOptions {
 	/**
 	 * Directory used to resolve relative config paths.
@@ -755,12 +782,7 @@ export async function resolveConfigEnvVars<TConfig extends DevflareConfig>(
 		...dotenv.values,
 		...process.env
 	}
-	const missing: MissingEnvVar[] = []
-	const vars = resolveVarsObject(config.vars, sources, options.mode, missing)
-
-	if (missing.length > 0) {
-		throw new EnvVarResolutionError(missing, options.mode)
-	}
+	const vars = resolveVarsFromSources(config.vars, sources, options.mode)
 
 	return vars === config.vars
 		? config

@@ -17,6 +17,8 @@ import {
 	normalizeDOBinding,
 	normalizeR2Binding
 } from '../config'
+import { resolveDevConfig } from '../config/dev-config'
+import { EnvVarParseError, EnvVarResolutionError } from '../config/env-vars'
 import type { RefResult, WorkerBinding } from '../config/ref'
 import {
 	buildAiSearchInstancesConfig,
@@ -295,17 +297,53 @@ function buildReferencedWorkerRuntimeConfig(config: DevflareConfig): Partial<Res
 	}
 }
 
-function normalizeReferencedConfig(config: RefResult['config']): DevflareConfig {
-	return configSchema.parse(config)
-}
-
-function resolveReferencedConfigDir(ref: RefResult, parentConfigDir: string): string | null {
+function resolveReferencedConfigPath(ref: RefResult, parentConfigDir: string): string | null {
 	const configPath = ref.configPath
 	if (!configPath || configPath === '<resolved>') {
 		return null
 	}
 
-	return dirname(resolvePackageSpecifier(configPath, parentConfigDir))
+	return resolvePackageSpecifier(configPath, parentConfigDir)
+}
+
+function resolveReferencedConfigDir(ref: RefResult, parentConfigDir: string): string | null {
+	const configPath = resolveReferencedConfigPath(ref, parentConfigDir)
+	return configPath ? dirname(configPath) : null
+}
+
+/**
+ * @description Reads a referenced worker's config the way the dev coordinator reads the main
+ * one ({@link resolveDevConfig}): its `env.NAME` vars resolved in dev mode, then the
+ * `.dev.vars` beside the referenced config on top, as wrangler gives each worker its own.
+ * Every consumer of this module builds a local runtime, so dev mode is always the right one.
+ * @param ref - the resolved ref
+ * @param parentConfigDir - the directory the ref's `configPath` is relative to
+ * @returns the config; its vars stay unresolved only when the ref carries no config path,
+ *   in which case no worker is built from it
+ * @throws {EnvVarResolutionError} When a required var has no value; the message names the worker.
+ * @throws {EnvVarParseError} When a var's parser throws; the message names the worker.
+ */
+async function resolveReferencedConfig(
+	ref: RefResult,
+	parentConfigDir: string
+): Promise<DevflareConfig> {
+	const config = configSchema.parse(ref.config)
+	const configPath = resolveReferencedConfigPath(ref, parentConfigDir)
+	if (!configPath) {
+		return config
+	}
+
+	try {
+		return await resolveDevConfig(config, { cwd: dirname(configPath), configPath })
+	} catch (error) {
+		// The variable tree names a var, not the config that declared it, and with several workers
+		// that is the question. The class is kept on purpose: the dev server waits for `.env` to
+		// change on an EnvVarResolutionError, and wrapping it would turn that wait into a crash.
+		if (error instanceof EnvVarResolutionError || error instanceof EnvVarParseError) {
+			error.message = `Service-bound worker "${ref.name}" (${configPath}):\n${error.message}`
+		}
+		throw error
+	}
 }
 
 interface ReferencedDurableObjectResolution {
@@ -441,7 +479,7 @@ export async function resolveServiceBindings(
 			// bundleAllEntrypoints will include the default worker entrypoint plus
 			// all named entrypoints discovered from files.entrypoints.
 			if (!workersByName.has(workerName) && !seenWorkers.has(workerName)) {
-				const refConfig = normalizeReferencedConfig(ref.config)
+				const refConfig = await resolveReferencedConfig(ref, configDir)
 				const worker = await resolveRefWorker(ref, entrypoint, configDir, refConfig)
 				if (worker) {
 					const refConfigDir = resolveReferencedConfigDir(ref, configDir)
@@ -511,11 +549,8 @@ async function resolveRefWorker(
 	ref: RefResult,
 	_entrypoint: string | undefined, // Ignored - we bundle all entrypoints
 	parentConfigDir: string,
-	resolvedConfig?: DevflareConfig
+	config: DevflareConfig
 ): Promise<ResolvedWorker | null> {
-	const config = resolvedConfig ?? normalizeReferencedConfig(ref.config)
-	if (!config) return null
-
 	const refConfigDir = resolveReferencedConfigDir(ref, parentConfigDir)
 	if (!refConfigDir) {
 		console.warn(`[devflare] Cannot resolve worker "${ref.name}" - configPath not available`)

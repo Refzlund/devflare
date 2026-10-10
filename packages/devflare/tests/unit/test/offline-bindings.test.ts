@@ -3,6 +3,8 @@ import type { Pipeline } from 'cloudflare:pipelines'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { env as configEnv, defineConfig } from '../../../src/config'
+import { EnvVarResolutionError } from '../../../src/config/env-vars'
 import { writeLocalSecret } from '../../../src/secrets/local-secrets'
 import {
 	createMockSendEmail,
@@ -506,5 +508,70 @@ describe('createOfflineBindings', () => {
 		)
 
 		expect(result.env.EMAIL).toBe(customMock)
+	})
+})
+
+describe('createOfflineEnv — vars declared with env.NAME', () => {
+	/** Names a test set on `process.env`, removed after it. */
+	const setEnvKeys: string[] = []
+
+	/**
+	 * @description Mints a variable name no developer shell holds, optionally setting it.
+	 * @param label - a readable fragment, for a failure message
+	 * @param value - the value to set on `process.env`; left unset when omitted
+	 * @returns the name, registered for removal after the test
+	 */
+	function mintEnvKey(label: string, value?: string): string {
+		const key = `DEVFLARE_OFFLINE_${label}_${crypto.randomUUID().replaceAll('-', '_')}`
+		setEnvKeys.push(key)
+		if (value !== undefined) {
+			process.env[key] = value
+		}
+		return key
+	}
+
+	afterEach(() => {
+		for (const key of setEnvKeys.splice(0)) {
+			delete process.env[key]
+		}
+	})
+
+	test('resolves them from process.env in dev mode, as createTestContext does', () => {
+		const origin = mintEnvKey('ORIGIN', 'http://127.0.0.1:6281')
+		const retries = mintEnvKey('RETRIES', '3')
+		const tenant = mintEnvKey('TENANT')
+		const label = mintEnvKey('LABEL')
+
+		const env = createOfflineEnv(
+			defineConfig({
+				name: 'offline-env-vars',
+				compatibilityDate: '2026-04-26',
+				vars: {
+					ORIGIN: configEnv[origin],
+					RETRIES: configEnv[retries].parse(Number),
+					TENANT: configEnv[tenant].dev('local-tenant'),
+					LABEL: configEnv[label].optional(),
+					PLAIN: 'as-written'
+				}
+			})
+		)
+
+		expect(env.ORIGIN).toBe('http://127.0.0.1:6281')
+		expect(env.RETRIES).toBe(3)
+		expect(env.TENANT).toBe('local-tenant')
+		expect('LABEL' in env).toBe(false)
+		expect(env.PLAIN).toBe('as-written')
+	})
+
+	test('a required one with no value throws, naming it, instead of handing over the descriptor', () => {
+		const missing = mintEnvKey('REQUIRED')
+		const config = defineConfig({
+			name: 'offline-env-missing',
+			compatibilityDate: '2026-04-26',
+			vars: { ORIGIN: configEnv[missing] }
+		})
+
+		expect(() => createOfflineBindings(config)).toThrow(EnvVarResolutionError)
+		expect(() => createOfflineBindings(config)).toThrow(missing)
 	})
 })

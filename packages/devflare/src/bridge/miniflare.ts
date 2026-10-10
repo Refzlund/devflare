@@ -21,6 +21,7 @@ import {
 	normalizeWorkflowBinding
 } from '../config'
 import { resolveDevConfig } from '../config/dev-config'
+import { resolveVarsFromSources } from '../config/env-vars'
 import {
 	buildRateLimitsConfig,
 	buildStreamingTailConsumersConfig,
@@ -641,19 +642,37 @@ export async function startMiniflare(options: MiniflareOptions = {}): Promise<Mi
 // -----------------------------------------------------------------------------
 
 /**
+ * @description The config {@link startMiniflareFromConfig} serves: every `env.NAME` var
+ * resolved, since Miniflare accepts only JSON values as plain bindings.
+ * @param config - the config as loaded
+ * @param options - `cwd` (with `configPath`, `environment`) locates the `.env` and `.dev.vars`
+ *   files; without a `cwd` no file is read and the vars resolve from `process.env` alone
+ * @returns the config with plain values in `vars`
+ * @throws {EnvVarResolutionError} When a required var has no value.
+ */
+export async function resolveMiniflareRuntimeConfig(
+	config: DevflareConfig,
+	options: Pick<Partial<MiniflareOptions>, 'cwd' | 'configPath' | 'environment'>
+): Promise<DevflareConfig> {
+	if (options.cwd) {
+		return resolveDevConfig(config, {
+			cwd: options.cwd,
+			configPath: options.configPath,
+			environment: options.environment
+		})
+	}
+
+	return { ...config, vars: resolveVarsFromSources(config.vars, process.env, 'dev') }
+}
+
+/**
  * Start Miniflare from a devflare config
  */
 export async function startMiniflareFromConfig(
 	config: DevflareConfig,
 	options: Partial<MiniflareOptions> = {}
 ): Promise<MiniflareInstance> {
-	const runtimeConfig = options.cwd
-		? await resolveDevConfig(config, {
-				cwd: options.cwd,
-				configPath: options.configPath,
-				environment: options.environment
-			})
-		: config
+	const runtimeConfig = await resolveMiniflareRuntimeConfig(config, options)
 	const bindings = runtimeConfig.bindings ?? {}
 	const localSecretServiceBindingConfig = options.cwd
 		? buildLocalSecretServiceBindingConfig(runtimeConfig, options.cwd)

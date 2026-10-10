@@ -341,10 +341,13 @@ and workers-types majors documented in Cloudflare toolchain support.
 ### Offline-first testing support matrix
 
 `createOfflineEnv(config, fixtures)` derives a deterministic pure-test `env`
-from Devflare config. Offline-native means Devflare or Miniflare can run a
-useful local simulator. Offline-fixture means Devflare provides an explicit
-in-memory or handler-backed mock. Remote-boundary means meaningful behavior
-lives in Cloudflare.
+from Devflare config. A var declared with `env.NAME` resolves from
+`process.env` in dev mode; a required one that is unset throws
+`EnvVarResolutionError`, and no `.env` or `.dev.vars` file is read.
+Offline-native means Devflare or Miniflare can run a useful local simulator.
+Offline-fixture means Devflare provides an explicit in-memory or
+handler-backed mock. Remote-boundary means meaningful behavior lives in
+Cloudflare.
 
 Use `shouldSkip.aiSearch`, `shouldSkip.aiGateway`,
 `shouldSkip.mtlsCertificates`, `shouldSkip.artifacts`, and `shouldSkip.builds`

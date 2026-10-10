@@ -7,6 +7,7 @@
 
 import type { Pipeline } from 'cloudflare:pipelines'
 import { type DevflareConfig, normalizeHyperdriveBinding } from '../config'
+import { resolveVarsFromSources } from '../config/env-vars'
 import { resolveLocalSecretValuesForBindings } from '../secrets/local-secrets'
 import type { LocalSendEmailBindingConfig } from '../utils/send-email'
 import {
@@ -485,9 +486,14 @@ function addBoundary(
 }
 
 function addStaticBindings(env: Record<string, unknown>, config: OfflineConfig) {
-	if (config.vars) {
-		Object.assign(env, config.vars)
+	if (!config.vars) {
+		return
 	}
+
+	// An `env.NAME` var resolves from `process.env` alone: this helper reads no file, and a
+	// descriptor handed over as-is reads as an object where the app expects a string.
+	const vars = resolveVarsFromSources(config.vars as DevflareConfig['vars'], process.env, 'dev')
+	Object.assign(env, vars)
 }
 
 function addRateLimitBindings(env: Record<string, unknown>, bindings: OfflineConfig['bindings']) {
@@ -863,6 +869,13 @@ function addRemoteBoundaries(
  * only `createTestContext()` provides. When such a binding is present in config
  * it is reported in the returned `missingFixtures` (its `env` entry is left
  * unset rather than silently faked); use `createTestContext()` for those.
+ *
+ * A var declared with `env.NAME` is resolved from `process.env` in dev mode, so
+ * `.dev()`, `.default()`, `.optional()` and `.parse()` apply; no `.env` or
+ * `.dev.vars` file is read.
+ *
+ * @throws {EnvVarResolutionError} When a required `env.NAME` var is not set in `process.env`.
+ * @throws {EnvVarParseError} When a var's parser throws.
  */
 export function createOfflineBindings(
 	config: OfflineConfig,
