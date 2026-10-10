@@ -42,7 +42,7 @@ afterEach(() => {
 })
 
 describe('resolveMiniflareRuntimeConfig', () => {
-	test('with a cwd, resolves env.NAME vars and applies that directory’s .dev.vars', async () => {
+	test('with a cwd, resolves env.NAME vars and applies the .dev.vars in that directory', async () => {
 		const key = setUniqueEnvVar('from-the-environment')
 		const cwd = makeAppWithDevVars()
 		const config = defineConfig({

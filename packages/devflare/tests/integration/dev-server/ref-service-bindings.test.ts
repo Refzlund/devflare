@@ -1,12 +1,24 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
+import { pathToFileURL } from 'node:url'
 import { join } from 'pathe'
 import { createDevServer, type DevServer } from '../../../src/dev-server'
 import { getAvailablePort } from '../helpers/built-devflare.helpers'
 import { createCapturedLogger } from './worker-only-multi-surface.helpers'
 
 const TEST_TIMEOUT_MS = 60_000
+
+/** The config-time `env` proxy, which the fixture's configs import from source. */
+const ENV_VARS_MODULE = pathToFileURL(
+	join(import.meta.dirname, '../../../src/config/env-vars.ts')
+).href
+
+/**
+ * The variable the referenced worker's `ORIGIN` var reads. Its value lives only in the `.env`
+ * beside the referenced config, which no ancestor of the gateway's config can see.
+ */
+const REF_ORIGIN_ENV = 'DEVFLARE_REF_SERVICE_INTEGRATION_ORIGIN'
 
 async function waitForJson<T>(url: string, timeoutMs = 20_000): Promise<T> {
 	const deadline = Date.now() + timeoutMs
@@ -56,7 +68,7 @@ export class ApiEntrypoint extends WorkerEntrypoint {
 		await env.CACHE.put('last', row.value)
 		const id = env.COUNTER.idFromName('main')
 		const counter = env.COUNTER.get(id)
-		return [row.value, await env.CACHE.get('last'), await counter.ping(), env.FEATURE_FLAG].join(':')
+		return [row.value, await env.CACHE.get('last'), await counter.ping(), env.FEATURE_FLAG, env.ORIGIN].join(':')
 	}
 }
 `.trim()
@@ -75,9 +87,13 @@ export class Counter extends DurableObject {
 `.trim()
 	)
 
+	await writeFile(join(projectDir, 'api', '.env'), `${REF_ORIGIN_ENV}=from-the-api-env\n`)
+
 	await writeFile(
 		join(projectDir, 'api', 'devflare.config.ts'),
 		`
+import { env } from '${ENV_VARS_MODULE}'
+
 export default {
 	name: 'api-worker',
 	compatibilityDate: '2026-04-28',
@@ -87,7 +103,8 @@ export default {
 		durableObjects: 'src/do.*.ts'
 	},
 	vars: {
-		FEATURE_FLAG: 'enabled'
+		FEATURE_FLAG: 'enabled',
+		ORIGIN: env.${REF_ORIGIN_ENV}
 	},
 	bindings: {
 		kv: {
@@ -107,6 +124,8 @@ export default {
 	await writeFile(
 		join(projectDir, 'devflare.config.ts'),
 		`
+import { env } from '${ENV_VARS_MODULE}'
+
 const apiConfig = {
 	name: 'api-worker',
 	compatibilityDate: '2026-04-28',
@@ -116,7 +135,8 @@ const apiConfig = {
 		durableObjects: 'src/do.*.ts'
 	},
 	vars: {
-		FEATURE_FLAG: 'enabled'
+		FEATURE_FLAG: 'enabled',
+		ORIGIN: env.${REF_ORIGIN_ENV}
 	},
 	bindings: {
 		kv: {
@@ -202,11 +222,11 @@ describe('dev server referenced service bindings', () => {
 	}, TEST_TIMEOUT_MS)
 
 	test(
-		'serves RPC from a referenced worker with its own local bindings',
+		'serves RPC from a referenced worker with its own local bindings and resolved env.NAME vars',
 		async () => {
 			const payload = await waitForJson<{ result: string }>(`http://127.0.0.1:${miniflarePort}/`)
 
-			expect(payload).toEqual({ result: 'PONG:PONG:DO_PONG:enabled' })
+			expect(payload).toEqual({ result: 'PONG:PONG:DO_PONG:enabled:from-the-api-env' })
 		},
 		TEST_TIMEOUT_MS
 	)
