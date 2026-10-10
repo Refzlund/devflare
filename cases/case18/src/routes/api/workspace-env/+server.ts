@@ -21,6 +21,8 @@ export const GET: RequestHandler = async ({ platform }) => {
 		processEnv: childEnv.CASE18_WORKSPACE_ENV ?? null,
 		/** A value only the coordinator's own environment holds. */
 		inherited: childEnv.CASE18_COORDINATOR_ONLY ?? null,
+		/** A name both `.env` files set, as the Vite child's process environment holds it. */
+		processEnvDotenvShared: childEnv.CASE18_DOTENV_SHARED ?? null,
 		/** What the config read from `process.env` when the child evaluated it. */
 		configSaw: env.CASE18_CONFIG_SAW ?? null,
 		/** A manifest key the config's `vars` never mention, in `platform.env`. */

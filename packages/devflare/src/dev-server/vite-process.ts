@@ -78,7 +78,7 @@ export function buildViteChildEnv(
 	// the coordinator's. Every name devflare sets is reserved, which also keeps a
 	// copied `DEVFLARE_*` name the child's environment, as it was before.
 	const inheritedCopies = (options.copiedDotenvNames ?? []).filter(
-		(name) => !(name in appEnv) && !isReservedAppEnvKey(name, { vite: true })
+		(name) => !Object.hasOwn(appEnv, name) && !isReservedAppEnvKey(name, { vite: true })
 	)
 
 	// Both channels are devflare's to set per child. Inheriting one would hand

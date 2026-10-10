@@ -6,7 +6,8 @@
 // resolving config's own `.env`. A process the coordinator spawns (a workspace
 // app's Vite child) inherits those values as plain environment, which it would
 // rank above that file. So the coordinator names them in one variable devflare
-// owns, and the child records them as copies before it resolves anything.
+// owns, and the SvelteKit handle records them as copies before it resolves the
+// config.
 //
 // → NAMES only. Every value already reaches the child under its own name, and a
 //   second copy of a credential in another variable buys nothing.

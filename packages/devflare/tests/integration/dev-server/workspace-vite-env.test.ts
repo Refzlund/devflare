@@ -24,7 +24,6 @@
 // =============================================================================
 
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
-import { existsSync } from 'node:fs'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
@@ -47,6 +46,7 @@ const caseDir = join(repoRoot, 'cases', 'case18')
 interface WorkspaceEnvPayload {
 	processEnv: string | null
 	inherited: string | null
+	processEnvDotenvShared: string | null
 	configSaw: string | null
 	manifestOnly: string | null
 	overridden: string | null
@@ -158,11 +158,6 @@ describe("workspace dev hands a Vite app's manifest env to its Vite child", () =
 	let wroteCase18Dotenv = false
 
 	beforeAll(async () => {
-		// A developer's own file is never overwritten: it is gitignored, so nothing could restore it.
-		if (existsSync(case18DotenvPath)) {
-			throw new Error(`${case18DotenvPath} exists; this test writes its own. Move it aside.`)
-		}
-
 		await ensurePackageBuilt()
 		await syncSvelteKit(caseDir)
 
@@ -180,7 +175,18 @@ describe("workspace dev hands a Vite app's manifest env to its Vite child", () =
 			"export default { name: 'case18-dotenv-peer', compatibilityDate: '2026-04-27', files: { fetch: false } }\n"
 		)
 		await writeFile(join(peerDir, '.env'), renderDotenv(peerDotenv))
-		await writeFile(case18DotenvPath, renderDotenv(case18Dotenv))
+		// `wx` refuses an existing file in the same call that writes it. A developer's own is
+		// never overwritten: it is gitignored, so nothing could restore it.
+		try {
+			await writeFile(case18DotenvPath, renderDotenv(case18Dotenv), { flag: 'wx' })
+		} catch (error) {
+			if ((error as { code?: unknown }).code === 'EEXIST') {
+				throw new Error(`${case18DotenvPath} exists; this test writes its own. Move it aside.`, {
+					cause: error
+				})
+			}
+			throw error
+		}
 		wroteCase18Dotenv = true
 
 		vitePort = await getAvailablePort()
@@ -190,7 +196,8 @@ describe("workspace dev hands a Vite app's manifest env to its Vite child", () =
 		devServer = createWorkspaceDevServer({
 			manifest: {
 				apps: [
-					// First, so its `.env` is copied before case18's config is read.
+					// First, so its `.env` is copied before case18's config is read. The test
+					// asserts this, through `processEnvDotenvShared`.
 					{
 						config: join(peerDir, 'devflare.config.ts'),
 						name: 'dotenv-peer',
@@ -247,6 +254,9 @@ describe("workspace dev hands a Vite app's manifest env to its Vite child", () =
 			expect(payload).toEqual({
 				processEnv: 'from-the-manifest',
 				inherited: 'inherited-from-the-coordinator',
+				// The premise of the `dotenv*` fields: the peer's `.env` was copied first, so its
+				// value is the one the child inherits. The child's process.env still holds it.
+				processEnvDotenvShared: 'from-the-peer-apps-env',
 				configSaw: 'from-the-manifest',
 				manifestOnly: 'from-the-manifest',
 				overridden: 'manifest-overrides-config',

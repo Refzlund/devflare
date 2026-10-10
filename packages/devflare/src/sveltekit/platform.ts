@@ -530,7 +530,14 @@ async function loadDevConfig(
 	// → NOTE: the `.env` values the coordinator copied into its own environment, from every
 	//   app's config, are inherited here as plain environment. They still rank as the
 	//   coordinator ranks them, below this app's own `.env`: the caller records them as copies
-	//   before this runs (see loadPlatformOptionsFromConfig).
+	//   before this runs (see loadPlatformOptionsFromConfig). Two limits remain:
+	//   - The Vite plugin resolves the config earlier, while `vite.config.ts` is evaluated, so
+	//     its context, `.devflare/wrangler.jsonc` and the workers it binds still rank those
+	//     values as the environment. None of that reaches `platform.env`.
+	//   - The coordinator resolves each app before it copies the `.env` of apps listed after it,
+	//     and this child inherits every app's. So an optional or `.dev()` `env.NAME` that this
+	//     app's own files lack reads a later app's value here and its fallback in the workers,
+	//     as it did before. A required one fails in the coordinator instead.
 	return resolveDevConfig(loaded, { cwd, configPath: configFile })
 }
 

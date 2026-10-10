@@ -127,6 +127,15 @@ describe('buildViteChildEnv', () => {
 		expect(readCopiedDotenvNames(env)).toEqual(['KEPT'])
 	})
 
+	test('a copy named like an Object.prototype member is still named', () => {
+		const env = buildViteChildEnv(
+			{ toString: 'copied', constructor: 'copied-too' },
+			{ miniflarePort: 8788, copiedDotenvNames: ['toString', 'constructor'] }
+		)
+
+		expect(readCopiedDotenvNames(env)).toEqual(['toString', 'constructor'])
+	})
+
 	test('a copy devflare overwrites with its own variable is not named', () => {
 		const env = buildViteChildEnv(
 			{ FORCE_COLOR: '0', DEVFLARE_BRIDGE_PORT: '1' },
