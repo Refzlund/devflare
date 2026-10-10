@@ -494,6 +494,43 @@ export default config
 		expect(error?.cause).toBeInstanceOf(Error)
 	})
 
+	test("fails, naming the binding, when a ref() names a Durable Object its config doesn't declare", async () => {
+		const projectDir = join(TEST_DIR, 'ref-undeclared-do')
+		await mkdir(join(projectDir, 'api'), { recursive: true })
+		await writeFile(
+			join(projectDir, 'api', 'devflare.config.ts'),
+			`
+			export default {
+				name: 'api-worker',
+				compatibilityDate: '2025-01-07',
+				bindings: { durableObjects: { COUNTER: 'Counter' } }
+			}
+		`
+		)
+		await writeFile(
+			join(projectDir, 'devflare.config.ts'),
+			`
+			import { ref } from '${REF_MODULE}'
+			const api = ref(() => import('./api/devflare.config.ts'))
+			export default {
+				name: 'gateway-worker',
+				compatibilityDate: '2025-01-07',
+				bindings: { durableObjects: { LIMITER: api.RATE_LIMITER } }
+			}
+		`
+		)
+
+		const error = await loadConfig({ cwd: projectDir }).then(
+			() => null,
+			(caught: unknown) => caught as Error
+		)
+
+		// Before, this compiled `class_name: "<pending>"` and said nothing.
+		expect(error).toBeInstanceOf(Error)
+		expect(error?.message).toContain('bindings.durableObjects.LIMITER')
+		expect(error?.message).toContain('does not declare')
+	})
+
 	test('prefers an explicit process env account id over the workspace-root .env', async () => {
 		const workspaceDir = join(TEST_DIR, 'workspace-root-explicit-env')
 		const projectDir = join(workspaceDir, 'apps/docs')

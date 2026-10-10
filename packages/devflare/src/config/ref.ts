@@ -182,7 +182,8 @@ interface ResolvedData<TConfig = DevflareConfigInput> {
 
 const resolvedCache = new WeakMap<RefResult, ResolvedData>()
 const pendingResolutions = new WeakMap<RefResult, Promise<ResolvedData>>()
-const PENDING_REF_VALUE = '<pending>'
+/** What an unresolved ref names its worker, and what an unextractable `configPath` reads. */
+export const PENDING_REF_VALUE = '<pending>'
 
 // -----------------------------------------------------------------------------
 // Config Path Extraction
@@ -365,75 +366,44 @@ export function ref<
 		)
 	}
 
+	/**
+	 * @description The worker name a binding to this ref carries right now.
+	 * @returns the resolved name, else the name override, else `<pending>`. `loadConfig` resolves
+	 *   the refs a config declares, but only after validating the config, which reads this first,
+	 *   and it never resolves a referenced config's own refs; `resolveServiceBindings` does those.
+	 */
+	function currentWorkerName(): string {
+		const cached = resolvedCache.get(proxy) as ResolvedData<TConfig> | undefined
+		if (cached) return cached.name
+		if (nameOverride) return nameOverride
+		return PENDING_REF_VALUE
+	}
+
 	// Create worker binding (deferred - doesn't need resolution immediately)
 	function createWorkerBinding(entrypoint?: string): WorkerBinding {
 		return {
-			// Service name is deferred - will be resolved when config is loaded
 			get service() {
-				// Try to get from cache, but don't throw if not resolved yet
-				const cached = resolvedCache.get(proxy) as ResolvedData<TConfig> | undefined
-				if (cached) return cached.name
-				// If name override is provided, use it directly
-				if (nameOverride) return nameOverride
-				// Otherwise pending. `loadConfig` resolves every ref a config declares, so only a
-				// config used without loading it reaches here.
-				return PENDING_REF_VALUE
+				return currentWorkerName()
 			},
 			entrypoint,
 			__ref: proxy
 		}
 	}
 
-	// The keys `.worker` answers as a binding. Its reflection (`in`, `Object.keys`, a spread) must
-	// report the same keys its `get` answers, because config transformers copy a binding with
-	// `{ ...binding }`.
-	// → GOTCHA: before the reflection traps below existed, every such copy produced an object
-	//   without `__ref`. `materializePreviewScopedConfig` makes that copy, so every Vite plugin path
-	//   lost the reference before `resolveServiceBindings` could build the worker it names.
-	//   `entrypoint` is left out on purpose: the default accessor has none, and a copy with an
-	//   `entrypoint: undefined` key would differ from the binding it replaced.
-	const accessorBindingKeys = ['service', '__ref'] as const
-	const isAccessorBindingKey = (prop: string | symbol): boolean =>
-		(accessorBindingKeys as readonly (string | symbol)[]).includes(prop)
-
-	// Worker accessor using a Proxy to defer property access
-	const workerAccessor = new Proxy((entrypoint: string) => createWorkerBinding(entrypoint), {
-		get(target, prop) {
-			if (prop === 'service') {
-				const cached = resolvedCache.get(proxy) as ResolvedData<TConfig> | undefined
-				if (cached) return cached.name
-				if (nameOverride) return nameOverride
-				return PENDING_REF_VALUE
-			}
-			if (prop === 'entrypoint') return undefined
-			if (prop === '__ref') return proxy
-			return Reflect.get(target, prop)
-		},
-		has(target, prop) {
-			return isAccessorBindingKey(prop) || Reflect.has(target, prop)
-		},
-		ownKeys(target) {
-			// The target is an arrow function, whose own `length` and `name` are configurable, so the
-			// Proxy invariants allow leaving them out; they are not part of the binding.
-			return [
-				...accessorBindingKeys,
-				...Reflect.ownKeys(target).filter(
-					(key) => Reflect.getOwnPropertyDescriptor(target, key)?.configurable === false
-				)
-			]
-		},
-		getOwnPropertyDescriptor(target, prop) {
-			if (isAccessorBindingKey(prop)) {
-				return {
-					value: workerAccessor[prop as (typeof accessorBindingKeys)[number]],
-					writable: false,
-					enumerable: true,
-					configurable: true
-				}
-			}
-			return Reflect.getOwnPropertyDescriptor(target, prop)
+	// `.worker` is a function (call it to name an entrypoint) that is also a binding, so its binding
+	// keys are REAL own properties: `in`, `Object.keys`, a spread and `Object.freeze` all see the
+	// `service` and `__ref` that a property read does.
+	// → GOTCHA: it was a Proxy that answered them from its `get` trap alone, so every copy made with
+	//   `{ ...binding }` lost `__ref`. `materializePreviewScopedConfig` makes that copy, so no Vite
+	//   plugin path ever built the worker a real ref() names. `__ref` is a getter only because
+	//   `proxy` is declared below. `entrypoint` is left off: the default accessor has none.
+	const workerAccessor = Object.defineProperties(
+		(entrypoint: string) => createWorkerBinding(entrypoint),
+		{
+			service: { get: currentWorkerName, enumerable: true, configurable: true },
+			__ref: { get: () => proxy, enumerable: true, configurable: true }
 		}
-	}) as WorkerBindingAccessor
+	) as unknown as WorkerBindingAccessor
 
 	// Create DO binding for cross-worker access
 	function createDOBinding(bindingName: string): DOBindingRef {
@@ -460,10 +430,7 @@ export function ref<
 			},
 			get scriptName() {
 				// Worker name for cross-worker access
-				const cached = resolvedCache.get(proxy) as ResolvedData<TConfig> | undefined
-				if (cached) return cached.name
-				if (nameOverride) return nameOverride
-				return PENDING_REF_VALUE
+				return currentWorkerName()
 			},
 			kind: 'cross-worker',
 			__ref: proxy
@@ -482,7 +449,8 @@ export function ref<
 		'__import',
 		'__nameOverride',
 		'resolve',
-		'then'
+		'then',
+		'toJSON'
 	])
 
 	// Create the proxy object with dynamic DO binding support
@@ -497,7 +465,11 @@ export function ref<
 		worker: workerAccessor,
 		__import: resolvedImportFn,
 		__nameOverride: nameOverride,
-		resolve: doResolve
+		resolve: doResolve,
+		// JSON names the ref instead of serialising the config it imports. That config can hold refs
+		// of its own, and an unresolved ref's `name` throws, so `devflare config print` failed on a
+		// gateway whose copied bindings carry `__ref`.
+		toJSON: () => ({ name: currentWorkerName(), configPath })
 	}
 
 	const proxy = new Proxy(proxyTarget, {

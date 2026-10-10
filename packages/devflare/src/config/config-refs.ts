@@ -13,6 +13,7 @@
 //   used (`resolveServiceBindings` recurses), so nothing here can cycle.
 // =============================================================================
 
+import { PENDING_REF_VALUE } from './ref'
 import type { DevflareConfig } from './schema'
 
 /** The binding groups whose entries can be a `ref()` binding (`.worker`, `.DO_NAME`). */
@@ -27,12 +28,17 @@ interface ResolvableRef {
 interface DeclaredRef {
 	/** Where the binding sits, e.g. `bindings.services.API` or `env.production.bindings.services.API`. */
 	path: string
+	/** The group it sits in, which decides what a resolved binding must then carry. */
+	group: (typeof REF_BINDING_GROUPS)[number]
+	/** The binding itself, read again once its ref has resolved. */
+	binding: unknown
 	ref: ResolvableRef
 }
 
 /**
- * @description Reads a binding's `__ref` through its `get` trap. A `ref().worker` binding is a
- * Proxy, so an `in` check is not a reliable way to ask.
+ * @description Reads a binding's `__ref`. The bindings come in three shapes — an object, the
+ * `.worker` accessor (a function), and a copy of either — and every shape answers a property read
+ * of `__ref`, which is the one question asked here.
  * @param binding - one entry of a binding group, of any shape
  * @returns the ref when the binding carries a resolvable one
  */
@@ -73,7 +79,7 @@ function collectDeclaredRefs(config: DevflareConfig): DeclaredRef[] {
 			Object.entries((bindings?.[group] ?? {}) as Record<string, unknown>).flatMap(
 				([bindingName, binding]) => {
 					const ref = refOf(binding)
-					return ref ? [{ path: `${scopePath}.${group}.${bindingName}`, ref }] : []
+					return ref ? [{ path: `${scopePath}.${group}.${bindingName}`, group, binding, ref }] : []
 				}
 			)
 		)
@@ -89,11 +95,13 @@ function collectDeclaredRefs(config: DevflareConfig): DeclaredRef[] {
  * @returns nothing; the effect is on the refs, which cache their resolution
  * @throws {Error} When a ref's config cannot be imported or has no `name`. The message names the
  *   binding and the config that declares it, and the original error is the `cause`.
+ * @throws {Error} When a `ref().DO_NAME` binding names a Durable Object its config does not
+ *   declare, which would otherwise compile as `class_name: "<pending>"`.
  */
 export async function resolveConfigRefs(config: DevflareConfig, configFile: string): Promise<void> {
 	// Sequential on purpose: refs to one config share a single import, and the first failure is
 	// then always the first declared binding, so the error is the same on every run.
-	for (const { path, ref } of collectDeclaredRefs(config)) {
+	for (const { path, group, binding, ref } of collectDeclaredRefs(config)) {
 		try {
 			await ref.resolve()
 		} catch (error) {
@@ -102,6 +110,16 @@ export async function resolveConfigRefs(config: DevflareConfig, configFile: stri
 				`Could not resolve the ref() at ${path} in ${configFile}: ${reason}\n` +
 					'A ref() binding names its worker from the config it imports, so that import must load.',
 				{ cause: error }
+			)
+		}
+
+		// A resolved DO ref reads its class from the referenced config's `durableObjects`; a name
+		// that config never declared stays `<pending>` with nothing else to say so.
+		const className = (binding as { className?: unknown }).className
+		if (group === 'durableObjects' && className === PENDING_REF_VALUE) {
+			throw new Error(
+				`The ref() at ${path} in ${configFile} names a Durable Object binding that the ` +
+					'referenced config does not declare in its bindings.durableObjects.'
 			)
 		}
 	}

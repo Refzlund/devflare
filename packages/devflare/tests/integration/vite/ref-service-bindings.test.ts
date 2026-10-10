@@ -239,3 +239,102 @@ describe('vite plugin with a real ref() service binding', () => {
 		expect(JSON.stringify(cloudflareConfig)).not.toContain(DEV_VARS_SECRET)
 	})
 })
+
+/** The secret only the SECOND-level worker's `.dev.vars` holds. */
+const NESTED_DEV_VARS_SECRET = 'secret-from-the-nested-workers-dev-vars'
+
+/**
+ * Write gateway → api → auth, each binding the next with a real `ref()`. Only `auth/` has a
+ * `.dev.vars`, so its secret can reach an output through the nested resolution alone.
+ *
+ * @param projectDir - the gateway's root; the workers live in `api/` and `auth/`
+ */
+async function writeNestedFixture(projectDir: string): Promise<void> {
+	for (const worker of ['api', 'auth']) {
+		await mkdir(join(projectDir, worker, 'src'), { recursive: true })
+		await writeFile(
+			join(projectDir, worker, 'src', 'worker.ts'),
+			`export async function ping(): Promise<string> {\n\treturn '${worker}'\n}\n`
+		)
+	}
+	await mkdir(join(projectDir, 'src'), { recursive: true })
+	await writeFile(
+		join(projectDir, 'package.json'),
+		JSON.stringify({ name: 'vite-nested-ref-test', private: true, type: 'module' })
+	)
+	await writeFile(
+		join(projectDir, 'src', 'fetch.ts'),
+		`export async function fetch(): Promise<Response> { return new Response('ok') }`
+	)
+	await writeFile(join(projectDir, 'auth', '.dev.vars'), `AUTH_SECRET=${NESTED_DEV_VARS_SECRET}\n`)
+	await writeFile(
+		join(projectDir, 'auth', 'devflare.config.ts'),
+		`export default { name: 'auth-worker', compatibilityDate: '2026-04-28', files: { fetch: false } }`
+	)
+	await writeFile(
+		join(projectDir, 'api', 'devflare.config.ts'),
+		`
+import { ref } from '${REF_MODULE}'
+
+export default {
+	name: 'api-worker',
+	compatibilityDate: '2026-04-28',
+	files: { fetch: false },
+	bindings: { services: { AUTH: ref(() => import('../auth/devflare.config.ts')).worker } }
+}
+`.trim()
+	)
+	await writeFile(
+		join(projectDir, 'devflare.config.ts'),
+		`
+import { ref } from '${REF_MODULE}'
+
+export default {
+	name: 'gateway-worker',
+	compatibilityDate: '2026-04-28',
+	files: { fetch: 'src/fetch.ts', durableObjects: false },
+	bindings: { services: { API: ref(() => import('./api/devflare.config.ts')).worker } }
+}
+`.trim()
+	)
+}
+
+describe('vite plugin with a ref() inside a referenced config', () => {
+	let projectDir: string
+
+	beforeEach(async () => {
+		projectDir = await mkdtemp(join(tmpdir(), 'devflare-vite-nested-ref-'))
+		await writeNestedFixture(projectDir)
+	})
+
+	afterEach(async () => {
+		await rm(projectDir, { recursive: true, force: true })
+	})
+
+	test('serve gives the second-level worker its .dev.vars, so the secret is reachable', async () => {
+		const plugin = devflarePlugin()
+		await (plugin.configResolved as (config: unknown) => Promise<void>)({
+			root: projectDir,
+			command: 'serve'
+		})
+
+		// The premise of the next test: a nested resolution that lays `.dev.vars` over the worker
+		// puts this secret into its vars.
+		const authWorker = getPluginContext().auxiliaryWorkerConfigs.find(
+			(worker) => worker.config.name === 'auth-worker'
+		)
+		expect(authWorker?.config.vars).toEqual({ AUTH_SECRET: NESTED_DEV_VARS_SECRET })
+	})
+
+	test("getDevflareConfigs() keeps a second-level worker's .dev.vars out of every output", async () => {
+		const result = await getDevflareConfigs({ cwd: projectDir })
+
+		expect(result.auxiliaryWorkers.map((worker) => [worker.config.name, worker.devOnly])).toEqual([
+			['auth-worker', true],
+			['api-worker', true]
+		])
+		const apiWorker = result.auxiliaryWorkers.find((worker) => worker.config.name === 'api-worker')
+		expect(apiWorker?.config.services).toEqual([{ binding: 'AUTH', service: 'auth-worker' }])
+		expect(JSON.stringify(result)).not.toContain(NESTED_DEV_VARS_SECRET)
+	})
+})

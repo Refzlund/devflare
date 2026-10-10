@@ -9,10 +9,11 @@ import {
 	getDevflareDotenvPaths,
 	loadDevflareDotenvIntoProcess
 } from '../../../src/config/env-vars'
-import type { RefResult } from '../../../src/config/ref'
+import { type RefResult, ref } from '../../../src/config/ref'
 import type { DevflareConfig } from '../../../src/config/schema'
 import {
 	clearBundleCache,
+	resolveDOBindings,
 	resolveServiceBindings,
 	resolveServiceBindingsFor
 } from '../../../src/test/resolve-service-bindings'
@@ -347,6 +348,78 @@ export async function ping(): Promise<string> {
 			})
 		}
 	)
+
+	// Under Node, c12's jiti rewrites a ref's `import(...)`, so `ref()` finds no specifier and its
+	// `configPath` is `<pending>`. Read as a path, that is the GATEWAY's own directory.
+	test("a cross-worker DO ref whose configPath is <pending> does not bundle the gateway's own DO classes", async () => {
+		const projectDir = await mkdtemp(join(tmpdir(), 'devflare-do-bindings-pending-'))
+		tempDirs.push(projectDir)
+		// The gateway hosts a class of the same name: a lookup in its directory would find it.
+		await mkdir(join(projectDir, 'src'), { recursive: true })
+		await writeFile(
+			join(projectDir, 'src', 'do.counter.ts'),
+			"import { DurableObject } from 'cloudflare:workers'\n\nexport class Counter extends DurableObject {}\n"
+		)
+
+		const hostRef = ref(async () => ({
+			default: defineConfig({
+				name: 'host-worker',
+				compatibilityDate: '2026-04-28',
+				bindings: { durableObjects: { COUNTER: 'Counter' } }
+			})
+		}))
+		expect(hostRef.configPath).toBe('<pending>')
+		const primaryConfig = {
+			name: 'site-worker',
+			compatibilityDate: '2026-04-28',
+			bindings: { durableObjects: { COUNTER: hostRef.COUNTER } }
+		} as unknown as DevflareConfig
+
+		const result = await resolveDOBindings(primaryConfig, projectDir)
+
+		expect(result.workers).toEqual([])
+		expect(result.crossWorkerDOBindings).toEqual({
+			COUNTER: { className: 'Counter', scriptName: 'host-worker' }
+		})
+	})
+
+	test("a ref whose configPath is <pending> builds nothing and reads nothing from the gateway's directory", async () => {
+		const envKey = `DEVFLARE_REF_PENDING_${crypto.randomUUID().replaceAll('-', '_')}`
+		const projectDir = await mkdtemp(join(tmpdir(), 'devflare-service-bindings-pending-'))
+		tempDirs.push(projectDir)
+		// Everything a wrong lookup would find: a worker entry, a secret, and an `.env` that lacks
+		// the referenced worker's required variable.
+		await mkdir(join(projectDir, 'src'), { recursive: true })
+		await writeFile(
+			join(projectDir, 'src', 'worker.ts'),
+			"export async function ping(): Promise<string> {\n\treturn 'GATEWAY'\n}\n"
+		)
+		await writeFile(join(projectDir, '.dev.vars'), 'GATEWAY_SECRET=from-the-gateways-dev-vars\n')
+		await writeFile(join(projectDir, '.env'), 'UNRELATED=1\n')
+
+		// A real ref() whose import function names no specifier, exactly as jiti leaves one.
+		const apiRef = ref(async () => ({
+			default: defineConfig({
+				name: 'api-worker',
+				compatibilityDate: '2026-04-28',
+				vars: { ORIGIN: env[envKey] }
+			})
+		}))
+		expect(apiRef.configPath).toBe('<pending>')
+		const primaryConfig = {
+			name: 'site-worker',
+			compatibilityDate: '2026-04-28',
+			bindings: { services: { API: apiRef.worker } }
+		} as DevflareConfig
+
+		const result = await resolveServiceBindingsFor(primaryConfig, projectDir, {
+			referencedEnv: 'local'
+		})
+
+		expect(result.workers).toEqual([])
+		expect(result.primaryServiceBindings).toEqual({ API: { name: 'api-worker' } })
+		expect(JSON.stringify(result)).not.toContain('from-the-gateways-dev-vars')
+	})
 
 	test("a referenced worker reads its own .env before the gateway's, which loadConfig copied into process.env", async () => {
 		const envKey = `DEVFLARE_REF_SHARED_${crypto.randomUUID().replaceAll('-', '_')}`

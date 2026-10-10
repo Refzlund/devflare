@@ -39,7 +39,6 @@ import { findDurableObjectClasses } from '../transform/durable-object'
 import { transformWorkerEntrypoint } from '../transform/worker-entrypoint'
 import { discoverEntrypointsSync } from '../utils/entrypoint-discovery'
 import { DEFAULT_DO_PATTERN, findFilesSync } from '../utils/glob'
-import { resolvePackageSpecifier } from '../utils/resolve-package'
 import {
 	type ReferencedEnv,
 	resolveReferencedConfig,
@@ -457,10 +456,18 @@ export async function resolveServiceBindingsFor(
 			const workerName = ref.name
 			const entrypoint = workerBinding.entrypoint
 
-			// Only resolve worker once per unique worker name
-			// bundleAllEntrypoints will include the default worker entrypoint plus
-			// all named entrypoints discovered from files.entrypoints.
-			if (!workersByName.has(workerName) && !seenWorkers.has(workerName)) {
+			// Bundling a referenced worker needs Bun. Under Node — `devflare dev` runs its Vite child
+			// there — none can be built, so its env files are not read either: reading them could only
+			// fail on a variable for a worker that is never served.
+			if (!getBunRuntime()) {
+				console.warn(
+					`[devflare] Not building service worker "${workerName}" for binding "${bindingName}": ` +
+						'bundling it needs the Bun runtime, and this process is not running under Bun.'
+				)
+			} else if (!workersByName.has(workerName) && !seenWorkers.has(workerName)) {
+				// Only resolve worker once per unique worker name
+				// bundleAllEntrypoints will include the default worker entrypoint plus
+				// all named entrypoints discovered from files.entrypoints.
 				const refConfig = await resolveReferencedConfig(ref, configDir, options.referencedEnv)
 				const worker = await resolveRefWorker(ref, entrypoint, configDir, refConfig)
 				if (worker) {
@@ -799,15 +806,13 @@ async function resolveDORefWorker(
 	const config = ref.config
 	if (!config) return null
 
-	const configPath = ref.configPath
-	if (!configPath || configPath === '<resolved>') {
+	// Resolve the config path (handles relative paths and package specifiers); null for the
+	// `<pending>` path a ref has when its import function's source names no specifier
+	const refConfigDir = resolveReferencedConfigDir(ref, parentConfigDir)
+	if (!refConfigDir) {
 		console.warn(`[devflare] Cannot resolve DO worker "${ref.name}" - configPath not available`)
 		return null
 	}
-
-	// Resolve the config path (handles both relative paths and package specifiers)
-	const resolvedConfigPath = resolvePackageSpecifier(configPath, parentConfigDir)
-	const refConfigDir = dirname(resolvedConfigPath)
 
 	// Get DO classes from the referenced config
 	const dosConfig = config.bindings?.durableObjects

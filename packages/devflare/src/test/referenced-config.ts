@@ -16,11 +16,18 @@ import {
 	EnvVarResolutionError,
 	resolveConfigEnvVars
 } from '../config/env-vars'
-import type { RefResult } from '../config/ref'
+import { PENDING_REF_VALUE, type RefResult } from '../config/ref'
 import { resolvePackageSpecifier } from '../utils/resolve-package'
 
 /**
  * @description Locates the config file a ref imports.
+ *
+ * → GOTCHA: `ref()` reads the specifier from its import function's SOURCE, and that source is
+ *   not always the one the author wrote. Under Node, c12 loads a config through jiti, which
+ *   rewrites `import('./api/devflare.config')` as `jitiImport(...)`, so the specifier is never
+ *   found and `configPath` is `<pending>`. Resolving `<pending>` as a path pointed at the
+ *   GATEWAY's own directory, whose `.env` and `.dev.vars` were then read as the referenced
+ *   worker's.
  * @param ref - the ref; its `configPath` is the specifier its import function names
  * @param parentConfigDir - the directory that specifier is relative to
  * @returns the absolute path, or null when the ref carries no usable specifier
@@ -30,7 +37,7 @@ export function resolveReferencedConfigPath(
 	parentConfigDir: string
 ): string | null {
 	const configPath = ref.configPath
-	if (!configPath || configPath === '<resolved>') {
+	if (!configPath || configPath === PENDING_REF_VALUE || configPath === '<resolved>') {
 		return null
 	}
 
@@ -53,7 +60,9 @@ export function resolveReferencedConfigDir(ref: RefResult, parentConfigDir: stri
  *
  * - `'local'` — a local runtime and nothing else (the dev server, a test context, the plugin in
  *   `vite dev`): `env.NAME` vars in dev mode, then the `.dev.vars` beside the referenced config
- *   on top, as wrangler gives each worker its own.
+ *   on top, as wrangler gives each worker its own. A referenced worker is built only under Bun,
+ *   which bundles it; under Node, where `devflare dev`'s Vite child runs, none is built and no
+ *   env file of it is read.
  * - `'dev'` / `'build'` — a result that can reach a build output: `env.NAME` vars in that mode,
  *   and NO `.dev.vars`. Pass the mode the main config's own vars were resolved in, so the two
  *   never disagree about one declaration.

@@ -70,7 +70,7 @@ describe('ref', () => {
 		expect(binding.__ref).toBe(result)
 	})
 
-	test('.worker reflects the keys its get trap answers, so a copy keeps service and __ref', async () => {
+	test('.worker reflects the keys a property read answers, so a copy keeps service and __ref', async () => {
 		const result = ref(async () => ({
 			default: { name: 'math-worker', compatibilityDate: '2025-01-07' }
 		}))
@@ -78,7 +78,7 @@ describe('ref', () => {
 		const binding = result.worker
 
 		// Every config transformer copies a binding with `{ ...binding }` or walks it with
-		// `Object.entries`, and a proxy whose reflection disagrees with its `get` loses `__ref` there.
+		// `Object.entries`, and a binding whose reflection disagrees with its reads loses `__ref` there.
 		expect('__ref' in binding).toBe(true)
 		expect('service' in binding).toBe(true)
 		expect(Object.keys(binding).sort()).toEqual(['__ref', 'service'])
@@ -86,6 +86,39 @@ describe('ref', () => {
 		const copy = { ...binding }
 		expect(copy.service).toBe('math-worker')
 		expect(copy.__ref).toBe(result)
+	})
+
+	test('.worker can be frozen and still names its worker', async () => {
+		const result = ref(async () => ({
+			default: { name: 'math-worker', compatibilityDate: '2025-01-07' }
+		}))
+		const binding = result.worker
+
+		expect(() => Object.freeze(binding)).not.toThrow()
+		await result.resolve()
+		expect(binding.service).toBe('math-worker')
+		expect(binding.__ref).toBe(result)
+	})
+
+	test('JSON names a ref instead of serialising the config it imports', async () => {
+		const inner = ref(async () => ({
+			default: { name: 'auth-worker', compatibilityDate: '2025-01-07' }
+		}))
+		const outer = ref(async () => ({
+			default: {
+				name: 'api-worker',
+				compatibilityDate: '2025-01-07',
+				// Never resolved: its `name` throws, which is what serialising the config would read.
+				bindings: { services: { AUTH: inner.worker('AuthEntrypoint') } }
+			}
+		}))
+		await outer.resolve()
+
+		const json = JSON.stringify({ API: { ...outer.worker } })
+
+		expect(JSON.parse(json)).toEqual({
+			API: { service: 'api-worker', __ref: { name: 'api-worker', configPath: '<pending>' } }
+		})
 	})
 
 	test('handles direct export (no default)', async () => {

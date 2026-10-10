@@ -1,9 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
+import { pathToFileURL } from 'node:url'
 import { join } from 'pathe'
 import { runConfigCommand } from '../../../src/cli/commands/config'
 import { createLogger } from '../../helpers/mock-logger'
+
+/** The real `ref()`, which a fixture config imports from source. */
+const REF_MODULE = pathToFileURL(join(import.meta.dirname, '../../../src/config/ref.ts')).href
 
 describe('runConfigCommand', () => {
 	let projectDir: string
@@ -94,4 +98,60 @@ export default {
 		expect(result.output).toContain('d1_databases')
 		expect(result.output).toContain('local-database')
 	})
+
+	// A printed binding that carries `__ref` must not serialise the referenced config: that config
+	// holds its own refs, which `loadConfig` never resolves, and an unresolved ref's `name` throws.
+	test.each([
+		['deploy', {}],
+		['local', { phase: 'local' }]
+	] as const)(
+		'prints a ref() binding whose referenced config holds a ref of its own (%s phase)',
+		async (_phase, phaseOption) => {
+			await mkdir(join(projectDir, 'api'), { recursive: true })
+			await mkdir(join(projectDir, 'auth'), { recursive: true })
+			await writeFile(
+				join(projectDir, 'auth', 'devflare.config.ts'),
+				`export default { name: 'auth-worker', compatibilityDate: '2025-01-07' }`
+			)
+			await writeFile(
+				join(projectDir, 'api', 'devflare.config.ts'),
+				`
+import { ref } from '${REF_MODULE}'
+export default {
+	name: 'api-worker',
+	compatibilityDate: '2025-01-07',
+	bindings: { services: { AUTH: ref(() => import('../auth/devflare.config.ts')).worker('AuthEntrypoint') } }
+}
+		`.trim()
+			)
+			await writeFile(
+				join(projectDir, 'devflare.config.ts'),
+				`
+import { ref } from '${REF_MODULE}'
+export default {
+	name: 'gateway-worker',
+	compatibilityDate: '2025-01-07',
+	bindings: { services: { API: ref(() => import('./api/devflare.config.ts')).worker } }
+}
+		`.trim()
+			)
+
+			const logger = createLogger({ includeLog: false })
+			const result = await runConfigCommand(
+				{ command: 'config', args: ['print'], options: { ...phaseOption, json: true } },
+				logger as unknown as Parameters<typeof runConfigCommand>[1],
+				{ cwd: projectDir, silent: true }
+			)
+
+			expect(result.exitCode).toBe(0)
+			const printed = JSON.parse(result.output ?? '') as {
+				bindings: { services: { API: { service: string; __ref?: unknown } } }
+			}
+			expect(printed.bindings.services.API.service).toBe('api-worker')
+			expect(printed.bindings.services.API.__ref).toEqual({
+				name: 'api-worker',
+				configPath: './api/devflare.config.ts'
+			})
+		}
+	)
 })
