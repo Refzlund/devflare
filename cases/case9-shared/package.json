@@ -1,0 +1,10 @@
+{
+	"name": "@devflare/case9-shared",
+	"version": "0.0.1",
+	"private": true,
+	"type": "module",
+	"main": "src/index.ts",
+	"exports": {
+		".": "./src/index.ts"
+	}
+}

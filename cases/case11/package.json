@@ -1,0 +1,21 @@
+{
+	"name": "@devflare/case11-cross-package-do",
+	"version": "0.0.1",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"test": "bun test",
+		"types": "devflare types",
+		"dev": "devflare dev",
+		"build": "devflare build"
+	},
+	"dependencies": {
+		"@devflare/case11-do-shared": "workspace:*"
+	},
+	"devDependencies": {
+		"@cloudflare/workers-types": "^4.20260702.1",
+		"@types/bun": "^1.4.2",
+		"devflare": "workspace:*",
+		"typescript": "^6.0.3"
+	}
+}

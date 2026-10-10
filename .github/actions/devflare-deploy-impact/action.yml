@@ -1,0 +1,69 @@
+name: "Devflare Deploy Impact"
+description: "Determine whether a deployment target is affected by workspace or global dependency changes"
+inputs:
+  target-package:
+    description: "Workspace package name to evaluate"
+    required: true
+  default-branch:
+    description: "Repository default branch used as a merge-base fallback when the event payload does not expose a usable previous ref"
+    required: false
+    default: "main"
+  event-name:
+    description: "GitHub event name"
+    required: false
+    default: ""
+  event-action:
+    description: "GitHub event action"
+    required: false
+    default: ""
+  push-before:
+    description: "Previous push SHA or pull_request synchronize before SHA when available"
+    required: false
+    default: ""
+  pull-request-base-sha:
+    description: "Base SHA from the pull request payload"
+    required: false
+    default: ""
+  pull-request-head-sha:
+    description: "Head SHA from the pull request payload"
+    required: false
+    default: ""
+  extra-paths:
+    description: "Optional newline-separated extra file or directory paths that should invalidate the target even when they are outside the target package root"
+    required: false
+    default: ""
+outputs:
+  should-deploy:
+    description: "true when the target package or one of its relevant dependencies changed"
+    value: ${{ steps.resolve.outputs.should-deploy }}
+  reason:
+    description: "Short explanation for the decision"
+    value: ${{ steps.resolve.outputs.reason }}
+  comparison-base:
+    description: "Resolved git base ref used for the comparison"
+    value: ${{ steps.resolve.outputs.comparison-base }}
+  comparison-head:
+    description: "Resolved git head ref used for the comparison"
+    value: ${{ steps.resolve.outputs.comparison-head }}
+  changed-workspaces:
+    description: "Comma-separated list of directly changed workspace package names"
+    value: ${{ steps.resolve.outputs.changed-workspaces }}
+  changed-files:
+    description: "Newline-separated list of changed files that were evaluated"
+    value: ${{ steps.resolve.outputs.changed-files }}
+runs:
+  using: "composite"
+  steps:
+    - name: Resolve deploy impact
+      id: resolve
+      shell: bash
+      env:
+        DEVFLARE_DEPLOY_TARGET: ${{ inputs.target-package }}
+        DEVFLARE_DEFAULT_BRANCH: ${{ inputs.default-branch }}
+        DEVFLARE_EVENT_NAME: ${{ inputs.event-name }}
+        DEVFLARE_EVENT_ACTION: ${{ inputs.event-action }}
+        DEVFLARE_PUSH_BEFORE: ${{ inputs.push-before }}
+        DEVFLARE_PULL_REQUEST_BASE_SHA: ${{ inputs.pull-request-base-sha }}
+        DEVFLARE_PULL_REQUEST_HEAD_SHA: ${{ inputs.pull-request-head-sha }}
+        DEVFLARE_EXTRA_PATHS: ${{ inputs.extra-paths }}
+      run: node ./.github/scripts/resolve-deploy-impact.mjs

@@ -1,0 +1,55 @@
+{
+	"name": "devflare-monorepo",
+	"private": true,
+	"type": "module",
+	"packageManager": "bun@1.4.2",
+	"workspaces": [
+		"apps/*",
+		"apps/testing/workers/*",
+		"packages/*",
+		"cases/*",
+		"cases/case9-shared",
+		"cases/case11-do-shared"
+	],
+	"scripts": {
+		"devflare": "bunx --bun devflare",
+		"turbo": "turbo run",
+		"devflare:dev": "turbo run dev --filter=devflare",
+		"devflare:test:watch": "turbo run test:watch --filter=devflare",
+		"devflare:build": "turbo run build --filter=devflare --filter=documentation",
+		"devflare:typecheck": "turbo run typecheck --filter=devflare && bun run devflare:typecheck:wt4",
+		"devflare:typecheck:wt4": "tsgo --noEmit -p tsconfig.devflare-wt4.json",
+		"devflare:test": "turbo run test --concurrency=1 --filter=...devflare",
+		"devflare:types": "turbo run types --filter=...devflare",
+		"devflare:check": "turbo run check --filter=documentation",
+		"devflare:docs-integrity": "bun test packages/devflare/tests/unit/docs",
+		"lint:devflare": "biome check packages/devflare",
+		"devflare:ci": "bun run lint:devflare && bun run devflare:build && bun run devflare:typecheck && bun run devflare:test && bun run devflare:types && bun run devflare:check && bun run devflare:docs-integrity",
+		"lint:root": "biome check .",
+		"lint": "turbo run lint:root",
+		"test:watch": "bun run devflare:test:watch",
+		"typecheck:root": "tsgo --noEmit",
+		"typecheck": "turbo run typecheck:root types check",
+		"types": "bun run typecheck",
+		"check": "turbo run check",
+		"test": "turbo run test",
+		"lint:fix": "biome check --write .",
+		"build": "turbo run build",
+		"ci": "bun run devflare:ci",
+		"ci:strict": "bun run lint:root && bun run typecheck:root && bun run devflare:ci",
+		"dev": "bun run devflare:dev"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.5.15",
+		"@changesets/cli": "^3.0.3",
+		"@cloudflare/workers-types": "4.20260426.1",
+		"@types/bun": "^1.4.2",
+		"@typescript/native-preview": "^7.0.0-dev.20260707.2",
+		"devflare": "workspace:*",
+		"turbo": "^2.11.7",
+		"typescript": "^6.0.3"
+	},
+	"overrides": {
+		"unicorn-magic": "^0.4.0"
+	}
+}

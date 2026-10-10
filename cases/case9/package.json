@@ -1,0 +1,19 @@
+{
+	"name": "@devflare/case9-monorepo",
+	"version": "0.0.1",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"test": "bun test",
+		"types": "devflare types"
+	},
+	"dependencies": {
+		"@devflare/case9-shared": "workspace:*"
+	},
+	"devDependencies": {
+		"@cloudflare/workers-types": "^4.20260702.1",
+		"@types/bun": "^1.4.2",
+		"devflare": "workspace:*",
+		"typescript": "^6.0.3"
+	}
+}
