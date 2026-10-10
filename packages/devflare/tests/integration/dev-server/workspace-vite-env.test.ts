@@ -14,16 +14,30 @@
 // REGRESSION, the same shape: the child built `platform.env` from the config's
 // `vars` without resolving them, so a var declared with `env.NAME` reached the
 // app as devflare's descriptor object. `descriptor` is such a var.
+//
+// REGRESSION: the coordinator copies every app's `.env` into its own
+// `process.env` and ranks those copies below the resolving config's own `.env`.
+// The child inherited them as plain environment, where they outranked it: a
+// name a second app's `.env` also set resolved to THAT app's value in the
+// child, and to this app's in its workers. A peer app, listed first so its
+// `.env` is copied first, sets the names the `dotenv*` fields read.
 // =============================================================================
 
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
+import { existsSync } from 'node:fs'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'pathe'
 import {
 	createWorkspaceDevServer,
 	type WorkspaceDevServer
 } from '../../../src/dev-server/workspace/server'
-import { ensurePackageBuilt, getAvailablePort } from '../helpers/built-devflare.helpers'
+import {
+	cleanupTempDirs,
+	ensurePackageBuilt,
+	getAvailablePort
+} from '../helpers/built-devflare.helpers'
 
 const HOOK_TIMEOUT_MS = 120_000
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '../../../../..')
@@ -37,6 +51,9 @@ interface WorkspaceEnvPayload {
 	manifestOnly: string | null
 	overridden: string | null
 	descriptor: unknown
+	dotenvShared: unknown
+	dotenvPeerOnly: unknown
+	dotenvManifest: unknown
 }
 
 /** Variables this test sets on its own process, restored afterwards. */
@@ -44,8 +61,41 @@ const coordinatorEnv = {
 	// The manifest names this too, with a different value; the manifest's must win.
 	CASE18_WORKSPACE_ENV: 'from-the-coordinator-shell',
 	// Only the coordinator holds this; the child gets it by inheritance alone. The
-	// config's `CASE18_DESCRIPTOR_VAR` is `env.CASE18_COORDINATOR_ONLY`.
+	// config's `CASE18_DESCRIPTOR_VAR` is `env.CASE18_COORDINATOR_ONLY`. case18's
+	// `.env.dev` sets it too, and loses: the environment outranks every `.env`.
 	CASE18_COORDINATOR_ONLY: 'inherited-from-the-coordinator'
+}
+
+/**
+ * The peer app's `.env`. The coordinator copies it into its own `process.env`
+ * (this test's) before it reads case18, so the Vite child inherits every value.
+ */
+const peerDotenv = {
+	CASE18_DOTENV_SHARED: 'from-the-peer-apps-env',
+	CASE18_DOTENV_PEER_ONLY: 'only-in-the-peer-apps-env',
+	CASE18_DOTENV_MANIFEST: 'from-the-peer-apps-env'
+}
+
+/**
+ * case18's own `.env.dev`, written for this test alone. `.env.dev` rather than
+ * `.env`, because wrangler's `.dev.vars` fallback reads `.env` into the vars of
+ * every case18 config, and `.env.dev` is devflare's alone.
+ */
+const case18Dotenv = {
+	CASE18_DOTENV_SHARED: 'from-case18s-own-env',
+	CASE18_DOTENV_MANIFEST: 'from-case18s-own-env',
+	CASE18_COORDINATOR_ONLY: 'from-case18s-own-env-and-it-loses'
+}
+
+/**
+ * @description Renders a `.env` file.
+ * @param values - the entries, by name
+ * @returns the file's text
+ */
+function renderDotenv(values: Record<string, string>): string {
+	return `${Object.entries(values)
+		.map(([name, value]) => `${name}=${value}`)
+		.join('\n')}\n`
 }
 
 /**
@@ -103,22 +153,49 @@ describe("workspace dev hands a Vite app's manifest env to its Vite child", () =
 	let devServer: WorkspaceDevServer | null = null
 	let vitePort = 0
 	const previousEnv: Record<string, string | undefined> = {}
+	const tempDirs: string[] = []
+	const case18DotenvPath = join(caseDir, '.env.dev')
+	let wroteCase18Dotenv = false
 
 	beforeAll(async () => {
+		// A developer's own file is never overwritten: it is gitignored, so nothing could restore it.
+		if (existsSync(case18DotenvPath)) {
+			throw new Error(`${case18DotenvPath} exists; this test writes its own. Move it aside.`)
+		}
+
 		await ensurePackageBuilt()
 		await syncSvelteKit(caseDir)
 
-		for (const [key, value] of Object.entries(coordinatorEnv)) {
+		// Every name the coordinator will set on this process, by its own hand or by copying a
+		// `.env`, is restored afterwards.
+		for (const key of [...Object.keys(coordinatorEnv), ...Object.keys(peerDotenv)]) {
 			previousEnv[key] = process.env[key]
-			process.env[key] = value
 		}
+		Object.assign(process.env, coordinatorEnv)
+
+		const peerDir = await mkdtemp(join(tmpdir(), 'devflare-workspace-dotenv-peer-'))
+		tempDirs.push(peerDir)
+		await writeFile(
+			join(peerDir, 'devflare.config.ts'),
+			"export default { name: 'case18-dotenv-peer', compatibilityDate: '2026-04-27', files: { fetch: false } }\n"
+		)
+		await writeFile(join(peerDir, '.env'), renderDotenv(peerDotenv))
+		await writeFile(case18DotenvPath, renderDotenv(case18Dotenv))
+		wroteCase18Dotenv = true
 
 		vitePort = await getAvailablePort()
 		const bridgePort = await getAvailablePort()
+		const peerPort = await getAvailablePort()
 
 		devServer = createWorkspaceDevServer({
 			manifest: {
 				apps: [
+					// First, so its `.env` is copied before case18's config is read.
+					{
+						config: join(peerDir, 'devflare.config.ts'),
+						name: 'dotenv-peer',
+						port: peerPort
+					},
 					{
 						config: './devflare.workspace-env.config.ts',
 						name: 'web',
@@ -127,7 +204,8 @@ describe("workspace dev hands a Vite app's manifest env to its Vite child", () =
 						bridgePort,
 						env: {
 							CASE18_WORKSPACE_ENV: 'from-the-manifest',
-							CASE18_STRING_VAR: 'manifest-overrides-config'
+							CASE18_STRING_VAR: 'manifest-overrides-config',
+							CASE18_DOTENV_MANIFEST: 'from-the-manifest'
 						}
 					}
 				]
@@ -140,15 +218,22 @@ describe("workspace dev hands a Vite app's manifest env to its Vite child", () =
 	}, HOOK_TIMEOUT_MS)
 
 	afterAll(async () => {
-		if (devServer) {
-			await devServer.stop()
-		}
-		for (const [key, value] of Object.entries(previousEnv)) {
-			if (value === undefined) {
-				delete process.env[key]
-			} else {
-				process.env[key] = value
+		try {
+			if (devServer) {
+				await devServer.stop()
 			}
+		} finally {
+			for (const [key, value] of Object.entries(previousEnv)) {
+				if (value === undefined) {
+					delete process.env[key]
+				} else {
+					process.env[key] = value
+				}
+			}
+			if (wroteCase18Dotenv) {
+				await rm(case18DotenvPath, { force: true })
+			}
+			await cleanupTempDirs(tempDirs)
 		}
 	}, HOOK_TIMEOUT_MS)
 
@@ -165,7 +250,13 @@ describe("workspace dev hands a Vite app's manifest env to its Vite child", () =
 				configSaw: 'from-the-manifest',
 				manifestOnly: 'from-the-manifest',
 				overridden: 'manifest-overrides-config',
-				descriptor: 'inherited-from-the-coordinator'
+				descriptor: 'inherited-from-the-coordinator',
+				// This app's own `.env` outranks a value copied from the peer's, as in its workers.
+				dotenvShared: 'from-case18s-own-env',
+				// A copied value still fills a name this app's own files lack.
+				dotenvPeerOnly: 'only-in-the-peer-apps-env',
+				// The manifest value is the child's environment, and outranks both files.
+				dotenvManifest: 'from-the-manifest'
 			})
 		},
 		HOOK_TIMEOUT_MS

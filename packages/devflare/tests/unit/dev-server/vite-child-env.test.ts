@@ -1,4 +1,8 @@
 import { describe, expect, test } from 'bun:test'
+import {
+	COPIED_DOTENV_NAMES_ENV,
+	readCopiedDotenvNames
+} from '../../../src/config/copied-dotenv-names'
 import { INJECTED_VARS_ENV, readInjectedVars } from '../../../src/config/injected-vars'
 import { isReservedAppEnvKey } from '../../../src/config/workspace'
 import { buildViteChildEnv, type ViteChildEnvOptions } from '../../../src/dev-server/vite-process'
@@ -8,7 +12,8 @@ const everyOption: ViteChildEnvOptions = {
 	configPath: '/apps/web/devflare.config.ts',
 	miniflarePort: 8788,
 	runtimeStatusUrl: 'http://127.0.0.1:9100/status',
-	r2Presign: { secret: 'presign-secret', origin: 'http://127.0.0.1:8788' }
+	r2Presign: { secret: 'presign-secret', origin: 'http://127.0.0.1:8788' },
+	copiedDotenvNames: ['FROM_A_DOTENV']
 }
 
 describe('buildViteChildEnv', () => {
@@ -79,11 +84,13 @@ describe('buildViteChildEnv', () => {
 		expect(readInjectedVars(withAppEnv)).toEqual({ OWN: 'x' })
 	})
 
-	test('without an app env, the single-app environment is exactly what it was', () => {
-		const env = buildViteChildEnv({ PATH: '/usr/bin' }, everyOption)
+	test("without an app env, the child gets the inherited environment and devflare's own variables", () => {
+		const env = buildViteChildEnv({ PATH: '/usr/bin', FROM_A_DOTENV: 'copied' }, everyOption)
 
 		expect(env).toEqual({
 			PATH: '/usr/bin',
+			FROM_A_DOTENV: 'copied',
+			[COPIED_DOTENV_NAMES_ENV]: '["FROM_A_DOTENV"]',
 			DEVFLARE_DEV: 'true',
 			DEVFLARE_BRIDGE_PORT: '8788',
 			DEVFLARE_RUNTIME_STATUS_URL: 'http://127.0.0.1:9100/status',
@@ -92,6 +99,54 @@ describe('buildViteChildEnv', () => {
 			DEVFLARE_R2_PRESIGN_ORIGIN: 'http://127.0.0.1:8788',
 			FORCE_COLOR: '1'
 		})
+	})
+
+	test("names the coordinator's .env copies, so the child can rank them as the coordinator does", () => {
+		const env = buildViteChildEnv(
+			{ SHARED: 'copied-from-another-app', SHELL_ONLY: 'from-the-shell' },
+			{ miniflarePort: 8788, copiedDotenvNames: ['SHARED'] }
+		)
+
+		expect(readCopiedDotenvNames(env)).toEqual(['SHARED'])
+		// Names only: the value already reaches the child under its own name.
+		expect(env[COPIED_DOTENV_NAMES_ENV]).not.toContain('copied-from-another-app')
+	})
+
+	test("a copy the app's manifest env sets is the child's environment, so it is not named", () => {
+		// The documented contract: a manifest value is what the child's process.env holds,
+		// and it outranks the app's own .env there. Ranking it as a copy would invert that.
+		const env = buildViteChildEnv(
+			{ SHARED: 'copied-from-another-app', KEPT: 'copied-too' },
+			{
+				miniflarePort: 8788,
+				appEnv: { SHARED: 'from-the-manifest' },
+				copiedDotenvNames: ['SHARED', 'KEPT']
+			}
+		)
+
+		expect(readCopiedDotenvNames(env)).toEqual(['KEPT'])
+	})
+
+	test('a copy devflare overwrites with its own variable is not named', () => {
+		const env = buildViteChildEnv(
+			{ FORCE_COLOR: '0', DEVFLARE_BRIDGE_PORT: '1' },
+			{ ...everyOption, copiedDotenvNames: ['FORCE_COLOR', 'DEVFLARE_BRIDGE_PORT'] }
+		)
+
+		expect(COPIED_DOTENV_NAMES_ENV in env).toBe(false)
+	})
+
+	test('sets no copied-names list without copies, and never inherits one', () => {
+		const inherited = { [COPIED_DOTENV_NAMES_ENV]: JSON.stringify(['LEAKED_FROM_A_PARENT']) }
+
+		const withoutCopies = buildViteChildEnv(inherited, { miniflarePort: 8788 })
+		const withCopies = buildViteChildEnv(inherited, {
+			miniflarePort: 8788,
+			copiedDotenvNames: ['OWN']
+		})
+
+		expect(COPIED_DOTENV_NAMES_ENV in withoutCopies).toBe(false)
+		expect(readCopiedDotenvNames(withCopies)).toEqual(['OWN'])
 	})
 
 	test("every variable devflare sets is a name a Vite app's manifest env may not use", () => {

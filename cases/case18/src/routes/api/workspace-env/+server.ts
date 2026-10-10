@@ -28,6 +28,12 @@ export const GET: RequestHandler = async ({ platform }) => {
 		/** A config var the manifest overrides, in `platform.env`. */
 		overridden: env.CASE18_STRING_VAR ?? null,
 		/** A config var declared with `env.NAME`, in `platform.env`. */
-		descriptor: env.CASE18_DESCRIPTOR_VAR ?? null
+		descriptor: env.CASE18_DESCRIPTOR_VAR ?? null,
+		/** `env.NAME`, where both this app's `.env.dev` and another app's `.env` set NAME. */
+		dotenvShared: env.CASE18_DOTENV_SHARED_VAR ?? null,
+		/** `env.NAME`, where only another app's `.env` sets NAME. */
+		dotenvPeerOnly: env.CASE18_DOTENV_PEER_ONLY_VAR ?? null,
+		/** `env.NAME`, where both `.env` files and this app's manifest `env` set NAME. */
+		dotenvManifest: env.CASE18_DOTENV_MANIFEST_VAR ?? null
 	})
 }

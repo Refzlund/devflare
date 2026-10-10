@@ -14,6 +14,10 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import {
+	COPIED_DOTENV_NAMES_ENV,
+	encodeCopiedDotenvNames
+} from '../../../src/config/copied-dotenv-names'
 import { EnvVarResolutionError } from '../../../src/config/env-vars'
 import { loadPlatformOptionsFromConfig, resetConfigCache } from '../../../src/sveltekit/platform'
 
@@ -140,5 +144,41 @@ describe('loadPlatformOptionsFromConfig', () => {
 		const options = await loadPlatformOptionsFromConfig(cwd, {})
 
 		expect(options).toEqual({ hints: {}, localBindings: {} })
+	})
+})
+
+describe('loadPlatformOptionsFromConfig in a Vite child a devflare coordinator started', () => {
+	// The coordinator copies every app's `.env` into its own `process.env`, ranks those copies
+	// below the resolving config's own `.env`, and the child inherits them as plain environment.
+	// These tests write `process.env` directly, which is what an inherited value looks like.
+
+	test("a value the coordinator copied from another app's .env ranks below this app's own, and still fills a gap", async () => {
+		const shared = mintEnvKey('SHARED')
+		const onlyCopied = mintEnvKey('ONLY_COPIED')
+		const { cwd, configPath } = writeApp(
+			`{ SHARED: env.${shared}, ONLY_COPIED: env.${onlyCopied} }`,
+			{ '.env': `${shared}=from-own-env\n` }
+		)
+		process.env[shared] = 'from-another-apps-env'
+		process.env[onlyCopied] = 'only-in-another-apps-env'
+
+		const { localBindings } = await loadPlatformOptionsFromConfig(cwd, {
+			DEVFLARE_CONFIG_PATH: configPath,
+			[COPIED_DOTENV_NAMES_ENV]: encodeCopiedDotenvNames([shared, onlyCopied])
+		})
+
+		expect(localBindings?.SHARED).toBe('from-own-env')
+		expect(localBindings?.ONLY_COPIED).toBe('only-in-another-apps-env')
+	})
+
+	test('a malformed copied-names list fails loudly, naming the variable', async () => {
+		const { cwd, configPath } = writeApp(`{ GREETING: 'hello' }`)
+
+		await expect(
+			loadPlatformOptionsFromConfig(cwd, {
+				DEVFLARE_CONFIG_PATH: configPath,
+				[COPIED_DOTENV_NAMES_ENV]: 'not json'
+			})
+		).rejects.toThrow(COPIED_DOTENV_NAMES_ENV)
 	})
 })

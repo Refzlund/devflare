@@ -7,7 +7,9 @@
 
 import { type BindingHints, createEnvProxy, getClient, setBindingHints } from '../bridge'
 import { type DevflareConfig, loadConfig } from '../config'
+import { readCopiedDotenvNames } from '../config/copied-dotenv-names'
 import { resolveDevConfig } from '../config/dev-config'
+import { recordInheritedDotenvCopies } from '../config/env-vars'
 import { readInjectedVars } from '../config/injected-vars'
 import {
 	type DevRuntimeReading,
@@ -520,13 +522,15 @@ async function loadDevConfig(
 	}
 
 	// → GOTCHA: this resolves against THIS process's environment, and a workspace Vite child's
-	//   carries the app's manifest `env` key by key, which the coordinator's does not. It also
-	//   inherits every `.env` value the coordinator copied in, from every app's config, and here
-	//   they read as the environment the process started with, which outranks this app's own
-	//   `.env`; the coordinator ranks them below it. So a descriptor whose env NAME is also a
-	//   manifest key or another app's `.env` key, or a manifest `CLOUDFLARE_ENV` (picking
-	//   `.dev.vars.<env>`), resolves here to a different value than in the app's workers.
-	//   Closing it means the coordinator handing the child its resolved vars.
+	//   carries the app's manifest `env` key by key, which the coordinator's does not. So a
+	//   descriptor whose env NAME is a manifest key, a var the config computes from one, or a
+	//   manifest `CLOUDFLARE_ENV` (picking `.dev.vars.<env>`) reads differently here than in
+	//   the app's workers. That is the documented contract — the manifest's `env` field, in
+	//   `config/workspace.ts` — not a defect to close here.
+	// → NOTE: the `.env` values the coordinator copied into its own environment, from every
+	//   app's config, are inherited here as plain environment. They still rank as the
+	//   coordinator ranks them, below this app's own `.env`: the caller records them as copies
+	//   before this runs (see loadPlatformOptionsFromConfig).
 	return resolveDevConfig(loaded, { cwd, configPath: configFile })
 }
 
@@ -561,17 +565,30 @@ async function loadDevConfigCached(
  *
  * Exported for unit testing; the handle calls it with no arguments.
  *
+ * Side effect: records the values a devflare coordinator copied from a `.env` file, as named
+ * in `DEVFLARE_COPIED_DOTENV_NAMES`, so resolving the config ranks them as the coordinator did.
+ *
  * @param cwd - the app root, where the config is searched for
  * @param environment - where devflare's own variables (`DEVFLARE_CONFIG_PATH`,
- *   `DEVFLARE_INJECTED_VARS`) are read from
+ *   `DEVFLARE_INJECTED_VARS`, `DEVFLARE_COPIED_DOTENV_NAMES`) are read from; the values the
+ *   config resolves are read from `process.env`
  * @returns no hints and no local bindings when no config could be loaded
  * @throws {EnvVarResolutionError} When a required `env.NAME` var has no value; the handle
  *   reports it on the request (see {@link createPlatformOrReport}).
+ * @throws {Error} When one of devflare's own variables is malformed, which is a defect in
+ *   whatever started this process.
  */
 export async function loadPlatformOptionsFromConfig(
 	cwd: string = process.cwd(),
 	environment: Record<string, string | undefined> = process.env
 ): Promise<Pick<DevflarePlatformOptions, 'hints' | 'localBindings'>> {
+	// Before this loads the config, which runs app code that may write to `process.env`; a
+	// value written over a copy is the environment's. Recording again on a later request
+	// changes nothing, since a name is recorded once.
+	// → GOTCHA: a write made before the first request, by `vite.config.ts` say, to a name the
+	//   coordinator copied, is recorded as the copy. Nothing in this process saw the original.
+	recordInheritedDotenvCopies(readCopiedDotenvNames(environment))
+
 	const config = await loadDevConfigCached(cwd, environment.DEVFLARE_CONFIG_PATH)
 	if (!config) {
 		return { hints: {}, localBindings: {} }

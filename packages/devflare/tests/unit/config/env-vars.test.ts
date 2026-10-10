@@ -6,8 +6,10 @@ import { defineConfig, env } from '../../../src/config'
 import {
 	EnvVarResolutionError,
 	getDevflareDotenvPaths,
+	listCopiedDotenvNames,
 	loadDevflareDotenv,
 	loadDevflareDotenvIntoProcess,
+	recordInheritedDotenvCopies,
 	resolveConfigEnvVars
 } from '../../../src/config/env-vars'
 
@@ -265,6 +267,119 @@ describe('resolveConfigEnvVars', () => {
 
 		expect(failure).toBeInstanceOf(EnvVarResolutionError)
 		expect((failure as EnvVarResolutionError).dotenvPaths).toEqual(getDevflareDotenvPaths(cwd))
+	})
+})
+
+describe('copies a child process inherits', () => {
+	// A process devflare spawns (a workspace app's Vite child) inherits the values its parent
+	// copied from a `.env` as ordinary environment. Told their names, it ranks them as the parent
+	// did. These tests stand in for the inheritance by writing `process.env` directly, which is
+	// what an inherited value looks like: nothing in this process copied it.
+
+	/**
+	 * @description An app directory whose `.env` sets one name, a config resolving two names
+	 * from it, and the two names, minted per call. Neither name carries the `DEVFLARE_` prefix.
+	 * @returns the names, and a function resolving the config against the app's `.env`
+	 */
+	function writeChildApp() {
+		const cwd = makeTempProject()
+		const suffix = crypto.randomUUID().replaceAll('-', '_')
+		const shared = `CHILD_SHARED_${suffix}`
+		const onlyInherited = `CHILD_ONLY_INHERITED_${suffix}`
+		writeProjectFile(cwd, '.env', `${shared}=from-own-env\n`)
+
+		const config = defineConfig({
+			name: 'child-app',
+			compatibilityDate: '2026-05-01',
+			vars: { shared: env[shared], onlyInherited: env[onlyInherited] }
+		})
+		const resolve = () =>
+			resolveConfigEnvVars(config, {
+				cwd,
+				configPath: join(cwd, 'devflare.config.ts'),
+				mode: 'dev'
+			})
+
+		return { shared, onlyInherited, resolve }
+	}
+
+	test("an inherited copy ranks below the config's own .env once recorded, and still fills a gap", async () => {
+		const { shared, onlyInherited, resolve } = writeChildApp()
+		process.env[shared] = 'copied-by-the-parent'
+		process.env[onlyInherited] = 'only-the-parent-copied'
+
+		try {
+			recordInheritedDotenvCopies([shared, onlyInherited])
+			const resolved = await resolve()
+
+			expect(resolved.vars).toEqual({
+				shared: 'from-own-env',
+				onlyInherited: 'only-the-parent-copied'
+			})
+		} finally {
+			delete process.env[shared]
+			delete process.env[onlyInherited]
+		}
+	})
+
+	test('an inherited value the parent did not copy is the environment, and wins', async () => {
+		const { shared, onlyInherited, resolve } = writeChildApp()
+		process.env[shared] = 'from-the-parent-environment'
+		process.env[onlyInherited] = 'copied-by-the-parent'
+
+		try {
+			recordInheritedDotenvCopies([onlyInherited])
+			const resolved = await resolve()
+
+			expect(resolved.vars?.shared).toBe('from-the-parent-environment')
+		} finally {
+			delete process.env[shared]
+			delete process.env[onlyInherited]
+		}
+	})
+
+	test('a value written over a recorded copy is the environment, even when the names are recorded again', async () => {
+		// The child records the names before every config read; a later write must not be
+		// re-recorded as a copy, or it would lose to the config's own .env.
+		const { shared, onlyInherited, resolve } = writeChildApp()
+		process.env[shared] = 'copied-by-the-parent'
+		process.env[onlyInherited] = 'from-the-parent-environment'
+
+		try {
+			recordInheritedDotenvCopies([shared])
+			process.env[shared] = 'written-after-the-record'
+			recordInheritedDotenvCopies([shared])
+			const resolved = await resolve()
+
+			expect(resolved.vars?.shared).toBe('written-after-the-record')
+		} finally {
+			delete process.env[shared]
+			delete process.env[onlyInherited]
+		}
+	})
+
+	test('the parent lists each copy that still holds its copied value, and nothing else', async () => {
+		const root = makeTempProject()
+		const suffix = crypto.randomUUID().replaceAll('-', '_')
+		const kept = `PARENT_KEPT_${suffix}`
+		const overwritten = `PARENT_OVERWRITTEN_${suffix}`
+		const environment = `PARENT_ENVIRONMENT_${suffix}`
+		writeProjectFile(root, '.env', `${kept}=a\n${overwritten}=b\n${environment}=c\n`)
+		process.env[environment] = 'from-the-environment'
+
+		try {
+			await loadDevflareDotenvIntoProcess(root)
+			process.env[overwritten] = 'written-after-the-copy'
+			const names = listCopiedDotenvNames()
+
+			expect(names).toContain(kept)
+			expect(names).not.toContain(overwritten)
+			expect(names).not.toContain(environment)
+		} finally {
+			delete process.env[kept]
+			delete process.env[overwritten]
+			delete process.env[environment]
+		}
 	})
 })
 

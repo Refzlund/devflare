@@ -8,6 +8,10 @@
 // reached the child before the config ran. `CASE18_STRING_VAR` is one the
 // manifest overrides. `CASE18_DESCRIPTOR_VAR` is declared with `env.NAME`, so
 // the child has to resolve it as the coordinator does, not serve the descriptor.
+//
+// The three `CASE18_DOTENV_*` vars read names that a second workspace app's
+// `.env` sets too. The test writes that app, and this app's `.env.dev`, while it
+// runs; every name is required, so this config resolves only under that test.
 // =============================================================================
 
 import { defineConfig, env } from 'devflare/config'
@@ -21,7 +25,10 @@ export default defineConfig({
 	vars: {
 		CASE18_STRING_VAR: 'case18-var-value',
 		CASE18_CONFIG_SAW: process.env.CASE18_WORKSPACE_ENV ?? 'absent when the config ran',
-		CASE18_DESCRIPTOR_VAR: env.CASE18_COORDINATOR_ONLY
+		CASE18_DESCRIPTOR_VAR: env.CASE18_COORDINATOR_ONLY,
+		CASE18_DOTENV_SHARED_VAR: env.CASE18_DOTENV_SHARED,
+		CASE18_DOTENV_PEER_ONLY_VAR: env.CASE18_DOTENV_PEER_ONLY,
+		CASE18_DOTENV_MANIFEST_VAR: env.CASE18_DOTENV_MANIFEST
 	},
 	wrangler: {
 		passthrough: {

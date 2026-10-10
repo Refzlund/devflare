@@ -1,6 +1,9 @@
 import { type ChildProcess, spawn } from 'node:child_process'
 import type { ConsolaInstance } from 'consola'
+import { COPIED_DOTENV_NAMES_ENV, encodeCopiedDotenvNames } from '../config/copied-dotenv-names'
+import { listCopiedDotenvNames } from '../config/env-vars'
 import { encodeInjectedVars, INJECTED_VARS_ENV } from '../config/injected-vars'
+import { isReservedAppEnvKey } from '../config/workspace'
 import { RUNTIME_STATUS_URL_ENV } from './runtime-status'
 import { waitForViteReady } from './vite-utils'
 
@@ -30,9 +33,17 @@ export interface ViteChildEnvOptions {
 	 * `vars`. The single-app `devflare dev` path has none.
 	 */
 	appEnv?: Record<string, string>
+	/**
+	 * Names of values the coordinator copied into its own environment from some
+	 * config's `.env` (`listCopiedDotenvNames`). Those the child inherits
+	 * unchanged are passed as {@link COPIED_DOTENV_NAMES_ENV}, so the child ranks
+	 * them below the app's own `.env`, as the coordinator does.
+	 */
+	copiedDotenvNames?: readonly string[]
 }
 
-export interface StartViteProcessOptions extends ViteChildEnvOptions {
+/** What a caller passes; the copied `.env` names are the coordinator's own state, read at spawn. */
+export interface StartViteProcessOptions extends Omit<ViteChildEnvOptions, 'copiedDotenvNames'> {
 	cwd: string
 	vitePort: number
 	generatedViteConfigPath: string | null
@@ -44,11 +55,11 @@ export interface StartViteProcessOptions extends ViteChildEnvOptions {
  *
  * Three layers, later winning: the inherited environment, then the app's
  * manifest `env`, then devflare's own variables. The inherited layer is kept
- * whole on purpose, except for {@link INJECTED_VARS_ENV}: apps read their
- * shell's variables through it, and a workspace consumer relies on it to pass
- * values the manifest does not carry. devflare's layer wins so a manifest can
- * never redirect the bridge or the config path (the manifest also refuses
- * those names when it loads).
+ * whole on purpose, except for devflare's two channels ({@link INJECTED_VARS_ENV}
+ * and {@link COPIED_DOTENV_NAMES_ENV}): apps read their shell's variables
+ * through it, and a workspace consumer relies on it to pass values the manifest
+ * does not carry. devflare's layer wins so a manifest can never redirect the
+ * bridge or the config path (the manifest also refuses those names when it loads).
  *
  * @param inherited - the coordinator's own environment (`process.env`)
  * @param options - what this child needs devflare to tell it
@@ -62,15 +73,30 @@ export function buildViteChildEnv(
 	const appEnv = options.appEnv ?? {}
 	const hasAppEnv = Object.keys(appEnv).length > 0
 
-	// The injected-vars channel is devflare's to set per child. Inheriting one
-	// would hand this child another app's vars — or, from a nested launch, a
-	// parent's — so it never passes through from the inherited layer.
-	const { [INJECTED_VARS_ENV]: _notInherited, ...inheritedWithoutChannel } = inherited
+	// A copy the manifest or devflare sets over is no longer the copied value in
+	// the child: it is the child's environment there, as an overwritten copy is
+	// the coordinator's. Every name devflare sets is reserved, which also keeps a
+	// copied `DEVFLARE_*` name the child's environment, as it was before.
+	const inheritedCopies = (options.copiedDotenvNames ?? []).filter(
+		(name) => !(name in appEnv) && !isReservedAppEnvKey(name, { vite: true })
+	)
+
+	// Both channels are devflare's to set per child. Inheriting one would hand
+	// this child another app's values — or, from a nested launch, a parent's —
+	// so neither passes through from the inherited layer.
+	const {
+		[INJECTED_VARS_ENV]: _injectedNotInherited,
+		[COPIED_DOTENV_NAMES_ENV]: _copiedNotInherited,
+		...inheritedWithoutChannels
+	} = inherited
 
 	return {
-		...inheritedWithoutChannel,
+		...inheritedWithoutChannels,
 		...appEnv,
 		...(hasAppEnv ? { [INJECTED_VARS_ENV]: encodeInjectedVars(appEnv) } : {}),
+		...(inheritedCopies.length > 0
+			? { [COPIED_DOTENV_NAMES_ENV]: encodeCopiedDotenvNames(inheritedCopies) }
+			: {}),
 		DEVFLARE_DEV: 'true',
 		DEVFLARE_BRIDGE_PORT: String(miniflarePort),
 		...(runtimeStatusUrl ? { [RUNTIME_STATUS_URL_ENV]: runtimeStatusUrl } : {}),
@@ -100,7 +126,12 @@ export async function startViteProcess(options: StartViteProcessOptions): Promis
 		cwd,
 		stdio: ['inherit', 'pipe', 'pipe'],
 		windowsHide: true,
-		env: buildViteChildEnv(process.env, options)
+		// Read at spawn, after both callers have loaded the configs they read at
+		// startup and so copied each one's `.env`.
+		env: buildViteChildEnv(process.env, {
+			...options,
+			copiedDotenvNames: listCopiedDotenvNames()
+		})
 	})
 
 	const readyUrl = await waitForViteReady(viteProcess, {

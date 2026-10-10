@@ -106,7 +106,11 @@ const workspaceAppSchema = z
 		 * each app gets in the shared instance, does not see them in
 		 * `process.env`. So a config must not derive which bindings it declares
 		 * from a value only this `env` sets: the coordinator and the Vite child
-		 * would then disagree about which bindings the app has.
+		 * would then disagree about which bindings the app has. Its `vars` differ
+		 * the same way, not only its bindings: a var the config computes from
+		 * such a value under another name, or declares as `env.NAME` with one as
+		 * NAME, reads the manifest's value in the Vite child's `platform.env` and
+		 * the coordinator's in the app's workers.
 		 *
 		 * Keys starting with `DEVFLARE_` are devflare's own and are refused on
 		 * every app; `FORCE_COLOR`, which devflare sets on the Vite child, is

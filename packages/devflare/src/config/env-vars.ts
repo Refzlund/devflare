@@ -558,6 +558,41 @@ function partitionProcessEnv(): {
 	return { copied, environment }
 }
 
+/**
+ * @description Names the values in `process.env` that devflare copied from a `.env` file and that
+ * still hold the copied value, so a process this one spawns can be told which of the values it
+ * inherits rank as copies (see {@link recordInheritedDotenvCopies}).
+ * @returns the names; values are never returned, since the child inherits them anyway
+ */
+export function listCopiedDotenvNames(): string[] {
+	return Object.keys(partitionProcessEnv().copied)
+}
+
+/**
+ * @description Records inherited variables as values a parent devflare process copied from a
+ * `.env` file, so {@link resolveConfigEnvVars} ranks them as the parent did: below the resolving
+ * config's own `.env` files, still filling a name those files lack. Without this the child reads
+ * them as the environment it started with, which outranks every `.env` file.
+ *
+ * Each name is recorded with the value it holds now, which is the copied value as long as this
+ * runs before anything in the child writes to it. A name already recorded keeps its record, so a
+ * value written over it later counts as the environment's, as it would in the parent.
+ *
+ * Side effect: adds to this module's record of copied values, for the life of the process.
+ *
+ * @param names - names the parent listed with {@link listCopiedDotenvNames}; one this process
+ *   does not hold is skipped
+ */
+export function recordInheritedDotenvCopies(names: Iterable<string>): void {
+	for (const name of names) {
+		const value = process.env[name]
+		if (value === undefined || copiedFromDotenv.has(name)) {
+			continue
+		}
+		copiedFromDotenv.set(name, value)
+	}
+}
+
 export interface MissingEnvVar {
 	/**
 	 * Nested `vars` path that required the missing variable.
