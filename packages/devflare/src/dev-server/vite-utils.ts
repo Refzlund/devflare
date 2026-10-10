@@ -27,6 +27,7 @@ export interface SpawnedLikeProcess {
 	pid?: number
 	stdout: NodeJS.ReadableStream | null
 	stderr: NodeJS.ReadableStream | null
+	/** True once a signal has been SENT (`ChildProcess.killed`); it says nothing about an exit. */
 	readonly killed: boolean
 	/** Set once the process has exited with a code (`ChildProcess.exitCode`); null before. */
 	readonly exitCode?: number | null
@@ -240,11 +241,37 @@ async function defaultRunCommand(command: string, args: string[]): Promise<void>
 	})
 }
 
+/** A process whose exit is already recorded, whether or not anyone heard the event. */
+type ExitRecordingProcess = Pick<SpawnedLikeProcess, 'exitCode' | 'signalCode'>
+
+/**
+ * @description Whether the process has already exited, read from its recorded
+ * exit status rather than from an `exit` event a late listener can miss.
+ * @param process - the spawned child
+ * @returns true once it has an exit code or an exit signal
+ */
+function hasExited(process: ExitRecordingProcess): boolean {
+	return (process.exitCode ?? null) !== null || (process.signalCode ?? null) !== null
+}
+
+/**
+ * @description Waits for the child to actually exit.
+ * → GOTCHA: never read `killed` here. Node and Bun set it the moment `kill()`
+ *   SENDS a signal, so a child that ignores SIGTERM reads as already gone.
+ * → The recorded status is checked first because `exit` fires once: a child that
+ *   exited before this call (on Windows, during `taskkill`; on macOS and Linux, to
+ *   the `SIGINT` a Ctrl+C sends its whole process group) never emits it again.
+ *   Both runtimes record the status before emitting, so checking and then
+ *   listening in the same tick leaves no gap.
+ * @param process - the spawned child
+ * @param timeoutMs - how long to wait for an exit not yet recorded
+ * @returns true once the child has exited; false if it is still running after `timeoutMs`
+ */
 function waitForProcessExit(
-	process: Pick<SpawnedLikeProcess, 'killed' | 'on'>,
+	process: ExitRecordingProcess & Pick<SpawnedLikeProcess, 'on'>,
 	timeoutMs: number
 ): Promise<boolean> {
-	if (process.killed) {
+	if (hasExited(process)) {
 		return Promise.resolve(true)
 	}
 
@@ -269,34 +296,23 @@ function waitForProcessExit(
 	})
 }
 
-/** A process whose exit is already recorded, whether or not anyone heard the event. */
-type ExitRecordingProcess = Pick<SpawnedLikeProcess, 'exitCode' | 'signalCode'>
-
 /**
- * @description Whether the process has already exited, read from its recorded
- * exit status rather than from an `exit` event a late listener can miss.
- * @param process - the spawned child
- * @returns true once it has an exit code or an exit signal
- */
-function hasExited(process: ExitRecordingProcess): boolean {
-	return (process.exitCode ?? null) !== null || (process.signalCode ?? null) !== null
-}
-
-/**
- * @description Stops a spawned child and everything it started: `taskkill /t /f`
- * on Windows, where the child is often a shim (`bunx`) whose own exit leaves its
- * grandchildren running; `SIGTERM` elsewhere.
+ * @description Stops a spawned child. On Windows it ends the whole tree with
+ * `taskkill /t /f`, since the child is often a shim (`bunx`) whose own exit
+ * leaves its grandchildren running. Elsewhere it signals the child alone:
+ * `SIGTERM`, then `SIGKILL` if the child is still running `timeoutMs` later.
  * @param process - the spawned child
  * @param options - platform, wait budget and command runner, for tests
- * @returns false when the Windows tree kill has still not seen the child exit
- *   `timeoutMs` later — the kill failed or missed it, and it may still hold its
- *   port; true otherwise.
- *   → GOTCHA: outside Windows `true` only says a signal was delivered.
- *   `waitForProcessExit` reads `killed`, which is set the moment a signal is
- *   sent, as an exit, so it never waits there and the `SIGKILL` step never runs.
+ * @returns true once the child has exited; false when it is still running after
+ *   the last step's `timeoutMs` — the kill failed or missed it, and it may still
+ *   hold its port.
+ *   → GOTCHA: outside Windows, true is about the child alone. A `bunx` shim
+ *   forwards `SIGTERM` to the program it runs, but `SIGKILL` ends only the shim,
+ *   so a program that ignored the `SIGTERM` outlives a stop that returned true.
+ *   Signalling the process group would reach it.
  */
 export async function stopSpawnedProcessTree(
-	process: Pick<SpawnedLikeProcess, 'pid' | 'kill' | 'killed' | 'on' | 'exitCode' | 'signalCode'>,
+	process: Pick<SpawnedLikeProcess, 'pid' | 'kill' | 'on' | 'exitCode' | 'signalCode'>,
 	options: StopProcessTreeOptions = {}
 ): Promise<boolean> {
 	const {
@@ -316,10 +332,9 @@ export async function stopSpawnedProcessTree(
 			}
 		}
 
-		// The child can exit while taskkill is still running, before the listener in
-		// waitForProcessExit is attached (measured under Node, 1 run in 5), so its
-		// recorded exit status counts as well as the event.
-		return (await waitForProcessExit(process, timeoutMs)) || hasExited(process)
+		// The child can exit while taskkill is still running, before anything listens
+		// for its `exit`; waitForProcessExit reads that from its recorded status.
+		return await waitForProcessExit(process, timeoutMs)
 	}
 
 	try {
@@ -339,5 +354,5 @@ export async function stopSpawnedProcessTree(
 		return hasExited(process)
 	}
 
-	return (await waitForProcessExit(process, timeoutMs)) || hasExited(process)
+	return await waitForProcessExit(process, timeoutMs)
 }

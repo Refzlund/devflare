@@ -26,25 +26,54 @@ function createMockFs(files: Record<string, string>): ViteProjectFileSystem {
 	}
 }
 
+/**
+ * @description A child process as Node and Bun model one: `kill()` only SENDS a
+ * signal, and sets `killed` the moment it does, while the child keeps running
+ * until it exits on its own terms. It exits on a signal only when that signal
+ * is in `diesOn`; otherwise the signal is ignored, as by a child that traps it.
+ */
 class FakeSpawnedProcess extends EventEmitter implements SpawnedLikeProcess {
 	pid?: number
 	stdout: PassThrough | null
 	stderr: PassThrough | null
+	/** True once any signal has been sent, exactly like `ChildProcess.killed`. */
 	killed = false
 	exitCode: number | null = null
+	signalCode: NodeJS.Signals | null = null
 	readonly killSignals: string[] = []
 
-	constructor(pid = 1234) {
+	/**
+	 * @param pid - the pid the stop logic hands to `taskkill`
+	 * @param diesOn - the signals this child exits on; any other is ignored
+	 */
+	constructor(
+		pid = 1234,
+		private readonly diesOn: ReadonlySet<NodeJS.Signals> = new Set()
+	) {
 		super()
 		this.pid = pid
 		this.stdout = new PassThrough()
 		this.stderr = new PassThrough()
 	}
 
-	kill(signal?: NodeJS.Signals): boolean {
+	kill(signal: NodeJS.Signals = 'SIGTERM'): boolean {
 		this.killed = true
-		this.killSignals.push(signal ?? 'SIGTERM')
+		this.killSignals.push(signal)
+		if (this.diesOn.has(signal)) {
+			queueMicrotask(() => this.exit(null, signal))
+		}
 		return true
+	}
+
+	/**
+	 * @description Ends the child: records its exit status, then emits `exit`, in
+	 * that order, as both runtimes do — so a listener attached afterwards hears
+	 * nothing and only the recorded status says it exited.
+	 */
+	exit(code: number | null, signal: NodeJS.Signals | null): void {
+		this.exitCode = code
+		this.signalCode = signal
+		this.emit('exit', code, signal)
 	}
 
 	override on(event: 'exit' | 'error', handler: (...args: any[]) => void): this {
@@ -177,10 +206,10 @@ describe('stopSpawnedProcessTree', () => {
 			timeoutMs: 25,
 			runCommand: async (command, args) => {
 				commands.push({ command, args })
-				queueMicrotask(() => {
-					process.killed = true
-					process.emit('exit', 0, null)
-				})
+				// taskkill is a separate process, so it never sets the child's `killed`.
+				// The exit lands after stop starts listening, so only the `exit` event
+				// can report it; the case below covers the exit that lands before.
+				setTimeout(() => process.exit(1, null), 5)
 			}
 		})
 
@@ -215,12 +244,39 @@ describe('stopSpawnedProcessTree', () => {
 			timeoutMs: 25,
 			// The child exits while taskkill runs, so its `exit` event fires before
 			// stopSpawnedProcessTree listens for one; only its exit code records it.
-			runCommand: async () => {
-				process.exitCode = 1
-				process.emit('exit', 1, null)
-			}
+			runCommand: async () => process.exit(1, null)
 		})
 
 		expect(exited).toBe(true)
+	})
+
+	test('outside Windows, stops a child that exits on SIGTERM without escalating', async () => {
+		const process = new FakeSpawnedProcess(4242, new Set(['SIGTERM']))
+
+		const exited = await stopSpawnedProcessTree(process, { platform: 'linux', timeoutMs: 25 })
+
+		expect(exited).toBe(true)
+		expect(process.killSignals).toEqual(['SIGTERM'])
+	})
+
+	test('outside Windows, escalates to SIGKILL when the child survives SIGTERM', async () => {
+		const process = new FakeSpawnedProcess(4242, new Set(['SIGKILL']))
+
+		const exited = await stopSpawnedProcessTree(process, { platform: 'linux', timeoutMs: 25 })
+
+		// `killed` is true from the SIGTERM on, so a wait that read it as an exit
+		// returned at once and the SIGKILL was never sent.
+		expect(process.killSignals).toEqual(['SIGTERM', 'SIGKILL'])
+		expect(process.signalCode).toBe('SIGKILL')
+		expect(exited).toBe(true)
+	})
+
+	test('outside Windows, reports a child that survives SIGTERM and SIGKILL', async () => {
+		const process = new FakeSpawnedProcess(4242)
+
+		const exited = await stopSpawnedProcessTree(process, { platform: 'linux', timeoutMs: 25 })
+
+		expect(process.killSignals).toEqual(['SIGTERM', 'SIGKILL'])
+		expect(exited).toBe(false)
 	})
 })

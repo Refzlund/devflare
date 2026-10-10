@@ -93,9 +93,10 @@ describe('disposeDevServerState', () => {
 		// can't trivially mock the import here, so instead replace viteProcess
 		// with a child-process-shaped stub whose `kill` records the order.
 		// Mock the spawned process so `stopSpawnedProcessTree` resolves
-		// immediately on every platform: setting `killed = true` short-circuits
-		// `waitForProcessExit`, and `pid = undefined` skips the win32
-		// `taskkill` branch so we don't try to spawn a real child process.
+		// immediately on every platform: a recorded `exitCode` short-circuits
+		// `waitForProcessExit` (`killed` does not — it only means a signal was
+		// sent), and `pid = undefined` skips the win32 `taskkill` branch so we
+		// don't try to spawn a real child process.
 		const fakeProc: {
 			killed: boolean
 			pid: undefined
