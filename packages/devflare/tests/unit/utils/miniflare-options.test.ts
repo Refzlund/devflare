@@ -3,9 +3,24 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import * as miniflare from 'miniflare'
-import { splitSharedOptions, toMiniflareOptions } from '../../../src/utils/miniflare-options'
+import { normalize } from 'pathe'
+import {
+	chooseModulesRoot,
+	splitSharedOptions,
+	toMiniflareOptions
+} from '../../../src/utils/miniflare-options'
 
 const tempDirs: string[] = []
+
+/** The slice of a converted worker's module manifest these tests read. */
+interface ModuleManifest {
+	/** Directory every module name is relative to. */
+	modulesRoot: string
+	/** Name of the entry module. */
+	mainModule: string
+	/** Modules keyed by name. */
+	modules: Record<string, unknown>
+}
 
 /** A fresh directory holding the given files, removed after each test. */
 function createTempFiles(files: Record<string, string>): string {
@@ -171,6 +186,58 @@ describe('toMiniflareOptions', () => {
 		).rejects.toThrow(/dynamic import\(\) whose specifier is not a string literal/)
 	})
 
+	test('names modules from the configured root when it holds every module', async () => {
+		// Every module sits two levels below the root, so a root taken from the
+		// modules alone would name them differently.
+		const dir = createTempFiles({
+			'.devflare/worker-entrypoints/main.js':
+				"import dep from './chunk.js'\nexport default { fetch() { return new Response(dep) } }\n",
+			'.devflare/worker-entrypoints/chunk.js': 'export default "dep"\n'
+		})
+
+		const options = await toMiniflareOptions(miniflare, {
+			name: 'worker',
+			compatibilityDate: '2026-01-01',
+			scriptPath: join(dir, '.devflare', 'worker-entrypoints', 'main.js'),
+			modulesRoot: dir,
+			modulesRules: [{ type: 'ESModule', include: ['**/*.js'] }]
+		})
+
+		const manifest = options.workers[0]?.config.manifest as ModuleManifest
+		expect(manifest.mainModule).toBe('.devflare/worker-entrypoints/main.js')
+		expect(Object.keys(manifest.modules).sort()).toEqual([
+			'.devflare/worker-entrypoints/chunk.js',
+			'.devflare/worker-entrypoints/main.js'
+		])
+	})
+
+	test('roots the modules at their deepest shared directory when the configured root misses them', async () => {
+		// The generated-state directory outside the app (an absolute DEVFLARE_DIR),
+		// and an app whose `baseDir` is a subfolder that never holds the bundle.
+		const dir = createTempFiles({
+			'generated/worker-entrypoints/main.js':
+				"import dep from '../shared/dep.js'\nexport default { fetch() { return new Response(dep) } }\n",
+			'generated/shared/dep.js': 'export default "dep"\n',
+			'app/src/index.ts': ''
+		})
+
+		const options = await toMiniflareOptions(miniflare, {
+			name: 'worker',
+			compatibilityDate: '2026-01-01',
+			scriptPath: join(dir, 'generated', 'worker-entrypoints', 'main.js'),
+			modulesRoot: join(dir, 'app', 'src'),
+			modulesRules: [{ type: 'ESModule', include: ['**/*.js'] }]
+		})
+
+		const manifest = options.workers[0]?.config.manifest as ModuleManifest
+		expect(normalize(manifest.modulesRoot)).toBe(normalize(join(dir, 'generated')))
+		expect(manifest.mainModule).toBe('worker-entrypoints/main.js')
+		expect(Object.keys(manifest.modules).sort()).toEqual([
+			'shared/dep.js',
+			'worker-entrypoints/main.js'
+		])
+	})
+
 	test('reads httpsKeyPath and httpsCertPath into the contents Miniflare 5 takes', async () => {
 		const dir = createTempFiles({ 'key.pem': 'KEY-PEM', 'cert.pem': 'CERT-PEM' })
 
@@ -221,5 +288,38 @@ describe('toMiniflareOptions', () => {
 				httpsCertPath: join(dir, 'cert.pem')
 			})
 		).rejects.toThrow(/given as httpsKeyPath/)
+	})
+})
+
+describe('chooseModulesRoot', () => {
+	test('keeps the configured root over the deeper directory the modules share', () => {
+		expect(chooseModulesRoot('C:/app', ['C:/app/.devflare/worker-entrypoints/main.js'])).toBe(
+			'C:/app'
+		)
+	})
+
+	test('reads a child directory named `..foo` as inside the configured root', () => {
+		expect(chooseModulesRoot('C:/app', ['C:/app/.devflare/main.js', 'C:/app/..foo/dep.js'])).toBe(
+			'C:/app'
+		)
+	})
+
+	test('does not read a configured root on another drive as holding the modules', () => {
+		// `relative()` across drives answers with an absolute path, not `../`.
+		expect(chooseModulesRoot('D:/elsewhere', ['C:/gen/entry/main.js', 'C:/gen/dep.js'])).toBe(
+			'C:/gen'
+		)
+	})
+
+	test('roots at the modules alone when the configured root is on another drive', () => {
+		expect(chooseModulesRoot('C:/app', ['D:/gen/worker-entrypoints/main.js'])).toBe(
+			'D:/gen/worker-entrypoints'
+		)
+	})
+
+	test('refuses modules that share no directory, naming them', () => {
+		expect(() => chooseModulesRoot('C:/app', ['C:/gen/main.js', 'D:/vendor/dep.js'])).toThrow(
+			/share no common directory \(C:\/gen\/main\.js, D:\/vendor\/dep\.js\)/
+		)
 	})
 })

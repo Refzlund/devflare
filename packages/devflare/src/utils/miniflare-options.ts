@@ -341,12 +341,65 @@ async function collectWorkerModules(
 }
 
 /**
+ * @description Whether a file lies under a directory. Path-segment aware, so a
+ * child directory named `..foo` is inside and a different drive is not —
+ * `relative()` answers the latter with an absolute path rather than `../`.
+ * @param directory - absolute, forward-slashed directory
+ * @param file - absolute, forward-slashed file path
+ * @returns `true` when `file` is somewhere below `directory`
+ */
+function isInsideDirectory(directory: string, file: string): boolean {
+	const fromDirectory = relative(directory, file)
+	return fromDirectory !== '..' && !fromDirectory.startsWith('../') && !isAbsolute(fromDirectory)
+}
+
+/**
+ * @description Chooses the directory a worker's module names are relative to.
+ * Miniflare names each module by its path relative to this root and rebuilds
+ * the source path as `root + name`, so ANY directory holding every module is
+ * correct; the choice only changes the names.
+ *
+ * The preferred root (the app, or its `baseDir`) is kept whenever it holds every
+ * module, so names do not change for a worker that already loaded. When it does
+ * not — the bundles devflare runs live in the generated-state directory, which
+ * an absolute `DEVFLARE_DIR` can put anywhere and a `baseDir` subfolder never
+ * contains — the root becomes the deepest directory holding every module.
+ *
+ * → NOTE: the fallback ignores the preferred root on purpose. Widening to a
+ *   common ancestor of BOTH finds none when the preferred root is on another
+ *   drive, although the modules themselves share a directory.
+ * @param preferred - the root the worker was configured with
+ * @param modulePaths - absolute, forward-slashed paths of every module, entry first
+ * @returns the root to hand Miniflare
+ * @throws When the modules share no directory at all (different drives), which
+ *   no root can express.
+ */
+export function chooseModulesRoot(preferred: string, modulePaths: string[]): string {
+	const preferredRoot = resolve(preferred)
+	if (modulePaths.every((path) => isInsideDirectory(preferredRoot, path))) return preferredRoot
+
+	let candidate = dirname(modulePaths[0])
+	while (!modulePaths.every((path) => isInsideDirectory(candidate, path))) {
+		const parent = dirname(candidate)
+		if (parent === candidate) {
+			throw new Error(
+				`The modules of the worker starting at ${modulePaths[0]} share no common directory (${modulePaths.join(', ')}); workerd needs every module under one root. Keep DEVFLARE_DIR and any imported module on the same drive.`
+			)
+		}
+		candidate = parent
+	}
+	return candidate
+}
+
+/**
  * @description Replaces a worker's `scriptPath` + `modulesRules` with the
- * explicit `modules` list Miniflare 5 needs. Workers without rules pass through.
+ * explicit `modules` list Miniflare 5 needs, under a root chosen by
+ * {@link chooseModulesRoot}. Workers without rules pass through.
  * @param worker - one v4 worker entry
  * @param runtime - the loaded `miniflare` module
  * @returns the worker, rewritten when it carried `modulesRules`
- * @throws When `modulesRules` arrive without a `scriptPath` to start from.
+ * @throws When `modulesRules` arrive without a `scriptPath` to start from, or
+ *   when the worker's modules share no common directory.
  */
 async function expandModuleRules(
 	worker: V4Worker,
@@ -359,22 +412,15 @@ async function expandModuleRules(
 		throw new Error('devflare emitted `modulesRules` for a worker without a `scriptPath`.')
 	}
 
-	const modulesRoot =
-		typeof worker.modulesRoot === 'string' ? worker.modulesRoot : dirname(scriptPath)
 	const modules = await collectWorkerModules(
 		resolve(scriptPath),
 		modulesRules as V4ModuleRuleInput[],
 		runtime
 	)
-
-	const outsideRoot = modules.find((module) =>
-		relative(resolve(modulesRoot), module.path).startsWith('..')
+	const modulesRoot = chooseModulesRoot(
+		typeof worker.modulesRoot === 'string' ? worker.modulesRoot : dirname(scriptPath),
+		modules.map((module) => module.path)
 	)
-	if (outsideRoot) {
-		throw new Error(
-			`Module ${outsideRoot.path} lies outside the worker's modules root ${modulesRoot}; workerd cannot load it.`
-		)
-	}
 
 	return { ...rest, modulesRoot, modules }
 }
