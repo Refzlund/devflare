@@ -14,13 +14,24 @@
 // The two apps below answer with their own names through a route AND through a
 // Durable Object bound under the same name in both, so a shared main bundle or a
 // shared `do-bundles/` would each make one app answer with the other's name.
+//
+// The last case is a smoke test of the BUILT CLI, run under Bun in a process of its
+// own: `workspace dev` reading its manifest, under an absolute override. The cases
+// above import `src/`, where the workspace server and `generatedDir` are one module
+// graph; in `dist` they are separate chunks that must share one AsyncLocalStorage.
+// → NOTE: no mutant has shown this case catching something the cases above miss. A
+//   single bundle build does not duplicate a module, and `ensurePackageBuilt`
+//   rebuilds `dist` from `src`, so a `src` mutant kills the source cases too.
 // =============================================================================
 
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
+import { type ChildProcess, spawn } from 'node:child_process'
 import { mkdir, mkdtemp, readdir, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'pathe'
+import { pathToFileURL } from 'node:url'
+import { join, resolve } from 'pathe'
 import { createDevServer, type DevServer } from '../../../src/dev-server'
+import { stopSpawnedProcessTree } from '../../../src/dev-server/vite-utils'
 import {
 	createWorkspaceDevServer,
 	type WorkspaceDevServer
@@ -28,6 +39,7 @@ import {
 import { GENERATED_DIR_ENV } from '../../../src/utils/generated-dir'
 import {
 	cleanupTempDirs,
+	ensurePackageBuilt,
 	getAvailablePort,
 	installBuiltDevflare,
 	waitForResponseText
@@ -223,4 +235,82 @@ describe('devflare dev with an absolute DEVFLARE_DIR outside the app', () => {
 		expect(await readdir(generatedRoot)).toEqual(expect.arrayContaining(['worker-entrypoints']))
 		expect(await readdir(projectDir)).not.toContain('.devflare')
 	})
+})
+
+describe('the BUILT workspace dev with an absolute DEVFLARE_DIR outside its apps', () => {
+	const builtCli = resolve(import.meta.dir, '../../../dist/cli/index.js')
+	let coordinator: ChildProcess | null = null
+	let output = ''
+	let portA = 0
+	let portB = 0
+
+	beforeAll(async () => {
+		await ensurePackageBuilt()
+		const workspaceDir = await mkdtemp(join(tmpdir(), 'devflare-built-workspace-absdir-'))
+		const generatedRoot = await mkdtemp(join(tmpdir(), 'devflare-built-generated-absdir-'))
+		tempDirs.push(workspaceDir, generatedRoot)
+		portA = await getAvailablePort()
+		portB = await getAvailablePort()
+
+		await createTaggedApp(join(workspaceDir, 'apps', 'a'), 'app-a', 'I_AM_A')
+		await createTaggedApp(join(workspaceDir, 'apps', 'b'), 'app-b', 'I_AM_B')
+		await writeFile(
+			join(workspaceDir, 'devflare.workspace.ts'),
+			`export default { apps: [
+	{ config: './apps/a/devflare.config.ts', name: 'app-a', port: ${portA} },
+	{ config: './apps/b/devflare.config.ts', name: 'app-b', port: ${portB} }
+] }
+`
+		)
+
+		// The package's own dist, imported where it lives so its dependencies
+		// resolve, run with the workspace as its cwd — what `devflare workspace dev`
+		// does there. The bin would run `src/` under Bun, so it is not used.
+		const script = `const { runCli } = await import(${JSON.stringify(pathToFileURL(builtCli).href)})
+const result = await runCli(['workspace', 'dev', '--no-persist'])
+process.exit(result.exitCode)`
+		const { [GENERATED_DIR_ENV]: _inherited, ...inherited } = process.env
+		coordinator = spawn(process.execPath, ['-e', script], {
+			cwd: workspaceDir,
+			env: { ...inherited, [GENERATED_DIR_ENV]: generatedRoot },
+			stdio: ['ignore', 'pipe', 'pipe']
+		})
+		coordinator.stdout?.on('data', (chunk) => {
+			output += String(chunk)
+		})
+		coordinator.stderr?.on('data', (chunk) => {
+			output += String(chunk)
+		})
+	}, HOOK_TIMEOUT_MS)
+
+	afterAll(async () => {
+		// A coordinator that outlives the stop would keep workerd on these ports for
+		// the rest of the lane, so it fails here rather than leaking quietly.
+		if (coordinator && !(await stopSpawnedProcessTree(coordinator))) {
+			throw new Error(`the built coordinator (pid ${coordinator.pid}) did not exit when stopped`)
+		}
+	}, HOOK_TIMEOUT_MS)
+
+	test(
+		"each app's route and Durable Object answer with its own code",
+		async () => {
+			try {
+				expect(await waitForResponseText(`http://127.0.0.1:${portA}/who`, 'I_AM_A', 60_000)).toBe(
+					'I_AM_A'
+				)
+				expect(await waitForResponseText(`http://127.0.0.1:${portB}/who`, 'I_AM_B')).toBe('I_AM_B')
+				expect(await waitForResponseText(`http://127.0.0.1:${portA}/do`, 'I_AM_A_DO')).toBe(
+					'I_AM_A_DO'
+				)
+				expect(await waitForResponseText(`http://127.0.0.1:${portB}/do`, 'I_AM_B_DO')).toBe(
+					'I_AM_B_DO'
+				)
+			} catch (error) {
+				throw new Error(`the built coordinator did not serve as expected; its output:\n${output}`, {
+					cause: error
+				})
+			}
+		},
+		HOOK_TIMEOUT_MS
+	)
 })

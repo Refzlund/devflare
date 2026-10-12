@@ -103,14 +103,16 @@ export interface WorkspaceDevServerOptions {
 
 /**
  * Collaborators {@link createWorkspaceDevServer} reaches through, replaceable so a
- * test can observe the ORDER of the lock and the Miniflare instance's life.
- * Production passes nothing.
+ * test can observe the ORDER of the lock and the Miniflare instance's life, and
+ * what each Vite child is started with. Production passes nothing.
  */
 export interface WorkspaceDevServerDeps {
 	/** Load the `miniflare` module (default: a dynamic import). */
 	loadMiniflare?: () => Promise<typeof import('miniflare')>
 	/** Take the coordinator lock (default: {@link acquireCoordinatorLock}). */
 	acquireCoordinatorLock?: typeof acquireCoordinatorLock
+	/** Spawn one Vite app's child (default: {@link startViteProcess}). */
+	startViteProcess?: typeof startViteProcess
 }
 
 /** A running app's browser origin, for reporting. */
@@ -188,6 +190,7 @@ export function createWorkspaceDevServer(
 	let starting: Promise<void> | null = null
 	const loadMiniflare = deps.loadMiniflare ?? (() => import('miniflare'))
 	const acquireLock = deps.acquireCoordinatorLock ?? acquireCoordinatorLock
+	const spawnVite = deps.startViteProcess ?? startViteProcess
 	let preparedApps: PreparedWorkspaceApp[] = []
 	// Resolved from the environment first, because every app's composed worker is
 	// built before any app config has been read. A per-app `email` block then
@@ -363,7 +366,7 @@ export function createWorkspaceDevServer(
 			if (!app.enableVite) {
 				continue
 			}
-			const child = await startViteProcess({
+			const child = await spawnVite({
 				cwd: app.appCwd,
 				configPath: app.configPath,
 				vitePort: app.vitePort,
