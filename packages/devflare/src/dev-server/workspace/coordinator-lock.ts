@@ -27,12 +27,26 @@
 	  another process took it within half a second). So every held connection is
 	  pinned in a module-level set until it is released — a local that goes out of
 	  scope, or even a module-level `const` no function reads, is not enough.
+	→ GOTCHA: SQLite opens a file it cannot write READ-ONLY without saying so,
+	  and on such a connection `BEGIN EXCLUSIVE` still succeeds while excluding
+	  nobody (measured). So a lock file that exists must pass a W_OK check first.
+	  Neither runtime's API says whether a connection fell back, so a write
+	  denied by an ACL the W_OK check cannot see remains a residual.
 	→ GOTCHA: a crash frees the lock, but it is NOT a safety property. workerd is
 	  spawned non-detached and without a job object, so a hard-killed coordinator
 	  can leave a workerd running with the store still open after the lock is free.
 */
 
-import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import {
+	accessSync,
+	constants,
+	existsSync,
+	mkdirSync,
+	readFileSync,
+	renameSync,
+	rmSync,
+	writeFileSync
+} from 'node:fs'
 import { dirname } from 'pathe'
 
 /** The environment variable that turns the lock off when set to `0` (or `false`). */
@@ -87,6 +101,8 @@ export type CoordinatorLockErrorCode =
 	| 'DEVFLARE_COORDINATOR_LOCK_ABORTED'
 	/** The lock file cannot be created or opened at all. */
 	| 'DEVFLARE_COORDINATOR_LOCK_UNAVAILABLE'
+	/** Locking or writing the note failed some other way (an I/O error, broken locking). */
+	| 'DEVFLARE_COORDINATOR_LOCK_FAILED'
 
 /** A refusal to start a coordinator because of its lock. The message is meant for a person, whole. */
 export class CoordinatorLockError extends Error {
@@ -278,8 +294,9 @@ export function isSqliteBusy(error: unknown): boolean {
 	if (primary !== undefined) {
 		return primary === 5
 	}
+	// No code at all, or Node's generic one without `errcode`: read the message.
 	return (
-		code === 'ERR_SQLITE_ERROR' &&
+		(code === undefined || code === 'ERR_SQLITE_ERROR') &&
 		typeof message === 'string' &&
 		/database is locked/i.test(message)
 	)
@@ -485,6 +502,62 @@ async function openLockConnection(
 	return { exec: (sql) => db.exec(sql), close: () => db.close() }
 }
 
+/** How to run without the lock, for every message that cannot be acted on otherwise. */
+const OPT_OUT_HINT =
+	`To run without the lock, set ${COORDINATOR_LOCK_ENV}=0, or pass ` +
+	'`persistLock: false` to createWorkspaceDevServer.'
+
+/**
+ * Where the lock lives, for messages: beside the persist dir, so in its PARENT.
+ *
+ * @param lockPath - The lock file.
+ * @returns A sentence naming the directory the lock file is written into.
+ */
+function placementNote(lockPath: string): string {
+	return (
+		`The lock file sits beside the persist directory, so it is written into ${dirname(lockPath)}, ` +
+		'which must be writable.'
+	)
+}
+
+/**
+ * The refusal for a lock file that cannot be opened for writing.
+ *
+ * @param lockPath - The lock file.
+ * @param error - What opening or the writability check threw.
+ * @returns The `UNAVAILABLE` error, with `error` as its cause.
+ */
+function unavailableError(lockPath: string, error: unknown): CoordinatorLockError {
+	return new CoordinatorLockError(
+		'DEVFLARE_COORDINATOR_LOCK_UNAVAILABLE',
+		`Cannot open the coordinator lock ${lockPath} for writing: ${(error as Error).message}. ` +
+			'devflare locks the persist directory so only one workspace coordinator writes it. ' +
+			`${placementNote(lockPath)} ${OPT_OUT_HINT}`,
+		{ lockPath, cause: error }
+	)
+}
+
+/**
+ * Prove an existing lock file is writable. SQLite would otherwise open it
+ * read-only, silently, and a read-only `BEGIN EXCLUSIVE` locks nothing. An
+ * absent file is created read-write by SQLite itself.
+ *
+ * → GOTCHA: a check by `access`, never by opening the file: on POSIX, closing
+ *   ANY descriptor of a file drops every `fcntl` lock this process holds on it,
+ *   which would free a lock this process already holds for another server.
+ *
+ * @param lockPath - The lock file.
+ * @throws {CoordinatorLockError} `UNAVAILABLE` when it exists and is not writable.
+ */
+function assertLockFileWritable(lockPath: string): void {
+	if (!existsSync(lockPath)) return
+	try {
+		accessSync(lockPath, constants.W_OK)
+	} catch (error) {
+		throw unavailableError(lockPath, error)
+	}
+}
+
 /**
  * Try ONCE to take the lock, never waiting; on success write the holder note.
  *
@@ -492,9 +565,11 @@ async function openLockConnection(
  * @param notePath - The holder note's path.
  * @param note - The note to write once the lock is held.
  * @returns taken, held (with whatever note was readable), or unsupported.
- * @throws whatever SQLite or the file system threw, for anything but SQLITE_BUSY —
- *   the connection is closed first. A note that cannot be written also throws,
- *   after the lock is released, so a holder is never anonymous by accident.
+ * @throws {CoordinatorLockError} `UNAVAILABLE` when the lock file exists but is
+ *   not writable; `FAILED` when the note cannot be written (after the lock is
+ *   released, so a holder is never anonymous by accident). Otherwise whatever
+ *   SQLite or the file system threw, for anything but SQLITE_BUSY — the
+ *   connection is closed first.
  */
 export async function tryTakeCoordinatorLock(
 	lockPath: string,
@@ -502,6 +577,7 @@ export async function tryTakeCoordinatorLock(
 	note: CoordinatorLockNote
 ): Promise<CoordinatorLockAttempt> {
 	mkdirSync(dirname(lockPath), { recursive: true })
+	assertLockFileWritable(lockPath)
 	const opened = await openLockConnection(lockPath)
 	if ('unsupported' in opened) {
 		return { kind: 'unsupported', reason: opened.unsupported }
@@ -525,7 +601,12 @@ export async function tryTakeCoordinatorLock(
 		writeNoteAtomically(notePath, note)
 	} catch (error) {
 		connection.close()
-		throw error
+		throw new CoordinatorLockError(
+			'DEVFLARE_COORDINATOR_LOCK_FAILED',
+			`Took the coordinator lock ${lockPath} but could not write its holder note ${notePath}: ` +
+				`${(error as Error).message}. The lock was released again. ${OPT_OUT_HINT}`,
+			{ lockPath, cause: error }
+		)
 	}
 	return { kind: 'taken', held: pinHeldLock(lockPath, notePath, connection, note) }
 }
@@ -728,16 +809,16 @@ const defaultIo: CoordinatorLockIo = {
 }
 
 /**
- * One attempt at the lock, with a lock file that cannot be opened turned into a
- * refusal a person can act on.
+ * One attempt at the lock, with every error turned into a refusal a person can
+ * act on: the lock path, where it lives, and the opt-out.
  *
  * @param io - The effects.
  * @param lockPath - The lock file.
  * @param notePath - The holder note's path.
  * @param note - The note to write once taken.
  * @returns The attempt.
- * @throws {CoordinatorLockError} `UNAVAILABLE` naming the path and the opt-outs;
- *   any other error as thrown.
+ * @throws {CoordinatorLockError} `UNAVAILABLE` for a file that cannot be opened
+ *   for writing; `FAILED`, with the original as `cause`, for anything else.
  */
 async function attemptOnce(
 	io: CoordinatorLockIo,
@@ -748,13 +829,14 @@ async function attemptOnce(
 	try {
 		return await io.tryTake(lockPath, notePath, note)
 	} catch (error) {
-		if (!isLockFileUnavailable(error)) throw error
+		if (error instanceof CoordinatorLockError) throw error
+		if (isLockFileUnavailable(error)) throw unavailableError(lockPath, error)
+		// PROPAGATE, enriched: a bare "disk I/O error" would name neither the lock nor the way out.
 		throw new CoordinatorLockError(
-			'DEVFLARE_COORDINATOR_LOCK_UNAVAILABLE',
-			`Cannot open the coordinator lock ${lockPath}: ${(error as Error).message}. ` +
-				'devflare locks the persist directory so only one workspace coordinator writes it. ' +
-				'Make that location writable, or run without the lock: set ' +
-				`${COORDINATOR_LOCK_ENV}=0, or pass \`persistLock: false\` to createWorkspaceDevServer.`,
+			'DEVFLARE_COORDINATOR_LOCK_FAILED',
+			`Locking ${lockPath} failed: ${(error as Error).message}. ${placementNote(lockPath)} ` +
+				'On a filesystem with unreliable locks (WSL2 /mnt/c, SMB/NFS, Docker bind mounts), move ' +
+				`the persist directory to a local disk. ${OPT_OUT_HINT}`,
 			{ lockPath, cause: error }
 		)
 	}
@@ -897,7 +979,8 @@ function waitAnnouncement(
  *   Node below 22.13) — warned once per process, and the coordinator runs unlocked.
  * @throws {CoordinatorLockError} `HELD` when another coordinator serves the dir or
  *   the wait ran out; `ABORTED` when the signal aborted; `UNAVAILABLE` when the
- *   lock file cannot be created or opened. Any other error propagates as thrown.
+ *   lock file cannot be created or opened for writing; `FAILED`, carrying the
+ *   original as `cause`, for any other error while locking.
  */
 export async function acquireCoordinatorLock(
 	options: AcquireCoordinatorLockOptions

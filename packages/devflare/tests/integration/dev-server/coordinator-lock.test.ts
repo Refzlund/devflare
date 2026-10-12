@@ -10,9 +10,9 @@
 */
 import { afterAll, afterEach, describe, expect, test } from 'bun:test'
 import { type ChildProcess, spawn, spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'pathe'
+import { dirname, join, resolve } from 'pathe'
 import {
 	acquireCoordinatorLock,
 	type CoordinatorLockError,
@@ -289,6 +289,52 @@ describe('release', () => {
 		expect(existsSync(coordinatorLockNotePath(persistDir))).toBe(false)
 		const free = await runFixture(BUN, 'try', { lockPath: coordinatorLockPath(persistDir) })
 		expect(free.line.taken).toBe(true)
+	})
+
+	test.skipIf(process.getuid?.() === 0)(
+		'a READ-ONLY lock file is refused, never trusted: SQLite would open it read-only and lock nothing',
+		async () => {
+			const persistDir = freshPersistDir()
+			const lockPath = coordinatorLockPath(persistDir)
+			mkdirSync(dirname(lockPath), { recursive: true })
+			writeFileSync(lockPath, '')
+			// On Windows this sets the read-only attribute.
+			chmodSync(lockPath, 0o444)
+			try {
+				const error = (await acquireCoordinatorLock({ persistDir }).catch(
+					(e) => e
+				)) as CoordinatorLockError
+				expect(error.code).toBe('DEVFLARE_COORDINATOR_LOCK_UNAVAILABLE')
+				expect(error.message).toContain(lockPath)
+				expect(error.message).toContain(`written into ${dirname(lockPath)}`)
+				expect(error.message).toContain('DEVFLARE_PERSIST_LOCK=0')
+
+				// Nor is any other process admitted.
+				const other = await runFixture(BUN, 'module', { modulePath: MODULE, persistDir })
+				expect(other.line.ready).toBe(false)
+				expect(other.line.error?.code).toBe('DEVFLARE_COORDINATOR_LOCK_UNAVAILABLE')
+			} finally {
+				chmodSync(lockPath, 0o644)
+			}
+		}
+	)
+
+	test('a lock error other than BUSY is never read as "held": it fails at once, naming the lock', async () => {
+		const persistDir = freshPersistDir()
+		const lockPath = coordinatorLockPath(persistDir)
+		mkdirSync(dirname(lockPath), { recursive: true })
+		// Not an SQLite database: the lock statements fail with SQLITE_NOTADB, not BUSY.
+		writeFileSync(lockPath, 'this is not an sqlite database, '.repeat(64))
+
+		const began = Date.now()
+		const error = (await acquireCoordinatorLock({ persistDir }).catch(
+			(e) => e
+		)) as CoordinatorLockError & { cause?: { code?: string } }
+		expect(Date.now() - began).toBeLessThan(1_000)
+		expect(error.code).toBe('DEVFLARE_COORDINATOR_LOCK_FAILED')
+		expect(error.message).toContain(lockPath)
+		expect(error.message).toContain('DEVFLARE_PERSIST_LOCK=0')
+		expect(error.cause?.code).toStartWith('SQLITE_NOTADB')
 	})
 
 	test('a lock file that cannot be opened fails loudly, naming the path and the opt-out', async () => {

@@ -5,7 +5,7 @@
 	here is taken and refused inside this process, which is all a unit can show.
 */
 import { afterEach, describe, expect, test } from 'bun:test'
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'pathe'
 import {
@@ -129,7 +129,10 @@ describe('reading what SQLite threw', () => {
 		).toBe(false)
 		// A Node file-system error's errno is not SQLite's.
 		expect(isSqliteBusy({ code: 'EACCES', errno: -4091, message: 'permission denied' })).toBe(false)
-		expect(isSqliteBusy(new Error('database is locked'))).toBe(false)
+		// No code at all (a Node whose sqlite error carries none): the message decides.
+		expect(isSqliteBusy(new Error('database is locked'))).toBe(true)
+		// A code that is not SQLite's is never read by its message.
+		expect(isSqliteBusy({ code: 'EBUSY', message: 'database is locked' })).toBe(false)
 		expect(isSqliteBusy(undefined)).toBe(false)
 	})
 
@@ -439,13 +442,21 @@ describe('acquireCoordinatorLock', () => {
 		expect((error as Error & { cause?: { code?: string } }).cause?.code).toBe('SQLITE_CANTOPEN')
 	})
 
-	test('any other error propagates as thrown', async () => {
+	test('any other error is wrapped with the lock path, its placement and the opt-out, keeping the cause', async () => {
 		const { io } = scriptedIo([])
 		const boom = Object.assign(new Error('disk I/O error'), { code: 'SQLITE_IOERR', errno: 10 })
 		io.tryTake = async () => {
 			throw boom
 		}
-		expect(await acquireCoordinatorLock({ persistDir: STORE, io }).catch((e) => e)).toBe(boom)
+		const error = (await acquireCoordinatorLock({ persistDir: STORE, io }).catch(
+			(e) => e
+		)) as CoordinatorLockError
+		expect(error.code).toBe('DEVFLARE_COORDINATOR_LOCK_FAILED')
+		expect(error.message).toContain(coordinatorLockPath(STORE))
+		expect(error.message).toContain('disk I/O error')
+		expect(error.message).toContain('written into C:/work/app/.devflare')
+		expect(error.message).toContain('DEVFLARE_PERSIST_LOCK=0')
+		expect((error as Error & { cause?: unknown }).cause).toBe(boom)
 	})
 
 	test('a runtime with no SQLite warns once per process and runs unlocked', async () => {
@@ -486,5 +497,21 @@ describe('a real lock, inside this process', () => {
 		const again = await acquireCoordinatorLock({ persistDir })
 		expect(again).not.toBeNull()
 		again!.release()
+	})
+
+	test('release removes only its OWN note: one naming another pid or since survives', async () => {
+		const dir = mkdtempSync(join(tmpdir(), 'devflare-coordlock-unit-'))
+		tempDirs.push(dir)
+		const persistDir = join(dir, 'workspace-data')
+		const notePath = coordinatorLockNotePath(persistDir)
+
+		for (const other of [{ since: 1 }, { pid: process.pid + 1 }]) {
+			const held = await acquireCoordinatorLock({ persistDir })
+			const replaced = serializeCoordinatorLockNote({ ...held!.note, ...other })
+			writeFileSync(notePath, replaced)
+			held!.release()
+			expect(readFileSync(notePath, 'utf8')).toBe(replaced)
+			rmSync(notePath)
+		}
 	})
 })

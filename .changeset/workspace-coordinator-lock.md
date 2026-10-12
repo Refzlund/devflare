@@ -11,7 +11,12 @@ opens the store, and holds it until `stop()` has disposed of Miniflare. Beside t
 holder note, `<persist>.coordinator.lock.json`:
 `{"pid":…,"role":"coordinator","since":…,"store":"<persist>"}`. The lock is an OS lock
 (`LockFileEx` on Windows, `fcntl` elsewhere), taken through `bun:sqlite` under Bun and `node:sqlite`
-under Node 22.13+. On an older Node, devflare warns once and runs without it.
+under Node 22.13+. On an older Node, devflare warns once and runs without it. Only Bun 1.4.2 and
+Node 22.17.1 and 25.9 were exercised; Node 22.13–22.16 are untested.
+
+The two files are SIBLINGS of the persist dir, so they are written into its parent: with
+`persist: '.'`, the directory above the project. That parent must now be writable for a persisting
+workspace to start.
 
 **When the lock is held**, a starting coordinator:
 
@@ -28,11 +33,15 @@ WSL2's `/mnt/c`, SMB/NFS shares and Docker bind mounts. Ctrl+C during a wait end
 **On by default whenever the workspace persists.** Opt out with `DEVFLARE_PERSIST_LOCK=0`, or with
 `createWorkspaceDevServer({ persistLock: false })`. `--no-persist` takes no lock. There is no
 manifest key on purpose: the manifest schema is strict, so a new key would make an older devflare
-reject the manifest. A lock file that cannot be opened fails the start loudly, naming the path and
-the opt-out.
+reject the manifest. A lock file that cannot be opened for writing fails the start loudly, naming
+the path and the opt-out — a read-only lock file in particular, because SQLite would silently open
+it read-only and a read-only lock excludes nobody. Any other locking error fails the start too, and
+is never read as "held".
 
 **A programmatic `start()` that rejects keeps the lock.** Call `stop()` even when `start()` fails,
-as the CLI does.
+as the CLI does. A `stop()` during `start()` makes `start()` reject at its next step, and waits for
+it (up to 30 s) before releasing the lock. `createWorkspaceDevServer` takes an optional second
+`deps` argument for tests.
 
 **A crash frees the lock, but that is not a guarantee the store is closed.** workerd is spawned
 non-detached, so a hard-killed coordinator can leave workerd running with the store open after the

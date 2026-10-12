@@ -51,6 +51,12 @@ export const DEFAULT_BROWSER_SHIM_BASE_PORT = 9700
 const MIGRATION_STABILIZE_DELAY_MS = 1000
 
 /**
+ * How long `stop()` waits for an in-flight `start()` to notice the stop before
+ * tearing down anyway. Bounded so a start step that hangs cannot make Ctrl+C hang.
+ */
+const STOP_WAITS_FOR_START_MS = 30_000
+
+/**
  * Place one app's Browser Rendering shim inside the workspace's shim block.
  *
  * The block is contiguous from the base port so a user who moves it only has to
@@ -94,6 +100,18 @@ export interface WorkspaceDevServerOptions {
 	debug?: boolean
 }
 
+/**
+ * Collaborators {@link createWorkspaceDevServer} reaches through, replaceable so a
+ * test can observe the ORDER of the lock and the Miniflare instance's life.
+ * Production passes nothing.
+ */
+export interface WorkspaceDevServerDeps {
+	/** Load the `miniflare` module (default: a dynamic import). */
+	loadMiniflare?: () => Promise<typeof import('miniflare')>
+	/** Take the coordinator lock (default: {@link acquireCoordinatorLock}). */
+	acquireCoordinatorLock?: typeof acquireCoordinatorLock
+}
+
 /** A running app's browser origin, for reporting. */
 export interface WorkspaceAppOrigin {
 	/** The app namespace. */
@@ -110,12 +128,15 @@ export interface WorkspaceDevServer {
 	 * Take the coordinator lock, then prepare, merge, start Miniflare, run
 	 * migrations, and spawn Vite children. A failed start does NOT tear down what
 	 * it started or release the lock: call {@link WorkspaceDevServer.stop} even
-	 * when this rejects, as the CLI does.
+	 * when this rejects, as the CLI does. A `stop()` while this runs makes it
+	 * reject at its next step.
 	 */
 	start(): Promise<void>
 	/**
 	 * Tear everything down (Miniflare, Vite children, shims, bundlers), then
-	 * release the coordinator lock. Aborts a lock wait that `start()` is still in.
+	 * release the coordinator lock. A `start()` still in flight is told to stop
+	 * (a lock wait is aborted at once) and awaited first, so nothing it opens
+	 * outlives the lock.
 	 */
 	stop(): Promise<void>
 	/** The shared Miniflare instance (or null before start / after stop). */
@@ -129,9 +150,13 @@ export interface WorkspaceDevServer {
  * Miniflare instance with live-shared bindings.
  *
  * @param options - The manifest, its directory, and logging/persist settings.
+ * @param deps - Replacement collaborators, for tests; production passes none.
  * @returns A {@link WorkspaceDevServer} handle.
  */
-export function createWorkspaceDevServer(options: WorkspaceDevServerOptions): WorkspaceDevServer {
+export function createWorkspaceDevServer(
+	options: WorkspaceDevServerOptions,
+	deps: WorkspaceDevServerDeps = {}
+): WorkspaceDevServer {
 	const { manifest, manifestDir, logger } = options
 	const persist = options.persist ?? true
 	const browserShimBasePort = options.browserShimBasePort ?? DEFAULT_BROWSER_SHIM_BASE_PORT
@@ -156,6 +181,12 @@ export function createWorkspaceDevServer(options: WorkspaceDevServerOptions): Wo
 	let coordinatorLock: HeldCoordinatorLock | null = null
 	/** Aborts a lock wait in progress when `stop()` runs (Ctrl+C during the wait). */
 	let lockWait: AbortController | null = null
+	/** Set by `stop()`; an in-flight `start()` checks it after every step and rejects. */
+	let stopRequested = false
+	/** The `start()` in flight (or last run), which `stop()` awaits before tearing down. */
+	let starting: Promise<void> | null = null
+	const loadMiniflare = deps.loadMiniflare ?? (() => import('miniflare'))
+	const acquireLock = deps.acquireCoordinatorLock ?? acquireCoordinatorLock
 	let preparedApps: PreparedWorkspaceApp[] = []
 	// Resolved from the environment first, because every app's composed worker is
 	// built before any app config has been read. A per-app `email` block then
@@ -256,7 +287,8 @@ export function createWorkspaceDevServer(options: WorkspaceDevServerOptions): Wo
 	}
 
 	async function startMiniflare(apps: PreparedWorkspaceApp[]): Promise<void> {
-		const miniflareModule = await import('miniflare')
+		const miniflareModule = await loadMiniflare()
+		throwIfStopping()
 		const { Miniflare, Log, LogLevel } = miniflareModule
 
 		const { config, directSockets } = buildMergedWorkspaceConfig({
@@ -373,7 +405,7 @@ export function createWorkspaceDevServer(options: WorkspaceDevServerOptions): Wo
 	 */
 	async function takeCoordinatorLock(): Promise<void> {
 		lockWait = new AbortController()
-		const held = await acquireCoordinatorLock({
+		const held = await acquireLock({
 			persistDir,
 			signal: lockWait.signal,
 			...(logger ? { logger } : {})
@@ -384,17 +416,38 @@ export function createWorkspaceDevServer(options: WorkspaceDevServerOptions): Wo
 		}
 	}
 
-	async function start(): Promise<void> {
+	/**
+	 * Reject when `stop()` has been called, so an in-flight `start()` opens
+	 * nothing more once the server is stopping.
+	 *
+	 * @throws {Error} when a stop was requested.
+	 */
+	function throwIfStopping(): void {
+		if (stopRequested) {
+			throw new Error('The workspace dev server was stopped while it was starting.')
+		}
+	}
+
+	function start(): Promise<void> {
+		stopRequested = false
+		starting = runStart()
+		return starting
+	}
+
+	async function runStart(): Promise<void> {
 		logger?.info('Starting workspace dev server…')
 
 		if (persistLock) {
 			await takeCoordinatorLock()
+			throwIfStopping()
 		}
 
 		setEmailDeliverySink(createHostEmailDeliverySink(() => emailRuntime))
 		outboundEmailService = await startOutboundEmailService(() => emailRuntime)
+		throwIfStopping()
 
 		preparedApps = await prepareAllApps()
+		throwIfStopping()
 		refineEmailRuntime(preparedApps)
 
 		if (manifest.shared) {
@@ -411,8 +464,11 @@ export function createWorkspaceDevServer(options: WorkspaceDevServerOptions): Wo
 
 		registerSharedSendEmailBindings(preparedApps)
 		await startMiniflare(preparedApps)
+		throwIfStopping()
 		await startViteChildren(preparedApps)
+		throwIfStopping()
 		await runMigrations(preparedApps)
+		throwIfStopping()
 
 		if (emailRuntime.inbound) {
 			logger?.info(
@@ -428,8 +484,32 @@ export function createWorkspaceDevServer(options: WorkspaceDevServerOptions): Wo
 		logger?.success(`Workspace ready — ${preparedApps.length} app(s) sharing one instance`)
 	}
 
+	/**
+	 * Wait for an in-flight `start()` to settle — it rejects at its next step once
+	 * `stopRequested` is set — but never longer than {@link STOP_WAITS_FOR_START_MS}.
+	 * Its rejection belongs to whoever awaited `start()`; this only waits.
+	 */
+	async function waitForStartToSettle(): Promise<void> {
+		if (!starting) return
+		let timer: ReturnType<typeof setTimeout> | undefined
+		const settled = await Promise.race([
+			Promise.allSettled([starting]).then(() => true),
+			new Promise<false>((done) => {
+				timer = setTimeout(() => done(false), STOP_WAITS_FOR_START_MS)
+			})
+		])
+		clearTimeout(timer)
+		if (!settled) {
+			logger?.warn(
+				`start() did not settle within ${STOP_WAITS_FOR_START_MS / 1000}s of stop(); tearing down anyway.`
+			)
+		}
+	}
+
 	async function stop(): Promise<void> {
+		stopRequested = true
 		lockWait?.abort()
+		await waitForStartToSettle()
 
 		if (inboundEmailPoller) {
 			await inboundEmailPoller.stop()

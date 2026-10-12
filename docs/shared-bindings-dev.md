@@ -408,11 +408,18 @@ holds it for its whole life.
 - **Files.** Two siblings of the persist dir, never inside it:
   `<persist>.coordinator.lock` (the lock) and `<persist>.coordinator.lock.json`
   (the holder note). The lock file stays after a release; the note goes.
+  Because they are siblings, they are written into the persist dir's PARENT:
+  with `persist: '.'` that is the directory above the project, and that parent
+  must be writable. uidini's store host derives the same path, so the placement
+  is a contract, not a detail.
 - **Mechanism.** An EXCLUSIVE SQLite lock on the lock file: `busy_timeout=0`,
   `journal_mode=DELETE`, then `BEGIN EXCLUSIVE`, held open and never committed.
   That is `LockFileEx` on Windows and `fcntl` elsewhere. It uses `bun:sqlite`
   under Bun and `node:sqlite` under Node 22.13+. On an older Node, devflare
-  warns once and runs without the lock.
+  warns once and runs without the lock. Exercised on Bun 1.4.2 and Node 22.17.1
+  and 25.9 only; Node 22.13–22.16 are untested. Busy is read from Node's
+  `errcode`, or from the message `database is locked` when a Node carries no
+  `errcode`.
 - **The note.** One line of JSON written through a temp file and a rename:
   `{"pid":…,"role":"coordinator","since":…,"store":"<persist>"}`. The note is for
   messages and for choosing how long to wait; the OS lock decides.
@@ -432,19 +439,29 @@ holds it for its whole life.
   Docker bind mounts. Ctrl+C during a wait ends it.
 - **Order.** `start()` takes the lock first. `stop()` releases it last, after
   Miniflare's `dispose()` has awaited workerd's exit. A failed `start()` keeps
-  the lock: call `stop()` even when `start()` rejects, as the CLI does.
+  the lock: call `stop()` even when `start()` rejects, as the CLI does. A
+  `stop()` during `start()` makes it reject at its next step and waits for it
+  (up to 30 s) before tearing down, so nothing `start()` opens outlives the lock.
 - **Opting out.** `DEVFLARE_PERSIST_LOCK=0` (older devflare ignores it), or
   `createWorkspaceDevServer({ persistLock: false })`. `--no-persist` takes no
   lock. There is deliberately no manifest key: the manifest schema is strict, so
   a new key would make an older devflare reject the manifest.
-- **A lock file that cannot be opened** (read-only location, a directory in its
-  place) fails the start loudly, naming the path and the opt-out.
+- **A lock file that cannot be opened for writing** (a read-only file or
+  location, a directory in its place) fails the start loudly, naming the path,
+  where it lives and the opt-out. This matters: SQLite opens a file it cannot
+  write READ-ONLY without saying so, and a read-only `BEGIN EXCLUSIVE` succeeds
+  while excluding nobody. An existing lock file must therefore pass a `W_OK`
+  check. A write denied only by an ACL that check cannot see stays a residual,
+  because neither runtime says whether a connection fell back to read-only.
+- **Any other locking error** (an I/O error, a file that is not a database) fails
+  the start too, with the lock path and the opt-out; it is never read as "held".
 - **Residual: a crash frees the lock, which is NOT a store-safety guarantee.**
   The OS frees the lock when a hard-killed coordinator dies. But workerd is
   spawned non-detached and without a job object, so it can outlive the
   coordinator with the store still open while the lock reads free. A tool that
   must know the store is closed should also check that the coordinator's ports
-  and processes are gone.
+  and processes are gone. The same holds if `stop()` gives up waiting for a
+  `start()` that hung for 30 s.
 
 ### Zero-config alternative — reuse `ref()`
 
