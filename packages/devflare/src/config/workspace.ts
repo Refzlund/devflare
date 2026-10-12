@@ -156,7 +156,9 @@ const workspaceManifestSchema = z
 		/**
 		 * One persist directory for the whole workspace (relative to the
 		 * manifest dir, or absolute). Default `.devflare/workspace-data`. A
-		 * single instance owns it, so there is no cross-process file contention.
+		 * single instance owns it: the coordinator holds an OS lock on
+		 * `<persist>.coordinator.lock` for its whole life, so a second coordinator
+		 * on the same directory is refused (opt out with `DEVFLARE_PERSIST_LOCK=0`).
 		 */
 		persist: z.string().min(1).optional(),
 		/** Host the shared instance binds (entry + direct sockets). Default `127.0.0.1`. */

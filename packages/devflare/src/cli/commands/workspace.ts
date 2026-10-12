@@ -127,7 +127,8 @@ export async function runWorkspaceCommand(
 		await new Promise(() => {})
 		return { exitCode: 0 }
 	} catch (error) {
-		if (error instanceof Error) {
+		// A signal during the coordinator-lock wait aborts start(); cleanup() is already exiting.
+		if (error instanceof Error && !isCleaningUp) {
 			logger.error('Workspace dev server failed:', error.message)
 			if (verbose) {
 				logger.error(error.stack)

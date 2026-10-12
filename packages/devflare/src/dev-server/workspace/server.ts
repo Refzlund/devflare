@@ -36,6 +36,11 @@ import { createMiniflareLog } from '../miniflare-log'
 import { createRuntimeLogForwarder } from '../runtime-logs'
 import { startViteProcess } from '../vite-process'
 import { stopSpawnedProcessTree } from '../vite-utils'
+import {
+	acquireCoordinatorLock,
+	coordinatorLockEnabled,
+	type HeldCoordinatorLock
+} from './coordinator-lock'
 import { buildMergedWorkspaceConfig } from './merge-config'
 import { type PreparedWorkspaceApp, prepareWorkspaceApp } from './prepare-app'
 
@@ -69,6 +74,13 @@ export interface WorkspaceDevServerOptions {
 	/** Persist storage to the shared workspace dir (default: true). */
 	persist?: boolean
 	/**
+	 * Hold the coordinator lock on the persist dir for the server's whole life
+	 * (default: true when persisting, unless `DEVFLARE_PERSIST_LOCK=0`). A second
+	 * coordinator on the same dir is then refused. `false` overrides the
+	 * environment; a non-persisting server never takes the lock.
+	 */
+	persistLock?: boolean
+	/**
 	 * First browser-shim port (default: 9700); each app that binds browser
 	 * rendering listens on `base + its index`. Move the block when another local
 	 * instance already owns it.
@@ -94,9 +106,17 @@ export interface WorkspaceAppOrigin {
 
 /** The workspace dev server handle. */
 export interface WorkspaceDevServer {
-	/** Prepare, merge, start Miniflare, run migrations, and spawn Vite children. */
+	/**
+	 * Take the coordinator lock, then prepare, merge, start Miniflare, run
+	 * migrations, and spawn Vite children. A failed start does NOT tear down what
+	 * it started or release the lock: call {@link WorkspaceDevServer.stop} even
+	 * when this rejects, as the CLI does.
+	 */
 	start(): Promise<void>
-	/** Tear everything down (Miniflare, Vite children, shims, bundlers). */
+	/**
+	 * Tear everything down (Miniflare, Vite children, shims, bundlers), then
+	 * release the coordinator lock. Aborts a lock wait that `start()` is still in.
+	 */
 	stop(): Promise<void>
 	/** The shared Miniflare instance (or null before start / after stop). */
 	getMiniflare(): MiniflareType | null
@@ -117,6 +137,7 @@ export function createWorkspaceDevServer(options: WorkspaceDevServerOptions): Wo
 	const browserShimBasePort = options.browserShimBasePort ?? DEFAULT_BROWSER_SHIM_BASE_PORT
 	const verbose = options.verbose ?? false
 	const debug = options.debug ?? process.env.DEVFLARE_DEBUG === 'true'
+	const persistLock = persist && coordinatorLockEnabled(process.env, options.persistLock)
 
 	const host = manifest.host ?? '127.0.0.1'
 	const persistDir = manifest.persist
@@ -127,6 +148,14 @@ export function createWorkspaceDevServer(options: WorkspaceDevServerOptions): Wo
 	const r2PresignSecret = `${crypto.randomUUID()}${crypto.randomUUID()}`
 
 	let miniflare: MiniflareType | null = null
+	/**
+	 * The coordinator lock, held from the first step of `start()` to the last of
+	 * `stop()`. → GOTCHA: it must stay reachable from here — a SQLite connection
+	 * that is garbage-collected closes and frees the lock (the module pins it too).
+	 */
+	let coordinatorLock: HeldCoordinatorLock | null = null
+	/** Aborts a lock wait in progress when `stop()` runs (Ctrl+C during the wait). */
+	let lockWait: AbortController | null = null
 	let preparedApps: PreparedWorkspaceApp[] = []
 	// Resolved from the environment first, because every app's composed worker is
 	// built before any app config has been read. A per-app `email` block then
@@ -337,8 +366,30 @@ export function createWorkspaceDevServer(options: WorkspaceDevServerOptions): Wo
 		}
 	}
 
+	/**
+	 * Take the coordinator lock before anything opens the persist dir. A stop that
+	 * lands during the wait aborts it; one that lands during the attempt that
+	 * takes the lock releases it again, and `start()` rejects either way.
+	 */
+	async function takeCoordinatorLock(): Promise<void> {
+		lockWait = new AbortController()
+		const held = await acquireCoordinatorLock({
+			persistDir,
+			signal: lockWait.signal,
+			...(logger ? { logger } : {})
+		})
+		if (held) {
+			coordinatorLock = held
+			logger?.debug(`Holding the coordinator lock ${held.lockPath}`)
+		}
+	}
+
 	async function start(): Promise<void> {
 		logger?.info('Starting workspace dev server…')
+
+		if (persistLock) {
+			await takeCoordinatorLock()
+		}
 
 		setEmailDeliverySink(createHostEmailDeliverySink(() => emailRuntime))
 		outboundEmailService = await startOutboundEmailService(() => emailRuntime)
@@ -378,6 +429,8 @@ export function createWorkspaceDevServer(options: WorkspaceDevServerOptions): Wo
 	}
 
 	async function stop(): Promise<void> {
+		lockWait?.abort()
+
 		if (inboundEmailPoller) {
 			await inboundEmailPoller.stop()
 			inboundEmailPoller = null
@@ -409,6 +462,13 @@ export function createWorkspaceDevServer(options: WorkspaceDevServerOptions): Wo
 		}
 
 		clearEmailDeliverySink()
+
+		// Last, after Miniflare's dispose has awaited workerd's exit, so nothing still
+		// has the store open when the next coordinator (or another holder) takes it.
+		// Not in a `finally`: a teardown that threw may have left the store open, and
+		// a retried stop() releases it then.
+		coordinatorLock?.release()
+		coordinatorLock = null
 	}
 
 	return {

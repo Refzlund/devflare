@@ -173,7 +173,8 @@ export const CORE_HELP_PAGES: HelpPage[] = [
 		notes: [
 			'Requires a `devflare.workspace.ts` at the current directory exporting `defineWorkspace({ apps: [...] })`.',
 			'Each app declares a `port` (pure worker) or `bridgePort` + `vitePort` (Vite app); those ports must be unique across the workspace.',
-			'Migrations run once per app against the shared store (the migration ledger dedupes shared files). Worker/DO hot reload inside the shared instance is not wired yet — restart to pick up worker source changes.'
+			'Migrations run once per app against the shared store (the migration ledger dedupes shared files). Worker/DO hot reload inside the shared instance is not wired yet — restart to pick up worker source changes.',
+			'A persisting workspace holds an OS lock on `<persist>.coordinator.lock` (holder note beside it) for its whole life, so a second coordinator on the same persist dir is refused, naming the first. Another holder that left a `deadline` in its note is waited for (up to 120s); an unidentified one for 10s. Opt out with DEVFLARE_PERSIST_LOCK=0; `--no-persist` takes no lock.'
 		]
 	},
 	{
@@ -195,7 +196,10 @@ export const CORE_HELP_PAGES: HelpPage[] = [
 			entry('--verbose', 'Increase logging verbosity'),
 			entry('--debug', 'Enable extra debug logging in the gateway workers')
 		],
-		examples: [entry('devflare workspace dev', 'Start all manifest apps sharing one instance')]
+		examples: [entry('devflare workspace dev', 'Start all manifest apps sharing one instance')],
+		notes: [
+			'Takes the coordinator lock (`<persist>.coordinator.lock`) before opening the store and releases it after the shared instance has stopped; a second coordinator on the same persist dir is refused. DEVFLARE_PERSIST_LOCK=0 opts out.'
+		]
 	},
 	{
 		path: ['build'],

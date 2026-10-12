@@ -399,6 +399,53 @@ building blocks (it already owns Miniflare lifecycle, DO hot-reload via
 merge+lifecycle into a `createWorkspaceDevServer` sibling to `createDevServer`,
 rather than bolting multi-app onto the single-app path.
 
+### The coordinator lock — one coordinator per persist dir
+
+Two coordinators on one persist dir would each open the same SQLite files
+(§3.2), so the coordinator takes an OS lock before anything opens the store and
+holds it for its whole life.
+
+- **Files.** Two siblings of the persist dir, never inside it:
+  `<persist>.coordinator.lock` (the lock) and `<persist>.coordinator.lock.json`
+  (the holder note). The lock file stays after a release; the note goes.
+- **Mechanism.** An EXCLUSIVE SQLite lock on the lock file: `busy_timeout=0`,
+  `journal_mode=DELETE`, then `BEGIN EXCLUSIVE`, held open and never committed.
+  That is `LockFileEx` on Windows and `fcntl` elsewhere. It uses `bun:sqlite`
+  under Bun and `node:sqlite` under Node 22.13+. On an older Node, devflare
+  warns once and runs without the lock.
+- **The note.** One line of JSON written through a temp file and a rename:
+  `{"pid":…,"role":"coordinator","since":…,"store":"<persist>"}`. The note is for
+  messages and for choosing how long to wait; the OS lock decides.
+- **Roles.** devflare writes `coordinator`. Another program may take the same lock
+  to keep a coordinator out while it works on the store. It writes its own role,
+  and a `deadline` (epoch ms) when it means to finish by one.
+- **When the lock is held**, a starting coordinator:
+  - refuses at once when a live `coordinator` holds it;
+  - waits for a live holder with a `deadline` until `min(deadline + 10 s, start + 120 s)`,
+    trying every 250 ms, then refuses;
+  - waits 10 s for anything else (no note, a pid that is not running, a holder
+    with no deadline), then refuses.
+
+  Every refusal names the holder's pid, role, since and deadline, and the lock
+  path. A refusal with no usable note also names the filesystem as a possible
+  cause: `fcntl` locks are unreliable on WSL2's `/mnt/c`, SMB/NFS shares and
+  Docker bind mounts. Ctrl+C during a wait ends it.
+- **Order.** `start()` takes the lock first. `stop()` releases it last, after
+  Miniflare's `dispose()` has awaited workerd's exit. A failed `start()` keeps
+  the lock: call `stop()` even when `start()` rejects, as the CLI does.
+- **Opting out.** `DEVFLARE_PERSIST_LOCK=0` (older devflare ignores it), or
+  `createWorkspaceDevServer({ persistLock: false })`. `--no-persist` takes no
+  lock. There is deliberately no manifest key: the manifest schema is strict, so
+  a new key would make an older devflare reject the manifest.
+- **A lock file that cannot be opened** (read-only location, a directory in its
+  place) fails the start loudly, naming the path and the opt-out.
+- **Residual: a crash frees the lock, which is NOT a store-safety guarantee.**
+  The OS frees the lock when a hard-killed coordinator dies. But workerd is
+  spawned non-detached and without a job object, so it can outlive the
+  coordinator with the store still open while the lock reads free. A tool that
+  must know the store is closed should also check that the coordinator's ports
+  and processes are gone.
+
 ### Zero-config alternative — reuse `ref()`
 
 Because `ref()` already co-hosts and shares bindings (§3.4), a lighter first
