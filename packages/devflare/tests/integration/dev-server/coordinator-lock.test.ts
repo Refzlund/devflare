@@ -16,11 +16,13 @@ import { dirname, join, resolve } from 'pathe'
 import {
 	acquireCoordinatorLock,
 	type CoordinatorLockError,
-	coordinatorLockNotePath,
-	coordinatorLockPath,
-	isSqliteBusy,
 	readCoordinatorLockNote
 } from '../../../src/dev-server/workspace/coordinator-lock'
+import {
+	coordinatorLockNotePath,
+	coordinatorLockPath,
+	isSqliteBusy
+} from '../../../src/dev-server/workspace/coordinator-lock-protocol'
 
 const FIXTURE = resolve(import.meta.dir, 'coordinator-lock.fixture.ts')
 const MODULE = resolve(import.meta.dir, '../../../src/dev-server/workspace/coordinator-lock.ts')

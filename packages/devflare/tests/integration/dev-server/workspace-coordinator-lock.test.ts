@@ -19,10 +19,12 @@ import type { WorkspaceManifest } from '../../../src/config/workspace'
 import {
 	acquireCoordinatorLock,
 	type CoordinatorLockError,
-	coordinatorLockNotePath,
-	coordinatorLockPath,
 	readCoordinatorLockNote
 } from '../../../src/dev-server/workspace/coordinator-lock'
+import {
+	coordinatorLockNotePath,
+	coordinatorLockPath
+} from '../../../src/dev-server/workspace/coordinator-lock-protocol'
 import {
 	createWorkspaceDevServer,
 	type WorkspaceDevServerDeps

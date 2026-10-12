@@ -12,7 +12,9 @@ import {
 	acquireCoordinatorLock,
 	type CoordinatorLockAttempt,
 	type CoordinatorLockError,
-	type CoordinatorLockIo,
+	type CoordinatorLockIo
+} from '../../../src/dev-server/workspace/coordinator-lock'
+import {
 	type CoordinatorLockNote,
 	coordinatorLockEnabled,
 	coordinatorLockNotePath,
@@ -24,7 +26,7 @@ import {
 	isSqliteBusy,
 	parseCoordinatorLockNote,
 	serializeCoordinatorLockNote
-} from '../../../src/dev-server/workspace/coordinator-lock'
+} from '../../../src/dev-server/workspace/coordinator-lock-protocol'
 
 const SINCE = Date.UTC(2026, 9, 12, 9, 0, 0)
 const STORE = 'C:/work/app/.devflare/workspace-data'

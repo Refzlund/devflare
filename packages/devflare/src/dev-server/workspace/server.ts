@@ -36,11 +36,8 @@ import { createMiniflareLog } from '../miniflare-log'
 import { createRuntimeLogForwarder } from '../runtime-logs'
 import { startViteProcess } from '../vite-process'
 import { stopSpawnedProcessTree } from '../vite-utils'
-import {
-	acquireCoordinatorLock,
-	coordinatorLockEnabled,
-	type HeldCoordinatorLock
-} from './coordinator-lock'
+import { acquireCoordinatorLock, type HeldCoordinatorLock } from './coordinator-lock'
+import { coordinatorLockEnabled } from './coordinator-lock-protocol'
 import { buildMergedWorkspaceConfig } from './merge-config'
 import { type PreparedWorkspaceApp, prepareWorkspaceApp } from './prepare-app'
 
