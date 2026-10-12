@@ -4,6 +4,7 @@ import { COPIED_DOTENV_NAMES_ENV, encodeCopiedDotenvNames } from '../config/copi
 import { listCopiedDotenvNames } from '../config/env-vars'
 import { encodeInjectedVars, INJECTED_VARS_ENV } from '../config/injected-vars'
 import { isReservedAppEnvKey } from '../config/workspace'
+import { GENERATED_DIR_ENV } from '../utils/generated-dir'
 import { RUNTIME_STATUS_URL_ENV } from './runtime-status'
 import { waitForViteReady } from './vite-utils'
 
@@ -40,6 +41,13 @@ export interface ViteChildEnvOptions {
 	 * them below the app's own `.env`, as the coordinator does.
 	 */
 	copiedDotenvNames?: readonly string[]
+	/**
+	 * The generated-state root a workspace assigned this app, because the
+	 * inherited `DEVFLARE_DIR` lands outside it. Exposed as `DEVFLARE_DIR`, so the
+	 * child finds the files the coordinator generated for THIS app rather than
+	 * the directory every app shares.
+	 */
+	generatedRoot?: string
 }
 
 /** What a caller passes; the copied `.env` names are the coordinator's own state, read at spawn. */
@@ -101,6 +109,7 @@ export function buildViteChildEnv(
 		DEVFLARE_BRIDGE_PORT: String(miniflarePort),
 		...(runtimeStatusUrl ? { [RUNTIME_STATUS_URL_ENV]: runtimeStatusUrl } : {}),
 		...(configPath ? { DEVFLARE_CONFIG_PATH: configPath } : {}),
+		...(options.generatedRoot ? { [GENERATED_DIR_ENV]: options.generatedRoot } : {}),
 		...(r2Presign
 			? {
 					DEVFLARE_R2_PRESIGN_SECRET: r2Presign.secret,

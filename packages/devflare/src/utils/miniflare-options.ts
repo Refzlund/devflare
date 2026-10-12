@@ -34,7 +34,8 @@ import {
 	parse as parseModule
 } from 'es-module-lexer'
 import type { CompiledModuleRule, MiniflareOptions, V4ModuleDefinition } from 'miniflare'
-import { dirname, isAbsolute, relative, resolve } from 'pathe'
+import { dirname, isAbsolute, resolve } from 'pathe'
+import { isWithin } from './is-within'
 
 /** The part of the `miniflare` module this adapter reads; callers pass the module they loaded. */
 export type MiniflareOptionsRuntime = Pick<
@@ -341,26 +342,13 @@ async function collectWorkerModules(
 }
 
 /**
- * @description Whether a file lies under a directory. Path-segment aware, so a
- * child directory named `..foo` is inside and a different drive is not —
- * `relative()` answers the latter with an absolute path rather than `../`.
- * @param directory - absolute, forward-slashed directory
- * @param file - absolute, forward-slashed file path
- * @returns `true` when `file` is somewhere below `directory`
- */
-function isInsideDirectory(directory: string, file: string): boolean {
-	const fromDirectory = relative(directory, file)
-	return fromDirectory !== '..' && !fromDirectory.startsWith('../') && !isAbsolute(fromDirectory)
-}
-
-/**
  * @description Chooses the directory a worker's module names are relative to.
  * Miniflare names each module by its path relative to this root and rebuilds
  * the source path as `root + name`, so ANY directory holding every module is
  * correct; the choice only changes the names.
  *
  * The preferred root (the app, or its `baseDir`) is kept whenever it holds every
- * module, so names do not change for a worker that already loaded. When it does
+ * module, so a worker it already held keeps its module names. When it does
  * not — the bundles devflare runs live in the generated-state directory, which
  * an absolute `DEVFLARE_DIR` can put anywhere and a `baseDir` subfolder never
  * contains — the root becomes the deepest directory holding every module.
@@ -375,11 +363,10 @@ function isInsideDirectory(directory: string, file: string): boolean {
  *   no root can express.
  */
 export function chooseModulesRoot(preferred: string, modulePaths: string[]): string {
-	const preferredRoot = resolve(preferred)
-	if (modulePaths.every((path) => isInsideDirectory(preferredRoot, path))) return preferredRoot
+	if (modulePaths.every((path) => isWithin(preferred, path))) return preferred
 
 	let candidate = dirname(modulePaths[0])
-	while (!modulePaths.every((path) => isInsideDirectory(candidate, path))) {
+	while (!modulePaths.every((path) => isWithin(candidate, path))) {
 		const parent = dirname(candidate)
 		if (parent === candidate) {
 			throw new Error(

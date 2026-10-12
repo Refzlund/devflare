@@ -197,10 +197,14 @@ export async function writeGeneratedViteConfig(options: {
 	const configDir = await ensureGeneratedConfigDir(options.cwd)
 	const generatedConfigPath = resolve(configDir, GENERATED_VITE_CONFIG_FILENAME)
 	const viteImportPath = await resolveGeneratedViteImportPath(configDir)
-	const content = `import { defineConfig } from 'vite'
-import { resolveViteUserConfig } from ${JSON.stringify(viteImportPath)}
+	// → GOTCHA: no bare import (`import { defineConfig } from 'vite'`) belongs
+	//   here. Node resolves it from THIS file's directory, which `DEVFLARE_DIR`
+	//   can put outside every `node_modules`, and Vite then refuses the config
+	//   ("Cannot find package 'vite'"). A function export is what `defineConfig`
+	//   returns anyway.
+	const content = `import { resolveViteUserConfig } from ${JSON.stringify(viteImportPath)}
 
-export default defineConfig(async (env) => {
+export default async (env) => {
 	return await resolveViteUserConfig(env, {
 		cwd: ${JSON.stringify(options.cwd)},
 		configPath: ${JSON.stringify(options.configPath)},
@@ -208,7 +212,7 @@ export default defineConfig(async (env) => {
 		localConfigPath: ${JSON.stringify(options.localConfigPath)},
 		bridgePort: ${JSON.stringify(options.bridgePort)}
 	})
-})
+}
 `
 
 	await fs.writeFile(generatedConfigPath, content, 'utf-8')

@@ -27,7 +27,11 @@ import { createHostEmailDeliverySink } from '../../email/host-sink'
 import { startInboundEmailPoller } from '../../email/inbound-poller'
 import { type ResolvedEmailRuntime, resolveEmailRuntime } from '../../email/runtime-config'
 import { clearEmailDeliverySink, setEmailDeliverySink } from '../../utils/email-delivery'
-import { generatedDir } from '../../utils/generated-dir'
+import {
+	generatedDir,
+	withGeneratedRoot,
+	workspaceAppGeneratedRoot
+} from '../../utils/generated-dir'
 import { toMiniflareOptions } from '../../utils/miniflare-options'
 import { setLocalSendEmailBindings } from '../../utils/send-email'
 import { runD1Migrations } from '../d1-migrations'
@@ -198,8 +202,11 @@ export function createWorkspaceDevServer(
 
 	/**
 	 * Prepare each manifest app (sequentially — config load + bundling mutate
-	 * app-local `.devflare/` dirs and we want deterministic, non-interleaved
-	 * work).
+	 * each app's generated-state dir and we want deterministic, non-interleaved
+	 * work). Every bundle is read only when Miniflare starts, after the last app,
+	 * so two apps sharing a generated dir would both run the last one's code:
+	 * an app whose `DEVFLARE_DIR` lands outside it is prepared under a root of
+	 * its own ({@link workspaceAppGeneratedRoot}).
 	 */
 	async function prepareAllApps(): Promise<PreparedWorkspaceApp[]> {
 		const prepared: PreparedWorkspaceApp[] = []
@@ -208,13 +215,15 @@ export function createWorkspaceDevServer(
 			const label = app.name ?? app.config
 			const directSocketPort = resolveAppDirectSocketPort(app, label)
 			const configPath = resolve(manifestDir, app.config)
+			const appCwd = dirname(configPath)
+			const generatedRoot = workspaceAppGeneratedRoot(manifestDir, appCwd)
 
 			logger?.info(`Preparing workspace app "${label}" (port ${directSocketPort})…`)
-			prepared.push(
-				await prepareWorkspaceApp({
+			const prepare = () =>
+				prepareWorkspaceApp({
 					appName: app.name,
 					configPath,
-					appCwd: dirname(configPath),
+					appCwd,
 					directSocketPort,
 					vite: app.vite ?? false,
 					vitePort: app.vitePort ?? 5173,
@@ -229,6 +238,10 @@ export function createWorkspaceDevServer(
 					...(emailRuntime.mode === 'live' ? { skipLocalSendEmailBindings: true } : {}),
 					logger
 				})
+			prepared.push(
+				generatedRoot === undefined
+					? await prepare()
+					: { ...(await withGeneratedRoot(generatedRoot, prepare)), generatedRoot }
 			)
 		}
 		return prepared
@@ -357,6 +370,7 @@ export function createWorkspaceDevServer(
 				miniflarePort: app.directSocketPort,
 				generatedViteConfigPath: app.generatedViteConfigPath,
 				appEnv: app.env,
+				generatedRoot: app.generatedRoot,
 				r2Presign: app.config.bindings?.r2
 					? {
 							secret: r2PresignSecret,

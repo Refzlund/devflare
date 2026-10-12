@@ -13,7 +13,8 @@ const everyOption: ViteChildEnvOptions = {
 	miniflarePort: 8788,
 	runtimeStatusUrl: 'http://127.0.0.1:9100/status',
 	r2Presign: { secret: 'presign-secret', origin: 'http://127.0.0.1:8788' },
-	copiedDotenvNames: ['FROM_A_DOTENV']
+	copiedDotenvNames: ['FROM_A_DOTENV'],
+	generatedRoot: '/gen/apps/web'
 }
 
 describe('buildViteChildEnv', () => {
@@ -95,6 +96,7 @@ describe('buildViteChildEnv', () => {
 			DEVFLARE_BRIDGE_PORT: '8788',
 			DEVFLARE_RUNTIME_STATUS_URL: 'http://127.0.0.1:9100/status',
 			DEVFLARE_CONFIG_PATH: '/apps/web/devflare.config.ts',
+			DEVFLARE_DIR: '/gen/apps/web',
 			DEVFLARE_R2_PRESIGN_SECRET: 'presign-secret',
 			DEVFLARE_R2_PRESIGN_ORIGIN: 'http://127.0.0.1:8788',
 			FORCE_COLOR: '1'
@@ -156,6 +158,16 @@ describe('buildViteChildEnv', () => {
 
 		expect(COPIED_DOTENV_NAMES_ENV in withoutCopies).toBe(false)
 		expect(readCopiedDotenvNames(withCopies)).toEqual(['OWN'])
+	})
+
+	test('an assigned generated root replaces the shared DEVFLARE_DIR the child would inherit', () => {
+		const inherited = { DEVFLARE_DIR: '/gen' }
+
+		expect(buildViteChildEnv(inherited, { miniflarePort: 8788 }).DEVFLARE_DIR).toBe('/gen')
+		expect(
+			buildViteChildEnv(inherited, { miniflarePort: 8788, generatedRoot: '/gen/apps/web' })
+				.DEVFLARE_DIR
+		).toBe('/gen/apps/web')
 	})
 
 	test("every variable devflare sets is a name a Vite app's manifest env may not use", () => {

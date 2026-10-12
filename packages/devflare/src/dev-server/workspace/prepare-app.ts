@@ -109,6 +109,12 @@ export interface PreparedWorkspaceApp {
 	browserShim: BrowserShim | null
 	/** This app's `sendEmail` bindings, merged once at the coordinator. */
 	sendEmailBindings: Record<string, any>
+	/**
+	 * The app's own generated-state root, when the workspace assigned one because
+	 * `DEVFLARE_DIR` lands outside the app. Its Vite child receives it as
+	 * `DEVFLARE_DIR`, so both processes use the same generated files.
+	 */
+	generatedRoot?: string
 	/** Resolved local ids per binding kind, for the `shared` assertion. */
 	sharedIds: { d1: Record<string, string>; r2: Record<string, string>; kv: Record<string, string> }
 }
