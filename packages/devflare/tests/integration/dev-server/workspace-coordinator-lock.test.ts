@@ -99,16 +99,17 @@ function lockFreeNow(persistDir: string): boolean {
  *
  * @param trace - Receives `lock:taken`, `miniflare:new`, `miniflare:dispose:start`,
  *   `miniflare:dispose:end` and `lock:released`, in the order they happen.
- * @param hooks - `onDispose` runs as dispose begins; `onLoadMiniflare` as the module loads.
+ * @param hooks - `onDispose` runs as dispose begins; `onLoadMiniflare` as the module
+ *   loads, and the load waits for it — a slow startup step.
  * @returns The deps to pass to `createWorkspaceDevServer`.
  */
 function tracingDeps(
 	trace: string[],
-	hooks: { onDispose?: () => void; onLoadMiniflare?: () => void } = {}
+	hooks: { onDispose?: () => void; onLoadMiniflare?: () => Promise<void> | void } = {}
 ): WorkspaceDevServerDeps {
 	return {
 		loadMiniflare: async () => {
-			hooks.onLoadMiniflare?.()
+			await hooks.onLoadMiniflare?.()
 			const miniflare = await import('miniflare')
 			class TracedMiniflare extends miniflare.Miniflare {
 				constructor(...args: ConstructorParameters<typeof miniflare.Miniflare>) {
@@ -386,11 +387,14 @@ describe('the workspace coordinator holds its lock', () => {
 			const server = createWorkspaceDevServer(
 				{ manifest, manifestDir: dir, persist: true },
 				tracingDeps(trace, {
-					onLoadMiniflare: () => {
-						// Ctrl+C lands while the instance is being created.
+					onLoadMiniflare: async () => {
+						// Ctrl+C lands while the instance is being created…
 						stopping = server.stop().then(() => {
 							trace.push('stop:resolved')
 						})
+						// …and this startup step takes a while: a stop that did not wait would
+						// finish its teardown, and release the lock, before start() noticed.
+						await Bun.sleep(1_000)
 					}
 				})
 			)
