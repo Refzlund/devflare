@@ -1,5 +1,84 @@
 # devflare
 
+## 1.0.0-next.103
+
+### Patch Changes
+
+- 24ab152: The local BROWSER binding now closes the other end of its DevTools relay whatever code the first
+  end closed with. A `browser.close()` — or any CDP command — that is in flight when Chrome exits or
+  crashes now fails at once instead of waiting out puppeteer's 180-second `protocolTimeout`. (A Chrome
+  that stays up and simply never answers still waits it out; nothing closed, so there is nothing to
+  relay.) The dev log also no longer prints
+  
+  ```
+  ERROR  [BrowserBinding] Failed to close socket: Invalid WebSocket close code: 1005.
+  ERROR  [BrowserBinding] Failed to close socket: Invalid WebSocket close code: 1006.
+  ```
+  
+  once per session.
+  
+  The relay between `@cloudflare/puppeteer` and Chrome copied one end's close code onto the other. The
+  two codes every session produces are reserved — workerd reports 1006 when Chrome exits and drops its
+  socket, and 1005 for `@cloudflare/puppeteer`'s own disconnect, a bare `ws.close()` — and workerd
+  refuses to SEND either. The copy threw, the relay logged it, and the other end was never closed.
+  When Chrome went down with a CDP command still in flight, the client was never told, and the
+  command waited out puppeteer's 180-second `protocolTimeout`. A crash does that every time; it was
+  also seen on `browser.close()` itself, whose reply Chrome can exit without sending.
+  
+  The relay now sends the nearest close each end may carry, measured against workerd itself: a close
+  with no status is relayed as no status, a code RFC 6455 assigns for sending passes through, and anything
+  else — 1006 above all — becomes 1011 with the original code in the reason. If workerd refuses a coded
+  close anyway, the socket is closed without a code rather than left open; only a socket that cannot
+  be closed at all is still reported. The shim's own websocket relay had the same check and the same
+  defect, and uses the same translation.
+  
+  Measured with real Chrome and `@cloudflare/puppeteer` 1.4.0, 20 sessions each: a command in flight
+  when Chrome crashed was still pending after 10 s in 20 of 20 sessions before, and was rejected in
+  44–184 ms in 20 of 20 after; ordinary sessions printed 20 `Failed to close socket` lines before and
+  0 after.
+- 9454639: On Windows the Browser Rendering shim no longer prints `taskkill` errors into the dev log every time
+  a session ends:
+  
+  ```
+  ERROR: The process "17540" not found.
+  ERROR: The process with PID 17308 (child process of PID 20932) could not be terminated.
+  Reason: The operation attempted is not supported.
+  ```
+  
+  When a client closes its browser, Chrome exits and the shim learns of it from puppeteer's
+  `disconnected` event. The shim answered with `browser.close()`. puppeteer-core then tried a CDP close
+  over the connection that had just dropped, failed, and fell back to `@puppeteer/browsers`' process
+  kill — `execSync('taskkill /pid … /T /F')` with no `stdio`, which hands taskkill's stderr straight to
+  the terminal while Chrome's process tree is half gone. That happened on every session close (10 of 10
+  measured).
+  
+  A Chrome that disconnected is now given up to 5 s to exit by itself, which it does in milliseconds,
+  and nothing is printed. Only one still running after that is killed — by devflare, with the kill's
+  output captured, so "already gone" counts as success — and only one that survives even the kill is
+  reported. Endings the shim decides on itself (the idle `keep_alive` reaper, shutdown, a DevTools
+  connection that timed out) meet a Chrome that is still running, and still close it over CDP.
+  
+  The shim's own DevTools relay — used by a client that connects to the shim directly, not by the
+  `devflare dev` BROWSER binding — used to end the session itself whenever Chrome's socket closed or
+  errored, which took the same taskkill path. It now only releases the session: a Chrome that went
+  away is reaped as above, and one still running is closed by the idle reaper once `keep_alive`
+  passes. `/v1/history` records such a session as `ChromeDisconnected` (or `BrowserIdle`) rather than
+  `ChromeError`.
+- 93905f8: The Browser Rendering shim's own DevTools relay now relays. This is the relay a client reaches when
+  it connects to the shim's `/v1/devtools/browser/<id>` (or `/v1/connectDevtools`) directly; the
+  `devflare dev` BROWSER binding does not use it.
+  
+  It forwarded every message as the Buffer the `ws` library delivered, and `ws` sends a Buffer as a
+  BINARY frame. Chrome's DevTools socket speaks text only and drops the connection on a binary frame,
+  so no command sent through this relay ever got a reply: the client saw its socket close and nothing
+  else. Messages a client sent before the relay's own connection to Chrome had opened (puppeteer starts
+  talking as soon as its own socket opens) were also dropped. Text now goes on as text, and early messages wait for Chrome and
+  are delivered in order.
+  
+  Measured with real Chrome under Bun, three sessions: before, 0 replies to `Browser.getVersion`; after,
+  every command answered, and each session ended `ChromeDisconnected` within 43–108 ms of
+  `Browser.close`, with nothing printed.
+
 ## 1.0.0-next.102
 
 ### Patch Changes
