@@ -52,7 +52,7 @@ import {
 } from '@puppeteer/browsers'
 import type { ConsolaInstance } from 'consola'
 import { launchChromeSession } from './chrome-process'
-import { relayedClose } from './close-codes'
+import { relayDevtools } from './devtools-relay'
 import {
 	type AcquireOptions,
 	isDevtoolsPath,
@@ -632,7 +632,7 @@ export function createBrowserShim(options: BrowserShimOptions = {}): BrowserShim
 			throw new Error('Chrome not initialized')
 		}
 
-		return launchChromeSession({ executablePath, args: chromeLaunchArgs })
+		return launchChromeSession({ executablePath, args: chromeLaunchArgs, logger })
 	}
 
 	/**
@@ -706,136 +706,17 @@ export function createBrowserShim(options: BrowserShimOptions = {}): BrowserShim
 					return
 				}
 
-				const connectionId = session.connectionId
-
 				wss.handleUpgrade(request, socket, head, (ws: any) => {
 					if (verbose) {
 						logger?.debug(`[BrowserShim] WebSocket connected for session ${sessionId}`)
 					}
 
-					// Connect to Chrome's DevTools WebSocket
-					const chromeWs = new WebSocketClass(session.wsEndpoint)
-					let chromeConnected = false
-
-					// Which end went first. Tearing the relay down closes this
-					// socket too, and without knowing who started it the close
-					// below reads its own teardown as "Chrome disconnected" and
-					// closes a session the client was entitled to reconnect to.
-					let clientGone = false
-
-					// Set a connection timeout
-					const connectTimeout = setTimeout(() => {
-						if (!chromeConnected) {
-							logger?.error('[BrowserShim] Chrome connection timeout')
-							try {
-								ws.close(1011, 'Chrome connection timeout')
-								chromeWs.close()
-							} catch (error) {
-								logger?.error('[BrowserShim] Error closing sockets after Chrome timeout:', error)
-							}
-							registry.close(sessionId, 5, 'ChromeConnectionTimeout').catch((err) => {
-								logger?.error('[BrowserShim] Error closing session after Chrome timeout:', err)
-							})
-						}
-					}, 10000) // 10 second timeout
-
-					chromeWs.on('open', () => {
-						chromeConnected = true
-						clearTimeout(connectTimeout)
-						if (verbose) {
-							logger?.debug('[BrowserShim] Connected to Chrome DevTools')
-						}
-					})
-
-					chromeWs.on('message', (data: Buffer | string) => {
-						if (ws.readyState === 1) {
-							// OPEN
-							ws.send(data)
-						}
-					})
-
-					chromeWs.on('close', (code: number, reason: Buffer) => {
-						if (verbose) {
-							logger?.debug(`[BrowserShim] Chrome WS closed: ${code}`)
-						}
-						// The code a closed socket reports is not always one a
-						// socket may send: the old 1000–4999 check let Chrome's
-						// 1005/1006 through, `ws` threw on them, and the client
-						// was left open. See ./close-codes.
-						const close = relayedClose(code, reason?.toString?.())
-						try {
-							ws.close(close.code, close.reason)
-						} catch (error) {
-							logger?.error('[BrowserShim] Error closing client socket after Chrome closed:', error)
-						}
-
-						// Nothing but this relay's own teardown closes this socket
-						// once the client has gone, and that is a release, not a
-						// Chrome that died. Otherwise: a crash, a kill or a real
-						// close, and the session is spent.
-						if (clientGone) return
-
-						registry.close(sessionId, 2, 'ChromeDisconnected').catch((err) => {
-							logger?.error('[BrowserShim] Error closing session after Chrome disconnect:', err)
-						})
-					})
-
-					chromeWs.on('error', (error: Error) => {
-						logger?.error('[BrowserShim] Chrome WS error:', error.message)
-						try {
-							ws.close(1011, 'Chrome WebSocket error')
-						} catch (error2) {
-							logger?.error('[BrowserShim] Error closing client socket after Chrome error:', error2)
-						}
-
-						// Chrome error - clean up the session
-						registry.close(sessionId, 4, 'ChromeError').catch((err) => {
-							logger?.error('[BrowserShim] Error closing session after Chrome error:', err)
-						})
-					})
-
-					ws.on('message', (data: Buffer | string) => {
-						if (chromeWs.readyState === 1) {
-							// OPEN
-							chromeWs.send(data)
-						}
-					})
-
-					ws.on('close', (code: number, reason: Buffer) => {
-						if (verbose) {
-							logger?.debug(`[BrowserShim] Client WS closed for session ${sessionId}`)
-						}
-
-						clientGone = true
-
-						// The same translation in this direction, where the common
-						// case is @cloudflare/puppeteer's bare ws.close(): 1005.
-						const close = relayedClose(code, reason?.toString?.())
-						try {
-							chromeWs.close(close.code, close.reason)
-						} catch (error) {
-							logger?.error('[BrowserShim] Error closing Chrome socket after disconnect:', error)
-						}
-
-						// Release rather than close: `keep_alive` is the budget a
-						// detached session gets, and until it runs out the client
-						// can reconnect to this same session by id — the reuse
-						// pattern /v1/sessions exists for. The connection id keeps
-						// a late close from a superseded client from detaching a
-						// newer one.
-						registry.release(sessionId, connectionId)
-					})
-
-					ws.on('error', (error: Error) => {
-						logger?.error('[BrowserShim] Client WS error:', error.message)
-						try {
-							chromeWs.close()
-						} catch (closeError) {
-							logger?.error(
-								'[BrowserShim] Error closing Chrome socket after client error:',
-								closeError
-							)
-						}
+					relayDevtools(ws, new WebSocketClass(session.wsEndpoint), {
+						sessionId,
+						connectionId: session.connectionId,
+						registry,
+						logger,
+						verbose
 					})
 				})
 			})

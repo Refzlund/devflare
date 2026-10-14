@@ -27,7 +27,10 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { Browser, getInstalledBrowsers } from '@puppeteer/browsers'
 import type { ConsolaInstance } from 'consola'
-import { launchChromeSession } from '../../../src/browser-shim/chrome-process'
+import {
+	DEFAULT_EXIT_GRACE_MS,
+	launchChromeSession
+} from '../../../src/browser-shim/chrome-process'
 import { resolveChromeFlags } from '../../../src/browser-shim/server'
 import {
 	type BrowserSessionRegistry,
@@ -101,10 +104,10 @@ describe.skipIf(!executablePath)(`browser shim sessions with real Chrome${SKIP_R
 
 	/** The kills of a Chrome that puppeteer's fallback attempted. */
 	function chromeKills(): string[] {
-		const taskkills = execSync.mock.calls
+		const taskkills = (execSync.mock.calls as unknown[][])
 			.map((call) => String(call[0]))
 			.filter((command) => command.startsWith('taskkill'))
-		const sigkills = kill.mock.calls
+		const sigkills = (kill.mock.calls as unknown[][])
 			.filter((call) => call[1] === 'SIGKILL')
 			.map((call) => `kill(${call[0]}, SIGKILL)`)
 		return [...taskkills, ...sigkills]
@@ -119,6 +122,17 @@ describe.skipIf(!executablePath)(`browser shim sessions with real Chrome${SKIP_R
 			await new Promise((resolve) => setTimeout(resolve, 20))
 		}
 		return undefined
+	}
+
+	/**
+	 * Whether Chrome's DevTools port still answers — false once the process is
+	 * gone. A refused connection is the expected answer, not a failure.
+	 */
+	async function answers(port: string): Promise<boolean> {
+		return fetch(`http://127.0.0.1:${port}/json/version`).then(
+			() => true,
+			() => false
+		)
 	}
 
 	/** Close Chrome the way @cloudflare/puppeteer does: CDP `Browser.close`. */
@@ -143,15 +157,46 @@ describe.skipIf(!executablePath)(`browser shim sessions with real Chrome${SKIP_R
 			const { sessionId } = await registry.acquire()
 			const session = registry.attach(sessionId)
 			await closeOverCdp(session?.wsEndpoint as string)
+			const closedAt = Date.now()
 
 			expect(await ended(sessionId)).toBe('ChromeDisconnected')
+			// Chrome exited by itself, well inside the grace a reap allows: the
+			// quiet path ran, not the kill.
+			expect(Date.now() - closedAt).toBeLessThan(DEFAULT_EXIT_GRACE_MS)
 			// Seen out means GONE: the DevTools port no longer answers.
-			const port = new URL(session?.wsEndpoint as string).port
-			await expect(fetch(`http://127.0.0.1:${port}/json/version`)).rejects.toThrow()
+			expect(await answers(new URL(session?.wsEndpoint as string).port)).toBe(false)
 		}
 
 		expect(chromeKills()).toEqual([])
 		expect(renderMessages(logger).filter((line) => /error|fail/i.test(line))).toEqual([])
+	}, 60000)
+
+	// The kill path, on a Chrome that really is still running: nothing above
+	// reaches it, because a Chrome that was asked to close exits by itself.
+	//
+	// → MUTANT: make toSessionBrowser()'s reap `async () => {}`, or hand
+	//   reapExitingChrome() `null` for the process. Chrome stays up and its
+	//   DevTools port still answers.
+	test('a running Chrome that is reaped is killed, and nothing is printed', async () => {
+		const launched = await launchChromeSession({
+			executablePath: executablePath as string,
+			args: resolveChromeFlags(),
+			reap: { exitGraceMs: 100 }
+		})
+		const port = new URL(launched.wsEndpoint).port
+
+		try {
+			const started = Date.now()
+			await launched.browser.reap()
+
+			expect(await answers(port)).toBe(false)
+			expect(Date.now() - started).toBeLessThan(DEFAULT_EXIT_GRACE_MS)
+			// devflare's own kill captures its output; puppeteer's taskkill never ran.
+			expect(chromeKills().filter((kill) => kill.startsWith('taskkill'))).toEqual([])
+		} finally {
+			// A Chrome a broken reap left running must not outlive the test.
+			if (await answers(port)) await launched.browser.close()
+		}
 	}, 60000)
 
 	// The other side of the change: endings the shim decides on meet a Chrome

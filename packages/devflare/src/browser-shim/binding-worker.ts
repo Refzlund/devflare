@@ -172,8 +172,13 @@ function describeError(error) {
 //   that still holds the invariant should workerd refuse a code anyway; it is
 //   logged under DEBUG only, because the socket did close and only its code
 //   was lost. Failing even that is unexpected, and stays visible.
-// → A socket already CLOSING or CLOSED has been closed by its own peer, so
-//   there is nothing left to do to it.
+// → A socket already CLOSING or CLOSED is left alone: this relay closed it, or
+//   its own peer sent a Close.
+// → GOTCHA: on older compatibility dates (measured at 2024-01-01; at
+//   2026-06-28 workerd answers a Close itself) a socket whose peer sent a
+//   Close stays CLOSING until the WORKER replies, and this relay never replies
+//   to the end that closed first — so that end's closing handshake is left
+//   unfinished. The invariant above still holds: the other end is closed.
 function closeSocket(socket, code, reason) {
 	if (socket.readyState !== 0 && socket.readyState !== 1) return
 	const close = relayedClose(code, reason)

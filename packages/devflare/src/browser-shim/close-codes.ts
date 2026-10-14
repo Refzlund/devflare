@@ -20,8 +20,9 @@
 	  close()            → sent; the peer reports 1005
 	  1000–1003, 1007–1014, 3000–4999 → sent as given
 	  1004, 1005, 1006, 1015, < 1000, > 4999 → THROWS
-	  1016–2999          → sent by workerd, but an RFC 6455 peer (Chrome, the
-	                       `ws` library) fails the connection on it
+	  1016–2999          → sent by workerd, but the `ws` library fails the
+	                       connection on it, as RFC 6455 lets any peer do with
+	                       an unassigned code; Chrome was not measured
 	  reason > 123 UTF-8 bytes → THROWS at 2026-06-28; at 2024-01-01 it is sent
 	                       and the peer fails the connection instead
 
@@ -51,7 +52,8 @@ export interface RelayedClose {
  * - No code, a non-integer, or 1005 (no status received) → no code at all:
  *   the one faithful relay of "no status", since the far end then reports
  *   1005 in turn.
- * - A code an RFC 6455 peer accepts on the wire → itself, reason kept.
+ * - A code RFC 6455's registry assigns for sending (what the `ws` library
+ *   accepts on the wire) → itself, reason kept.
  * - Anything else — 1006 above all, a peer gone without a Close frame — →
  *   1011, "the other end failed", naming the original code in the reason.
  *   1011 rather than 1001 because the relay cannot tell an orderly exit from

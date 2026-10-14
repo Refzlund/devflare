@@ -49,11 +49,14 @@ export function workerdCloseRefusal(code?: number, reason?: string): string | nu
 }
 
 /**
- * @description Whether an RFC 6455 peer — Chrome, or the `ws` library behind
- * puppeteer-core — accepts this code ON THE WIRE. Narrower than what workerd
- * will send: workerd sends 1016–2999, and such a peer fails the connection on
- * them (measured: the `ws` peer reported 1006, not the code).
+ * @description Whether the `ws` library — behind puppeteer-core, and the shim's
+ * own relay under node — accepts this code ON THE WIRE; it is `ws`'s own
+ * `isValidStatusCode` (lib/validation.js), restated because `ws` does not
+ * export it. Narrower than what workerd will send: workerd sends 1016–2999, and
+ * a `ws` peer failed the connection on them (measured: it reported 1006, not
+ * the code). Chrome was not measured; RFC 6455 lets any peer do the same.
  * @param code - a code the relay sent, or `undefined` for no status
+ * @returns whether a `ws` peer would accept it
  */
 export function isWireValidCloseCode(code?: number): boolean {
 	if (code === undefined) return true

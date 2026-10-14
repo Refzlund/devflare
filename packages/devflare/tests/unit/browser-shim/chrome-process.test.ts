@@ -15,9 +15,14 @@ import {
 
 /** A stand-in Chrome process that exits when a test says so. */
 interface FakeChrome extends ExitingProcess {
+	/** Exit now: set the exit code and fire `exit`, as a ChildProcess does. */
 	exit(): void
 }
 
+/**
+ * @param options.exited - start already exited, as a Chrome that crashed first
+ * @param options.pid - its pid; pass `undefined` explicitly for a process without one
+ */
 function createFakeChrome(options: { exited?: boolean; pid?: number } = {}): FakeChrome {
 	const events = new EventEmitter()
 	const chrome = {
@@ -34,7 +39,12 @@ function createFakeChrome(options: { exited?: boolean; pid?: number } = {}): Fak
 	return chrome as unknown as FakeChrome
 }
 
-/** A killer that records its calls, and may make the process exit. */
+/**
+ * A killer that records the pids it was asked to kill.
+ * @param chrome - the process its kill acts on
+ * @param effect - whether the kill makes that process exit, shortly after
+ * @param printed - what the kill reports having printed
+ */
 function createKiller(chrome: FakeChrome | null, effect: 'exits' | 'survives', printed = '') {
 	const calls: number[] = []
 	return {

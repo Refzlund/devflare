@@ -40,13 +40,14 @@ describe('relayedClose', () => {
 		expect(relayedClose(1006, '')).toEqual({ code: 1011, reason: 'peer closed with 1006' })
 	})
 
-	// Reserved, out of range, or sendable by workerd but fatal to an RFC 6455
-	// peer like Chrome (1016–2999): none may be relayed as-is.
+	// Reserved, out of range, or sendable by workerd but fatal to a peer that
+	// enforces RFC 6455's registry (1016–2999; measured against the `ws`
+	// library, not against Chrome): none may be relayed as-is.
 	test.each([0, 999, 1004, 1015, 1016, 2000, 2999, 5000, 65535])('relays %p as 1011', (code) => {
 		expect(relayedClose(code, '').code).toBe(1011)
 	})
 
-	test('every integer code becomes a close workerd sends and Chrome accepts', () => {
+	test('every integer code becomes a close workerd sends and `ws` accepts', () => {
 		for (let code = 0; code <= 5001; code += 1) {
 			const close = relayedClose(code, 'r')
 			expect([code, workerdCloseRefusal(close.code, close.reason)]).toEqual([code, null])
@@ -69,10 +70,14 @@ describe('relayedClose', () => {
 		expect(close.reason?.endsWith('€')).toBe(true)
 	})
 
-	test('keeps a reason of exactly 123 bytes whole', () => {
+	// Both sides of the line: 123 bytes pass whole, 124 are cut to 123.
+	//
+	// → MUTANT: compare with `> 124` instead of `> 123` in relayedClose().
+	test('keeps a reason of exactly 123 bytes whole, and cuts one of 124', () => {
 		const reason = 'x'.repeat(123)
 
 		expect(relayedClose(1000, reason)).toEqual({ code: 1000, reason })
+		expect(relayedClose(1000, `${reason}y`)).toEqual({ code: 1000, reason })
 	})
 
 	// The binding worker runs this function from its SOURCE, inside a workerd

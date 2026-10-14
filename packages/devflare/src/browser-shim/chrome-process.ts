@@ -28,6 +28,7 @@
 */
 
 import { type ChildProcess, execFile } from 'node:child_process'
+import type { ConsolaInstance } from 'consola'
 import puppeteerCore, { type Browser, type BrowserEvent } from 'puppeteer-core'
 import type { LaunchedBrowser, SessionBrowser } from './sessions'
 
@@ -65,6 +66,10 @@ export class ChromeReapError extends Error {
 	/** The process that would not exit. */
 	readonly pid: number | undefined
 
+	/**
+	 * @param pid - the process that would not exit; `undefined` when it had none to kill
+	 * @param detail - why: what the kill printed, or why no kill was possible
+	 */
 	constructor(pid: number | undefined, detail: string) {
 		super(
 			`Chrome (pid ${pid ?? 'unknown'}) was still running after its DevTools connection closed and it was killed: ${detail}`
@@ -107,6 +112,8 @@ export async function reapExitingChrome(
 
 /**
  * @description Resolve once `chrome` has exited, or after `ms` without.
+ * @param chrome - the process to watch; one that has already exited resolves at once
+ * @param ms - the longest to wait, in milliseconds
  * @returns whether it exited
  */
 function waitForExit(chrome: ExitingProcess, ms: number): Promise<boolean> {
@@ -160,6 +167,7 @@ export function killProcessTree(pid: number): Promise<string> {
 
 /**
  * @description SIGKILL a POSIX process group, falling back to the lone pid.
+ * @param pid - the group leader, which is Chrome when it was launched detached
  * @returns why neither kill landed, or empty when one did or the process was
  * already gone
  */
@@ -184,14 +192,25 @@ function killPosixTree(pid: number): string {
  * for one that has disconnected.
  * @param browser - a browser puppeteer launched, so it owns a process
  * @param options - how a reap waits and kills; defaults suit a dev server
+ * @param logger - receives a debug line when a reap had to kill
  */
-export function toSessionBrowser(browser: Browser, options: ReapOptions = {}): SessionBrowser {
+export function toSessionBrowser(
+	browser: Browser,
+	options: ReapOptions = {},
+	logger?: ConsolaInstance
+): SessionBrowser {
 	const chrome = browser.process()
 
 	return {
 		close: () => browser.close(),
 		reap: async () => {
-			await reapExitingChrome(chrome, options)
+			// Handled, so not an error — but a Chrome that outlives its own
+			// disconnect is worth seeing when someone is looking.
+			if ((await reapExitingChrome(chrome, options)) === 'killed') {
+				logger?.debug(
+					`[BrowserShim] Chrome (pid ${chrome?.pid}) had to be killed after it disconnected`
+				)
+			}
 		},
 		// BrowserEvent is an ambient const enum, so its member is named by type
 		// only; at runtime it is the same 'disconnected' string the registry passes.
@@ -207,6 +226,8 @@ export interface ChromeLaunchOptions {
 	args: string[]
 	/** How a disconnected Chrome is seen out. */
 	reap?: ReapOptions
+	/** Receives a debug line when a reap had to kill. */
+	logger?: ConsolaInstance
 }
 
 /**
@@ -225,5 +246,8 @@ export async function launchChromeSession(options: ChromeLaunchOptions): Promise
 		args: options.args
 	})
 
-	return { browser: toSessionBrowser(browser, options.reap), wsEndpoint: browser.wsEndpoint() }
+	return {
+		browser: toSessionBrowser(browser, options.reap, options.logger),
+		wsEndpoint: browser.wsEndpoint()
+	}
 }

@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test'
+import { describe, expect, spyOn, test } from 'bun:test'
 import type { ConsolaInstance } from 'consola'
 import {
 	type BrowserSessionRegistry,
@@ -292,7 +292,8 @@ describe('browser shim session closing', () => {
 	// A Chrome that will not close is a process the developer may have to reap
 	// by hand — it must not pass silently, and it must not abort the sweep.
 	test('a browser that refuses to close still leaves the registry consistent', async () => {
-		const { registry, browsers } = createHarness({ keepAlive: 10000 })
+		const logger = createLogger()
+		const { registry, browsers } = createHarness({ keepAlive: 10000, logger })
 		const first = await registry.acquire()
 		const second = await registry.acquire()
 
@@ -303,6 +304,28 @@ describe('browser shim session closing', () => {
 		expect(registry.get(first.sessionId)).toBeUndefined()
 		expect(registry.get(second.sessionId)).toBeUndefined()
 		expect(browsers[1].closeCount).toBe(1)
+		expect(renderMessages(logger).join(' ')).toContain('chrome is wedged')
+	})
+
+	// The registry takes its logger as optional, and a failure it reports must
+	// not vanish with it.
+	//
+	// → MUTANT: `logger?.error(…)` in end()'s catch, as it was.
+	test('with no logger, a Chrome that would not close still reaches the console', async () => {
+		const consoleError = spyOn(console, 'error').mockImplementation(() => {})
+		try {
+			const { registry, browsers } = createHarness({ keepAlive: 10000 })
+			const { sessionId } = await registry.acquire()
+
+			browsers[0].failNextReap('Chrome (pid 4242) was still running after it was killed')
+			browsers[0].emitDisconnected()
+			await sleep(10)
+
+			expect(consoleError).toHaveBeenCalledTimes(1)
+			expect(String(consoleError.mock.calls[0]?.join(' '))).toContain(sessionId)
+		} finally {
+			consoleError.mockRestore()
+		}
 	})
 
 	test('closeAll records why every session ended', async () => {

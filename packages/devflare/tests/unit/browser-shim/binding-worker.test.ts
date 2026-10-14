@@ -465,7 +465,7 @@ describe('browser binding worker closing the other end', () => {
 	]
 
 	// The invariant: when either end closes, the other end is closed, with a
-	// close workerd accepts and an RFC 6455 peer (Chrome) accepts too.
+	// close workerd accepts and a `ws`-library peer accepts too.
 	//
 	// → MUTANT: in closeSocket(), use `{ code, reason }` instead of
 	//   `relayedClose(code, reason)`. workerd refuses 1004/1005/1006/1015 and

@@ -23,3 +23,10 @@ and nothing is printed. Only one still running after that is killed — by devfl
 output captured, so "already gone" counts as success — and only one that survives even the kill is
 reported. Endings the shim decides on itself (the idle `keep_alive` reaper, shutdown, a DevTools
 connection that timed out) meet a Chrome that is still running, and still close it over CDP.
+
+The shim's own DevTools relay — used by a client that connects to the shim directly, not by the
+`devflare dev` BROWSER binding — used to end the session itself whenever Chrome's socket closed or
+errored, which took the same taskkill path. It now only releases the session: a Chrome that went
+away is reaped as above, and one still running is closed by the idle reaper once `keep_alive`
+passes. `/v1/history` records such a session as `ChromeDisconnected` (or `BrowserIdle`) rather than
+`ChromeError`.

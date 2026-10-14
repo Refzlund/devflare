@@ -237,6 +237,7 @@ describe('browser binding relay closing, in real workerd', () => {
 		return address.port
 	}
 
+	/** Have the client send one CDP command to a Chrome that ends the way `exit` says. */
 	async function sendCommand(exit: ChromeExit): Promise<ClientOutcome> {
 		const response = await miniflare.dispatchFetch(new URL(`/?exit=${exit}`, baseUrl).href)
 		return (await response.json()) as ClientOutcome

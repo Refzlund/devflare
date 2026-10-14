@@ -12,11 +12,14 @@
  * real browser, so every rule below used to be reachable only by running the
  * dev server, and none of it was graded.
  *
- * → KEY: exactly two things end a session on their own — the **idle timer**,
- *   which exists only while nothing is attached, and Chrome's own
+ * → KEY: two things end a session from inside the registry — the **idle
+ *   timer**, which exists only while nothing is attached, and Chrome's own
  *   **`disconnected`** event. They tear Chrome down differently: the timer
  *   CLOSES a Chrome that is still running, `disconnected` REAPS one that is
- *   already exiting (see {@link SessionBrowser.reap}).
+ *   already exiting (see {@link SessionBrowser.reap}). The rest come through
+ *   {@link BrowserSessionRegistry.close} from the shim, and also meet a running
+ *   Chrome: `closeAll()` at shutdown, and the shim's own relay giving up on a
+ *   Chrome that never answered its DevTools upgrade (./devtools-relay).
  *   The idle timer used to be armed unconditionally and re-check
  *   `session.connectionId` when it fired; on the live dev path nothing ever
  *   sets that field, so the check was always true and every session was killed
@@ -373,6 +376,12 @@ export function createSessionRegistry(options: SessionRegistryOptions): BrowserS
 	 * → `teardown` is the only thing that differs between the shim deciding a
 	 *   session is over (close a running Chrome) and Chrome deciding it
 	 *   (reap one that is already going). The bookkeeping is the same.
+	 *
+	 * @param sessionId - the session to end; an unknown one is a no-op
+	 * @param closeReason - numeric reason recorded in history
+	 * @param closeReasonText - human reason recorded in history
+	 * @param teardown - closeBrowser or reapBrowser; a rejection is reported,
+	 * never rethrown, and the session is recorded as ended either way
 	 */
 	async function end(
 		sessionId: string,
@@ -397,8 +406,11 @@ export function createSessionRegistry(options: SessionRegistryOptions): BrowserS
 			// registry, and throwing here would abort a closeAll() midway and
 			// strand every session after this one. A Chrome that will not close
 			// is a process the developer may have to reap by hand, so it must
-			// not pass silently either.
-			logger?.error(`[BrowserShim] Failed to close Chrome for session ${sessionId}:`, error)
+			// not pass silently either — hence the console when no logger was given.
+			;(logger ?? console).error(
+				`[BrowserShim] Failed to close Chrome for session ${sessionId}:`,
+				error
+			)
 		}
 
 		history.unshift({
