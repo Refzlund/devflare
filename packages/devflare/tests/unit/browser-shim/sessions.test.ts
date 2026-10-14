@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+import type { ConsolaInstance } from 'consola'
 import {
 	type BrowserSessionRegistry,
 	createSessionRegistry,
@@ -6,6 +7,7 @@ import {
 	type SessionBrowser,
 	SessionLimitError
 } from '../../../src/browser-shim/sessions'
+import { createLogger, renderMessages, type TestLogger } from '../../helpers/mock-logger'
 
 // The shim server cannot start without downloading Chrome, so until the
 // lifecycle moved into its own module none of this was reachable from a unit
@@ -15,11 +17,16 @@ import {
 
 /** A stub standing in for puppeteer's `Browser`, recording what was done to it. */
 interface FakeBrowser extends SessionBrowser {
+	/** CDP closes asked of this browser — the request for a RUNNING Chrome. */
 	closeCount: number
+	/** Reaps asked of this browser — seeing out a Chrome already exiting. */
+	reapCount: number
 	/** Fire `disconnected`, as Chrome crashing or being killed would. */
 	emitDisconnected(): void
 	/** Make the next close() reject, as a wedged Chrome would. */
 	failNextClose(message: string): void
+	/** Make the next reap() reject, as a Chrome that survives its kill would. */
+	failNextReap(message: string): void
 }
 
 /**
@@ -34,10 +41,12 @@ interface FakeBrowser extends SessionBrowser {
 function createFakeBrowser(): FakeBrowser {
 	const handlers: (() => void)[] = []
 	let closeError: string | null = null
+	let reapError: string | null = null
 	let disconnected = false
 
 	const browser: FakeBrowser = {
 		closeCount: 0,
+		reapCount: 0,
 		async close() {
 			browser.closeCount += 1
 			if (closeError) {
@@ -47,6 +56,14 @@ function createFakeBrowser(): FakeBrowser {
 			}
 
 			browser.emitDisconnected()
+		},
+		async reap() {
+			browser.reapCount += 1
+			if (reapError) {
+				const message = reapError
+				reapError = null
+				throw new Error(message)
+			}
 		},
 		on(_event, handler) {
 			handlers.push(handler)
@@ -59,6 +76,9 @@ function createFakeBrowser(): FakeBrowser {
 		},
 		failNextClose(message) {
 			closeError = message
+		},
+		failNextReap(message) {
+			reapError = message
 		}
 	}
 
@@ -74,7 +94,12 @@ interface Harness {
 }
 
 function createHarness(
-	options: { keepAlive?: number; maxConcurrentSessions?: number; launchDelayMs?: number } = {}
+	options: {
+		keepAlive?: number
+		maxConcurrentSessions?: number
+		launchDelayMs?: number
+		logger?: TestLogger
+	} = {}
 ): Harness {
 	const browsers: FakeBrowser[] = []
 	const harness = {
@@ -85,6 +110,7 @@ function createHarness(
 	harness.registry = createSessionRegistry({
 		keepAlive: options.keepAlive,
 		maxConcurrentSessions: options.maxConcurrentSessions,
+		logger: options.logger as unknown as ConsolaInstance | undefined,
 		async launch(): Promise<LaunchedBrowser> {
 			harness.launches += 1
 			if (options.launchDelayMs) {
@@ -302,6 +328,86 @@ describe('browser shim session closing', () => {
 
 		expect(browsers[0].closeCount).toBe(1)
 		expect(registry.historySize).toBe(1)
+	})
+})
+
+describe('browser shim session teardown', () => {
+	// `disconnected` almost always means Chrome is already exiting — on the dev
+	// path the client's own Browser.close went straight to it. Answering with a
+	// CDP close sent a request down the connection that had just dropped;
+	// puppeteer then fell back to @puppeteer/browsers' kill, whose taskkill
+	// printed `ERROR: The process "…" not found.` into the dev log on every
+	// session close (10 of 10, measured).
+	//
+	// → MUTANT: in acquire()'s `disconnected` handler pass closeBrowser
+	//   instead of reapBrowser — the pre-fix behaviour. closeCount becomes 1
+	//   and reapCount 0.
+	test('a Chrome that disconnects by itself is reaped, never closed over CDP', async () => {
+		const { registry, browsers } = createHarness({ keepAlive: 10000 })
+		const { sessionId } = await registry.acquire()
+		registry.attach(sessionId)
+
+		browsers[0].emitDisconnected()
+		await sleep(10)
+
+		expect(browsers[0].reapCount).toBe(1)
+		expect(browsers[0].closeCount).toBe(0)
+		expect(registry.history()[0]).toMatchObject({
+			sessionId,
+			closeReasonText: 'ChromeDisconnected'
+		})
+	})
+
+	// The shim's own endings meet a Chrome that is still running, and a CDP
+	// close is the right request there. The fake's close() fires
+	// `disconnected` as a real one does, so this also proves that re-entry
+	// reaps nothing on top of the close.
+	//
+	// → MUTANT: give the idle timer reapBrowser instead of close(): the idle
+	//   case's closeCount becomes 0.
+	test("the shim's own endings close a running Chrome, and reap nothing", async () => {
+		const idle = createHarness({ keepAlive: 25 })
+		await idle.registry.acquire()
+		await sleep(80)
+
+		const explicit = createHarness({ keepAlive: 10000 })
+		const { sessionId } = await explicit.registry.acquire()
+		await explicit.registry.close(sessionId)
+
+		const shutdown = createHarness({ keepAlive: 10000 })
+		await shutdown.registry.acquire()
+		await shutdown.registry.closeAll()
+		await sleep(10)
+
+		for (const { registry, browsers } of [idle, explicit, shutdown]) {
+			expect(browsers[0].closeCount).toBe(1)
+			expect(browsers[0].reapCount).toBe(0)
+			expect(registry.historySize).toBe(1)
+		}
+	})
+
+	// Silence is for a Chrome that exits; one that survives even its kill is a
+	// process the developer may have to end by hand.
+	//
+	// → MUTANT: empty the catch block in end(). Nothing is logged.
+	test('a Chrome that will not die is reported, and its session still ends', async () => {
+		const logger = createLogger()
+		const { registry, browsers } = createHarness({ keepAlive: 10000, logger })
+		const { sessionId } = await registry.acquire()
+
+		browsers[0].failNextReap('Chrome (pid 4242) was still running after it was killed')
+		browsers[0].emitDisconnected()
+		await sleep(10)
+
+		expect(logger.error).toHaveBeenCalledTimes(1)
+		const reported = renderMessages(logger).join(' ')
+		expect(reported).toContain(sessionId)
+		expect(reported).toContain('pid 4242')
+		expect(registry.get(sessionId)).toBeUndefined()
+		expect(registry.history()[0]).toMatchObject({
+			sessionId,
+			closeReasonText: 'ChromeDisconnected'
+		})
 	})
 })
 

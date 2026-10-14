@@ -17,6 +17,7 @@ const SHIM_ORIGIN = 'http://127.0.0.1:8788'
 function createStubBrowser(): SessionBrowser {
 	return {
 		async close() {},
+		async reap() {},
 		on() {
 			return this
 		}

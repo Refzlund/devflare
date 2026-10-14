@@ -12,8 +12,11 @@
  * real browser, so every rule below used to be reachable only by running the
  * dev server, and none of it was graded.
  *
- * → KEY: exactly two things reap a session — the **idle timer**, which exists
- *   only while nothing is attached, and Chrome's own **`disconnected`** event.
+ * → KEY: exactly two things end a session on their own — the **idle timer**,
+ *   which exists only while nothing is attached, and Chrome's own
+ *   **`disconnected`** event. They tear Chrome down differently: the timer
+ *   CLOSES a Chrome that is still running, `disconnected` REAPS one that is
+ *   already exiting (see {@link SessionBrowser.reap}).
  *   The idle timer used to be armed unconditionally and re-check
  *   `session.connectionId` when it fired; on the live dev path nothing ever
  *   sets that field, so the check was always true and every session was killed
@@ -53,6 +56,12 @@ export const DEFAULT_MAX_CONCURRENT_SESSIONS = 10
 /** Closed sessions kept for `/v1/history`. */
 const MAX_HISTORY_ENTRIES = 100
 
+/** Tear down a Chrome that is still running. */
+const closeBrowser = (browser: SessionBrowser): Promise<void> => browser.close()
+
+/** Tear down a Chrome that has already disconnected. */
+const reapBrowser = (browser: SessionBrowser): Promise<void> => browser.reap()
+
 // -----------------------------------------------------------------------------
 // Types
 // -----------------------------------------------------------------------------
@@ -64,8 +73,21 @@ const MAX_HISTORY_ENTRIES = 100
  * reaching for page or target APIs without widening this on purpose.
  */
 export interface SessionBrowser {
-	/** Close Chrome and everything in it. */
+	/**
+	 * Close a Chrome that is still running, over CDP — for an ending the shim
+	 * decides on: the idle reaper, shutdown, a relay that timed out.
+	 */
 	close(): Promise<void>
+	/**
+	 * See out a Chrome that has already disconnected: let it exit by itself,
+	 * and kill it only if it does not. Silent when it exits; rejects when it
+	 * will not die even when killed.
+	 *
+	 * → a CDP close here is a request over the connection that just dropped.
+	 *   It fails, and puppeteer's fallback kill printed taskkill's errors into
+	 *   the dev log on every session close. See ./chrome-process.
+	 */
+	reap(): Promise<void>
 	/**
 	 * Subscribe to Chrome going away — a crash, a kill, or the client's own
 	 * `Browser.close`. The registry treats it as the session ending.
@@ -287,9 +309,10 @@ export function createSessionRegistry(options: SessionRegistryOptions): BrowserS
 
 		// Chrome exiting is the one disconnect signal the shim gets for free —
 		// `browser.close()` from the client reaches Chrome directly on the dev
-		// path, and this is how the shim learns the session is spent.
+		// path, and this is how the shim learns the session is spent. Chrome is
+		// already on its way out, so it is reaped, not asked to close.
 		session.browser.on('disconnected', () => {
-			void close(sessionId, 2, 'ChromeDisconnected')
+			void end(sessionId, 2, 'ChromeDisconnected', reapBrowser)
 		})
 
 		// Acquired, not yet connected: the client has `keep_alive` to attach.
@@ -340,18 +363,35 @@ export function createSessionRegistry(options: SessionRegistryOptions): BrowserS
 		closeReason = 1,
 		closeReasonText = 'NormalClosure'
 	): Promise<void> {
+		await end(sessionId, closeReason, closeReasonText, closeBrowser)
+	}
+
+	/**
+	 * End a session: take it out of the registry, tear its browser down the
+	 * way `teardown` says, and record it in history.
+	 *
+	 * → `teardown` is the only thing that differs between the shim deciding a
+	 *   session is over (close a running Chrome) and Chrome deciding it
+	 *   (reap one that is already going). The bookkeeping is the same.
+	 */
+	async function end(
+		sessionId: string,
+		closeReason: number,
+		closeReasonText: string,
+		teardown: (browser: SessionBrowser) => Promise<void>
+	): Promise<void> {
 		const session = sessions.get(sessionId)
 		if (!session) return
 
 		// Remove first. `browser.close()` below fires `disconnected`, which
-		// re-enters this function; taking the session out of the map up front is
-		// what makes the second pass a no-op instead of a second close and a
-		// duplicate history entry.
+		// re-enters through end(); taking the session out of the map up front is
+		// what makes the second pass a no-op instead of a reap on top of the
+		// close and a duplicate history entry.
 		sessions.delete(sessionId)
 		clearIdleTimer(session)
 
 		try {
-			await session.browser.close()
+			await teardown(session.browser)
 		} catch (error) {
 			// REPORT rather than rethrow: the session is already out of the
 			// registry, and throwing here would abort a closeAll() midway and

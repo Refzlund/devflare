@@ -51,7 +51,7 @@ import {
 	resolveBuildId
 } from '@puppeteer/browsers'
 import type { ConsolaInstance } from 'consola'
-import puppeteerCore from 'puppeteer-core'
+import { launchChromeSession } from './chrome-process'
 import { relayedClose } from './close-codes'
 import {
 	type AcquireOptions,
@@ -625,22 +625,14 @@ export function createBrowserShim(options: BrowserShimOptions = {}): BrowserShim
 	 * Start one headless Chrome with remote debugging enabled.
 	 *
 	 * The registry's sole route to a browser; everything about what happens to
-	 * that browser afterwards lives in ./sessions.
+	 * that browser afterwards lives in ./sessions and ./chrome-process.
 	 */
 	async function launchChrome() {
 		if (!executablePath) {
 			throw new Error('Chrome not initialized')
 		}
 
-		const browser = await puppeteerCore.launch({
-			executablePath,
-			headless: true,
-			// Increase protocol timeout for complex pages
-			protocolTimeout: 120000,
-			args: chromeLaunchArgs
-		})
-
-		return { browser, wsEndpoint: browser.wsEndpoint() }
+		return launchChromeSession({ executablePath, args: chromeLaunchArgs })
 	}
 
 	/**
