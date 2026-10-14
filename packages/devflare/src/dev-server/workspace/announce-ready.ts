@@ -1,14 +1,15 @@
 import type { ConsolaInstance } from 'consola'
-import type { ViteReadyOutcome } from '../vite-utils'
+import type { ViteProcessHandle } from '../vite-process'
 
 /** One workspace app's Vite child, as far as the ready announcement needs to know it. */
 export interface WorkspaceViteReadiness {
 	/** The app's manifest name, used in the log line. */
 	appName: string
-	/** Its startup outcome if already decided, read synchronously; null while it is still starting. */
-	readonly outcome: ViteReadyOutcome | null
-	/** Settles once its startup is decided; never rejects. */
-	ready: Promise<ViteReadyOutcome>
+	/**
+	 * Its Vite startup, passed as the handle itself: `outcome` is read again after
+	 * `ready` settles, so a copy of it taken now would stay null forever.
+	 */
+	startup: Pick<ViteProcessHandle, 'ready' | 'outcome'>
 }
 
 /** What {@link announceWorkspaceReady} reports on. */
@@ -41,7 +42,7 @@ export function announceWorkspaceReady(options: AnnounceWorkspaceReadyOptions): 
 		if (isStopping()) {
 			return
 		}
-		const failed = viteApps.filter((app) => app.outcome?.status === 'failed')
+		const failed = viteApps.filter((app) => app.startup.outcome?.status === 'failed')
 		if (failed.length === 0) {
 			logger?.success(`Workspace ready — ${sharing}`)
 			return
@@ -53,7 +54,7 @@ export function announceWorkspaceReady(options: AnnounceWorkspaceReadyOptions): 
 		)
 	}
 
-	const pending = viteApps.filter((app) => app.outcome === null)
+	const pending = viteApps.filter((app) => app.startup.outcome === null)
 	if (pending.length === 0) {
 		announceFinal()
 		return Promise.resolve()
@@ -61,5 +62,5 @@ export function announceWorkspaceReady(options: AnnounceWorkspaceReadyOptions): 
 
 	const names = pending.map((app) => `"${app.appName}"`).join(', ')
 	logger?.info(`Workspace started — ${sharing}; waiting for Vite: ${names}`)
-	return Promise.all(pending.map((app) => app.ready)).then(announceFinal)
+	return Promise.all(pending.map((app) => app.startup.ready)).then(announceFinal)
 }

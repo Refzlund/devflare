@@ -369,6 +369,9 @@ export function createWorkspaceDevServer(
 	 */
 	async function startViteChildren(apps: PreparedWorkspaceApp[]): Promise<void> {
 		for (const app of apps) {
+			// Each spawn can wait out the startup bound, so a stop that lands meanwhile
+			// must keep the next app from being spawned after the teardown ran.
+			throwIfStopping()
 			if (!app.enableVite) {
 				continue
 			}
@@ -507,13 +510,7 @@ export function createWorkspaceDevServer(
 		// is announced when it serves rather than claimed ready before it does.
 		void announceWorkspaceReady({
 			appCount: preparedApps.length,
-			viteApps: viteChildren.map((entry) => ({
-				appName: entry.appName,
-				ready: entry.vite.ready,
-				get outcome() {
-					return entry.vite.outcome
-				}
-			})),
+			viteApps: viteChildren.map((entry) => ({ appName: entry.appName, startup: entry.vite })),
 			...(logger ? { logger } : {}),
 			isStopping: () => stopRequested
 		})

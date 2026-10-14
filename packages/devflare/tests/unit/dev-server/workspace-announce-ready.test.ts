@@ -24,9 +24,11 @@ function controllableApp(appName: string): WorkspaceViteReadiness & {
 	})
 	return {
 		appName,
-		ready,
-		get outcome() {
-			return outcome
+		startup: {
+			ready,
+			get outcome() {
+				return outcome
+			}
 		},
 		decide(decided) {
 			outcome = decided

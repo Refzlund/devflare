@@ -174,8 +174,8 @@ describe('watchViteStartup', () => {
 		)
 	})
 
-	// Kills: logging the late failure (or the stall) unconditionally, which would
-	// report every Ctrl+C during a slow start as a Vite fault.
+	// Kills: logging the late failure unconditionally, which would report every
+	// Ctrl+C during a slow start as a Vite fault.
 	test('an exit while the caller is stopping is not reported', async () => {
 		const child = new FakeViteChild()
 		const { logger, lines } = recordingLogger()
@@ -193,6 +193,25 @@ describe('watchViteStartup', () => {
 
 		expect((await handle.ready).status).toBe('failed')
 		await Bun.sleep(60)
+		expect(lines.map((line) => line.level)).toEqual(['info'])
+	})
+	// Kills: an unconditional stall warning, which a stop that cannot end the child
+	// (it survives the signal) would otherwise follow with 'may be stuck'.
+	test('no stall warning once the caller is stopping, even if the child lives on', async () => {
+		const child = new FakeViteChild()
+		const { logger, lines } = recordingLogger()
+		let stopping = false
+
+		await watchViteStartup(asChild(child), {
+			logger,
+			isStopping: () => stopping,
+			startupWaitMs: 10,
+			stallWarningMs: 40,
+			...quiet
+		})
+		stopping = true
+		await Bun.sleep(80)
+
 		expect(lines.map((line) => line.level)).toEqual(['info'])
 	})
 })
