@@ -38,8 +38,9 @@ import { runD1Migrations } from '../d1-migrations'
 import { resolveR2PresignOrigin } from '../miniflare-dev-config'
 import { createMiniflareLog } from '../miniflare-log'
 import { createRuntimeLogForwarder } from '../runtime-logs'
-import { startViteProcess } from '../vite-process'
+import { startViteProcess, type ViteProcessHandle } from '../vite-process'
 import { stopSpawnedProcessTree } from '../vite-utils'
+import { announceWorkspaceReady } from './announce-ready'
 import { acquireCoordinatorLock, type HeldCoordinatorLock } from './coordinator-lock'
 import { coordinatorLockEnabled } from './coordinator-lock-protocol'
 import { buildMergedWorkspaceConfig } from './merge-config'
@@ -199,8 +200,13 @@ export function createWorkspaceDevServer(
 	let emailRuntime: ResolvedEmailRuntime = resolveEmailRuntime(undefined, process.env)
 	let outboundEmailService: Awaited<ReturnType<typeof startOutboundEmailService>> | null = null
 	let inboundEmailPoller: ReturnType<typeof startInboundEmailPoller> | null = null
-	/** Each running Vite child, with what a report about it needs to name. */
-	const viteChildren: Array<{ appName: string; vitePort: number; child: ChildProcess }> = []
+	/** Each running Vite child, with what a report about it needs to name and its startup readiness. */
+	const viteChildren: Array<{
+		appName: string
+		vitePort: number
+		child: ChildProcess
+		vite: ViteProcessHandle
+	}> = []
 	const appOrigins: WorkspaceAppOrigin[] = []
 
 	/**
@@ -366,8 +372,9 @@ export function createWorkspaceDevServer(
 			if (!app.enableVite) {
 				continue
 			}
-			const child = await spawnVite({
+			const vite = await spawnVite({
 				cwd: app.appCwd,
+				appName: app.appName,
 				configPath: app.configPath,
 				vitePort: app.vitePort,
 				miniflarePort: app.directSocketPort,
@@ -380,9 +387,10 @@ export function createWorkspaceDevServer(
 							origin: resolveR2PresignOrigin(app.config.server, host, app.directSocketPort)
 						}
 					: null,
-				logger
+				logger,
+				isStopping: () => stopRequested
 			})
-			viteChildren.push({ appName: app.appName, vitePort: app.vitePort, child })
+			viteChildren.push({ appName: app.appName, vitePort: app.vitePort, child: vite.child, vite })
 		}
 	}
 
@@ -495,7 +503,20 @@ export function createWorkspaceDevServer(
 			})
 		}
 
-		logger?.success(`Workspace ready — ${preparedApps.length} app(s) sharing one instance`)
+		// Not awaited: start() resolves once the workspace is running, and a slow Vite
+		// is announced when it serves rather than claimed ready before it does.
+		void announceWorkspaceReady({
+			appCount: preparedApps.length,
+			viteApps: viteChildren.map((entry) => ({
+				appName: entry.appName,
+				ready: entry.vite.ready,
+				get outcome() {
+					return entry.vite.outcome
+				}
+			})),
+			...(logger ? { logger } : {}),
+			isStopping: () => stopRequested
+		})
 	}
 
 	/**

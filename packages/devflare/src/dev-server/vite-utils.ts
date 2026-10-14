@@ -41,10 +41,34 @@ export interface SpawnedLikeProcess {
 	on(event: 'error', handler: (error: Error) => void): SpawnedLikeProcess
 }
 
+/** How a Vite child's startup ended: it reported the local URL it serves, or it failed first. */
+export type ViteReadyOutcome =
+	| {
+			status: 'ready'
+			/** The local URL Vite reported, e.g. `http://localhost:5173/`. */
+			url: string
+	  }
+	| {
+			status: 'failed'
+			/** Why: the child exited (code or signal named) or could not be spawned. */
+			error: Error
+	  }
+
+/** Options for {@link waitForViteReady}. */
 export interface WaitForViteReadyOptions {
+	/** How long the returned promise waits before resolving `null` (default 15 s). */
 	timeoutMs?: number
+	/** Receives every stdout chunk, for the whole life of the child. */
 	onStdout?: (chunk: string | Buffer) => void
+	/** Receives every stderr chunk, for the whole life of the child. */
 	onStderr?: (chunk: string | Buffer) => void
+	/**
+	 * Called once, with how startup ended, when that happens AFTER the returned
+	 * promise already resolved `null` at `timeoutMs`. Never called when the promise
+	 * itself settled with the outcome, and never while Vite neither reports a URL
+	 * nor exits. Without it, a URL that arrives after the bound is lost.
+	 */
+	onLateOutcome?: (outcome: ViteReadyOutcome) => void
 }
 
 export interface StopProcessTreeOptions {
@@ -170,35 +194,60 @@ export function extractViteReadyUrl(output: string): string | null {
 	return fallbackMatch?.[0] ?? null
 }
 
+/**
+ * @description Waits for a Vite child to report the local URL it serves, for at
+ * most `timeoutMs`, and keeps watching past that bound: an outcome that arrives
+ * later goes to `onLateOutcome`. The child's output is forwarded for its whole
+ * life either way.
+ * @param process - the spawned Vite child
+ * @param options - the bound, output forwarders and the late-outcome hook
+ * @returns the ready URL, or `null` when `timeoutMs` passed first (Vite is
+ *   still starting, or stuck — `onLateOutcome` tells which, if either ever happens)
+ * @throws {Error} when the child errors or exits before reporting a URL within the bound
+ */
 export async function waitForViteReady(
 	process: SpawnedLikeProcess,
 	options: WaitForViteReadyOptions = {}
 ): Promise<string | null> {
-	const { timeoutMs = 15000, onStdout, onStderr } = options
+	const { timeoutMs = 15000, onStdout, onStderr, onLateOutcome } = options
 
 	let combinedOutput = ''
 
 	return await new Promise<string | null>((resolvePromise, rejectPromise) => {
-		let settled = false
+		// `waiting` until the URL, a failure or the bound; `late` after the bound
+		// resolved null; `decided` once the outcome is known to someone.
+		let phase: 'waiting' | 'late' | 'decided' = 'waiting'
 		let timeout: ReturnType<typeof setTimeout>
 
-		const settle = (resolver: () => void) => {
-			if (settled) {
+		const decide = (outcome: ViteReadyOutcome) => {
+			if (phase === 'decided') {
 				return
 			}
-			settled = true
+			const wasLate = phase === 'late'
+			phase = 'decided'
 			clearTimeout(timeout)
-			resolver()
+			if (wasLate) {
+				onLateOutcome?.(outcome)
+			} else if (outcome.status === 'ready') {
+				resolvePromise(outcome.url)
+			} else {
+				rejectPromise(outcome.error)
+			}
 		}
 
 		// Decoded through `TextDecoder`, as `Buffer#toString('utf-8')` did. Workers-types 5.x declares
 		// its own global `Buffer`, beside which the checker types `Buffer#toString` as `() => string`.
 		const utf8 = new TextDecoder()
 		const inspectChunk = (chunk: string | Uint8Array) => {
+			// Once decided, stop buffering: the output keeps flowing for the life of the
+			// dev server, and re-scanning all of it on every chunk would only grow.
+			if (phase === 'decided') {
+				return
+			}
 			combinedOutput += typeof chunk === 'string' ? chunk : utf8.decode(chunk)
 			const readyUrl = extractViteReadyUrl(combinedOutput)
 			if (readyUrl) {
-				settle(() => resolvePromise(readyUrl))
+				decide({ status: 'ready', url: readyUrl })
 			}
 		}
 
@@ -213,18 +262,22 @@ export async function waitForViteReady(
 		})
 
 		process.on('error', (error) => {
-			settle(() => rejectPromise(error))
+			decide({ status: 'failed', error })
 		})
 
 		process.on('exit', (code, signal) => {
-			settle(() => {
-				const reason = signal ? `signal ${signal}` : `exit code ${code ?? 'unknown'}`
-				rejectPromise(new Error(`Vite exited before reporting a ready URL (${reason})`))
+			const reason = signal ? `signal ${signal}` : `exit code ${code ?? 'unknown'}`
+			decide({
+				status: 'failed',
+				error: new Error(`Vite exited before reporting a ready URL (${reason})`)
 			})
 		})
 
 		timeout = setTimeout(() => {
-			settle(() => resolvePromise(null))
+			if (phase === 'waiting') {
+				phase = 'late'
+				resolvePromise(null)
+			}
 		}, timeoutMs)
 	})
 }

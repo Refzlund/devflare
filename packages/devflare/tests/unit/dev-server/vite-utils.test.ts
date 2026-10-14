@@ -7,6 +7,7 @@ import {
 	type SpawnedLikeProcess,
 	stopSpawnedProcessTree,
 	type ViteProjectFileSystem,
+	type ViteReadyOutcome,
 	waitForViteReady
 } from '../../../src/dev-server/vite-utils'
 
@@ -193,6 +194,60 @@ describe('waitForViteReady', () => {
 
 		expect(await readyPromise).toBe('http://localhost:5180/')
 		expect(forwardedStdout.join('')).toContain('http://localhost:5180/')
+	})
+
+	// A cold SvelteKit start printed its banner at 25.9 s against the 15 s bound;
+	// the URL used to be dropped with nothing ever reporting it.
+	test('a URL reported after the bound reaches onLateOutcome', async () => {
+		const process = new FakeSpawnedProcess()
+		const late: ViteReadyOutcome[] = []
+
+		const initial = await waitForViteReady(process, {
+			timeoutMs: 10,
+			onLateOutcome: (outcome) => late.push(outcome)
+		})
+		expect(initial).toBeNull()
+		expect(late).toEqual([])
+
+		process.stdout?.write('  ➜  Local:   http://127.0.0.1:5173/\n')
+		await Bun.sleep(0)
+
+		expect(late).toEqual([{ status: 'ready', url: 'http://127.0.0.1:5173/' }])
+	})
+
+	test('an exit after the bound reaches onLateOutcome as a failure, once', async () => {
+		const process = new FakeSpawnedProcess()
+		const late: ViteReadyOutcome[] = []
+
+		expect(
+			await waitForViteReady(process, {
+				timeoutMs: 10,
+				onLateOutcome: (outcome) => late.push(outcome)
+			})
+		).toBeNull()
+
+		process.exit(1, null)
+		// A later URL or error changes nothing: the outcome is already decided.
+		process.stdout?.write('  ➜  Local:   http://127.0.0.1:5173/\n')
+		await Bun.sleep(0)
+
+		expect(late).toHaveLength(1)
+		expect(late[0]?.status).toBe('failed')
+		expect(late[0]?.status === 'failed' && late[0].error.message).toContain('exit code 1')
+	})
+
+	test('an exit within the bound still rejects, and is not reported again as late', async () => {
+		const process = new FakeSpawnedProcess()
+		const late: ViteReadyOutcome[] = []
+
+		const ready = waitForViteReady(process, {
+			timeoutMs: 1000,
+			onLateOutcome: (outcome) => late.push(outcome)
+		})
+		process.exit(null, 'SIGTERM')
+
+		await expect(ready).rejects.toThrow('Vite exited before reporting a ready URL (signal SIGTERM)')
+		expect(late).toEqual([])
 	})
 })
 

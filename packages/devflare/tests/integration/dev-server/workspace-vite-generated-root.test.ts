@@ -99,10 +99,12 @@ async function startTwoViteApps(
 		{
 			startViteProcess: async (options) => {
 				started.set(options.cwd, options)
-				// An idle child, so `stop()` has a real process tree to end.
-				return spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], {
+				// An idle child, so `stop()` has a real process tree to end, reported ready.
+				const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], {
 					stdio: 'ignore'
 				}) as ChildProcess
+				const outcome = { status: 'ready', url: `http://localhost:${options.vitePort}/` } as const
+				return { child, ready: Promise.resolve(outcome), outcome }
 			}
 		}
 	)

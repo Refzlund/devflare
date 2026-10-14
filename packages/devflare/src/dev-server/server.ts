@@ -592,7 +592,9 @@ export function createDevServer(options: DevServerOptions): DevServer {
 			state.runtimeStatusService = await startRuntimeStatusService(readRuntimeState)
 			logger?.debug(`Runtime status channel → ${state.runtimeStatusService.url}`)
 
-			state.viteProcess = await startViteProcess({
+			// Returns after at most the startup wait; a slow Vite's URL is logged when it
+			// arrives, and nothing below needs Vite to be serving.
+			const vite = await startViteProcess({
 				cwd,
 				configPath,
 				vitePort,
@@ -605,8 +607,10 @@ export function createDevServer(options: DevServerOptions): DevServer {
 							origin: resolveR2PresignOrigin(state.config.server, miniflareHost, miniflarePort)
 						}
 					: null,
-				logger
+				logger,
+				isStopping: () => isStopping
 			})
+			state.viteProcess = vite.child
 		} else {
 			logger?.info('Vite startup skipped (no effective Vite config found for this package)')
 		}

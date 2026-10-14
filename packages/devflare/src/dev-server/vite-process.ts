@@ -6,7 +6,7 @@ import { encodeInjectedVars, INJECTED_VARS_ENV } from '../config/injected-vars'
 import { isReservedAppEnvKey } from '../config/workspace'
 import { GENERATED_DIR_ENV } from '../utils/generated-dir'
 import { RUNTIME_STATUS_URL_ENV } from './runtime-status'
-import { waitForViteReady } from './vite-utils'
+import { type ViteReadyOutcome, waitForViteReady } from './vite-utils'
 
 /** The parts of {@link StartViteProcessOptions} that decide the Vite child's environment. */
 export interface ViteChildEnvOptions {
@@ -56,6 +56,10 @@ export interface StartViteProcessOptions extends Omit<ViteChildEnvOptions, 'copi
 	vitePort: number
 	generatedViteConfigPath: string | null
 	logger?: ConsolaInstance
+	/** The workspace app this Vite serves, named in its log lines. */
+	appName?: string
+	/** See {@link WatchViteStartupOptions.isStopping}. */
+	isStopping?: () => boolean
 }
 
 /**
@@ -120,11 +124,155 @@ export function buildViteChildEnv(
 	}
 }
 
+/** How long startup waits for Vite's URL before moving on without it. */
+export const VITE_STARTUP_WAIT_MS = 15_000
+
 /**
- * Start the Vite dev server process.
+ * How long Vite may go without reporting a URL before devflare says it may be
+ * stuck. A slow first start (a cold SvelteKit dep scan) takes 25–30 s, so this
+ * sits well past that.
  */
-export async function startViteProcess(options: StartViteProcessOptions): Promise<ChildProcess> {
-	const { cwd, vitePort, generatedViteConfigPath, logger } = options
+export const VITE_STALL_WARNING_MS = 60_000
+
+/** A running Vite child and what is known about its startup. */
+export interface ViteProcessHandle {
+	/** The spawned child (a `bunx` shim on every platform), for teardown. */
+	child: ChildProcess
+	/**
+	 * Settles once startup is decided: `ready` with the URL, or `failed` when the
+	 * child exited or errored AFTER the startup wait gave up on it. Never rejects,
+	 * and stays pending while Vite neither serves nor exits.
+	 */
+	ready: Promise<ViteReadyOutcome>
+	/** The outcome once {@link ready} has settled, read synchronously; null before. */
+	readonly outcome: ViteReadyOutcome | null
+}
+
+/** What {@link watchViteStartup} needs besides the child. */
+export interface WatchViteStartupOptions {
+	/** The workspace app this Vite serves; the single-app `devflare dev` has none. */
+	appName?: string
+	logger?: ConsolaInstance
+	/**
+	 * Whether the caller is shutting down. A child the stop itself ended exits
+	 * "before it became ready", which is not news, so late failures and the stall
+	 * warning are not logged once this returns true.
+	 */
+	isStopping?: () => boolean
+	/** Default {@link VITE_STARTUP_WAIT_MS}. */
+	startupWaitMs?: number
+	/** Default {@link VITE_STALL_WARNING_MS}, measured from the start of the watch. */
+	stallWarningMs?: number
+	/** Receives every stdout chunk (default: this process's stdout). */
+	onStdout?: (chunk: string | Buffer) => void
+	/** Receives every stderr chunk (default: this process's stderr). */
+	onStderr?: (chunk: string | Buffer) => void
+}
+
+/**
+ * @description Watches a freshly spawned Vite child until it reports its URL,
+ * logging what happens in words that match what is known: ready, still starting
+ * (not a fault — a cold start often outlasts the startup wait), ready late,
+ * apparently stuck, or exited before it ever served.
+ *
+ * Returns after at most `startupWaitMs`, so a caller can register the child for
+ * teardown and carry on starting; the watch continues past that and settles
+ * {@link ViteProcessHandle.ready} whenever startup is decided.
+ * → GOTCHA: do not make the startup wait unbounded. Both callers register the
+ *   child only once this returns, so a stop during an unbounded wait would leave
+ *   a Vite that never serves running with nothing to end it.
+ * @param child - the spawned Vite child
+ * @param options - labels, logger, stop flag and timings
+ * @returns the child with its readiness
+ * @throws {Error} when the child errors or exits within the startup wait, as before
+ */
+export async function watchViteStartup(
+	child: ChildProcess,
+	options: WatchViteStartupOptions = {}
+): Promise<ViteProcessHandle> {
+	const {
+		appName,
+		logger,
+		isStopping = () => false,
+		startupWaitMs = VITE_STARTUP_WAIT_MS,
+		stallWarningMs = VITE_STALL_WARNING_MS,
+		onStdout = (chunk) => process.stdout.write(chunk),
+		onStderr = (chunk) => process.stderr.write(chunk)
+	} = options
+	const subject = appName ? `Vite for app "${appName}"` : 'Vite dev server'
+	const startedAt = performance.now()
+	const elapsed = () => `${((performance.now() - startedAt) / 1000).toFixed(1)}s`
+
+	let outcome: ViteReadyOutcome | null = null
+	let resolveReady!: (outcome: ViteReadyOutcome) => void
+	const ready = new Promise<ViteReadyOutcome>((resolve) => {
+		resolveReady = resolve
+	})
+	const handle: ViteProcessHandle = {
+		child,
+		ready,
+		get outcome() {
+			return outcome
+		}
+	}
+
+	let stallTimer: ReturnType<typeof setTimeout> | undefined
+	const record = (decided: ViteReadyOutcome) => {
+		clearTimeout(stallTimer)
+		outcome = decided
+		resolveReady(decided)
+	}
+
+	const initialUrl = await waitForViteReady(child, {
+		timeoutMs: startupWaitMs,
+		onStdout,
+		onStderr,
+		onLateOutcome(late) {
+			record(late)
+			if (late.status === 'ready') {
+				logger?.success(`${subject} started on ${late.url} (after ${elapsed()})`)
+			} else if (!isStopping()) {
+				logger?.error(`${subject} stopped before it became ready: ${late.error.message}`)
+			}
+		}
+	})
+
+	if (initialUrl) {
+		record({ status: 'ready', url: initialUrl })
+		logger?.success(`${subject} started on ${initialUrl}`)
+		return handle
+	}
+
+	logger?.info(
+		`${subject} is still starting after ${elapsed()}; devflare will report its URL when it is ready`
+	)
+	stallTimer = setTimeout(
+		() => {
+			if (outcome === null && !isStopping()) {
+				logger?.warn(
+					`${subject} has not reported a local URL after ${elapsed()} and has not exited; ` +
+						'it may be stuck — check its output above'
+				)
+			}
+		},
+		Math.max(0, stallWarningMs - (performance.now() - startedAt))
+	)
+	// The warning is advice; it must never be what keeps the process alive.
+	stallTimer.unref?.()
+	return handle
+}
+
+/**
+ * @description Spawns the Vite dev server (`bunx vite dev`) for one app and
+ * watches its startup ({@link watchViteStartup}).
+ * @param options - where and how to run it, and what its environment carries
+ * @returns the child with its readiness, after at most the startup wait
+ * @throws {Error} when Vite errors or exits within the startup wait
+ */
+export async function startViteProcess(
+	options: StartViteProcessOptions
+): Promise<ViteProcessHandle> {
+	const { cwd, vitePort, generatedViteConfigPath, logger, appName, isStopping } = options
 
 	const args = ['vite', 'dev', '--port', String(vitePort)]
 	if (generatedViteConfigPath) {
@@ -143,20 +291,9 @@ export async function startViteProcess(options: StartViteProcessOptions): Promis
 		})
 	})
 
-	const readyUrl = await waitForViteReady(viteProcess, {
-		onStdout(chunk) {
-			process.stdout.write(chunk)
-		},
-		onStderr(chunk) {
-			process.stderr.write(chunk)
-		}
+	return await watchViteStartup(viteProcess, {
+		...(appName ? { appName } : {}),
+		...(logger ? { logger } : {}),
+		...(isStopping ? { isStopping } : {})
 	})
-
-	if (readyUrl) {
-		logger?.success(`Vite dev server started on ${readyUrl}`)
-		return viteProcess
-	}
-
-	logger?.warn('Vite process started, but the final local URL could not be confirmed yet')
-	return viteProcess
 }
