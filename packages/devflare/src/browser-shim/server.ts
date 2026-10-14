@@ -52,6 +52,7 @@ import {
 } from '@puppeteer/browsers'
 import type { ConsolaInstance } from 'consola'
 import puppeteerCore from 'puppeteer-core'
+import { relayedClose } from './close-codes'
 import {
 	type AcquireOptions,
 	isDevtoolsPath,
@@ -765,10 +766,13 @@ export function createBrowserShim(options: BrowserShimOptions = {}): BrowserShim
 						if (verbose) {
 							logger?.debug(`[BrowserShim] Chrome WS closed: ${code}`)
 						}
-						// Ensure valid close code (1000-4999)
-						const validCode = typeof code === 'number' && code >= 1000 && code <= 4999 ? code : 1000
+						// The code a closed socket reports is not always one a
+						// socket may send: the old 1000–4999 check let Chrome's
+						// 1005/1006 through, `ws` threw on them, and the client
+						// was left open. See ./close-codes.
+						const close = relayedClose(code, reason?.toString?.())
 						try {
-							ws.close(validCode, reason?.toString?.() || '')
+							ws.close(close.code, close.reason)
 						} catch (error) {
 							logger?.error('[BrowserShim] Error closing client socket after Chrome closed:', error)
 						}
@@ -812,10 +816,11 @@ export function createBrowserShim(options: BrowserShimOptions = {}): BrowserShim
 
 						clientGone = true
 
-						// Ensure valid close code (1000-4999)
-						const validCode = typeof code === 'number' && code >= 1000 && code <= 4999 ? code : 1000
+						// The same translation in this direction, where the common
+						// case is @cloudflare/puppeteer's bare ws.close(): 1005.
+						const close = relayedClose(code, reason?.toString?.())
 						try {
-							chromeWs.close(validCode, reason?.toString?.() || '')
+							chromeWs.close(close.code, close.reason)
 						} catch (error) {
 							logger?.error('[BrowserShim] Error closing Chrome socket after disconnect:', error)
 						}

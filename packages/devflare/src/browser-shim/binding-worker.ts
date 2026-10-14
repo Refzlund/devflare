@@ -39,6 +39,7 @@
 // - Must split Chrome responses into chunks for puppeteer
 // =============================================================================
 
+import { relayedClose } from './close-codes'
 import {
 	DEVTOOLS_PATH_PREFIX,
 	LEGACY_DEVTOOLS_PATH,
@@ -91,6 +92,10 @@ const SESSION_PATH_PREFIX = ${JSON.stringify(SESSION_PATH_PREFIX)}
 const SESSION_RELEASE_SUFFIX = ${JSON.stringify(SESSION_RELEASE_SUFFIX)}
 const SESSION_ATTACH_PARAM = ${JSON.stringify(SESSION_ATTACH_PARAM)}
 const SESSION_CONNECTION_PARAM = ${JSON.stringify(SESSION_CONNECTION_PARAM)}
+
+// Interpolated from src/browser-shim/close-codes.ts by its SOURCE: the code a
+// close may carry on to the other end, which is not always the code it arrived with.
+const relayedClose = ${relayedClose.toString()}
 
 // A DevTools endpoint, in either @cloudflare/puppeteer generation's spelling
 function isDevtoolsPath(pathname) {
@@ -150,25 +155,39 @@ async function proxyToBrowserShim(request, url) {
 	})
 }
 
-// Validate WebSocket close code to be in valid range
-function validateCloseCode(code) {
-	if (typeof code !== 'number' || isNaN(code)) return 1000
-	if (code < 1000 || code > 4999) return 1000
-	return code
+// The message of something thrown, for a log line.
+function describeError(error) {
+	return error && error.message ? error.message : String(error)
 }
 
-// Close a socket that may already be closing, and say so when that fails.
+// Close one end of the relay because the other end closed or failed.
 //
-// The state this is usually reached from is exactly the one where close()
-// throws, hence the readyState precondition. Anything that gets past it is
-// unexpected and is logged rather than swallowed: these calls sit inside event
-// listeners, where a throw has no boundary to reach.
+// → KEY: the invariant is that when either end closes, the other end ALWAYS
+//   closes. It used to copy the peer's code, and the two codes every session
+//   produces are reserved — 1006 when Chrome exits and drops its socket, 1005
+//   for @cloudflare/puppeteer's bare ws.close(). workerd refused them, this
+//   logged "Failed to close socket", and the other end stayed open. A client
+//   with a command in flight then waited out puppeteer's 180s protocolTimeout.
+// → relayedClose() keeps the code sendable. The uncoded close is the fallback
+//   that still holds the invariant should workerd refuse a code anyway; it is
+//   logged under DEBUG only, because the socket did close and only its code
+//   was lost. Failing even that is unexpected, and stays visible.
+// → A socket already CLOSING or CLOSED has been closed by its own peer, so
+//   there is nothing left to do to it.
 function closeSocket(socket, code, reason) {
 	if (socket.readyState !== 0 && socket.readyState !== 1) return
+	const close = relayedClose(code, reason)
 	try {
-		socket.close(validateCloseCode(code), reason || '')
+		if (close.code === undefined) socket.close()
+		else socket.close(close.code, close.reason)
+		return
 	} catch (error) {
-		console.error('[BrowserBinding] Failed to close socket:', error && error.message ? error.message : error)
+		log('close(' + close.code + ') was refused (' + describeError(error) + '); closing without a code')
+	}
+	try {
+		socket.close()
+	} catch (error) {
+		console.error('[BrowserBinding] Failed to close socket:', describeError(error))
 	}
 }
 

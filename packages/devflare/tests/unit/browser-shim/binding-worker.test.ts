@@ -1,9 +1,10 @@
-import { afterEach, describe, expect, test } from 'bun:test'
+import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { getBrowserBindingScript } from '../../../src/browser-shim/binding-worker'
+import { isWireValidCloseCode, workerdCloseRefusal } from '../../helpers/workerd-websocket-close'
 
 // The binding worker is a script string compiled inside workerd, so these
 // tests compile it for real and drive its fetch handler with stubbed globals.
@@ -19,12 +20,27 @@ interface BindingWorker {
 	default: { fetch(request: Request, env?: unknown, ctx?: unknown): Promise<Response> }
 }
 
-/** A websocket end the worker can accept, send on, and receive events from. */
+/**
+ * A websocket end the worker can accept, send on, and receive events from.
+ *
+ * → KEY: close() enforces workerd's own rule (workerdCloseRefusal, which the
+ *   integration lane checks against real workerd). Its predecessor accepted
+ *   any code, so a relay that copied a peer's reserved 1005/1006 onto the
+ *   other socket — refused by workerd, which left that socket open — passed
+ *   here while hanging every client that had a command in flight.
+ */
 interface FakeSocket {
 	readyState: number
 	sent: unknown[]
-	/** Every close() the worker asked for, in order. */
+	/** Every close() the worker asked for that was accepted, in order. */
 	closed: { code?: number; reason?: string }[]
+	/** Every close() refused, in order — workerd's rule, or `refuse` below. */
+	refused: { code?: number; reason?: string }[]
+	/**
+	 * A refusal on top of workerd's, to stand in for a runtime stricter than
+	 * the model: returns the message to throw, or null to defer to workerd's rule.
+	 */
+	refuse?: (code?: number, reason?: string) => string | null
 	accept(): void
 	close(code?: number, reason?: string): void
 	send(data: unknown): void
@@ -40,8 +56,14 @@ function createFakeSocket(): FakeSocket {
 		readyState: 1,
 		sent: [],
 		closed: [],
+		refused: [],
 		accept() {},
 		close(code, reason) {
+			const refusal = socket.refuse?.(code, reason) ?? workerdCloseRefusal(code, reason)
+			if (refusal) {
+				socket.refused.push({ code, reason })
+				throw new TypeError(refusal)
+			}
 			socket.closed.push({ code, reason })
 			socket.readyState = 3 // CLOSED
 		},
@@ -423,5 +445,136 @@ describe('browser binding worker session lifecycle', () => {
 
 		expect(calls.find((call) => call.url === SESSION_ATTACH_URL)?.bounded).toBe(true)
 		expect(calls.find((call) => call.url === CHROME_UPGRADE_URL)?.bounded).toBe(true)
+	})
+})
+
+describe('browser binding worker closing the other end', () => {
+	// Every code a close event can carry, in either direction. A Chrome that
+	// exits is reported as 1006 (TCP gone, no Close frame) or 1000;
+	// @cloudflare/puppeteer's disconnect is a bare ws.close(), which the relay
+	// sees as 1005. The rest are what any peer could send.
+	const REPORTED_CODES = [
+		undefined,
+		0,
+		999,
+		...Array.from({ length: 17 }, (_, index) => 1000 + index),
+		2999,
+		3000,
+		4999,
+		5000
+	]
+
+	// The invariant: when either end closes, the other end is closed, with a
+	// close workerd accepts and an RFC 6455 peer (Chrome) accepts too.
+	//
+	// → MUTANT: in closeSocket(), use `{ code, reason }` instead of
+	//   `relayedClose(code, reason)`. workerd refuses 1004/1005/1006/1015 and
+	//   the out-of-range codes, `refused` fills, and this fails — before the
+	//   fallback has had a chance to hide it.
+	test.each(REPORTED_CODES)(
+		'a close reporting %p is relayed as a close both ends accept',
+		async (code) => {
+			const fromChrome = await upgrade(`/v1/devtools/browser/${SESSION_ID}`)
+			fromChrome.chrome.emit('close', { code, reason: 'gone' })
+
+			const fromClient = await upgrade(`/v1/devtools/browser/${SESSION_ID}`)
+			fromClient.client.emit('close', { code, reason: 'gone' })
+
+			for (const socket of [fromChrome.client, fromClient.chrome]) {
+				expect(socket.refused).toEqual([])
+				expect(socket.closed).toHaveLength(1)
+				expect(isWireValidCloseCode(socket.closed[0]?.code)).toBe(true)
+			}
+		}
+	)
+
+	// The uidini hang: Chrome exits mid-`Browser.close` and its socket drops.
+	test('a Chrome gone without a Close frame closes the client with 1011, naming why', async () => {
+		const { chrome, client } = await upgrade(`/v1/devtools/browser/${SESSION_ID}`)
+
+		chrome.emit('close', {
+			code: 1006,
+			reason: 'WebSocket disconnected without sending Close frame.'
+		})
+
+		expect(client.closed).toEqual([
+			{
+				code: 1011,
+				reason: 'peer closed with 1006: WebSocket disconnected without sending Close frame.'
+			}
+		])
+	})
+
+	// Relayed as what it was: no status. close() with no arguments is the only
+	// way to send that, and the far end reports 1005 in turn.
+	test('a close with no status is relayed as no status, in both directions', async () => {
+		const fromChrome = await upgrade(`/v1/devtools/browser/${SESSION_ID}`)
+		fromChrome.chrome.emit('close', { code: 1005, reason: '' })
+
+		const fromClient = await upgrade(`/v1/devtools/browser/${SESSION_ID}`)
+		fromClient.client.emit('close', { code: 1005, reason: '' })
+
+		expect(fromChrome.client.closed).toEqual([{ code: undefined, reason: undefined }])
+		expect(fromClient.chrome.closed).toEqual([{ code: undefined, reason: undefined }])
+	})
+
+	// RFC 6455 leaves a reason 123 bytes, and workerd throws past them. A
+	// mapped reason grows by its prefix, so it must be cut — on a character
+	// boundary, or the cut itself produces a lone surrogate.
+	test('a reason that would outgrow 123 UTF-8 bytes is cut on a character boundary', async () => {
+		const { chrome, client } = await upgrade(`/v1/devtools/browser/${SESSION_ID}`)
+
+		chrome.emit('close', { code: 1006, reason: '€'.repeat(41) })
+
+		const reason = client.closed[0]?.reason ?? ''
+		expect(client.refused).toEqual([])
+		expect(new TextEncoder().encode(reason).length).toBeLessThanOrEqual(123)
+		expect(reason.startsWith('peer closed with 1006: €')).toBe(true)
+		expect(reason.endsWith('€')).toBe(true)
+	})
+
+	// The invariant must hold even if workerd's rule is ever stricter than the
+	// relay's model of it: the socket closes without a code rather than staying
+	// open. That is handled, so it is not an error line.
+	//
+	// → MUTANT: delete the uncoded `socket.close()` fallback in closeSocket().
+	//   The client is never closed and `closed` stays empty.
+	test('a coded close workerd refuses anyway still closes the socket, without a code', async () => {
+		const consoleError = spyOn(console, 'error').mockImplementation(() => {})
+		try {
+			const { chrome, client } = await upgrade(`/v1/devtools/browser/${SESSION_ID}`)
+			client.refuse = (code) =>
+				code === undefined ? null : `Invalid WebSocket close code: ${code}.`
+
+			chrome.emit('close', { code: 1006, reason: '' })
+
+			expect(client.refused.map((close) => close.code)).toEqual([1011])
+			expect(client.closed).toEqual([{ code: undefined, reason: undefined }])
+			expect(consoleError).not.toHaveBeenCalled()
+		} finally {
+			consoleError.mockRestore()
+		}
+	})
+
+	// A socket that cannot be closed at all is a relay that may hang a client,
+	// so it stays visible in the dev log.
+	//
+	// → MUTANT: turn the final console.error in closeSocket() into a DEBUG log.
+	test('a socket that refuses every close is reported', async () => {
+		const consoleError = spyOn(console, 'error').mockImplementation(() => {})
+		try {
+			const { chrome, client } = await upgrade(`/v1/devtools/browser/${SESSION_ID}`)
+			client.refuse = () => 'the socket is wedged'
+
+			chrome.emit('close', { code: 1000, reason: '' })
+
+			expect(client.closed).toEqual([])
+			expect(consoleError).toHaveBeenCalledTimes(1)
+			expect(String(consoleError.mock.calls[0]?.join(' '))).toContain(
+				'Failed to close socket: the socket is wedged'
+			)
+		} finally {
+			consoleError.mockRestore()
+		}
 	})
 })
