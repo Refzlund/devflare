@@ -53,6 +53,48 @@ describe('main barrel public surface', () => {
 		}
 	})
 
+	test('re-exports the env-vars dotenv readers themselves, not wrappers', async () => {
+		const mod = await import('../../src/index.ts')
+		const layer = await import('../../src/config/env-vars.ts')
+
+		// Identity, not presence: a wrapper or a second copy could drift from the layer. That the
+		// loader calls these same functions is `loader.ts`'s property, and this does not grade it.
+		expect(mod.getDevflareDotenvPaths).toBe(layer.getDevflareDotenvPaths)
+		expect(mod.loadDevflareDotenv).toBe(layer.loadDevflareDotenv)
+		expect(mod.parseDevflareEnvFile).toBe(layer.parseDevflareEnvFile)
+
+		// The mutating sibling stays internal: copying into a caller's process.env is loadConfig's call.
+		expect('loadDevflareDotenvIntoProcess' in mod).toBe(false)
+	})
+
+	test('the browser entry refuses the dotenv readers by name rather than omitting them', async () => {
+		const browser = await import('../../src/browser.ts')
+
+		for (const name of [
+			'getDevflareDotenvPaths',
+			'loadDevflareDotenv',
+			'parseDevflareEnvFile'
+		] as const) {
+			// The Node-only hint, because neither devflare/test nor devflare/runtime carries them.
+			expect(() => (browser[name] as () => unknown)()).toThrow(
+				`${name} is not available in browser environments; call it from a Node script`
+			)
+		}
+	})
+
+	test('the browser entry carries every root export, bar two gaps that predate this check', async () => {
+		const root = Object.keys(await import('../../src/index.ts'))
+		const browser = new Set(Object.keys(await import('../../src/browser.ts')))
+
+		// → NOTE: these two were already missing when this check was written. Each must STILL be
+		//   missing, so closing a gap fails here until its name leaves the list.
+		const knownGaps = ['defineWorkspace', 'preview']
+		for (const name of knownGaps) expect(browser.has(name)).toBe(false)
+
+		const missing = root.filter((name) => !browser.has(name) && !knownGaps.includes(name))
+		expect(missing).toEqual([])
+	})
+
 	test('removed names remain importable from devflare/test subpath', async () => {
 		const testMod = await import('../../src/test/index.ts')
 		expect('createTestContext' in testMod).toBe(true)

@@ -569,7 +569,8 @@ export const configurationDocsPart1: DocPage[] = [
 				paragraphs: [
 					'Devflare reads `.env.public`, `.env.dev` and `.env` from the config directory and every parent directory. Parent files load first, then closer files override them. Within one directory the order is `.env.public`, then `.env.dev`, then `.env`, so a developer file always wins over one the repository ships.',
 					'`.env.public` is the tier meant to be committed. Every other env file is conventionally git-ignored, which leaves values that are genuinely not secrets — a sender address, a support forwarding target, a public API origin — with nowhere to live but a deploy dashboard. It is deliberately the weakest tier so a committed default can never override the machine it runs on.',
-					'The parser does not expand `$OTHER_VARIABLE` references. Values such as passwords, MongoDB connection strings, and shell-looking fragments are read as written instead of being interpreted by Bun.'
+					'The parser does not expand `$OTHER_VARIABLE` references. Values such as passwords, MongoDB connection strings, and shell-looking fragments are read as written instead of being interpreted by Bun.',
+					'A script that must know what a command will see — a predeploy check that refuses a committed dev value, say — can ask the same layer instead of re-implementing it. `getDevflareDotenvPaths(dir)` lists every candidate file in load order, `parseDevflareEnvFile(text)` reads one file the way Devflare does, and `loadDevflareDotenv(dir)` returns the merged `values` and the `files` that supplied them. All three come from `devflare` and none of them touches `process.env`.'
 				],
 				snippets: [
 					{
@@ -592,6 +593,13 @@ export const configurationDocsPart1: DocPage[] = [
 						title: '`.env.public` is a promise you keep, not one Devflare checks',
 						body: [
 							'Anything committed to `.env.public` is in version-control history permanently. Devflare cannot tell a sender address from an SMTP URL with a password in it, so nothing validates the name — treat it as documentation of intent, and keep secrets in `.env` or `.env.dev`.'
+						]
+					},
+					{
+						tone: 'warning',
+						title: '`.env.dev` reaches production deploys too',
+						body: [
+							'The three files are loaded by every command that loads a config, whatever its mode: `devflare deploy --prod` reads `.env.dev` exactly as `devflare dev` does. The name says whose machine the file serves, not which builds it reaches — so a dev-only flag kept there ships with a production deploy run from that machine.'
 						]
 					}
 				]

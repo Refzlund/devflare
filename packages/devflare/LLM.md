@@ -3051,6 +3051,8 @@ Devflare reads `.env.public`, `.env.dev` and `.env` from the config directory an
 
 The parser does not expand `$OTHER_VARIABLE` references. Values such as passwords, MongoDB connection strings, and shell-looking fragments are read as written instead of being interpreted by Bun.
 
+A script that must know what a command will see — a predeploy check that refuses a committed dev value, say — can ask the same layer instead of re-implementing it. `getDevflareDotenvPaths(dir)` lists every candidate file in load order, `parseDevflareEnvFile(text)` reads one file the way Devflare does, and `loadDevflareDotenv(dir)` returns the merged `values` and the `files` that supplied them. All three come from `devflare` and none of them touches `process.env`.
+
 > **Note — Process env still wins over files**
 >
 > CI-provided environment variables and explicit shell exports override `.env` file values. Dotenv files fill in missing process variables; they do not stomp values the process already had.
@@ -3058,6 +3060,10 @@ The parser does not expand `$OTHER_VARIABLE` references. Values such as password
 > **Warning — `.env.public` is a promise you keep, not one Devflare checks**
 >
 > Anything committed to `.env.public` is in version-control history permanently. Devflare cannot tell a sender address from an SMTP URL with a password in it, so nothing validates the name — treat it as documentation of intent, and keep secrets in `.env` or `.env.dev`.
+
+> **Warning — `.env.dev` reaches production deploys too**
+>
+> The three files are loaded by every command that loads a config, whatever its mode: `devflare deploy --prod` reads `.env.dev` exactly as `devflare dev` does. The name says whose machine the file serves, not which builds it reaches — so a dev-only flag kept there ships with a production deploy run from that machine.
 
 ##### Example — The later `.env` value overrides the earlier `.env.dev` value
 

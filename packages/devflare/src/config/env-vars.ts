@@ -403,6 +403,9 @@ export function parseDevflareEnvFile(contents: string): Record<string, string> {
 	return values
 }
 
+/** A Windows drive root as pathe spells it, e.g. `C:/`. */
+const WINDOWS_DRIVE_ROOT = /^[A-Za-z]:\/$/
+
 function collectAncestorDirectories(startDir: string): string[] {
 	const directories: string[] = []
 	let current = resolve(startDir)
@@ -410,7 +413,10 @@ function collectAncestorDirectories(startDir: string): string[] {
 	while (true) {
 		directories.push(current)
 		const parent = dirname(current)
-		if (parent === current) {
+		// → GOTCHA: pathe takes `C:/` up to `/`, and `/` is the root of whichever drive the PROCESS
+		//   is on, not the project's. Climbing there read `C:\.env` for a project on `D:`, and on one
+		//   drive listed the drive root's files twice, so a drive root ends the walk.
+		if (parent === current || WINDOWS_DRIVE_ROOT.test(current)) {
 			break
 		}
 		current = parent
@@ -447,6 +453,16 @@ const DOTENV_FILES_LOWEST_FIRST = ['.env.public', '.env.dev', '.env'] as const
  * first, then closer files, and within each directory the order of
  * {@link DOTENV_FILES_LOWEST_FIRST} — committed defaults, then a developer's
  * dev file, then their `.env`.
+ *
+ * → GOTCHA: the list does not depend on the command or its mode. `devflare deploy
+ *   --prod` loads `.env.dev` exactly as `devflare dev` does, so `.env.dev` names
+ *   whose machine it serves, not which builds it reaches. A check that must know
+ *   what a production deploy sees reads every path here, not only `.env.public`.
+ *
+ * @param startDir - The config's directory; every ancestor up to the filesystem
+ *   root (on Windows, the drive root) contributes its three candidates, whether
+ *   or not the files exist.
+ * @returns Absolute, forward-slashed candidate paths in load order.
  *
  * @example
  * ```ts

@@ -30,6 +30,21 @@ export {
 	type WorkspaceManifestInput
 } from './config'
 
+// The dotenv layer — which `.env` files a command loads, and what they set
+//
+// Every command that loads a config (`dev`, `build`, `deploy --prod` included) runs this layer first,
+// so a script that must know what a deploy will see — a predeploy guard refusing a committed dev
+// value — has to ask it rather than mirror it. The pure readers only: the mutating
+// `loadDevflareDotenvIntoProcess` stays internal, because copying into a caller's `process.env` is
+// a decision `loadConfig` makes for itself.
+
+export {
+	getDevflareDotenvPaths,
+	type LoadDevflareDotenvResult,
+	loadDevflareDotenv,
+	parseDevflareEnvFile
+} from './config'
+
 // Cross-config referencing
 
 export {

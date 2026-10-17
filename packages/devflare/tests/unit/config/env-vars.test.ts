@@ -71,6 +71,25 @@ describe('loadDevflareDotenv', () => {
 	})
 })
 
+describe('getDevflareDotenvPaths', () => {
+	test('a Windows walk ends at the drive root, never at the current drive', () => {
+		// pathe takes `C:/` up to `/`, which resolves against the PROCESS's drive. Pure path
+		// arithmetic, so it runs the same on a Linux runner.
+		const paths = getDevflareDotenvPaths('C:/work/site')
+
+		expect(paths.slice(0, 3)).toEqual(['C:/.env.public', 'C:/.env.dev', 'C:/.env'])
+		expect(paths).toHaveLength(9)
+	})
+
+	test('a POSIX walk still reaches the filesystem root', () => {
+		expect(getDevflareDotenvPaths('/work/site').slice(0, 3)).toEqual([
+			'/.env.public',
+			'/.env.dev',
+			'/.env'
+		])
+	})
+})
+
 describe('resolveConfigEnvVars', () => {
 	test('resolves nested env descriptors, parsers, defaults, dev defaults, and optional vars', async () => {
 		const cwd = makeTempProject()

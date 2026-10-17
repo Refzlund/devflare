@@ -48,15 +48,20 @@ type ConfigResourceResolutionErrorArgs = ConstructorParameters<
 	ConfigModule['ConfigResourceResolutionError']
 >
 
-function createUnsupportedApiError(name: string): Error {
-	return new Error(
-		`${name} is not available in browser environments; import from devflare/test or devflare/runtime in a worker/Node context instead.`
-	)
+/** Where to go instead, for an export that exists in worker/Node code. */
+const WORKER_OR_NODE_HINT =
+	'import from devflare/test or devflare/runtime in a worker/Node context instead.'
+
+/** Where to go instead, for an export that only Node can run because it reads the disk. */
+const NODE_ONLY_HINT = 'call it from a Node script; it reads files from disk.'
+
+function createUnsupportedApiError(name: string, hint = WORKER_OR_NODE_HINT): Error {
+	return new Error(`${name} is not available in browser environments; ${hint}`)
 }
 
-function unsupportedFunction<TFunction>(name: string): TFunction {
+function unsupportedFunction<TFunction>(name: string, hint?: string): TFunction {
 	return ((..._args: readonly unknown[]) => {
-		throw createUnsupportedApiError(name)
+		throw createUnsupportedApiError(name, hint)
 	}) as unknown as TFunction
 }
 
@@ -83,6 +88,20 @@ function createUnsupportedObject<T extends object>(name: string): T {
 export const loadConfig = unsupportedFunction<ConfigModule['loadConfig']>('loadConfig')
 export const loadResolvedConfig =
 	unsupportedFunction<ConfigModule['loadResolvedConfig']>('loadResolvedConfig')
+
+// Neither devflare/test nor devflare/runtime carries these, so the generic advice would lead nowhere.
+export const getDevflareDotenvPaths = unsupportedFunction<ConfigModule['getDevflareDotenvPaths']>(
+	'getDevflareDotenvPaths',
+	NODE_ONLY_HINT
+)
+export const loadDevflareDotenv = unsupportedFunction<ConfigModule['loadDevflareDotenv']>(
+	'loadDevflareDotenv',
+	NODE_ONLY_HINT
+)
+export const parseDevflareEnvFile = unsupportedFunction<ConfigModule['parseDevflareEnvFile']>(
+	'parseDevflareEnvFile',
+	NODE_ONLY_HINT
+)
 
 export const compileConfig = unsupportedFunction<ConfigModule['compileConfig']>('compileConfig')
 export const stringifyConfig =
