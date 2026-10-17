@@ -1,0 +1,22 @@
+{
+	// devflare's sources checked against @cloudflare/workers-types 4, the older major its peer range
+	// admits. The package's own typecheck compiles against 5 (its devDependency), so a 5-only type in
+	// a public signature passes there. This config resolves the root's 4.x copy instead.
+	// → The root pins that copy to EXACTLY the peer range's 4.x floor (4.20260426.1), never a caret
+	//   range: `^` resolves the newest 4.x, and a type added after the floor would pass here while
+	//   failing for a consumer on the floor. package-metadata.test.ts holds the pin to the floor.
+	//   The cases keep their own ^4.20260702.1 copies.
+	// → GOTCHA: `paths` must map the module name too. Three test helpers import types from
+	//   '@cloudflare/workers-types', and without the mapping those imports resolve to the package's
+	//   5.x copy, so a 5-only type imported there would still pass.
+	"extends": "./tsconfig.json",
+	"compilerOptions": {
+		"paths": {
+			"devflare": ["./packages/devflare/src/index.ts"],
+			"devflare/*": ["./packages/devflare/src/*.ts"],
+			"@cloudflare/workers-types": ["./node_modules/@cloudflare/workers-types/index.ts"]
+		}
+	},
+	"include": ["packages/devflare/src/**/*.ts"],
+	"exclude": ["node_modules", "dist"]
+}
