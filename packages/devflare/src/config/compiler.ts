@@ -45,6 +45,27 @@ export function compileConfig(config: ResolvedConfig, environment?: string): Wra
 	return compileConfigInternal(config, environment)
 }
 
+/**
+ * @description Compile a loaded DevflareConfig to the WranglerConfig `devflare build` writes —
+ * offline, with no Cloudflare account. A KV, D1 or Hyperdrive binding configured by NAME stays a
+ * name (`database_name`, `name`) instead of being resolved to its id, which is the one thing
+ * {@link compileConfig} refuses to do without {@link loadResolvedConfig}. Otherwise it is the
+ * same compile: the environment's overrides merged over the base, preview-scoped names
+ * materialized, `vars`, and `wrangler.passthrough` applied last.
+ *
+ * → GOTCHA: it is not the whole of what a deploy ships, so do not grade its output as if it were.
+ *   An `env.X` var descriptor stays the descriptor object here; a deploy resolves it from
+ *   `process.env` and the dotenv files first, `.default()` included. Preview-scoped names read
+ *   `DEVFLARE_PREVIEW_*` from `process.env`, which `deploy --prod` clears before loading and this does
+ *   not. And a deploy also takes `main`/`assets` from the build artefact, resolves resource ids, and
+ *   drops crons and queue consumers for a preview scope.
+ * @param config - a config as `loadConfig` returns it
+ * @param environment - the environment whose `env.<name>` overrides are merged in — `'production'`
+ *   for `devflare deploy --prod`; omit for the base config alone
+ * @param options - `alreadyResolved`: the caller has merged the environment and materialized the
+ *   preview names itself, so neither is done again
+ * @returns the Wrangler config, bindings by name where the config named them
+ */
 export function compileBuildConfig(
 	config: DevflareConfig,
 	environment?: string,

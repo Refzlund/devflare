@@ -67,6 +67,15 @@ describe('main barrel public surface', () => {
 		expect('loadDevflareDotenvIntoProcess' in mod).toBe(false)
 	})
 
+	test('re-exports the offline build compiler itself, not a wrapper', async () => {
+		const mod = await import('../../src/index.ts')
+		const compiler = await import('../../src/config/compiler.ts')
+
+		// Identity for the same reason as the dotenv readers: what a predeploy check grades with it
+		// must be what `devflare build` and `deploy --dry-run` compile with.
+		expect(mod.compileBuildConfig).toBe(compiler.compileBuildConfig)
+	})
+
 	test('the browser entry refuses the dotenv readers by name rather than omitting them', async () => {
 		const browser = await import('../../src/browser.ts')
 
@@ -80,6 +89,11 @@ describe('main barrel public surface', () => {
 				`${name} is not available in browser environments; call it from a Node script`
 			)
 		}
+
+		// The same for the offline compiler, whose generic hint would point at entries that lack it.
+		expect(() => (browser.compileBuildConfig as () => unknown)()).toThrow(
+			'compileBuildConfig is not available in browser environments; call it from a Node script'
+		)
 	})
 
 	test('the browser entry carries every root export, bar two gaps that predate this check', async () => {

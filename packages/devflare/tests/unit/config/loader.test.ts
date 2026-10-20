@@ -566,6 +566,108 @@ export default config
 
 		expect(config.accountId).toBe('explicit-account')
 	})
+
+	// A predeploy guard evaluating under a built environment must see the config as a deploy
+	// compiles it, but never what an untracked `.env` on the machine running it would add.
+	describe('with dotenv: false', () => {
+		/**
+		 * One probe per file, each set by that file alone, so a value anywhere names the file that
+		 * leaked. The two placements are different loaders' reach: devflare's layer walks the
+		 * ANCESTORS, while c12's own dotenv option would read only the config's directory — so a
+		 * fixture with a single ancestor file cannot tell the option off from c12's loader turned on.
+		 */
+		const PROBES = {
+			/** In the workspace root, the tier a repository commits. */
+			ancestorPublic: 'DEVFLARE_DOTENV_OPT_OUT_PUBLIC',
+			/** Beside the config itself. */
+			besideConfig: 'DEVFLARE_DOTENV_OPT_OUT_LOCAL'
+		} as const
+
+		/**
+		 * @description A project whose workspace root holds a `.env.public` and whose own directory
+		 * holds a `.env`, each setting one of {@link PROBES}, and whose config emits whatever the
+		 * process holds for each at evaluation time.
+		 * @param name - the fixture directory under the test root
+		 * @returns the project directory to load from
+		 */
+		async function projectReadingTheProbes(name: string): Promise<string> {
+			const workspaceDir = join(TEST_DIR, name)
+			const projectDir = join(workspaceDir, 'apps/worker')
+			await mkdir(projectDir, { recursive: true })
+			await writeFile(join(workspaceDir, '.env.public'), `${PROBES.ancestorPublic}=from-file\n`)
+			await writeFile(join(projectDir, '.env'), `${PROBES.besideConfig}=from-file\n`)
+			await writeFile(
+				join(projectDir, 'devflare.config.ts'),
+				`
+				export default {
+					name: 'worker',
+					compatibilityDate: '2025-01-07',
+					vars: {
+						ANCESTOR_PUBLIC: process.env.${PROBES.ancestorPublic} ?? 'unset',
+						BESIDE_CONFIG: process.env.${PROBES.besideConfig} ?? 'unset'
+					}
+				}
+			`
+			)
+			return projectDir
+		}
+
+		afterEach(() => {
+			for (const probe of Object.values(PROBES)) delete process.env[probe]
+		})
+
+		test('evaluates the config without copying any .env file into process.env', async () => {
+			const config = await loadConfig({
+				cwd: await projectReadingTheProbes('dotenv-off'),
+				dotenv: false
+			})
+
+			expect(config.vars).toEqual({ ANCESTOR_PUBLIC: 'unset', BESIDE_CONFIG: 'unset' })
+			for (const probe of Object.values(PROBES)) expect(process.env[probe]).toBeUndefined()
+		})
+
+		// The other side of the line, on the same fixture: without the option the layer runs, so
+		// the case above is graded by the option rather than by a fixture the layer cannot reach.
+		test('runs the layer when the option is left out', async () => {
+			const config = await loadConfig({ cwd: await projectReadingTheProbes('dotenv-on') })
+
+			expect(config.vars).toEqual({ ANCESTOR_PUBLIC: 'from-file', BESIDE_CONFIG: 'from-file' })
+		})
+
+		test('still validates the config against the schema', async () => {
+			const projectDir = join(TEST_DIR, 'dotenv-off-invalid')
+			await mkdir(projectDir, { recursive: true })
+			await writeFile(join(projectDir, 'devflare.config.ts'), `export default { vars: { A: 'a' } }`)
+
+			await expect(loadConfig({ cwd: projectDir, dotenv: false })).rejects.toThrow(
+				'Worker name is required'
+			)
+		})
+
+		test("still applies c12's extends layers", async () => {
+			const projectDir = join(TEST_DIR, 'dotenv-off-extends')
+			await mkdir(join(projectDir, 'layer'), { recursive: true })
+			await writeFile(
+				join(projectDir, 'layer', 'devflare.config.ts'),
+				`export default { vars: { FROM_LAYER: 'layer', SHARED: 'layer' } }`
+			)
+			await writeFile(
+				join(projectDir, 'devflare.config.ts'),
+				`
+				export default {
+					extends: './layer',
+					name: 'worker',
+					compatibilityDate: '2025-01-07',
+					vars: { SHARED: 'base' }
+				}
+			`
+			)
+
+			const config = await loadConfig({ cwd: projectDir, dotenv: false })
+
+			expect(config.vars).toEqual({ FROM_LAYER: 'layer', SHARED: 'base' })
+		})
+	})
 })
 
 describe('resolveConfigPath', () => {

@@ -104,6 +104,12 @@ export const parseDevflareEnvFile = unsupportedFunction<ConfigModule['parseDevfl
 )
 
 export const compileConfig = unsupportedFunction<ConfigModule['compileConfig']>('compileConfig')
+// Neither devflare/test nor devflare/runtime carries it either, and it compiles what `loadConfig`
+// loads, which only Node can do.
+export const compileBuildConfig = unsupportedFunction<ConfigModule['compileBuildConfig']>(
+	'compileBuildConfig',
+	'call it from a Node script, on a config loadConfig returned.'
+)
 export const stringifyConfig =
 	unsupportedFunction<ConfigModule['stringifyConfig']>('stringifyConfig')
 export const configSchema = createUnsupportedObject<ConfigModule['configSchema']>('configSchema')

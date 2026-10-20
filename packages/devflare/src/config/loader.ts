@@ -19,8 +19,30 @@ export interface LoadConfigOptions {
 	cwd?: string
 	/** Custom config file name */
 	configFile?: string
-	/** Environment name for env-specific overrides */
+	/**
+	 * Environment name for env-specific overrides. NOT read by `loadConfig`, which returns the base
+	 * config with every `env.<name>` entry still in it: `loadResolvedConfig` merges this one, and so
+	 * does `compileBuildConfig(config, environment)`.
+	 */
 	environment?: string
+	/**
+	 * Whether to run the dotenv layer before the config is evaluated: copy `.env.public`, `.env.dev`
+	 * and `.env` from the config's directory and every ancestor into `process.env`, for each name
+	 * the process leaves unset. Every command runs it; pass `false` to evaluate the config against
+	 * `process.env` as it stands.
+	 *
+	 * → KEY: `false` is for a script that must see the config as a deploy compiles it but must NOT
+	 *   let the machine's untracked `.env` files decide the answer — a predeploy guard evaluating
+	 *   under a built environment, which grades those files separately with `loadDevflareDotenv`.
+	 *   The dotenv layer is the only step it skips: the file c12 picks, its `extends` layers, the
+	 *   schema, `ref()` resolution and the framework providers are the same either way.
+	 * → GOTCHA: it cannot stop the RUNTIME's own dotenv loading. Bun reads `.env`, `.env.local` and
+	 *   `.env.<NODE_ENV>` from the working directory before any script runs, so a process that must
+	 *   not see them is started with `bun --no-env-file`.
+	 *
+	 * @default true
+	 */
+	dotenv?: boolean
 }
 
 /**
@@ -70,7 +92,9 @@ export async function loadConfig(options: LoadConfigOptions = {}): Promise<Devfl
 	const cwd = resolve(options.cwd ?? process.cwd())
 	const configFile = options.configFile ?? 'devflare.config'
 
-	await loadDevflareDotenvIntoProcess(await resolveConfigDotenvDirectory(cwd, configFile))
+	if (options.dotenv !== false) {
+		await loadDevflareDotenvIntoProcess(await resolveConfigDotenvDirectory(cwd, configFile))
+	}
 
 	const { config, configFile: loadedFile } = await loadWithC12<DevflareConfig>({
 		name: 'devflare',

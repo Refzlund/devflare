@@ -3053,6 +3053,10 @@ The parser does not expand `$OTHER_VARIABLE` references. Values such as password
 
 A script that must know what a command will see — a predeploy check that refuses a committed dev value, say — can ask the same layer instead of re-implementing it. `getDevflareDotenvPaths(dir)` lists every candidate file in load order, `parseDevflareEnvFile(text)` reads one file the way Devflare does, and `loadDevflareDotenv(dir)` returns the merged `values` and the `files` that supplied them. All three come from `devflare` and none of them touches `process.env`.
 
+The same script may need the config itself without the files: grading a production config under a controlled environment, say, where an untracked `.env` on the machine running the check must not decide the answer. `loadConfig({ cwd, dotenv: false })` skips this layer and nothing else: the config is evaluated with `process.env` as it stands, and c12 still picks the file and applies `extends`. `compileBuildConfig(config, 'production')` then compiles it offline the way `devflare build` does — the `env.production` overrides merged in and `wrangler.passthrough` applied last — keeping a KV, D1 or Hyperdrive binding that is configured by name as a name, where `compileConfig` would need its id.
+
+That is not everything a deploy ships. An `env.X` var descriptor stays the descriptor object, where a deploy resolves it from `process.env` and these files, `.default()` included — so a check reading `vars` as strings must treat a descriptor as unresolved, not as safe. Preview-scoped names read `DEVFLARE_PREVIEW_*` from `process.env`, which `deploy --prod` clears and the check must clear too. And Bun loads `.env`, `.env.local` and `.env.<NODE_ENV>` from the working directory before any of this runs, so run such a check with `bun --no-env-file`.
+
 > **Note — Process env still wins over files**
 >
 > CI-provided environment variables and explicit shell exports override `.env` file values. Dotenv files fill in missing process variables; they do not stomp values the process already had.
