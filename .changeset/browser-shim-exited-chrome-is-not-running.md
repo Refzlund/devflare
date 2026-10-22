@@ -1,0 +1,24 @@
+---
+'devflare': patch
+---
+
+On Windows the Browser Rendering shim no longer reports a Chrome that has exited as still running:
+
+```
+[BrowserShim] Failed to close Chrome for session …: Chrome (pid 11076) was still running after its
+DevTools connection closed and it was killed: ERROR: The process with PID 11076 (child process of
+PID 15200) could not be terminated.
+Reason: There is no running instance of the task.
+```
+
+After a client closes its browser, the shim waits for Chrome to exit before deciding it must be
+killed. It decided by the runtime's `exit` event alone, and on Windows that event can arrive
+seconds after Chrome has exited: it follows the Chrome's `conhost.exe` child going away, not the
+Chrome itself. Measured under Bun and Node alike, it came more than a second late in about one
+session in six, 17.6 s at worst. Past the 5 s grace the shim killed a Chrome that was already gone,
+waited 5 s more for the event, and logged it as an error — while taskkill answered "There is no
+running instance of the task" for its pid.
+
+The shim now also asks the operating system (`process.kill(pid, 0)`) while it waits, so a Chrome
+that has exited is seen out at once, silently, whether or not the event has come. A Chrome the OS
+still reports running after the kill is still reported.

@@ -19,6 +19,19 @@
 	killed — by devflare, with taskkill's output captured, so "already gone" is
 	the success it is — and only one that survives even the kill is reported.
 
+	"Exited" is the OS's answer, not only the runtime's `exit` event. On Windows
+	that event can trail the exit by seconds. Measured under Bun 1.4.2 and Node
+	25.9.0 alike, chrome-headless-shell 156, Windows 11, closing over CDP:
+	`process.kill(pid, 0)` answered ESRCH first, and `exit` tracked the root's
+	`conhost.exe` child going away rather than the root's own exit. It came over
+	a second after the ESRCH in 3 of 15 Node sessions and 10 of 65 Bun ones —
+	17.6 s at worst, and one Bun session saw no `exit` in the 14 s it was
+	watched. Both 5 s graces can run out on the event alone: a Chrome that had
+	exited was killed and then reported as still running, while taskkill itself
+	answered "There is no running instance of the task" for its pid. The wait
+	below therefore polls {@link processIsRunning} beside the event; an `exit`
+	still ends it at once.
+
 	→ KEY: this is for the `disconnected` path ONLY. Idle reaping, shutdown and
 	  the shim's connection timeout close a Chrome that is still running, and
 	  they keep `browser.close()`: there a CDP close is the right request.
@@ -53,6 +66,46 @@ export interface ReapOptions {
 	 * that output reach the terminal itself. Defaults to {@link killProcessTree}.
 	 */
 	killTree?: (pid: number) => Promise<string>
+	/**
+	 * Whether the OS still runs `pid`: the answer that decides "exited", beside
+	 * the runtime's `exit` event, which on Windows can trail the exit by
+	 * seconds. Asked on a poll while a reap waits; a throw rejects the reap.
+	 * Defaults to {@link processIsRunning}.
+	 */
+	isRunning?: (pid: number) => boolean
+}
+
+/** How often a waiting reap asks the OS whether Chrome is still running. */
+const LIVENESS_POLL_MS = 100
+
+/**
+ * @description Ask the OS whether a process is still running, without
+ * signalling it: `process.kill(pid, 0)`.
+ *
+ * → On Windows that is OpenProcess plus GetExitCodeProcess, so it answers
+ *   ESRCH as soon as the process has an exit code. Measured: for a Chrome
+ *   whose `exit` event had not fired yet, often while tasklist still listed it.
+ * → EPERM means the process exists and is not ours to signal: running.
+ * → GOTCHA: a pid can be reused once its process is gone, and a probe of a
+ *   reused pid answers for a stranger. Windows does not hand a pid out again
+ *   while any handle to its process is open, and the runtime that launched
+ *   Chrome holds one until it reports `exit` — libuv does; for Bun this is
+ *   assumed, not verified. A reap only probes before that report.
+ *
+ * @param pid - the process to ask about
+ * @returns false once the process has exited, true while it runs
+ * @throws whatever `process.kill` threw other than ESRCH or EPERM
+ */
+export function processIsRunning(pid: number): boolean {
+	try {
+		process.kill(pid, 0)
+		return true
+	} catch (error) {
+		const code = (error as NodeJS.ErrnoException).code
+		if (code === 'ESRCH') return false
+		if (code === 'EPERM') return true
+		throw error
+	}
 }
 
 /** How an exiting Chrome ended: by itself, or because it was killed. */
@@ -83,10 +136,12 @@ export class ChromeReapError extends Error {
  * @description See out a Chrome whose DevTools connection has already gone:
  * wait for it to exit by itself, and kill it only if it does not.
  * @param chrome - the browser process; `null` when puppeteer launched none
- * @param options - the two grace periods and the killer, see {@link ReapOptions}
+ * @param options - the two grace periods, the killer and the liveness probe,
+ * see {@link ReapOptions}
  * @returns `exited` when Chrome exited by itself — the normal close, and
  * silent — or `killed` when it had to be killed and then did exit
- * @throws {ChromeReapError} when Chrome is still running after the kill
+ * @throws {ChromeReapError} when the OS still runs Chrome after the kill
+ * @throws whatever the liveness probe threw
  */
 export async function reapExitingChrome(
 	chrome: ExitingProcess | null,
@@ -95,42 +150,74 @@ export async function reapExitingChrome(
 	const {
 		exitGraceMs = DEFAULT_EXIT_GRACE_MS,
 		killGraceMs = DEFAULT_KILL_GRACE_MS,
-		killTree = killProcessTree
+		killTree = killProcessTree,
+		isRunning = processIsRunning
 	} = options
 
-	if (!chrome || (await waitForExit(chrome, exitGraceMs))) return 'exited'
+	if (!chrome || (await waitForExit(chrome, exitGraceMs, isRunning))) return 'exited'
 
 	if (chrome.pid === undefined) {
 		throw new ChromeReapError(undefined, 'it has no pid to kill')
 	}
 
 	const killOutput = await killTree(chrome.pid)
-	if (await waitForExit(chrome, killGraceMs)) return 'killed'
+	if (await waitForExit(chrome, killGraceMs, isRunning)) return 'killed'
 
 	throw new ChromeReapError(chrome.pid, killOutput || 'the kill printed nothing')
 }
 
 /**
  * @description Resolve once `chrome` has exited, or after `ms` without.
+ *
+ * → "Exited" is whichever comes first: the runtime's `exit` event (or an exit
+ *   code it has already set), or the OS saying the pid no longer runs. The
+ *   event alone is not enough on Windows, where it can trail the exit by
+ *   longer than either grace — see the header.
+ *
  * @param chrome - the process to watch; one that has already exited resolves at once
  * @param ms - the longest to wait, in milliseconds
+ * @param isRunning - the liveness probe, asked at once, on every poll and at the deadline
  * @returns whether it exited
+ * @throws (as a rejection) whatever the probe threw
  */
-function waitForExit(chrome: ExitingProcess, ms: number): Promise<boolean> {
-	if (chrome.exitCode !== null || chrome.signalCode !== null) return Promise.resolve(true)
+function waitForExit(
+	chrome: ExitingProcess,
+	ms: number,
+	isRunning: (pid: number) => boolean
+): Promise<boolean> {
+	const { pid } = chrome
+	const osSaysGone = () => pid !== undefined && !isRunning(pid)
 
-	return new Promise((resolve) => {
-		const onExit = () => {
+	return new Promise((resolve, reject) => {
+		const stop = () => {
 			clearTimeout(timer)
-			resolve(true)
-		}
-		const timer = setTimeout(() => {
+			clearInterval(poll)
 			chrome.off('exit', onExit)
-			resolve(false)
-		}, ms)
+		}
+		const finish = (exited: boolean) => {
+			stop()
+			resolve(exited)
+		}
+		const ask = (atDeadline: boolean) => {
+			try {
+				if (osSaysGone()) finish(true)
+				else if (atDeadline) finish(false)
+			} catch (error) {
+				stop()
+				reject(error)
+			}
+		}
+		const onExit = () => finish(true)
+
+		const timer = setTimeout(() => ask(true), ms)
+		const poll = setInterval(() => ask(false), LIVENESS_POLL_MS)
 		// A wait for Chrome must not be what keeps a stopping dev server alive.
 		timer.unref?.()
+		poll.unref?.()
 		chrome.once('exit', onExit)
+
+		if (chrome.exitCode !== null || chrome.signalCode !== null) finish(true)
+		else ask(false)
 	})
 }
 
