@@ -5,6 +5,7 @@
 export interface RuntimeLogLogger {
 	log?(message: string): void
 	info?(message: string): void
+	warn?(message: string): void
 	error?(message: string): void
 }
 
@@ -21,13 +22,13 @@ export interface RuntimeLogEntry {
 	message: string
 }
 
-/**
- * Levels that used to arrive on workerd's stderr (`console.warn`/`console.error`
- * and runtime failures); everything else came on stdout.
- */
-const STDERR_LEVELS = new Set(['warn', 'error'])
+/*
+	One writer per severity: each sends the line to the logger's method for it,
+	and to the console's when the logger has none. `log` and `info` share a
+	writer, preferring `logger.log`.
+*/
 
-function writeStdout(logger: RuntimeLogLogger | undefined, message: string): void {
+function writeInfo(logger: RuntimeLogLogger | undefined, message: string): void {
 	if (typeof logger?.log === 'function') {
 		logger.log(message)
 		return
@@ -41,7 +42,16 @@ function writeStdout(logger: RuntimeLogLogger | undefined, message: string): voi
 	console.log(message)
 }
 
-function writeStderr(logger: RuntimeLogLogger | undefined, message: string): void {
+function writeWarn(logger: RuntimeLogLogger | undefined, message: string): void {
+	if (typeof logger?.warn === 'function') {
+		logger.warn(message)
+		return
+	}
+
+	console.warn(message)
+}
+
+function writeError(logger: RuntimeLogLogger | undefined, message: string): void {
 	if (typeof logger?.error === 'function') {
 		logger.error(message)
 		return
@@ -52,12 +62,13 @@ function writeStderr(logger: RuntimeLogLogger | undefined, message: string): voi
 
 /**
  * @description Builds Miniflare's `handleStructuredLogs` callback, routing each
- * runtime log line into the dev logger: warnings and errors to `logger.error`,
- * everything else to `logger.log` (or `logger.info`).
+ * runtime log line into the dev logger at its own level: `error` to
+ * `logger.error`, `warn` to `logger.warn`, everything else to `logger.log`
+ * (or `logger.info`).
  *
- * → Miniflare 4 handed over workerd's raw stdout/stderr streams
- *   (`handleRuntimeStdio`); Miniflare 5 removed that and reports parsed
- *   entries instead. The routing is the same split the two streams made.
+ * → Each level keeps its own severity. Warnings once arrived on workerd's
+ *   stderr with the errors, and were routed to `logger.error` for that reason,
+ *   so every `console.warn` a worker made printed as ` ERROR ` in the dev log.
  * → GOTCHA: a workerd line that is NOT JSON reaches here as level `log`
  *   whichever stream it came from (Miniflare's `parseStructuredLog` assigns
  *   it), so such a line on stderr now goes to `logger.log`. Nothing in the
@@ -70,11 +81,16 @@ function writeStderr(logger: RuntimeLogLogger | undefined, message: string): voi
  */
 export function createRuntimeLogForwarder(logger?: RuntimeLogLogger) {
 	return ({ level, message }: RuntimeLogEntry): void => {
-		if (STDERR_LEVELS.has(level)) {
-			writeStderr(logger, message)
+		if (level === 'error') {
+			writeError(logger, message)
 			return
 		}
 
-		writeStdout(logger, message)
+		if (level === 'warn') {
+			writeWarn(logger, message)
+			return
+		}
+
+		writeInfo(logger, message)
 	}
 }
