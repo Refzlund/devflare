@@ -127,9 +127,16 @@ describe.skipIf(!executablePath)(`browser shim sessions with real Chrome${SKIP_R
 	/**
 	 * Whether Chrome's DevTools port still answers — false once the process is
 	 * gone. A refused connection is the expected answer, not a failure.
+	 *
+	 * → A reap can now finish on the OS's word that Chrome exited, before
+	 *   Windows has torn its sockets down. A connection accepted by a dying
+	 *   process and never answered is "not answering" — bounded, so it can
+	 *   never hang the test instead.
 	 */
 	async function answers(port: string): Promise<boolean> {
-		return fetch(`http://127.0.0.1:${port}/json/version`).then(
+		return fetch(`http://127.0.0.1:${port}/json/version`, {
+			signal: AbortSignal.timeout(2000)
+		}).then(
 			() => true,
 			() => false
 		)

@@ -1,12 +1,16 @@
-import { describe, expect, test } from 'bun:test'
+import { describe, expect, mock, test } from 'bun:test'
 import { spawn } from 'node:child_process'
 import { EventEmitter } from 'node:events'
+import type { ConsolaInstance } from 'consola'
+import type { Browser } from 'puppeteer-core'
 import {
+	ChromeLivenessError,
 	ChromeReapError,
 	type ExitingProcess,
 	killProcessTree,
 	processIsRunning,
-	reapExitingChrome
+	reapExitingChrome,
+	toSessionBrowser
 } from '../../../src/browser-shim/chrome-process'
 
 // The reap that replaced `browser.close()` on the `disconnected` path. Its
@@ -87,16 +91,20 @@ describe('reapExitingChrome', () => {
 	test('a Chrome that exits by itself is never killed', async () => {
 		const chrome = createFakeChrome()
 		const killer = createKiller(chrome, 'exits')
+		const seenByOs: number[] = []
 		setTimeout(() => chrome.exit(), 20)
 
 		const outcome = await reapExitingChrome(chrome, {
 			exitGraceMs: 1000,
 			killTree: killer.killTree,
-			isRunning: chrome.isRunning
+			isRunning: chrome.isRunning,
+			onExitSeenByOs: (pid) => seenByOs.push(pid)
 		})
 
 		expect(outcome).toBe('exited')
 		expect(killer.calls).toEqual([])
+		// The event decided, so there is nothing to trace.
+		expect(seenByOs).toEqual([])
 	})
 
 	test('a Chrome that has already exited is not waited for', async () => {
@@ -182,20 +190,30 @@ describe('reapExitingChrome', () => {
 	// → MUTANT: decide "exited" by the `exit` event and the exit code alone, as
 	//   before. The grace runs out, the killer runs, the event never comes, and
 	//   the reap throws ChromeReapError.
+	//
+	// → MUTANT: drop the poll, leaving the probe asked only at once and at the
+	//   deadline. The reap still says `exited`, but only when the 2 s grace ends.
+	// → MUTANT: drop the onExitSeenByOs call. Nothing traces the late event.
 	test('a Chrome the OS reports gone has exited, though its exit event has not come', async () => {
 		const chrome = createFakeChrome({ pid: 31337 })
 		const killer = createKiller(chrome, 'survives')
+		const seenByOs: number[] = []
 		setTimeout(() => chrome.exitUnnoticed(), 20)
+		const started = Date.now()
 
 		const outcome = await reapExitingChrome(chrome, {
 			exitGraceMs: 2000,
 			killGraceMs: 10,
 			killTree: killer.killTree,
-			isRunning: chrome.isRunning
+			isRunning: chrome.isRunning,
+			onExitSeenByOs: (pid) => seenByOs.push(pid)
 		})
 
 		expect(outcome).toBe('exited')
+		// Seen on the poll, long before the grace runs out.
+		expect(Date.now() - started).toBeLessThan(500)
 		expect(killer.calls).toEqual([])
+		expect(seenByOs).toEqual([31337])
 	})
 
 	test('a Chrome the OS already reports gone is not waited for', async () => {
@@ -211,7 +229,8 @@ describe('reapExitingChrome', () => {
 				isRunning: chrome.isRunning
 			})
 		).toBe('exited')
-		expect(Date.now() - started).toBeLessThan(1000)
+		// → MUTANT: drop the probe asked at once. The first poll answers, 100 ms in.
+		expect(Date.now() - started).toBeLessThan(50)
 		expect(killer.calls).toEqual([])
 	})
 
@@ -221,16 +240,22 @@ describe('reapExitingChrome', () => {
 	test('a killed Chrome the OS reports gone was killed, though its exit event has not come', async () => {
 		const chrome = createFakeChrome({ pid: 31337 })
 		const killer = createKiller(chrome, 'exits-unnoticed')
+		const seenByOs: number[] = []
+		const started = Date.now()
 
 		const outcome = await reapExitingChrome(chrome, {
 			exitGraceMs: 20,
 			killGraceMs: 2000,
 			killTree: killer.killTree,
-			isRunning: chrome.isRunning
+			isRunning: chrome.isRunning,
+			onExitSeenByOs: (pid) => seenByOs.push(pid)
 		})
 
 		expect(outcome).toBe('killed')
+		// Seen on the poll, long before the kill grace runs out.
+		expect(Date.now() - started).toBeLessThan(500)
 		expect(killer.calls).toEqual([31337])
+		expect(seenByOs).toEqual([31337])
 	})
 
 	// The report still exists: a Chrome the OS says is running after its kill
@@ -262,28 +287,123 @@ describe('reapExitingChrome', () => {
 		expect(new Set(probedAfterKill)).toEqual(new Set([31337]))
 	})
 
-	// A probe that cannot answer is a fault to surface, not a verdict either way.
-	test('a liveness probe that throws rejects the reap with its error', async () => {
+	// A probe that cannot answer is a fault to surface, not a verdict either way —
+	// and the report must say which Chrome, and that it was left running.
+	//
+	// → MUTANT: let the probe's own error through. It names no pid and does not
+	//   say the kill never ran.
+	test('a liveness probe that fails before the kill names the Chrome and says it was not killed', async () => {
+		const chrome = createFakeChrome({ pid: 31337 })
+		const killer = createKiller(chrome, 'survives')
+		const failure = new Error('EINVAL: probe failed')
+
+		const reap = reapExitingChrome(chrome, {
+			exitGraceMs: 300,
+			killTree: killer.killTree,
+			isRunning: () => {
+				throw failure
+			}
+		})
+
+		await expect(reap).rejects.toBeInstanceOf(ChromeLivenessError)
+		await expect(reap).rejects.toThrow('pid 31337')
+		await expect(reap).rejects.toThrow('so it was not killed: EINVAL: probe failed')
+		await expect(reap).rejects.toMatchObject({ pid: 31337, cause: failure })
+		expect(killer.calls).toEqual([])
+	})
+
+	test('a liveness probe that fails after the kill says the kill ran', async () => {
 		const chrome = createFakeChrome({ pid: 31337 })
 		const killer = createKiller(chrome, 'survives')
 
-		await expect(
-			reapExitingChrome(chrome, {
-				exitGraceMs: 300,
-				killTree: killer.killTree,
-				isRunning: () => {
-					throw new Error('EINVAL: probe failed')
-				}
-			})
-		).rejects.toThrow('EINVAL: probe failed')
-		expect(killer.calls).toEqual([])
+		const reap = reapExitingChrome(chrome, {
+			exitGraceMs: 10,
+			killGraceMs: 300,
+			killTree: killer.killTree,
+			isRunning: (pid) => {
+				if (killer.calls.length > 0) throw new Error('EINVAL: probe failed')
+				return chrome.isRunning(pid)
+			}
+		})
+
+		await expect(reap).rejects.toBeInstanceOf(ChromeLivenessError)
+		await expect(reap).rejects.toThrow('exited after it was killed')
+		expect(killer.calls).toEqual([31337])
+	})
+
+	// A reap that has finished must stop asking: a poll left running would ask
+	// the OS ten times a second, for every session the dev server ever ended.
+	//
+	// → MUTANT: drop `clearInterval(poll)` from waitForExit's stop(). The probe
+	//   keeps being asked after the reap resolved.
+	test.each([
+		['the exit event', 'exit'],
+		['the OS', 'exitUnnoticed']
+	] as const)('a reap decided by %s stops asking the OS', async (_, how) => {
+		const chrome = createFakeChrome({ pid: 31337 })
+		const killer = createKiller(chrome, 'survives')
+		let probes = 0
+		setTimeout(() => chrome[how](), 150)
+
+		await reapExitingChrome(chrome, {
+			exitGraceMs: 2000,
+			killTree: killer.killTree,
+			isRunning: (pid) => {
+				probes += 1
+				return chrome.isRunning(pid)
+			}
+		})
+		const probesAtResolve = probes
+		await new Promise((resolve) => setTimeout(resolve, 350))
+
+		// It polled while it waited — so a later poll WOULD show up.
+		expect(probesAtResolve).toBeGreaterThan(1)
+		expect(probes).toBe(probesAtResolve)
 	})
 })
 
 describe('processIsRunning', () => {
-	// The default probe. On Windows `process.kill(pid, 0)` asks the OS for the
-	// process's exit code, so it answers for an exited process even while the
-	// runtime has not reported the exit.
+	/** A stand-in for `process.kill` that fails the way the OS would. */
+	function failingWith(code: string) {
+		const calls: Array<[number, number]> = []
+		return {
+			calls,
+			kill(pid: number, signal: number): never {
+				calls.push([pid, signal])
+				throw Object.assign(new Error(`kill ${code}`), { code })
+			}
+		}
+	}
+
+	test('asks with signal 0, and a call that returns means running', () => {
+		const calls: Array<[number, number]> = []
+		expect(processIsRunning(31337, (pid, signal) => calls.push([pid, signal]))).toBe(true)
+		expect(calls).toEqual([[31337, 0]])
+	})
+
+	test('ESRCH means gone', () => {
+		expect(processIsRunning(31337, failingWith('ESRCH').kill)).toBe(false)
+	})
+
+	// → MUTANT: map EPERM to "gone". A Chrome that is not ours to signal would
+	//   be seen out as exited, and never killed or reported.
+	test('EPERM means running: the process exists, it is just not ours to signal', () => {
+		expect(processIsRunning(31337, failingWith('EPERM').kill)).toBe(true)
+	})
+
+	test('any other failure is thrown, not taken as an answer', () => {
+		expect(() => processIsRunning(31337, failingWith('EINVAL').kill)).toThrow('kill EINVAL')
+	})
+
+	// The default probe, against the OS. On Windows `process.kill(pid, 0)` asks
+	// for the process's exit code, so it answers for an exited process even
+	// while the runtime has not reported the exit — and it is asked in a loop
+	// that never yields, so the runtime cannot report `exit`, and release the pid
+	// for reuse by some other process, before the probe has answered.
+	//
+	// → NOTE: on POSIX a killed child is a zombie, which `kill(pid, 0)` reports
+	//   as running, until the runtime reaps it — which it does only on its event
+	//   loop, as it reports `exit`. So there the probe is asked after `exit`.
 	test('is true for a running process and false once it has exited', async () => {
 		const child = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 60000)'], {
 			stdio: 'ignore'
@@ -292,14 +412,42 @@ describe('processIsRunning', () => {
 		await new Promise((resolve) => child.once('spawn', resolve))
 		const pid = child.pid as number
 
-		try {
-			expect(processIsRunning(pid)).toBe(true)
-		} finally {
-			child.kill('SIGKILL')
-		}
-		await exited
+		expect(processIsRunning(pid)).toBe(true)
+		child.kill('SIGKILL')
 
-		expect(processIsRunning(pid)).toBe(false)
+		let running = true
+		if (process.platform === 'win32') {
+			const deadline = Date.now() + 5000
+			while (running && Date.now() < deadline) running = processIsRunning(pid)
+			await exited
+		} else {
+			await exited
+			running = processIsRunning(pid)
+		}
+
+		expect(running).toBe(false)
+	})
+})
+
+describe('toSessionBrowser', () => {
+	// The trace the reap offers is only worth anything if the shim's browser
+	// writes it somewhere a developer looking can see.
+	//
+	// → MUTANT: drop toSessionBrowser's default onExitSeenByOs. A Chrome the OS
+	//   saw out before the runtime did leaves no line at all.
+	test('a reap decided by the OS leaves a debug line naming the Chrome', async () => {
+		const chrome = createFakeChrome({ pid: 31337 })
+		chrome.exitUnnoticed()
+		const browser = { process: () => chrome } as unknown as Browser
+		const debug = mock((message: string) => message)
+
+		await toSessionBrowser(browser, { isRunning: chrome.isRunning }, {
+			debug
+		} as unknown as ConsolaInstance).reap()
+
+		expect(debug.mock.calls.map(([message]) => message)).toEqual([
+			"[BrowserShim] Chrome (pid 31337) had exited by the OS's account before the runtime reported it"
+		])
 	})
 })
 
