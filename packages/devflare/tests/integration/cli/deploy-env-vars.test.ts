@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'pathe'
+import { formatDriftWarning } from '../../../src/cli/build-manifest'
 import { runDeployCommand } from '../../../src/cli/commands/deploy'
 import { clearDependencies, setDependencies } from '../../../src/cli/dependencies'
 import {
@@ -25,6 +26,24 @@ const PREVIEW_ENV_NAME = 'DEVFLARE_TEST_DEPLOY_PREVIEW_ONLY'
 /** Set nowhere, and read only by a base var that `env.production.vars` replaces. */
 const SHADOWED_ENV_NAME = 'DEVFLARE_TEST_DEPLOY_SHADOWED_BY_ENVIRONMENT'
 const TEST_ENV_NAMES = [DEPLOY_ENV_NAME, PRODUCTION_ENV_NAME, PREVIEW_ENV_NAME, SHADOWED_ENV_NAME]
+
+/**
+ * The first line of every build-drift warning. It is taken from the formatter, so if the warning is
+ * reworded, a "no drift" assertion keeps checking for the real text instead of passing on any output.
+ */
+const DRIFT_HEADING = (
+	formatDriftWarning({
+		configChanged: true,
+		versionChanged: false,
+		targetChanged: false,
+		previousVersion: '',
+		currentVersion: '',
+		previousTarget: { preview: false },
+		currentTarget: { preview: false },
+		bindingsAdded: [],
+		bindingsRemoved: []
+	}) ?? ''
+).split('\n')[0]
 
 /**
  * The object an `env.<name>` call evaluates to, written out because the temp project cannot import devflare.
@@ -150,6 +169,20 @@ function useRecordingWrangler(executions: ExecInvocation[] = []): void {
 	)
 }
 
+/**
+ * Whether a deploy warned that its build artefact had drifted.
+ *
+ * @param logger - The logger the deploy wrote to.
+ * @throws When {@link DRIFT_HEADING} is empty, because an empty heading would match every line.
+ */
+function reportedDrift(logger: TestLogger): boolean {
+	if (!DRIFT_HEADING) {
+		throw new Error('formatDriftWarning returned no heading for a changed config')
+	}
+
+	return logger.messages.some((message) => message.args.join(' ').includes(DRIFT_HEADING))
+}
+
 /** Parse a config devflare generated: a `//` comment header, then JSON. */
 function parseGeneratedConfig(text: string): { vars?: Record<string, unknown> } {
 	return JSON.parse(text.slice(text.indexOf('{')))
@@ -214,9 +247,7 @@ async function deployAfterDryRun(
 			deploy.exitCode === 0
 				? parseGeneratedConfig(await readGeneratedDeployConfig(projectDir)).vars
 				: undefined,
-		deployReportedDrift: deployLogger.messages.some((message) =>
-			message.args.join(' ').includes('Build artefact drift detected')
-		)
+		deployReportedDrift: reportedDrift(deployLogger)
 	}
 }
 
@@ -330,5 +361,33 @@ describe('deploy env var descriptors', () => {
 		expect(productionRun.deployReportedDrift).toBe(false)
 		expect(previewRun.deployExitCode).toBe(0)
 		expect(previewRun.deployReportedDrift).toBe(false)
+	})
+
+	test('deploy --build reports drift when the config changed after the build, so the check above is live', async () => {
+		await writeEnvironmentOnlyDescriptorProject(projectDir)
+		useRecordingWrangler()
+		const firstDeploy = await runDeployCommand(
+			{ command: 'deploy', args: [], options: { prod: true } },
+			createLogger() as any,
+			{ cwd: projectDir }
+		)
+		await writeWorkerProject(projectDir, {
+			dotenv: `${PRODUCTION_ENV_NAME}=production-value\n`,
+			configMembers: `vars: { ADDED_AFTER_BUILD: 'new' },
+	env: {
+		production: { vars: { ENVIRONMENT_ONLY: ${descriptorSource(PRODUCTION_ENV_NAME)} } }
+	}`
+		})
+
+		const redeployLogger = createLogger()
+		const redeploy = await runDeployCommand(
+			{ command: 'deploy', args: [], options: { prod: true, build: '.devflare/build' } },
+			redeployLogger as any,
+			{ cwd: projectDir }
+		)
+
+		expect(firstDeploy.exitCode).toBe(0)
+		expect(redeploy.exitCode).toBe(0)
+		expect(reportedDrift(redeployLogger)).toBe(true)
 	})
 })
