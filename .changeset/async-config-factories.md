@@ -13,15 +13,19 @@ reading `config.bindings` type-checked while it was `undefined` at runtime. It n
 
 The same mistake meant that no factory's body was checked against the config schema. A factory
 returning `bindings: { kv: 42 }` compiled without an error, and its returned object got no editor
-completions. Both kinds of factory are now checked and completed like a plain config object, and a
-sync factory's `vars` are inferred as an object's are. **A factory config may report type errors
-it had all along.** A plain object config types exactly as before.
+completions. Both kinds of factory are now checked against the schema and get the config's
+completions, and a sync factory's `vars` are inferred as an object's are. **A factory config may
+report type errors it had all along**, including a factory that declares a parameter, which
+`defineConfig` never passes. A plain object config types as before, and its errors now point at the
+field that is wrong rather than at the whole call. A value typed as `DefineConfigInput`, which may
+be either form, now types as `TypedConfig<…> | Promise<TypedConfig<…>>`.
 
-**`ref()` evaluates the referenced config the way `loadConfig` does.** It now awaits the module's
-default and calls it when it is a factory, before reading `name`. Before this change, a ref to an
-async config threw `Referenced config must have a "name" property`. A ref to a module exporting a
-named factory (`export default function makeConfig() {…}`) resolved to a worker called
-`makeConfig`. `ref()`'s types accept such modules and type `ref().config` as the evaluated config.
+**`ref()` evaluates the referenced module's default before reading `name`.** It awaits it and calls
+it when it is a factory, as c12 does when `loadConfig` reads a config file. Before this change, a
+ref to an async config threw `Referenced config must have a "name" property`, and a ref to a module
+exporting a named factory (`export default function makeConfig() {…}`) resolved to a worker called
+`makeConfig`. `ref().config` is now typed as the config such a module evaluates to, not as the
+function it exports.
 
 **`ref().worker(…)` keeps the entrypoints a config declares.** For any config written
 `defineConfig<Entrypoints>(…)`, object or factory, the accessor widened to `string`, so an

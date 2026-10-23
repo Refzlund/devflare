@@ -83,6 +83,18 @@ export function defineConfig<
 >(
 	config: () => Promise<TConfig & DevflareConfigInput>
 ): Promise<TypedConfig<TEntrypoints, InferConfigVars<NonNullable<TConfig['vars']>>>>
+// A value typed as any `DefineConfigInput` (a wrapper passing its own argument on) may be either
+// form, so the result may be a Promise.
+// → GOTCHA: the object arm carries `NotAFunction` too. Plain `DefineConfigInput` would hand every
+//   factory the first overload refused back to its object arm, unchecked.
+// → NOTE: with four overloads TypeScript reports only this last one's error, and it elaborates a
+//   factory against the FIRST function arm of a union. One arm returning either form is what lets
+//   both a sync and an async factory's error reach the field that is wrong.
+export function defineConfig<TEntrypoints extends string = string>(
+	config:
+		| (DevflareConfigInput & NotAFunction)
+		| (() => DevflareConfigInput | Promise<DevflareConfigInput>)
+): TypedConfig<TEntrypoints, unknown> | Promise<TypedConfig<TEntrypoints, unknown>>
 export function defineConfig<
 	TEntrypoints extends string = string,
 	TConfig extends DevflareConfigInput = DevflareConfigInput
