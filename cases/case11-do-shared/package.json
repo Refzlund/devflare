@@ -1,0 +1,16 @@
+{
+	"name": "@devflare/case11-do-shared",
+	"version": "0.0.1",
+	"private": true,
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts",
+		"./devflare.config": "./devflare.config.ts"
+	},
+	"devDependencies": {
+		"@cloudflare/workers-types": "^4.20260702.1",
+		"@types/bun": "^1.4.2",
+		"devflare": "workspace:*",
+		"typescript": "^6.0.3"
+	}
+}

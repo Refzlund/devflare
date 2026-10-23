@@ -1,0 +1,9 @@
+# Devflare generated config (gitignored by default)
+.devflare/
+
+# Build output
+.svelte-kit/
+.wrangler/
+
+# Dependencies
+node_modules/

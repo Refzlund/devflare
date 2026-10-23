@@ -1,0 +1,22 @@
+{
+	"extends": "./.svelte-kit/tsconfig.json",
+	"compilerOptions": {
+		"rootDir": "./",
+		"types": ["@cloudflare/workers-types", "@sveltejs/kit"],
+		"skipLibCheck": true,
+		// TypeScript 6 turned `strict` on by default. This fixture was always checked
+		// non-strict, so it says so explicitly rather than gaining six errors from the
+		// compiler upgrade alone. Under strict, `sequence(devflareHandle)` does not
+		// type-check: devflare's `handle` constraint types `resolve` as
+		// `(event: unknown) => …`, which Kit's `resolve` cannot satisfy.
+		"strict": false
+	},
+	"include": [
+		"env.d.ts",
+		"src/**/*.ts",
+		"src/**/*.svelte",
+		"devflare.config.ts",
+		"vite.config.ts",
+		".svelte-kit/types/**/*.d.ts"
+	]
+}
