@@ -4,6 +4,7 @@ import {
 	readCopiedDotenvNames
 } from '../../../src/config/copied-dotenv-names'
 import { INJECTED_VARS_ENV, readInjectedVars } from '../../../src/config/injected-vars'
+import { LOCAL_DEV_VARS_ENV } from '../../../src/config/local-dev-vars-switch'
 import { isReservedAppEnvKey } from '../../../src/config/workspace'
 import { buildViteChildEnv, type ViteChildEnvOptions } from '../../../src/dev-server/vite-process'
 
@@ -26,6 +27,15 @@ describe('buildViteChildEnv', () => {
 		const env = buildViteChildEnv(inherited, { miniflarePort: 8788 })
 
 		expect(env).toMatchObject(inherited)
+	})
+
+	test('inherits the local-vars overlay switch, so the child resolves its platform.env without it', () => {
+		// The child re-resolves the config through `resolveDevConfig`, which reads the switch from its
+		// own `process.env`. Stripping inherited `DEVFLARE_*` names here would quietly lay `.dev.vars`
+		// over the child's vars again while the coordinator's stayed clean.
+		const env = buildViteChildEnv({ [LOCAL_DEV_VARS_ENV]: 'off' }, everyOption)
+
+		expect(env[LOCAL_DEV_VARS_ENV]).toBe('off')
 	})
 
 	test("sets each of the app's manifest env entries in the child", () => {
