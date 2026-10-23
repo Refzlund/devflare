@@ -18,16 +18,28 @@ import ts from 'typescript'
 const devflareRoot = resolve(import.meta.dir, '../../..')
 const fixtureDir = resolve(devflareRoot, 'tests/unit/config/__fixtures__/config-factory-types')
 const probePath = resolve(fixtureDir, 'probe.ts')
-const asyncWorkerPath = resolve(fixtureDir, 'async-worker.config.ts')
 
-const asyncWorkerSource = `
+/** The config modules the probe imports through `ref()`, by file name. */
+const workerConfigSources = {
+	'async-worker.config.ts': `
 import { defineConfig } from '../../../../../src/config/define'
 
 export default defineConfig<'AdminEntrypoint'>(async () => ({
 	name: 'async-worker',
 	bindings: { durableObjects: { COUNTER: 'Counter' } }
 }))
+`,
+	'object-worker.config.ts': `
+import { defineConfig } from '../../../../../src/config/define'
+
+export default defineConfig<'ObjectEntrypoint'>({ name: 'object-worker' })
+`,
+	'plain-worker.config.ts': `
+import { defineConfig } from '../../../../../src/config/define'
+
+export default defineConfig({ name: 'plain-worker' })
 `
+}
 
 const probeSource = `
 import { defineConfig } from '../../../../../src/config/define'
@@ -41,11 +53,20 @@ export const awaitedBindings = (await asyncConfig).bindings
 
 export const asyncRef = ref(() => import('./async-worker.config'))
 export const asyncRefConfig = asyncRef.config
+export const asyncRefWorker = asyncRef.worker
+export const objectRefWorker = ref(() => import('./object-worker.config')).worker
+export const plainRefWorker = ref(() => import('./plain-worker.config')).worker
+
+asyncRefWorker('AdminEntrypoint')
+objectRefWorker('ObjectEntrypoint')
+plainRefWorker('AnyEntrypoint')
 
 asyncConfig.bindings // error: an async config is read without awaiting it
 defineConfig(async () => ({ name: 'bad', bindings: { kv: 42 } })) // error: an async factory's body is checked
 defineConfig(() => ({ name: 'bad', bindings: { kv: 42 } })) // error: a sync factory's body is checked
 defineConfig<'X'>(async () => ({ name: 'bad', bindings: { kv: 42 } })) // error: explicit type arguments too
+asyncRefWorker('NotAnEntrypoint') // error: a ref keeps an async config's entrypoints
+objectRefWorker('NotAnEntrypoint') // error: a ref keeps an object config's entrypoints
 export const control: number = 'not a number' // error: control
 `
 
@@ -71,7 +92,9 @@ function compileProbe(): ProbeResult {
 
 	const inMemory = new Map([
 		[probePath, probeSource],
-		[asyncWorkerPath, asyncWorkerSource]
+		...Object.entries(workerConfigSources).map(
+			([fileName, source]) => [resolve(fixtureDir, fileName), source] as const
+		)
 	])
 	const options: ts.CompilerOptions = {
 		module: ts.ModuleKind.ESNext,
@@ -175,5 +198,18 @@ describe('ref() to a config with an async factory', () => {
 		const { typesByName } = compileProbe()
 
 		expect(typesByName.get('asyncRefConfig')).toBe('TypedConfig<"AdminEntrypoint", unknown>')
+	}, 30_000)
+})
+
+describe('ref().worker', () => {
+	// Explicit entrypoints leave the config's vars `unknown`, and matching the config against
+	// `TypedConfig<infer E>` (default vars `Record<string, unknown>`) failed on exactly those, so
+	// the entrypoints `defineConfig<Entrypoints>` declares widened to `string`.
+	test('accepts only the entrypoints the referenced config declares', () => {
+		const { typesByName } = compileProbe()
+
+		expect(typesByName.get('asyncRefWorker')).toBe('WorkerBindingAccessor<"AdminEntrypoint">')
+		expect(typesByName.get('objectRefWorker')).toBe('WorkerBindingAccessor<"ObjectEntrypoint">')
+		expect(typesByName.get('plainRefWorker')).toBe('WorkerBindingAccessor<string>')
 	}, 30_000)
 })

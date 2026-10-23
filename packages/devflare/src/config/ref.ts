@@ -41,8 +41,11 @@ import type { DevflareConfigInput } from './schema'
 /**
  * Extract entrypoint type from a TypedConfig
  * Falls back to string if no type parameter was provided
+ * → GOTCHA: match with `unknown` vars. The default (`Record<string, unknown>`) refuses a config
+ *   whose vars are `unknown`, which is every `defineConfig<Entrypoints>(…)`, so their entrypoints
+ *   widened to `string`.
  */
-type ExtractEntrypoints<TConfig> = TConfig extends TypedConfig<infer E> ? E : string
+type ExtractEntrypoints<TConfig> = TConfig extends TypedConfig<infer E, unknown> ? E : string
 
 /**
  * @description What a config module may export before it is evaluated: the config itself, the
