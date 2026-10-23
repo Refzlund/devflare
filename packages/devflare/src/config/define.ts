@@ -27,6 +27,19 @@ export interface TypedConfig<TEntrypoints extends string = string, TVars = Recor
 }
 
 /**
+ * @description Refuses a function where `defineConfig` expects a config OBJECT. Every function
+ *   satisfies `DevflareConfigInput` on its own (its `name` is a string and the rest is optional), so
+ *   without this the object overload took every factory: an async factory typed as a config instead
+ *   of a Promise, and no factory's body was checked against the schema.
+ *   `Symbol.hasInstance` is a member every function has and no config object does, and a symbol key
+ *   never shows up among the property completions offered inside the config literal.
+ */
+interface NotAFunction {
+	/** A function's `instanceof` hook; a config object has none. */
+	readonly [Symbol.hasInstance]?: never
+}
+
+/**
  * Type-safe helper for defining devflare configuration.
  *
  * @typeParam TEntrypoints - Union of valid entrypoint names (from generated types)
@@ -56,7 +69,7 @@ export function defineConfig<
 	TEntrypoints extends string = string,
 	TConfig extends DevflareConfigInput = DevflareConfigInput
 >(
-	config: TConfig & DevflareConfigInput
+	config: TConfig & DevflareConfigInput & NotAFunction
 ): TypedConfig<TEntrypoints, InferConfigVars<NonNullable<TConfig['vars']>>>
 export function defineConfig<
 	TEntrypoints extends string = string,

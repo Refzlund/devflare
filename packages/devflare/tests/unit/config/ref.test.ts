@@ -3,6 +3,7 @@
 // =============================================================================
 
 import { describe, expect, test } from 'bun:test'
+import { defineConfig } from '../../../src/config/define'
 import { ref } from '../../../src/config/ref'
 
 describe('ref', () => {
@@ -131,6 +132,42 @@ describe('ref', () => {
 		await result.resolve()
 
 		expect(result.name).toBe('direct-export-worker')
+	})
+
+	// A config module's default is not always an object: `defineConfig(async () => …)` exports the
+	// Promise its factory returned, and a module may export a factory without `defineConfig`. c12
+	// evaluates both for `loadConfig`, so a ref to the same file must too.
+	// → GOTCHA: a NAMED factory is the silent case. Read raw, its `name` is the function's own name,
+	//   so the ref resolved to a worker called `makeConfig` instead of throwing.
+	test.each([
+		[
+			'a Promise (defineConfig with an async factory)',
+			(config: object) => defineConfig(async () => config as never)
+		],
+		['a sync factory', (config: object) => () => config as never],
+		['an async factory', (config: object) => async () => config as never],
+		[
+			'a named factory',
+			(config: object) =>
+				function makeConfig() {
+					return config as never
+				}
+		]
+	])('evaluates a referenced default that is %s before reading its name', async (_, toDefault) => {
+		const config = {
+			name: 'async-worker',
+			compatibilityDate: '2025-01-07',
+			bindings: { durableObjects: { COUNTER: 'Counter' } }
+		}
+
+		const result = ref(async () => ({ default: toDefault(config) }))
+		await result.resolve()
+
+		expect(result.name).toBe('async-worker')
+		expect(result.config).toBe(config)
+		expect((result as unknown as Record<string, { className: string }>).COUNTER.className).toBe(
+			'Counter'
+		)
 	})
 
 	test('worker.service returns name override before resolution', () => {

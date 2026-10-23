@@ -45,20 +45,32 @@ import type { DevflareConfigInput } from './schema'
 type ExtractEntrypoints<TConfig> = TConfig extends TypedConfig<infer E> ? E : string
 
 /**
+ * @description What a config module may export before it is evaluated: the config itself, the
+ *   Promise `defineConfig(async () => …)` returns, or a factory exported without `defineConfig`.
+ */
+type ConfigExport<T extends DevflareConfigInput = DevflareConfigInput> =
+	| T
+	| Promise<T>
+	| (() => T | Promise<T>)
+
+/** @description The config a `ConfigExport` evaluates to: a factory called, a Promise awaited. */
+type EvaluatedConfig<TExport> = TExport extends () => infer TResult
+	? Awaited<TResult>
+	: Awaited<TExport>
+
+/**
  * Extract the config type from a dynamic import function
- * Handles both `{ default: Config }` and direct `Config` module shapes
+ * Handles both `{ default: Config }` and direct `Config` module shapes, evaluated
  */
 type ExtractConfig<TImport> = TImport extends () => Promise<infer TModule>
-	? TModule extends { default: infer TConfig }
-		? TConfig
-		: TModule
+	? EvaluatedConfig<TModule extends { default: infer TExport } ? TExport : TModule>
 	: DevflareConfigInput
 
 /**
  * Dynamic import function type for config modules
  */
 type ConfigImport<T extends DevflareConfigInput = DevflareConfigInput> = () => Promise<
-	{ default: T } | T
+	{ default: ConfigExport<T> } | ConfigExport<T>
 >
 
 /**
@@ -284,12 +296,14 @@ function extractConfigPathFromImportFn(fn: (...args: unknown[]) => unknown): str
  * // With name override
  * const mathWorker = ref('custom-math', () => import('./math-worker/devflare.config'))
  */
-export function ref<
-	TImport extends () => Promise<{ default: DevflareConfigInput } | DevflareConfigInput>
->(nameOrImport: string | TImport, maybeImport?: TImport): RefResult<ExtractConfig<TImport>>
-export function ref<
-	TImport extends () => Promise<{ default: DevflareConfigInput } | DevflareConfigInput>
->(nameOrImport: string | TImport, maybeImport?: TImport): RefResult<ExtractConfig<TImport>> {
+export function ref<TImport extends ConfigImport>(
+	nameOrImport: string | TImport,
+	maybeImport?: TImport
+): RefResult<ExtractConfig<TImport>>
+export function ref<TImport extends ConfigImport>(
+	nameOrImport: string | TImport,
+	maybeImport?: TImport
+): RefResult<ExtractConfig<TImport>> {
 	type TConfig = ExtractConfig<TImport>
 	const nameOverride = typeof nameOrImport === 'string' ? nameOrImport : undefined
 	let importFn: ConfigImport<TConfig> | undefined
@@ -332,7 +346,11 @@ export function ref<
 		// Start resolution
 		const promise = (async () => {
 			const module = await resolvedImportFn()
-			const config = ('default' in module ? module.default : module) as TConfig
+			// Evaluate the export the way c12 does for `loadConfig`: await it, then call it if it is a
+			// factory. Read raw, the Promise `defineConfig(async () => …)` exports has no `name`, and a
+			// named factory's `name` is the function's own.
+			const exported = await ('default' in module ? module.default : module)
+			const config = (typeof exported === 'function' ? await exported() : exported) as TConfig
 
 			if (!config.name && !nameOverride) {
 				throw new Error('Referenced config must have a "name" property')
