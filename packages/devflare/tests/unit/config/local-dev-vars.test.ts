@@ -4,7 +4,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
 	applyLocalDevVarsToConfig,
+	LOCAL_DEV_VARS_ENV,
 	loadLocalDevVars,
+	localDevVarsEnabled,
 	toWranglerSecretsConfig
 } from '../../../src/config/local-dev-vars'
 import type { DevflareConfig } from '../../../src/config/schema'
@@ -163,5 +165,51 @@ describe('applyLocalDevVarsToConfig', () => {
 			API_TOKEN: 'secret',
 			PUBLIC_FLAG: 'on'
 		})
+	})
+})
+
+describe('the local-vars overlay switch', () => {
+	/** What the process held before a case set the switch, restored after it. */
+	const before = process.env[LOCAL_DEV_VARS_ENV]
+
+	afterEach(() => {
+		if (before === undefined) {
+			delete process.env[LOCAL_DEV_VARS_ENV]
+		} else {
+			process.env[LOCAL_DEV_VARS_ENV] = before
+		}
+	})
+
+	test('only 0, false, no and off turn it off, in any case and with surrounding space', () => {
+		for (const value of [undefined, '', '1', 'true', 'on', 'yes', 'anything']) {
+			expect(localDevVarsEnabled({ [LOCAL_DEV_VARS_ENV]: value }), String(value)).toBe(true)
+		}
+		for (const value of ['0', 'false', 'no', 'off', ' OFF ', 'False']) {
+			expect(localDevVarsEnabled({ [LOCAL_DEV_VARS_ENV]: value }), value).toBe(false)
+		}
+	})
+
+	test('off, the overlay returns the config itself and lays nothing over its vars', async () => {
+		const cwd = makeTempProject()
+		writeProjectFile(cwd, '.dev.vars', 'API_TOKEN=from-dev-vars\nDEV_ONLY=yes\n')
+		const config: DevflareConfig = {
+			name: 'my-worker',
+			compatibilityDate: '2026-04-26',
+			compatibilityFlags: [],
+			vars: { API_TOKEN: 'from-config' }
+		}
+		const options = { cwd, configPath: join(cwd, 'devflare.config.ts') }
+
+		// The control: the same file, with the switch unset, is laid over the config.
+		delete process.env[LOCAL_DEV_VARS_ENV]
+		expect((await applyLocalDevVarsToConfig(config, options)).vars).toEqual({
+			API_TOKEN: 'from-dev-vars',
+			DEV_ONLY: 'yes'
+		})
+
+		process.env[LOCAL_DEV_VARS_ENV] = 'off'
+		const off = await applyLocalDevVarsToConfig(config, options)
+		expect(off).toBe(config)
+		expect(off.vars).toEqual({ API_TOKEN: 'from-config' })
 	})
 })

@@ -47,6 +47,14 @@ export {
 	parseDevflareEnvFile
 } from './config'
 
+// The local-vars overlay switch — the variable that keeps `.dev.vars` (or wrangler's `.env` fallback)
+// from being laid over a config's `vars` in dev
+//
+// Exported so a launcher setting it, and a test asserting the launcher does, name the same variable
+// rather than two copies of a string.
+
+export { LOCAL_DEV_VARS_ENV } from './config/local-dev-vars'
+
 // Cross-config referencing
 
 export {

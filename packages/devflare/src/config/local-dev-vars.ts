@@ -2,6 +2,38 @@ import { readFile } from 'node:fs/promises'
 import { resolve } from 'pathe'
 import type { DevflareConfig } from './schema'
 
+/**
+ * The environment variable that turns the local-vars overlay off for one process and everything it
+ * spawns. Set to `0`, `false`, `no` or `off`, {@link applyLocalDevVarsToConfig} returns the config
+ * unchanged and reads no file, so `vars` are exactly what the config and its `env.NAME` descriptors
+ * resolved to.
+ *
+ * → KEY: the overlay beats the config. A `.dev.vars` (or wrangler's `.env` fallback) in the app
+ *   directory replaces any var the config computed from the process environment. So a launcher that
+ *   decides those values itself, such as a test harness pointing a server at its own instance, cannot
+ *   hold them while the overlay is on. This is how it holds them.
+ * → NOTE: it is read from `process.env` at resolution time, in whichever process resolves the config.
+ *   A Vite child inherits it from `devflare dev`.
+ */
+export const LOCAL_DEV_VARS_ENV = 'DEVFLARE_LOCAL_DEV_VARS'
+
+/**
+ * @description Whether the local-vars overlay applies, as {@link LOCAL_DEV_VARS_ENV} says.
+ * @param environment - the environment to read; `process.env` when omitted
+ * @returns `false` when the variable is `0`, `false`, `no` or `off`, ignoring case and surrounding
+ *   space; `true` otherwise, unset and empty included
+ */
+export function localDevVarsEnabled(
+	environment: Record<string, string | undefined> = process.env
+): boolean {
+	const configured = environment[LOCAL_DEV_VARS_ENV]?.trim().toLowerCase()
+	if (!configured) {
+		return true
+	}
+
+	return !['0', 'false', 'no', 'off'].includes(configured)
+}
+
 export interface LoadLocalDevVarsOptions {
 	cwd: string
 	configPath?: string
@@ -144,10 +176,22 @@ export async function loadLocalDevVars(
 	}
 }
 
+/**
+ * @description Lays the app directory's wrangler-compatible local-vars files over a config's `vars`,
+ * as {@link loadLocalDevVars} reads them, unless {@link LOCAL_DEV_VARS_ENV} turns the overlay off.
+ * @param config - the config, its `env.NAME` descriptors already resolved
+ * @param options - where the files are read from; see {@link LoadLocalDevVarsOptions}
+ * @returns the config with the files' values over its `vars`; the same config object when the overlay
+ *   is off or there is nothing to lay
+ */
 export async function applyLocalDevVarsToConfig(
 	config: DevflareConfig,
 	options: Omit<LoadLocalDevVarsOptions, 'vars' | 'secrets'>
 ): Promise<DevflareConfig> {
+	if (!localDevVarsEnabled()) {
+		return config
+	}
+
 	const vars = await loadLocalDevVars({
 		...options,
 		vars: config.vars,
