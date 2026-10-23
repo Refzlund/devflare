@@ -53,7 +53,7 @@ export {
 // Exported so a launcher setting it, and a test asserting the launcher does, name the same variable
 // rather than two copies of a string.
 
-export { LOCAL_DEV_VARS_ENV } from './config/local-dev-vars'
+export { LOCAL_DEV_VARS_ENV } from './config/local-dev-vars-switch'
 
 // Cross-config referencing
 

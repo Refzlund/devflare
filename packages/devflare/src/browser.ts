@@ -11,6 +11,10 @@
 export { defineConfig } from './config/define'
 export { ref } from './config/ref'
 
+// The local-vars overlay switch: a plain string, so it is safe here as it is at the root entry.
+
+export { LOCAL_DEV_VARS_ENV } from './config/local-dev-vars-switch'
+
 // Safe runtime-facing exports
 
 export { env, vars } from './env'

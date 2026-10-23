@@ -1,37 +1,34 @@
 import { readFile } from 'node:fs/promises'
 import { resolve } from 'pathe'
+import { LOCAL_DEV_VARS_ENV } from './local-dev-vars-switch'
 import type { DevflareConfig } from './schema'
 
-/**
- * The environment variable that turns the local-vars overlay off for one process and everything it
- * spawns. Set to `0`, `false`, `no` or `off`, {@link applyLocalDevVarsToConfig} returns the config
- * unchanged and reads no file, so `vars` are exactly what the config and its `env.NAME` descriptors
- * resolved to.
- *
- * → KEY: the overlay beats the config. A `.dev.vars` (or wrangler's `.env` fallback) in the app
- *   directory replaces any var the config computed from the process environment. So a launcher that
- *   decides those values itself, such as a test harness pointing a server at its own instance, cannot
- *   hold them while the overlay is on. This is how it holds them.
- * → NOTE: it is read from `process.env` at resolution time, in whichever process resolves the config.
- *   A Vite child inherits it from `devflare dev`.
- */
-export const LOCAL_DEV_VARS_ENV = 'DEVFLARE_LOCAL_DEV_VARS'
+export { LOCAL_DEV_VARS_ENV }
 
 /**
  * @description Whether the local-vars overlay applies, as {@link LOCAL_DEV_VARS_ENV} says.
  * @param environment - the environment to read; `process.env` when omitted
- * @returns `false` when the variable is `0`, `false`, `no` or `off`, ignoring case and surrounding
- *   space; `true` otherwise, unset and empty included
+ * @returns `false` for `0`, `false`, `no` or `off`; `true` for `1`, `true`, `yes`, `on`, empty or
+ *   unset. Case and surrounding space are ignored.
+ * @throws When the variable holds any other value. A launcher sets it to keep the overlay off, so a
+ *   misspelled value refuses rather than quietly leaving the overlay on.
  */
 export function localDevVarsEnabled(
 	environment: Record<string, string | undefined> = process.env
 ): boolean {
-	const configured = environment[LOCAL_DEV_VARS_ENV]?.trim().toLowerCase()
-	if (!configured) {
+	const raw = environment[LOCAL_DEV_VARS_ENV]
+	const configured = raw?.trim().toLowerCase()
+	if (!configured || ['1', 'true', 'yes', 'on'].includes(configured)) {
 		return true
 	}
+	if (['0', 'false', 'no', 'off'].includes(configured)) {
+		return false
+	}
 
-	return !['0', 'false', 'no', 'off'].includes(configured)
+	throw new Error(
+		`${LOCAL_DEV_VARS_ENV} is "${raw}": set it to 0, false, no or off to keep .dev.vars and .env ` +
+			'off a config’s vars, or to 1, true, yes or on (or leave it unset) to lay them over'
+	)
 }
 
 export interface LoadLocalDevVarsOptions {

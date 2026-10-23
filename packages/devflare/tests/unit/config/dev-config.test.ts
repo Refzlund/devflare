@@ -1,14 +1,26 @@
-import { afterEach, describe, expect, test } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { defineConfig, env } from '../../../src/config'
 import { resolveDevConfig } from '../../../src/config/dev-config'
-import { LOCAL_DEV_VARS_ENV } from '../../../src/config/local-dev-vars'
+import { LOCAL_DEV_VARS_ENV } from '../../../src/config/local-dev-vars-switch'
 
 const tempDirs: string[] = []
 
+/** The overlay switch as the shell running this suite holds it. Every case starts with it unset. */
+const ambientSwitch = process.env[LOCAL_DEV_VARS_ENV]
+
+beforeEach(() => {
+	delete process.env[LOCAL_DEV_VARS_ENV]
+})
+
 afterEach(() => {
+	if (ambientSwitch === undefined) {
+		delete process.env[LOCAL_DEV_VARS_ENV]
+	} else {
+		process.env[LOCAL_DEV_VARS_ENV] = ambientSwitch
+	}
 	for (const dir of tempDirs.splice(0)) {
 		rmSync(dir, { recursive: true, force: true })
 	}
@@ -53,17 +65,6 @@ describe('resolveDevConfig', () => {
 })
 
 describe('resolveDevConfig with the local-vars overlay off', () => {
-	/** What the process held before the case set the switch, restored after it. */
-	const before = process.env[LOCAL_DEV_VARS_ENV]
-
-	afterEach(() => {
-		if (before === undefined) {
-			delete process.env[LOCAL_DEV_VARS_ENV]
-		} else {
-			process.env[LOCAL_DEV_VARS_ENV] = before
-		}
-	})
-
 	test('still resolves descriptors from .env, and lays no .dev.vars over the result', async () => {
 		const cwd = mkdtempSync(join(tmpdir(), 'devflare-dev-config-off-'))
 		tempDirs.push(cwd)

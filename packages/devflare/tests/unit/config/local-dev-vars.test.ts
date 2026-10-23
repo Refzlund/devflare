@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, test } from 'bun:test'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
@@ -24,7 +24,19 @@ function writeProjectFile(dir: string, name: string, contents: string): void {
 	writeFileSync(join(dir, name), contents)
 }
 
+/** The overlay switch as the shell running this suite holds it. Every case starts with it unset. */
+const ambientSwitch = process.env[LOCAL_DEV_VARS_ENV]
+
+beforeEach(() => {
+	delete process.env[LOCAL_DEV_VARS_ENV]
+})
+
 afterEach(() => {
+	if (ambientSwitch === undefined) {
+		delete process.env[LOCAL_DEV_VARS_ENV]
+	} else {
+		process.env[LOCAL_DEV_VARS_ENV] = ambientSwitch
+	}
 	while (tempDirs.length > 0) {
 		const dir = tempDirs.pop()
 		if (dir) {
@@ -169,24 +181,19 @@ describe('applyLocalDevVarsToConfig', () => {
 })
 
 describe('the local-vars overlay switch', () => {
-	/** What the process held before a case set the switch, restored after it. */
-	const before = process.env[LOCAL_DEV_VARS_ENV]
-
-	afterEach(() => {
-		if (before === undefined) {
-			delete process.env[LOCAL_DEV_VARS_ENV]
-		} else {
-			process.env[LOCAL_DEV_VARS_ENV] = before
-		}
-	})
-
-	test('only 0, false, no and off turn it off, in any case and with surrounding space', () => {
-		for (const value of [undefined, '', '1', 'true', 'on', 'yes', 'anything']) {
+	test('0, false, no and off turn it off; 1, true, yes, on, empty and unset keep it', () => {
+		for (const value of [undefined, '', '  ', '1', 'true', 'on', 'yes', ' ON ']) {
 			expect(localDevVarsEnabled({ [LOCAL_DEV_VARS_ENV]: value }), String(value)).toBe(true)
 		}
 		for (const value of ['0', 'false', 'no', 'off', ' OFF ', 'False']) {
 			expect(localDevVarsEnabled({ [LOCAL_DEV_VARS_ENV]: value }), value).toBe(false)
 		}
+	})
+
+	test('any other value is refused, naming the variable and the value', () => {
+		expect(() => localDevVarsEnabled({ [LOCAL_DEV_VARS_ENV]: 'disabled' })).toThrow(
+			`${LOCAL_DEV_VARS_ENV} is "disabled"`
+		)
 	})
 
 	test('off, the overlay returns the config itself and lays nothing over its vars', async () => {
@@ -201,7 +208,6 @@ describe('the local-vars overlay switch', () => {
 		const options = { cwd, configPath: join(cwd, 'devflare.config.ts') }
 
 		// The control: the same file, with the switch unset, is laid over the config.
-		delete process.env[LOCAL_DEV_VARS_ENV]
 		expect((await applyLocalDevVarsToConfig(config, options)).vars).toEqual({
 			API_TOKEN: 'from-dev-vars',
 			DEV_ONLY: 'yes'
@@ -211,5 +217,25 @@ describe('the local-vars overlay switch', () => {
 		const off = await applyLocalDevVarsToConfig(config, options)
 		expect(off).toBe(config)
 		expect(off.vars).toEqual({ API_TOKEN: 'from-config' })
+	})
+
+	test('off, the overlay reads no file: an unreadable .dev.vars is never opened', async () => {
+		// A directory where `.dev.vars` should be cannot be read, and the reader rethrows anything but
+		// ENOENT. So the overlay can only succeed over it by never opening it.
+		const cwd = makeTempProject()
+		mkdirSync(join(cwd, '.dev.vars'))
+		const config: DevflareConfig = {
+			name: 'my-worker',
+			compatibilityDate: '2026-04-26',
+			compatibilityFlags: [],
+			vars: { API_TOKEN: 'from-config' }
+		}
+		const options = { cwd, configPath: join(cwd, 'devflare.config.ts') }
+
+		// The control: with the switch unset, the overlay opens it and fails.
+		await expect(applyLocalDevVarsToConfig(config, options)).rejects.toThrow()
+
+		process.env[LOCAL_DEV_VARS_ENV] = 'off'
+		expect(await applyLocalDevVarsToConfig(config, options)).toBe(config)
 	})
 })
