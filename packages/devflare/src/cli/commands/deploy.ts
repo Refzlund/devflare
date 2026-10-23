@@ -10,12 +10,11 @@ import {
 	compileBuildConfig,
 	compileConfig,
 	loadConfig,
-	prepareConfigResourcesForDeploy,
-	resolveConfigEnvVars,
-	resolveConfigForEnvironment
+	prepareConfigResourcesForDeploy
 } from '../../config'
 import { stringifyConfig } from '../../config/compiler'
 import { ZoneProvisionError } from '../../config/deploy-zones'
+import { resolveConfigEnvVarsForEnvironment } from '../../config/env-vars-for-environment'
 import { generatedDir } from '../../utils/generated-dir'
 import { getDependencies } from '../dependencies'
 import { applyDeploymentStrategy, describeDeploymentStrategy } from '../deploy-strategy'
@@ -117,14 +116,12 @@ export async function runDeployCommand(
 				previewScopeName || process.env.DEVFLARE_PREVIEW_BRANCH?.trim() || undefined
 			if (dryRun) {
 				const rawConfig = await loadConfig({ cwd, configFile: configPath })
-				const config = await resolveConfigEnvVars(
-					resolveConfigForEnvironment(rawConfig, environment),
-					{
-						cwd,
-						configPath,
-						mode: 'build'
-					}
-				)
+				const config = await resolveConfigEnvVarsForEnvironment(rawConfig, {
+					cwd,
+					configPath,
+					environment,
+					mode: 'build'
+				})
 				const deploymentStrategy = applyDeploymentStrategy(config, {
 					environment,
 					preview,
@@ -164,7 +161,12 @@ export async function runDeployCommand(
 						environment,
 						describeOnly: true
 					})
-					const resolvedWranglerConfig = compileConfig(describeResult.config)
+					// Resource preparation merges `env.<name>` again from the section the merged config still
+					// carries. That section's vars are unresolved descriptors, so keep the `vars` resolved above.
+					const resolvedWranglerConfig = compileConfig({
+						...describeResult.config,
+						vars: deploymentStrategy.config.vars
+					})
 					logLine(
 						logger,
 						dim('Resolved view (would-create placeholders for missing resources):', theme)

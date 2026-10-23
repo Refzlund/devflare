@@ -10,12 +10,12 @@ import {
 	type PrepareConfigResourcesForDeployResult,
 	prepareConfigResourcesForDeploy,
 	readWranglerConfig,
-	resolveConfigEnvVars,
 	ServiceBindingValidationError,
 	validateServiceBindings,
 	type WranglerConfig
 } from '../../../config'
 import { rebaseWranglerConfigPaths, writeWranglerConfig } from '../../../config/compiler'
+import { resolveConfigEnvVarsForEnvironment } from '../../../config/env-vars-for-environment'
 import { preparePreviewScopedResourcesForDeploy } from '../../../config/preview-resources'
 import {
 	compareManifests,
@@ -167,9 +167,13 @@ export async function prepareDeployConfig(options: {
 		cwd: options.cwd,
 		configFile: options.configPath
 	})
-	const rawConfig = await resolveConfigEnvVars(loadedConfig, {
+	// This is the config `devflare build` resolved for the artefact being deployed. Resolving it
+	// before anything below provisions resources means a missing variable fails the deploy before
+	// it has changed anything.
+	const targetConfig = await resolveConfigEnvVarsForEnvironment(loadedConfig, {
 		cwd: options.cwd,
 		configPath: options.configPath,
+		environment: options.environment,
 		mode: 'build'
 	})
 
@@ -179,7 +183,9 @@ export async function prepareDeployConfig(options: {
 	const manifestDir = dirname(options.buildConfigPath)
 	const manifest = await readBuildManifest(manifestDir)
 	if (manifest) {
-		const currentManifest = createBuildManifest(rawConfig, {
+		// Hash the same merged config the build hashed. The unmerged config reported "source
+		// config changed" on every deploy of a config with an `env` section for its target.
+		const currentManifest = createBuildManifest(targetConfig, {
 			devflareVersion: await getPackageVersion(),
 			intendedTarget: {
 				environment: options.environment,
@@ -203,20 +209,30 @@ export async function prepareDeployConfig(options: {
 		}
 	}
 
+	// Both steps merge the environment themselves. They also need the preview-scoped markers that
+	// `targetConfig` has already materialised, so they take the loaded config rather than the
+	// resolved one.
 	const previewScopedResources =
 		options.environment === 'preview'
-			? await preparePreviewScopedResourcesForDeploy(rawConfig, {
+			? await preparePreviewScopedResourcesForDeploy(loadedConfig, {
 					environment: options.environment
 				})
 			: null
-	const deployResources = await prepareConfigResourcesForDeploy(
-		previewScopedResources?.config ?? rawConfig,
+	const preparedResources = await prepareConfigResourcesForDeploy(
+		previewScopedResources?.config ?? loadedConfig,
 		{
 			environment: options.environment,
 			accountId: previewScopedResources?.accountId,
 			cloudflare: previewScopedResources?.resourceResolutionCloudflare
 		}
 	)
+	// Their merge copies `env.<name>.vars` from the loaded config, where they are still descriptors.
+	// Take the resolved `vars` from `targetConfig` instead, so the deployed values are the ones the
+	// build resolved.
+	const deployResources: PrepareConfigResourcesForDeployResult = {
+		...preparedResources,
+		config: { ...preparedResources.config, vars: targetConfig.vars }
+	}
 	const deploymentStrategy = applyDeploymentStrategy(deployResources.config, {
 		environment: options.environment,
 		preview: options.preview,

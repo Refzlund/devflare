@@ -847,6 +847,10 @@ export interface ResolveConfigEnvVarsOptions {
 /**
  * Resolve all `env.NAME` descriptors under a config's `vars` object.
  *
+ * @remarks Only `config.vars` is read, never `env.<name>.vars`. Call this on a config that is already
+ * merged for its environment. To merge and resolve a loaded config in one step, use
+ * `resolveConfigEnvVarsForEnvironment`.
+ *
  * @throws {EnvVarResolutionError} When required environment variables are missing.
  * @throws {EnvVarParseError} When a descriptor parser throws.
  *

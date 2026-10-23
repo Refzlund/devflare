@@ -1,13 +1,7 @@
 import type { ConsolaInstance } from 'consola'
 import { dirname, relative, resolve } from 'pathe'
 import { bundleWorkerEntry } from '../../bundler'
-import {
-	compileBuildConfig,
-	type DevflareConfig,
-	loadConfig,
-	resolveConfigEnvVars,
-	resolveConfigForEnvironment
-} from '../../config'
+import { compileBuildConfig, type DevflareConfig, loadConfig } from '../../config'
 import {
 	compileConfig,
 	isolateViteBuildOutputPaths as isolateCompiledViteBuildOutputPaths,
@@ -15,6 +9,7 @@ import {
 	type WranglerConfig,
 	writeWranglerConfig
 } from '../../config/compiler'
+import { resolveConfigEnvVarsForEnvironment } from '../../config/env-vars-for-environment'
 import { detectViteProject } from '../../dev-server/vite-utils'
 import { generatedDir } from '../../utils/generated-dir'
 import { resolvePackageSpecifier } from '../../utils/resolve-package'
@@ -399,9 +394,10 @@ export async function prepareBuildArtifacts(
 	const environment = parsed.options.env as string | undefined
 
 	const rawConfig = await loadConfig({ cwd, configFile: configPath })
-	const config = await resolveConfigEnvVars(resolveConfigForEnvironment(rawConfig, environment), {
+	const config = await resolveConfigEnvVarsForEnvironment(rawConfig, {
 		cwd,
 		configPath,
+		environment,
 		mode: 'build'
 	})
 
