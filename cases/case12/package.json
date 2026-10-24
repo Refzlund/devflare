@@ -1,0 +1,21 @@
+{
+	"name": "@devflare/case12-email-handlers",
+	"version": "0.0.1",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"test": "bun test",
+		"types": "devflare types",
+		"dev": "devflare dev",
+		"build": "devflare build",
+		"deploy": "devflare deploy"
+	},
+	"devDependencies": {
+		"@cloudflare/workers-types": "^4.20260702.1",
+		"@types/bun": "^1.4.2",
+		"devflare": "workspace:*",
+		"mimetext": "^3.0.24",
+		"postal-mime": "^4.0.5",
+		"typescript": "^6.0.3"
+	}
+}

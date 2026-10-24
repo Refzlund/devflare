@@ -1,0 +1,5 @@
+# Normalize line endings to LF in the working tree on every platform. The repo
+# is stored with LF and the formatter (biome) is LF-only, so without this a
+# Windows checkout (core.autocrlf=true) gets CRLF and biome reports spurious
+# format errors. `text=auto` lets git auto-detect and skip binary files.
+* text=auto eol=lf
