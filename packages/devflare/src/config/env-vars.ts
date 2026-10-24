@@ -781,18 +781,41 @@ function resolveVarValue(
 	return value
 }
 
-function resolveVarsObject(
+/** What resolving a config's `vars` produced: the values, and the required variables that had none. */
+export interface ResolvedVars {
+	/** `vars` with each descriptor replaced by its value. A descriptor that resolved to nothing is dropped. */
+	vars: DevflareConfig['vars']
+	/** Every required variable that had no value, in the order `vars` is walked. Empty when none. */
+	missing: MissingEnvVar[]
+}
+
+/**
+ * @description Resolves the `env.NAME` descriptors under a config's `vars` from the values given,
+ * reading no file, and REPORTS each required variable that has no value instead of throwing. A
+ * missing one is dropped from `vars`, as an absent optional one is. The resolvers that throw are this
+ * call plus a check of `missing`, so every caller resolves in the same order.
+ * @param vars - a config's `vars`; plain values pass through as written
+ * @param sources - the values a descriptor reads, by variable name, and the only values it reads
+ * @param mode - `dev` honours `.dev()` and `.absentInDev()`; `build` does not
+ * @returns the resolved `vars`, and the variables that were required and missing
+ * @throws {EnvVarParseError} When a descriptor's parser throws. A value that is present and refused
+ *   is not a missing value, and a build fails on it the same way.
+ */
+export function resolveVarsReportingMissing(
 	vars: DevflareConfig['vars'],
 	sources: Record<string, string | undefined>,
-	mode: EnvResolutionMode,
-	missing: MissingEnvVar[]
-): DevflareConfig['vars'] {
+	mode: EnvResolutionMode
+): ResolvedVars {
+	const missing: MissingEnvVar[] = []
 	if (!vars) {
-		return vars
+		return { vars, missing }
 	}
 
 	const resolved = resolveVarValue(vars, sources, [], mode, missing)
-	return resolved === OMIT_VALUE ? undefined : (resolved as DevflareConfig['vars'])
+	return {
+		vars: resolved === OMIT_VALUE ? undefined : (resolved as DevflareConfig['vars']),
+		missing
+	}
 }
 
 /**
@@ -811,14 +834,13 @@ export function resolveVarsFromSources(
 	sources: Record<string, string | undefined>,
 	mode: EnvResolutionMode
 ): DevflareConfig['vars'] {
-	const missing: MissingEnvVar[] = []
-	const resolved = resolveVarsObject(vars, sources, mode, missing)
+	const resolved = resolveVarsReportingMissing(vars, sources, mode)
 
-	if (missing.length > 0) {
-		throw new EnvVarResolutionError(missing, mode)
+	if (resolved.missing.length > 0) {
+		throw new EnvVarResolutionError(resolved.missing, mode)
 	}
 
-	return resolved
+	return resolved.vars
 }
 
 export interface ResolveConfigEnvVarsOptions {
@@ -881,8 +903,7 @@ export async function resolveConfigEnvVars<TConfig extends DevflareConfig>(
 		...dotenv.values,
 		...environment
 	}
-	const missing: MissingEnvVar[] = []
-	const vars = resolveVarsObject(config.vars, sources, options.mode, missing)
+	const { vars, missing } = resolveVarsReportingMissing(config.vars, sources, options.mode)
 
 	if (missing.length > 0) {
 		throw new EnvVarResolutionError(missing, options.mode, getDevflareDotenvPaths(startDir))

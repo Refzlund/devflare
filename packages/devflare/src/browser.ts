@@ -114,6 +114,10 @@ export const compileBuildConfig = unsupportedFunction<ConfigModule['compileBuild
 	'compileBuildConfig',
 	'call it from a Node script, on a config loadConfig returned.'
 )
+// It resolves what `loadConfig` loads, for the same Node script, so the same hint.
+export const resolveConfigEnvVarsFromSources = unsupportedFunction<
+	ConfigModule['resolveConfigEnvVarsFromSources']
+>('resolveConfigEnvVarsFromSources', 'call it from a Node script, on a config loadConfig returned.')
 export const stringifyConfig =
 	unsupportedFunction<ConfigModule['stringifyConfig']>('stringifyConfig')
 export const configSchema = createUnsupportedObject<ConfigModule['configSchema']>('configSchema')

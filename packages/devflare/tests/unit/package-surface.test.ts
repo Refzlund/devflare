@@ -76,6 +76,23 @@ describe('main barrel public surface', () => {
 		expect(mod.compileBuildConfig).toBe(compiler.compileBuildConfig)
 	})
 
+	test('re-exports the reporting descriptor resolver itself, and not the throwing ones', async () => {
+		const mod = await import('../../src/index.ts')
+		const layer = await import('../../src/config/env-vars-for-environment.ts')
+
+		// Identity again: a check must resolve the way `devflare build` and `deploy` resolve.
+		expect(mod.resolveConfigEnvVarsFromSources).toBe(layer.resolveConfigEnvVarsFromSources)
+
+		// The resolvers that throw on a missing required variable stay internal.
+		for (const name of [
+			'resolveConfigEnvVars',
+			'resolveConfigEnvVarsForEnvironment',
+			'resolveVarsFromSources'
+		]) {
+			expect(name in mod).toBe(false)
+		}
+	})
+
 	test('the browser entry refuses the dotenv readers by name rather than omitting them', async () => {
 		const browser = await import('../../src/browser.ts')
 
@@ -93,6 +110,9 @@ describe('main barrel public surface', () => {
 		// The same for the offline compiler, whose generic hint would point at entries that lack it.
 		expect(() => (browser.compileBuildConfig as () => unknown)()).toThrow(
 			'compileBuildConfig is not available in browser environments; call it from a Node script'
+		)
+		expect(() => (browser.resolveConfigEnvVarsFromSources as () => unknown)()).toThrow(
+			'resolveConfigEnvVarsFromSources is not available in browser environments; call it from a Node script'
 		)
 	})
 

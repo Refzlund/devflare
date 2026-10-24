@@ -55,10 +55,11 @@ export function compileConfig(config: ResolvedConfig, environment?: string): Wra
  *
  * → GOTCHA: it is not the whole of what a deploy ships, so do not grade its output as if it were.
  *   An `env.X` var descriptor stays the descriptor object here; a deploy resolves it from
- *   `process.env` and the dotenv files first, `.default()` included. Preview-scoped names read
- *   `DEVFLARE_PREVIEW_*` from `process.env`, which `deploy --prod` clears before loading and this does
- *   not. And a deploy also takes `main`/`assets` from the build artefact, resolves resource ids, and
- *   drops crons and queue consumers for a preview scope.
+ *   `process.env` and the dotenv files first, `.default()` included. To grade resolved values, run
+ *   `resolveConfigEnvVarsFromSources` first and compile its `config` with `alreadyResolved: true`.
+ *   Preview-scoped names read `DEVFLARE_PREVIEW_*` from `process.env`, which `deploy --prod` clears
+ *   before loading and this does not. And a deploy also takes `main`/`assets` from the build
+ *   artefact, resolves resource ids, and drops crons and queue consumers for a preview scope.
  * @param config - a config as `loadConfig` returns it
  * @param environment - the environment whose `env.<name>` overrides are merged in — `'production'`
  *   for `devflare deploy --prod`; omit for the base config alone

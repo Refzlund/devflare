@@ -42,6 +42,11 @@ export {
 	resolveConfigEnvVars
 } from './env-vars'
 export {
+	type ConfigEnvVarsResolution,
+	type ResolveConfigEnvVarsFromSourcesOptions,
+	resolveConfigEnvVarsFromSources
+} from './env-vars-for-environment'
+export {
 	ConfigNotFoundError,
 	ConfigResourceResolutionError,
 	ConfigValidationError,

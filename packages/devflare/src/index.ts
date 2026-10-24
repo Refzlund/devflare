@@ -47,6 +47,20 @@ export {
 	parseDevflareEnvFile
 } from './config'
 
+// What a build resolves `env.X` var descriptors to, from values the caller chooses
+//
+// The same script grading a deploy needs the descriptors resolved as `devflare build` resolves them,
+// `.default()` included, without reading the dotenv layer and without failing on a required variable
+// nobody provisioned. The function reports that variable instead; the throwing resolvers stay internal.
+
+export {
+	type ConfigEnvVarsResolution,
+	type EnvResolutionMode,
+	type MissingEnvVar,
+	type ResolveConfigEnvVarsFromSourcesOptions,
+	resolveConfigEnvVarsFromSources
+} from './config'
+
 // The local-vars overlay switch — the variable that keeps `.dev.vars` (or wrangler's `.env` fallback)
 // from being laid over a config's `vars` in dev
 //
